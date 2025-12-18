@@ -1,14 +1,30 @@
 {
   "name": "prediction-dao-research",
   "version": "1.0.0",
-  "description": "Research in to dao empowered by prediction markets",
+  "description": "Futarchy Prediction DAO with privacy-preserving mechanisms",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:coverage": "hardhat coverage",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "node": "hardhat node",
+    "clean": "hardhat clean",
+    "frontend": "cd frontend && npm run dev"
   },
-  "keywords": [],
+  "keywords": [
+    "futarchy",
+    "prediction-markets",
+    "dao",
+    "governance",
+    "privacy",
+    "zero-knowledge",
+    "maci",
+    "nightmarket",
+    "gnosis"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
     "@nomicfoundation/hardhat-ethers": "^3.1.3",
