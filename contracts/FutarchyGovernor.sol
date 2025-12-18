@@ -79,7 +79,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         address _marketFactory,
         address _privacyCoordinator,
         address _oracleResolver,
-        address _ragequitModule,
+        address payable _ragequitModule,
         address _treasuryVault
     ) Ownable(msg.sender) {
         require(_welfareRegistry != address(0), "Invalid welfare registry");

@@ -6,9 +6,10 @@ describe("ProposalRegistry", function () {
   let owner;
   let proposer;
   let recipient;
-  const BOND_AMOUNT = ethers.parseEther("50");
+  let BOND_AMOUNT;
 
   beforeEach(async function () {
+    BOND_AMOUNT = ethers.parseEther("50");
     [owner, proposer, recipient] = await ethers.getSigners();
     
     const ProposalRegistry = await ethers.getContractFactory("ProposalRegistry");
