@@ -211,7 +211,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             uint256 fundingAmount,
             address recipient,
             ,
-            
+            ProposalRegistry.ProposalStatus status
         ) = proposalRegistry.getProposal(govProposal.proposalId);
 
         // Check daily spending limit
