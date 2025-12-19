@@ -177,7 +177,7 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
             </div>
 
             <div className="privacy-notice">
-              Your position will be encrypted using zero-knowledge encryption
+              🔐 Your position will be encrypted using Nightmarket-style zero-knowledge encryption
             </div>
 
             <button type="submit" className="trade-submit-button">
