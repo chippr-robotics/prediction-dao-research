@@ -6,13 +6,13 @@ function LandingPage({ onConnect }) {
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
-          <h1 className="hero-title">Clear Path</h1>
+          <h1 className="hero-title">ClearPath</h1>
           <p className="hero-subtitle">
             Institutional-Grade Governance Through Prediction Markets
           </p>
           <p className="hero-description">
             Harness collective intelligence for informed decision-making in private equity governance. 
-            Clear Path combines democratic voting with prediction markets to deliver transparent, 
+            ClearPath combines democratic voting with prediction markets to deliver transparent, 
             data-driven outcomes for institutional investors.
           </p>
           <button onClick={onConnect} className="cta-button">
@@ -202,7 +202,7 @@ function LandingPage({ onConnect }) {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>&copy; 2024 Clear Path. Apache License 2.0</p>
+            <p>&copy; 2026 ChipprRobotics LLC. Apache License 2.0</p>
           </div>
         </div>
       </footer>
