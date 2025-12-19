@@ -10,9 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dynamic-labs/ethereum": "^4.51.0",
+    "@dynamic-labs/sdk-react-core": "^4.51.0",
     "ethers": "^6.16.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "viem": "^2.43.2",
+    "wagmi": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
