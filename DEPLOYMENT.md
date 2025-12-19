@@ -1,4 +1,4 @@
-# Frontend Deployment to Google Cloud Run
+# Frontend Deployment to Google Cloud Run 
 
 This document describes how to deploy the React frontend application to Google Cloud Run using GitHub Actions.
 
