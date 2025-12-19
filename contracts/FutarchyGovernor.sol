@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./WelfareMetricRegistry.sol";
 import "./ProposalRegistry.sol";
 import "./ConditionalMarketFactory.sol";
@@ -14,8 +16,10 @@ import "./RagequitModule.sol";
  * @title FutarchyGovernor
  * @notice Main governance coordinator integrating all futarchy components
  * @dev Coordinates prediction markets, privacy mechanisms, and proposal execution
+ * Supports both native token and ERC20 token funding
  */
 contract FutarchyGovernor is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     WelfareMetricRegistry public welfareRegistry;
     ProposalRegistry public proposalRegistry;
     ConditionalMarketFactory public marketFactory;
@@ -211,8 +215,15 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             uint256 fundingAmount,
             address recipient,
             ,
-            ProposalRegistry.ProposalStatus status
+            ProposalRegistry.ProposalStatus status,
+            address fundingToken,
+            uint256 startDate,
+            uint256 executionDeadline
         ) = proposalRegistry.getProposal(govProposal.proposalId);
+
+        // Check execution constraints
+        require(block.timestamp >= startDate, "Execution start date not reached");
+        require(block.timestamp <= executionDeadline, "Execution deadline passed");
 
         // Check daily spending limit
         uint256 today = block.timestamp / 1 days;
@@ -222,9 +233,15 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         govProposal.phase = ProposalPhase.Completed;
         dailySpending[today] += fundingAmount;
 
-        // Execute fund transfer
-        (bool success, ) = payable(recipient).call{value: fundingAmount}("");
-        require(success, "Transfer failed");
+        // Execute fund transfer based on token type
+        if (fundingToken == address(0)) {
+            // Native token (ETH/ETC)
+            (bool success, ) = payable(recipient).call{value: fundingAmount}("");
+            require(success, "Transfer failed");
+        } else {
+            // ERC20 token
+            IERC20(fundingToken).safeTransferFrom(treasuryVault, recipient, fundingAmount);
+        }
 
         // Mark ragequit window as closed
         ragequitModule.markProposalExecuted(govProposal.proposalId);

@@ -3,13 +3,18 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title ProposalRegistry
  * @notice Permissionless submission interface for funding requests
  * @dev Manages proposals with standardized metadata and collateral bonding
+ * Supports both native token (ETH/ETC) and ERC20 token funding
  */
 contract ProposalRegistry is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     struct Milestone {
         string description;
         uint256 percentage; // Basis points (10000 = 100%)
@@ -28,6 +33,9 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
         uint256 bondAmount;
         uint256 submittedAt;
         uint256 reviewEndsAt;
+        uint256 executionDeadline;  // Deadline for execution after approval
+        uint256 startDate;           // Earliest date proposal can be executed
+        address fundingToken;        // Address(0) for native token, otherwise ERC20 address
         ProposalStatus status;
         Milestone[] milestones;
     }
@@ -52,7 +60,9 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
         uint256 indexed proposalId,
         address indexed proposer,
         string title,
-        uint256 fundingAmount
+        uint256 fundingAmount,
+        address fundingToken,
+        uint256 executionDeadline
     );
     event ProposalCancelled(uint256 indexed proposalId);
     event ProposalActivated(uint256 indexed proposalId);
@@ -62,24 +72,36 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) {}
 
     /**
-     * @notice Submit a new funding proposal
+     * @notice Submit a new funding proposal with constraints
      * @param title Proposal title
      * @param description Detailed description
      * @param fundingAmount Amount requested from treasury
      * @param recipient Address to receive funds
      * @param welfareMetricId Welfare metric for evaluation
+     * @param fundingToken Token address (address(0) for native token)
+     * @param startDate Earliest date proposal can be executed (0 for immediate)
+     * @param executionDeadline Latest date proposal can be executed (must be set)
      */
     function submitProposal(
         string calldata title,
         string calldata description,
         uint256 fundingAmount,
         address payable recipient,
-        uint256 welfareMetricId
+        uint256 welfareMetricId,
+        address fundingToken,
+        uint256 startDate,
+        uint256 executionDeadline
     ) external payable nonReentrant returns (uint256) {
         require(msg.value == bondAmount, "Incorrect bond amount");
         require(fundingAmount > 0 && fundingAmount <= MAX_PROPOSAL_AMOUNT, "Invalid funding amount");
         require(recipient != address(0), "Invalid recipient");
         require(bytes(title).length > 0 && bytes(title).length <= 100, "Invalid title length");
+        require(executionDeadline > block.timestamp, "Deadline must be in future");
+        require(executionDeadline > startDate, "Deadline must be after start date");
+        
+        // If startDate is 0, set it to current time
+        uint256 effectiveStartDate = startDate == 0 ? block.timestamp : startDate;
+        require(effectiveStartDate >= block.timestamp, "Start date cannot be in past");
 
         uint256 proposalId = proposalCount++;
 
@@ -93,9 +115,12 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
         newProposal.bondAmount = msg.value;
         newProposal.submittedAt = block.timestamp;
         newProposal.reviewEndsAt = block.timestamp + REVIEW_PERIOD;
+        newProposal.startDate = effectiveStartDate;
+        newProposal.executionDeadline = executionDeadline;
+        newProposal.fundingToken = fundingToken;
         newProposal.status = ProposalStatus.Reviewing;
 
-        emit ProposalSubmitted(proposalId, msg.sender, title, fundingAmount);
+        emit ProposalSubmitted(proposalId, msg.sender, title, fundingAmount, fundingToken, executionDeadline);
         return proposalId;
     }
 
@@ -210,7 +235,10 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
         uint256 fundingAmount,
         address recipient,
         uint256 welfareMetricId,
-        ProposalStatus status
+        ProposalStatus status,
+        address fundingToken,
+        uint256 startDate,
+        uint256 executionDeadline
     ) {
         require(proposalId < proposalCount, "Invalid proposal ID");
         Proposal storage proposal = proposals[proposalId];
@@ -221,7 +249,10 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
             proposal.fundingAmount,
             proposal.recipient,
             proposal.welfareMetricId,
-            proposal.status
+            proposal.status,
+            proposal.fundingToken,
+            proposal.startDate,
+            proposal.executionDeadline
         );
     }
 
