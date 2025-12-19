@@ -245,6 +245,27 @@ npx hardhat coverage
 npx hardhat run scripts/deploy.js --network mordor
 ```
 
+### Frontend Deployment to Google Cloud Run
+
+The React frontend can be automatically deployed to Google Cloud Run using GitHub Actions. See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete setup instructions including:
+- Google Cloud project configuration
+- GitHub secrets setup
+- Workload Identity Federation configuration
+- Docker containerization details
+
+**Quick Start:**
+1. Set up Google Cloud project and enable required APIs
+2. Configure GitHub repository secrets
+3. Push changes to `main` or `develop` branch
+4. GitHub Actions will automatically build and deploy the frontend
+
+For local Docker testing:
+```bash
+cd frontend
+docker build -t prediction-dao-frontend .
+docker run -p 8080:8080 prediction-dao-frontend
+```
+
 ### Mainnet Deployment
 
 Before mainnet deployment:
