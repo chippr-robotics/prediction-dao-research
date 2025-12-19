@@ -1,6 +1,15 @@
-# Prediction DAO Research
+# ClearPath — Prediction DAO Research
 
-Research and implementation of a DAO empowered by prediction markets, integrating privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
+Clear signals for collective decisions — ClearPath brings clarity to governance through futarchy-based decision-making, integrating privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
+
+## 📚 Documentation
+
+**[View the full ClearPath documentation →](https://chippr-robotics.github.io/prediction-dao-research/)**
+
+The documentation site provides comprehensive guides for:
+- **Users**: Getting started, trading on markets, submitting proposals
+- **Developers**: Setup instructions, architecture, API reference
+- **System Overview**: How it works, privacy mechanisms, security model
 
 ## Overview
 
