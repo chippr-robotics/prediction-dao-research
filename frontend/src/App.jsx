@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import './App.css'
 import LandingPage from './components/LandingPage'
@@ -15,27 +15,26 @@ function App() {
   const [connected, setConnected] = useState(false)
   const [showLanding, setShowLanding] = useState(true)
 
-  useEffect(() => {
-    checkConnection()
+  const handleAccountsChanged = useCallback(async (accounts) => {
+    if (accounts.length === 0) {
+      // User disconnected
+      setProvider(null)
+      setSigner(null)
+      setAccount(null)
+      setConnected(false)
+    } else {
+      // Account changed
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+      const address = await signer.getAddress()
+      
+      setProvider(provider)
+      setSigner(signer)
+      setAccount(address)
+    }
   }, [])
 
-  const checkConnection = async () => {
-    if (window.ethereum) {
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const accounts = await provider.listAccounts()
-        
-        if (accounts.length > 0) {
-          setShowLanding(false)
-          await connectWallet()
-        }
-      } catch (error) {
-        console.error('Error checking connection:', error)
-      }
-    }
-  }
-
-  const connectWallet = async () => {
+  const connectWallet = useCallback(async () => {
     try {
       if (!window.ethereum) {
         alert('Please install MetaMask to use this application')
@@ -63,26 +62,27 @@ function App() {
       console.error('Error connecting wallet:', error)
       alert('Failed to connect wallet')
     }
-  }
+  }, [handleAccountsChanged])
 
-  const handleAccountsChanged = async (accounts) => {
-    if (accounts.length === 0) {
-      // User disconnected
-      setProvider(null)
-      setSigner(null)
-      setAccount(null)
-      setConnected(false)
-    } else {
-      // Account changed
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
-      
-      setProvider(provider)
-      setSigner(signer)
-      setAccount(address)
+  const checkConnection = useCallback(async () => {
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum)
+        const accounts = await provider.listAccounts()
+        
+        if (accounts.length > 0) {
+          setShowLanding(false)
+          await connectWallet()
+        }
+      } catch (error) {
+        console.error('Error checking connection:', error)
+      }
     }
-  }
+  }, [connectWallet])
+
+  useEffect(() => {
+    checkConnection()
+  }, [checkConnection])
 
   const disconnectWallet = () => {
     setProvider(null)

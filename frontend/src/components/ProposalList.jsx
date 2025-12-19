@@ -1,14 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
-function ProposalList({ provider, signer }) {
+// eslint-disable-next-line no-unused-vars
+function ProposalList({ provider }) {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadProposals()
-  }, [provider])
-
-  const loadProposals = async () => {
+  const loadProposals = useCallback(async () => {
     try {
       // Mock data for demonstration
       // In production, this would fetch from ProposalRegistry contract
@@ -37,7 +34,11 @@ function ProposalList({ provider, signer }) {
       console.error('Error loading proposals:', error)
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadProposals()
+  }, [loadProposals])
 
   const getStatusColor = (status) => {
     const colors = {

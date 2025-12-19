@@ -1,17 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
-function MarketTrading({ provider, signer }) {
+// eslint-disable-next-line no-unused-vars
+function MarketTrading({ provider }) {
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadMarkets()
-  }, [provider])
-
-  const loadMarkets = async () => {
+  const loadMarkets = useCallback(async () => {
     try {
       // Mock data for demonstration
       // In production, this would fetch from ConditionalMarketFactory contract
@@ -44,7 +41,11 @@ function MarketTrading({ provider, signer }) {
       console.error('Error loading markets:', error)
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadMarkets()
+  }, [loadMarkets])
 
   const handleTrade = async (e) => {
     e.preventDefault()

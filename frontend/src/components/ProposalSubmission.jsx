@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
+// eslint-disable-next-line no-unused-vars
 function ProposalSubmission({ provider, signer }) {
+  // provider and signer will be used when connecting to deployed contracts
   const [formData, setFormData] = useState({
     title: '',
     description: '',
