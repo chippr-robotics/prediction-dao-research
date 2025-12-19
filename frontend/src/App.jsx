@@ -95,8 +95,8 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>ClearPath</h1>
-        <p className="subtitle">Institutional-Grade Governance Platform</p>
+        <h1>🔮 Futarchy Prediction DAO</h1>
+        <p className="subtitle">Privacy-Preserving Decentralized Governance</p>
         
         <div className="wallet-section">
           {!connected ? (
@@ -120,12 +120,12 @@ function App() {
       <main className="main-content">
         {!connected ? (
           <div className="not-connected">
-            <h2>Welcome to ClearPath</h2>
-            <p>An enterprise platform for prediction market-based governance integrating:</p>
+            <h2>Welcome to Futarchy DAO</h2>
+            <p>A prediction market-based governance system integrating:</p>
             <ul>
-              <li>Zero-knowledge position encryption for privacy</li>
-              <li>Anti-collusion infrastructure for secure voting</li>
-              <li>Conditional Token Framework for market mechanics</li>
+              <li>🔐 Nightmarket zero-knowledge position encryption</li>
+              <li>🛡️ MACI anti-collusion infrastructure</li>
+              <li>📊 Gnosis Conditional Token Framework</li>
             </ul>
             <p>Please connect your wallet to continue</p>
           </div>
@@ -155,7 +155,7 @@ function App() {
       </main>
 
       <footer className="App-footer">
-        <p>ClearPath - Enterprise Governance Platform | Privacy-Preserving • Secure • Transparent</p>
+        <p>Integrating Nightmarket Privacy + MACI Anti-Collusion + Gnosis CTF Standards</p>
       </footer>
     </div>
   )
