@@ -11,6 +11,9 @@ on:
       - develop
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   smart-contract-tests:
     name: Smart Contract Tests
