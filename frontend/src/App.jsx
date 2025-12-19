@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import './App.css'
+import LandingPage from './components/LandingPage'
 import ProposalSubmission from './components/ProposalSubmission'
 import ProposalList from './components/ProposalList'
 import WelfareMetrics from './components/WelfareMetrics'
@@ -12,6 +13,7 @@ function App() {
   const [account, setAccount] = useState(null)
   const [chainId, setChainId] = useState(null)
   const [connected, setConnected] = useState(false)
+  const [showLanding, setShowLanding] = useState(true)
 
   useEffect(() => {
     checkConnection()
@@ -24,6 +26,7 @@ function App() {
         const accounts = await provider.listAccounts()
         
         if (accounts.length > 0) {
+          setShowLanding(false)
           await connectWallet()
         }
       } catch (error) {
@@ -51,6 +54,7 @@ function App() {
       setAccount(address)
       setChainId(network.chainId)
       setConnected(true)
+      setShowLanding(false)
 
       // Listen for account changes
       window.ethereum.on('accountsChanged', handleAccountsChanged)
@@ -85,6 +89,7 @@ function App() {
     setSigner(null)
     setAccount(null)
     setConnected(false)
+    setShowLanding(true)
   }
 
   const shortenAddress = (address) => {
@@ -93,71 +98,77 @@ function App() {
   }
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>🔮 Futarchy Prediction DAO</h1>
-        <p className="subtitle">Privacy-Preserving Decentralized Governance</p>
-        
-        <div className="wallet-section">
-          {!connected ? (
-            <button onClick={connectWallet} className="connect-button">
-              Connect Wallet
-            </button>
-          ) : (
-            <div className="connected-wallet">
-              <div className="wallet-info">
-                <span className="wallet-address">{shortenAddress(account)}</span>
-                <span className="chain-id">Chain: {chainId?.toString()}</span>
+    <>
+      {showLanding ? (
+        <LandingPage onConnect={connectWallet} />
+      ) : (
+        <div className="App">
+          <header className="App-header">
+            <h1>Clear Path</h1>
+            <p className="subtitle">Institutional Governance Platform</p>
+            
+            <div className="wallet-section">
+              {!connected ? (
+                <button onClick={connectWallet} className="connect-button">
+                  Connect Wallet
+                </button>
+              ) : (
+                <div className="connected-wallet">
+                  <div className="wallet-info">
+                    <span className="wallet-address">{shortenAddress(account)}</span>
+                    <span className="chain-id">Chain: {chainId?.toString()}</span>
+                  </div>
+                  <button onClick={disconnectWallet} className="disconnect-button">
+                    Disconnect
+                  </button>
+                </div>
+              )}
+            </div>
+          </header>
+
+          <main className="main-content">
+            {!connected ? (
+              <div className="not-connected">
+                <h2>Welcome to Clear Path</h2>
+                <p>A prediction market-based governance system integrating:</p>
+                <ul>
+                  <li>🔐 Nightmarket zero-knowledge position encryption</li>
+                  <li>🛡️ MACI anti-collusion infrastructure</li>
+                  <li>📊 Gnosis Conditional Token Framework</li>
+                </ul>
+                <p>Please connect your wallet to continue</p>
               </div>
-              <button onClick={disconnectWallet} className="disconnect-button">
-                Disconnect
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="dashboard">
+                <div className="section">
+                  <h2>Welfare Metrics</h2>
+                  <WelfareMetrics provider={provider} signer={signer} />
+                </div>
+
+                <div className="section">
+                  <h2>Submit Proposal</h2>
+                  <ProposalSubmission provider={provider} signer={signer} />
+                </div>
+
+                <div className="section">
+                  <h2>Active Proposals</h2>
+                  <ProposalList provider={provider} signer={signer} />
+                </div>
+
+                <div className="section">
+                  <h2>Prediction Markets</h2>
+                  <MarketTrading provider={provider} signer={signer} />
+                </div>
+              </div>
+            )}
+          </main>
+
+          <footer className="App-footer">
+            <p>Clear Path: Institutional-Grade Governance Through Prediction Markets</p>
+          </footer>
         </div>
-      </header>
-
-      <main className="main-content">
-        {!connected ? (
-          <div className="not-connected">
-            <h2>Welcome to Futarchy DAO</h2>
-            <p>A prediction market-based governance system integrating:</p>
-            <ul>
-              <li>🔐 Nightmarket zero-knowledge position encryption</li>
-              <li>🛡️ MACI anti-collusion infrastructure</li>
-              <li>📊 Gnosis Conditional Token Framework</li>
-            </ul>
-            <p>Please connect your wallet to continue</p>
-          </div>
-        ) : (
-          <div className="dashboard">
-            <div className="section">
-              <h2>Welfare Metrics</h2>
-              <WelfareMetrics provider={provider} signer={signer} />
-            </div>
-
-            <div className="section">
-              <h2>Submit Proposal</h2>
-              <ProposalSubmission provider={provider} signer={signer} />
-            </div>
-
-            <div className="section">
-              <h2>Active Proposals</h2>
-              <ProposalList provider={provider} signer={signer} />
-            </div>
-
-            <div className="section">
-              <h2>Prediction Markets</h2>
-              <MarketTrading provider={provider} signer={signer} />
-            </div>
-          </div>
-        )}
-      </main>
-
-      <footer className="App-footer">
-        <p>Integrating Nightmarket Privacy + MACI Anti-Collusion + Gnosis CTF Standards</p>
-      </footer>
-    </div>
+      )}
+    </>
   )
 }
 
