@@ -93,6 +93,7 @@ nav:
     - Setup: developer-guide/setup.md
     - Architecture: developer-guide/architecture.md
     - Smart Contracts: developer-guide/smart-contracts.md
+    - Singleton Deployment Patterns: developer-guide/singleton-deployment-patterns.md
     - Frontend Development: developer-guide/frontend.md
     - Testing: developer-guide/testing.md
     - Contributing: developer-guide/contributing.md
