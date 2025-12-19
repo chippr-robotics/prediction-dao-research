@@ -26,7 +26,7 @@ describe("WelfareMetricRegistry", function () {
 
   describe("Metric Proposal", function () {
     it("Should allow owner to propose a metric", async function () {
-      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000);
+      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000, 0); // 0 = Governance
       
       expect(await welfareRegistry.metricCount()).to.equal(1);
       
@@ -38,32 +38,32 @@ describe("WelfareMetricRegistry", function () {
 
     it("Should reject metric with zero weight", async function () {
       await expect(
-        welfareRegistry.proposeMetric("Invalid", "Invalid metric", 0)
+        welfareRegistry.proposeMetric("Invalid", "Invalid metric", 0, 0)
       ).to.be.revertedWith("Invalid weight");
     });
 
     it("Should reject metric with weight > 10000", async function () {
       await expect(
-        welfareRegistry.proposeMetric("Invalid", "Invalid metric", 10001)
+        welfareRegistry.proposeMetric("Invalid", "Invalid metric", 10001, 0)
       ).to.be.revertedWith("Invalid weight");
     });
 
     it("Should reject metric with empty name", async function () {
       await expect(
-        welfareRegistry.proposeMetric("", "Invalid metric", 1000)
+        welfareRegistry.proposeMetric("", "Invalid metric", 1000, 0)
       ).to.be.revertedWith("Empty name");
     });
 
     it("Should only allow owner to propose metrics", async function () {
       await expect(
-        welfareRegistry.connect(addr1).proposeMetric("Test", "Test metric", 1000)
+        welfareRegistry.connect(addr1).proposeMetric("Test", "Test metric", 1000, 0)
       ).to.be.revertedWithCustomError(welfareRegistry, "OwnableUnauthorizedAccount");
     });
   });
 
   describe("Metric Activation", function () {
     beforeEach(async function () {
-      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000);
+      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000, 0);
     });
 
     it("Should allow owner to activate a metric", async function () {
@@ -93,7 +93,7 @@ describe("WelfareMetricRegistry", function () {
 
   describe("Metric Deactivation", function () {
     beforeEach(async function () {
-      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000);
+      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000, 0);
       await welfareRegistry.activateMetric(0);
     });
 
@@ -117,7 +117,7 @@ describe("WelfareMetricRegistry", function () {
 
   describe("Metric Weight Update", function () {
     beforeEach(async function () {
-      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000);
+      await welfareRegistry.proposeMetric("Treasury Value", "TWAP of treasury holdings", 5000, 0);
     });
 
     it("Should allow owner to update metric weight", async function () {
