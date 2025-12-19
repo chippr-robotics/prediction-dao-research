@@ -1,5 +1,5 @@
-site_name: Prediction DAO Research
-site_description: Research and implementation of a DAO empowered by prediction markets with privacy-preserving mechanisms
+site_name: ClearPath
+site_description: Futarchy-based governance with privacy-preserving mechanisms - clarity in collective decision-making
 site_author: Chippr Robotics
 site_url: https://chippr-robotics.github.io/prediction-dao-research/
 
@@ -13,16 +13,16 @@ theme:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -111,3 +111,6 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/chippr-robotics/prediction-dao-research
+
+extra_css:
+  - stylesheets/extra.css

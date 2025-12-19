@@ -1,15 +1,17 @@
-# Welcome to Prediction DAO Research
+# Welcome to ClearPath
 
-Research and implementation of a DAO empowered by prediction markets, integrating privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
+**Clear signals for collective decisions** — ClearPath brings clarity to governance through futarchy-based decision-making, integrating privacy-preserving mechanisms for transparent yet secure collective intelligence.
 
 ## Overview
 
-This project implements a futarchy-based governance system where:
+ClearPath implements a futarchy-based governance system where:
 
 - **Democratic voting** establishes welfare metrics (protocol success measures)
 - **Prediction markets** aggregate distributed knowledge about which proposals maximize those metrics
 - **Privacy mechanisms** prevent collusion and vote buying
 - **Conditional tokens** enable efficient market-based decision making
+
+The system combines Nightmarket's zero-knowledge position encryption, MACI's anti-collusion infrastructure, and Gnosis Conditional Token Framework standards to create a governance platform that balances transparency with privacy.
 
 ## Quick Navigation
 
@@ -72,7 +74,7 @@ This project implements a futarchy-based governance system where:
 
 ## System Components
 
-The Prediction DAO consists of seven main smart contracts:
+ClearPath consists of seven main smart contracts that work together:
 
 1. **FutarchyGovernor** - Main governance coordinator
 2. **WelfareMetricRegistry** - Welfare metrics management
@@ -116,8 +118,8 @@ Choose your path:
 
 ## Security Notice
 
-!!! warning "Research Software"
-    This is research and demonstration code. Before deploying to mainnet:
+!!! warning "Development Status"
+    ClearPath is in active development. Before mainnet deployment:
     
     1. Complete professional security audits (minimum 2)
     2. Run bug bounty program
