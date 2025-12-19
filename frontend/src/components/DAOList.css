@@ -1,0 +1,222 @@
+.dao-list-container {
+  width: 100%;
+}
+
+.dao-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 24px;
+}
+
+.dao-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dao-card:hover {
+  border-color: #61dafb;
+  background: rgba(97, 218, 251, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(97, 218, 251, 0.1);
+}
+
+.dao-card.selected {
+  border-color: #61dafb;
+  background: rgba(97, 218, 251, 0.08);
+}
+
+.dao-card.inactive {
+  opacity: 0.6;
+}
+
+.dao-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.dao-name {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dao-name h3 {
+  margin: 0;
+  color: #61dafb;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.inactive-badge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dao-id {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: #a0aec0;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.dao-description {
+  color: #a0aec0;
+  margin: 0 0 20px 0;
+  line-height: 1.6;
+}
+
+.dao-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.metadata-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metadata-item .label {
+  color: #718096;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.metadata-item .value {
+  color: #e2e8f0;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.dao-details {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dao-details h4 {
+  margin: 0 0 16px 0;
+  color: #61dafb;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.contract-addresses {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.address-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.contract-name {
+  color: #718096;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.contract-address {
+  color: #e2e8f0;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.dao-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.action-btn.secondary {
+  background: rgba(97, 218, 251, 0.1);
+  color: #61dafb;
+  border: 1px solid #61dafb;
+}
+
+.action-btn.secondary:hover {
+  background: rgba(97, 218, 251, 0.2);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: #a0aec0;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.empty-state h3 {
+  color: #61dafb;
+  margin: 0 0 16px 0;
+  font-size: 24px;
+}
+
+.empty-state p {
+  margin: 8px 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .dao-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dao-actions {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
+}

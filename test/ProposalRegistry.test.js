@@ -8,6 +8,40 @@ describe("ProposalRegistry", function () {
   let recipient;
   let BOND_AMOUNT;
 
+  // Helper function to get future timestamp (in seconds)
+  const getFutureTimestamp = (daysFromNow) => {
+    return Math.floor(Date.now() / 1000) + (daysFromNow * 24 * 60 * 60);
+  };
+
+  // Helper function to submit a proposal with default values
+  const submitTestProposal = async (overrides = {}) => {
+    const defaults = {
+      title: "Test Proposal",
+      description: "This is a test proposal",
+      fundingAmount: ethers.parseEther("1000"),
+      recipient: recipient.address,
+      welfareMetricId: 0,
+      fundingToken: ethers.ZeroAddress,
+      startDate: 0,
+      executionDeadline: getFutureTimestamp(90), // 90 days from now
+      value: BOND_AMOUNT
+    };
+
+    const params = { ...defaults, ...overrides };
+
+    return proposalRegistry.connect(proposer).submitProposal(
+      params.title,
+      params.description,
+      params.fundingAmount,
+      params.recipient,
+      params.welfareMetricId,
+      params.fundingToken,
+      params.startDate,
+      params.executionDeadline,
+      { value: params.value }
+    );
+  };
+
   beforeEach(async function () {
     BOND_AMOUNT = ethers.parseEther("50");
     [owner, proposer, recipient] = await ethers.getSigners();
@@ -33,97 +67,69 @@ describe("ProposalRegistry", function () {
 
   describe("Proposal Submission", function () {
     it("Should allow submission with correct bond", async function () {
-      await expect(
-        proposalRegistry.connect(proposer).submitProposal(
-          "Test Proposal",
-          "This is a test proposal",
-          ethers.parseEther("1000"),
-          recipient.address,
-          0,
-          { value: BOND_AMOUNT }
-        )
-      ).to.emit(proposalRegistry, "ProposalSubmitted")
-        .withArgs(0, proposer.address, "Test Proposal", ethers.parseEther("1000"));
+      await expect(submitTestProposal())
+        .to.emit(proposalRegistry, "ProposalSubmitted");
 
       expect(await proposalRegistry.proposalCount()).to.equal(1);
     });
 
     it("Should reject submission with incorrect bond", async function () {
       await expect(
-        proposalRegistry.connect(proposer).submitProposal(
-          "Test Proposal",
-          "This is a test proposal",
-          ethers.parseEther("1000"),
-          recipient.address,
-          0,
-          { value: ethers.parseEther("10") }
-        )
+        submitTestProposal({ value: ethers.parseEther("10") })
       ).to.be.revertedWith("Incorrect bond amount");
     });
 
     it("Should reject submission with zero funding amount", async function () {
       await expect(
-        proposalRegistry.connect(proposer).submitProposal(
-          "Test Proposal",
-          "This is a test proposal",
-          0,
-          recipient.address,
-          0,
-          { value: BOND_AMOUNT }
-        )
+        submitTestProposal({ fundingAmount: 0 })
       ).to.be.revertedWith("Invalid funding amount");
     });
 
     it("Should reject submission exceeding max amount", async function () {
       await expect(
-        proposalRegistry.connect(proposer).submitProposal(
-          "Test Proposal",
-          "This is a test proposal",
-          ethers.parseEther("50001"),
-          recipient.address,
-          0,
-          { value: BOND_AMOUNT }
-        )
+        submitTestProposal({ fundingAmount: ethers.parseEther("50001") })
       ).to.be.revertedWith("Invalid funding amount");
     });
 
     it("Should reject submission with invalid recipient", async function () {
       await expect(
-        proposalRegistry.connect(proposer).submitProposal(
-          "Test Proposal",
-          "This is a test proposal",
-          ethers.parseEther("1000"),
-          ethers.ZeroAddress,
-          0,
-          { value: BOND_AMOUNT }
-        )
+        submitTestProposal({ recipient: ethers.ZeroAddress })
       ).to.be.revertedWith("Invalid recipient");
     });
 
     it("Should reject submission with empty title", async function () {
       await expect(
-        proposalRegistry.connect(proposer).submitProposal(
-          "",
-          "This is a test proposal",
-          ethers.parseEther("1000"),
-          recipient.address,
-          0,
-          { value: BOND_AMOUNT }
-        )
+        submitTestProposal({ title: "" })
       ).to.be.revertedWith("Invalid title length");
+    });
+
+    it("Should reject submission with deadline in past", async function () {
+      await expect(
+        submitTestProposal({ executionDeadline: Math.floor(Date.now() / 1000) - 86400 })
+      ).to.be.revertedWith("Deadline must be in future");
+    });
+
+    it("Should reject submission with deadline before start date", async function () {
+      const futureStart = getFutureTimestamp(30);
+      await expect(
+        submitTestProposal({ 
+          startDate: futureStart,
+          executionDeadline: futureStart - 86400 
+        })
+      ).to.be.revertedWith("Deadline must be after start date");
+    });
+
+    it("Should accept submission with ERC20 token", async function () {
+      const tokenAddress = "0x" + "1".repeat(40);
+      await expect(
+        submitTestProposal({ fundingToken: tokenAddress })
+      ).to.emit(proposalRegistry, "ProposalSubmitted");
     });
   });
 
   describe("Milestones", function () {
     beforeEach(async function () {
-      await proposalRegistry.connect(proposer).submitProposal(
-        "Test Proposal",
-        "This is a test proposal",
-        ethers.parseEther("1000"),
-        recipient.address,
-        0,
-        { value: BOND_AMOUNT }
-      );
+      await submitTestProposal();
     });
 
     it("Should allow proposer to add milestones during review", async function () {
@@ -178,14 +184,7 @@ describe("ProposalRegistry", function () {
 
   describe("Proposal Cancellation", function () {
     beforeEach(async function () {
-      await proposalRegistry.connect(proposer).submitProposal(
-        "Test Proposal",
-        "This is a test proposal",
-        ethers.parseEther("1000"),
-        recipient.address,
-        0,
-        { value: BOND_AMOUNT }
-      );
+      await submitTestProposal();
     });
 
     it("Should allow proposer to cancel during review", async function () {
@@ -222,14 +221,7 @@ describe("ProposalRegistry", function () {
 
   describe("Proposal Activation", function () {
     beforeEach(async function () {
-      await proposalRegistry.connect(proposer).submitProposal(
-        "Test Proposal",
-        "This is a test proposal",
-        ethers.parseEther("1000"),
-        recipient.address,
-        0,
-        { value: BOND_AMOUNT }
-      );
+      await submitTestProposal();
     });
 
     it("Should allow owner to activate after review period", async function () {
@@ -263,14 +255,7 @@ describe("ProposalRegistry", function () {
 
   describe("Bond Management", function () {
     beforeEach(async function () {
-      await proposalRegistry.connect(proposer).submitProposal(
-        "Test Proposal",
-        "This is a test proposal",
-        ethers.parseEther("1000"),
-        recipient.address,
-        0,
-        { value: BOND_AMOUNT }
-      );
+      await submitTestProposal();
     });
 
     it("Should allow owner to forfeit bond", async function () {

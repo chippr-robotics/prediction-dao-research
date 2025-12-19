@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ethers } from 'ethers'
 
 function ProposalSubmission({ provider, signer }) {
   const [formData, setFormData] = useState({
@@ -6,7 +7,10 @@ function ProposalSubmission({ provider, signer }) {
     description: '',
     fundingAmount: '',
     recipient: '',
-    welfareMetricId: '0'
+    welfareMetricId: '0',
+    fundingToken: '',
+    startDate: '',
+    executionDeadline: ''
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -25,7 +29,10 @@ function ProposalSubmission({ provider, signer }) {
         description: '',
         fundingAmount: '',
         recipient: '',
-        welfareMetricId: '0'
+        welfareMetricId: '0',
+        fundingToken: '',
+        startDate: '',
+        executionDeadline: ''
       })
     } catch (error) {
       console.error('Error submitting proposal:', error)
@@ -42,11 +49,15 @@ function ProposalSubmission({ provider, signer }) {
     })
   }
 
+  const formatDateForInput = (date) => {
+    return date ? new Date(date).toISOString().slice(0, 16) : ''
+  }
+
   return (
     <div className="proposal-submission">
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="title">Proposal Title</label>
+          <label htmlFor="title">Proposal Title *</label>
           <input
             type="text"
             id="title"
@@ -60,7 +71,7 @@ function ProposalSubmission({ provider, signer }) {
         </div>
 
         <div className="form-group">
-          <label htmlFor="description">Description</label>
+          <label htmlFor="description">Description *</label>
           <textarea
             id="description"
             name="description"
@@ -73,24 +84,38 @@ function ProposalSubmission({ provider, signer }) {
         </div>
 
         <div className="form-group">
-          <label htmlFor="fundingAmount">Funding Amount (ETC)</label>
+          <label htmlFor="fundingToken">Funding Token</label>
+          <input
+            type="text"
+            id="fundingToken"
+            name="fundingToken"
+            value={formData.fundingToken}
+            onChange={handleChange}
+            placeholder="0x... (leave empty for native token)"
+            pattern="^$|^0x[a-fA-F0-9]{40}$"
+          />
+          <small>Enter ERC20 token address, or leave empty for native token (ETH/ETC)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="fundingAmount">Funding Amount *</label>
           <input
             type="number"
             id="fundingAmount"
             name="fundingAmount"
             value={formData.fundingAmount}
             onChange={handleChange}
-            placeholder="Amount in ETC"
+            placeholder="Amount in tokens"
             step="0.01"
             min="0"
             max="50000"
             required
           />
-          <small>Maximum: 50,000 ETC per proposal</small>
+          <small>Maximum: 50,000 tokens per proposal</small>
         </div>
 
         <div className="form-group">
-          <label htmlFor="recipient">Recipient Address</label>
+          <label htmlFor="recipient">Recipient Address *</label>
           <input
             type="text"
             id="recipient"
@@ -104,7 +129,34 @@ function ProposalSubmission({ provider, signer }) {
         </div>
 
         <div className="form-group">
-          <label htmlFor="welfareMetricId">Welfare Metric</label>
+          <label htmlFor="startDate">Start Date (Optional)</label>
+          <input
+            type="datetime-local"
+            id="startDate"
+            name="startDate"
+            value={formData.startDate}
+            onChange={handleChange}
+            min={new Date().toISOString().slice(0, 16)}
+          />
+          <small>Earliest date the proposal can be executed (leave empty for immediate)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="executionDeadline">Execution Deadline *</label>
+          <input
+            type="datetime-local"
+            id="executionDeadline"
+            name="executionDeadline"
+            value={formData.executionDeadline}
+            onChange={handleChange}
+            min={new Date().toISOString().slice(0, 16)}
+            required
+          />
+          <small className="required-field">Required: Latest date the proposal can be executed</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="welfareMetricId">Welfare Metric *</label>
           <select
             id="welfareMetricId"
             name="welfareMetricId"
@@ -120,7 +172,12 @@ function ProposalSubmission({ provider, signer }) {
         </div>
 
         <div className="bond-notice">
-          <strong>Note:</strong> Submitting a proposal requires a bond of 50 ETC
+          <strong>⚠️ Important:</strong>
+          <ul>
+            <li>Submitting a proposal requires a bond of 50 ETC</li>
+            <li>You must set an execution deadline to ensure time-bound execution</li>
+            <li>Treasury must have approved tokens if using ERC20</li>
+          </ul>
         </div>
 
         <button type="submit" disabled={submitting} className="submit-button">

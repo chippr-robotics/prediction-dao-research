@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import './App.css'
 import LandingPage from './components/LandingPage'
-import ProposalSubmission from './components/ProposalSubmission'
-import ProposalList from './components/ProposalList'
-import WelfareMetrics from './components/WelfareMetrics'
-import MarketTrading from './components/MarketTrading'
+import Dashboard from './components/Dashboard'
 
 function App() {
   const [provider, setProvider] = useState(null)
@@ -139,27 +136,7 @@ function App() {
                 <p>Please connect your wallet to continue</p>
               </div>
             ) : (
-              <div className="dashboard">
-                <div className="section">
-                  <h2>Welfare Metrics</h2>
-                  <WelfareMetrics provider={provider} signer={signer} />
-                </div>
-
-                <div className="section">
-                  <h2>Submit Proposal</h2>
-                  <ProposalSubmission provider={provider} signer={signer} />
-                </div>
-
-                <div className="section">
-                  <h2>Active Proposals</h2>
-                  <ProposalList provider={provider} signer={signer} />
-                </div>
-
-                <div className="section">
-                  <h2>Prediction Markets</h2>
-                  <MarketTrading provider={provider} signer={signer} />
-                </div>
-              </div>
+              <Dashboard provider={provider} signer={signer} account={account} />
             )}
           </main>
 
