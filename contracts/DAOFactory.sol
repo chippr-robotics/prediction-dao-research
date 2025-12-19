@@ -44,8 +44,8 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
     // User address => array of DAO IDs they're associated with
     mapping(address => uint256[]) public userDAOs;
 
-    // DAO ID => address => role
-    mapping(uint256 => mapping(address => bytes32)) public daoRoles;
+    // DAO ID => address => role => bool
+    mapping(uint256 => mapping(address => mapping(bytes32 => bool))) public daoRoles;
 
     // DAO-specific role definitions
     bytes32 public constant DAO_ADMIN_ROLE = keccak256("DAO_ADMIN_ROLE");
@@ -231,7 +231,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         require(user != address(0), "Invalid user address");
         require(
             hasRole(PLATFORM_ADMIN_ROLE, msg.sender) ||
-            daoRoles[daoId][msg.sender] == DAO_ADMIN_ROLE,
+            daoRoles[daoId][msg.sender][DAO_ADMIN_ROLE],
             "Not authorized"
         );
 
@@ -252,7 +252,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         require(daoId < daoCount, "DAO does not exist");
         require(
             hasRole(PLATFORM_ADMIN_ROLE, msg.sender) ||
-            daoRoles[daoId][msg.sender] == DAO_ADMIN_ROLE,
+            daoRoles[daoId][msg.sender][DAO_ADMIN_ROLE],
             "Not authorized"
         );
 
@@ -271,7 +271,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         address user,
         bytes32 role
     ) external view returns (bool) {
-        return daoRoles[daoId][user] == role || hasRole(PLATFORM_ADMIN_ROLE, user);
+        return daoRoles[daoId][user][role] || hasRole(PLATFORM_ADMIN_ROLE, user);
     }
 
     /**
@@ -336,7 +336,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
      * @dev Internal function to grant DAO role
      */
     function _grantDAORole(uint256 daoId, address user, bytes32 role) internal {
-        daoRoles[daoId][user] = role;
+        daoRoles[daoId][user][role] = true;
         
         // Add to user's DAO list if not already present
         bool found = false;
@@ -358,8 +358,8 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
      * @dev Internal function to revoke DAO role
      */
     function _revokeDAORole(uint256 daoId, address user, bytes32 role) internal {
-        if (daoRoles[daoId][user] == role) {
-            delete daoRoles[daoId][user];
+        if (daoRoles[daoId][user][role]) {
+            daoRoles[daoId][user][role] = false;
             emit DAORoleRevoked(daoId, user, role);
         }
     }
