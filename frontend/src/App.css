@@ -1,14 +1,33 @@
 :root {
-  --primary-color: #6366f1;
-  --secondary-color: #8b5cf6;
-  --success-color: #10b981;
-  --warning-color: #f59e0b;
-  --danger-color: #ef4444;
-  --bg-dark: #0f172a;
-  --bg-light: #1e293b;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border-color: #334155;
+  /* Kelly Green Corporate Color Palette */
+  --primary-color: #2d6a4f;
+  --primary-light: #40916c;
+  --primary-dark: #1b4332;
+  --secondary-color: #52b788;
+  --accent-color: #74c69d;
+  --success-color: #40916c;
+  --warning-color: #f77f00;
+  --danger-color: #d62828;
+  
+  /* Corporate Backgrounds - Light, Professional */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --bg-card: #ffffff;
+  
+  /* Text Colors - High Contrast for Readability */
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-muted: #6c757d;
+  
+  /* Borders and Dividers */
+  --border-color: #dee2e6;
+  --border-color-dark: #adb5bd;
+  
+  /* Shadows for Depth */
+  --shadow-sm: 0 1px 3px rgba(45, 106, 79, 0.08);
+  --shadow-md: 0 4px 6px rgba(45, 106, 79, 0.12);
+  --shadow-lg: 0 10px 15px rgba(45, 106, 79, 0.15);
 }
 
 * {
@@ -18,13 +37,13 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-dark);
+  background-color: var(--bg-secondary);
   color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 16px;
 }
 
 .App {
@@ -34,21 +53,27 @@ body {
 }
 
 .App-header {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  padding: 2rem;
+  background: var(--primary-color);
+  padding: 2rem 3rem;
   text-align: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
+  border-bottom: 3px solid var(--primary-dark);
 }
 
 .App-header h1 {
-  font-size: 2.5rem;
+  font-size: 2.25rem;
   margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
-  font-size: 1.1rem;
-  opacity: 0.9;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.95);
   margin-bottom: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
 }
 
 .wallet-section {
@@ -68,11 +93,14 @@ body {
 .connect-button {
   background-color: white;
   color: var(--primary-color);
+  border: 2px solid white;
+  font-weight: 600;
 }
 
 .connect-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .connected-wallet {
@@ -80,9 +108,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   display: inline-flex;
 }
 
@@ -93,21 +122,24 @@ body {
 
 .wallet-address {
   font-weight: 600;
+  color: #ffffff;
 }
 
 .chain-id {
-  opacity: 0.8;
+  color: rgba(255, 255, 255, 0.85);
   font-size: 0.9rem;
 }
 
 .disconnect-button {
-  background-color: rgba(239, 68, 68, 0.2);
+  background-color: rgba(214, 40, 40, 0.15);
   color: white;
   padding: 0.5rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .disconnect-button:hover {
-  background-color: rgba(239, 68, 68, 0.4);
+  background-color: rgba(214, 40, 40, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .main-content {
@@ -121,14 +153,16 @@ body {
 .not-connected {
   text-align: center;
   padding: 4rem 2rem;
-  background: var(--bg-light);
+  background: var(--bg-card);
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
 }
 
 .not-connected h2 {
   color: var(--primary-color);
   margin-bottom: 1rem;
+  font-weight: 600;
 }
 
 .not-connected ul {
@@ -138,7 +172,8 @@ body {
 
 .not-connected li {
   padding: 0.75rem;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  color: var(--text-secondary);
 }
 
 .dashboard {
@@ -148,17 +183,20 @@ body {
 }
 
 .section {
-  background: var(--bg-light);
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
 }
 
 .section h2 {
   color: var(--primary-color);
   margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--border-color);
-  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 1.5rem;
 }
 
 /* Proposal Submission */
@@ -184,10 +222,11 @@ body {
 .form-group select {
   padding: 0.75rem;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-dark);
+  border-radius: 6px;
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input:focus,
@@ -195,6 +234,7 @@ body {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.1);
 }
 
 .form-group small {
@@ -204,29 +244,32 @@ body {
 
 .bond-notice {
   padding: 1rem;
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(247, 127, 0, 0.08);
   border: 1px solid var(--warning-color);
-  border-radius: 8px;
-  color: var(--warning-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  border-left: 4px solid var(--warning-color);
 }
 
 .submit-button,
 .trade-submit-button {
-  padding: 0.75rem 2rem;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  padding: 0.875rem 2rem;
+  background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .submit-button:hover,
 .trade-submit-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .submit-button:disabled {
@@ -243,17 +286,18 @@ body {
 }
 
 .proposal-card {
-  background: var(--bg-dark);
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-color);
-  transition: all 0.3s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .proposal-card:hover {
   border-color: var(--primary-color);
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .proposal-header {
@@ -265,8 +309,9 @@ body {
 
 .proposal-header h3 {
   color: var(--primary-color);
-  font-size: 1.2rem;
+  font-size: 1.125rem;
   flex: 1;
+  font-weight: 600;
 }
 
 .proposal-status {
@@ -307,19 +352,20 @@ body {
 .view-button,
 .trade-button {
   flex: 1;
-  padding: 0.5rem;
-  border: 1px solid var(--primary-color);
+  padding: 0.625rem;
+  border: 2px solid var(--primary-color);
   background: transparent;
   color: var(--primary-color);
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
 }
 
 .view-button:hover {
   background: var(--primary-color);
   color: white;
+  box-shadow: var(--shadow-sm);
 }
 
 .trade-button {
@@ -328,8 +374,10 @@ body {
 }
 
 .trade-button:hover {
-  background: var(--success-color);
+  background: var(--secondary-color);
   color: white;
+  border-color: var(--secondary-color);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Welfare Metrics */
@@ -341,10 +389,11 @@ body {
 }
 
 .metric-card {
-  background: var(--bg-dark);
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 
 .metric-header {
@@ -356,12 +405,13 @@ body {
 
 .metric-header h3 {
   color: var(--primary-color);
-  font-size: 1.1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
 }
 
 .active-badge {
   padding: 0.25rem 0.75rem;
-  background: var(--success-color);
+  background: var(--secondary-color);
   color: white;
   border-radius: 20px;
   font-size: 0.75rem;
@@ -399,15 +449,17 @@ body {
 }
 
 .metrics-info {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(45, 106, 79, 0.05);
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid var(--primary-color);
+  border-left: 4px solid var(--primary-color);
 }
 
 .metrics-info h4 {
   color: var(--primary-color);
   margin-bottom: 0.5rem;
+  font-weight: 600;
 }
 
 .metrics-info p {
@@ -424,12 +476,13 @@ body {
 }
 
 .market-card {
-  background: var(--bg-dark);
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 8px;
   border: 2px solid var(--border-color);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .market-card:hover {
@@ -438,13 +491,14 @@ body {
 
 .market-card.selected {
   border-color: var(--primary-color);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.15);
 }
 
 .market-card h3 {
   color: var(--primary-color);
   margin-bottom: 1rem;
-  font-size: 1.1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
 }
 
 .market-prices {
@@ -461,8 +515,8 @@ body {
 }
 
 .price-item.pass {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid var(--success-color);
+  background: rgba(82, 183, 136, 0.08);
+  border: 1px solid var(--secondary-color);
 }
 
 .price-item.fail {
@@ -485,7 +539,7 @@ body {
 }
 
 .price-item.pass .price {
-  color: var(--success-color);
+  color: var(--secondary-color);
 }
 
 .price-item.fail .price {
@@ -514,16 +568,17 @@ body {
 }
 
 .trading-panel {
-  background: var(--bg-dark);
+  background: var(--bg-card);
   padding: 2rem;
   border-radius: 8px;
   border: 2px solid var(--primary-color);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .trading-panel h3 {
   color: var(--primary-color);
   margin-bottom: 1.5rem;
+  font-weight: 600;
 }
 
 .token-selector {
@@ -535,39 +590,42 @@ body {
 .token-button {
   padding: 1rem;
   border: 2px solid var(--border-color);
-  background: var(--bg-light);
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: all 0.2s ease;
 }
 
 .token-button.active {
   border-color: var(--primary-color);
-  background: rgba(99, 102, 241, 0.2);
+  background: rgba(45, 106, 79, 0.1);
   color: var(--primary-color);
 }
 
 .token-button:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .privacy-notice {
   padding: 1rem;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid var(--secondary-color);
-  border-radius: 8px;
-  color: var(--secondary-color);
+  background: rgba(45, 106, 79, 0.05);
+  border: 1px solid var(--primary-color);
+  border-radius: 6px;
+  color: var(--text-primary);
   text-align: center;
+  border-left: 4px solid var(--primary-color);
 }
 
 .App-footer {
-  background: var(--bg-light);
+  background: var(--bg-card);
   padding: 2rem;
   text-align: center;
   color: var(--text-secondary);
   margin-top: auto;
+  border-top: 1px solid var(--border-color);
 }
 
 .loading,
