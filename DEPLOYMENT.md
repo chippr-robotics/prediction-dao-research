@@ -2,6 +2,8 @@
 
 This document describes how to deploy the React frontend application to Google Cloud Run using GitHub Actions.
 
+> **Note**: Throughout this document, replace placeholder values like `YOUR_GITHUB_ORG`, `YOUR_REPO_NAME`, `my-project-123`, etc. with your actual values.
+
 ## Overview
 
 The deployment workflow automatically:
@@ -83,7 +85,7 @@ Workload Identity Federation allows GitHub Actions to authenticate to Google Clo
      --workload-identity-pool="github-pool" \
      --display-name="GitHub Provider" \
      --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
-     --attribute-condition="assertion.repository_owner == 'chippr-robotics'" \
+     --attribute-condition="assertion.repository_owner == 'YOUR_GITHUB_ORG'" \
      --issuer-uri="https://token.actions.githubusercontent.com"
    ```
 
@@ -92,7 +94,7 @@ Workload Identity Federation allows GitHub Actions to authenticate to Google Clo
    gcloud iam service-accounts add-iam-policy-binding \
      "github-actions-deployer@$PROJECT_ID.iam.gserviceaccount.com" \
      --role="roles/iam.workloadIdentityUser" \
-     --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/chippr-robotics/prediction-dao-research"
+     --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/YOUR_GITHUB_ORG/YOUR_REPO_NAME"
    ```
 
 6. **Get Workload Identity Provider Resource Name**
