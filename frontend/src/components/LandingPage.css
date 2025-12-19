@@ -103,6 +103,16 @@
   letter-spacing: -0.01em;
 }
 
+/* Section Intro */
+.section-intro {
+  text-align: center;
+  font-size: 1.25rem;
+  color: #4a5568;
+  max-width: 700px;
+  margin: -1rem auto 3rem;
+  line-height: 1.6;
+}
+
 /* How It Works Section */
 .how-it-works-section {
   padding: 6rem 2rem;
@@ -111,7 +121,7 @@
 
 .steps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2rem;
 }
 
@@ -200,10 +210,117 @@
   font-size: 1rem;
 }
 
+/* Comparison Section */
+.comparison-section {
+  padding: 6rem 2rem;
+  background-color: white;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.comparison-card {
+  background: #f8f9fa;
+  padding: 2.5rem;
+  border-radius: 12px;
+  border-left: 4px solid #2D7A4F;
+  transition: all 0.3s ease;
+}
+
+.comparison-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(45, 122, 79, 0.15);
+  background: white;
+}
+
+.comparison-card h3 {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #2D7A4F;
+  margin-bottom: 1rem;
+}
+
+.comparison-card p {
+  color: #4a5568;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+/* Use Cases Section */
+.use-cases-section {
+  padding: 6rem 2rem;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #e8f5e9 100%);
+}
+
+.use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 2.5rem;
+}
+
+.use-case-card {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border-top: 4px solid #34A853;
+}
+
+.use-case-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(45, 122, 79, 0.15);
+}
+
+.use-case-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.use-case-card h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2D7A4F;
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.use-case-description {
+  color: #4a5568;
+  line-height: 1.7;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.use-case-description strong {
+  color: #2D7A4F;
+  font-weight: 600;
+}
+
+.use-case-outcome {
+  color: #1a5a37;
+  line-height: 1.7;
+  font-size: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #e8f5e9;
+  margin-top: 1rem;
+}
+
+.use-case-outcome strong {
+  color: #2D7A4F;
+  font-weight: 600;
+}
+
 /* Understanding Section */
 .understanding-section {
   padding: 6rem 2rem;
-  background: linear-gradient(to bottom, #f8f9fa 0%, #e8f5e9 100%);
+  background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
 }
 
 .understanding-content {
@@ -379,7 +496,9 @@
   }
 
   .steps-grid,
-  .features-grid {
+  .features-grid,
+  .comparison-grid,
+  .use-cases-grid {
     grid-template-columns: 1fr;
   }
 
