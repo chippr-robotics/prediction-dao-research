@@ -78,7 +78,8 @@ git push origin feature/my-feature
 1. Update README.md or documentation if needed
 2. Ensure all tests pass
 3. Update CHANGELOG.md (if exists)
-4. Create pull request with:
+4. **Smart Contract PRs**: The Ethereum Security Review Agent will automatically review all `.sol` file changes for security vulnerabilities and best practices compliance
+5. Create pull request with:
    - Clear title
    - Description of changes
    - Related issue numbers
@@ -287,6 +288,16 @@ Documentation locations:
 - Help contributors improve
 
 ## Security
+
+### Automated Security Review
+
+All smart contract code changes are automatically reviewed by the **Ethereum Security Review Agent**:
+
+- **Automatic Analysis**: Detects vulnerabilities in Solidity code
+- **EthTrust Standards**: Follows [Ethereum Trust Alliance Security Levels](https://entethalliance.org/specs/ethtrust-sl/)
+- **Best Practices**: Enforces secure coding patterns
+- **Quick Start**: See [Ethereum Security Quick Start](ethereum-security-quickstart.md)
+- **Full Guide**: See [Ethereum Security Agent Documentation](ethereum-security-agent.md)
 
 ### Reporting Vulnerabilities
 

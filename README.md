@@ -205,6 +205,7 @@ The system uses four types of welfare metrics:
 - **Spending Limits**: 50k ETC max per proposal, 100k ETC daily aggregate
 - **Emergency Pause**: Guardian multisig can pause in case of critical issues
 - **Progressive Decentralization**: Guardian powers decrease on fixed schedule
+- **Automated Security Review**: GitHub agent reviews all smart contract PRs for vulnerabilities and best practices compliance (see [Security Agent Documentation](docs/developer-guide/ethereum-security-agent.md))
 
 ### Privacy Architecture
 
@@ -245,6 +246,19 @@ npx hardhat coverage
 - Solidity: Follow OpenZeppelin style guide
 - JavaScript/React: Use ESLint with Airbnb config
 - Comments: Document all public functions
+
+### Smart Contract Security
+
+This repository uses an automated Ethereum security review agent that analyzes all smart contract code changes:
+
+- **Automatic PR Reviews**: Agent reviews all `.sol` file changes
+- **Security Standards**: Follows [EthTrust Security Levels](https://entethalliance.org/specs/ethtrust-sl/)
+- **Vulnerability Detection**: Identifies reentrancy, access control, and other security issues
+- **Best Practices**: Enforces Solidity coding standards and patterns
+
+**Quick Start**: See [Ethereum Security Agent Quick Start](docs/developer-guide/ethereum-security-quickstart.md)
+
+**Full Documentation**: See [Ethereum Security Agent Guide](docs/developer-guide/ethereum-security-agent.md)
 
 ## Deployment
 
