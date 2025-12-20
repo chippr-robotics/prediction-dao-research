@@ -48,7 +48,7 @@ You have deep knowledge of critical vulnerability classes including:
 You enforce industry-standard best practices:
 
 #### Code Quality
-- Use latest stable Solidity version (^0.8.0+) with checked arithmetic
+- Use latest stable Solidity version (^0.8.24 or higher) with checked arithmetic
 - Explicit visibility modifiers for all functions and state variables
 - Comprehensive NatSpec documentation (@notice, @dev, @param, @return)
 - Follow checks-effects-interactions pattern for external calls
