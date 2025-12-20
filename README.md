@@ -262,11 +262,79 @@ This repository uses an automated Ethereum security review agent that analyzes a
 
 ## Deployment
 
-### Testnet Deployment (Mordor)
+### Automated Testnet Deployment (Mordor)
+
+The DAO contracts can be automatically deployed to the Ethereum Classic Mordor testnet using GitHub Actions. This deployment uses the **Safe Singleton Factory** for deterministic, reproducible contract addresses across networks. This mirrors the setup from [@chippr-robotics/mordor-public-faucet](https://github.com/chippr-robotics/mordor-public-faucet).
+
+#### Deterministic Deployment
+
+All contracts are deployed using the [Safe Singleton Factory](https://github.com/safe-fndn/safe-singleton-factory) at address `0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7`. This ensures:
+- **Reproducible addresses**: Same contract addresses across different networks
+- **Verifiable deployments**: Easy to verify that deployed bytecode matches source
+- **No centralization**: Removes reliance on specific deployment keys
+- **Security**: Deterministic deployments improve auditability
+
+The factory is pre-deployed on Mordor testnet (Chain ID: 63) and many other EVM-compatible networks.
+
+#### Prerequisites
+
+1. **Add Private Key to GitHub Secrets**
+   - Go to **Settings** → **Secrets and variables** → **Actions**
+   - Click **New repository secret**
+   - Name: `PRIVATE_KEY`
+   - Value: Your Ethereum Classic wallet private key (without the `0x` prefix)
+   - Click **Add secret**
+   
+   ⚠️ **Security Warning**: Never commit your private key to the repository! Always use GitHub Secrets.
+
+2. **Ensure Sufficient Balance**
+   - Your wallet needs sufficient Mordor testnet ETC for deployment
+   - Get testnet ETC from the [Mordor faucet](https://github.com/chippr-robotics/mordor-public-faucet)
+
+#### Deployment Methods
+
+**Method 1: Automatic Deployment (Recommended)**
+- Automatically deploys when you push to the `main` branch with contract changes
+- Monitors changes to:
+  - `contracts/**`
+  - `scripts/deploy.js`
+  - `hardhat.config.js`
+
+**Method 2: Manual Deployment**
+1. Go to the **Actions** tab in GitHub
+2. Select **Deploy DAO Contracts to Mordor Testnet** workflow
+3. Click **Run workflow**
+4. Select the target network (default: mordor)
+5. Click **Run workflow** button
+
+#### Deployment Information
+
+- **Network**: Ethereum Classic Mordor Testnet
+- **RPC URL**: https://rpc.mordor.etccooperative.org
+- **Chain ID**: 63
+- **Block Explorer**: https://etc-mordor.blockscout.com/
+
+After deployment, you can view:
+- Deployment logs in the GitHub Actions workflow run
+- Contract addresses in the workflow summary
+- All contracts on Blockscout using the provided links
+
+#### Local Testnet Deployment
+
+For local testing, you can also deploy deterministically:
+
+```bash
+export PRIVATE_KEY=your_private_key_without_0x_prefix
+npx hardhat run scripts/deploy-deterministic.js --network mordor
+```
+
+Or use the non-deterministic deployment script:
 
 ```bash
 npx hardhat run scripts/deploy.js --network mordor
 ```
+
+**Note**: The deterministic deployment ensures the same contract addresses will be used if you deploy to other networks that have the Safe Singleton Factory deployed.
 
 ### Frontend Deployment to Google Cloud Run
 
