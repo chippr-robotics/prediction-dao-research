@@ -256,6 +256,10 @@ This repository uses an automated Ethereum security review agent that analyzes a
 - **Vulnerability Detection**: Identifies reentrancy, access control, and other security issues
 - **Best Practices**: Enforces Solidity coding standards and patterns
 
+**Security Review Status**: A comprehensive security review has been conducted. See:
+- [SECURITY_REVIEW.md](./SECURITY_REVIEW.md) - Detailed findings and recommendations
+- [SECURITY_REVIEW_SUMMARY.md](./SECURITY_REVIEW_SUMMARY.md) - Summary of review and fixes applied
+
 **Quick Start**: See [Ethereum Security Agent Quick Start](docs/developer-guide/ethereum-security-quickstart.md)
 
 **Full Documentation**: See [Ethereum Security Agent Guide](docs/developer-guide/ethereum-security-agent.md)
