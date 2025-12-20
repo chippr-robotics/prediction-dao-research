@@ -168,7 +168,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
         // Get resolution from oracle
         (
-            OracleResolver.ResolutionStage stage,
+            ,  // stage not used
             uint256 passValue,
             uint256 failValue,
             bool finalized
@@ -215,7 +215,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             uint256 fundingAmount,
             address recipient,
             ,
-            ProposalRegistry.ProposalStatus status,
+            ,  // status not used
             address fundingToken,
             uint256 startDate,
             uint256 executionDeadline
@@ -240,6 +240,8 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             require(success, "Transfer failed");
         } else {
             // ERC20 token
+            // NOTE: Treasury vault must approve this contract before deployment
+            // to allow transferFrom operations. See deployment documentation.
             IERC20(fundingToken).safeTransferFrom(treasuryVault, recipient, fundingAmount);
         }
 

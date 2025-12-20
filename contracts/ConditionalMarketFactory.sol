@@ -181,9 +181,17 @@ contract ConditionalToken is IERC20 {
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
 
+    address public immutable factory;
+
+    modifier onlyFactory() {
+        require(msg.sender == factory, "Only factory can mint/burn");
+        _;
+    }
+
     constructor(string memory _name, string memory _symbol) {
         name = _name;
         symbol = _symbol;
+        factory = msg.sender;
     }
 
     function totalSupply() external view override returns (uint256) {
@@ -214,13 +222,13 @@ contract ConditionalToken is IERC20 {
         return true;
     }
 
-    function mint(address to, uint256 amount) external {
+    function mint(address to, uint256 amount) external onlyFactory {
         _totalSupply += amount;
         _balances[to] += amount;
         emit Transfer(address(0), to, amount);
     }
 
-    function burn(address from, uint256 amount) external {
+    function burn(address from, uint256 amount) external onlyFactory {
         require(_balances[from] >= amount, "Insufficient balance");
         _balances[from] -= amount;
         _totalSupply -= amount;
