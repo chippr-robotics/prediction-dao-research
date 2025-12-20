@@ -1,6 +1,6 @@
 # Smart Contract Security Review
 
-**Review Date:** 2025-12-20  
+**Review Date:** 2024-12-20  
 **Reviewer:** Automated Security Review  
 **Contracts Reviewed:** 8 Solidity contracts  
 **Solidity Version:** 0.8.24  
@@ -75,6 +75,8 @@ function mint(address to, uint256 amount) external onlyFactory {
 - Added `onlyFactory` modifier to restrict mint/burn to factory contract
 - Applied modifier to both `mint()` and `burn()` functions
 
+**Note:** The current implementation sets `factory = msg.sender` in the constructor, assuming the ConditionalMarketFactory deploys the tokens. This works for the current architecture where `deployMarketPair()` creates new ConditionalToken instances. If the deployment pattern changes, the factory address should be passed as an explicit constructor parameter.
+
 ### C-2: Insufficient Validation of ERC20 Transfers in FutarchyGovernor ✅ DOCUMENTED
 
 **Contract:** `FutarchyGovernor.sol`  
@@ -136,6 +138,8 @@ IERC20(governanceToken).transferFrom(msg.sender, address(this), tokenAmount);
 - Moved state update (`hasRagequit[msg.sender][proposalId] = true`) before external calls
 - Added comment documenting the checks-effects-interactions pattern
 - This ensures the state is updated before any external interactions occur
+
+**Note:** The function correctly checks `!hasRagequit[msg.sender][proposalId]` at the beginning and updates it before external calls. The `nonReentrant` modifier provides additional protection. While the gap between the check and update could theoretically allow state inconsistency on revert, the require statements before the state update ensure all conditions are validated before any state changes occur.
 
 ### H-2: Missing Access Control on Market Resolution
 

@@ -4,7 +4,7 @@
 
 This document summarizes the security review conducted on the ClearPath Prediction DAO smart contracts and the immediate fixes applied.
 
-**Review Date:** 2025-12-20  
+**Review Date:** 2024-12-20  
 **Total Contracts Reviewed:** 8  
 **Compiler Version:** Solidity 0.8.24  
 
