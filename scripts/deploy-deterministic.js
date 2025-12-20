@@ -164,11 +164,15 @@ async function main() {
   deployments.oracleResolver = oracleResolver.address;
 
   // 6. Deploy RagequitModule
-  // Using deployer address as placeholder for governance token and treasury
-  const mockGovernanceToken = deployer.address;
+  // Note: Using deployer address as temporary placeholders for governance token and treasury
+  // These should be updated to actual governance token and treasury addresses in production
+  console.log("\n⚠️  Using deployer address as temporary placeholder for governance token and treasury");
+  console.log("    In production, update RagequitModule with actual token and treasury addresses");
+  const PLACEHOLDER_ADDRESS = deployer.address;
+  
   const ragequitModule = await deployDeterministic(
     "RagequitModule",
-    [mockGovernanceToken, deployer.address],
+    [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS], // [governanceToken, treasuryVault]
     generateSalt(saltPrefix + "RagequitModule"),
     deployer
   );
@@ -184,7 +188,7 @@ async function main() {
       privacyCoordinator.address,
       oracleResolver.address,
       ragequitModule.address,
-      deployer.address // Treasury vault placeholder
+      PLACEHOLDER_ADDRESS // Treasury vault placeholder - should be updated in production
     ],
     generateSalt(saltPrefix + "FutarchyGovernor"),
     deployer
@@ -194,30 +198,42 @@ async function main() {
   // Setup initial configuration (only if contracts are newly deployed)
   console.log("\n\nSetting up initial configuration...");
   
+  const txConfirmations = [];
+  
   // Only transfer ownership if the contract was just deployed (not already deployed)
   if (!welfareRegistry.alreadyDeployed) {
     console.log("Transferring WelfareMetricRegistry ownership...");
-    await welfareRegistry.contract.transferOwnership(futarchyGovernor.address);
+    const tx = await welfareRegistry.contract.transferOwnership(futarchyGovernor.address);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
   }
   
   if (!proposalRegistry.alreadyDeployed) {
     console.log("Transferring ProposalRegistry ownership...");
-    await proposalRegistry.contract.transferOwnership(futarchyGovernor.address);
+    const tx = await proposalRegistry.contract.transferOwnership(futarchyGovernor.address);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
   }
   
   if (!marketFactory.alreadyDeployed) {
     console.log("Transferring ConditionalMarketFactory ownership...");
-    await marketFactory.contract.transferOwnership(futarchyGovernor.address);
+    const tx = await marketFactory.contract.transferOwnership(futarchyGovernor.address);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
   }
   
   if (!oracleResolver.alreadyDeployed) {
     console.log("Transferring OracleResolver ownership...");
-    await oracleResolver.contract.transferOwnership(futarchyGovernor.address);
+    const tx = await oracleResolver.contract.transferOwnership(futarchyGovernor.address);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
   }
   
   if (!ragequitModule.alreadyDeployed) {
     console.log("Transferring RagequitModule ownership...");
-    await ragequitModule.contract.transferOwnership(futarchyGovernor.address);
+    const tx = await ragequitModule.contract.transferOwnership(futarchyGovernor.address);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
   }
 
   // PrivacyCoordinator keeps deployer as owner for coordinator role
