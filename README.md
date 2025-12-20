@@ -266,6 +266,8 @@ This repository uses an automated Ethereum security review agent that analyzes a
 
 The DAO contracts can be automatically deployed to the Ethereum Classic Mordor testnet using GitHub Actions. This deployment uses the **Safe Singleton Factory** for deterministic, reproducible contract addresses across networks. This mirrors the setup from [@chippr-robotics/mordor-public-faucet](https://github.com/chippr-robotics/mordor-public-faucet).
 
+📖 **Quick Start**: See [DEPLOYMENT_QUICKSTART.md](./DEPLOYMENT_QUICKSTART.md) for a 5-minute setup guide
+
 #### Deterministic Deployment
 
 All contracts are deployed using the [Safe Singleton Factory](https://github.com/safe-fndn/safe-singleton-factory) at address `0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7`. This ensures:
