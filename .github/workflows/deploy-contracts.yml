@@ -16,7 +16,7 @@ on:
       - develop
     paths:
       - 'contracts/**'
-      - 'scripts/deploy.js'
+      - 'scripts/deploy-deterministic.js'
       - 'hardhat.config.js'
       - '.github/workflows/deploy-contracts.yml'
 

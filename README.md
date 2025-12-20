@@ -276,6 +276,8 @@ All contracts are deployed using the [Safe Singleton Factory](https://github.com
 
 The factory is pre-deployed on Mordor testnet (Chain ID: 63) and many other EVM-compatible networks.
 
+📖 **For detailed information about deterministic deployment**, see [DETERMINISTIC_DEPLOYMENT.md](./DETERMINISTIC_DEPLOYMENT.md)
+
 #### Prerequisites
 
 1. **Add Private Key to GitHub Secrets**
@@ -297,7 +299,7 @@ The factory is pre-deployed on Mordor testnet (Chain ID: 63) and many other EVM-
 - Automatically deploys when you push to the `main` branch with contract changes
 - Monitors changes to:
   - `contracts/**`
-  - `scripts/deploy.js`
+  - `scripts/deploy-deterministic.js`
   - `hardhat.config.js`
 
 **Method 2: Manual Deployment**
