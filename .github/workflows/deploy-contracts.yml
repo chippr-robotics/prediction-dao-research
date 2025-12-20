@@ -1,0 +1,170 @@
+name: Deploy DAO Contracts to Mordor Testnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: 'Target network for deployment'
+        required: false
+        default: 'mordor'
+        type: choice
+        options:
+          - mordor
+  push:
+    branches:
+      - main
+    paths:
+      - 'contracts/**'
+      - 'scripts/deploy-deterministic.js'
+      - 'hardhat.config.js'
+      - '.github/workflows/deploy-contracts.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-contracts:
+    name: Deploy DAO Contracts
+    runs-on: ubuntu-latest
+    # Only auto-deploy on main branch, require manual trigger for other branches
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Deploy contracts to Mordor testnet (Deterministic)
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          NETWORK: ${{ github.event.inputs.network || 'mordor' }}
+        run: |
+          if [ -z "$PRIVATE_KEY" ]; then
+            echo "❌ ERROR: PRIVATE_KEY secret not configured"
+            echo "Please add your private key to GitHub repository secrets"
+            echo "Settings → Secrets and variables → Actions → New repository secret"
+            exit 1
+          fi
+
+          echo "🚀 Deploying contracts deterministically to $NETWORK network..."
+          echo "Network: $NETWORK"
+          echo "Using Safe Singleton Factory for deterministic deployments"
+          echo "Factory Address: 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7"
+          echo ""
+          
+          # Run deterministic deployment script
+          npx hardhat run scripts/deploy-deterministic.js --network $NETWORK | tee deployment.log
+          
+          # Check if deployment was successful
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi
+
+      - name: Extract deployment addresses
+        id: extract
+        if: success()
+        run: |
+          # Extract contract addresses from deployment log
+          echo "📝 Extracting deployment information..."
+          
+          if [ -f deployment.log ]; then
+            # Create a summary of deployed contracts
+            echo "## 🎉 Contract Deployment Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Network:** Mordor Testnet (Chain ID: 63)" >> $GITHUB_STEP_SUMMARY
+            echo "**Deployed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Deployed Contracts" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Extract contract addresses
+            grep -E "(WelfareMetricRegistry|ProposalRegistry|ConditionalMarketFactory|PrivacyCoordinator|OracleResolver|RagequitModule|FutarchyGovernor) deployed to:" deployment.log | while IFS= read -r line; do
+              contract=$(echo "$line" | awk '{print $1}')
+              address=$(echo "$line" | awk '{print $NF}')
+              echo "- **$contract**: \`$address\`" >> $GITHUB_STEP_SUMMARY
+              echo "  - [View on Blockscout](https://etc-mordor.blockscout.com/address/$address)" >> $GITHUB_STEP_SUMMARY
+            done
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Blockscout Links" >> $GITHUB_STEP_SUMMARY
+            echo "- [Mordor Testnet Explorer](https://etc-mordor.blockscout.com/)" >> $GITHUB_STEP_SUMMARY
+            echo "- [Mordor Testnet RPC](https://rpc.mordor.etccooperative.org)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload deployment logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-logs-${{ github.run_number }}
+          path: deployment.log
+          retention-days: 90
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let logContent = '';
+            
+            try {
+              logContent = fs.readFileSync('deployment.log', 'utf8');
+            } catch (error) {
+              console.log('No deployment log found');
+              return;
+            }
+            
+            // Extract contract addresses
+            const contracts = [];
+            const lines = logContent.split('\n');
+            
+            for (const line of lines) {
+              if (line.includes('deployed to:')) {
+                const match = line.match(/(\w+) deployed to: (0x[a-fA-F0-9]{40})/);
+                if (match) {
+                  contracts.push({
+                    name: match[1],
+                    address: match[2]
+                  });
+                }
+              }
+            }
+            
+            if (contracts.length === 0) {
+              return;
+            }
+            
+            let comment = '## 🚀 Contract Deployment Results\n\n';
+            comment += '**Network:** Mordor Testnet (Chain ID: 63)\n\n';
+            comment += '### Deployed Contracts\n\n';
+            
+            for (const contract of contracts) {
+              comment += `- **${contract.name}**: \`${contract.address}\`\n`;
+              comment += `  - [View on Blockscout](https://etc-mordor.blockscout.com/address/${contract.address})\n`;
+            }
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: comment
+            });

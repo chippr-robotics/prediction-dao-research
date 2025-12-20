@@ -19,6 +19,11 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
     },
+    mordor: {
+      url: "https://rpc.mordor.etccooperative.org",
+      chainId: 63,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   paths: {
     sources: "./contracts",
