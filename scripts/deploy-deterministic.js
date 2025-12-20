@@ -52,8 +52,21 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
   
   // Deploy using the factory
   console.log(`  Deploying via Safe Singleton Factory...`);
+  
+  // Estimate gas and add 20% buffer for safety
+  let gasLimit;
+  try {
+    const estimatedGas = await factory.deploy.estimateGas(deploymentData, salt);
+    gasLimit = (estimatedGas * 120n) / 100n; // Add 20% buffer
+    console.log(`  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} with buffer)`);
+  } catch (error) {
+    // Fallback to conservative default if estimation fails
+    gasLimit = 5000000n;
+    console.log(`  Gas estimation failed, using default: ${gasLimit.toString()}`);
+  }
+  
   const tx = await factory.deploy(deploymentData, salt, {
-    gasLimit: 5000000 // Ensure sufficient gas
+    gasLimit: gasLimit
   });
   
   const receipt = await tx.wait();
@@ -86,6 +99,24 @@ async function main() {
   // Verify network
   const network = await ethers.provider.getNetwork();
   console.log(`Network: ${network.name} (Chain ID: ${network.chainId})`);
+  
+  // Security check: Prevent mainnet deployment with placeholder addresses
+  const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Ethereum Classic Mainnet
+  const isMainnet = MAINNET_CHAIN_IDS.includes(Number(network.chainId));
+  
+  if (isMainnet) {
+    console.error("\n❌ MAINNET DEPLOYMENT BLOCKED");
+    console.error("═".repeat(60));
+    console.error("This script uses PLACEHOLDER addresses for:");
+    console.error("  - Governance Token");
+    console.error("  - Treasury Vault");
+    console.error("\nBefore deploying to mainnet, you must:");
+    console.error("  1. Update RagequitModule constructor with real token address");
+    console.error("  2. Update FutarchyGovernor constructor with real treasury address");
+    console.error("  3. Remove this mainnet check after verification");
+    console.error("═".repeat(60));
+    throw new Error("Mainnet deployment requires manual configuration changes");
+  }
   
   // Check if Safe Singleton Factory is available on this network
   const factoryInfo = getSingletonFactoryInfo(Number(network.chainId));
