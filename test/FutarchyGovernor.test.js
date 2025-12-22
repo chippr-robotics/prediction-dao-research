@@ -62,6 +62,9 @@ describe("FutarchyGovernor", function () {
       await ragequitModule.getAddress(),
       addr1.address
     );
+
+    // Transfer ownership of marketFactory to futarchyGovernor so it can deploy markets
+    await marketFactory.transferOwnership(await futarchyGovernor.getAddress());
   });
 
   describe("Deployment", function () {
@@ -132,6 +135,176 @@ describe("FutarchyGovernor", function () {
       await expect(
         futarchyGovernor.connect(addr1).updateGuardian(addr1.address, true)
       ).to.be.revertedWithCustomError(futarchyGovernor, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("Governance Proposal Creation", function () {
+    let proposalId;
+
+    beforeEach(async function () {
+      // Create a welfare metric first
+      await welfareRegistry.proposeMetric("Test Metric", "Test", 5000, 0);
+      await welfareRegistry.activateMetric(0);
+
+      // Submit a proposal to registry  
+      const bondAmount = await proposalRegistry.bondAmount();
+      const currentBlock = await ethers.provider.getBlock('latest');
+      const futureDeadline = currentBlock.timestamp + (90 * 24 * 60 * 60);
+
+      proposalId = await proposalRegistry.submitProposal.staticCall(
+        "Test Proposal",
+        "Test Description",
+        ethers.parseEther("1000"),
+        addr1.address,
+        0, // welfareMetricId
+        ethers.ZeroAddress, // native token
+        0, // startDate
+        futureDeadline,
+        { value: bondAmount }
+      );
+
+      await proposalRegistry.submitProposal(
+        "Test Proposal",
+        "Test Description",
+        ethers.parseEther("1000"),
+        addr1.address,
+        0,
+        ethers.ZeroAddress,
+        0,
+        futureDeadline,
+        { value: bondAmount }
+      );
+    });
+
+    it("Should allow creating governance proposal", async function () {
+      await expect(
+        futarchyGovernor.createGovernanceProposal(
+          proposalId,
+          ethers.parseEther("100"),
+          ethers.parseEther("50"),
+          7 * 24 * 60 * 60
+        )
+      ).to.emit(futarchyGovernor, "GovernanceProposalCreated");
+    });
+
+    it("Should reject creation when paused", async function () {
+      await futarchyGovernor.togglePause();
+
+      await expect(
+        futarchyGovernor.createGovernanceProposal(
+          proposalId,
+          ethers.parseEther("100"),
+          ethers.parseEther("50"),
+          7 * 24 * 60 * 60
+        )
+      ).to.be.revertedWith("System paused");
+    });
+
+    it("Should only allow owner to create governance proposal", async function () {
+      await expect(
+        futarchyGovernor.connect(addr1).createGovernanceProposal(
+          proposalId,
+          ethers.parseEther("100"),
+          ethers.parseEther("50"),
+          7 * 24 * 60 * 60
+        )
+      ).to.be.revertedWithCustomError(futarchyGovernor, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("Governance Proposal Query", function () {
+    let govProposalId;
+
+    beforeEach(async function () {
+      // Create welfare metric
+      await welfareRegistry.proposeMetric("Test Metric", "Test", 5000, 0);
+      await welfareRegistry.activateMetric(0);
+
+      // Submit proposal
+      const bondAmount = await proposalRegistry.bondAmount();
+      const currentBlock = await ethers.provider.getBlock('latest');
+      const futureDeadline = currentBlock.timestamp + (90 * 24 * 60 * 60);
+
+      const proposalId = await proposalRegistry.submitProposal.staticCall(
+        "Test Proposal",
+        "Test Description",
+        ethers.parseEther("1000"),
+        addr1.address,
+        0,
+        ethers.ZeroAddress,
+        0,
+        futureDeadline,
+        { value: bondAmount }
+      );
+
+      await proposalRegistry.submitProposal(
+        "Test Proposal",
+        "Test Description",
+        ethers.parseEther("1000"),
+        addr1.address,
+        0,
+        ethers.ZeroAddress,
+        0,
+        futureDeadline,
+        { value: bondAmount }
+      );
+
+      // Create governance proposal
+      govProposalId = await futarchyGovernor.governanceProposalCount();
+      await futarchyGovernor.createGovernanceProposal(
+        proposalId,
+        ethers.parseEther("100"),
+        ethers.parseEther("50"),
+        7 * 24 * 60 * 60
+      );
+    });
+
+    it("Should return governance proposal details", async function () {
+      const [proposalId, marketId, phase, createdAt, executionTime, executed] = await futarchyGovernor.getGovernanceProposal(govProposalId);
+      
+      expect(executed).to.equal(false);
+      expect(phase).to.equal(1); // MarketTrading phase
+    });
+  });
+
+  describe("Emergency Withdraw", function () {
+    it("Should allow owner to emergency withdraw", async function () {
+      // Send some ETH to the contract
+      await owner.sendTransaction({
+        to: await futarchyGovernor.getAddress(),
+        value: ethers.parseEther("1")
+      });
+
+      const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
+      const tx = await futarchyGovernor.emergencyWithdraw();
+      const receipt = await tx.wait();
+      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
+
+      expect(ownerBalanceAfter).to.be.closeTo(
+        ownerBalanceBefore + ethers.parseEther("1") - gasUsed,
+        ethers.parseEther("0.001")
+      );
+    });
+
+    it("Should only allow owner to emergency withdraw", async function () {
+      await expect(
+        futarchyGovernor.connect(addr1).emergencyWithdraw()
+      ).to.be.revertedWithCustomError(futarchyGovernor, "OwnableUnauthorizedAccount");
+    });
+  });
+
+  describe("Receive ETH", function () {
+    it("Should accept ETH transfers", async function () {
+      const amount = ethers.parseEther("1");
+      
+      await owner.sendTransaction({
+        to: await futarchyGovernor.getAddress(),
+        value: amount
+      });
+
+      const balance = await ethers.provider.getBalance(await futarchyGovernor.getAddress());
+      expect(balance).to.equal(amount);
     });
   });
 });
