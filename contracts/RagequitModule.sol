@@ -32,6 +32,8 @@ contract RagequitModule is Ownable, ReentrancyGuard {
     
     uint256 public constant RAGEQUIT_WINDOW = 7 days;
 
+    bool private _initialized;
+
     event RagequitWindowOpened(uint256 indexed proposalId, uint256 snapshotTime, uint256 executionTime);
     event RagequitExecuted(
         address indexed user,
@@ -40,11 +42,27 @@ contract RagequitModule is Ownable, ReentrancyGuard {
         uint256 treasuryShare
     );
 
-    constructor(address _governanceToken, address _treasuryVault) Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     * @param _governanceToken Address of the governance token
+     * @param _treasuryVault Address of the treasury vault
+     */
+    function initialize(
+        address initialOwner,
+        address _governanceToken,
+        address _treasuryVault
+    ) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
         require(_governanceToken != address(0), "Invalid token");
         require(_treasuryVault != address(0), "Invalid vault");
+        _initialized = true;
         governanceToken = _governanceToken;
         treasuryVault = _treasuryVault;
+        _transferOwnership(initialOwner);
     }
 
     /**

@@ -48,6 +48,7 @@ describe("ProposalRegistry", function () {
     
     const ProposalRegistry = await ethers.getContractFactory("ProposalRegistry");
     proposalRegistry = await ProposalRegistry.deploy();
+    await proposalRegistry.initialize(owner.address);
     await proposalRegistry.waitForDeployment();
   });
 

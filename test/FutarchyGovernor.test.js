@@ -23,28 +23,37 @@ describe("FutarchyGovernor", function () {
     // Deploy dependencies
     const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
     welfareRegistry = await WelfareMetricRegistry.deploy();
+    await welfareRegistry.initialize(owner.address);
     
     const ProposalRegistry = await ethers.getContractFactory("ProposalRegistry");
     proposalRegistry = await ProposalRegistry.deploy();
+    await proposalRegistry.initialize(owner.address);
     
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
+    await marketFactory.initialize(owner.address);
     
     const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
     privacyCoordinator = await PrivacyCoordinator.deploy();
+    await privacyCoordinator.initialize(owner.address);
     
     const OracleResolver = await ethers.getContractFactory("OracleResolver");
     oracleResolver = await OracleResolver.deploy();
+    await oracleResolver.initialize(owner.address);
     
     const RagequitModule = await ethers.getContractFactory("RagequitModule");
-    ragequitModule = await RagequitModule.deploy(
+    ragequitModule = await RagequitModule.deploy();
+    await ragequitModule.initialize(
+      owner.address,
       await governanceToken.getAddress(),
       addr1.address
     );
     
     // Deploy FutarchyGovernor
     const FutarchyGovernor = await ethers.getContractFactory("FutarchyGovernor");
-    futarchyGovernor = await FutarchyGovernor.deploy(
+    futarchyGovernor = await FutarchyGovernor.deploy();
+    await futarchyGovernor.initialize(
+      owner.address,
       await welfareRegistry.getAddress(),
       await proposalRegistry.getAddress(),
       await marketFactory.getAddress(),

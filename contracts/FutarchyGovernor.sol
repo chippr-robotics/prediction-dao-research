@@ -61,6 +61,8 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
     bool public paused;
     mapping(address => bool) public guardians;
 
+    bool private _initialized;
+
     event GovernanceProposalCreated(uint256 indexed governanceProposalId, uint256 indexed proposalId, uint256 indexed marketId);
     event ProposalPhaseChanged(uint256 indexed governanceProposalId, ProposalPhase newPhase);
     event ProposalExecuted(uint256 indexed governanceProposalId, address recipient, uint256 amount);
@@ -77,7 +79,21 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(
+    constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     * @param _welfareRegistry Address of the welfare registry
+     * @param _proposalRegistry Address of the proposal registry
+     * @param _marketFactory Address of the market factory
+     * @param _privacyCoordinator Address of the privacy coordinator
+     * @param _oracleResolver Address of the oracle resolver
+     * @param _ragequitModule Address of the ragequit module
+     * @param _treasuryVault Address of the treasury vault
+     */
+    function initialize(
+        address initialOwner,
         address _welfareRegistry,
         address _proposalRegistry,
         address _marketFactory,
@@ -85,7 +101,9 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         address _oracleResolver,
         address payable _ragequitModule,
         address _treasuryVault
-    ) Ownable(msg.sender) {
+    ) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
         require(_welfareRegistry != address(0), "Invalid welfare registry");
         require(_proposalRegistry != address(0), "Invalid proposal registry");
         require(_marketFactory != address(0), "Invalid market factory");
@@ -94,6 +112,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         require(_ragequitModule != address(0), "Invalid ragequit module");
         require(_treasuryVault != address(0), "Invalid treasury vault");
 
+        _initialized = true;
         welfareRegistry = WelfareMetricRegistry(_welfareRegistry);
         proposalRegistry = ProposalRegistry(_proposalRegistry);
         marketFactory = ConditionalMarketFactory(_marketFactory);
@@ -101,8 +120,8 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         oracleResolver = OracleResolver(_oracleResolver);
         ragequitModule = RagequitModule(_ragequitModule);
         treasuryVault = _treasuryVault;
-
-        guardians[msg.sender] = true;
+        guardians[initialOwner] = true;
+        _transferOwnership(initialOwner);
     }
 
     /**

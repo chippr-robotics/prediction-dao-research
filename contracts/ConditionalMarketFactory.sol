@@ -43,6 +43,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     uint256 public constant MIN_TRADING_PERIOD = 7 days;
     uint256 public constant MAX_TRADING_PERIOD = 21 days;
 
+    bool private _initialized;
+
     event MarketCreated(
         uint256 indexed marketId,
         uint256 indexed proposalId,
@@ -54,6 +56,17 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     event MarketCancelled(uint256 indexed marketId);
 
     constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     */
+    function initialize(address initialOwner) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
+        _initialized = true;
+        _transferOwnership(initialOwner);
+    }
 
     /**
      * @notice Deploy a market pair for a proposal

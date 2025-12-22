@@ -12,6 +12,7 @@ describe("PrivacyCoordinator", function () {
     
     const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
     privacyCoordinator = await PrivacyCoordinator.deploy();
+    await privacyCoordinator.initialize(owner.address);
   });
 
   describe("Deployment", function () {
