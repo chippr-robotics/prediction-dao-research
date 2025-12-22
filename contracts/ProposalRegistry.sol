@@ -56,6 +56,8 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     uint256 public constant REVIEW_PERIOD = 7 days;
     uint256 public constant MAX_PROPOSAL_AMOUNT = 50000 ether; // 50k ETC max
 
+    bool private _initialized;
+
     event ProposalSubmitted(
         uint256 indexed proposalId,
         address indexed proposer,
@@ -70,6 +72,17 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     event BondReturned(uint256 indexed proposalId, address indexed proposer);
 
     constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     */
+    function initialize(address initialOwner) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
+        _initialized = true;
+        _transferOwnership(initialOwner);
+    }
 
     /**
      * @notice Submit a new funding proposal with constraints

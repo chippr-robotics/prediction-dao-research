@@ -17,7 +17,9 @@ describe("RagequitModule", function () {
     governanceToken = await MockERC20.deploy("Governance Token", "GOV", ethers.parseEther("1000000"));
     
     const RagequitModule = await ethers.getContractFactory("RagequitModule");
-    ragequitModule = await RagequitModule.deploy(
+    ragequitModule = await RagequitModule.deploy();
+    await ragequitModule.initialize(
+      owner.address,
       await governanceToken.getAddress(),
       treasuryVault.address
     );
@@ -42,15 +44,17 @@ describe("RagequitModule", function () {
 
     it("Should reject zero token address", async function () {
       const RagequitModule = await ethers.getContractFactory("RagequitModule");
+      const module = await RagequitModule.deploy();
       await expect(
-        RagequitModule.deploy(ethers.ZeroAddress, treasuryVault.address)
+        module.initialize(owner.address, ethers.ZeroAddress, treasuryVault.address)
       ).to.be.revertedWith("Invalid token");
     });
 
     it("Should reject zero vault address", async function () {
       const RagequitModule = await ethers.getContractFactory("RagequitModule");
+      const module = await RagequitModule.deploy();
       await expect(
-        RagequitModule.deploy(await governanceToken.getAddress(), ethers.ZeroAddress)
+        module.initialize(owner.address, await governanceToken.getAddress(), ethers.ZeroAddress)
       ).to.be.revertedWith("Invalid vault");
     });
   });

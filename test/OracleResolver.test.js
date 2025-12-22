@@ -12,6 +12,7 @@ describe("OracleResolver", function () {
     
     const OracleResolver = await ethers.getContractFactory("OracleResolver");
     oracleResolver = await OracleResolver.deploy();
+    await oracleResolver.initialize(owner.address);
   });
 
   describe("Deployment", function () {

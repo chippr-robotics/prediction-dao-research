@@ -41,6 +41,8 @@ contract PrivacyCoordinator is Ownable {
 
     address public coordinator;
 
+    bool private _initialized;
+
     event PublicKeyRegistered(address indexed user, bytes32 publicKey);
     event EncryptedPositionSubmitted(uint256 indexed positionId, address indexed user, bytes32 commitment);
     event KeyChangeSubmitted(address indexed user, uint256 keyChangeIndex);
@@ -52,9 +54,19 @@ contract PrivacyCoordinator is Ownable {
         _;
     }
 
-    constructor() Ownable(msg.sender) {
-        coordinator = msg.sender;
+    constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     */
+    function initialize(address initialOwner) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
+        _initialized = true;
+        coordinator = initialOwner;
         epochStartTime = block.timestamp;
+        _transferOwnership(initialOwner);
     }
 
     /**

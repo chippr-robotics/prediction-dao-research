@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./WelfareMetricRegistry.sol";
 import "./ProposalRegistry.sol";
 import "./ConditionalMarketFactory.sol";
@@ -53,6 +54,15 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
     bytes32 public constant DAO_PROPOSER_ROLE = keccak256("DAO_PROPOSER_ROLE");
     bytes32 public constant DAO_ORACLE_ROLE = keccak256("DAO_ORACLE_ROLE");
 
+    // Implementation contract addresses
+    address public immutable welfareRegistryImpl;
+    address public immutable proposalRegistryImpl;
+    address public immutable marketFactoryImpl;
+    address public immutable privacyCoordinatorImpl;
+    address public immutable oracleResolverImpl;
+    address public immutable ragequitModuleImpl;
+    address public immutable futarchyGovernorImpl;
+
     event DAOCreated(
         uint256 indexed daoId,
         string name,
@@ -84,6 +94,15 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         // Set role admin relationships
         _setRoleAdmin(PLATFORM_ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
         _setRoleAdmin(DAO_CREATOR_ROLE, PLATFORM_ADMIN_ROLE);
+
+        // Deploy implementation contracts once
+        welfareRegistryImpl = address(new WelfareMetricRegistry());
+        proposalRegistryImpl = address(new ProposalRegistry());
+        marketFactoryImpl = address(new ConditionalMarketFactory());
+        privacyCoordinatorImpl = address(new PrivacyCoordinator());
+        oracleResolverImpl = address(new OracleResolver());
+        ragequitModuleImpl = address(new RagequitModule());
+        futarchyGovernorImpl = address(new FutarchyGovernor());
     }
 
     /**
@@ -156,43 +175,54 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
             address
         ) 
     {
-        // Deploy DAO components
-        WelfareMetricRegistry welfareRegistry = new WelfareMetricRegistry();
-        ProposalRegistry proposalRegistry = new ProposalRegistry();
-        ConditionalMarketFactory marketFactory = new ConditionalMarketFactory();
-        PrivacyCoordinator privacyCoordinator = new PrivacyCoordinator();
-        OracleResolver oracleResolver = new OracleResolver();
-        RagequitModule ragequitModule = new RagequitModule(
+        // Clone DAO components using minimal proxies
+        address welfareRegistry = Clones.clone(welfareRegistryImpl);
+        address proposalRegistry = Clones.clone(proposalRegistryImpl);
+        address marketFactory = Clones.clone(marketFactoryImpl);
+        address privacyCoordinator = Clones.clone(privacyCoordinatorImpl);
+        address oracleResolver = Clones.clone(oracleResolverImpl);
+        address payable ragequitModule = payable(Clones.clone(ragequitModuleImpl));
+        address payable futarchyGovernor = payable(Clones.clone(futarchyGovernorImpl));
+
+        // Initialize clones (ownership starts with factory)
+        WelfareMetricRegistry(welfareRegistry).initialize(address(this));
+        ProposalRegistry(proposalRegistry).initialize(address(this));
+        ConditionalMarketFactory(marketFactory).initialize(address(this));
+        PrivacyCoordinator(privacyCoordinator).initialize(address(this));
+        OracleResolver(oracleResolver).initialize(address(this));
+        RagequitModule(ragequitModule).initialize(
             address(this),
+            address(this), // Placeholder: DAO must set proper governance token after creation
             treasuryVault
         );
 
-        // Deploy FutarchyGovernor
-        FutarchyGovernor futarchyGovernor = new FutarchyGovernor(
-            address(welfareRegistry),
-            address(proposalRegistry),
-            address(marketFactory),
-            address(privacyCoordinator),
-            address(oracleResolver),
-            payable(address(ragequitModule)),
+        // Initialize FutarchyGovernor - ownership remains with factory
+        FutarchyGovernor(futarchyGovernor).initialize(
+            address(this),
+            welfareRegistry,
+            proposalRegistry,
+            marketFactory,
+            privacyCoordinator,
+            oracleResolver,
+            ragequitModule,
             treasuryVault
         );
 
-        // Transfer ownership
-        welfareRegistry.transferOwnership(address(futarchyGovernor));
-        proposalRegistry.transferOwnership(address(futarchyGovernor));
-        marketFactory.transferOwnership(address(futarchyGovernor));
-        oracleResolver.transferOwnership(address(futarchyGovernor));
-        ragequitModule.transferOwnership(address(futarchyGovernor));
+        // Transfer ownership of components to FutarchyGovernor
+        WelfareMetricRegistry(welfareRegistry).transferOwnership(futarchyGovernor);
+        ProposalRegistry(proposalRegistry).transferOwnership(futarchyGovernor);
+        ConditionalMarketFactory(marketFactory).transferOwnership(futarchyGovernor);
+        OracleResolver(oracleResolver).transferOwnership(futarchyGovernor);
+        RagequitModule(ragequitModule).transferOwnership(futarchyGovernor);
 
         return (
-            address(futarchyGovernor),
-            address(welfareRegistry),
-            address(proposalRegistry),
-            address(marketFactory),
-            address(privacyCoordinator),
-            address(oracleResolver),
-            address(ragequitModule)
+            futarchyGovernor,
+            welfareRegistry,
+            proposalRegistry,
+            marketFactory,
+            privacyCoordinator,
+            oracleResolver,
+            ragequitModule
         );
     }
 
