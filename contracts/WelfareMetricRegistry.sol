@@ -58,6 +58,8 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
     uint256 public constant VOTING_PERIOD = 14 days;
     uint256 public constant TOTAL_WEIGHT = 10000; // 100% in basis points
 
+    bool private _initialized;
+
     event MetricProposed(uint256 indexed metricId, string name, string description, uint256 weight, MetricCategory category);
     event MetricActivated(uint256 indexed metricId);
     event MetricDeactivated(uint256 indexed metricId);
@@ -65,6 +67,17 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
     event MetricValueRecorded(uint256 indexed metricId, uint256 value, uint256 timestamp, address reporter);
 
     constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     */
+    function initialize(address initialOwner) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
+        _initialized = true;
+        _transferOwnership(initialOwner);
+    }
 
     /**
      * @notice Propose a new welfare metric

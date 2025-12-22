@@ -57,6 +57,8 @@ contract OracleResolver is Ownable, ReentrancyGuard {
     // Designated reporters
     mapping(address => bool) public designatedReporters;
 
+    bool private _initialized;
+
     event ReportSubmitted(
         uint256 indexed proposalId,
         address indexed reporter,
@@ -74,8 +76,18 @@ contract OracleResolver is Ownable, ReentrancyGuard {
     event ReporterAdded(address indexed reporter);
     event ReporterRemoved(address indexed reporter);
 
-    constructor() Ownable(msg.sender) {
-        designatedReporters[msg.sender] = true;
+    constructor() Ownable(msg.sender) {}
+
+    /**
+     * @notice Initialize the contract (used for clones)
+     * @param initialOwner Address of the initial owner
+     */
+    function initialize(address initialOwner) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
+        _initialized = true;
+        designatedReporters[initialOwner] = true;
+        _transferOwnership(initialOwner);
     }
 
     /**
