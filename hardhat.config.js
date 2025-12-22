@@ -31,4 +31,11 @@ module.exports = {
     cache: "./cache",
     artifacts: "./artifacts",
   },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS ? true : false,
+    currency: "USD",
+    outputFile: process.env.REPORT_GAS ? "gas-report.txt" : undefined,
+    noColors: process.env.REPORT_GAS ? true : false,
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
+  },
 };
