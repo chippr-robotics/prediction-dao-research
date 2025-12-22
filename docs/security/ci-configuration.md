@@ -194,12 +194,14 @@ summary:
 | Tool | Version | Update Command |
 |------|---------|----------------|
 | Node.js | 20.x | Update `actions/setup-node` |
-| Python | 3.11 | Update `actions/setup-python` |
+| Python | 3.10 | Update `actions/setup-python` |
 | Go | 1.21 | Update `actions/setup-go` |
 | Hardhat | 2.22.0 | `npm update hardhat` |
 | Slither | latest | `pip install --upgrade slither-analyzer` |
 | Manticore | latest | `pip install --upgrade manticore[native]` |
 | Medusa | latest | `go install github.com/crytic/medusa@latest` |
+
+**Note:** Python 3.10 is used for Slither and Manticore due to compatibility issues with the `pysha3` package in newer Python versions.
 
 ## Updating the Workflow
 

@@ -59,7 +59,8 @@ Manticore explores:
 ### Prerequisites
 
 ```bash
-# Python 3.8 or higher required
+# Python 3.10 recommended (3.8-3.10 supported)
+# Note: Python 3.11+ has compatibility issues with pysha3 package
 python3 --version
 
 # Install system dependencies (Ubuntu/Debian)

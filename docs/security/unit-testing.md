@@ -21,7 +21,7 @@ All contracts in the repository have comprehensive unit tests:
 | Contract | Test File | Tests |
 |----------|-----------|-------|
 | ConditionalMarketFactory | `ConditionalMarketFactory.test.js` | 12 tests |
-| DAOFactory | `DAOFactory.test.js` | Existing tests |
+| DAOFactory | `DAOFactory.test.js` | 24 tests (skipped*) |
 | FutarchyGovernor | `FutarchyGovernor.test.js` | 13 tests |
 | OracleResolver | `OracleResolver.test.js` | 13 tests |
 | PrivacyCoordinator | `PrivacyCoordinator.test.js` | 13 tests |
@@ -29,7 +29,9 @@ All contracts in the repository have comprehensive unit tests:
 | RagequitModule | `RagequitModule.test.js` | 12 tests |
 | WelfareMetricRegistry | `WelfareMetricRegistry.test.js` | 17 tests |
 
-**Total: 95+ passing tests**
+**Total: 95 passing tests**
+
+\* *DAOFactory tests are skipped due to the contract exceeding EIP-170's 24KB bytecode size limit. The contract deploys 6 sub-contracts in the constructor, causing it to exceed the deployment size limit. This is a known issue that requires contract refactoring (e.g., using EIP-1167 minimal proxies).*
 
 ## Running Unit Tests
 

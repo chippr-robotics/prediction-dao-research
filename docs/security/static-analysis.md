@@ -39,6 +39,8 @@ Slither analyzes code for:
 ### Local Installation
 
 ```bash
+# Python 3.10 recommended for best compatibility
+# Note: Python 3.11+ may have issues with some dependencies
 pip install slither-analyzer
 pip install solc-select
 
