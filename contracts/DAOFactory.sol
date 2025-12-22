@@ -184,7 +184,7 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         address payable ragequitModule = payable(Clones.clone(ragequitModuleImpl));
         address payable futarchyGovernor = payable(Clones.clone(futarchyGovernorImpl));
 
-        // Initialize clones (initialization will transfer ownership to this contract initially)
+        // Initialize clones (ownership starts with factory)
         WelfareMetricRegistry(welfareRegistry).initialize(address(this));
         ProposalRegistry(proposalRegistry).initialize(address(this));
         ConditionalMarketFactory(marketFactory).initialize(address(this));
@@ -192,13 +192,13 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         OracleResolver(oracleResolver).initialize(address(this));
         RagequitModule(ragequitModule).initialize(
             address(this),
-            address(this), // governance token placeholder
+            address(this), // Placeholder: DAO must set proper governance token after creation
             treasuryVault
         );
 
-        // Initialize FutarchyGovernor with all component addresses
+        // Initialize FutarchyGovernor - ownership remains with factory
         FutarchyGovernor(futarchyGovernor).initialize(
-            address(this), // temporary owner
+            address(this),
             welfareRegistry,
             proposalRegistry,
             marketFactory,
