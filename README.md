@@ -217,19 +217,53 @@ The system uses four types of welfare metrics:
 
 ## Testing
 
-Run the test suite:
+The project includes comprehensive automated testing and security analysis:
+
+### Quick Start
+
+Run the complete test suite:
 ```bash
-npx hardhat test
+npm test
 ```
 
-Run specific test file:
+Run tests with gas reporting:
 ```bash
-npx hardhat test test/WelfareMetricRegistry.test.js
+npm run test:gas
 ```
 
 Run with coverage:
 ```bash
-npx hardhat coverage
+npm run test:coverage
+```
+
+### Security Testing Documentation
+
+For comprehensive documentation on all testing and security analysis:
+
+**[View Security Testing Documentation →](https://chippr-robotics.github.io/prediction-dao-research/security/)**
+
+The security testing documentation covers:
+- **[Unit Testing](https://chippr-robotics.github.io/prediction-dao-research/security/unit-testing/)**: Hardhat test suite with gas reporting
+- **[Static Analysis](https://chippr-robotics.github.io/prediction-dao-research/security/static-analysis/)**: Slither for vulnerability detection
+- **[Symbolic Execution](https://chippr-robotics.github.io/prediction-dao-research/security/symbolic-execution/)**: Manticore for path exploration
+- **[Fuzz Testing](https://chippr-robotics.github.io/prediction-dao-research/security/fuzz-testing/)**: Medusa for property-based testing
+- **[CI/CD Configuration](https://chippr-robotics.github.io/prediction-dao-research/security/ci-configuration/)**: GitHub Actions workflow maintenance
+
+### Test Structure
+
+```
+test/
+├── ConditionalMarketFactory.test.js   # Market factory tests
+├── DAOFactory.test.js                 # DAO factory tests
+├── FutarchyGovernor.test.js          # Main governor tests
+├── OracleResolver.test.js            # Oracle resolution tests
+├── PrivacyCoordinator.test.js        # Privacy mechanism tests
+├── ProposalRegistry.test.js          # Proposal management tests
+├── RagequitModule.test.js            # Ragequit functionality tests
+├── WelfareMetricRegistry.test.js     # Welfare metrics tests
+└── fuzzing/                          # Fuzz test contracts
+    ├── ProposalRegistryFuzzTest.sol
+    └── WelfareMetricRegistryFuzzTest.sol
 ```
 
 ## Development

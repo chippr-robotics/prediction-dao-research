@@ -1,0 +1,290 @@
+name: Security Testing & Analysis
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  hardhat-tests:
+    name: Hardhat Unit Tests & Gas Report
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Run tests with gas reporting
+        env:
+          REPORT_GAS: true
+        run: npm test
+
+      - name: Upload gas report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gas-report
+          path: gas-report.txt
+          retention-days: 30
+
+  coverage-report:
+    name: Coverage Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+        continue-on-error: true
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+  slither-analysis:
+    name: Slither Static Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Slither
+        run: |
+          pip install slither-analyzer
+          pip install solc-select
+          solc-select install 0.8.24
+          solc-select use 0.8.24
+
+      - name: Run Slither analysis
+        run: |
+          slither . --config-file slither.config.json || true
+
+      - name: Upload Slither reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: slither-reports
+          path: |
+            slither-report.json
+            slither-report.md
+          retention-days: 30
+
+  manticore-analysis:
+    name: Manticore Symbolic Execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Manticore
+        run: |
+          pip install manticore[native]
+          pip install solc-select
+          solc-select install 0.8.24
+          solc-select use 0.8.24
+
+      - name: Run Manticore on ProposalRegistry
+        run: |
+          manticore contracts/ProposalRegistry.sol \
+            --contract ProposalRegistry \
+            --timeout 300 \
+            --quick-mode || true
+        continue-on-error: true
+
+      - name: Run Manticore on WelfareMetricRegistry
+        run: |
+          manticore contracts/WelfareMetricRegistry.sol \
+            --contract WelfareMetricRegistry \
+            --timeout 300 \
+            --quick-mode || true
+        continue-on-error: true
+
+      - name: Collect Manticore results
+        if: always()
+        run: |
+          mkdir -p manticore-results
+          find . -type d -name "mcore_*" -exec cp -r {} manticore-results/ \; || true
+
+      - name: Upload Manticore results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: manticore-results
+          path: manticore-results/
+          retention-days: 30
+
+  medusa-fuzzing:
+    name: Medusa Fuzz Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Medusa
+        run: |
+          go install github.com/crytic/medusa@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
+
+      - name: Install crytic-compile
+        run: |
+          pip install crytic-compile
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Run Medusa fuzzing
+        run: |
+          export PATH=$PATH:$HOME/go/bin
+          medusa fuzz --timeout 300 || true
+        continue-on-error: true
+
+      - name: Collect Medusa results
+        if: always()
+        run: |
+          mkdir -p medusa-results
+          cp -r medusa-corpus medusa-results/ || true
+          cp medusa.json medusa-results/ || true
+          find . -name "medusa-output" -exec cp -r {} medusa-results/ \; || true
+
+      - name: Upload Medusa results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: medusa-results
+          path: medusa-results/
+          retention-days: 30
+
+  summary:
+    name: Generate Test Summary
+    runs-on: ubuntu-latest
+    needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis, medusa-fuzzing]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Generate summary
+        run: |
+          echo "# Security Testing & Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Gas Report
+          if [ -f "artifacts/gas-report/gas-report.txt" ]; then
+            echo "### Gas Report" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -50 artifacts/gas-report/gas-report.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Slither Results
+          if [ -f "artifacts/slither-reports/slither-report.md" ]; then
+            echo "### Slither Static Analysis" >> $GITHUB_STEP_SUMMARY
+            cat artifacts/slither-reports/slither-report.md >> $GITHUB_STEP_SUMMARY || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Gas Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Coverage Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Slither Analysis: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Manticore Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Medusa Fuzzing: Available in artifacts" >> $GITHUB_STEP_SUMMARY

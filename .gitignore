@@ -144,5 +144,19 @@ cache
 artifacts
 typechain-types
 
+# Gas reporter
+gas-report.txt
+gasReporterOutput.json
+
+# Security analysis tools
+.slither/
+slither-report.json
+slither-report.md
+crytic-export/
+mcore_*
+manticore-output/
+medusa-output/
+.medusa/
+
 # MkDocs
 site/

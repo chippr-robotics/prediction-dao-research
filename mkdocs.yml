@@ -101,6 +101,13 @@ nav:
     - Frontend Development: developer-guide/frontend.md
     - Testing: developer-guide/testing.md
     - Contributing: developer-guide/contributing.md
+  - Security Testing:
+    - Overview: security/index.md
+    - Unit Testing: security/unit-testing.md
+    - Static Analysis: security/static-analysis.md
+    - Symbolic Execution: security/symbolic-execution.md
+    - Fuzz Testing: security/fuzz-testing.md
+    - CI/CD Configuration: security/ci-configuration.md
   - System Overview:
     - Introduction: system-overview/introduction.md
     - How It Works: system-overview/how-it-works.md
