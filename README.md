@@ -1,3 +1,5 @@
+![](docs/assets/logo_fwcp.png)
+
 # ClearPath — Prediction DAO Research
 
 Clear signals for collective decisions — ClearPath brings clarity to governance through futarchy-based decision-making, integrating privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
