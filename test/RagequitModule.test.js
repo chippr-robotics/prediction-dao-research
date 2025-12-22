@@ -125,7 +125,9 @@ describe("RagequitModule", function () {
   describe("Ragequit Execution", function () {
     beforeEach(async function () {
       const proposalId = 1;
-      const snapshotTime = Math.floor(Date.now() / 1000) + 1;
+      // Use blockchain time, not JavaScript time
+      const currentBlock = await ethers.provider.getBlock('latest');
+      const snapshotTime = currentBlock.timestamp + 10;
       const executionTime = snapshotTime + (10 * 24 * 60 * 60);
 
       await ragequitModule.openRagequitWindow(proposalId, snapshotTime, executionTime);
@@ -245,7 +247,9 @@ describe("RagequitModule", function () {
       const testToken = await MockERC20.connect(testOwner).deploy("Test Token", "TEST", ethers.parseEther("1000000"));
       
       const RagequitModule = await ethers.getContractFactory("RagequitModule");
-      const testModule = await RagequitModule.connect(testOwner).deploy(
+      const testModule = await RagequitModule.connect(testOwner).deploy();
+      await testModule.initialize(
+        testOwner.address,
         await testToken.getAddress(),
         testVault.address
       );
@@ -277,7 +281,9 @@ describe("RagequitModule", function () {
       const testToken = await MockERC20.connect(testOwner).deploy("Test Token", "TEST", ethers.parseEther("1000000"));
       
       const RagequitModule = await ethers.getContractFactory("RagequitModule");
-      const testModule = await RagequitModule.connect(testOwner).deploy(
+      const testModule = await RagequitModule.connect(testOwner).deploy();
+      await testModule.initialize(
+        testOwner.address,
         await testToken.getAddress(),
         testVault.address
       );
@@ -298,7 +304,9 @@ describe("RagequitModule", function () {
       const testToken = await MockERC20.connect(testOwner).deploy("Test Token", "TEST", ethers.parseEther("1000000"));
       
       const RagequitModule = await ethers.getContractFactory("RagequitModule");
-      const newRagequitModule = await RagequitModule.connect(testOwner).deploy(
+      const newRagequitModule = await RagequitModule.connect(testOwner).deploy();
+      await newRagequitModule.initialize(
+        testOwner.address,
         await testToken.getAddress(),
         emptyVault.address
       );
