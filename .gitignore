@@ -146,6 +146,7 @@ typechain-types
 
 # Gas reporter
 gas-report.txt
+gasReporterOutput.json
 
 # Security analysis tools
 .slither/
