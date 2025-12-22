@@ -1,9 +1,10 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-// NOTE: DAOFactory tests are skipped due to contract size exceeding EIP-170's 24KB limit
-// The contract deploys 6 sub-contracts in the constructor which increases bytecode size significantly
-// This is a known issue that needs to be addressed with contract refactoring (e.g., using minimal proxies)
+// NOTE: DAOFactory tests are skipped due to contract bytecode size exceeding EIP-170's 24KB limit (47KB actual)
+// The contract creates 6 sub-contracts (WelfareRegistry, ProposalRegistry, MarketFactory, PrivacyCoordinator, 
+// OracleResolver, RagequitModule) which bloats the bytecode. This would require architectural refactoring
+// (e.g., using minimal proxies or factory patterns) to fix. Prioritizing other low-coverage contracts instead.
 // See: https://eips.ethereum.org/EIPS/eip-170
 describe.skip("DAOFactory", function () {
   let daoFactory;
