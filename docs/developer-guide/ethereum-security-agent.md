@@ -384,7 +384,7 @@ To improve the agent teammate:
 
 ## License
 
-This agent configuration is part of the prediction-dao-research project and licensed under Apache 2.0.
+This agent configuration is part of the ClearPath project and licensed under Apache 2.0.
 
 ---
 
