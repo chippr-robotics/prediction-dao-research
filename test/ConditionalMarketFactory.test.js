@@ -427,4 +427,218 @@ describe("ConditionalMarketFactory", function () {
       ).to.be.revertedWith("Invalid market ID");
     });
   });
+
+  describe("ConditionalToken Tests", function () {
+    let passToken, failToken;
+
+    beforeEach(async function () {
+      const proposalId = 1;
+      const collateralToken = ethers.ZeroAddress;
+      const liquidityAmount = ethers.parseEther("1000");
+      const liquidityParameter = ethers.parseEther("100");
+      const tradingPeriod = 7 * 24 * 60 * 60;
+
+      await marketFactory.deployMarketPair(
+        proposalId,
+        collateralToken,
+        liquidityAmount,
+        liquidityParameter,
+        tradingPeriod
+      );
+
+      const market = await marketFactory.getMarket(0);
+      const ConditionalToken = await ethers.getContractFactory("ConditionalToken");
+      passToken = ConditionalToken.attach(market.passToken);
+      failToken = ConditionalToken.attach(market.failToken);
+    });
+
+    describe("Token Properties", function () {
+      it("Should have correct name and symbol", async function () {
+        expect(await passToken.name()).to.equal("PASS");
+        expect(await passToken.symbol()).to.equal("P");
+        expect(await failToken.name()).to.equal("FAIL");
+        expect(await failToken.symbol()).to.equal("F");
+      });
+
+      it("Should have 18 decimals", async function () {
+        expect(await passToken.decimals()).to.equal(18);
+      });
+
+      it("Should start with zero total supply", async function () {
+        expect(await passToken.totalSupply()).to.equal(0);
+      });
+    });
+
+    describe("Minting", function () {
+      it("Should allow minting tokens", async function () {
+        const amount = ethers.parseEther("100");
+        
+        await passToken.mint(owner.address, amount);
+        
+        expect(await passToken.totalSupply()).to.equal(amount);
+        expect(await passToken.balanceOf(owner.address)).to.equal(amount);
+      });
+
+      it("Should emit Transfer event on mint", async function () {
+        const amount = ethers.parseEther("100");
+        
+        await expect(passToken.mint(owner.address, amount))
+          .to.emit(passToken, "Transfer")
+          .withArgs(ethers.ZeroAddress, owner.address, amount);
+      });
+    });
+
+    describe("Burning", function () {
+      beforeEach(async function () {
+        const amount = ethers.parseEther("100");
+        await passToken.mint(owner.address, amount);
+      });
+
+      it("Should allow burning tokens", async function () {
+        const burnAmount = ethers.parseEther("50");
+        
+        await passToken.burn(owner.address, burnAmount);
+        
+        expect(await passToken.totalSupply()).to.equal(ethers.parseEther("50"));
+        expect(await passToken.balanceOf(owner.address)).to.equal(ethers.parseEther("50"));
+      });
+
+      it("Should emit Transfer event on burn", async function () {
+        const burnAmount = ethers.parseEther("50");
+        
+        await expect(passToken.burn(owner.address, burnAmount))
+          .to.emit(passToken, "Transfer")
+          .withArgs(owner.address, ethers.ZeroAddress, burnAmount);
+      });
+
+      it("Should reject burning more than balance", async function () {
+        const burnAmount = ethers.parseEther("200");
+        
+        await expect(
+          passToken.burn(owner.address, burnAmount)
+        ).to.be.revertedWith("Insufficient balance");
+      });
+    });
+
+    describe("Transfer", function () {
+      beforeEach(async function () {
+        const amount = ethers.parseEther("100");
+        await passToken.mint(owner.address, amount);
+      });
+
+      it("Should allow token transfer", async function () {
+        const transferAmount = ethers.parseEther("30");
+        
+        await passToken.transfer(addr1.address, transferAmount);
+        
+        expect(await passToken.balanceOf(owner.address)).to.equal(ethers.parseEther("70"));
+        expect(await passToken.balanceOf(addr1.address)).to.equal(transferAmount);
+      });
+
+      it("Should emit Transfer event", async function () {
+        const transferAmount = ethers.parseEther("30");
+        
+        await expect(passToken.transfer(addr1.address, transferAmount))
+          .to.emit(passToken, "Transfer")
+          .withArgs(owner.address, addr1.address, transferAmount);
+      });
+
+      it("Should reject transfer to zero address", async function () {
+        const transferAmount = ethers.parseEther("30");
+        
+        await expect(
+          passToken.transfer(ethers.ZeroAddress, transferAmount)
+        ).to.be.revertedWith("Transfer to zero address");
+      });
+
+      it("Should reject transfer with insufficient balance", async function () {
+        const transferAmount = ethers.parseEther("200");
+        
+        await expect(
+          passToken.transfer(addr1.address, transferAmount)
+        ).to.be.revertedWith("Insufficient balance");
+      });
+    });
+
+    describe("Approval and Allowance", function () {
+      it("Should allow setting allowance", async function () {
+        const approvalAmount = ethers.parseEther("50");
+        
+        await passToken.approve(addr1.address, approvalAmount);
+        
+        expect(await passToken.allowance(owner.address, addr1.address)).to.equal(approvalAmount);
+      });
+
+      it("Should emit Approval event", async function () {
+        const approvalAmount = ethers.parseEther("50");
+        
+        await expect(passToken.approve(addr1.address, approvalAmount))
+          .to.emit(passToken, "Approval")
+          .withArgs(owner.address, addr1.address, approvalAmount);
+      });
+
+      it("Should allow updating allowance", async function () {
+        await passToken.approve(addr1.address, ethers.parseEther("50"));
+        await passToken.approve(addr1.address, ethers.parseEther("100"));
+        
+        expect(await passToken.allowance(owner.address, addr1.address)).to.equal(ethers.parseEther("100"));
+      });
+    });
+
+    describe("TransferFrom", function () {
+      beforeEach(async function () {
+        const amount = ethers.parseEther("100");
+        await passToken.mint(owner.address, amount);
+        await passToken.approve(addr1.address, ethers.parseEther("50"));
+      });
+
+      it("Should allow transferFrom with approval", async function () {
+        const transferAmount = ethers.parseEther("30");
+        
+        await passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount);
+        
+        expect(await passToken.balanceOf(owner.address)).to.equal(ethers.parseEther("70"));
+        expect(await passToken.balanceOf(addr1.address)).to.equal(transferAmount);
+      });
+
+      it("Should decrease allowance after transferFrom", async function () {
+        const transferAmount = ethers.parseEther("30");
+        
+        await passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount);
+        
+        expect(await passToken.allowance(owner.address, addr1.address)).to.equal(ethers.parseEther("20"));
+      });
+
+      it("Should reject transferFrom without sufficient allowance", async function () {
+        const transferAmount = ethers.parseEther("60");
+        
+        await expect(
+          passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount)
+        ).to.be.revertedWith("Insufficient allowance");
+      });
+
+      it("Should emit Transfer event on transferFrom", async function () {
+        const transferAmount = ethers.parseEther("30");
+        
+        await expect(passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount))
+          .to.emit(passToken, "Transfer")
+          .withArgs(owner.address, addr1.address, transferAmount);
+      });
+    });
+
+    describe("Multiple Token Interactions", function () {
+      it("Should handle both pass and fail tokens independently", async function () {
+        await passToken.mint(owner.address, ethers.parseEther("100"));
+        await failToken.mint(owner.address, ethers.parseEther("200"));
+        
+        expect(await passToken.totalSupply()).to.equal(ethers.parseEther("100"));
+        expect(await failToken.totalSupply()).to.equal(ethers.parseEther("200"));
+        
+        await passToken.transfer(addr1.address, ethers.parseEther("50"));
+        
+        expect(await passToken.balanceOf(addr1.address)).to.equal(ethers.parseEther("50"));
+        expect(await failToken.balanceOf(addr1.address)).to.equal(0);
+      });
+    });
+  });
 });
