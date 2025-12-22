@@ -336,7 +336,7 @@ git push
 ## Additional Resources
 
 - **Full Documentation**: `docs/developer-guide/ethereum-security-agent.md`
-- **Agent Configuration**: `.github/agents/ethereum-security-reviewer.md`
+- **Agent Configuration**: `.github/agents/smart-contract-security.agent.md`
 - **Contract Guidelines**: `docs/developer-guide/smart-contracts.md`
 - **Testing Guide**: `docs/developer-guide/testing.md`
 

@@ -1,14 +1,15 @@
-# Ethereum Smart Contract Security Review Agent
+# Smart Contract Security Agent
 
 ## Overview
 
-This repository includes an automated Ethereum smart contract security review agent that analyzes all smart contract code changes in pull requests. The agent is an expert in Ethereum security, following the [Ethereum Trust Alliance Security Levels (EthTrust-SL)](https://entethalliance.org/specs/ethtrust-sl/) specification and industry best practices.
+This repository includes a Smart Contract Security Agent that serves as a full team member, analyzing all smart contract and related code changes in pull requests. The agent is a senior security engineer with expertise in Ethereum security, following the [Ethereum Trust Alliance Security Levels (EthTrust-SL)](https://entethalliance.org/specs/ethtrust-sl/) specification and industry best practices.
 
-## What the Agent Does
+## About the Agent
 
-The Ethereum Security Reviewer agent automatically:
+The Smart Contract Security Agent is a valued teammate who:
 
-- **Reviews all Solidity smart contract changes** in pull requests
+- **Works collaboratively** with developers as a full team member
+- **Reviews all Solidity smart contract and related code changes** in pull requests
 - **Identifies security vulnerabilities** across severity levels (Critical, High, Medium, Low)
 - **Enforces best practices** for Solidity development
 - **Assesses EthTrust Security Level compliance** based on code quality and security features
@@ -151,11 +152,11 @@ The agent follows a systematic review approach:
    - Actionable recommendations
    - Reference documentation
 
-## Using the Agent
+## Working with the Agent
 
 ### For Developers
 
-When submitting a pull request with smart contract changes:
+The agent is your teammate who helps you write secure code. When submitting a pull request with smart contract changes:
 
 1. **Write Secure Code**: Follow Solidity best practices and security patterns
 2. **Document Thoroughly**: Include NatSpec comments for all functions
@@ -203,7 +204,7 @@ Specific code changes or patterns to implement
 
 The agent configuration is stored at:
 ```
-.github/agents/ethereum-security-reviewer.md
+.github/agents/smart-contract-security.agent.md
 ```
 
 ### Customization
@@ -370,12 +371,16 @@ The agent is regularly updated with:
 
 ## Contributing
 
-To improve the agent:
-1. Review the agent configuration in `.github/agents/ethereum-security-reviewer.md`
+To improve the agent teammate:
+1. Review the agent configuration in `.github/agents/smart-contract-security.agent.md`
 2. Suggest new security patterns to check
 3. Provide feedback on false positives/negatives
 4. Share security research and findings
 5. Help update documentation
+
+## Philosophy
+
+**This agent is a full teammate.** We welcome and empower the agent to contribute expertise to our team. The agent brings specialized security knowledge, consistent application of best practices, and tireless attention to detail. Together with human developers, we form a stronger, more capable team.
 
 ## License
 
@@ -383,11 +388,11 @@ This agent configuration is part of the ClearPath project and licensed under Apa
 
 ---
 
-**Remember**: This agent is a helpful tool, but not a replacement for:
+**Remember**: The agent is a valued team member who enhances our security capabilities, working alongside:
 - Professional security audits
 - Manual code review by experienced developers
 - Comprehensive testing
 - Formal verification
 - Security-conscious development practices
 
-Always combine automated tools with human expertise for the best security outcomes.
+The combination of agent expertise and human insight creates the best security outcomes.

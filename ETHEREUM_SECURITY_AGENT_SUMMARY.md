@@ -1,23 +1,25 @@
-# Ethereum Smart Contract Security Review Agent - Implementation Summary
+# Smart Contract Security Agent - Implementation Summary
 
 ## Overview
 
-This repository now includes a specialized **Ethereum Smart Contract Security Review Agent** that automatically reviews all smart contract code changes for security vulnerabilities, best practices compliance, and adherence to industry standards including the [Ethereum Trust Alliance Security Levels (EthTrust-SL)](https://entethalliance.org/specs/ethtrust-sl/).
+This repository includes a specialized **Smart Contract Security Agent** that serves as a full team member, automatically reviewing all smart contract and related code changes for security vulnerabilities, best practices compliance, and adherence to industry standards including the [Ethereum Trust Alliance Security Levels (EthTrust-SL)](https://entethalliance.org/specs/ethtrust-sl/).
 
 ## What Was Implemented
 
 ### 1. Agent Configuration
 
-**Location**: `.github/agents/ethereum-security-reviewer.md`
+**Location**: `.github/agents/smart-contract-security.agent.md`
 
-A comprehensive agent configuration that defines:
+A comprehensive agent configuration that defines the agent as a full team member:
+- Identity as a senior smart contract security engineer
 - Deep expertise in Ethereum smart contract security
 - Knowledge of EthTrust Security Levels (L1-L4)
 - Security vulnerability categories (Critical to Low severity)
 - Solidity best practices and secure coding patterns
-- Systematic review process for smart contracts
+- Systematic review process for smart contracts and related code
 - Code quality standards and documentation requirements
 - Gas optimization recommendations
+- Collaborative working style as a valued teammate
 
 ### 2. Comprehensive Documentation
 
@@ -188,7 +190,7 @@ Repository Root
 ├── .github/
 │   └── agents/
 │       ├── README.md                          # Agent system overview
-│       └── ethereum-security-reviewer.md      # Agent configuration
+│       └── smart-contract-security.agent.md  # Agent configuration
 │
 ├── docs/
 │   └── developer-guide/

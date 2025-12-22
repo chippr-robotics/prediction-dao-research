@@ -1,17 +1,17 @@
-# Configuring the Ethereum Security Review Agent
+# Configuring the Smart Contract Security Agent
 
 ## Overview
 
-The Ethereum Security Review Agent can be customized to fit your project's specific security requirements and development workflow. This guide explains how to configure the agent, adjust security thresholds, and add custom rules.
+The Smart Contract Security Agent can be customized to fit your project's specific security requirements and development workflow. This guide explains how to configure the agent teammate, adjust security thresholds, and add custom rules.
 
 ## Agent Configuration File
 
 The agent is configured through the file:
 ```
-.github/agents/ethereum-security-reviewer.md
+.github/agents/smart-contract-security.agent.md
 ```
 
-This markdown file contains the agent's instructions, expertise areas, and review processes.
+This markdown file contains the agent's identity, instructions, expertise areas, and review processes as a full team member.
 
 ## Configuration Options
 
@@ -243,7 +243,7 @@ jobs:
       - name: Run Security Agent
         uses: github/copilot-agent@v1
         with:
-          agent: ethereum-security-reviewer
+          agent: smart-contract-security
           files: 'contracts/**/*.sol'
 ```
 
@@ -375,7 +375,7 @@ Track changes to agent configuration:
 git checkout -b update/security-agent-config
 
 # Edit configuration
-vim .github/agents/ethereum-security-reviewer.md
+vim .github/agents/smart-contract-security.agent.md
 
 # Commit with clear description
 git commit -m "Update security agent: add oracle manipulation checks"
@@ -399,8 +399,8 @@ After updating the agent configuration:
 ### Agent Not Reviewing PRs
 
 Check:
-- Agent configuration file exists at `.github/agents/ethereum-security-reviewer.md`
-- PR includes modified `.sol` files
+- Agent configuration file exists at `.github/agents/smart-contract-security.agent.md`
+- PR includes modified `.sol` files or related smart contract code
 - GitHub Actions has proper permissions
 - No syntax errors in configuration file
 

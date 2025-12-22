@@ -1,6 +1,6 @@
-# Ethereum Security Agent - Example Review
+# Smart Contract Security Agent - Example Reviews
 
-This document demonstrates how the Ethereum Security Review Agent works by showing examples of vulnerabilities it detects and the feedback it provides.
+This document demonstrates how the Smart Contract Security Agent works as a team member by showing examples of vulnerabilities it detects and the collaborative feedback it provides.
 
 ## Example 1: Reentrancy Vulnerability
 
