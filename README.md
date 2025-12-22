@@ -236,45 +236,18 @@ Run with coverage:
 npm run test:coverage
 ```
 
-### Automated Security Testing
+### Security Testing Documentation
 
-The repository includes automated workflows for:
+For comprehensive documentation on all testing and security analysis:
 
-- **Unit Testing**: Comprehensive test coverage for all contracts
-- **Gas Optimization**: Automated gas usage reporting
-- **Coverage Analysis**: Code coverage metrics
-- **Static Analysis**: Slither for vulnerability detection
-- **Symbolic Execution**: Manticore for deep analysis
-- **Fuzz Testing**: Medusa for property-based testing
+**[View Security Testing Documentation →](https://chippr-robotics.github.io/prediction-dao-research/security/)**
 
-See [CI_TESTING.md](CI_TESTING.md) for detailed documentation on the automated testing pipeline.
-
-### Running Security Tools Locally
-
-Install security analysis tools:
-```bash
-# Install Python tools
-pip install slither-analyzer manticore[native] crytic-compile solc-select
-
-# Install Medusa
-go install github.com/crytic/medusa@latest
-
-# Set Solidity compiler version
-solc-select install 0.8.24
-solc-select use 0.8.24
-```
-
-Run security analysis:
-```bash
-# Slither static analysis
-slither . --config-file slither.config.json
-
-# Manticore symbolic execution
-manticore contracts/ProposalRegistry.sol --contract ProposalRegistry --timeout 300
-
-# Medusa fuzz testing
-medusa fuzz --timeout 300
-```
+The security testing documentation covers:
+- **[Unit Testing](https://chippr-robotics.github.io/prediction-dao-research/security/unit-testing/)**: Hardhat test suite with gas reporting
+- **[Static Analysis](https://chippr-robotics.github.io/prediction-dao-research/security/static-analysis/)**: Slither for vulnerability detection
+- **[Symbolic Execution](https://chippr-robotics.github.io/prediction-dao-research/security/symbolic-execution/)**: Manticore for path exploration
+- **[Fuzz Testing](https://chippr-robotics.github.io/prediction-dao-research/security/fuzz-testing/)**: Medusa for property-based testing
+- **[CI/CD Configuration](https://chippr-robotics.github.io/prediction-dao-research/security/ci-configuration/)**: GitHub Actions workflow maintenance
 
 ### Test Structure
 
