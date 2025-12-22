@@ -217,19 +217,80 @@ The system uses four types of welfare metrics:
 
 ## Testing
 
-Run the test suite:
+The project includes comprehensive automated testing and security analysis:
+
+### Quick Start
+
+Run the complete test suite:
 ```bash
-npx hardhat test
+npm test
 ```
 
-Run specific test file:
+Run tests with gas reporting:
 ```bash
-npx hardhat test test/WelfareMetricRegistry.test.js
+npm run test:gas
 ```
 
 Run with coverage:
 ```bash
-npx hardhat coverage
+npm run test:coverage
+```
+
+### Automated Security Testing
+
+The repository includes automated workflows for:
+
+- **Unit Testing**: Comprehensive test coverage for all contracts
+- **Gas Optimization**: Automated gas usage reporting
+- **Coverage Analysis**: Code coverage metrics
+- **Static Analysis**: Slither for vulnerability detection
+- **Symbolic Execution**: Manticore for deep analysis
+- **Fuzz Testing**: Medusa for property-based testing
+
+See [CI_TESTING.md](CI_TESTING.md) for detailed documentation on the automated testing pipeline.
+
+### Running Security Tools Locally
+
+Install security analysis tools:
+```bash
+# Install Python tools
+pip install slither-analyzer manticore[native] crytic-compile solc-select
+
+# Install Medusa
+go install github.com/crytic/medusa@latest
+
+# Set Solidity compiler version
+solc-select install 0.8.24
+solc-select use 0.8.24
+```
+
+Run security analysis:
+```bash
+# Slither static analysis
+slither . --config-file slither.config.json
+
+# Manticore symbolic execution
+manticore contracts/ProposalRegistry.sol --contract ProposalRegistry --timeout 300
+
+# Medusa fuzz testing
+medusa fuzz --timeout 300
+```
+
+### Test Structure
+
+```
+test/
+├── ConditionalMarketFactory.test.js   # Market factory tests
+├── DAOFactory.test.js                 # DAO factory tests
+├── FutarchyGovernor.test.js          # Main governor tests
+├── OracleResolver.test.js            # Oracle resolution tests
+├── PrivacyCoordinator.test.js        # Privacy mechanism tests
+├── ProposalRegistry.test.js          # Proposal management tests
+├── RagequitModule.test.js            # Ragequit functionality tests
+├── WelfareMetricRegistry.test.js     # Welfare metrics tests
+└── fuzzing/                          # Fuzz test contracts
+    ├── ProposalRegistryFuzzTest.sol
+    └── WelfareMetricRegistryFuzzTest.sol
 ```
 
 ## Development
