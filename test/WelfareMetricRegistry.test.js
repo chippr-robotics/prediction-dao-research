@@ -11,6 +11,7 @@ describe("WelfareMetricRegistry", function () {
     
     const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
     welfareRegistry = await WelfareMetricRegistry.deploy();
+    await welfareRegistry.initialize(owner.address);
     await welfareRegistry.waitForDeployment();
   });
 

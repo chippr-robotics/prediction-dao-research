@@ -11,6 +11,7 @@ describe("ConditionalMarketFactory", function () {
     
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
+    await marketFactory.initialize(owner.address);
   });
 
   describe("Deployment", function () {

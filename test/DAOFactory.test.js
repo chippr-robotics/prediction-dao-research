@@ -1,11 +1,9 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-// NOTE: DAOFactory tests are skipped due to contract size exceeding EIP-170's 24KB limit
-// The contract deploys 6 sub-contracts in the constructor which increases bytecode size significantly
-// This is a known issue that needs to be addressed with contract refactoring (e.g., using minimal proxies)
-// See: https://eips.ethereum.org/EIPS/eip-170
-describe.skip("DAOFactory", function () {
+// Tests for DAOFactory using EIP-1167 Minimal Proxy Pattern
+// The factory now uses clones to stay under the 24KB contract size limit
+describe("DAOFactory", function () {
   let daoFactory;
   let owner;
   let addr1;
