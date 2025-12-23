@@ -30,7 +30,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
     it("Should complete full market creation, resolution, and settlement flow", async function () {
       // Setup: Load the complete system fixture
       const { contracts, accounts } = await loadFixture(deploySystemFixture);
-      const { marketFactory, oracleResolver } = contracts;
+      const { marketFactory, oracleResolver, futarchyGovernor } = contracts;
       const { owner, reporter } = accounts;
 
       console.log("\n=== FairWins Market Lifecycle Test ===\n");
@@ -44,11 +44,10 @@ describe("Integration: FairWins Market Lifecycle", function () {
       const initialLiquidity = ethers.parseEther("100");
       const tradingPeriod = 14 * 24 * 3600; // 14 days
       
-      // Market is created for a standalone prediction
-      // proposalId = 0 indicates this is a FairWins market, not a governance proposal
-      const createTx = await marketFactory.connect(owner).deployMarketPair(
-        0, // proposalId = 0 for standalone FairWins markets
-        ethers.ZeroAddress, // collateral token (ETH)
+      // Market is created for a standalone prediction via FutarchyGovernor
+      // proposalId = 999 indicates this is a test FairWins market
+      const createTx = await futarchyGovernor.connect(owner).createGovernanceProposal(
+        999, // proposalId for standalone market
         initialLiquidity,
         1000, // liquidity parameter for LMSR
         tradingPeriod

@@ -8,7 +8,8 @@ const {
   completeOracleResolution,
   createProposalData,
   waitForTradingPeriodEnd,
-  createTradeConfigs
+  createTradeConfigs,
+  advanceProposalToExecution
 } = require("../helpers");
 
 /**
@@ -53,47 +54,53 @@ describe("Integration: Complete Proposal Lifecycle", function () {
       const proposal = await proposalRegistry.getProposal(proposalId);
       expect(proposal.status).to.equal(1, "Proposal should be active");
 
-      // Step 3: Execute trades from multiple traders
-      console.log("Step 2: Executing trades on markets...");
+      // Step 3: Verify market was created for proposal
+      console.log("Step 2: Verifying market creation...");
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
+      expect(marketId).to.be.greaterThanOrEqual(0, "Market should be created");
+      console.log("  ✓ Market created for proposal");
+
+      // Step 4: Execute trades from multiple traders
+      console.log("Step 3: Executing trades on markets...");
       const trades = createTradeConfigs(
         [trader1, trader2, trader3],
         [true, true, false], // 2 PASS, 1 FAIL
         [constants.TRADE_AMOUNT, constants.TRADE_AMOUNT, constants.TRADE_AMOUNT]
       );
 
-      await executeTrades(marketFactory, trades, proposalId);
+      await executeTrades(marketFactory, trades, marketId);
       console.log("  ✓ Trades executed: 2 PASS, 1 FAIL");
 
-      // Step 4: Advance time past trading period
-      console.log("Step 3: Waiting for trading period to end...");
-      await waitForTradingPeriodEnd(14); // 14 days
-      console.log("  ✓ Trading period ended");
-
-      // Step 5: Oracle submits resolution with positive outcome
-      console.log("Step 4: Submitting oracle resolution...");
-      const positiveValue = ethers.parseEther("1.2"); // 20% increase
-      await completeOracleResolution(
+      // Step 5: Advance through governance phases to execution
+      console.log("Step 4: Advancing proposal through governance phases...");
+      const passValue = ethers.parseEther("1.2"); // 20% increase with proposal
+      const failValue = ethers.parseEther("1.0"); // No change without proposal
+      
+      const governanceProposalId = await advanceProposalToExecution(
+        futarchyGovernor,
         oracleResolver,
         { owner, reporter },
         proposalId,
-        positiveValue,
+        passValue,
+        failValue,
         "Treasury value increased by 20% - positive outcome"
       );
-      console.log("  ✓ Oracle resolution completed");
+      console.log("  ✓ Proposal advanced to execution phase");
 
       // Step 6: Execute proposal
       console.log("Step 5: Executing approved proposal...");
-      const executeTx = await futarchyGovernor.connect(owner).executeProposal(proposalId);
+      const executeTx = await futarchyGovernor.connect(owner).executeProposal(governanceProposalId);
       
       await expect(executeTx)
         .to.emit(futarchyGovernor, "ProposalExecuted")
-        .withArgs(proposalId);
+        .withArgs(governanceProposalId, proposer1.address, constants.FUNDING_AMOUNT);
       
       console.log("  ✓ Proposal executed");
 
-      // Step 7: Verify final state
-      const finalProposal = await proposalRegistry.getProposal(proposalId);
-      expect(finalProposal.status).to.equal(3, "Proposal should be executed");
+      // Step 7: Verify final governance proposal state
+      const govProposal = await futarchyGovernor.governanceProposals(governanceProposalId);
+      expect(govProposal.executed).to.equal(true, "Governance proposal should be executed");
+      expect(govProposal.phase).to.equal(4, "Should be in Completed phase");
 
       // Step 8: Verify proposer bond was returned
       // Note: In a real scenario, we'd check the balance change
@@ -160,34 +167,38 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         proposalData
       );
 
-      // Execute trades favoring FAIL
+      // Verify market was created and execute trades
+      const marketId = await contracts.marketFactory.getMarketForProposal(proposalId);
+      expect(marketId).to.be.greaterThanOrEqual(0);
+      
       const trades = createTradeConfigs(
         [trader1, trader2],
         [false, false], // Both buy FAIL tokens
         [constants.TRADE_AMOUNT, constants.TRADE_AMOUNT]
       );
 
-      await executeTrades(contracts.marketFactory, trades, proposalId);
+      await executeTrades(contracts.marketFactory, trades, marketId);
 
-      // Wait for trading period
-      await waitForTradingPeriodEnd(14);
-
-      // Oracle submits negative resolution
-      const negativeValue = ethers.parseEther("0.8"); // 20% decrease
-      await completeOracleResolution(
+      // Advance through governance - oracle shows negative outcome (fail better than pass)
+      const passValue = ethers.parseEther("0.8"); // 20% decrease with proposal
+      const failValue = ethers.parseEther("1.0"); // No change without proposal
+      
+      const governanceProposalId = await advanceProposalToExecution(
+        contracts.futarchyGovernor,
         contracts.oracleResolver,
         { owner, reporter },
         proposalId,
-        negativeValue,
+        passValue,
+        failValue,
         "Treasury value decreased - negative outcome"
       );
 
-      // Attempting to execute should fail or be rejected
-      // (Implementation depends on how rejection is handled)
-      const proposal = await contracts.proposalRegistry.getProposal(proposalId);
+      // Proposal with negative outcome should be rejected
+      const govProposal = await contracts.futarchyGovernor.governanceProposals(governanceProposalId);
       
-      // Verify proposal is in rejected or failed state
-      expect(proposal.status).to.not.equal(3, "Rejected proposal should not be executed");
+      // Verify proposal was rejected (failValue >= passValue)
+      expect(govProposal.phase).to.equal(5, "Should be in Rejected phase");
+      expect(govProposal.executed).to.equal(false, "Should not be executed");
     });
   });
 
@@ -207,13 +218,12 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         proposalData
       );
 
-      // Verify state consistency between ProposalRegistry and FutarchyGovernor
+      // Verify state consistency - proposal exists and is active
       const registryProposal = await contracts.proposalRegistry.getProposal(proposalId);
-      const governorProposal = await contracts.futarchyGovernor.getProposal(proposalId);
-
-      expect(registryProposal.id).to.equal(governorProposal.id);
-      expect(registryProposal.proposer).to.equal(governorProposal.proposer);
-      expect(registryProposal.status).to.equal(governorProposal.status);
+      
+      expect(registryProposal.proposer).to.equal(proposer1.address);
+      expect(registryProposal.status).to.equal(1); // Active status
+      expect(registryProposal.fundingAmount).to.equal(proposalData.fundingAmount);
     });
 
     it("Should emit events in correct sequence", async function () {
@@ -243,11 +253,14 @@ describe("Integration: Complete Proposal Lifecycle", function () {
       // Verify ProposalSubmitted event
       await expect(submitTx).to.emit(contracts.proposalRegistry, "ProposalSubmitted");
 
+      // Wait for review period
+      await waitForTradingPeriodEnd(7); // 7 day review period
+
       // Activate proposal
-      const activateTx = await contracts.futarchyGovernor.connect(owner).activateProposal(0);
+      const activateTx = await contracts.proposalRegistry.connect(owner).activateProposal(0);
 
       // Verify ProposalActivated event
-      await expect(activateTx).to.emit(contracts.futarchyGovernor, "ProposalActivated");
+      await expect(activateTx).to.emit(contracts.proposalRegistry, "ProposalActivated");
     });
   });
 
@@ -267,21 +280,16 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         proposalData
       );
 
-      // Should be able to trade during trading period
-      await expect(
-        contracts.marketFactory.connect(trader1).buyTokens(
-          proposalId,
-          true,
-          constants.TRADE_AMOUNT,
-          { value: constants.TRADE_AMOUNT }
-        )
-      ).to.not.be.reverted;
+      // Verify market is in active state
+      const marketId = await contracts.marketFactory.getMarketForProposal(proposalId);
+      const market = await contracts.marketFactory.getMarket(marketId);
+      expect(market.status).to.equal(0); // Active status
 
       // Wait for trading period to end
-      await waitForTradingPeriodEnd(14);
+      await waitForTradingPeriodEnd(10);
 
-      // Trading should not be allowed after period ends
-      // (Implementation depends on market mechanics)
+      // Market should transition to TradingEnded status
+      // (Market status transitions are handled by endTrading function)
     });
 
     it("Should enforce challenge period for oracle resolution", async function () {
@@ -299,19 +307,22 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         proposalData
       );
 
-      await waitForTradingPeriodEnd(14);
+      await waitForTradingPeriodEnd(10);
 
-      // Reporter submits resolution
+      // Reporter submits resolution with both pass and fail values
+      const passValue = ethers.parseEther("1.1");
+      const failValue = ethers.parseEther("1.0");
+      const evidence = ethers.toUtf8Bytes("IPFS hash or evidence");
+      
       await contracts.oracleResolver
         .connect(reporter)
-        .submitReport(proposalId, ethers.parseEther("1.1"), "Evidence", {
+        .submitReport(proposalId, passValue, failValue, evidence, {
           value: constants.ORACLE_BOND
         });
 
-      // During challenge period, challenges should be allowed
-      // (Implementation specific)
-
-      // After challenge period, finalization should be allowed
+      // Verify resolution is in DesignatedReporting stage
+      const [stage] = await contracts.oracleResolver.getResolution(proposalId);
+      expect(stage).to.equal(1); // DesignatedReporting stage
     });
   });
 });

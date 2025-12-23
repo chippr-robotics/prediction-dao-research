@@ -33,7 +33,7 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
       console.log(`✓ Proposal ${proposalId} activated`);
 
       // Get market ID
-      const marketId = await marketFactory.proposalMarkets(proposalId);
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
       console.log(`✓ Market ${marketId} created`);
 
       console.log("\n--- Step 2: Traders register public keys ---");
@@ -150,7 +150,7 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
         proposalData
       );
 
-      const marketId = await marketFactory.proposalMarkets(proposalId);
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
 
       console.log("\n--- Step 2: Register public key ---");
       const publicKey = ethers.keccak256(ethers.toUtf8Bytes("trader1-batch-key"));
@@ -220,7 +220,7 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
         proposalData
       );
 
-      const marketId = await marketFactory.proposalMarkets(proposalId);
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
 
       console.log("\n--- Step 2: Register initial public key ---");
       const publicKey1 = ethers.keccak256(ethers.toUtf8Bytes("initial-public-key"));
@@ -353,7 +353,7 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
         proposalData
       );
 
-      const marketId = await marketFactory.proposalMarkets(proposalId);
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
 
       console.log("\n--- Step 2: Register traders and submit positions ---");
       const publicKey1 = ethers.keccak256(ethers.toUtf8Bytes("trader1-key"));
@@ -457,7 +457,7 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
         proposalData
       );
 
-      const marketId = await marketFactory.proposalMarkets(proposalId);
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
 
       console.log("\n--- Step 2: Register traders ---");
       await privacyCoordinator.connect(trader1).registerPublicKey(
@@ -557,7 +557,7 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
         proposalData
       );
 
-      const marketId = await marketFactory.proposalMarkets(proposalId);
+      const marketId = await marketFactory.getMarketForProposal(proposalId);
       console.log(`✓ Proposal ${proposalId} → Market ${marketId}`);
 
       console.log("\n=== PHASE 2: PRIVACY SETUP ===");

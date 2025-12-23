@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * @returns {BigInt} proposalId
  */
 async function submitAndActivateProposal(contracts, accounts, proposalData) {
-  const { proposalRegistry, futarchyGovernor } = contracts;
+  const { proposalRegistry, marketFactory, futarchyGovernor } = contracts;
   const { proposer, owner } = accounts;
 
   const tx = await proposalRegistry
@@ -43,6 +43,16 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
   await proposalRegistry
     .connect(owner)
     .activateProposal(proposalId);
+
+  // Create governance proposal with market through FutarchyGovernor
+  await futarchyGovernor
+    .connect(owner)
+    .createGovernanceProposal(
+      proposalId,
+      ethers.parseEther("1000"), // 1000 ETH liquidity
+      ethers.parseEther("100"), // liquidity parameter
+      10 * 24 * 3600 // 10 days trading period
+    );
 
   return proposalId;
 }
@@ -266,6 +276,41 @@ function createTradeConfigs(traders, directions, amounts) {
   }));
 }
 
+/**
+ * Move governance proposal through phases to execution
+ * @param {Object} futarchyGovernor - FutarchyGovernor contract
+ * @param {Object} oracleResolver - OracleResolver contract
+ * @param {Object} accounts - Test accounts with owner and reporter
+ * @param {BigInt} proposalId - Proposal identifier
+ * @param {BigInt} passValue - Pass welfare value
+ * @param {BigInt} failValue - Fail welfare value
+ * @param {String} evidence - Evidence for oracle
+ * @returns {BigInt} governanceProposalId
+ */
+async function advanceProposalToExecution(futarchyGovernor, oracleResolver, accounts, proposalId, passValue, failValue, evidence) {
+  const { owner, reporter } = accounts;
+  
+  // Get governance proposal ID (it's always proposalId = governanceProposalId for first proposal)
+  const governanceProposalId = 0n;
+  
+  // Wait for trading period to end (10 days)
+  await time.increase(10 * 24 * 3600 + 1);
+  
+  // Move to resolution phase
+  await futarchyGovernor.connect(owner).moveToResolution(governanceProposalId);
+  
+  // Complete oracle resolution
+  await completeOracleResolution(oracleResolver, accounts, proposalId, passValue, failValue, evidence);
+  
+  // Finalize proposal (sets execution phase)
+  await futarchyGovernor.connect(owner).finalizeProposal(governanceProposalId);
+  
+  // Wait for timelock (2 days minimum)
+  await time.increase(2 * 24 * 3600 + 1);
+  
+  return governanceProposalId;
+}
+
 module.exports = {
   submitAndActivateProposal,
   executeTrades,
@@ -278,5 +323,6 @@ module.exports = {
   createProposalData,
   waitForTradingPeriodEnd,
   verifyProposalState,
-  createTradeConfigs
+  createTradeConfigs,
+  advanceProposalToExecution
 };

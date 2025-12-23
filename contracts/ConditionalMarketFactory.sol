@@ -9,6 +9,19 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @title ConditionalMarketFactory
  * @notice Automated deployment of pass-fail market pairs using Gnosis CTF standards
  * @dev Creates conditional prediction markets for proposals
+ * 
+ * TRADING INTEGRATION:
+ * This contract handles market creation and settlement. Trading operations are
+ * intended to be handled by ETC Swap v3 contracts (https://github.com/etcswap/v3-core).
+ * The buyTokens/sellTokens functions currently provide simplified placeholder implementations
+ * for testing and will be replaced with proper ETC Swap integration in production.
+ * 
+ * Integration approach:
+ * 1. ConditionalMarketFactory creates PASS/FAIL token pairs
+ * 2. ETC Swap pools are created for PASS/ETH and FAIL/ETH trading pairs
+ * 3. Liquidity is provided to ETC Swap pools
+ * 4. Users trade through ETC Swap's battle-tested DEX infrastructure
+ * 5. ConditionalMarketFactory handles final settlement based on oracle outcomes
  */
 contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     struct Market {
@@ -63,6 +76,22 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 liquidityParameter,
         uint256 createdAt,
         address creator
+    );
+    
+    event TokensPurchased(
+        uint256 indexed marketId,
+        address indexed buyer,
+        bool indexed buyPass,
+        uint256 collateralAmount,
+        uint256 tokenAmount
+    );
+    
+    event TokensSold(
+        uint256 indexed marketId,
+        address indexed seller,
+        bool indexed sellPass,
+        uint256 tokenAmount,
+        uint256 collateralAmount
     );
     
     event MarketStatusChanged(
@@ -233,6 +262,82 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         }
         
         emit BatchMarketsCreated(marketIds, block.timestamp, params.length);
+    }
+
+    /**
+     * @notice Buy outcome tokens (placeholder for ETC Swap integration)
+     * @dev This is a temporary implementation for testing. In production, this will
+     *      integrate with ETC Swap v3 contracts for actual DEX trading.
+     *      See: https://github.com/etcswap/v3-core
+     * @param marketId ID of the market
+     * @param buyPass True to buy PASS tokens, false for FAIL tokens
+     * @param amount Amount of collateral to spend
+     * @return tokenAmount Amount of outcome tokens received
+     */
+    function buyTokens(
+        uint256 marketId,
+        bool buyPass,
+        uint256 amount
+    ) external payable nonReentrant returns (uint256 tokenAmount) {
+        require(marketId < marketCount, "Invalid market ID");
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.Active, "Market not active");
+        require(block.timestamp < market.tradingEndTime, "Trading period ended");
+        require(msg.value == amount, "Incorrect ETH amount");
+        require(amount > 0, "Amount must be positive");
+
+        // TODO: Integrate with ETC Swap v3 for actual DEX trading
+        // This simplified implementation mints tokens directly for testing
+        // Production should route through ETC Swap pools
+        tokenAmount = (amount * 1e18) / 1e15; // Simplified: 1000 tokens per ETH
+        
+        // Mint tokens to buyer
+        ConditionalToken token = ConditionalToken(buyPass ? market.passToken : market.failToken);
+        token.mint(msg.sender, tokenAmount);
+        
+        // Update market liquidity
+        market.totalLiquidity += amount;
+        
+        emit TokensPurchased(marketId, msg.sender, buyPass, amount, tokenAmount);
+    }
+    
+    /**
+     * @notice Sell outcome tokens (placeholder for ETC Swap integration)
+     * @dev This is a temporary implementation for testing. In production, this will
+     *      integrate with ETC Swap v3 contracts for actual DEX trading.
+     * @param marketId ID of the market
+     * @param sellPass True to sell PASS tokens, false for FAIL tokens
+     * @param tokenAmount Amount of tokens to sell
+     * @return collateralAmount Amount of collateral received
+     */
+    function sellTokens(
+        uint256 marketId,
+        bool sellPass,
+        uint256 tokenAmount
+    ) external nonReentrant returns (uint256 collateralAmount) {
+        require(marketId < marketCount, "Invalid market ID");
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.Active, "Market not active");
+        require(block.timestamp < market.tradingEndTime, "Trading period ended");
+        require(tokenAmount > 0, "Amount must be positive");
+
+        // TODO: Integrate with ETC Swap v3 for actual DEX trading
+        // Burn tokens from seller
+        ConditionalToken token = ConditionalToken(sellPass ? market.passToken : market.failToken);
+        token.burn(msg.sender, tokenAmount);
+        
+        // Calculate collateral to return using simplified pricing
+        collateralAmount = (tokenAmount * 1e15) / 1e18; // Inverse of buy pricing
+        require(collateralAmount <= market.totalLiquidity, "Insufficient liquidity");
+        
+        // Update market liquidity
+        market.totalLiquidity -= collateralAmount;
+        
+        // Transfer collateral to seller
+        (bool success, ) = payable(msg.sender).call{value: collateralAmount}("");
+        require(success, "Transfer failed");
+        
+        emit TokensSold(marketId, msg.sender, sellPass, tokenAmount, collateralAmount);
     }
 
     /**

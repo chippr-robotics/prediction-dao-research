@@ -114,7 +114,12 @@ async function deploySystemFixture() {
   );
   await welfareRegistry.connect(owner).activateMetric(1);
   
-  // Note: Ownership NOT transferred to FutarchyGovernor in fixture
+  // Transfer ownership of key contracts to FutarchyGovernor
+  // This allows the governor to coordinate market creation and resolution
+  await marketFactory.connect(owner).transferOwnership(await futarchyGovernor.getAddress());
+  await ragequitModule.connect(owner).transferOwnership(await futarchyGovernor.getAddress());
+  
+  // Note: ProposalRegistry and OracleResolver remain under owner control
   // This allows tests to use the owner account directly for simpler setup
   // Individual tests can transfer ownership if needed for specific scenarios
 
