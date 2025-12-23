@@ -16,6 +16,14 @@ module.exports = {
     hardhat: {
       chainId: 1337,
       allowUnlimitedContractSize: true,
+      accounts: {
+        count: 20, // More accounts for integration tests
+        accountsBalance: "10000000000000000000000", // 10,000 ETH each
+      },
+      mining: {
+        auto: true,
+        interval: 0,
+      },
     },
     localhost: {
       url: "http://127.0.0.1:8545",
@@ -31,6 +39,9 @@ module.exports = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
+  },
+  mocha: {
+    timeout: 120000, // 2 minutes for integration tests
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS ? true : false,
