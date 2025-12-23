@@ -35,8 +35,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     // Market ID => Market
     mapping(uint256 => Market) public markets;
     
-    // Proposal ID => Market ID
-    mapping(uint256 => uint256) public proposalToMarket;
+    // Proposal ID => Market ID (marketId + 1 to avoid 0 confusion)
+    mapping(uint256 => uint256) private _proposalToMarketPlusOne;
     
     // Market status tracking for efficient querying
     mapping(MarketStatus => uint256[]) private marketsByStatus;
@@ -129,7 +129,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 liquidityParameter,
         uint256 tradingPeriod
     ) external onlyOwner returns (uint256 marketId) {
-        require(proposalToMarket[proposalId] == 0, "Market already exists");
+        require(_proposalToMarketPlusOne[proposalId] == 0, "Market already exists");
         require(tradingPeriod >= MIN_TRADING_PERIOD && tradingPeriod <= MAX_TRADING_PERIOD, "Invalid trading period");
 
         marketId = marketCount++;
@@ -152,7 +152,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             status: MarketStatus.Active
         });
 
-        proposalToMarket[proposalId] = marketId;
+        _proposalToMarketPlusOne[proposalId] = marketId + 1;
         
         // Update indexes
         _updateMarketIndex(marketId, MarketStatus.Active);
@@ -184,7 +184,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         marketIds = new uint256[](params.length);
         
         for (uint256 i = 0; i < params.length; ) {
-            require(proposalToMarket[params[i].proposalId] == 0, "Market already exists");
+            require(_proposalToMarketPlusOne[params[i].proposalId] == 0, "Market already exists");
             require(
                 params[i].tradingPeriod >= MIN_TRADING_PERIOD && 
                 params[i].tradingPeriod <= MAX_TRADING_PERIOD,
@@ -212,7 +212,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 status: MarketStatus.Active
             });
             
-            proposalToMarket[params[i].proposalId] = marketId;
+            _proposalToMarketPlusOne[params[i].proposalId] = marketId + 1;
             
             // Update indexes
             _updateMarketIndex(marketId, MarketStatus.Active);
@@ -396,7 +396,18 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
      * @param proposalId ID of the proposal
      */
     function getMarketForProposal(uint256 proposalId) external view returns (uint256) {
-        return proposalToMarket[proposalId];
+        uint256 marketIdPlusOne = _proposalToMarketPlusOne[proposalId];
+        require(marketIdPlusOne > 0, "No market for proposal");
+        return marketIdPlusOne - 1;
+    }
+    
+    /**
+     * @notice Check if a proposal has a market
+     * @param proposalId ID of the proposal
+     * @return bool True if market exists
+     */
+    function hasMarketForProposal(uint256 proposalId) external view returns (bool) {
+        return _proposalToMarketPlusOne[proposalId] > 0;
     }
     
     /**
