@@ -98,7 +98,8 @@ describe("Integration: Ragequit Protection Flow", function () {
 
       // Calculate expected treasury share
       const totalSupply = await governanceToken.totalSupply();
-      const treasuryBalance = await ethers.provider.getBalance(owner.address);
+      const treasuryVault = await ragequitModule.treasuryVault();
+      const treasuryBalance = await ethers.provider.getBalance(treasuryVault);
       const expectedShare = (treasuryBalance * ragequitTokenAmount) / totalSupply;
 
       // Execute ragequit
@@ -127,17 +128,21 @@ describe("Integration: Ragequit Protection Flow", function () {
       const hasRagequit = await ragequitModule.hasRagequit(trader1.address, proposalId);
       expect(hasRagequit).to.be.true;
 
-      // Verify no longer eligible
+      // Verify isEligible returns false after ragequit (blocked by hasRagequit flag)
       const stillEligible = await ragequitModule.isEligible(proposalId, trader1.address);
       expect(stillEligible).to.be.false;
 
       // Verify tokens were transferred to module
       const trader1FinalTokenBalance = await governanceToken.balanceOf(trader1.address);
       expect(trader1FinalTokenBalance).to.equal(trader1InitialTokenBalance - ragequitTokenAmount);
+      
+      // Verify module received the tokens
+      const moduleTokenBalance = await governanceToken.balanceOf(await ragequitModule.getAddress());
+      expect(moduleTokenBalance).to.be.gte(ragequitTokenAmount);
 
       // Verify ETH was received (approximately, accounting for gas)
       const trader1FinalBalance = await ethers.provider.getBalance(trader1.address);
-      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const gasUsed = receipt.fee ?? (receipt.gasUsed * ragequitTx.gasPrice);
       // Allow generous variance for gas costs and timing
       expect(trader1FinalBalance).to.be.closeTo(
         trader1InitialBalance + expectedShare - gasUsed,
@@ -151,7 +156,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should handle multiple token holders ragequitting", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -216,7 +220,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should prevent ragequit after proposal execution", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -264,7 +267,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should prevent ineligible users from ragequitting", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -310,7 +312,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should prevent ragequit after window closes", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -362,7 +363,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should calculate proportional treasury share correctly", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -393,7 +393,8 @@ describe("Integration: Ragequit Protection Flow", function () {
       console.log("\n--- Test proportional calculation ---");
       const ragequitAmount = ethers.parseEther("1000"); // 1000 tokens
       const totalSupply = await governanceToken.totalSupply();
-      const treasuryBalance = await ethers.provider.getBalance(owner.address);
+      const treasuryVault = await ragequitModule.treasuryVault();
+      const treasuryBalance = await ethers.provider.getBalance(treasuryVault);
 
       const calculatedShare = await ragequitModule.calculateTreasuryShare(
         trader1.address,
@@ -415,7 +416,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should reject double ragequit from same user", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -469,7 +469,6 @@ describe("Integration: Ragequit Protection Flow", function () {
     it("Should handle zero treasury balance gracefully", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
-        proposalRegistry,
         ragequitModule,
         governanceToken
       } = contracts;
@@ -497,10 +496,11 @@ describe("Integration: Ragequit Protection Flow", function () {
 
       await ragequitModule.connect(owner).setEligible(proposalId, trader1.address);
 
-      // Calculate share with minimal treasury (owner address used as treasury)
+      // Calculate share with minimal treasury (treasury vault address used as treasury)
       const ragequitAmount = ethers.parseEther("500");
       const totalSupply = await governanceToken.totalSupply();
-      const treasuryBalance = await ethers.provider.getBalance(owner.address);
+      const treasuryVault = await ragequitModule.treasuryVault();
+      const treasuryBalance = await ethers.provider.getBalance(treasuryVault);
       const expectedShare = (treasuryBalance * ragequitAmount) / totalSupply;
 
       const calculatedShare = await ragequitModule.calculateTreasuryShare(
