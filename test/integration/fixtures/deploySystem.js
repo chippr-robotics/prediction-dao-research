@@ -114,10 +114,20 @@ async function deploySystemFixture() {
   );
   await welfareRegistry.connect(owner).activateMetric(1);
   
+  // Fund FutarchyGovernor with ETH for proposal execution
+  await owner.sendTransaction({
+    to: await futarchyGovernor.getAddress(),
+    value: ethers.parseEther("5000") // 5,000 ETH for testing
+  });
+  
   // Transfer ownership of key contracts to FutarchyGovernor
   // This allows the governor to coordinate market creation and resolution
   await marketFactory.connect(owner).transferOwnership(await futarchyGovernor.getAddress());
   await ragequitModule.connect(owner).transferOwnership(await futarchyGovernor.getAddress());
+  
+  // Grant FutarchyGovernor permission to return bonds on ProposalRegistry
+  // (ProposalRegistry remains owned by owner for activation control)
+  await proposalRegistry.connect(owner).setGovernor(await futarchyGovernor.getAddress());
   
   // Note: ProposalRegistry and OracleResolver remain under owner control
   // This allows tests to use the owner account directly for simpler setup

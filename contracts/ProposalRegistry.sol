@@ -56,6 +56,9 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     uint256 public constant REVIEW_PERIOD = 7 days;
     uint256 public constant MAX_PROPOSAL_AMOUNT = 50000 ether; // 50k ETC max
 
+    // FutarchyGovernor address - allowed to return bonds
+    address public governor;
+
     bool private _initialized;
 
     event ProposalSubmitted(
@@ -70,6 +73,12 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     event ProposalActivated(uint256 indexed proposalId);
     event BondForfeited(uint256 indexed proposalId, address indexed proposer);
     event BondReturned(uint256 indexed proposalId, address indexed proposer);
+    event GovernorSet(address indexed governor);
+
+    modifier onlyOwnerOrGovernor() {
+        require(msg.sender == owner() || msg.sender == governor, "Not authorized");
+        _;
+    }
 
     constructor() Ownable(msg.sender) {}
 
@@ -187,6 +196,16 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Set the governor address that can return bonds
+     * @param _governor Address of the FutarchyGovernor contract
+     */
+    function setGovernor(address _governor) external onlyOwner {
+        require(_governor != address(0), "Invalid governor address");
+        governor = _governor;
+        emit GovernorSet(_governor);
+    }
+
+    /**
      * @notice Activate proposal after review period
      * @param proposalId ID of the proposal
      */
@@ -216,7 +235,7 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
      * @notice Return bond after successful resolution
      * @param proposalId ID of the proposal
      */
-    function returnBond(uint256 proposalId) external onlyOwner nonReentrant {
+    function returnBond(uint256 proposalId) external onlyOwnerOrGovernor nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.bondAmount > 0, "Bond already returned");
 
