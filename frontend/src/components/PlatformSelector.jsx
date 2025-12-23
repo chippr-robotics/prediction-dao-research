@@ -7,7 +7,7 @@ function PlatformSelector({ onSelectPlatform }) {
       <section className="selector-hero">
         <div className="hero-content">
           <img 
-            src="/docs/assets/logo_fwcp.png" 
+            src="/logo_fwcp.png" 
             alt="ClearPath & FairWins Logo" 
             className="hero-logo"
           />
@@ -26,7 +26,7 @@ function PlatformSelector({ onSelectPlatform }) {
             <div className="platform-card clearpath">
               <div className="platform-logo">
                 <img 
-                  src="/docs/assets/logo_clearpath.png" 
+                  src="/logo_clearpath.png" 
                   alt="ClearPath Logo" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
@@ -62,7 +62,7 @@ function PlatformSelector({ onSelectPlatform }) {
             <div className="platform-card fairwins">
               <div className="platform-logo">
                 <img 
-                  src="/docs/assets/logo_fairwins.png" 
+                  src="/logo_fairwins.png" 
                   alt="FairWins Logo" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}

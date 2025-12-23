@@ -20,7 +20,7 @@ function FairWinsApp({ provider, signer, account, onDisconnect, onBack }) {
             <div className="branding">
               <div className="brand-logo">
                 <img 
-                  src="/docs/assets/logo_fairwins.png" 
+                  src="/logo_fairwins.png" 
                   alt="FairWins Logo" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none' }}

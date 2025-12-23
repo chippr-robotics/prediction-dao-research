@@ -19,7 +19,7 @@ function ClearPathApp({ provider, signer, account, onDisconnect, onBack }) {
             <div className="branding">
               <div className="brand-logo">
                 <img 
-                  src="/docs/assets/logo_clearpath.png" 
+                  src="/logo_clearpath.png" 
                   alt="ClearPath Logo" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none' }}
