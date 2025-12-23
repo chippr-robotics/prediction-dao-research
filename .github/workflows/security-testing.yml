@@ -112,7 +112,7 @@ jobs:
 
       - name: Run Slither analysis
         run: |
-          slither . --config-file slither.config.json || true
+          slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md || true
 
       - name: Upload Slither reports
         uses: actions/upload-artifact@v4

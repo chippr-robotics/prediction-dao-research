@@ -7,9 +7,6 @@
   "exclude_medium": false,
   "exclude_high": false,
   "json": "slither-report.json",
-  "markdown-root": ".",
-  "checklist": true,
-  "markdown": "slither-report.md",
   "solc_remaps": [
     "@openzeppelin/contracts=node_modules/@openzeppelin/contracts"
   ],
