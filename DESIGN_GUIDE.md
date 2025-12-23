@@ -322,32 +322,184 @@ Current palette meets these requirements:
 - Secondary text (#94a3b8) on dark bg: 7.8:1 ✓
 
 #### Keyboard Navigation
-- All interactive elements must be keyboard accessible
-- Visible focus indicators (ring or outline)
-- Logical tab order following visual flow
-- Skip links for main content
+All interactive elements must be keyboard accessible with proper focus management.
 
+**Requirements**:
+- All interactive elements must be focusable (buttons, links, form controls)
+- Interactive `<div>` elements must have `role="button"`, `tabIndex="0"`, and keyboard event handlers
+- Visible focus indicators on all focusable elements
+- Logical tab order following visual flow (top to bottom, left to right)
+- Skip links for main content navigation
+- Modal dialogs must trap focus within the modal
+- No keyboard traps - users can always navigate away
+
+**Focus Indicator Standard**:
 ```css
-:focus-visible {
+/* Global focus style - REQUIRED */
+*:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* For browsers without :focus-visible support */
+@supports not selector(:focus-visible) {
+  *:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+/* Never remove focus outline without replacement */
+/* ❌ WRONG */
+input:focus {
+  outline: none;
+}
+
+/* ✅ CORRECT */
+input:focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;
 }
 ```
 
-#### Screen Reader Support
-- Use semantic HTML (`<button>`, `<nav>`, `<main>`, `<article>`)
-- Provide alt text for all images
-- Use ARIA labels for icon-only buttons
-- Announce dynamic content changes with ARIA live regions
+**Interactive Card Pattern**:
+```jsx
+// For clickable cards, use proper keyboard support
+<div
+  role="button"
+  tabIndex="0"
+  onClick={handleClick}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  }}
+  aria-label="Descriptive label for card"
+>
+  {content}
+</div>
+```
 
+#### Screen Reader Support
+Use semantic HTML and ARIA attributes for screen reader compatibility.
+
+**Requirements**:
+- Use semantic HTML5 elements (`<button>`, `<nav>`, `<main>`, `<article>`, `<header>`, `<footer>`)
+- Provide descriptive alt text for all images
+- Use ARIA labels for icon-only buttons
+- Use ARIA live regions to announce dynamic content changes
+- Form inputs must have associated `<label>` elements with matching `htmlFor`/`id`
+- Use `aria-describedby` to associate help text with inputs
+- Use `aria-invalid` and `role="alert"` for error messages
+
+**ARIA Live Regions for Dynamic Updates**:
+```jsx
+// Add a global announcement region for status updates
+<div 
+  role="status" 
+  aria-live="polite" 
+  aria-atomic="true"
+  className="sr-only"
+>
+  {announcement}
+</div>
+
+// CSS for screen-reader-only content
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+```
+
+**Icon Buttons**:
 ```jsx
 <button aria-label="Connect wallet">
-  <WalletIcon />
+  <WalletIcon aria-hidden="true" />
 </button>
+```
 
-<div role="status" aria-live="polite">
-  {statusMessage}
-</div>
+**Status Announcements**:
+```jsx
+// Announce wallet connection status
+const announce = (message) => {
+  setAnnouncement(message)
+  setTimeout(() => setAnnouncement(''), 1000)
+}
+
+// Usage
+announce('Wallet connected successfully')
+announce('Transaction pending...')
+announce('Proposal submitted')
+```
+
+#### Tab Navigation (ARIA Tabs Pattern)
+For tab-based interfaces, use proper ARIA roles and keyboard navigation.
+
+**Requirements**:
+- Use `role="tablist"` on the container
+- Use `role="tab"` on each tab button
+- Use `role="tabpanel"` on each content panel
+- Use `aria-selected` to indicate active tab
+- Use `aria-controls` to link tabs to panels
+- Support arrow key navigation between tabs
+- Only the active tab should have `tabIndex="0"`
+
+**Complete Tab Implementation**:
+```jsx
+function Dashboard({ activeTab, setActiveTab }) {
+  const tabs = ['daos', 'proposals', 'metrics', 'launchpad']
+  
+  const handleTabKeyDown = (e, currentTab) => {
+    const currentIndex = tabs.indexOf(currentTab)
+    
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      const nextIndex = (currentIndex + 1) % tabs.length
+      setActiveTab(tabs[nextIndex])
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
+      setActiveTab(tabs[prevIndex])
+    }
+  }
+  
+  return (
+    <>
+      <div className="tabs" role="tablist" aria-label="Dashboard Navigation">
+        <button
+          role="tab"
+          aria-selected={activeTab === 'daos'}
+          aria-controls="daos-panel"
+          id="daos-tab"
+          tabIndex={activeTab === 'daos' ? 0 : -1}
+          onClick={() => setActiveTab('daos')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'daos')}
+        >
+          My DAOs
+        </button>
+        {/* More tabs... */}
+      </div>
+      
+      <div
+        role="tabpanel"
+        id="daos-panel"
+        aria-labelledby="daos-tab"
+        hidden={activeTab !== 'daos'}
+        tabIndex="0"
+      >
+        {activeTab === 'daos' && <DAOList />}
+      </div>
+    </>
+  )
+}
 ```
 
 #### Motion & Animation
@@ -364,23 +516,164 @@ Respect `prefers-reduced-motion` for users with vestibular disorders:
 ```
 
 #### Form Accessibility
-- Label all form inputs
-- Provide helpful error messages
-- Use appropriate input types
-- Group related inputs with fieldset
+Forms must be fully accessible with proper labels, error handling, and validation feedback.
 
+**Requirements**:
+- All form inputs must have associated `<label>` elements
+- Use `htmlFor` attribute on labels matching input `id`
+- Required fields must have `required` attribute and `aria-required="true"`
+- Use `aria-describedby` to link help text with inputs
+- Error messages must be inline and use `role="alert"` with `aria-live="assertive"`
+- Invalid inputs must have `aria-invalid="true"`
+- Focus first error field when validation fails
+- Preserve form state on errors (don't clear fields)
+
+**Complete Form Pattern**:
 ```jsx
-<label htmlFor="proposalTitle">
-  Proposal Title
-  <span className="required" aria-label="required">*</span>
-</label>
-<input 
-  id="proposalTitle"
-  type="text"
-  required
-  aria-describedby="titleHelp"
-/>
-<small id="titleHelp">Brief, descriptive title for your proposal</small>
+const [errors, setErrors] = useState({})
+const titleRef = useRef(null)
+
+const validateForm = () => {
+  const newErrors = {}
+  if (!formData.title.trim()) {
+    newErrors.title = 'Proposal title is required'
+  }
+  setErrors(newErrors)
+  
+  // Focus first error
+  if (Object.keys(newErrors).length > 0) {
+    titleRef.current?.focus()
+  }
+  
+  return Object.keys(newErrors).length === 0
+}
+
+// In JSX:
+<div className="form-group">
+  <label htmlFor="proposalTitle">
+    Proposal Title
+    <span className="required" aria-label="required">*</span>
+  </label>
+  <input 
+    ref={titleRef}
+    id="proposalTitle"
+    type="text"
+    value={formData.title}
+    onChange={handleChange}
+    required
+    aria-required="true"
+    aria-describedby="titleHelp"
+    aria-invalid={errors.title ? "true" : "false"}
+  />
+  <small id="titleHelp">Brief, descriptive title for your proposal</small>
+  {errors.title && (
+    <span 
+      className="error-text" 
+      role="alert"
+      aria-live="assertive"
+    >
+      {errors.title}
+    </span>
+  )}
+</div>
+```
+
+**Error Styling**:
+```css
+.error-text {
+  color: var(--danger-color);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: var(--danger-color);
+}
+```
+
+#### Color Independence
+Information must never be conveyed by color alone - always use additional visual indicators.
+
+**Requirements**:
+- Use icons + color for status indicators (not color alone)
+- Text labels must accompany all color-coded information
+- Charts and graphs must use patterns or textures in addition to color
+- Different shapes or icons for different data categories
+
+**Status Indicator Pattern**:
+```jsx
+// ❌ WRONG - Color only
+<span className="status-badge" style={{ backgroundColor: statusColor }}>
+  {status}
+</span>
+
+// ✅ CORRECT - Icon + Color + Text
+function StatusBadge({ status }) {
+  const icons = {
+    'Active': '✓',
+    'Reviewing': '⏳',
+    'Cancelled': '⛔',
+    'Executed': '✅',
+    'Forfeited': '❌'
+  }
+  
+  return (
+    <span className={`status-badge status-${status.toLowerCase()}`}>
+      <span className="status-icon" aria-hidden="true">
+        {icons[status]}
+      </span>
+      {status}
+    </span>
+  )
+}
+```
+
+**PASS/FAIL Token Pattern**:
+```jsx
+// Market price indicators with icons
+<div className="price-item pass">
+  <span className="token-icon" aria-hidden="true">↑</span>
+  <label>PASS Token</label>
+  <div className="price">0.52 ETC</div>
+  <div className="probability">52% probability</div>
+</div>
+
+<div className="price-item fail">
+  <span className="token-icon" aria-hidden="true">↓</span>
+  <label>FAIL Token</label>
+  <div className="price">0.48 ETC</div>
+  <div className="probability">48% probability</div>
+</div>
+```
+
+**CSS for Status Colors**:
+```css
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.status-active {
+  background: var(--success-color);
+  color: white;
+}
+
+.status-reviewing {
+  background: var(--warning-color);
+  color: white;
+}
+
+.status-forfeited {
+  background: var(--danger-color);
+  color: white;
+}
 ```
 
 ---
