@@ -29,6 +29,7 @@ contract RagequitModule is Ownable, ReentrancyGuard {
 
     address public governanceToken;
     address public treasuryVault;
+    address public governor; // FutarchyGovernor address
     
     uint256 public constant RAGEQUIT_WINDOW = 7 days;
 
@@ -41,6 +42,12 @@ contract RagequitModule is Ownable, ReentrancyGuard {
         uint256 tokenAmount,
         uint256 treasuryShare
     );
+    event GovernorSet(address indexed governor);
+
+    modifier onlyOwnerOrGovernor() {
+        require(msg.sender == owner() || msg.sender == governor, "Not authorized");
+        _;
+    }
 
     constructor() Ownable(msg.sender) {}
 
@@ -66,6 +73,16 @@ contract RagequitModule is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Set the governor address that can manage ragequit windows
+     * @param _governor Address of the FutarchyGovernor contract
+     */
+    function setGovernor(address _governor) external onlyOwner {
+        require(_governor != address(0), "Invalid governor address");
+        governor = _governor;
+        emit GovernorSet(_governor);
+    }
+
+    /**
      * @notice Open ragequit window for a proposal
      * @param proposalId ID of the proposal
      * @param snapshotTime Time of token snapshot
@@ -75,7 +92,7 @@ contract RagequitModule is Ownable, ReentrancyGuard {
         uint256 proposalId,
         uint256 snapshotTime,
         uint256 executionTime
-    ) external onlyOwner {
+    ) external onlyOwnerOrGovernor {
         require(executionTime > snapshotTime, "Invalid execution time");
         require(ragequitWindows[proposalId].snapshotTime == 0, "Window already opened");
 
@@ -158,7 +175,7 @@ contract RagequitModule is Ownable, ReentrancyGuard {
      * @notice Mark proposal as executed, closing ragequit window
      * @param proposalId ID of the proposal
      */
-    function markProposalExecuted(uint256 proposalId) external onlyOwner {
+    function markProposalExecuted(uint256 proposalId) external onlyOwnerOrGovernor {
         require(ragequitWindows[proposalId].snapshotTime > 0, "Window not opened");
         ragequitWindows[proposalId].executed = true;
     }
