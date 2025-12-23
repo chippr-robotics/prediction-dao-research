@@ -201,6 +201,126 @@ useEffect(() => {
 }, [dependency])
 ```
 
+#### Accessibility Best Practices
+
+**1. Always Use Semantic HTML**
+```jsx
+// ❌ WRONG - Non-semantic
+<div className="nav">
+  <div onClick={handleClick}>Home</div>
+</div>
+
+// ✅ CORRECT - Semantic
+<nav>
+  <button onClick={handleClick}>Home</button>
+</nav>
+```
+
+**2. Provide Focus Management**
+```jsx
+// Focus first error on validation failure
+const validateAndFocus = () => {
+  const errors = validate(formData)
+  if (errors.length > 0) {
+    const firstErrorField = errorRefs[errors[0].field]
+    firstErrorField.current?.focus()
+  }
+  return errors.length === 0
+}
+```
+
+**3. Implement ARIA Live Regions**
+```jsx
+// Global announcement hook
+const useAnnouncement = () => {
+  const [announcement, setAnnouncement] = useState('')
+  
+  const announce = useCallback((message) => {
+    setAnnouncement(message)
+    setTimeout(() => setAnnouncement(''), 1000)
+  }, [])
+  
+  return { announcement, announce }
+}
+
+// In App component
+const { announcement, announce } = useAnnouncement()
+
+// Use throughout app
+announce('Wallet connected')
+announce('Transaction submitted')
+```
+
+**4. Make Interactive Elements Keyboard Accessible**
+```jsx
+// For clickable non-button elements
+const handleKeyDown = (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    handleClick()
+  }
+}
+
+<div
+  role="button"
+  tabIndex="0"
+  onClick={handleClick}
+  onKeyDown={handleKeyDown}
+  aria-label="Descriptive label"
+>
+```
+
+**5. Use Proper Focus Styles**
+```css
+/* Add to every CSS file */
+*:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* NEVER do this without replacement */
+/* ❌ WRONG */
+*:focus {
+  outline: none;
+}
+```
+
+**6. Add Status Icons with Color**
+```jsx
+// Never rely on color alone
+const StatusIndicator = ({ status }) => {
+  const config = {
+    active: { icon: '✓', color: 'success', label: 'Active' },
+    pending: { icon: '⏳', color: 'warning', label: 'Pending' },
+    failed: { icon: '❌', color: 'danger', label: 'Failed' }
+  }
+  
+  const { icon, color, label } = config[status]
+  
+  return (
+    <span className={`status status-${color}`}>
+      <span aria-hidden="true">{icon}</span>
+      {label}
+    </span>
+  )
+}
+```
+
+**7. Implement Motion Preferences**
+```css
+/* Add to all CSS files with animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+```
+
 ---
 
 ## Component Library
@@ -837,11 +957,69 @@ import { debounce } from 'lodash-es'
 - [ ] No horizontal scrolling
 
 #### Accessibility
-- [ ] Keyboard navigation works
-- [ ] Focus indicators visible
-- [ ] Screen reader compatible
-- [ ] Color contrast passes WCAG AA
-- [ ] Alt text for images
+Comprehensive accessibility testing is REQUIRED before deployment.
+
+**Keyboard Navigation** (Test with keyboard only, no mouse):
+- [ ] All interactive elements reachable via Tab key
+- [ ] Tab order is logical (top to bottom, left to right)
+- [ ] Focus indicators always visible (2px outline)
+- [ ] Enter/Space keys activate buttons
+- [ ] Escape key closes modals/dialogs
+- [ ] Arrow keys work in tab navigation
+- [ ] No keyboard traps (can always navigate away)
+- [ ] Skip-to-content link works (if implemented)
+
+**Screen Reader Testing** (Test with NVDA/JAWS on Windows, VoiceOver on Mac):
+- [ ] All content is announced correctly
+- [ ] Form labels read properly
+- [ ] Button purposes are clear
+- [ ] Dynamic changes are announced (ARIA live regions)
+- [ ] Status messages are announced
+- [ ] Error messages are announced
+- [ ] Images have descriptive alt text
+- [ ] No confusing or repetitive content
+
+**Visual Testing**:
+- [ ] Color contrast meets WCAG AA (4.5:1 for normal text, 3:1 for large text)
+- [ ] Focus indicators visible on all interactive elements
+- [ ] Status indicators use icons + color (not color alone)
+- [ ] Text is readable at 200% zoom
+- [ ] No information conveyed by color alone
+
+**Motion Sensitivity**:
+- [ ] Enable "Reduce Motion" in OS settings
+- [ ] Reload application
+- [ ] Verify all transitions are minimal or instant
+- [ ] All functionality works without animations
+
+**Automated Testing** (Run before every deployment):
+```bash
+# 1. Lighthouse Accessibility Audit (Chrome DevTools)
+# Target: 100 score
+# Run on each major page/component
+
+# 2. axe DevTools (Chrome Extension)
+# Install: https://www.deque.com/axe/devtools/
+# Analyze each page and fix all issues
+
+# 3. WAVE Tool (Chrome Extension)
+# Install: https://wave.webaim.org/extension/
+# Check for WCAG violations
+```
+
+**Color Blindness Simulation**:
+- [ ] Test with Chrome DevTools vision deficiency emulation
+- [ ] Protanopia (red-blind)
+- [ ] Deuteranopia (green-blind)
+- [ ] Tritanopia (blue-blind)
+- [ ] Verify all information still accessible
+
+**Minimum Requirements for Deployment**:
+- ✅ Lighthouse Accessibility score: 100
+- ✅ No WCAG AA violations in axe DevTools
+- ✅ All interactive elements keyboard accessible
+- ✅ Focus indicators visible on all elements
+- ✅ Screen reader can complete all tasks
 
 ### Browser Testing
 Test in:
@@ -972,9 +1150,14 @@ try {
 - Show loading states
 - Validate user input
 - Cache data when appropriate
-- Use semantic HTML
-- Follow accessibility guidelines
-- Test on multiple devices
+- Use semantic HTML (`<button>`, `<nav>`, `<main>`)
+- Follow accessibility guidelines (WCAG 2.1 AA)
+- Test with keyboard only and screen readers
+- Add focus indicators to all interactive elements
+- Use ARIA live regions for dynamic updates
+- Include status icons with color indicators
+- Implement prefers-reduced-motion support
+- Test on multiple devices and browsers
 - Keep components small and focused
 - Document complex logic
 
@@ -984,11 +1167,68 @@ try {
 - Don't use inline styles (use CSS classes)
 - Don't hardcode values (use constants)
 - Don't skip accessibility features
+- Don't remove focus outlines without replacement
+- Don't use `<div>` with `onClick` without proper ARIA
+- Don't rely on color alone for information
+- Don't create keyboard traps
 - Don't trust user input without validation
 - Don't fetch data in render
 - Don't mutate state directly
 - Don't use class components (use functional)
-- Don't skip testing
+- Don't skip testing (especially accessibility testing)
+
+### Accessibility Anti-Patterns to Avoid ⚠️
+
+**1. Removing Focus Outlines**
+```css
+/* ❌ NEVER DO THIS */
+*:focus {
+  outline: none;
+}
+```
+
+**2. Using Divs as Buttons**
+```jsx
+/* ❌ WRONG */
+<div onClick={handleClick}>Click me</div>
+
+/* ✅ CORRECT */
+<button onClick={handleClick}>Click me</button>
+```
+
+**3. Missing Form Labels**
+```jsx
+/* ❌ WRONG */
+<input type="text" placeholder="Enter name" />
+
+/* ✅ CORRECT */
+<label htmlFor="name">Name</label>
+<input id="name" type="text" />
+```
+
+**4. Color-Only Indicators**
+```jsx
+/* ❌ WRONG */
+<span style={{ color: 'green' }}>Active</span>
+
+/* ✅ CORRECT */
+<span className="status-active">
+  <span aria-hidden="true">✓</span> Active
+</span>
+```
+
+**5. No Error Announcements**
+```jsx
+/* ❌ WRONG */
+{error && <span className="error">{error}</span>}
+
+/* ✅ CORRECT */
+{error && (
+  <span className="error" role="alert" aria-live="assertive">
+    {error}
+  </span>
+)}
+```
 
 ---
 
