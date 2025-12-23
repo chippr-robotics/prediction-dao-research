@@ -59,13 +59,13 @@ Manticore explores:
 ### Prerequisites
 
 ```bash
-# Python 3.10 REQUIRED (3.8-3.10 supported)
-# CRITICAL: Python 3.11+ has compatibility issues with pysha3 package
-# pysha3 is a dependency of Manticore that fails to build on Python 3.11+
+# Python 3.10 REQUIRED (Python 3.8-3.10 supported)
+# CRITICAL: Python 3.11+ is incompatible due to pysha3 dependency
+# pysha3 fails to build on Python 3.11+ (missing pystrhex.h)
 python3 --version
 
 # Install system dependencies (Ubuntu/Debian)
-# These are required for building pysha3 and other native dependencies
+# Required for building pysha3 and other native dependencies
 sudo apt-get update
 sudo apt-get install -y build-essential python3-dev
 ```

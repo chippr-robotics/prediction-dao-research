@@ -215,7 +215,10 @@ summary:
 | Manticore | latest | `pip install --upgrade manticore[native]` |
 | Medusa | latest | `go install github.com/crytic/medusa@latest` |
 
-**Critical Note:** Python 3.10 is REQUIRED for Slither and Manticore due to compatibility issues with the `pysha3` package in Python 3.11+. The `pysha3` package, a dependency of Manticore, cannot be built on Python 3.11+ because it relies on `pystrhex.h` which was removed. Additionally, system dependencies (`build-essential` and `python3-dev`) must be installed for successful compilation of native Python packages.
+**Critical Note:** Python 3.10 is REQUIRED for Slither and Manticore. Why?
+- The `pysha3` package (Manticore dependency) is incompatible with Python 3.11+
+- Python 3.11+ removed `pystrhex.h` which pysha3 requires for compilation
+- System dependencies (`build-essential`, `python3-dev`) must be installed for native packages
 
 ## Updating the Workflow
 
