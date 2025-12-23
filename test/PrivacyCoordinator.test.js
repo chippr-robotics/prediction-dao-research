@@ -79,7 +79,7 @@ describe("PrivacyCoordinator", function () {
 
     it("Should allow user to submit encrypted position", async function () {
       await expect(
-        privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof)
+        privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof, 1)
       ).to.emit(privacyCoordinator, "EncryptedPositionSubmitted");
       
       expect(await privacyCoordinator.positionCount()).to.equal(1);
@@ -87,13 +87,13 @@ describe("PrivacyCoordinator", function () {
 
     it("Should reject submission without public key registration", async function () {
       await expect(
-        privacyCoordinator.connect(user2).submitEncryptedPosition(commitment, zkProof)
+        privacyCoordinator.connect(user2).submitEncryptedPosition(commitment, zkProof, 1)
       ).to.be.revertedWith("Public key not registered");
     });
 
     it("Should reject zero commitment", async function () {
       await expect(
-        privacyCoordinator.connect(user1).submitEncryptedPosition(ethers.ZeroHash, zkProof)
+        privacyCoordinator.connect(user1).submitEncryptedPosition(ethers.ZeroHash, zkProof, 1)
       ).to.be.revertedWith("Invalid commitment");
     });
   });
@@ -171,7 +171,7 @@ describe("PrivacyCoordinator", function () {
       for (let i = 0; i < 3; i++) {
         const commitment = ethers.keccak256(ethers.toUtf8Bytes(`commitment_${i}`));
         const zkProof = ethers.toUtf8Bytes(`proof_${i}`);
-        await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof);
+        await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof, 1);
       }
     });
 
@@ -250,7 +250,7 @@ describe("PrivacyCoordinator", function () {
       // Submit positions in epoch 0
       const commitment1 = ethers.keccak256(ethers.toUtf8Bytes("commitment_1"));
       const zkProof1 = ethers.toUtf8Bytes("proof_1");
-      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment1, zkProof1);
+      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment1, zkProof1, 1);
       
       let epoch0Positions = await privacyCoordinator.getEpochPositions(0);
       expect(epoch0Positions.length).to.equal(1);
@@ -263,7 +263,7 @@ describe("PrivacyCoordinator", function () {
       // Submit positions in epoch 1
       const commitment2 = ethers.keccak256(ethers.toUtf8Bytes("commitment_2"));
       const zkProof2 = ethers.toUtf8Bytes("proof_2");
-      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment2, zkProof2);
+      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment2, zkProof2, 1);
       
       epoch0Positions = await privacyCoordinator.getEpochPositions(0);
       const epoch1Positions = await privacyCoordinator.getEpochPositions(1);
@@ -280,7 +280,7 @@ describe("PrivacyCoordinator", function () {
       
       const commitment = ethers.keccak256(ethers.toUtf8Bytes("commitment_1"));
       const zkProof = ethers.toUtf8Bytes("proof_1");
-      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof);
+      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof, 1);
     });
 
     it("Should return position details", async function () {
@@ -332,7 +332,7 @@ describe("PrivacyCoordinator", function () {
       const commitment = ethers.keccak256(ethers.toUtf8Bytes("commitment_1"));
       const zkProof = ethers.toUtf8Bytes("valid_proof");
       
-      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof);
+      await privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, zkProof, 1);
       
       const isValid = await privacyCoordinator.verifyPositionProof(0);
       expect(isValid).to.equal(true);
@@ -355,7 +355,7 @@ describe("PrivacyCoordinator", function () {
       const commitment = ethers.keccak256(ethers.toUtf8Bytes("commitment_1"));
       
       await expect(
-        privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, "0x")
+        privacyCoordinator.connect(user1).submitEncryptedPosition(commitment, "0x", 1)
       ).to.be.revertedWith("Invalid proof");
     });
   });
