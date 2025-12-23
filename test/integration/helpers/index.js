@@ -36,7 +36,10 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
   
   const proposalId = event ? proposalRegistry.interface.parseLog(event).args.proposalId : 0n;
 
-  await futarchyGovernor
+  // Wait for review period to end (7 days)
+  await time.increase(7 * 24 * 3600 + 1); // 7 days + 1 second
+
+  await proposalRegistry
     .connect(owner)
     .activateProposal(proposalId);
 
