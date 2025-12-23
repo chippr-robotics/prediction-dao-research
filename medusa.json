@@ -7,7 +7,7 @@
     "callSequenceLength": 100,
     "corpusDirectory": "medusa-corpus",
     "coverageEnabled": true,
-    "targetContracts": ["ConditionalMarketFactory", "DAOFactory", "FutarchyGovernor", "OracleResolver", "PrivacyCoordinator", "ProposalRegistry", "RagequitModule", "WelfareMetricRegistry"],
+    "targetContracts": ["ProposalRegistryFuzzTest", "WelfareMetricRegistryFuzzTest"],
     "targetContractsBalances": [],
     "constructorArgs": {},
     "deployerAddress": "0x30000",
