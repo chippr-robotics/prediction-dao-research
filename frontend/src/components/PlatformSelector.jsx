@@ -155,7 +155,7 @@ function PlatformSelector({ onSelectPlatform }) {
             </div>
           </div>
           <div className="footer-bottom">
-            <p>&copy; 2026 ChipprRobotics LLC. Apache License 2.0</p>
+            <p>&copy; 2024 ChipprRobotics LLC. Apache License 2.0</p>
           </div>
         </div>
       </footer>
