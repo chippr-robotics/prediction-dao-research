@@ -80,7 +80,7 @@ npm run preview
 
 Create a `.env` file based on `.env.example`:
 
-```env
+```bash
 VITE_NETWORK_ID=1337              # Network ID (1337 for Hardhat local)
 VITE_RPC_URL=http://localhost:8545  # RPC endpoint
 ```
