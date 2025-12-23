@@ -307,7 +307,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
     it("Should support multiple key changes", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
-      const { privacyCoordinator, trader1 } = accounts;
+      const { privacyCoordinator } = contracts;
+      const { trader1 } = accounts;
 
       console.log("\n--- Testing multiple key changes ---");
 
@@ -659,13 +660,18 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
       console.log("\n=== PHASE 6: MARKET COMPLETION ===");
       console.log("\n--- Step 6.1: End trading period ---");
       await advanceDays(15);
-      await marketFactory.connect(owner).endTrading(marketId);
+      // Use futarchyGovernor to end trading since it owns marketFactory
+      await futarchyGovernor.connect(owner).moveToResolution(0);  // governanceProposalId = 0
       console.log("✓ Trading period ended");
 
       console.log("\n--- Step 6.2: Oracle resolution ---");
+      const passValue = ethers.parseEther("1.2");
+      const failValue = ethers.parseEther("1.0");
       await oracleResolver
         .connect(reporter)
-        .submitReport(proposalId, ethers.parseEther("1.2"), "Positive outcome");
+        .submitReport(proposalId, passValue, failValue, ethers.toUtf8Bytes("Positive outcome"), {
+          value: constants.ORACLE_BOND
+        });
 
       await time.increase(3 * 24 * 3600); // Wait challenge period
       
@@ -673,11 +679,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
       console.log("✓ Oracle resolved");
 
       console.log("\n--- Step 6.3: Resolve market ---");
-      await marketFactory.connect(owner).resolveMarket(
-        marketId,
-        ethers.parseEther("1.2"),
-        ethers.parseEther("1.0")
-      );
+      // Use futarchyGovernor to finalize proposal (which resolves the market)
+      await futarchyGovernor.connect(owner).finalizeProposal(0); // governanceProposalId = 0
 
       const market = await marketFactory.getMarket(marketId);
       expect(market.resolved).to.be.true;
@@ -701,7 +704,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
   describe("Error Handling and Edge Cases", function () {
     it("Should reject position submission without public key", async function () {
       const { contracts, accounts } = await loadFixture(deploySystemFixture);
-      const { privacyCoordinator, trader1 } = accounts;
+      const { privacyCoordinator } = contracts;
+      const { trader1 } = accounts;
 
       const commitment = ethers.keccak256(ethers.toUtf8Bytes("no-key-commitment"));
       const proof = ethers.toUtf8Bytes("no-key-proof");
@@ -713,7 +717,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
     it("Should reject empty proof submission", async function () {
       const { contracts, accounts } = await loadFixture(deploySystemFixture);
-      const { privacyCoordinator, trader1 } = accounts;
+      const { privacyCoordinator } = contracts;
+      const { trader1 } = accounts;
 
       const publicKey = ethers.keccak256(ethers.toUtf8Bytes("test-key"));
       await privacyCoordinator.connect(trader1).registerPublicKey(publicKey);
@@ -727,7 +732,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
     it("Should reject batch that exceeds maximum size", async function () {
       const { contracts, accounts } = await loadFixture(deploySystemFixture);
-      const { privacyCoordinator, trader1 } = accounts;
+      const { privacyCoordinator } = contracts;
+      const { trader1 } = accounts;
 
       const publicKey = ethers.keccak256(ethers.toUtf8Bytes("test-key"));
       await privacyCoordinator.connect(trader1).registerPublicKey(publicKey);
@@ -752,7 +758,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
     it("Should handle processing of invalid position IDs gracefully", async function () {
       const { contracts, accounts } = await loadFixture(deploySystemFixture);
-      const { privacyCoordinator, owner, trader1 } = accounts;
+      const { privacyCoordinator } = contracts;
+      const { owner, trader1 } = accounts;
 
       const publicKey = ethers.keccak256(ethers.toUtf8Bytes("test-key"));
       await privacyCoordinator.connect(trader1).registerPublicKey(publicKey);
