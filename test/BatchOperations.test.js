@@ -672,9 +672,9 @@ describe("Batch Operations", function () {
       // Batch should be more efficient
       expect(batchGasUsed).to.be.lessThan(totalIndividualGas);
       
-      // Calculate savings percentage
-      const savings = Number((totalIndividualGas - batchGasUsed) * 100n / totalIndividualGas);
-      console.log(`Gas savings from batch market creation: ${savings}%`);
+      // Calculate savings percentage - convert to Number to avoid BigInt division truncation
+      const savings = Number(totalIndividualGas - batchGasUsed) * 100 / Number(totalIndividualGas);
+      console.log(`Gas savings from batch market creation: ${savings.toFixed(2)}%`);
     });
 
     it("Batch position submission should be more efficient than individual", async function () {
@@ -721,9 +721,9 @@ describe("Batch Operations", function () {
       // Batch should be more efficient
       expect(batchGasUsed).to.be.lessThan(totalIndividualGas);
       
-      // Calculate savings percentage
-      const savings = Number((totalIndividualGas - batchGasUsed) * 100n / totalIndividualGas);
-      console.log(`Gas savings from batch position submission: ${savings}%`);
+      // Calculate savings percentage - convert to Number to avoid BigInt division truncation
+      const savings = Number(totalIndividualGas - batchGasUsed) * 100 / Number(totalIndividualGas);
+      console.log(`Gas savings from batch position submission: ${savings.toFixed(2)}%`);
     });
   });
 });
