@@ -46,7 +46,7 @@ contract WelfareMetricRegistryFuzzTest {
     /**
      * @notice Test metric weight is always within bounds
      */
-    function property_metric_weight_bounded(uint256 weight) public pure returns (bool) {
-        return weight <= 10000; // Valid weights are 0-10000 basis points
+    function property_metric_weight_bounded(uint256 weight) public view returns (bool) {
+        return weight <= registry.TOTAL_WEIGHT(); // Valid weights are 0-TOTAL_WEIGHT basis points
     }
 }

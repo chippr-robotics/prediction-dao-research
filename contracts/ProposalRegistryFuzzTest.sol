@@ -12,7 +12,6 @@ contract ProposalRegistryFuzzTest {
     ProposalRegistry public proposalRegistry;
     WelfareMetricRegistry public welfareRegistry;
     
-    uint256 public constant INITIAL_BOND = 50 ether;
     uint256 private previousProposalCount;
     
     constructor() {
@@ -40,24 +39,27 @@ contract ProposalRegistryFuzzTest {
     
     /**
      * @notice Test that input parameters are validated correctly
-     * @dev This validates input constraints without calling the contract
+     * @dev This validates input constraints, returning false for invalid inputs
      */
     function property_submission_parameters_valid(
         string memory title,
         uint256 fundingAmount,
         address recipient
-    ) public pure returns (bool) {
-        // All combinations that don't meet requirements should be rejected
+    ) public view returns (bool) {
+        // Check title is not empty
         if (bytes(title).length == 0) {
-            return true; // Should revert for empty title
+            return false;
         }
         
+        // Check recipient is not zero address
         if (recipient == address(0)) {
-            return true; // Should revert for zero recipient
+            return false;
         }
         
-        if (fundingAmount == 0 || fundingAmount > 50000 ether) {
-            return true; // Should revert for invalid amounts
+        // Check funding amount is within valid range
+        uint256 maxAmount = proposalRegistry.MAX_PROPOSAL_AMOUNT();
+        if (fundingAmount == 0 || fundingAmount > maxAmount) {
+            return false;
         }
         
         return true;
