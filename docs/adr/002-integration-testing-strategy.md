@@ -1,4 +1,4 @@
-# ADR-001: Integration Testing Strategy for E2E Workflows
+# ADR-002: Integration Testing Strategy for E2E Workflows
 
 **Status**: Accepted
 

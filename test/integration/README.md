@@ -272,6 +272,6 @@ When adding new integration tests:
 ## References
 
 - [Integration Testing Plan](../../docs/developer-guide/integration-testing.md)
-- [ADR-001: Integration Testing Strategy](../../docs/adr/001-integration-testing-strategy.md)
+- [ADR-002: Integration Testing Strategy](../../docs/adr/002-integration-testing-strategy.md)
 - [Testing Guide](../../docs/developer-guide/testing.md)
 - [Hardhat Network Helpers](https://hardhat.org/hardhat-network-helpers/docs)

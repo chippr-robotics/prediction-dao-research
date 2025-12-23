@@ -117,7 +117,8 @@ nav:
     - Governance: system-overview/governance.md
   - Architecture Decisions:
     - Overview: adr/README.md
-    - ADR-001 Integration Testing Strategy: adr/001-integration-testing-strategy.md
+    - ADR-001 Trail of Bits Toolchain: adr/001-trail-of-bits-toolchain.md
+    - ADR-002 Integration Testing Strategy: adr/002-integration-testing-strategy.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
