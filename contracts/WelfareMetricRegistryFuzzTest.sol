@@ -9,17 +9,21 @@ import "./WelfareMetricRegistry.sol";
  */
 contract WelfareMetricRegistryFuzzTest {
     WelfareMetricRegistry public registry;
+    uint256 private previousMetricCount;
     
     constructor() {
         registry = new WelfareMetricRegistry();
+        previousMetricCount = 0;
     }
     
     /**
      * @notice Invariant: Metric count should never decrease
      */
-    function property_metric_count_never_decreases() public view returns (bool) {
+    function property_metric_count_never_decreases() public returns (bool) {
         uint256 currentCount = registry.metricCount();
-        return currentCount >= 0;
+        bool result = currentCount >= previousMetricCount;
+        previousMetricCount = currentCount;
+        return result;
     }
     
     /**
