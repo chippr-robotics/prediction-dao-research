@@ -1,7 +1,31 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
-const { deploySystemFixture } = require("../fixtures/deploySystem");
+
+/**
+ * Simplified deployment fixture for FairWins standalone markets
+ * Unlike governance proposals, FairWins markets are standalone predictions
+ */
+async function deployFairWinsFixture() {
+  const [owner, reporter, trader1, trader2] = await ethers.getSigners();
+
+  // Deploy only what's needed for standalone markets
+  const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
+  const marketFactory = await ConditionalMarketFactory.deploy();
+  await marketFactory.waitForDeployment();
+  await marketFactory.initialize(owner.address);
+
+  const OracleResolver = await ethers.getContractFactory("OracleResolver");
+  const oracleResolver = await OracleResolver.deploy();
+  await oracleResolver.waitForDeployment();
+  await oracleResolver.initialize(owner.address);
+  await oracleResolver.connect(owner).addDesignatedReporter(reporter.address);
+
+  return {
+    contracts: { marketFactory, oracleResolver },
+    accounts: { owner, reporter, trader1, trader2 }
+  };
+}
 
 /**
  * Integration tests for FairWins Market Lifecycle
@@ -28,9 +52,9 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
   describe("Complete Market Lifecycle", function () {
     it("Should complete full market creation, resolution, and settlement flow", async function () {
-      // Setup: Load the complete system fixture
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
-      const { marketFactory, oracleResolver, futarchyGovernor } = contracts;
+      // Setup: Load the FairWins-specific fixture
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
+      const { marketFactory, oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
       console.log("\n=== FairWins Market Lifecycle Test ===\n");
@@ -44,10 +68,11 @@ describe("Integration: FairWins Market Lifecycle", function () {
       const initialLiquidity = ethers.parseEther("100");
       const tradingPeriod = 14 * 24 * 3600; // 14 days
       
-      // Market is created for a standalone prediction via FutarchyGovernor
-      // proposalId = 999 indicates this is a test FairWins market
-      const createTx = await futarchyGovernor.connect(owner).createGovernanceProposal(
-        999, // proposalId for standalone market
+      // Market is created for a standalone prediction
+      // proposalId = 0 indicates this is a FairWins market, not a governance proposal
+      const createTx = await marketFactory.connect(owner).deployMarketPair(
+        0, // proposalId = 0 for standalone FairWins markets
+        ethers.ZeroAddress, // collateral token (ETH)
         initialLiquidity,
         1000, // liquidity parameter for LMSR
         tradingPeriod
@@ -172,7 +197,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
     });
 
     it("Should handle NO outcome correctly", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
       const { marketFactory, oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
@@ -250,7 +275,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
   describe("Market Creation", function () {
     it("Should create market with custom parameters", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
       const { marketFactory } = contracts;
       const { owner } = accounts;
 
@@ -285,7 +310,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
     });
 
     it("Should reject invalid trading period", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
       const { marketFactory } = contracts;
       const { owner } = accounts;
 
@@ -305,7 +330,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
   describe("Resolution Phase", function () {
     it("Should only allow resolution after trading ends", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
       const { marketFactory, oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
@@ -366,7 +391,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
     });
 
     it("Should update market status to Resolved after resolution", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
       const { marketFactory, oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
@@ -419,7 +444,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
   describe("Market Status Tracking", function () {
     it("Should properly track market status transitions", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
       const { marketFactory, oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
