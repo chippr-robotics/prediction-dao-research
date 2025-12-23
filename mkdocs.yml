@@ -100,6 +100,7 @@ nav:
     - Singleton Deployment Patterns: developer-guide/singleton-deployment-patterns.md
     - Frontend Development: developer-guide/frontend.md
     - Testing: developer-guide/testing.md
+    - Integration Testing: developer-guide/integration-testing.md
     - Contributing: developer-guide/contributing.md
   - Security Testing:
     - Overview: security/index.md
@@ -114,6 +115,10 @@ nav:
     - Privacy Mechanisms: system-overview/privacy.md
     - Security Model: system-overview/security.md
     - Governance: system-overview/governance.md
+  - Architecture Decisions:
+    - Overview: adr/README.md
+    - ADR-001 Trail of Bits Toolchain: adr/001-trail-of-bits-toolchain.md
+    - ADR-002 Integration Testing Strategy: adr/002-integration-testing-strategy.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
