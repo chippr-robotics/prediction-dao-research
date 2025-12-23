@@ -4,32 +4,6 @@
 
 This document describes the Medusa fuzz testing setup for the Prediction DAO smart contracts.
 
-## What Was Fixed
-
-The Medusa fuzzing configuration was incorrectly targeting production contracts instead of fuzz test contracts. This has been corrected to ensure proper security testing.
-
-### Changes Made
-
-1. **Updated medusa.json configuration**
-   - Changed `targetContracts` from production contracts to fuzz test contracts:
-     - `ProposalRegistryFuzzTest`
-     - `WelfareMetricRegistryFuzzTest`
-
-2. **Relocated fuzz test contracts**
-   - Moved fuzz test contracts from `test/fuzzing/` to `contracts/` directory
-   - This ensures they are properly compiled by crytic-compile which Medusa uses
-
-3. **Fixed imports**
-   - Updated import paths to reflect the new location
-   - Changed from `../../contracts/X.sol` to `./X.sol`
-
-4. **Improved test implementations**
-   - Fixed invariant tests to properly track state changes between calls
-   - Updated WelfareMetricRegistryFuzzTest to use correct contract methods
-
-5. **Updated .gitignore**
-   - Added `medusa-corpus/` to prevent committing test artifacts
-
 ## Running Medusa Locally
 
 To run Medusa fuzz testing locally:

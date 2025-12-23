@@ -29,7 +29,7 @@ contract WelfareMetricRegistryFuzzTest {
     }
     
     /**
-     * @notice Invariant: Individual metric weight should never exceed maximum
+     * @notice Invariant: Individual metric weights should never exceed TOTAL_WEIGHT
      */
     function property_total_weight_bounded() public view returns (bool) {
         uint256 count = registry.metricCount();

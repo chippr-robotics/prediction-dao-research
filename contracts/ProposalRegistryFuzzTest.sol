@@ -40,8 +40,9 @@ contract ProposalRegistryFuzzTest {
     }
     
     /**
-     * @notice Test that input parameters are validated correctly
-     * @dev This validates input constraints, returning false for invalid inputs
+     * @notice Validates parameter constraints for proposal submission
+     * @dev This checks if parameters meet the contract requirements without calling the contract
+     * @return true if parameters are valid, false otherwise
      */
     function property_submission_parameters_valid(
         string memory title,
