@@ -63,9 +63,8 @@ All research documents should:
 
 For questions about research documents or to propose new research topics, please:
 
-- Open an issue on GitHub
-- Discuss in the community forum
-- Reach out to the core team
+- Open an issue on [GitHub](https://github.com/chippr-robotics/prediction-dao-research/issues)
+- Contact the core team
 
 ---
 
