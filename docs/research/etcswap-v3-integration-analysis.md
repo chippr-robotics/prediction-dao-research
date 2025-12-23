@@ -372,125 +372,18 @@ Risk: Impermanent loss if price moves outside range
 
 ---
 
-## Additional Integration Paths Considered
+## Alternative Approaches
 
-The following options were evaluated but not recommended given the platform-specific approach is optimal for the dual-platform structure.
+During the research phase, four alternative integration approaches were evaluated:
 
-### Option 2: Parallel Markets (Both Platforms)
+- **Option 2: Parallel Markets** - Both LMSR and V3 on both platforms
+- **Option 3: Hybrid Model** - LMSR base layer with V3 supplementary liquidity
+- **Option 4: Specialized Markets** - Mechanism choice based on market characteristics
+- **Option 5: Post-Resolution Secondary Market** - V3 pools for resolved token trading
 
-**Concept**: Run both LMSR and V3 pools side-by-side for the same tokens on both platforms
+These alternatives provided valuable insights but were not recommended given the platform-specific approach is optimal for the dual-platform structure. Each option had significant drawbacks including liquidity fragmentation, increased complexity, or misalignment with platform-specific requirements.
 
-**Architecture**:
-```
-Conditional Tokens (PASS/FAIL)
-        ↓
-    ┌───┴────┐
-    ↓        ↓
-LMSR Pool   V3 Pool
-(Default)   (Optional)
-```
-
-**Advantages**:
-- ✅ Users choose preferred mechanism on each platform
-- ✅ Arbitrage ensures price consistency
-- ✅ Gradual adoption path for V3
-- ✅ Maintains full backward compatibility
-
-**Disadvantages**:
-- ❌ Liquidity fragmentation on each platform
-- ❌ User confusion about which to use
-- ❌ Potential for price discrepancies
-- ❌ Higher complexity than platform-specific approach
-
-**Use Case**: 
-- Could be used if both platforms want both options
-- Not recommended due to complexity and fragmentation
-
-### Option 3: Hybrid Model
-
-**Concept**: Use LMSR as base layer, V3 as supplementary liquidity
-
-**Architecture**:
-```
-            Traders
-               ↓
-        Smart Order Router
-          ↓         ↓
-     LMSR Pool   V3 Pool
-    (Base Layer) (Supplementary)
-```
-
-**Features**:
-- LMSR provides guaranteed liquidity across all prices
-- V3 provides concentrated liquidity near market price
-- Router finds best execution path
-- Arbitrage keeps prices aligned
-
-**Advantages**:
-- ✅ Best of both worlds
-- ✅ Guaranteed baseline liquidity (LMSR)
-- ✅ Enhanced efficiency near market price (V3)
-- ✅ Reduced capital requirements
-
-**Disadvantages**:
-- ❌ Complex routing logic
-- ❌ Higher gas costs
-- ❌ Challenging to implement privacy
-
-### Option 4: Specialized Markets
-
-**Concept**: Use V3 exclusively for specific market types
-
-**Market Type Mapping**:
-
-**LMSR Markets** (Keep as-is):
-- ClearPath governance proposals
-- FairWins markets with resolution risk
-- Markets requiring privacy
-- Low-volume prediction markets
-- Binary outcome markets
-
-**V3 Pools** (New addition):
-- Secondary market for redeemed tokens
-- Stablecoin pairs (USDC/USDT/DAI)
-- DAO governance tokens
-- High-volume event markets
-- Multi-outcome markets (future)
-
-**Advantages**:
-- ✅ Right tool for right job
-- ✅ Clear separation of concerns
-- ✅ No system conflicts
-- ✅ Simpler than hybrid
-
-**Disadvantages**:
-- ❌ Users need to understand distinction
-- ❌ Still requires two codebases
-- ❌ Less synergy between systems
-
-### Option 5: Post-Resolution Secondary Market
-
-**Concept**: Use V3 pools for trading resolved tokens before redemption
-
-**Flow**:
-```
-1. Market resolves (PASS wins)
-2. PASS tokens can redeem for 1 USDC
-3. V3 pool opens: PASS/USDC
-4. Traders can sell PASS for ~0.99 USDC (immediate liquidity)
-5. Arbitrageurs buy at discount, redeem at 1 USDC
-```
-
-**Advantages**:
-- ✅ No conflict with LMSR during active trading
-- ✅ Provides early exit option
-- ✅ Useful for winners who need immediate liquidity
-- ✅ Simple to implement
-
-**Disadvantages**:
-- ❌ Limited use case (post-resolution only)
-- ❌ Arbitrage opportunity (but that's feature not bug)
-- ❌ Requires liquidity provision
+**For detailed analysis of each alternative approach, see**: [Alternative Approaches Appendix](etcswap-v3-alternative-approaches.md)
 
 ---
 

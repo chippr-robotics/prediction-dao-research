@@ -127,6 +127,7 @@ nav:
     - ADR-002 Integration Testing Strategy: adr/002-integration-testing-strategy.md
   - Research:
     - ETCswap v3 Integration Analysis: research/etcswap-v3-integration-analysis.md
+    - Alternative Approaches (Appendix): research/etcswap-v3-alternative-approaches.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
