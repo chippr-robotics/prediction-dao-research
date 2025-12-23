@@ -65,6 +65,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
         }
       });
       
+      expect(marketCreatedEvent).to.not.be.undefined;
       const marketId = marketFactory.interface.parseLog(marketCreatedEvent).args.marketId;
       console.log(`  ✓ Market created: ID ${marketId}`);
       console.log(`  ✓ Question: "${marketQuestion}"`);
@@ -197,6 +198,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
           return false;
         }
       });
+      expect(marketCreatedEvent).to.not.be.undefined;
       const marketId = marketFactory.interface.parseLog(marketCreatedEvent).args.marketId;
       console.log(`  ✓ Market created: ID ${marketId}`);
       console.log("  ✓ Question: 'Will BTC surpass $150k by year end?'\n");
@@ -275,6 +277,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
           return false;
         }
       });
+      expect(event).to.not.be.undefined;
       const marketId = marketFactory.interface.parseLog(event).args.marketId;
 
       const market = await marketFactory.getMarket(marketId);
@@ -324,6 +327,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
           return false;
         }
       });
+      expect(event).to.not.be.undefined;
       const marketId = marketFactory.interface.parseLog(event).args.marketId;
       const market = await marketFactory.getMarket(marketId);
 
@@ -383,6 +387,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
           return false;
         }
       });
+      expect(event).to.not.be.undefined;
       const marketId = marketFactory.interface.parseLog(event).args.marketId;
       const market = await marketFactory.getMarket(marketId);
 
@@ -435,6 +440,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
           return false;
         }
       });
+      expect(event).to.not.be.undefined;
       const marketId = marketFactory.interface.parseLog(event).args.marketId;
 
       // Status 1: Active

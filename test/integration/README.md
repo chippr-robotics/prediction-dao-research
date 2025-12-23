@@ -53,7 +53,6 @@ Integration tests are organized by feature area:
 - **privacy/**: Tests for privacy-preserving trading workflows ✅
 - **ragequit/**: Tests for ragequit protection mechanisms ✅
 - **fairwins/**: Tests for FairWins prediction market lifecycle ✅
-- **fairwins/**: Tests for FairWins (prediction markets) workflows
 - **oracle/**: Tests for oracle resolution and dispute mechanisms
 - **factory/**: Tests for DAO factory deployment
 
