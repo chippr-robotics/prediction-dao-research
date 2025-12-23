@@ -13,7 +13,7 @@
     "test:integration:fairwins": "hardhat test test/integration/fairwins/**/*.test.js",
     "test:all": "hardhat test test/**/*.test.js",
     "test:gas": "REPORT_GAS=true hardhat test",
-    "test:coverage": "hardhat coverage",
+    "test:coverage": "hardhat coverage --testfiles '{test/!(BatchOperations|DAOFactory).test.js,test/integration/!(factory)/**/*.test.js}'",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "deploy:mordor": "hardhat run scripts/deploy-deterministic.js --network mordor",
     "deploy:deterministic": "hardhat run scripts/deploy-deterministic.js",

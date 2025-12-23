@@ -8,9 +8,10 @@ describe("ProposalRegistry", function () {
   let recipient;
   let BOND_AMOUNT;
 
-  // Helper function to get future timestamp (in seconds)
-  const getFutureTimestamp = (daysFromNow) => {
-    return Math.floor(Date.now() / 1000) + (daysFromNow * 24 * 60 * 60);
+  // Helper function to get future timestamp (in seconds) using blockchain time
+  const getFutureTimestamp = async (daysFromNow) => {
+    const currentBlock = await ethers.provider.getBlock('latest');
+    return currentBlock.timestamp + (daysFromNow * 24 * 60 * 60);
   };
 
   // Helper function to submit a proposal with default values
@@ -23,7 +24,7 @@ describe("ProposalRegistry", function () {
       welfareMetricId: 0,
       fundingToken: ethers.ZeroAddress,
       startDate: 0,
-      executionDeadline: getFutureTimestamp(90), // 90 days from now
+      executionDeadline: await getFutureTimestamp(90), // 90 days from now
       value: BOND_AMOUNT
     };
 
@@ -105,13 +106,15 @@ describe("ProposalRegistry", function () {
     });
 
     it("Should reject submission with deadline in past", async function () {
+      const currentBlock = await ethers.provider.getBlock('latest');
+      const pastDeadline = currentBlock.timestamp - 86400;
       await expect(
-        submitTestProposal({ executionDeadline: Math.floor(Date.now() / 1000) - 86400 })
+        submitTestProposal({ executionDeadline: pastDeadline })
       ).to.be.revertedWith("Deadline must be in future");
     });
 
     it("Should reject submission with deadline before start date", async function () {
-      const futureStart = getFutureTimestamp(30);
+      const futureStart = await getFutureTimestamp(30);
       const deadline = futureStart - 1; // Clearly before start date
       
       // This test may hit "Deadline must be in future" first if blockchain time has advanced
