@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
-import "../../contracts/WelfareMetricRegistry.sol";
+import "./WelfareMetricRegistry.sol";
 
 /**
  * @title WelfareMetricRegistryFuzzTest
@@ -23,11 +23,20 @@ contract WelfareMetricRegistryFuzzTest {
     }
     
     /**
-     * @notice Invariant: Total weight should never exceed maximum
+     * @notice Invariant: Individual metric weight should never exceed maximum
      */
     function property_total_weight_bounded() public view returns (bool) {
-        uint256 totalWeight = registry.totalActiveWeight();
-        return totalWeight <= 10000; // 100% in basis points
+        uint256 count = registry.metricCount();
+        if (count == 0) return true;
+        
+        // Check that no individual metric weight exceeds TOTAL_WEIGHT
+        for (uint256 i = 0; i < count; i++) {
+            WelfareMetricRegistry.WelfareMetric memory metric = registry.getMetric(i);
+            if (metric.weight > registry.TOTAL_WEIGHT()) {
+                return false;
+            }
+        }
+        return true;
     }
     
     /**

@@ -157,6 +157,7 @@ mcore_*
 manticore-output/
 medusa-output/
 .medusa/
+medusa-corpus/
 
 # MkDocs
 site/
