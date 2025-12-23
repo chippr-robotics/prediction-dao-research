@@ -9,6 +9,7 @@
     "test:unit": "hardhat test test/*.test.js",
     "test:integration": "hardhat test test/integration/**/*.test.js",
     "test:integration:clearpath": "hardhat test test/integration/clearpath/**/*.test.js",
+    "test:integration:oracle": "hardhat test test/integration/oracle/*.test.js",
     "test:integration:fairwins": "hardhat test test/integration/fairwins/**/*.test.js",
     "test:all": "hardhat test test/**/*.test.js",
     "test:gas": "REPORT_GAS=true hardhat test",

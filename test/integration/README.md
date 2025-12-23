@@ -6,15 +6,17 @@ This directory contains integration tests for the Prediction DAO Research platfo
 
 ```
 test/integration/
-├── README.md                           # This file
+├── README.md                                    # This file
 ├── fixtures/
-│   └── deploySystem.js                # System-wide deployment fixture
+│   └── deploySystem.js                          # System-wide deployment fixture
 ├── helpers/
-│   └── index.js                       # Reusable helper functions
+│   └── index.js                                 # Reusable helper functions
 ├── clearpath/
-│   └── proposal-lifecycle.test.js     # ClearPath proposal lifecycle tests
+│   └── proposal-lifecycle.test.js               # ClearPath proposal lifecycle tests
+├── oracle/
+│   └── multi-stage-resolution.test.js           # Multi-stage oracle resolution tests ✅
 ├── privacy/
-│   └── privacy-trading-lifecycle.test.js # Privacy-preserving trading tests
+│   └── privacy-trading-lifecycle.test.js        # Privacy-preserving trading tests
 ├── ragequit/
 │   └── ragequit-protection.test.js    # Ragequit protection tests ✅
 ├── fairwins/
@@ -31,12 +33,13 @@ npm run test:integration
 
 # Run specific test suite
 npm run test:integration:clearpath
+npm run test:integration:oracle
 
 # Run with gas reporting
 REPORT_GAS=true npm run test:integration
 
 # Run specific test file
-npx hardhat test test/integration/clearpath/proposal-lifecycle.test.js
+npx hardhat test test/integration/oracle/multi-stage-resolution.test.js
 
 # Run with verbose output
 npx hardhat test test/integration/**/*.test.js --verbose
@@ -98,6 +101,9 @@ const {
 - **submitAndActivateProposal**: Submit proposal and activate it in one step
 - **executeTrades**: Execute multiple trades from different accounts
 - **completeOracleResolution**: Complete full oracle resolution including challenge period
+- **submitOracleReport**: Submit initial oracle report with bond
+- **challengeOracleReport**: Challenge an oracle report during challenge period
+- **completeOracleResolutionWithChallenge**: Complete resolution with challenge workflow
 - **advanceDays**: Fast-forward blockchain time by specified days
 - **createProposalData**: Generate proposal data with sensible defaults
 
@@ -195,17 +201,19 @@ it("Should complete entire proposal lifecycle successfully", async function () {
 - Oracle resolution
 - Proposal execution
 
-### 2. Privacy-Preserving Trading (To be implemented)
+### 2. Privacy-Preserving Trading
 - Encrypted position submission
 - zkSNARK proof verification
 - Key-change messages
 - Batch processing
 
-### 3. Multi-Stage Oracle Resolution (To be implemented)
-- Initial report submission
-- Challenge period
-- Dispute resolution
-- Final settlement
+### 3. Multi-Stage Oracle Resolution ✅
+- Initial report submission by designated reporter
+- Challenge period where reports can be contested
+- Dispute resolution escalation to UMA
+- Final settlement with bond distribution
+- Multiple resolutions in parallel
+- Access control and bond management
 
 ### 4. Ragequit Protection (Implemented)
 - Token holder exit ✅
@@ -263,10 +271,20 @@ See `.github/workflows/integration-tests.yml` (to be created)
 
 | Metric | Target | Status |
 |--------|--------|--------|
-| E2E Workflows | 100% | 🟡 In Progress (3/6) |
-| Critical Paths | 100% | 🟡 In Progress |
-| Contract Interactions | ≥ 90% | 🟡 In Progress |
-| Error Scenarios | ≥ 80% | 🟢 Ragequit: Complete |
+| E2E Workflows | 100% | 🟢 In Progress (3/6) |
+| Critical Paths | 100% | 🟢 In Progress |
+| Contract Interactions | ≥ 90% | 🟢 In Progress |
+| Error Scenarios | ≥ 80% | 🟢 Oracle & Ragequit: Complete |
+
+### Oracle Resolution Coverage
+- ✅ Unchallenged resolution (happy path)
+- ✅ Challenged resolution with bond redistribution
+- ✅ UMA dispute escalation
+- ✅ Bond management and validation
+- ✅ Access control enforcement
+- ✅ Multiple proposals in parallel
+- ✅ Edge cases (double reporting, double finalization)
+- ✅ Query functions and state verification
 
 ## Contributing
 

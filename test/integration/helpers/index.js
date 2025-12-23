@@ -1,4 +1,5 @@
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { ethers } = require("hardhat");
 
 /**
  * Helper function to submit and activate a proposal
@@ -67,24 +68,129 @@ async function executeTrades(marketFactory, trades, marketId) {
  * @param {Object} oracleResolver - Oracle resolver contract
  * @param {Object} accounts - Test accounts with owner and reporter
  * @param {BigInt} proposalId - Proposal identifier
- * @param {BigInt} value - Welfare metric value
+ * @param {BigInt} passValue - Welfare metric value if proposal passes
+ * @param {BigInt} failValue - Welfare metric value if proposal fails
  * @param {String} evidence - Evidence string or IPFS hash
  */
-async function completeOracleResolution(oracleResolver, accounts, proposalId, value, evidence) {
+async function completeOracleResolution(oracleResolver, accounts, proposalId, passValue, failValue, evidence) {
   const { owner, reporter } = accounts;
 
+  const reporterBond = await oracleResolver.REPORTER_BOND();
+  
   // Reporter submits the report
   await oracleResolver
     .connect(reporter)
-    .submitReport(proposalId, value, evidence || "Integration test evidence");
+    .submitReport(
+      proposalId, 
+      passValue, 
+      failValue,
+      ethers.toUtf8Bytes(evidence || "Integration test evidence"),
+      { value: reporterBond }
+    );
 
-  // Wait for challenge period to pass (3 days)
-  await time.increase(3 * 24 * 3600);
+  // Wait for challenge period to pass (2 days)
+  const challengePeriod = await oracleResolver.CHALLENGE_PERIOD();
+  await time.increase(challengePeriod + 1n);
 
   // Owner finalizes the resolution
   await oracleResolver
     .connect(owner)
     .finalizeResolution(proposalId);
+}
+
+/**
+ * Submit oracle report (initial report submission stage)
+ * @param {Object} oracleResolver - Oracle resolver contract
+ * @param {Object} reporter - Reporter signer
+ * @param {BigInt} proposalId - Proposal identifier
+ * @param {BigInt} passValue - Welfare metric value if proposal passes
+ * @param {BigInt} failValue - Welfare metric value if proposal fails
+ * @param {String} evidence - Evidence string or IPFS hash
+ * @returns {Object} Transaction receipt
+ */
+async function submitOracleReport(oracleResolver, reporter, proposalId, passValue, failValue, evidence) {
+  const reporterBond = await oracleResolver.REPORTER_BOND();
+  
+  return await oracleResolver
+    .connect(reporter)
+    .submitReport(
+      proposalId,
+      passValue,
+      failValue,
+      ethers.toUtf8Bytes(evidence || "Oracle report evidence"),
+      { value: reporterBond }
+    );
+}
+
+/**
+ * Challenge an oracle report during challenge period
+ * @param {Object} oracleResolver - Oracle resolver contract
+ * @param {Object} challenger - Challenger signer
+ * @param {BigInt} proposalId - Proposal identifier
+ * @param {BigInt} counterPassValue - Alternative pass value
+ * @param {BigInt} counterFailValue - Alternative fail value
+ * @param {String} counterEvidence - Counter-evidence
+ * @returns {Object} Transaction receipt
+ */
+async function challengeOracleReport(oracleResolver, challenger, proposalId, counterPassValue, counterFailValue, counterEvidence) {
+  const challengerBond = await oracleResolver.CHALLENGER_BOND();
+  
+  return await oracleResolver
+    .connect(challenger)
+    .challengeReport(
+      proposalId,
+      counterPassValue,
+      counterFailValue,
+      ethers.toUtf8Bytes(counterEvidence || "Challenge evidence"),
+      { value: challengerBond }
+    );
+}
+
+/**
+ * Complete oracle resolution with challenge
+ * @param {Object} oracleResolver - Oracle resolver contract
+ * @param {Object} accounts - Test accounts with owner, reporter, and challenger
+ * @param {BigInt} proposalId - Proposal identifier
+ * @param {Object} reportValues - Initial report {passValue, failValue, evidence}
+ * @param {Object} challengeValues - Challenge values {passValue, failValue, evidence}
+ * @returns {Object} Final resolution values
+ */
+async function completeOracleResolutionWithChallenge(
+  oracleResolver, 
+  accounts, 
+  proposalId, 
+  reportValues,
+  challengeValues
+) {
+  const { owner, reporter, challenger } = accounts;
+
+  // Submit initial report
+  await submitOracleReport(
+    oracleResolver,
+    reporter,
+    proposalId,
+    reportValues.passValue,
+    reportValues.failValue,
+    reportValues.evidence
+  );
+
+  // Submit challenge
+  await challengeOracleReport(
+    oracleResolver,
+    challenger,
+    proposalId,
+    challengeValues.passValue,
+    challengeValues.failValue,
+    challengeValues.evidence
+  );
+
+  // Owner finalizes (accepts challenge)
+  await oracleResolver
+    .connect(owner)
+    .finalizeResolution(proposalId);
+
+  // Return final resolution
+  return await oracleResolver.getResolution(proposalId);
 }
 
 /**
@@ -164,6 +270,9 @@ module.exports = {
   submitAndActivateProposal,
   executeTrades,
   completeOracleResolution,
+  submitOracleReport,
+  challengeOracleReport,
+  completeOracleResolutionWithChallenge,
   getFutureTimestamp,
   advanceDays,
   createProposalData,

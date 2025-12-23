@@ -65,6 +65,9 @@ async function deploySystemFixture() {
   const oracleResolver = await OracleResolver.deploy();
   await oracleResolver.waitForDeployment();
   await oracleResolver.initialize(owner.address);
+  
+  // Add reporter as designated reporter before transferring ownership
+  await oracleResolver.connect(owner).addDesignatedReporter(reporter.address);
 
   // Deploy RagequitModule
   const RagequitModule = await ethers.getContractFactory("RagequitModule");
