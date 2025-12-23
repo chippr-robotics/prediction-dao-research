@@ -288,13 +288,15 @@ Risk: Impermanent loss if price moves outside range
 
 ### Privacy Compatibility
 
-| Mechanism | LMSR + Nightmarket | V3 + Nightmarket (Proposed) |
-|-----------|-------------------|----------------------------|
-| **Position Privacy** | ✅ Fully supported | ⚠️ Requires adaptation |
-| **Trade Batching** | ✅ Native | ⚠️ Needs custom implementation |
-| **Price Privacy** | ✅ Only aggregate visible | ⚠️ Tick movements visible |
-| **LP Privacy** | ✅ Single provider | ⚠️ Multiple LPs harder to hide |
-| **Implementation** | Mature | Requires development |
+| Mechanism | LMSR + Nightmarket | V3 (No Privacy) |
+|-----------|-------------------|-----------------|
+| **Position Privacy** | ✅ Fully supported | ❌ Not applicable (FairWins uses V3 without privacy) |
+| **Trade Batching** | ✅ Native | ❌ Standard V3 execution |
+| **Price Privacy** | ✅ Only aggregate visible | ❌ All trades public |
+| **LP Privacy** | ✅ Single provider | ❌ All positions public |
+| **Implementation** | Mature (ClearPath) | Standard V3 (FairWins) |
+
+**Note**: FairWins will use ETCswap V3 without modification. Privacy is not required for public prediction markets, and V3 is deployed as-is for transparency and efficiency.
 
 ---
 
@@ -367,6 +369,12 @@ Risk: Impermanent loss if price moves outside range
   - Sports and entertainment markets
   - Financial forecasting
   - Any high-volume public market
+
+---
+
+## Additional Integration Paths Considered
+
+The following options were evaluated but not recommended given the platform-specific approach is optimal for the dual-platform structure.
 
 ### Option 2: Parallel Markets (Both Platforms)
 
@@ -839,53 +847,46 @@ Impermanent loss: $2.4 (2%)
 - ✅ Technical analysis
 - ✅ Integration recommendations
 
-### Phase 1: Prototype Development (3-4 weeks)
+### Phase 1: Prototype Development
 
-**Objective**: Build proof-of-concept V3 integration
+**Objective**: Build proof-of-concept V3 integration for FairWins
 
 **Tasks**:
 
-**Week 1-2: Core Contracts**
+**Core Contracts**
 - [ ] Fork/adapt Uniswap V3 contracts for Solidity 0.8.24
 - [ ] Implement V3MarketFactory
 - [ ] Connect to existing ConditionalMarketFactory
 - [ ] Create test pools for PASS/FAIL tokens
 
-**Week 3: Integration Layer**
-- [ ] Build MarketRouter (basic version)
-- [ ] Implement quote aggregation
-- [ ] Add price comparison logic
-- [ ] Test routing decisions
-
-**Week 4: Testing & Documentation**
+**Testing & Documentation**
 - [ ] Write unit tests for V3MarketFactory
-- [ ] Write integration tests for routing
+- [ ] Write integration tests for FairWins V3 markets
 - [ ] Document integration API
 - [ ] Create deployment scripts
 
 **Deliverables**:
 - V3MarketFactory contract
-- MarketRouter contract  
 - Test suite (>90% coverage)
 - Integration documentation
 
-### Phase 2: Testnet Deployment (2-3 weeks)
+### Phase 2: Testnet Deployment
 
 **Objective**: Deploy and test on Mordor testnet
 
 **Tasks**:
 - [ ] Deploy V3Factory to Mordor
 - [ ] Deploy V3MarketFactory
-- [ ] Deploy MarketRouter
-- [ ] Create test markets and gather feedback
+- [ ] Create test FairWins markets
+- [ ] Gather community feedback
 
 **Success Criteria**:
-- Stable operation for 2+ weeks
+- Stable operation over extended testing period
 - No critical bugs found
 - Gas costs within acceptable range
 - Positive community feedback
 
-### Phase 3: Security Audit (4-6 weeks)
+### Phase 3: Security Audit
 
 **Objective**: Professional security review
 
@@ -900,47 +901,35 @@ Impermanent loss: $2.4 (2%)
 - High/medium issues resolved
 - Audit report published
 
-### Phase 4: Mainnet Launch (Phased - 8-12 weeks)
+### Phase 4: Mainnet Launch (Phased)
 
 **Objective**: Gradual rollout to mainnet
 
-**Stage 1: Limited Launch (Week 1-4)**
+**Stage 1: Limited Launch**
 - [ ] Deploy to mainnet
-- [ ] Enable V3 for 2-3 pilot markets
+- [ ] Enable V3 for pilot FairWins markets
 - [ ] Protocol provides initial liquidity
 - [ ] Monitor closely
 
-**Stage 2: Expansion (Week 5-8)**
-- [ ] Open to more markets (10-20)
+**Stage 2: Expansion**
+- [ ] Open to additional markets
 - [ ] Allow community LP participation
-- [ ] Enable MarketRouter
 - [ ] Gather usage data
 
-**Stage 3: Full Availability (Week 9-12)**
-- [ ] Available for all eligible markets
+**Stage 3: Full Availability**
+- [ ] Available for all FairWins markets
 - [ ] Fully permissionless LP participation
-- [ ] Router becomes default
 - [ ] Documentation and guides complete
 
 **Success Criteria**:
-- 30% of volume on V3 pools
-- Average slippage reduced by 20%
-- Active LP community (50+ LPs)
+- Significant volume on V3 pools
+- Reduced average slippage
+- Active LP community
 - No security incidents
 
-### Phase 5: Privacy Enhancement (Future - 12+ weeks)
+### Phase 5: Advanced Features (Future)
 
-**Objective**: Add privacy features to V3 trading
-
-**Tasks**:
-- [ ] Research ZK-compatible AMM designs
-- [ ] Design V3PrivacyAdapter
-- [ ] Prototype batch trade system
-- [ ] Test privacy guarantees
-
-### Phase 6: Advanced Features (Future - 16+ weeks)
-
-**Objective**: Add sophisticated V3 capabilities
+**Objective**: Add sophisticated V3 capabilities for FairWins
 
 **Potential Features**:
 - [ ] Multi-outcome markets (>2 outcomes)
@@ -948,6 +937,7 @@ Impermanent loss: $2.4 (2%)
 - [ ] IL insurance protocol
 - [ ] Advanced analytics dashboard
 - [ ] LP strategy templates
+- [ ] Cross-chain liquidity bridging
 
 ---
 

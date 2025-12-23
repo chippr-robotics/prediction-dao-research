@@ -13,12 +13,12 @@ A comprehensive analysis exploring the integration of ETCswap v3 (Uniswap v3 for
 
 - **Architecture Analysis**: Deep dive into V3's concentrated liquidity mechanisms, tick mathematics, and fee structures
 - **Comparative Study**: Detailed comparison between current LMSR markets and V3 AMM approaches
-- **Integration Strategies**: Four distinct approaches with trade-offs and recommendations
+- **Integration Strategies**: Five distinct approaches with trade-offs and recommendations
 - **Technical Design**: Proposed smart contract architecture and implementation details
 - **Risk Assessment**: Comprehensive analysis of technical, economic, and operational risks
-- **Implementation Roadmap**: Phased rollout plan spanning 6-12 months
+- **Implementation Roadmap**: Phased rollout plan for FairWins V3 integration
 
-**Key Recommendation**: Parallel Markets approach with phased rollout, maintaining LMSR as default while offering V3 as an opt-in enhancement for high-volume markets.
+**Key Recommendation**: Platform-specific approach where ClearPath uses LMSR with Nightmarket privacy for governance (privacy-first), and FairWins uses V3 concentrated liquidity for prediction markets (efficiency-first).
 
 ---
 
