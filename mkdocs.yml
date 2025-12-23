@@ -113,6 +113,7 @@ nav:
     - Introduction: system-overview/introduction.md
     - How It Works: system-overview/how-it-works.md
     - Privacy Mechanisms: system-overview/privacy.md
+    - Ragequit Protection: system-overview/ragequit-protection.md
     - Security Model: system-overview/security.md
     - Governance: system-overview/governance.md
   - Architecture Decisions:
