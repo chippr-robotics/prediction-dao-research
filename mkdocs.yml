@@ -84,9 +84,11 @@ plugins:
 nav:
   - Home: index.md
   - User Guide:
+    - User Experience Overview: user-guide/overview.md
     - Getting Started: user-guide/getting-started.md
     - User Journeys: user-guide/user-journeys.md
     - Practical Scenarios: user-guide/practical-scenarios.md
+    - Understanding the Interface: user-guide/interface-guide.md
     - Using the System: user-guide/using-the-system.md
     - Submitting Proposals: user-guide/submitting-proposals.md
     - Trading on Markets: user-guide/trading-on-markets.md
