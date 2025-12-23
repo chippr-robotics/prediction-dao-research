@@ -41,11 +41,23 @@ All 10 tests pass successfully with no security vulnerabilities detected.
 
 ## CI/CD Integration
 
-Medusa runs automatically in the GitHub Actions workflow:
-- Job: `medusa-fuzzing` in `security-testing.yml`
-- Timeout: 30 minutes
-- Results are collected and uploaded as artifacts
-- The job continues on error to allow review of any findings
+Medusa fuzz testing runs in two contexts:
+
+### Weekly Torture Test
+- **Workflow:** `torture-test.yml`
+- **Schedule:** Every Monday at 00:00 UTC
+- **Timeout:** 2 hours (120 minutes)
+- **Fuzzing Duration:** 1 hour (3600 seconds)
+- **Purpose:** Comprehensive security testing with extended fuzzing time
+- **Trigger:** Automated weekly + manual dispatch
+
+### Local Development
+For quick local testing, use a shorter timeout:
+```bash
+medusa fuzz --timeout 300  # 5 minutes for quick checks
+```
+
+Results are collected and uploaded as artifacts with 90-day retention for the torture test.
 
 ## Configuration
 

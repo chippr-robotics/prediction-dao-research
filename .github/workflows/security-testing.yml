@@ -187,67 +187,10 @@ jobs:
           path: manticore-results/
           retention-days: 30
 
-  medusa-fuzzing:
-    name: Medusa Fuzz Testing
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-
-      - name: Install Medusa
-        run: |
-          go install github.com/crytic/medusa@latest
-          echo "$HOME/go/bin" >> $GITHUB_PATH
-
-      - name: Install crytic-compile
-        run: |
-          pip install crytic-compile
-
-      - name: Compile contracts
-        run: npm run compile
-
-      - name: Run Medusa fuzzing
-        run: |
-          export PATH=$PATH:$HOME/go/bin
-          medusa fuzz --timeout 300 || true
-        continue-on-error: true
-
-      - name: Collect Medusa results
-        if: always()
-        run: |
-          mkdir -p medusa-results
-          cp -r medusa-corpus medusa-results/ || true
-          cp medusa.json medusa-results/ || true
-          find . -name "medusa-output" -exec cp -r {} medusa-results/ \; || true
-
-      - name: Upload Medusa results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: medusa-results
-          path: medusa-results/
-          retention-days: 30
-
   summary:
     name: Generate Test Summary
     runs-on: ubuntu-latest
-    needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis, medusa-fuzzing]
+    needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis]
     if: always()
     
     steps:
@@ -287,4 +230,5 @@ jobs:
           echo "- Coverage Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Slither Analysis: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Manticore Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Medusa Fuzzing: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Medusa fuzz testing runs in the Weekly Torture Test workflow." >> $GITHUB_STEP_SUMMARY
