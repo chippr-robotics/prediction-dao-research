@@ -65,6 +65,9 @@ async function deploySystemFixture() {
   const oracleResolver = await OracleResolver.deploy();
   await oracleResolver.waitForDeployment();
   await oracleResolver.initialize(owner.address);
+  
+  // Add reporter as designated reporter before transferring ownership
+  await oracleResolver.connect(owner).addDesignatedReporter(reporter.address);
 
   // Deploy RagequitModule
   const RagequitModule = await ethers.getContractFactory("RagequitModule");
@@ -111,11 +114,12 @@ async function deploySystemFixture() {
   );
   await welfareRegistry.connect(owner).activateMetric(1);
   
-  // Transfer ownership back to FutarchyGovernor
+  // Transfer ownership to FutarchyGovernor (except OracleResolver for integration tests)
   await welfareRegistry.connect(owner).transferOwnership(await futarchyGovernor.getAddress());
   await proposalRegistry.transferOwnership(await futarchyGovernor.getAddress());
   await marketFactory.transferOwnership(await futarchyGovernor.getAddress());
-  await oracleResolver.transferOwnership(await futarchyGovernor.getAddress());
+  // Note: OracleResolver ownership is NOT transferred to allow direct testing in integration tests
+  // In production, it would be owned by FutarchyGovernor
 
   return {
     contracts: {
