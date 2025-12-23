@@ -10,11 +10,11 @@ This document analyzes the potential integration of ETCswap v3 (a fork of Uniswa
 
 ### Key Findings
 
-1. **Complementary Use Cases**: ETCswap v3 and current LMSR markets serve different purposes and can coexist
-2. **Liquidity Efficiency**: Concentrated liquidity could reduce capital requirements for market makers
-3. **Integration Complexity**: Moderate to high - requires careful architectural planning
-4. **Privacy Challenges**: V3's design requires adaptation for Nightmarket-style privacy
-5. **Recommendation**: Phased integration approach starting with optional liquidity pools
+1. **Platform-Specific Optimization**: ClearPath and FairWins have different requirements that make them suited to different market mechanisms
+2. **ClearPath + LMSR**: Governance decisions require privacy at the core - LMSR with Nightmarket integration is ideal
+3. **FairWins + V3**: High volume and activity benefit from efficient LPs and transparency - concentrated liquidity is optimal
+4. **Liquidity Efficiency**: V3's concentrated liquidity provides 3-5x better capital efficiency for high-volume markets
+5. **Recommendation**: Platform-specific approach - LMSR for ClearPath (privacy-first), V3 for FairWins (efficiency-first)
 
 ---
 
@@ -300,9 +300,77 @@ Risk: Impermanent loss if price moves outside range
 
 ## Integration Approaches
 
-### Option 1: Parallel Markets (Recommended)
+### Option 1: Platform-Specific Mechanisms (Recommended)
 
-**Concept**: Run both LMSR and V3 pools side-by-side for the same tokens
+**Concept**: Use different market mechanisms optimized for each platform's unique requirements
+
+**Architecture**:
+```
+┌─────────────────────────────────────────────┐
+│         Prediction DAO Ecosystem             │
+├─────────────────────────────────────────────┤
+│                                              │
+│  ┌──────────────┐      ┌─────────────────┐ │
+│  │  ClearPath   │      │   FairWins      │ │
+│  │  (Governance)│      │   (Prediction)  │ │
+│  └──────┬───────┘      └────────┬────────┘ │
+│         │                       │           │
+│         ↓                       ↓           │
+│  ┌──────────────┐      ┌─────────────────┐ │
+│  │ LMSR Markets │      │  V3 Pools       │ │
+│  │ + Privacy    │      │ (Concentrated   │ │
+│  │ (Nightmarket)│      │  Liquidity)     │ │
+│  └──────────────┘      └─────────────────┘ │
+│                                              │
+└─────────────────────────────────────────────┘
+```
+
+**Rationale**:
+
+**ClearPath → LMSR + Privacy**:
+- Governance decisions require privacy to prevent vote buying and collusion
+- LMSR's bounded loss protects DAO treasury
+- Predictable pricing for institutional decision-making
+- Nightmarket integration mature and battle-tested
+- Lower complexity reduces governance risk
+
+**FairWins → V3 Concentrated Liquidity**:
+- High volume and activity justify V3's complexity
+- Efficient LPs reduce capital requirements
+- Transparency acceptable for prediction markets
+- Community liquidity provision increases engagement
+- Market-driven pricing improves price discovery
+- Multiple fee tiers suit various market types
+
+**Advantages**:
+- ✅ Each platform uses optimal mechanism for its use case
+- ✅ No liquidity fragmentation within each platform
+- ✅ Clear separation reduces user confusion
+- ✅ Privacy where needed, efficiency where possible
+- ✅ Simpler than running both systems everywhere
+- ✅ Maintains ClearPath's privacy guarantees
+
+**Disadvantages**:
+- ❌ Two systems to maintain (unavoidable)
+- ❌ Different user experiences across platforms
+- ❌ Cannot easily move markets between platforms
+
+**Use Case Mapping**: 
+- **ClearPath (LMSR)**: 
+  - DAO governance proposals
+  - Treasury management decisions
+  - Protocol parameter changes
+  - Any decision requiring privacy
+  
+- **FairWins (V3)**:
+  - Event outcome predictions
+  - Sports and entertainment markets
+  - Financial forecasting
+  - Any high-volume public market
+
+### Option 2: Parallel Markets (Both Platforms)
+
+**Concept**: Run both LMSR and V3 pools side-by-side for the same tokens on both platforms
 
 **Architecture**:
 ```
@@ -315,22 +383,22 @@ LMSR Pool   V3 Pool
 ```
 
 **Advantages**:
-- ✅ Low risk - systems independent
-- ✅ Users choose preferred mechanism
+- ✅ Users choose preferred mechanism on each platform
 - ✅ Arbitrage ensures price consistency
-- ✅ Maintains backward compatibility
-- ✅ Gradual adoption path
+- ✅ Gradual adoption path for V3
+- ✅ Maintains full backward compatibility
 
 **Disadvantages**:
-- ❌ Liquidity fragmentation
-- ❌ Two systems to maintain
+- ❌ Liquidity fragmentation on each platform
+- ❌ User confusion about which to use
 - ❌ Potential for price discrepancies
+- ❌ Higher complexity than platform-specific approach
 
 **Use Case**: 
-- LMSR: Default for all markets, simple UX
-- V3: Optional for high-volume markets, advanced users
+- Could be used if both platforms want both options
+- Not recommended due to complexity and fragmentation
 
-### Option 2: Hybrid Model
+### Option 3: Hybrid Model
 
 **Concept**: Use LMSR as base layer, V3 as supplementary liquidity
 
@@ -361,7 +429,7 @@ LMSR Pool   V3 Pool
 - ❌ Higher gas costs
 - ❌ Challenging to implement privacy
 
-### Option 3: Specialized Markets
+### Option 4: Specialized Markets
 
 **Concept**: Use V3 exclusively for specific market types
 
@@ -392,7 +460,7 @@ LMSR Pool   V3 Pool
 - ❌ Still requires two codebases
 - ❌ Less synergy between systems
 
-### Option 4: Post-Resolution Secondary Market
+### Option 5: Post-Resolution Secondary Market
 
 **Concept**: Use V3 pools for trading resolved tokens before redemption
 
@@ -420,55 +488,73 @@ LMSR Pool   V3 Pool
 
 ## Technical Design
 
-### Recommended Architecture: Option 1 (Parallel Markets)
+### Recommended Architecture: Option 1 (Platform-Specific Mechanisms)
 
 #### Component Structure
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Prediction DAO Platform                   │
+│              Prediction DAO Ecosystem                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  ┌──────────────────┐          ┌─────────────────────┐    │
-│  │  Market Router   │          │  Privacy Coordinator │    │
-│  │  (Optional)      │◄────────►│  (Nightmarket)       │    │
-│  └────────┬─────────┘          └─────────────────────┘    │
-│           │                                                  │
-│    ┌──────┴───────┐                                        │
-│    ↓              ↓                                         │
-│ ┌─────────┐  ┌──────────┐                                 │
-│ │  LMSR   │  │ V3 Pools │                                 │
-│ │ Factory │  │ Factory  │                                 │
-│ └────┬────┘  └────┬─────┘                                 │
-│      │            │                                         │
-│   ┌──┴──┐      ┌──┴───┐                                   │
-│   │LMSR │      │ V3   │                                    │
-│   │Pool │      │Pool  │                                    │
-│   └─────┘      └──────┘                                    │
-│      ↓            ↓                                         │
-│   ┌────────────────────┐                                   │
-│   │ Conditional Tokens │                                    │
-│   │   (PASS/FAIL)      │                                    │
-│   └────────────────────┘                                   │
+│  ┌────────────────────────┐   ┌──────────────────────────┐ │
+│  │   ClearPath Platform   │   │   FairWins Platform      │ │
+│  │   (DAO Governance)     │   │   (Prediction Markets)   │ │
+│  └───────────┬────────────┘   └──────────┬───────────────┘ │
+│              │                            │                  │
+│              ↓                            ↓                  │
+│  ┌────────────────────┐     ┌────────────────────────────┐ │
+│  │ LMSR Markets       │     │ V3 Concentrated Liquidity  │ │
+│  │ + Privacy          │     │ Pools                      │ │
+│  │ (Nightmarket)      │     │ (Community LPs)            │ │
+│  └──────────┬─────────┘     └──────────┬─────────────────┘ │
+│             │                           │                   │
+│             ↓                           ↓                   │
+│  ┌──────────────────┐       ┌─────────────────────────┐   │
+│  │ Privacy          │       │ Multiple Fee Tiers      │   │
+│  │ Coordinator      │       │ (0.05%, 0.3%, 1%)       │   │
+│  └──────────────────┘       └─────────────────────────┘   │
+│                                                              │
+│             Both use Conditional Tokens (PASS/FAIL)         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-#### New Smart Contracts Required
+**Key Design Principles**:
 
-##### 1. V3MarketFactory
+1. **ClearPath**: 
+   - Uses existing LMSR + ConditionalMarketFactory
+   - Maintains Nightmarket privacy integration
+   - No V3 integration needed (privacy requirement)
+   - Bounded loss protects DAO treasury
+
+2. **FairWins**:
+   - Deploys V3 pools for all markets
+   - No privacy requirement (public prediction markets)
+   - Community liquidity provision enabled
+   - Multiple fee tiers for different market types
+
+3. **Shared Infrastructure**:
+   - Both platforms use same conditional token standard
+   - OracleResolver works for both systems
+   - ProposalRegistry shared for metadata
+   - Frontend routes to appropriate platform
+
+#### New Smart Contracts Required (FairWins Only)
+
+##### 1. V3MarketFactory (FairWins)
 
 ```solidity
 /**
  * @title V3MarketFactory
- * @notice Factory for creating V3 liquidity pools for prediction market tokens
+ * @notice Factory for creating V3 liquidity pools for FairWins prediction markets
  * @dev Wraps Uniswap V3 Factory with prediction market specific logic
  */
 contract V3MarketFactory {
     IUniswapV3Factory public immutable v3Factory;
     ConditionalMarketFactory public immutable conditionalFactory;
     
-    // Mapping: proposalId => (token0, token1, fee) => pool address
-    mapping(uint256 => mapping(bytes32 => address)) public proposalPools;
+    // Mapping: marketId => (token0, token1, fee) => pool address
+    mapping(uint256 => mapping(bytes32 => address)) public marketPools;
     
     event V3PoolCreated(
         uint256 indexed proposalId,
@@ -495,107 +581,152 @@ contract V3MarketFactory {
 }
 ```
 
-##### 2. MarketRouter (Optional)
+**Note**: MarketRouter is not needed with platform-specific approach. ClearPath uses only LMSR, and FairWins uses only V3.
 
-```solidity
-/**
- * @title MarketRouter
- * @notice Routes trades to best available market (LMSR or V3)
- */
-contract MarketRouter {
-    ConditionalMarketFactory public immutable lmsrFactory;
-    V3MarketFactory public immutable v3Factory;
-    
-    enum MarketType { LMSR, V3 }
-    
-    /**
-     * @notice Get best quote for trade
-     * @param proposalId Proposal ID
-     * @param buyPass True for PASS, false for FAIL
-     * @param amount Amount to buy
-     * @return price Best available price
-     * @return marketType Which market provides best price
-     */
-    function getBestQuote(
-        uint256 proposalId,
-        bool buyPass,
-        uint256 amount
-    ) external view returns (uint256 price, MarketType marketType);
-}
+#### Integration Flow
+
+##### Creating Markets
+
+**ClearPath (Governance)**:
+```
+1. Proposal created in ProposalRegistry
+2. ConditionalMarketFactory creates LMSR market (current flow)
+3. PrivacyCoordinator enables encrypted trading
+4. Protocol provides liquidity with bounded loss guarantee
+```
+
+**FairWins (Prediction Markets)**:
+```
+1. Market created in FairWins platform
+2. V3MarketFactory creates V3 pool
+3. Market creator or community provides initial liquidity
+4. LPs can add liquidity in custom ranges
+5. Trading occurs through standard V3 interface
+```
+
+##### Trading Flow
+
+**ClearPath**:
+```
+User → Privacy-Enabled LMSR Market
+  │
+  ├─► Create encrypted position
+  ├─► Generate zkSNARK proof
+  ├─► Submit to PrivacyCoordinator
+  └─► Batch processing with other trades
+```
+
+**FairWins**:
+```
+User → V3 Pool (Direct)
+  │
+  ├─► Quote from pool
+  ├─► Execute swap through V3 interface
+  └─► Transparent on-chain execution
 ```
 
 ---
 
 ## Benefits and Synergies
 
-### Benefits of Integration
+### Benefits of Platform-Specific Integration
 
-#### 1. Enhanced Capital Efficiency
+#### 1. Optimal Mechanism for Each Use Case
 
-**Current State** (LMSR only):
+**ClearPath (LMSR)**:
+- Privacy preserved for governance decisions
+- Bounded loss protects DAO treasury
+- Predictable pricing for institutional decisions
+- Proven Nightmarket integration
+- Lower complexity reduces risk
+
+**FairWins (V3)**:
+- 3-5x capital efficiency for LPs
+- Community liquidity provision
+- Market-driven price discovery
+- Transparent for public predictions
+- Multiple fee tiers for different markets
+
+#### 2. No Liquidity Fragmentation
+
+**Previous Concern (Parallel Markets)**:
 ```
-Market needs $10,000 liquidity for 7-day trading period
-- Protocol provides all liquidity upfront
-- Liquidity spread across full 0-1 range
-- Capital tied up for entire period
+$100k total liquidity split:
+- $60k in LMSR
+- $40k in V3
+→ Both pools less deep than unified
 ```
 
-**With V3 Integration**:
+**Platform-Specific Solution**:
 ```
-Same market with V3 pool option:
-- Multiple LPs provide concentrated liquidity
-- Most liquidity in [0.4, 0.6] range (likely outcome)
-- ~3x more effective depth per dollar
-- LPs can adjust positions as market develops
+ClearPath: $50k in LMSR (100% of platform liquidity)
+FairWins: $50k in V3 (100% of platform liquidity)
+→ No fragmentation within each platform
 ```
 
-**Capital Savings**: 50-70% for high-activity markets
+#### 3. Clear User Experience
 
-#### 2. Improved Price Discovery
+**No Confusion**:
+- ClearPath users = LMSR + Privacy (only option)
+- FairWins users = V3 + Transparency (only option)
+- No need to choose between mechanisms
+- Platform selection is the mechanism selection
 
-**LMSR**: Algorithmic pricing based on cost function
-**V3**: Market-driven pricing based on supply/demand
+#### 4. Simplified Development
 
-**Synergy**: 
-- LMSR provides baseline/fallback pricing
-- V3 provides tighter spreads during active trading
-- Arbitrage ensures consistency
+**Compared to Parallel Markets**:
+- No router needed
+- No arbitrage concerns between mechanisms
+- Simpler frontend (one mechanism per platform)
+- Easier to test and audit
+- Lower maintenance burden
 
-#### 3. Community Liquidity Provision
+#### 5. Community Liquidity Provision (FairWins)
 
-**Current**: Protocol/creator must provide all liquidity
+**LMSR (ClearPath)**:
+- Protocol/DAO provides all liquidity
+- Controlled and predictable
+- Bounded loss protection
 
-**With V3**: 
+**V3 (FairWins)**:
 - Anyone can become LP
 - Earn fees from market activity
-- No permission needed
-- Incentivizes participation
+- Permissionless participation
+- Increases community engagement
 
-#### 4. Multiple Fee Tiers
+#### 6. Multiple Fee Tiers (FairWins)
 
-**Current**: Fixed fee structure (or no fees)
+**V3 Flexibility**:
+- 0.05% tier: Stable/obvious outcome markets
+- 0.3% tier: Standard uncertainty markets
+- 1% tier: High volatility/speculation markets
 
-**With V3**:
-- 0.05% tier: Stable markets, low spread
-- 0.3% tier: Standard markets
-- 1% tier: Volatile markets, high uncertainty
+**Benefit**: LPs choose risk/reward profile matching their strategy
 
-**Benefit**: LPs can choose risk/reward profile
+#### 7. Risk Distribution
 
-#### 5. Reduced Protocol Risk
+**ClearPath**: Protocol bears all market making risk (acceptable for governance)
 
-**Current**: Protocol bears all impermanent loss risk
-
-**With V3**: 
-- Risk distributed across many LPs
-- Protocol can be LP but not required
+**FairWins**: Risk distributed across many LPs (appropriate for predictions)
+- Protocol can participate as LP but not required
 - Market participants self-regulate liquidity
+- Reduces protocol's capital requirements
+
+### Synergies Between Platforms
+
+Despite using different mechanisms, the platforms can still benefit from shared infrastructure:
+
+1. **Shared Conditional Token Standard**: Both use PASS/FAIL tokens
+2. **Oracle Resolution**: OracleResolver works for both platforms
+3. **Metadata Registry**: ProposalRegistry provides standardized data
+4. **Frontend Components**: Reusable UI elements where appropriate
+5. **Community**: Users can participate in both platforms
 
 ---
 
 ## Risks and Limitations
 
-### Technical Risks
+### Technical Risks (Primarily FairWins/V3)
 
 #### Risk 1: Smart Contract Complexity
 
@@ -824,76 +955,108 @@ Impermanent loss: $2.4 (2%)
 
 ### Summary of Findings
 
-ETCswap v3's concentrated liquidity mechanisms offer compelling advantages for prediction market trading:
+ETCswap v3's concentrated liquidity mechanisms offer compelling advantages for high-volume prediction markets:
 
 1. **Capital Efficiency**: 3-5x improvement for concentrated positions
 2. **Community Participation**: Permissionless liquidity provision
 3. **Flexible Fee Structures**: Multiple tiers for different market types
-4. **Price Discovery**: Market-driven pricing supplements algorithmic LMSR
+4. **Price Discovery**: Market-driven pricing for active markets
 
-However, integration requires careful consideration:
+LMSR remains optimal for privacy-required governance:
 
-1. **Complexity**: V3 is significantly more complex than LMSR
-2. **Privacy Limitations**: Requires additional work for Nightmarket compatibility
-3. **Liquidity Fragmentation**: Risk of splitting liquidity
-4. **User Experience**: May confuse less sophisticated users
+1. **Privacy Integration**: Mature Nightmarket implementation
+2. **Bounded Loss**: Protects protocol/DAO treasury
+3. **Predictability**: Consistent pricing for governance
+4. **Simplicity**: Lower complexity reduces risk
+
+### Platform-Specific Recommendation
+
+The analysis shows that ClearPath and FairWins have fundamentally different requirements:
+
+**ClearPath**: Privacy is paramount for governance → LMSR + Nightmarket is ideal
+**FairWins**: Volume and efficiency matter → V3 concentrated liquidity is optimal
+
+This platform-specific approach:
+- ✅ Eliminates liquidity fragmentation (no split within platforms)
+- ✅ Provides optimal mechanism for each use case
+- ✅ Simplifies user experience (one mechanism per platform)
+- ✅ Reduces development complexity (no routing needed)
+- ✅ Maintains ClearPath's privacy guarantees
 
 ### Recommended Approach
 
-**Parallel Markets (Option 1)** with phased rollout:
+**Platform-Specific Mechanisms (Option 1)**:
 
-1. **Start Simple**: Deploy V3 alongside LMSR, no complex routing
-2. **Learn**: Gather data on usage patterns, LP behavior, pricing efficiency
-3. **Iterate**: Add router and advanced features based on learnings
-4. **Optimize**: Privacy integration once core functionality proven
+1. **ClearPath → LMSR + Privacy**:
+   - Governance requires privacy to prevent collusion
+   - Bounded loss protects DAO treasury
+   - Proven Nightmarket integration
+   - Maintain current implementation
+
+2. **FairWins → V3 Concentrated Liquidity**:
+   - High volume justifies complexity
+   - Community LP participation
+   - Transparency acceptable for predictions
+   - Capital efficiency gains
+   - Market-driven price discovery
+
+3. **No Fragmentation**:
+   - Each platform has single mechanism
+   - No user confusion about which to use
+   - No liquidity split within platforms
 
 **Key Principles**:
-- LMSR remains default (backward compatible)
-- V3 is opt-in enhancement (advanced users, high volume)
-- Both systems coexist (no forced migration)
-- Gradual rollout (minimize risk)
+- Right tool for right job (governance vs predictions)
+- Privacy where critical (ClearPath)
+- Efficiency where beneficial (FairWins)
+- Simpler than parallel markets approach
+- Clear user experience per platform
 
 ### Strategic Value
 
 **Short-term (6-12 months)**:
-- Enhanced trading experience for high-volume markets
-- Community LP participation increases platform stickiness
-- Reduced protocol liquidity requirements
+- **ClearPath**: Maintains privacy-first governance with LMSR
+- **FairWins**: V3 attracts liquidity providers and increases volume
+- Reduced overall protocol liquidity requirements
+- Clear differentiation between platforms
 
 **Medium-term (1-2 years)**:
-- V3 becomes primary trading mechanism for major markets
-- LMSR provides fallback/guaranteed liquidity
-- Privacy features bring V3 to parity with LMSR
+- **ClearPath**: Remains privacy-focused governance platform
+- **FairWins**: Becomes leading efficient prediction market
+- V3 liquidity depth rivals centralized prediction markets
+- Community LP ecosystem matures
 
 **Long-term (2+ years)**:
-- Unified trading experience across both mechanisms
-- Prediction DAO as leader in efficient prediction markets
-- DeFi integration opportunities
+- **ClearPath**: Gold standard for private DAO governance
+- **FairWins**: Most capital-efficient prediction market platform
+- Potential for additional V3 features (multi-outcome, etc.)
+- Both platforms reference implementations in their categories
 
 ### Next Steps
 
 1. **Immediate** (This Week):
    - [ ] Review this document with core team
-   - [ ] Get buy-in on recommended approach
-   - [ ] Allocate resources for Phase 1
+   - [ ] Get buy-in on platform-specific approach
+   - [ ] Allocate resources for FairWins V3 integration
 
 2. **Short-term** (Next Month):
-   - [ ] Begin Phase 1 prototype development
+   - [ ] Begin Phase 1 prototype development (FairWins only)
    - [ ] Set up dedicated testnet environment
-   - [ ] Engage with potential early LP partners
+   - [ ] Engage with potential FairWins LP partners
 
 3. **Medium-term** (Next Quarter):
    - [ ] Complete prototype and testing
    - [ ] Select and engage audit firm
-   - [ ] Prepare community for new feature
+   - [ ] Prepare FairWins community for V3 launch
 
 ### Open Questions for Discussion
 
-1. **Scope**: Should we start with Option 1 (Parallel) or Option 4 (Post-Resolution)?
-2. **Privacy**: Is V3 without privacy acceptable for some use cases?
-3. **Economics**: How to incentivize early LPs? Protocol rewards?
-4. **Governance**: Who decides which markets get V3 pools?
-5. **Resources**: Do we have bandwidth for 3-6 month development cycle?
+1. **Timeline**: Should FairWins V3 launch before or after ClearPath goes live?
+2. **Initial Liquidity**: How to bootstrap FairWins V3 pools? Protocol seed funding?
+3. **Fee Tiers**: Which fee tiers should be enabled initially for FairWins?
+4. **LP Incentives**: Should protocol offer additional rewards to early LPs?
+5. **Resources**: Do we have bandwidth for parallel ClearPath and FairWins development?
+6. **Migration**: Should existing FairWins markets migrate from LMSR to V3?
 
 ---
 
@@ -952,21 +1115,29 @@ However, integration requires careful consideration:
 
 #### Market Type Recommendations
 
-| Market Type | Recommended Mechanism | Rationale |
-|-------------|----------------------|-----------|
-| ClearPath Governance | LMSR | Privacy required, controlled liquidity |
-| Small FairWins Markets | LMSR | Lower overhead, simpler UX |
-| Large FairWins Markets | V3 (optional) | Better efficiency with volume |
-| High-Certainty Events | V3 | Concentrated liquidity effective |
-| Uncertain Outcomes | LMSR | Bounded loss protects protocol |
-| Privacy-Required | LMSR | Current privacy integration |
-| Post-Resolution Trading | V3 | Secondary market efficiency |
+| Market Type | Platform | Mechanism | Rationale |
+|-------------|----------|-----------|-----------|
+| DAO Governance Proposals | ClearPath | LMSR + Privacy | Privacy required for governance, bounded loss |
+| Treasury Management | ClearPath | LMSR + Privacy | Privacy required, controlled liquidity |
+| Protocol Parameter Changes | ClearPath | LMSR + Privacy | Privacy required, predictable pricing |
+| All FairWins Markets | FairWins | V3 Pools | High volume, community LPs, transparency OK |
+| Event Predictions | FairWins | V3 Pools | Market-driven pricing, efficient LPs |
+| Sports/Entertainment | FairWins | V3 Pools | High activity benefits from V3 |
+| Financial Forecasting | FairWins | V3 Pools | Multiple fee tiers for different volatility |
+
+**Key Principle**: Platform determines mechanism
+- ClearPath = Always LMSR (privacy-first)
+- FairWins = Always V3 (efficiency-first)
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 2.0  
 **Last Updated**: December 23, 2025  
 **Authors**: Prediction DAO Research Team  
-**Status**: Final - Ready for Review
+**Status**: Final - Platform-Specific Approach
+
+**Changelog**:
+- v2.0: Updated to platform-specific approach (ClearPath=LMSR, FairWins=V3)
+- v1.0: Initial parallel markets recommendation
 
 ---
