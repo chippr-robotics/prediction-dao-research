@@ -572,14 +572,15 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
       console.log("  ✓ Double finalization prevented");
     });
 
-    it("Should require evidence data", async function () {
+    it("Should accept empty evidence (evidence validation is off-chain)", async function () {
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { oracleResolver } = contracts;
       const { reporter } = accounts;
 
       const proposalId = 22;
 
-      // Submit with empty evidence should still work (evidence is optional bytes)
+      // Evidence is optional at the contract level (bytes parameter)
+      // Real-world validation of evidence happens off-chain and in governance
       await expect(
         oracleResolver
           .connect(reporter)
@@ -592,7 +593,7 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
           )
       ).to.emit(oracleResolver, "ReportSubmitted");
 
-      console.log("  ✓ Report accepts empty evidence (validated off-chain)");
+      console.log("  ✓ Empty evidence accepted (evidence validation is off-chain)");
     });
   });
 
