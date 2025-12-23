@@ -109,18 +109,19 @@
 }
 
 .platform-logo {
-  margin-bottom: 1rem;
-  height: 80px;
+  margin-bottom: 1.5rem;
+  height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .logo-image {
-  max-width: 150px;
-  max-height: 80px;
+  max-width: 100%;
+  max-height: 120px;
   width: auto;
   height: auto;
+  object-fit: contain;
 }
 
 .platform-icon {
@@ -342,6 +343,14 @@
     gap: 2rem;
   }
 
+  .platform-logo {
+    height: 100px;
+  }
+
+  .logo-image {
+    max-height: 100px;
+  }
+
   .tech-grid {
     grid-template-columns: 1fr;
   }
@@ -352,5 +361,25 @@
 
   .platform-card h2 {
     font-size: 1.75rem;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .platform-logo {
+    height: 110px;
+  }
+
+  .logo-image {
+    max-height: 110px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .platform-logo {
+    height: 140px;
+  }
+
+  .logo-image {
+    max-height: 140px;
   }
 }
