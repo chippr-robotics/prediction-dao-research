@@ -1,0 +1,304 @@
+name: CI Manager - Smart Test Selection
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-changes:
+    name: Detect Changed Components
+    runs-on: ubuntu-latest
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docs: ${{ steps.filter.outputs.docs }}
+      security: ${{ steps.filter.outputs.security }}
+      core: ${{ steps.filter.outputs.core }}
+      any_code_changed: ${{ steps.check.outputs.any_code_changed }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            contracts:
+              - 'contracts/**'
+              - 'hardhat.config.js'
+              - 'scripts/deploy*.js'
+              - 'test/*.test.js'
+              - 'test/integration/**'
+              - 'medusa.json'
+              - 'slither.config.json'
+            frontend:
+              - 'frontend/**'
+              - '!frontend/README.md'
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+              - 'requirements.txt'
+              - '*.md'
+              - '!frontend/README.md'
+            security:
+              - 'contracts/**'
+              - 'hardhat.config.js'
+              - 'test/**'
+              - 'medusa.json'
+              - 'slither.config.json'
+            core:
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/**'
+
+      - name: Check if any code changed
+        id: check
+        run: |
+          if [[ "${{ steps.filter.outputs.contracts }}" == "true" || \
+                "${{ steps.filter.outputs.frontend }}" == "true" || \
+                "${{ steps.filter.outputs.core }}" == "true" ]]; then
+            echo "any_code_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "any_code_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate change summary
+        run: |
+          echo "## 🔍 Change Detection Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow intelligently detects which components have changed" >> $GITHUB_STEP_SUMMARY
+          echo "and runs only the necessary tests to save CI time and resources." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Components Changed:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.filter.outputs.contracts }}" == "true" ]]; then
+            echo "✅ **Smart Contracts** - Will run contract tests" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Smart Contracts** - No changes detected, tests skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ steps.filter.outputs.frontend }}" == "true" ]]; then
+            echo "✅ **Frontend** - Will run frontend tests" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Frontend** - No changes detected, tests skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ steps.filter.outputs.docs }}" == "true" ]]; then
+            echo "✅ **Documentation** - Will build docs" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Documentation** - No changes detected, build skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ steps.filter.outputs.security }}" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "✅ **Security Testing** - Will run security analysis" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Security Testing** - No changes detected, analysis skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tests to Execute:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          test_count=0
+          if [[ "${{ steps.filter.outputs.contracts }}" == "true" ]]; then
+            echo "- Smart Contract Tests" >> $GITHUB_STEP_SUMMARY
+            ((test_count++))
+          fi
+          if [[ "${{ steps.filter.outputs.frontend }}" == "true" ]]; then
+            echo "- Frontend Lint & Build" >> $GITHUB_STEP_SUMMARY
+            ((test_count++))
+          fi
+          if [[ "${{ steps.filter.outputs.docs }}" == "true" ]]; then
+            echo "- Documentation Build" >> $GITHUB_STEP_SUMMARY
+            ((test_count++))
+          fi
+          if [[ "${{ steps.filter.outputs.security }}" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "- Security Analysis" >> $GITHUB_STEP_SUMMARY
+            ((test_count++))
+          fi
+          
+          if [[ $test_count -eq 0 ]]; then
+            echo "- None (Documentation-only changes)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total test suites to run:** $test_count" >> $GITHUB_STEP_SUMMARY
+
+  smart-contract-tests:
+    name: Smart Contract Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.contracts == 'true' || needs.detect-changes.outputs.core == 'true'
+    uses: ./.github/workflows/test.yml
+
+  frontend-tests:
+    name: Frontend Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true' || needs.detect-changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: frontend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+          retention-days: 7
+
+  docs-build:
+    name: Documentation Build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build MkDocs site
+        run: mkdocs build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: ./site
+          retention-days: 7
+
+  security-analysis:
+    name: Security Analysis
+    needs: detect-changes
+    # Run on main branch or when security-relevant files changed
+    if: |
+      github.ref == 'refs/heads/main' ||
+      needs.detect-changes.outputs.security == 'true'
+    uses: ./.github/workflows/security-testing.yml
+
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: 
+      - detect-changes
+      - smart-contract-tests
+      - frontend-tests
+      - docs-build
+      - security-analysis
+    if: always()
+    
+    steps:
+      - name: Generate final summary
+        run: |
+          echo "## 🎉 CI Manager Execution Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Reason |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Smart Contract Tests
+          if [[ "${{ needs.smart-contract-tests.result }}" == "success" ]]; then
+            echo "| Smart Contract Tests | ✅ Success | Tests passed |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.smart-contract-tests.result }}" == "skipped" ]]; then
+            echo "| Smart Contract Tests | ⏭️ Skipped | No contract changes detected |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.smart-contract-tests.result }}" == "failure" ]]; then
+            echo "| Smart Contract Tests | ❌ Failed | Tests failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Frontend Tests
+          if [[ "${{ needs.frontend-tests.result }}" == "success" ]]; then
+            echo "| Frontend Tests | ✅ Success | Tests passed |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.frontend-tests.result }}" == "skipped" ]]; then
+            echo "| Frontend Tests | ⏭️ Skipped | No frontend changes detected |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.frontend-tests.result }}" == "failure" ]]; then
+            echo "| Frontend Tests | ❌ Failed | Tests failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Docs Build
+          if [[ "${{ needs.docs-build.result }}" == "success" ]]; then
+            echo "| Documentation Build | ✅ Success | Build completed |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.docs-build.result }}" == "skipped" ]]; then
+            echo "| Documentation Build | ⏭️ Skipped | No doc changes detected |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.docs-build.result }}" == "failure" ]]; then
+            echo "| Documentation Build | ❌ Failed | Build failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Security Analysis
+          if [[ "${{ needs.security-analysis.result }}" == "success" ]]; then
+            echo "| Security Analysis | ✅ Success | Analysis completed |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.security-analysis.result }}" == "skipped" ]]; then
+            echo "| Security Analysis | ⏭️ Skipped | No security changes detected |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.security-analysis.result }}" == "failure" ]]; then
+            echo "| Security Analysis | ❌ Failed | Analysis found issues |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 **Tip:** This CI Manager optimizes test execution by only running tests" >> $GITHUB_STEP_SUMMARY
+          echo "for components that have changed. This saves time and resources!" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check overall status
+        run: |
+          if [[ "${{ needs.smart-contract-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.frontend-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.docs-build.result }}" == "failure" ]] || \
+             [[ "${{ needs.security-analysis.result }}" == "failure" ]]; then
+            echo "❌ One or more CI jobs failed"
+            exit 1
+          fi
+          echo "✅ All CI jobs completed successfully"
