@@ -45,7 +45,9 @@ contract RagequitModule is Ownable, ReentrancyGuard {
     event GovernorSet(address indexed governor);
 
     modifier onlyOwnerOrGovernor() {
-        require(msg.sender == owner() || msg.sender == governor, "Not authorized");
+        if (msg.sender != owner() && msg.sender != governor) {
+            revert OwnableUnauthorizedAccount(msg.sender);
+        }
         _;
     }
 
