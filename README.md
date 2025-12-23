@@ -14,6 +14,7 @@ Both platforms integrate privacy-preserving mechanisms from Nightmarket (zero-kn
 **[View the full documentation →](https://chippr-robotics.github.io/prediction-dao-research/)**
 
 The documentation site provides comprehensive guides for both platforms:
+- **User Experience**: Complete narrative guides walking through user journeys, practical scenarios, and interface understanding
 - **Users**: Getting started, choosing platforms, trading on markets, submitting proposals
 - **Developers**: Setup instructions, architecture, API reference
 - **System Overview**: How it works, privacy mechanisms, security model

@@ -14,9 +14,11 @@ test/integration/
 ├── clearpath/
 │   └── proposal-lifecycle.test.js               # ClearPath proposal lifecycle tests
 ├── oracle/
-│   └── multi-stage-resolution.test.js           # Multi-stage oracle resolution tests
+│   └── multi-stage-resolution.test.js           # Multi-stage oracle resolution tests ✅
 ├── privacy/
 │   └── privacy-trading-lifecycle.test.js        # Privacy-preserving trading tests
+├── ragequit/
+│   └── ragequit-protection.test.js              # Ragequit protection tests ✅
 ├── fairwins/                                    # FairWins market tests (to be implemented)
 └── factory/                                     # DAO factory tests (to be implemented)
 ```
@@ -48,6 +50,7 @@ Integration tests are organized by feature area:
 - **clearpath/**: Tests for ClearPath (DAO governance) workflows
 - **oracle/**: Tests for oracle resolution and dispute mechanisms ✅
 - **privacy/**: Tests for privacy-preserving trading workflows
+- **ragequit/**: Tests for ragequit protection mechanisms ✅
 - **fairwins/**: Tests for FairWins (prediction markets) workflows (to be implemented)
 - **factory/**: Tests for DAO factory deployment (to be implemented)
 
@@ -209,10 +212,12 @@ it("Should complete entire proposal lifecycle successfully", async function () {
 - Multiple resolutions in parallel
 - Access control and bond management
 
-### 4. Ragequit Protection (To be implemented)
-- Token holder exit
-- Proportional share calculation
-- Treasury withdrawal
+### 4. Ragequit Protection (Implemented)
+- Token holder exit ✅
+- Proportional share calculation ✅
+- Treasury withdrawal ✅
+- Multiple token holders exiting ✅
+- Window enforcement and eligibility checks ✅
 
 ### 5. FairWins Market Lifecycle (To be implemented)
 - Market creation
@@ -263,10 +268,10 @@ See `.github/workflows/integration-tests.yml` (to be created)
 
 | Metric | Target | Status |
 |--------|--------|--------|
-| E2E Workflows | 100% | 🟢 In Progress (2/6) |
+| E2E Workflows | 100% | 🟢 In Progress (3/6) |
 | Critical Paths | 100% | 🟢 In Progress |
 | Contract Interactions | ≥ 90% | 🟢 In Progress |
-| Error Scenarios | ≥ 80% | 🟢 In Progress |
+| Error Scenarios | ≥ 80% | 🟢 Oracle & Ragequit: Complete |
 
 ### Oracle Resolution Coverage
 - ✅ Unchallenged resolution (happy path)
