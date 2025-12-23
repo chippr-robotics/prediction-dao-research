@@ -17,7 +17,8 @@ test/integration/
 │   └── privacy-trading-lifecycle.test.js # Privacy-preserving trading tests
 ├── ragequit/
 │   └── ragequit-protection.test.js    # Ragequit protection tests ✅
-├── fairwins/                          # FairWins market tests (to be implemented)
+├── fairwins/
+│   └── market-lifecycle.test.js       # FairWins market lifecycle tests ✅
 ├── oracle/                            # Oracle resolution tests (to be implemented)
 └── factory/                           # DAO factory tests (to be implemented)
 ```
@@ -45,9 +46,10 @@ npx hardhat test test/integration/**/*.test.js --verbose
 
 Integration tests are organized by feature area:
 
-- **clearpath/**: Tests for ClearPath (DAO governance) workflows
-- **privacy/**: Tests for privacy-preserving trading workflows
+- **clearpath/**: Tests for ClearPath (DAO governance) workflows ✅
+- **privacy/**: Tests for privacy-preserving trading workflows ✅
 - **ragequit/**: Tests for ragequit protection mechanisms ✅
+- **fairwins/**: Tests for FairWins prediction market lifecycle ✅
 - **fairwins/**: Tests for FairWins (prediction markets) workflows
 - **oracle/**: Tests for oracle resolution and dispute mechanisms
 - **factory/**: Tests for DAO factory deployment
