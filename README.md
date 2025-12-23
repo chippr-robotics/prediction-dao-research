@@ -1,66 +1,104 @@
 ![](docs/assets/logo_fwcp.png)
 
-# ClearPath — Prediction DAO Research
+# ClearPath & FairWins — Prediction Market Platform Suite
 
-Clear signals for collective decisions — ClearPath brings clarity to governance through futarchy-based decision-making, integrating privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
+**Clear signals for collective decisions** — A comprehensive platform suite offering two distinct applications built on shared, privacy-preserving infrastructure:
+
+- **ClearPath**: Futarchy-based DAO governance platform for institutional decision-making
+- **FairWins**: Open prediction markets for anyone to create, join, and resolve markets
+
+Both platforms integrate privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
 
 ## 📚 Documentation
 
-**[View the full ClearPath documentation →](https://chippr-robotics.github.io/prediction-dao-research/)**
+**[View the full documentation →](https://chippr-robotics.github.io/prediction-dao-research/)**
 
-The documentation site provides comprehensive guides for:
-- **Users**: Getting started, trading on markets, submitting proposals
+The documentation site provides comprehensive guides for both platforms:
+- **Users**: Getting started, choosing platforms, trading on markets, submitting proposals
 - **Developers**: Setup instructions, architecture, API reference
 - **System Overview**: How it works, privacy mechanisms, security model
 
-## Overview
+## Platform Overview
 
-This project implements a futarchy-based governance system where:
+### 🏛️ ClearPath — DAO Governance Platform
+
+ClearPath implements a futarchy-based governance system where:
 - **Democratic voting** establishes welfare metrics (protocol success measures)
 - **Prediction markets** aggregate distributed knowledge about which proposals maximize those metrics
 - **Privacy mechanisms** prevent collusion and vote buying
 - **Conditional tokens** enable efficient market-based decision making
 
+**Use Cases:**
+- DAO treasury management
+- Institutional governance
+- Protocol upgrades and parameter changes
+- Grant allocation and funding decisions
+
+### 🎯 FairWins — Open Prediction Markets
+
+FairWins provides an open prediction market platform where:
+- **Anyone can create markets** on any topic with custom parameters
+- **Flexible controls** allow market creators to set resolution criteria
+- **Fair participation** enables anyone to trade based on their knowledge
+- **Transparent resolution** ensures trust and accountability
+
+**Use Cases:**
+- Event outcome predictions
+- Financial market forecasting
+- Sports and entertainment betting
+- Community sentiment tracking
+
+## Shared Infrastructure
+
+Both platforms are built on the same secure, privacy-preserving foundation:
+
 ## System Components
 
-### Smart Contracts
+### Smart Contracts (Shared Infrastructure)
 
 1. **FutarchyGovernor.sol** - Main governance coordinator
    - Integrates all futarchy components
    - Manages proposal lifecycle from submission to execution
    - Implements timelock and emergency pause mechanisms
+   - Used by: ClearPath
 
 2. **WelfareMetricRegistry.sol** - Welfare metrics management
    - On-chain storage of democratically-selected protocol success measures
    - Versioning and weight update mechanisms
    - Primary, secondary, tertiary, and quaternary metrics
+   - Used by: ClearPath
 
 3. **ProposalRegistry.sol** - Proposal submission and management
    - Permissionless proposal submission with bond requirements
    - Standardized metadata schemas
    - Milestone tracking and completion criteria
+   - Used by: Both platforms
 
 4. **ConditionalMarketFactory.sol** - Market deployment
    - Automated deployment of PASS/FAIL market pairs
    - Based on Gnosis Conditional Token Framework standards
    - LMSR (Logarithmic Market Scoring Rule) for market making
+   - Used by: Both platforms (core component)
 
 5. **PrivacyCoordinator.sol** - Privacy and anti-collusion
    - MACI-style encrypted message submission
    - Key-change capability to prevent vote buying
    - Nightmarket-style position encryption with zkSNARK proofs
    - Poseidon hash commitments for privacy
+   - Used by: Both platforms
 
 6. **OracleResolver.sol** - Multi-stage oracle resolution
    - Designated reporting phase
    - Open challenge period
    - UMA-style escalation mechanism
    - Bond-based dispute resolution
+   - Used by: Both platforms
 
 7. **RagequitModule.sol** - Minority protection
    - Moloch-style ragequit functionality
    - Allows dissenting token holders to exit with proportional treasury share
    - Prevents forced participation in controversial proposals
+   - Used by: ClearPath
 
 ## Features
 
@@ -160,9 +198,21 @@ npm run dev
 
 4. Open browser to `http://localhost:5173`
 
+You will see a platform selector where you can choose between:
+- **ClearPath**: DAO governance interface
+- **FairWins**: Prediction market interface
+
 ## Usage
 
-### For Proposers
+### Platform Selection
+
+1. **Open Application**: Navigate to the frontend at `http://localhost:5173`
+2. **Choose Platform**: Select either ClearPath or FairWins based on your use case
+3. **Connect Wallet**: Click to connect your MetaMask or compatible wallet
+
+### Using ClearPath (DAO Governance)
+
+#### For Proposers
 
 1. **Connect Wallet**: Connect MetaMask or compatible wallet
 2. **Submit Proposal**: 
@@ -188,6 +238,41 @@ npm run dev
 1. **Set Welfare Metrics**: Vote on which protocol success measures to use
 2. **Challenge Oracle Reports**: Submit counter-evidence during challenge period
 3. **Ragequit**: Exit with proportional treasury share if you disagree with proposal
+
+### Using FairWins (Prediction Markets)
+
+#### For Market Creators
+
+1. **Connect Wallet**: Connect to FairWins platform
+2. **Create Market**: 
+   - Define clear prediction question
+   - Set resolution criteria and dates
+   - Provide initial liquidity (minimum 100 USDC)
+   - Stake creator bond (returned after proper resolution)
+3. **Monitor Market**: Track participation and trading activity
+4. **Resolve Market**: Submit outcome evidence when resolution date arrives
+
+#### For Traders
+
+1. **Browse Markets**: View active prediction markets across all topics
+2. **Research**: Review market details, resolution criteria, and current odds
+3. **Trade Positions**:
+   - Buy YES tokens if you believe the outcome will occur
+   - Buy NO tokens if you believe it won't
+4. **Track Positions**: Monitor your positions and market developments
+5. **Settle**: Redeem winning tokens after market resolution
+
+## Platform Comparison
+
+| Feature | ClearPath (DAO) | FairWins (Markets) |
+|---------|----------------|-------------------|
+| **Primary Use** | Governance decisions | General predictions |
+| **Market Creation** | Automated (per proposal) | Manual (user-created) |
+| **Resolution Criteria** | Welfare metrics | Flexible, creator-defined |
+| **Participation** | DAO members | Open to anyone |
+| **Treasury** | Shared DAO treasury | Individual market pools |
+| **Voting Integration** | Yes (welfare metrics) | No |
+| **Ragequit Protection** | Yes | No |
 
 ## Technical Details
 

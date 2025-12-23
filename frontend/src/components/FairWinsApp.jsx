@@ -18,8 +18,18 @@ function FairWinsApp({ provider, signer, account, onDisconnect, onBack }) {
               ← Back
             </button>
             <div className="branding">
-              <h1>FairWins</h1>
-              <p className="subtitle">Open Prediction Markets</p>
+              <div className="brand-logo">
+                <img 
+                  src="/docs/assets/logo_fairwins.png" 
+                  alt="FairWins Logo" 
+                  className="logo-image"
+                  onError={(e) => { e.target.style.display = 'none' }}
+                />
+              </div>
+              <div className="brand-text">
+                <h1>FairWins</h1>
+                <p className="subtitle">Open Prediction Markets</p>
+              </div>
             </div>
           </div>
           

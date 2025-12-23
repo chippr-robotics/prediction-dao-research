@@ -6,6 +6,11 @@ function PlatformSelector({ onSelectPlatform }) {
       {/* Hero Section */}
       <section className="selector-hero">
         <div className="hero-content">
+          <img 
+            src="/docs/assets/logo_fwcp.png" 
+            alt="ClearPath & FairWins Logo" 
+            className="hero-logo"
+          />
           <h1 className="hero-title">Welcome to the Future of Decision-Making</h1>
           <p className="hero-subtitle">
             Choose your path: Governance or Prediction Markets
@@ -19,7 +24,15 @@ function PlatformSelector({ onSelectPlatform }) {
           <div className="platforms-grid">
             {/* ClearPath Card */}
             <div className="platform-card clearpath">
-              <div className="platform-icon">🏛️</div>
+              <div className="platform-logo">
+                <img 
+                  src="/docs/assets/logo_clearpath.png" 
+                  alt="ClearPath Logo" 
+                  className="logo-image"
+                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
+                />
+                <div className="platform-icon" style={{display: 'none'}}>🏛️</div>
+              </div>
               <h2>ClearPath</h2>
               <p className="platform-tagline">DAO Governance Platform</p>
               <p className="platform-description">
@@ -47,7 +60,15 @@ function PlatformSelector({ onSelectPlatform }) {
 
             {/* FairWins Card */}
             <div className="platform-card fairwins">
-              <div className="platform-icon">🎯</div>
+              <div className="platform-logo">
+                <img 
+                  src="/docs/assets/logo_fairwins.png" 
+                  alt="FairWins Logo" 
+                  className="logo-image"
+                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
+                />
+                <div className="platform-icon" style={{display: 'none'}}>🎯</div>
+              </div>
               <h2>FairWins</h2>
               <p className="platform-tagline">Open Prediction Markets</p>
               <p className="platform-description">

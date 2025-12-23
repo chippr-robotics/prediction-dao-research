@@ -17,8 +17,18 @@ function ClearPathApp({ provider, signer, account, onDisconnect, onBack }) {
               ← Back
             </button>
             <div className="branding">
-              <h1>ClearPath</h1>
-              <p className="subtitle">DAO Governance Platform</p>
+              <div className="brand-logo">
+                <img 
+                  src="/docs/assets/logo_clearpath.png" 
+                  alt="ClearPath Logo" 
+                  className="logo-image"
+                  onError={(e) => { e.target.style.display = 'none' }}
+                />
+              </div>
+              <div className="brand-text">
+                <h1>ClearPath</h1>
+                <p className="subtitle">DAO Governance Platform</p>
+              </div>
             </div>
           </div>
           

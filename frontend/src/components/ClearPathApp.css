@@ -45,13 +45,30 @@
   transform: translateX(-2px);
 }
 
-.branding h1 {
+.branding {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand-logo {
+  height: 50px;
+  display: flex;
+  align-items: center;
+}
+
+.brand-logo .logo-image {
+  max-height: 50px;
+  width: auto;
+}
+
+.brand-text h1 {
   font-size: 2rem;
   margin-bottom: 0.25rem;
   color: white;
 }
 
-.branding .subtitle {
+.brand-text .subtitle {
   font-size: 0.95rem;
   opacity: 0.9;
   color: white;
