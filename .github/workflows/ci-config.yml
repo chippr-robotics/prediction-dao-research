@@ -1,0 +1,57 @@
+# CI Configuration for Change Detection
+# This file defines path patterns for different components of the repository
+# to enable intelligent test selection based on code changes.
+
+version: "1.0"
+
+# Path patterns for each component category
+# Patterns support glob syntax and are matched against changed file paths
+components:
+  contracts:
+    description: "Smart contract source code and related files"
+    patterns:
+      - "contracts/**"
+      - "hardhat.config.js"
+      - "scripts/deploy*.js"
+      - "test/*.test.js"
+      - "test/integration/**"
+      - "medusa.json"
+      - "slither.config.json"
+
+  frontend:
+    description: "Frontend application code and configuration"
+    patterns:
+      - "frontend/**"
+      - "!frontend/README.md"
+
+  docs:
+    description: "Documentation files and configuration"
+    patterns:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "requirements.txt"
+      - "*.md"
+      - "!frontend/README.md"
+
+  security:
+    description: "Security-related testing and analysis"
+    patterns:
+      - "contracts/**"
+      - "hardhat.config.js"
+      - "test/**"
+      - "medusa.json"
+      - "slither.config.json"
+
+  core:
+    description: "Core dependencies and workflow files"
+    patterns:
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/**"
+
+# Special rules for always running certain checks
+always_run:
+  # These checks run on every PR regardless of changes
+  on_pr: []
+  # These checks run on specific branches regardless of changes
+  on_main: ["security"]
