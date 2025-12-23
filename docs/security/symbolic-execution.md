@@ -59,29 +59,50 @@ Manticore explores:
 ### Prerequisites
 
 ```bash
-# Python 3.10 recommended (3.8-3.10 supported)
-# Note: Python 3.11+ has compatibility issues with pysha3 package
+# Python 3.10 REQUIRED (Python 3.8-3.10 supported)
+# CRITICAL: Python 3.11+ is incompatible due to pysha3 dependency
+# pysha3 fails to build on Python 3.11+ (missing pystrhex.h)
 python3 --version
 
 # Install system dependencies (Ubuntu/Debian)
-sudo apt-get install build-essential python3-dev
+# Required for building pysha3 and other native dependencies
+sudo apt-get update
+sudo apt-get install -y build-essential python3-dev
 ```
 
 ### Install Manticore
 
 ```bash
+# Upgrade pip first
+python -m pip install --upgrade pip
+
+# Install protobuf version compatible with Manticore
+# CRITICAL: Manticore requires protobuf<=3.20.3
+# Newer versions cause incompatibility errors
+pip install 'protobuf<=3.20.3'
+
+# Install Manticore with native support
 pip install manticore[native]
+
+# Install Solidity compiler selector
 pip install solc-select
 
 # Select Solidity compiler version
 solc-select install 0.8.24
 solc-select use 0.8.24
+
+# IMPORTANT: Patch wasm package for Python 3.10+ compatibility
+# The wasm package (a Manticore dependency) has a bug where it uses
+# collections.Callable instead of collections.abc.Callable
+# This is automatically handled in CI, but for local installations:
+python scripts/patch-wasm-types.py
 ```
 
 ### Verify Installation
 
 ```bash
 manticore --version
+solc --version
 ```
 
 ## Running Manticore
@@ -147,10 +168,14 @@ Manticore runs automatically in the GitHub Actions workflow:
 ```yaml
 - name: Install Manticore
   run: |
+    pip install 'protobuf<=3.20.3'
     pip install manticore[native]
     pip install solc-select
     solc-select install 0.8.24
     solc-select use 0.8.24
+
+- name: Patch wasm package for Python 3.10+ compatibility
+  run: python scripts/patch-wasm-types.py
 
 - name: Run Manticore on ProposalRegistry
   run: |
