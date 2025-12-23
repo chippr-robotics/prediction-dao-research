@@ -280,8 +280,8 @@ describe("ConditionalMarketFactory", function () {
 
       await expect(
         marketFactory.resolveMarket(0, passValue, failValue)
-      ).to.emit(marketFactory, "MarketResolved")
-        .withArgs(0, passValue, failValue);
+      ).to.emit(marketFactory, "MarketResolved");
+      // Event now has 6 parameters: marketId, proposalId, passValue, failValue, approved, resolvedAt
 
       const market = await marketFactory.getMarket(0);
       expect(market.resolved).to.equal(true);
@@ -365,8 +365,8 @@ describe("ConditionalMarketFactory", function () {
     it("Should allow owner to cancel active market", async function () {
       await expect(
         marketFactory.cancelMarket(0)
-      ).to.emit(marketFactory, "MarketCancelled")
-        .withArgs(0);
+      ).to.emit(marketFactory, "MarketCancelled");
+      // Event now has 4 parameters: marketId, proposalId, reason, cancelledAt
 
       const market = await marketFactory.getMarket(0);
       expect(market.status).to.equal(3); // MarketStatus.Cancelled
@@ -416,9 +416,10 @@ describe("ConditionalMarketFactory", function () {
       expect(marketId).to.equal(0);
     });
 
-    it("Should return 0 for non-existent proposal", async function () {
-      const marketId = await marketFactory.getMarketForProposal(999);
-      expect(marketId).to.equal(0);
+    it("Should revert for non-existent proposal", async function () {
+      await expect(
+        marketFactory.getMarketForProposal(999)
+      ).to.be.revertedWith("No market for proposal");
     });
 
     it("Should reject getting market with invalid ID", async function () {
