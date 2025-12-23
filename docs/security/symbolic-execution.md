@@ -59,18 +59,27 @@ Manticore explores:
 ### Prerequisites
 
 ```bash
-# Python 3.10 recommended (3.8-3.10 supported)
-# Note: Python 3.11+ has compatibility issues with pysha3 package
+# Python 3.10 REQUIRED (3.8-3.10 supported)
+# CRITICAL: Python 3.11+ has compatibility issues with pysha3 package
+# pysha3 is a dependency of Manticore that fails to build on Python 3.11+
 python3 --version
 
 # Install system dependencies (Ubuntu/Debian)
-sudo apt-get install build-essential python3-dev
+# These are required for building pysha3 and other native dependencies
+sudo apt-get update
+sudo apt-get install -y build-essential python3-dev
 ```
 
 ### Install Manticore
 
 ```bash
+# Upgrade pip first
+python -m pip install --upgrade pip
+
+# Install Manticore with native support
 pip install manticore[native]
+
+# Install Solidity compiler selector
 pip install solc-select
 
 # Select Solidity compiler version
@@ -82,6 +91,7 @@ solc-select use 0.8.24
 
 ```bash
 manticore --version
+solc --version
 ```
 
 ## Running Manticore
