@@ -131,18 +131,19 @@ button:focus-visible {
 
 ❌ **Issues Found**:
 ```jsx
-// Dashboard.jsx - Line 98: Missing semantic elements
+// Dashboard.jsx - Missing semantic elements
 <div className="dashboard-container">  // Should be <main>
   <div className="dashboard-header">  // Could be <header>
     <h2>DAO Management Dashboard</h2>
 ```
 
+**ProposalList.jsx - Buttons have visible text (acceptable)**:
+The action buttons in proposal cards have clear text labels, which is good:
 ```jsx
-// ProposalList.jsx - Line 86-88: Buttons lack ARIA labels
 <button className="view-button">View Details</button>
 <button className="trade-button">Trade on Market</button>
-// These are acceptable as they have visible text
 ```
+However, they could be enhanced with `aria-label` for additional context when taken out of the card context.
 
 ```css
 /* App.css - Line 68: Status badges use color alone */
@@ -1564,11 +1565,69 @@ export default Modal
 
 ### Modal Focus Trap Template
 ```jsx
-// Full implementation in Section 3.10 "Implement Proper Modal Focus Management"
-// Summary: Create Modal component with useRef for focus management,
-// trap focus inside modal with Tab key handler, restore focus on close,
-// handle Escape key to close, and use aria-modal="true"
+import { useEffect, useRef } from 'react'
+
+function Modal({ isOpen, onClose, title, children }) {
+  const modalRef = useRef(null)
+  const previousFocusRef = useRef(null)
+  
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement
+      modalRef.current?.focus()
+      
+      const trapFocus = (e) => {
+        if (e.key === 'Tab') {
+          const focusableElements = modalRef.current.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+          const firstElement = focusableElements[0]
+          const lastElement = focusableElements[focusableElements.length - 1]
+          
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault()
+            lastElement.focus()
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault()
+            firstElement.focus()
+          }
+        }
+        if (e.key === 'Escape') onClose()
+      }
+      
+      document.addEventListener('keydown', trapFocus)
+      return () => {
+        document.removeEventListener('keydown', trapFocus)
+        previousFocusRef.current?.focus()
+      }
+    }
+  }, [isOpen, onClose])
+  
+  if (!isOpen) return null
+  
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        ref={modalRef}
+        className="modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        tabIndex="-1"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header>
+          <h2 id="modal-title">{title}</h2>
+          <button onClick={onClose} aria-label="Close">×</button>
+        </header>
+        <div>{children}</div>
+      </div>
+    </div>
+  )
+}
 ```
+
+Full implementation details in Section 3.10.
 
 ---
 
