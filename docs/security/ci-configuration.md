@@ -125,6 +125,7 @@ manticore-analysis:
         sudo apt-get install -y build-essential python3-dev
     - run: |
         python -m pip install --upgrade pip
+        pip install 'protobuf<=3.20.3'
         pip install manticore[native] solc-select
     - run: solc-select install 0.8.24 && solc-select use 0.8.24
     - run: manticore --version && solc --version
@@ -146,6 +147,7 @@ manticore-analysis:
 - Added Python 3.10 requirement
 - Added system dependencies (build-essential, python3-dev) for pysha3
 - Added pip upgrade step
+- **Added protobuf<=3.20.3 constraint to fix compatibility issues**
 - Added verification step for Manticore installation
 
 **Outputs:**
@@ -219,6 +221,7 @@ summary:
 - The `pysha3` package (Manticore dependency) is incompatible with Python 3.11+
 - Python 3.11+ removed `pystrhex.h` which pysha3 requires for compilation
 - System dependencies (`build-essential`, `python3-dev`) must be installed for native packages
+- **protobuf must be <=3.20.3** to avoid incompatibility with Manticore's dependencies
 
 ## Updating the Workflow
 

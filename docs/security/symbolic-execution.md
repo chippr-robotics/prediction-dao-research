@@ -76,6 +76,11 @@ sudo apt-get install -y build-essential python3-dev
 # Upgrade pip first
 python -m pip install --upgrade pip
 
+# Install protobuf version compatible with Manticore
+# CRITICAL: Manticore requires protobuf<=3.20.3
+# Newer versions cause incompatibility errors
+pip install 'protobuf<=3.20.3'
+
 # Install Manticore with native support
 pip install manticore[native]
 
@@ -157,6 +162,7 @@ Manticore runs automatically in the GitHub Actions workflow:
 ```yaml
 - name: Install Manticore
   run: |
+    pip install 'protobuf<=3.20.3'
     pip install manticore[native]
     pip install solc-select
     solc-select install 0.8.24
