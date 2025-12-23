@@ -60,9 +60,10 @@ The CI Manager tracks these components:
 
 ## Need More Info?
 
-- **Full Documentation**: See [README.md](.github/workflows/README.md)
-- **Test Scenarios**: See [CI_MANAGER_TEST_SCENARIOS.md](.github/workflows/CI_MANAGER_TEST_SCENARIOS.md)
-- **Configuration**: See [ci-config.yml](.github/workflows/ci-config.yml)
+- **Full Documentation**: See [README.md](README.md)
+- **Test Scenarios**: See [CI_MANAGER_TEST_SCENARIOS.md](CI_MANAGER_TEST_SCENARIOS.md)
+- **Configuration**: See [ci-config.yml](ci-config.yml)
+- **Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## Troubleshooting
 

@@ -320,12 +320,13 @@ You can use this script to test multiple scenarios automatically:
 ```bash
 #!/bin/bash
 # test-ci-manager.sh - Automated CI Manager testing
+# This script creates test changes to verify CI Manager behavior
 
 scenarios=(
-  "contracts:contracts/ProposalRegistry.sol"
-  "frontend:frontend/src/App.jsx"
-  "docs:docs/index.md"
-  "multi:contracts/OracleResolver.sol,frontend/src/hooks/useOracle.js"
+  "contracts:hardhat.config.js"
+  "frontend:frontend/package.json"
+  "docs:README.md"
+  "multi:package.json,docs/index.md"
   "deps:package.json"
 )
 
@@ -334,18 +335,23 @@ for scenario in "${scenarios[@]}"; do
   files="${scenario#*:}"
   
   echo "Testing scenario: $name"
-  git checkout -b "test/ci-manager-$name"
+  git checkout main
+  git pull
+  git checkout -b "test/ci-manager-$name-$(date +%s)"
   
   IFS=',' read -ra FILEARRAY <<< "$files"
   for file in "${FILEARRAY[@]}"; do
-    echo "// Test change $(date)" >> "$file"
-    git add "$file"
+    if [ -f "$file" ]; then
+      echo "# Test change $(date)" >> "$file"
+      git add "$file"
+    else
+      echo "Warning: File $file does not exist, skipping"
+    fi
   done
   
   git commit -m "test: CI manager scenario $name"
-  git push origin "test/ci-manager-$name"
-  
-  echo "Create PR for branch: test/ci-manager-$name"
+  echo "Branch created: test/ci-manager-$name-$(date +%s)"
+  echo "Push and create PR to test CI Manager"
   echo "---"
 done
 ```

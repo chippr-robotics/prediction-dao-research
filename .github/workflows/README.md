@@ -255,7 +255,7 @@ The CI Manager generates two summaries:
 
 **Solution:** Check path patterns in ci-manager.yml match your file changes.
 
-Example: If you changed `contracts/mocks/MockToken.sol` but contract tests didn't run, verify the pattern includes `contracts/**`.
+Example: If you changed `scripts/custom-deploy.js` but contract tests didn't run, verify the pattern includes your file. The pattern `scripts/deploy*.js` only matches files starting with "deploy".
 
 ### Issue: Too many tests running
 
