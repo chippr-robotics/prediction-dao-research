@@ -22,6 +22,8 @@ contract ProposalRegistryFuzzTest {
     
     /**
      * @notice Invariant: Proposal count should never decrease
+     * @dev Tracks proposal count between sequential calls to verify monotonic increase
+     * Note: This is safe in Medusa's sequential execution model
      */
     function property_proposal_count_never_decreases() public returns (bool) {
         uint256 currentCount = proposalRegistry.proposalCount();
