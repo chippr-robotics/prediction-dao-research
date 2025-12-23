@@ -91,28 +91,31 @@ async function deploySystemFixture() {
     owner.address // Treasury vault (using owner as placeholder)
   );
 
-  // Transfer ownership to FutarchyGovernor
-  await welfareRegistry.transferOwnership(await futarchyGovernor.getAddress());
-  await proposalRegistry.transferOwnership(await futarchyGovernor.getAddress());
-  await marketFactory.transferOwnership(await futarchyGovernor.getAddress());
-  await oracleResolver.transferOwnership(await futarchyGovernor.getAddress());
-
-  // Setup initial welfare metrics
+  // Setup initial welfare metrics before transferring ownership
+  
   // Metric 0: Treasury Value - 50% weight
-  await futarchyGovernor.connect(owner).proposeMetric(
+  await welfareRegistry.connect(owner).proposeMetric(
     "Treasury Value",
+    "TWAP of total treasury holdings in USD",
     5000, // 50% weight
     0 // Governance category
   );
-  await futarchyGovernor.connect(owner).activateMetric(0);
+  await welfareRegistry.connect(owner).activateMetric(0);
 
   // Metric 1: Network Activity - 30% weight
-  await futarchyGovernor.connect(owner).proposeMetric(
+  await welfareRegistry.connect(owner).proposeMetric(
     "Network Activity",
+    "Composite index of transactions and active addresses",
     3000, // 30% weight
     0 // Governance category
   );
-  await futarchyGovernor.connect(owner).activateMetric(1);
+  await welfareRegistry.connect(owner).activateMetric(1);
+  
+  // Transfer ownership back to FutarchyGovernor
+  await welfareRegistry.connect(owner).transferOwnership(await futarchyGovernor.getAddress());
+  await proposalRegistry.transferOwnership(await futarchyGovernor.getAddress());
+  await marketFactory.transferOwnership(await futarchyGovernor.getAddress());
+  await oracleResolver.transferOwnership(await futarchyGovernor.getAddress());
 
   return {
     contracts: {
