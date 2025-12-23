@@ -87,7 +87,8 @@ async function deploySystemFixture() {
     await marketFactory.getAddress(),
     await privacyCoordinator.getAddress(),
     await oracleResolver.getAddress(),
-    await ragequitModule.getAddress()
+    await ragequitModule.getAddress(),
+    owner.address // Treasury vault (using owner as placeholder)
   );
 
   // Transfer ownership to FutarchyGovernor
