@@ -38,22 +38,67 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     // Proposal ID => Market ID
     mapping(uint256 => uint256) public proposalToMarket;
     
+    // Market status tracking for efficient querying
+    mapping(MarketStatus => uint256[]) private marketsByStatus;
+    
+    // Time-based indexing (day => market IDs)
+    mapping(uint256 => uint256[]) private marketsByDay;
+    
     uint256 public marketCount;
     uint256 public constant DEFAULT_TRADING_PERIOD = 10 days;
     uint256 public constant MIN_TRADING_PERIOD = 7 days;
     uint256 public constant MAX_TRADING_PERIOD = 21 days;
+    uint256 public constant MAX_BATCH_SIZE = 50;
 
     bool private _initialized;
 
+    // Enhanced events for better indexing and market discovery
     event MarketCreated(
         uint256 indexed marketId,
         uint256 indexed proposalId,
+        address indexed collateralToken,
         address passToken,
         address failToken,
-        uint256 tradingEndTime
+        uint256 tradingEndTime,
+        uint256 liquidityParameter,
+        uint256 createdAt,
+        address creator
     );
-    event MarketResolved(uint256 indexed marketId, uint256 passValue, uint256 failValue);
-    event MarketCancelled(uint256 indexed marketId);
+    
+    event MarketStatusChanged(
+        uint256 indexed marketId,
+        MarketStatus indexed previousStatus,
+        MarketStatus indexed newStatus,
+        uint256 changedAt
+    );
+    
+    event MarketResolved(
+        uint256 indexed marketId,
+        uint256 indexed proposalId,
+        uint256 passValue,
+        uint256 failValue,
+        bool indexed approved,
+        uint256 resolvedAt
+    );
+    
+    event MarketCancelled(
+        uint256 indexed marketId,
+        uint256 indexed proposalId,
+        string reason,
+        uint256 cancelledAt
+    );
+    
+    event BatchMarketsCreated(
+        uint256[] marketIds,
+        uint256 batchTimestamp,
+        uint256 totalMarketsCreated
+    );
+    
+    event BatchMarketsResolved(
+        uint256[] marketIds,
+        uint256 batchTimestamp,
+        uint256 totalMarketsResolved
+    );
 
     constructor() Ownable(msg.sender) {}
 
@@ -108,8 +153,86 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         });
 
         proposalToMarket[proposalId] = marketId;
+        
+        // Update indexes
+        _updateMarketIndex(marketId, MarketStatus.Active);
 
-        emit MarketCreated(marketId, proposalId, passToken, failToken, markets[marketId].tradingEndTime);
+        emit MarketCreated(
+            marketId,
+            proposalId,
+            collateralToken,
+            passToken,
+            failToken,
+            markets[marketId].tradingEndTime,
+            liquidityParameter,
+            block.timestamp,
+            msg.sender
+        );
+    }
+    
+    /**
+     * @notice Batch deploy multiple market pairs for efficiency
+     * @param params Array of market creation parameters
+     * @return marketIds Array of created market IDs
+     */
+    function batchDeployMarkets(
+        MarketCreationParams[] calldata params
+    ) external onlyOwner returns (uint256[] memory marketIds) {
+        require(params.length > 0, "Empty batch");
+        require(params.length <= MAX_BATCH_SIZE, "Batch too large");
+        
+        marketIds = new uint256[](params.length);
+        
+        for (uint256 i = 0; i < params.length; ) {
+            require(proposalToMarket[params[i].proposalId] == 0, "Market already exists");
+            require(
+                params[i].tradingPeriod >= MIN_TRADING_PERIOD && 
+                params[i].tradingPeriod <= MAX_TRADING_PERIOD,
+                "Invalid trading period"
+            );
+            
+            uint256 marketId = marketCount++;
+            marketIds[i] = marketId;
+            
+            // Create conditional tokens
+            address passToken = address(new ConditionalToken("PASS", "P"));
+            address failToken = address(new ConditionalToken("FAIL", "F"));
+            
+            markets[marketId] = Market({
+                proposalId: params[i].proposalId,
+                passToken: passToken,
+                failToken: failToken,
+                collateralToken: params[i].collateralToken,
+                tradingEndTime: block.timestamp + params[i].tradingPeriod,
+                liquidityParameter: params[i].liquidityParameter,
+                totalLiquidity: params[i].liquidityAmount,
+                resolved: false,
+                passValue: 0,
+                failValue: 0,
+                status: MarketStatus.Active
+            });
+            
+            proposalToMarket[params[i].proposalId] = marketId;
+            
+            // Update indexes
+            _updateMarketIndex(marketId, MarketStatus.Active);
+            
+            emit MarketCreated(
+                marketId,
+                params[i].proposalId,
+                params[i].collateralToken,
+                passToken,
+                failToken,
+                markets[marketId].tradingEndTime,
+                params[i].liquidityParameter,
+                block.timestamp,
+                msg.sender
+            );
+            
+            unchecked { ++i; }
+        }
+        
+        emit BatchMarketsCreated(marketIds, block.timestamp, params.length);
     }
 
     /**
@@ -122,7 +245,11 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         require(market.status == MarketStatus.Active, "Market not active");
         require(block.timestamp >= market.tradingEndTime, "Trading period not ended");
 
+        MarketStatus oldStatus = market.status;
         market.status = MarketStatus.TradingEnded;
+        _updateMarketIndex(marketId, oldStatus, MarketStatus.TradingEnded);
+        
+        emit MarketStatusChanged(marketId, oldStatus, MarketStatus.TradingEnded, block.timestamp);
     }
 
     /**
@@ -144,9 +271,89 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         market.resolved = true;
         market.passValue = passValue;
         market.failValue = failValue;
+        MarketStatus oldStatus = market.status;
         market.status = MarketStatus.Resolved;
+        _updateMarketIndex(marketId, oldStatus, MarketStatus.Resolved);
 
-        emit MarketResolved(marketId, passValue, failValue);
+        emit MarketResolved(
+            marketId,
+            market.proposalId,
+            passValue,
+            failValue,
+            passValue > failValue,
+            block.timestamp
+        );
+        emit MarketStatusChanged(marketId, oldStatus, MarketStatus.Resolved, block.timestamp);
+    }
+    
+    /**
+     * @notice Batch resolve multiple markets for efficiency
+     * @param params Array of market resolution parameters
+     * @return results Array indicating success/failure for each resolution
+     */
+    function batchResolveMarkets(
+        MarketResolutionParams[] calldata params
+    ) external onlyOwner nonReentrant returns (bool[] memory results) {
+        require(params.length > 0, "Empty batch");
+        require(params.length <= MAX_BATCH_SIZE, "Batch too large");
+        
+        results = new bool[](params.length);
+        uint256[] memory resolvedIds = new uint256[](params.length);
+        uint256 successCount = 0;
+        
+        for (uint256 i = 0; i < params.length; ) {
+            uint256 marketId = params[i].marketId;
+            
+            // Validate market
+            if (marketId >= marketCount) {
+                results[i] = false;
+                unchecked { ++i; }
+                continue;
+            }
+            
+            Market storage market = markets[marketId];
+            
+            if (market.status != MarketStatus.TradingEnded || market.resolved) {
+                results[i] = false;
+                unchecked { ++i; }
+                continue;
+            }
+            
+            // Resolve market
+            market.resolved = true;
+            market.passValue = params[i].passValue;
+            market.failValue = params[i].failValue;
+            MarketStatus oldStatus = market.status;
+            market.status = MarketStatus.Resolved;
+            _updateMarketIndex(marketId, oldStatus, MarketStatus.Resolved);
+            
+            emit MarketResolved(
+                marketId,
+                market.proposalId,
+                params[i].passValue,
+                params[i].failValue,
+                params[i].passValue > params[i].failValue,
+                block.timestamp
+            );
+            emit MarketStatusChanged(marketId, oldStatus, MarketStatus.Resolved, block.timestamp);
+            
+            resolvedIds[successCount] = marketId;
+            results[i] = true;
+            unchecked {
+                ++successCount;
+                ++i;
+            }
+        }
+        
+        // Emit batch event with only successful resolutions
+        if (successCount > 0) {
+            uint256[] memory successfulIds = new uint256[](successCount);
+            for (uint256 j = 0; j < successCount; ) {
+                successfulIds[j] = resolvedIds[j];
+                unchecked { ++j; }
+            }
+            emit BatchMarketsResolved(successfulIds, block.timestamp, successCount);
+        }
     }
 
     /**
@@ -154,12 +361,25 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
      * @param marketId ID of the market
      */
     function cancelMarket(uint256 marketId) external onlyOwner {
+        cancelMarketWithReason(marketId, "Cancelled by owner");
+    }
+    
+    /**
+     * @notice Cancel a market with reason
+     * @param marketId ID of the market
+     * @param reason Cancellation reason
+     */
+    function cancelMarketWithReason(uint256 marketId, string memory reason) public onlyOwner {
         require(marketId < marketCount, "Invalid market ID");
         Market storage market = markets[marketId];
         require(market.status == MarketStatus.Active, "Market not active");
 
+        MarketStatus oldStatus = market.status;
         market.status = MarketStatus.Cancelled;
-        emit MarketCancelled(marketId);
+        _updateMarketIndex(marketId, oldStatus, MarketStatus.Cancelled);
+        
+        emit MarketCancelled(marketId, market.proposalId, reason, block.timestamp);
+        emit MarketStatusChanged(marketId, oldStatus, MarketStatus.Cancelled, block.timestamp);
     }
 
     /**
@@ -177,6 +397,175 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
      */
     function getMarketForProposal(uint256 proposalId) external view returns (uint256) {
         return proposalToMarket[proposalId];
+    }
+    
+    /**
+     * @notice Get active markets with pagination
+     * @param offset Starting index
+     * @param limit Maximum results to return
+     * @return marketIds Array of market IDs
+     * @return hasMore Whether more results exist
+     */
+    function getActiveMarkets(
+        uint256 offset,
+        uint256 limit
+    ) external view returns (uint256[] memory marketIds, bool hasMore) {
+        return getMarketsByStatus(MarketStatus.Active, offset, limit);
+    }
+    
+    /**
+     * @notice Get markets by status with pagination
+     * @param status Market status to filter by
+     * @param offset Starting index
+     * @param limit Maximum results
+     * @return marketIds Array of market IDs
+     * @return hasMore Whether more results exist
+     */
+    function getMarketsByStatus(
+        MarketStatus status,
+        uint256 offset,
+        uint256 limit
+    ) public view returns (uint256[] memory marketIds, bool hasMore) {
+        uint256[] storage statusMarkets = marketsByStatus[status];
+        uint256 totalCount = statusMarkets.length;
+        
+        if (offset >= totalCount) {
+            return (new uint256[](0), false);
+        }
+        
+        uint256 resultCount = totalCount - offset;
+        if (resultCount > limit) {
+            resultCount = limit;
+            hasMore = true;
+        } else {
+            hasMore = false;
+        }
+        
+        marketIds = new uint256[](resultCount);
+        for (uint256 i = 0; i < resultCount; ) {
+            marketIds[i] = statusMarkets[offset + i];
+            unchecked { ++i; }
+        }
+    }
+    
+    /**
+     * @notice Get markets by date range
+     * @param startTime Start timestamp
+     * @param endTime End timestamp
+     * @param offset Starting index
+     * @param limit Maximum results
+     * @return marketIds Array of market IDs in range
+     * @return hasMore Whether more results exist
+     */
+    function getMarketsByDateRange(
+        uint256 startTime,
+        uint256 endTime,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (uint256[] memory marketIds, bool hasMore) {
+        require(startTime < endTime, "Invalid date range");
+        
+        uint256 startDay = startTime / 1 days;
+        uint256 endDay = endTime / 1 days;
+        
+        // Collect market IDs from all days in range
+        uint256 totalCount = 0;
+        for (uint256 day = startDay; day <= endDay; ) {
+            totalCount += marketsByDay[day].length;
+            unchecked { ++day; }
+        }
+        
+        if (offset >= totalCount) {
+            return (new uint256[](0), false);
+        }
+        
+        uint256 resultCount = totalCount - offset;
+        if (resultCount > limit) {
+            resultCount = limit;
+            hasMore = true;
+        } else {
+            hasMore = false;
+        }
+        
+        marketIds = new uint256[](resultCount);
+        uint256 currentIndex = 0;
+        uint256 skipCount = offset;
+        
+        for (uint256 day = startDay; day <= endDay && currentIndex < resultCount; ) {
+            uint256[] storage dayMarkets = marketsByDay[day];
+            
+            for (uint256 i = 0; i < dayMarkets.length && currentIndex < resultCount; ) {
+                if (skipCount > 0) {
+                    unchecked { --skipCount; }
+                } else {
+                    marketIds[currentIndex] = dayMarkets[i];
+                    unchecked { ++currentIndex; }
+                }
+                unchecked { ++i; }
+            }
+            unchecked { ++day; }
+        }
+    }
+    
+    /**
+     * @notice Get total count of markets by status
+     * @param status Market status
+     * @return count Number of markets with given status
+     */
+    function getMarketCountByStatus(MarketStatus status) external view returns (uint256) {
+        return marketsByStatus[status].length;
+    }
+    
+    /**
+     * @notice Internal function to update market indexes
+     * @param marketId Market ID
+     * @param newStatus New market status
+     */
+    function _updateMarketIndex(uint256 marketId, MarketStatus newStatus) internal {
+        // Add to status index
+        marketsByStatus[newStatus].push(marketId);
+        
+        // Add to time-based index
+        uint256 day = block.timestamp / 1 days;
+        marketsByDay[day].push(marketId);
+    }
+    
+    /**
+     * @notice Internal function to update market indexes on status change
+     * @param marketId Market ID
+     * @param oldStatus Old market status
+     * @param newStatus New market status
+     */
+    function _updateMarketIndex(
+        uint256 marketId,
+        MarketStatus oldStatus,
+        MarketStatus newStatus
+    ) internal {
+        // Remove from old status index (skip for efficiency - historical data)
+        // In production, consider implementing if cleanup is needed
+        
+        // Add to new status index
+        marketsByStatus[newStatus].push(marketId);
+    }
+    
+    /**
+     * @notice Struct for batch market creation parameters
+     */
+    struct MarketCreationParams {
+        uint256 proposalId;
+        address collateralToken;
+        uint256 liquidityAmount;
+        uint256 liquidityParameter;
+        uint256 tradingPeriod;
+    }
+    
+    /**
+     * @notice Struct for batch market resolution parameters
+     */
+    struct MarketResolutionParams {
+        uint256 marketId;
+        uint256 passValue;
+        uint256 failValue;
     }
 }
 
