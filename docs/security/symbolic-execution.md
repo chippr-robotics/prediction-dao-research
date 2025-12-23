@@ -90,6 +90,12 @@ pip install solc-select
 # Select Solidity compiler version
 solc-select install 0.8.24
 solc-select use 0.8.24
+
+# IMPORTANT: Patch wasm package for Python 3.10+ compatibility
+# The wasm package (a Manticore dependency) has a bug where it uses
+# collections.Callable instead of collections.abc.Callable
+# This is automatically handled in CI, but for local installations:
+python scripts/patch-wasm-types.py
 ```
 
 ### Verify Installation
@@ -167,6 +173,9 @@ Manticore runs automatically in the GitHub Actions workflow:
     pip install solc-select
     solc-select install 0.8.24
     solc-select use 0.8.24
+
+- name: Patch wasm package for Python 3.10+ compatibility
+  run: python scripts/patch-wasm-types.py
 
 - name: Run Manticore on ProposalRegistry
   run: |

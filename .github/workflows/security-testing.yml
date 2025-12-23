@@ -164,6 +164,9 @@ jobs:
           solc-select install 0.8.24
           solc-select use 0.8.24
 
+      - name: Patch wasm package for Python 3.10+ compatibility
+        run: python scripts/patch-wasm-types.py
+
       - name: Verify Manticore installation
         run: |
           manticore --version

@@ -127,6 +127,7 @@ manticore-analysis:
         python -m pip install --upgrade pip
         pip install 'protobuf<=3.20.3'
         pip install manticore[native] solc-select
+    - run: python scripts/patch-wasm-types.py
     - run: solc-select install 0.8.24 && solc-select use 0.8.24
     - run: manticore --version && solc --version
     - run: |
@@ -148,6 +149,7 @@ manticore-analysis:
 - Added system dependencies (build-essential, python3-dev) for pysha3
 - Added pip upgrade step
 - **Added protobuf<=3.20.3 constraint to fix compatibility issues**
+- **Added patch for wasm package Python 3.10+ compatibility (collections.Callable)**
 - Added verification step for Manticore installation
 
 **Outputs:**
