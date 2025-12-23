@@ -1,8 +1,26 @@
-# Scalability Architecture & Batch Market Updates
+# ADR 001: Scalable Architecture & Batch Market Updates
+
+**Status**: Accepted
+
+**Date**: 2025-12-23
+
+**Deciders**: Development Team
+
+**Technical Story**: [Issue: Scalable Architecture & Batch Market Updates for High-Traffic Scenarios](https://github.com/chippr-robotics/prediction-dao-research/issues/)
 
 ## Executive Summary
 
 This document outlines the scalable architecture design for the ClearPath & FairWins prediction market platform, with specific focus on batch processing capabilities, enhanced event structures, and efficient market discovery mechanisms to support high-traffic scenarios and explosive growth.
+
+## Context
+
+The application is preparing for potential explosive growth and needs proactive scalability measures. Current system limitations include:
+- Individual transaction processing leading to high gas costs
+- No batch processing capabilities for markets or positions
+- Limited event indexing making market discovery inefficient
+- Sequential operations creating bottlenecks at scale
+
+This ADR documents the architectural decisions to address these limitations and enable 100-1000x growth in concurrent markets.
 
 ## Table of Contents
 

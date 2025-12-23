@@ -1,8 +1,26 @@
-# Batch Operations & Market Discovery API - Integration Guide
+# ADR 002: Batch Operations & Market Discovery API Integration
+
+**Status**: Accepted
+
+**Date**: 2025-12-23
+
+**Deciders**: Development Team
+
+**Technical Story**: [Issue: Scalable Architecture & Batch Market Updates for High-Traffic Scenarios](https://github.com/chippr-robotics/prediction-dao-research/issues/)
 
 ## Overview
 
 This guide provides practical examples for integrating with the enhanced scalability features of the ClearPath & FairWins prediction market platform, including batch operations, event indexing, and market discovery APIs.
+
+## Context
+
+Following the architectural decisions in ADR 001, this document provides implementation guidance and integration examples for developers building on the platform. It addresses the practical concerns of:
+- How to use batch operations efficiently
+- How to index events for market discovery
+- How to query markets and positions at scale
+- How to set up off-chain infrastructure
+
+This ADR serves as the technical integration guide for the scalability architecture.
 
 ## Table of Contents
 
