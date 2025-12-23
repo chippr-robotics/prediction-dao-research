@@ -606,3 +606,30 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Loading Screen */
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-dark);
+}
+
+.loading-content {
+  text-align: center;
+  padding: 3rem;
+  background: var(--bg-light);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.loading-content h2 {
+  color: var(--primary-color);
+  margin-bottom: 1rem;
+}
+
+.loading-content p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}

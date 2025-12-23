@@ -1,0 +1,356 @@
+/* Platform Selector Styles */
+
+.platform-selector {
+  width: 100%;
+  min-height: 100vh;
+  background-color: #ffffff;
+  color: #1a1a1a;
+}
+
+/* Hero Section */
+.selector-hero {
+  background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
+  color: white;
+  padding: 4rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.selector-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(52, 168, 83, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(45, 122, 79, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-content {
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-logo {
+  max-width: 300px;
+  height: auto;
+  margin-bottom: 1.5rem;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.hero-subtitle {
+  font-size: 1.5rem;
+  font-weight: 400;
+  opacity: 0.95;
+}
+
+/* Platforms Section */
+.platforms-section {
+  padding: 4rem 2rem;
+  background: #f8f9fa;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.platforms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 3rem;
+  margin-top: 2rem;
+}
+
+.platform-card {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  border: 3px solid transparent;
+}
+
+.platform-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.platform-card.clearpath {
+  border-color: #2D7A4F;
+}
+
+.platform-card.clearpath:hover {
+  box-shadow: 0 8px 30px rgba(45, 122, 79, 0.3);
+}
+
+.platform-card.fairwins {
+  border-color: #3B82F6;
+}
+
+.platform-card.fairwins:hover {
+  box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3);
+}
+
+.platform-logo {
+  margin-bottom: 1rem;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-image {
+  max-width: 150px;
+  max-height: 80px;
+  width: auto;
+  height: auto;
+}
+
+.platform-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.platform-card h2 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: #1a1a1a;
+}
+
+.platform-tagline {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  opacity: 0.7;
+}
+
+.platform-card.clearpath .platform-tagline {
+  color: #2D7A4F;
+}
+
+.platform-card.fairwins .platform-tagline {
+  color: #3B82F6;
+}
+
+.platform-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  color: #4b5563;
+  flex-grow: 1;
+}
+
+.platform-features {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+
+.platform-features li {
+  padding: 0.5rem 0;
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
+.platform-button {
+  width: 100%;
+  padding: 1rem 2rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+  color: white;
+}
+
+.clearpath-button {
+  background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
+}
+
+.clearpath-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(45, 122, 79, 0.4);
+}
+
+.fairwins-button {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+}
+
+.fairwins-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.platform-footer {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Shared Section */
+.shared-section {
+  padding: 4rem 2rem;
+  background: white;
+}
+
+.section-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.section-intro {
+  text-align: center;
+  font-size: 1.125rem;
+  color: #6b7280;
+  margin-bottom: 3rem;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.tech-card {
+  text-align: center;
+  padding: 2rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.tech-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tech-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.tech-card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #2D7A4F;
+  margin-bottom: 0.5rem;
+}
+
+.tech-card p {
+  font-size: 0.95rem;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+/* Footer */
+.selector-footer {
+  background: #1a1a1a;
+  color: white;
+  padding: 3rem 2rem 1.5rem;
+}
+
+.footer-content {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.footer-section h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #2D7A4F;
+}
+
+.footer-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.footer-section li {
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+
+.footer-section p {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid #374151;
+}
+
+.footer-bottom p {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.25rem;
+  }
+
+  .platforms-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .tech-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-card h2 {
+    font-size: 1.75rem;
+  }
+}

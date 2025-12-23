@@ -16,7 +16,7 @@ const DAOFactoryABI = [
 ]
 
 // Replace with deployed factory address
-const FACTORY_ADDRESS = process.env.REACT_APP_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
 function Dashboard({ provider, signer, account }) {
   const [activeTab, setActiveTab] = useState('daos')

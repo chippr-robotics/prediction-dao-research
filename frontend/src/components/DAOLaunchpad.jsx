@@ -6,7 +6,7 @@ const DAOFactoryABI = [
   "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
 ]
 
-const FACTORY_ADDRESS = process.env.REACT_APP_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
 function DAOLaunchpad({ signer, onDAOCreated }) {
   const [formData, setFormData] = useState({

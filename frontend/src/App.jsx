@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import './App.css'
-import LandingPage from './components/LandingPage'
-import Dashboard from './components/Dashboard'
+import PlatformSelector from './components/PlatformSelector'
+import ClearPathApp from './components/ClearPathApp'
+import FairWinsApp from './components/FairWinsApp'
 
 function App() {
   const [provider, setProvider] = useState(null)
@@ -10,26 +11,12 @@ function App() {
   const [account, setAccount] = useState(null)
   const [chainId, setChainId] = useState(null)
   const [connected, setConnected] = useState(false)
-  const [showLanding, setShowLanding] = useState(true)
+  const [selectedPlatform, setSelectedPlatform] = useState(null) // 'clearpath' or 'fairwins'
 
-  useEffect(() => {
-    checkConnection()
-  }, [])
-
-  const checkConnection = async () => {
-    if (window.ethereum) {
-      try {
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const accounts = await provider.listAccounts()
-        
-        if (accounts.length > 0) {
-          setShowLanding(false)
-          await connectWallet()
-        }
-      } catch (error) {
-        console.error('Error checking connection:', error)
-      }
-    }
+  const handlePlatformSelect = async (platform) => {
+    setSelectedPlatform(platform)
+    // Connect wallet after platform selection
+    await connectWallet()
   }
 
   const connectWallet = async () => {
@@ -51,11 +38,12 @@ function App() {
       setAccount(address)
       setChainId(network.chainId)
       setConnected(true)
-      setShowLanding(false)
 
       // Listen for account changes
-      window.ethereum.on('accountsChanged', handleAccountsChanged)
-      window.ethereum.on('chainChanged', () => window.location.reload())
+      if (!window.ethereum._events || !window.ethereum._events.accountsChanged) {
+        window.ethereum.on('accountsChanged', handleAccountsChanged)
+        window.ethereum.on('chainChanged', () => window.location.reload())
+      }
     } catch (error) {
       console.error('Error connecting wallet:', error)
       alert('Failed to connect wallet')
@@ -86,66 +74,51 @@ function App() {
     setSigner(null)
     setAccount(null)
     setConnected(false)
-    setShowLanding(true)
+    setSelectedPlatform(null)
   }
 
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  const handleBackToPlatformSelection = () => {
+    setSelectedPlatform(null)
   }
 
+  // Show platform selector if no platform is selected
+  if (!selectedPlatform) {
+    return <PlatformSelector onSelectPlatform={handlePlatformSelect} />
+  }
+
+  // Show selected platform app if connected
+  if (connected && selectedPlatform === 'clearpath') {
+    return (
+      <ClearPathApp 
+        provider={provider}
+        signer={signer}
+        account={account}
+        onDisconnect={disconnectWallet}
+        onBack={handleBackToPlatformSelection}
+      />
+    )
+  }
+
+  if (connected && selectedPlatform === 'fairwins') {
+    return (
+      <FairWinsApp 
+        provider={provider}
+        signer={signer}
+        account={account}
+        onDisconnect={disconnectWallet}
+        onBack={handleBackToPlatformSelection}
+      />
+    )
+  }
+
+  // Loading state while connecting
   return (
-    <>
-      {showLanding ? (
-        <LandingPage onConnect={connectWallet} />
-      ) : (
-        <div className="App">
-          <header className="App-header">
-            <h1>Clear Path</h1>
-            <p className="subtitle">Institutional Governance Platform</p>
-            
-            <div className="wallet-section">
-              {!connected ? (
-                <button onClick={connectWallet} className="connect-button">
-                  Connect Wallet
-                </button>
-              ) : (
-                <div className="connected-wallet">
-                  <div className="wallet-info">
-                    <span className="wallet-address">{shortenAddress(account)}</span>
-                    <span className="chain-id">Chain: {chainId?.toString()}</span>
-                  </div>
-                  <button onClick={disconnectWallet} className="disconnect-button">
-                    Disconnect
-                  </button>
-                </div>
-              )}
-            </div>
-          </header>
-
-          <main className="main-content">
-            {!connected ? (
-              <div className="not-connected">
-                <h2>Welcome to Clear Path</h2>
-                <p>A prediction market-based governance system integrating:</p>
-                <ul>
-                  <li>🔐 Nightmarket zero-knowledge position encryption</li>
-                  <li>🛡️ MACI anti-collusion infrastructure</li>
-                  <li>📊 Gnosis Conditional Token Framework</li>
-                </ul>
-                <p>Please connect your wallet to continue</p>
-              </div>
-            ) : (
-              <Dashboard provider={provider} signer={signer} account={account} />
-            )}
-          </main>
-
-          <footer className="App-footer">
-            <p>Clear Path: Institutional-Grade Governance Through Prediction Markets</p>
-          </footer>
-        </div>
-      )}
-    </>
+    <div className="App loading-screen">
+      <div className="loading-content">
+        <h2>Connecting Wallet...</h2>
+        <p>Please confirm the connection in your wallet</p>
+      </div>
+    </div>
   )
 }
 
