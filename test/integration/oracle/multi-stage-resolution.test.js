@@ -77,6 +77,7 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
       console.log("  ✓ Resolution finalized");
 
       // Step 4: Verify final state
+      let finalPassValue, finalFailValue;
       [stage, finalPassValue, finalFailValue, finalized] = await oracleResolver.getResolution(proposalId);
       expect(stage).to.equal(4); // Finalized
       expect(finalPassValue).to.equal(passValue);
@@ -283,6 +284,7 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
         .finalizeResolution(proposalId);
 
       // Verify finalized
+      let finalized;
       [stage, , , finalized] = await oracleResolver.getResolution(proposalId);
       expect(stage).to.equal(4); // Finalized
       expect(finalized).to.equal(true);
@@ -486,19 +488,19 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
       // Finalize challenged proposal (11)
       await oracleResolver.connect(owner).finalizeResolution(11);
-      [, , , finalized11] = await oracleResolver.getResolution(11);
+      const [, , , finalized11] = await oracleResolver.getResolution(11);
       expect(finalized11).to.equal(true);
 
       // Finalize disputed proposal (12)
       await oracleResolver.connect(owner).finalizeResolution(12);
-      [, , , finalized12] = await oracleResolver.getResolution(12);
+      const [, , , finalized12] = await oracleResolver.getResolution(12);
       expect(finalized12).to.equal(true);
 
       // Finalize unchallenged proposal (10) after challenge period
       const challengePeriod = await oracleResolver.CHALLENGE_PERIOD();
       await time.increase(challengePeriod + 1n);
       await oracleResolver.connect(owner).finalizeResolution(10);
-      [, , , finalized10] = await oracleResolver.getResolution(10);
+      const [, , , finalized10] = await oracleResolver.getResolution(10);
       expect(finalized10).to.equal(true);
 
       console.log("  ✓ All proposals finalized successfully");
