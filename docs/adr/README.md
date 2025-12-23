@@ -11,6 +11,21 @@ An Architecture Decision Record (ADR) captures an important architectural decisi
 - Document the evolution of the system architecture
 - Facilitate knowledge transfer to new team members
 
+## What Belongs in an ADR?
+
+ADRs should document **significant architectural decisions** such as:
+- Technology stack choices (frameworks, libraries, tools)
+- Architectural patterns and system design
+- Security infrastructure and approaches
+- Data storage and management strategies
+- Integration and API design decisions
+
+ADRs should **NOT** include:
+- Implementation guides (use `docs/active_build/`)
+- Operational runbooks (use `docs/runbooks/`)
+- User documentation (use `docs/user-guide/`)
+- Detailed API references (use `docs/reference/`)
+
 ## ADR Format
 
 Each ADR follows a consistent structure:
@@ -24,21 +39,36 @@ Each ADR follows a consistent structure:
 
 ### Active ADRs
 
-| ADR | Title | Status | Date | Phase |
-|-----|-------|--------|------|-------|
-| [001](./001-scalability-architecture.md) | Scalable Architecture & Batch Market Updates | Accepted | 2025-12-23 | Design |
-| [002](./002-batch-operations-guide.md) | Batch Operations & Market Discovery API Integration | Accepted | 2025-12-23 | Implementation |
-| [003](./003-implementation-summary.md) | Scalability Implementation Summary & Results | Accepted | 2025-12-23 | Complete |
+| ADR | Title | Status | Date | Category |
+|-----|-------|--------|------|----------|
+| [001](./001-trail-of-bits-toolchain.md) | Adoption of Trail of Bits Security Testing Toolchain | Accepted | 2024-06-15 | Security |
 
 ### Superseded ADRs
 
 None yet.
 
+## Related Documentation
+
+### Active Build Documentation (`docs/active_build/`)
+Current implementation work and technical specifications:
+- [Scalability Architecture](../active_build/scalability-architecture.md) - System scaling design and implementation
+- [Implementation Summary](../active_build/scalability-implementation.md) - Current phase results and status
+
+### Operational Runbooks (`docs/runbooks/`)
+Step-by-step operational guides:
+- [Batch Operations](../runbooks/batch-operations.md) - Integration guide for batch processing APIs
+
+### Other Documentation
+- [Security Testing](../security/) - Detailed testing procedures and tools
+- [Developer Guide](../developer-guide/) - Setup and contribution guidelines
+- [System Overview](../system-overview/) - Architecture and design overview
+
 ## How to Create a New ADR
 
 1. Create a new file in this directory with the format: `NNN-title-with-dashes.md`
-   - Use the next available number (e.g., `004-your-decision.md`)
+   - Use the next available number (e.g., `002-your-decision.md`)
    - Use lowercase with dashes for the title
+   - Focus on **architectural decisions**, not implementation details
 
 2. Use this template structure:
 
@@ -55,94 +85,60 @@ None yet.
 
 ## Context
 
-What is the issue or problem that we're addressing? What factors are influencing this decision?
+What is the architectural issue or problem that we're addressing? 
+What factors influenced this decision?
 
 ## Decision
 
-What is the change that we're proposing and/or doing?
+What architectural change are we proposing/doing?
+What technology, pattern, or approach are we adopting?
+
+## Rationale
+
+Why did we choose this approach?
+What alternatives did we consider?
 
 ## Consequences
 
-What becomes easier or more difficult to do because of this change? What are the trade-offs?
+What becomes easier or more difficult because of this architectural decision?
 
 ### Positive
 
-- List of positive consequences
+- List of benefits and improvements
 
 ### Negative
 
-- List of negative consequences or trade-offs
+- List of drawbacks and trade-offs
 
 ### Neutral
 
-- Other implications
+- Other implications or considerations
 
 ## Implementation
 
-How will this decision be implemented? What are the key steps?
+High-level approach to implementing this decision.
+(Detailed implementation goes in docs/active_build/)
 
 ## References
 
-- Links to related documents, discussions, or external resources
+- Links to related documents, tools, or external resources
 ```
 
 3. Update this README to include your new ADR in the index
 
 4. Get the ADR reviewed and approved before marking it as "Accepted"
 
-## Implementation Phases
-
-The scalability architecture follows a phased implementation approach:
-
-### Phase 1: Foundation (Weeks 1-2) - **CURRENT**
-- ✅ Batch market creation and enhanced events
-- ✅ Storage packing and indexing infrastructure
-- ✅ Pagination helper functions
-- ✅ Unit tests for batch operations
-- 🔄 Integration with existing systems (In Progress)
-
-### Phase 2: Batch Processing (Weeks 3-4)
-- ⏳ Position batching enhancements
-- ⏳ Batch ZK proof verification
-- ⏳ Epoch consolidation logic
-- ⏳ Failure handling and monitoring
-
-### Phase 3: Query API (Weeks 5-6)
-- ⏳ On-chain query optimization
-- ⏳ Off-chain indexer implementation
-- ⏳ GraphQL/REST API deployment
-- ⏳ Integration examples
-
-### Phase 4: Optimization & Testing (Weeks 7-8)
-- ⏳ Gas optimization profiling
-- ⏳ Security audit preparation
-- ⏳ Load testing
-- ⏳ Documentation review
-
-### Phase 5: Deployment & Monitoring (Weeks 9-10)
-- ⏳ Testnet deployment
-- ⏳ Monitoring infrastructure
-- ⏳ Production preparation
-- ⏳ Mainnet deployment plan
-
-## Status Legend
-
-- ✅ **Complete**: Implementation finished and tested
-- 🔄 **In Progress**: Currently being worked on
-- ⏳ **Planned**: Scheduled for future implementation
-- ❌ **Blocked**: Cannot proceed due to dependencies
-- 🔁 **Needs Review**: Implementation complete, awaiting review
-
 ## Contributing
 
 When making significant architectural changes:
 
 1. Create a new ADR following the template
-2. Discuss with the team before implementation
-3. Update this README with the new ADR
-4. Mark as "Proposed" until team consensus
-5. Update to "Accepted" after implementation
-6. Link to implementation PR/commits
+2. Focus on the "why" not the "how" (how goes in docs/active_build/)
+3. Discuss with the team before implementation
+4. Update this README with the new ADR
+5. Mark as "Proposed" until team consensus
+6. Update to "Accepted" after decision is finalized
+7. Link to implementation documentation in docs/active_build/
 
 ## Questions?
 
