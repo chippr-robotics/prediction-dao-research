@@ -212,6 +212,7 @@ button:focus-visible {
 ```bash
 # Search performed during this review to check for prefers-reduced-motion in CSS files
 # Command: grep -r "prefers-reduced-motion" frontend/src/
+# Note: Path is relative to repository root
 # Result: No matches found - this media query is missing from the implementation
 ```
 
@@ -672,8 +673,8 @@ button:focus-visible {
 ```
 
 **Files to Update**:
-- `/frontend/src/App.css` - Lines 194-199
-- `/frontend/src/index.css` - Lines 52-55
+- `frontend/src/App.css` - Focus styles section
+- `frontend/src/index.css` - Button focus styles
 - All component-specific CSS files
 
 **Estimated Effort**: 2 hours  
@@ -703,10 +704,10 @@ button:focus-visible {
 ```
 
 **Files to Update**:
-- `/frontend/src/App.css`
-- `/frontend/src/components/PlatformSelector.css`
-- `/frontend/src/components/ClearPathApp.css`
-- `/frontend/src/components/FairWinsApp.css`
+- `frontend/src/App.css`
+- `frontend/src/components/PlatformSelector.css`
+- `frontend/src/components/ClearPathApp.css`
+- `frontend/src/components/FairWinsApp.css`
 - All other component CSS files with transitions
 
 **Estimated Effort**: 1 hour  
@@ -753,9 +754,9 @@ button:focus-visible {
 ```
 
 **Files to Update**:
-- `/frontend/src/components/ProposalList.jsx` - Lines 63-93
-- `/frontend/src/components/MarketTrading.jsx` (similar pattern)
-- `/frontend/src/App.css` - Add focus styles
+- `frontend/src/components/ProposalList.jsx` - Update proposal card elements
+- `frontend/src/components/MarketTrading.jsx` (if exists - similar pattern)
+- `frontend/src/App.css` - Add focus styles for cards
 
 **Estimated Effort**: 3 hours  
 **Impact**: High - Makes core navigation accessible
@@ -801,8 +802,8 @@ const connectWallet = async () => {
 ```
 
 **Files to Update**:
-- `/frontend/src/App.jsx`
-- `/frontend/src/App.css` - Add `.sr-only` class
+- `frontend/src/App.jsx`
+- `frontend/src/App.css` - Add `.sr-only` class
 
 **Estimated Effort**: 4 hours  
 **Impact**: High - Critical for screen reader users
@@ -904,8 +905,8 @@ const handleSubmit = async (e) => {
 ```
 
 **Files to Update**:
-- `/frontend/src/components/ProposalSubmission.jsx`
-- `/frontend/src/App.css`
+- `frontend/src/components/ProposalSubmission.jsx`
+- `frontend/src/App.css`
 
 **Estimated Effort**: 6 hours  
 **Impact**: Medium-High - Improves form usability significantly
@@ -961,9 +962,9 @@ import StatusIcon from './StatusIcon'
 ```
 
 **Files to Update**:
-- Create `/frontend/src/components/StatusIcon.jsx`
-- `/frontend/src/components/ProposalList.jsx`
-- `/frontend/src/components/MarketTrading.jsx` (if exists)
+- Create `frontend/src/components/StatusIcon.jsx`
+- `frontend/src/components/ProposalList.jsx`
+- `frontend/src/components/MarketTrading.jsx` (if exists)
 
 **Estimated Effort**: 3 hours  
 **Impact**: Medium - Improves accessibility for colorblind users
@@ -1032,7 +1033,7 @@ const handleTabKeyDown = (e, currentTab) => {
 ```
 
 **Files to Update**:
-- `/frontend/src/components/Dashboard.jsx`
+- `frontend/src/components/Dashboard.jsx`
 
 **Estimated Effort**: 4 hours  
 **Impact**: Medium - Improves keyboard navigation
