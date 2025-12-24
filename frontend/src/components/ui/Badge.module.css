@@ -1,0 +1,51 @@
+/* Badge Base Styles */
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+}
+
+.badge-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 1em;
+}
+
+/* Success Variant */
+.badge-success {
+  background: #22c55e;
+  color: white;
+}
+
+/* Warning Variant */
+.badge-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+/* Danger Variant */
+.badge-danger {
+  background: #dc2626;
+  color: white;
+}
+
+/* Neutral Variant */
+.badge-neutral {
+  background: #94a3b8;
+  color: white;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .badge {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
