@@ -683,6 +683,39 @@ select[aria-invalid="true"] {
   .token-selector {
     grid-template-columns: 1fr;
   }
+
+  /* Ensure touch targets are at least 44x44px on mobile */
+  button,
+  .tab-button,
+  .view-button,
+  .trade-button,
+  .submit-button,
+  .connect-button,
+  .disconnect-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1.25rem;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Responsive typography */
+  body {
+    font-size: 0.9375rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+  }
 }
 
 /* Loading Screen */

@@ -78,14 +78,6 @@ function Dashboard() {
     ? ['daos', 'proposals', 'metrics', 'launchpad', 'admin']
     : ['daos', 'proposals', 'metrics', 'launchpad']
 
-  const tabLabels = {
-    daos: 'My DAOs',
-    proposals: 'Active Proposals',
-    metrics: 'Welfare Metrics',
-    launchpad: 'Launch DAO',
-    admin: 'Admin'
-  }
-
   // Handle keyboard navigation for ARIA tabs pattern
   const handleTabKeyDown = (e, currentTab) => {
     const currentIndex = tabs.indexOf(currentTab)

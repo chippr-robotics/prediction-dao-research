@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
-import { ethers } from 'ethers'
 
-function ProposalSubmission({ provider, signer }) {
+function ProposalSubmission() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -106,10 +105,6 @@ function ProposalSubmission({ provider, signer }) {
       ...formData,
       [e.target.name]: e.target.value
     })
-  }
-
-  const formatDateForInput = (date) => {
-    return date ? new Date(date).toISOString().slice(0, 16) : ''
   }
 
   return (
