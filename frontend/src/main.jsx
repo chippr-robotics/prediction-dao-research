@@ -9,6 +9,7 @@ import { Web3Provider } from './contexts/Web3Context'
 import { UIProvider } from './contexts/UIContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { PriceProvider } from './contexts/PriceContext'
+import { ETCswapProvider } from './contexts/ETCswapContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 // Create query client for wagmi
@@ -21,11 +22,13 @@ createRoot(document.getElementById('root')).render(
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <Web3Provider>
-              <UIProvider>
-                <PriceProvider>
-                  <App />
-                </PriceProvider>
-              </UIProvider>
+              <ETCswapProvider>
+                <UIProvider>
+                  <PriceProvider>
+                    <App />
+                  </PriceProvider>
+                </UIProvider>
+              </ETCswapProvider>
             </Web3Provider>
           </ThemeProvider>
         </QueryClientProvider>

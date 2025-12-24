@@ -5,6 +5,9 @@ import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
+import SwapPanel from './SwapPanel'
+import BalanceDisplay from './BalanceDisplay'
+import BalanceChart from './BalanceChart'
 import './FairWinsAppNew.css'
 
 // Extended mock market data with more entries for scrolling demo
@@ -695,10 +698,20 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
           {/* Primary Grid View - Always visible unless hero is open */}
           {!showHero && (
             <>
-              {selectedCategory === 'all' ? (
+              {selectedCategory === 'swap' ? (
+                /* Swap Panel View */
+                <div className="swap-view-container">
+                  <BalanceDisplay />
+                  <SwapPanel />
+                  <BalanceChart />
+                </div>
+              ) : selectedCategory === 'all' ? (
                 /* Category Rows - Each category gets its own horizontally scrolling row */
                 <div className="categories-rows-container">
                   {categories.map((category) => {
+                    // Skip special categories like swap
+                    if (category.isSpecial) return null
+                    
                     const categoryMarkets = marketsByCategory[category.id]
                     if (categoryMarkets && categoryMarkets.length > 0) {
                       return (

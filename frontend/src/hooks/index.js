@@ -7,6 +7,9 @@ export {
   useWallet 
 } from './useWeb3'
 
+// ETCswap hooks
+export { useETCswap } from './useETCswap'
+
 // UI hooks
 export { 
   useUI, 
