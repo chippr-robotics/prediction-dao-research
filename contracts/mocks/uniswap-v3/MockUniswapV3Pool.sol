@@ -119,8 +119,11 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
                 uint256 amountInAfterFee = absAmountSpecified - feeAmount;
                 uint256 amountOut = (amountInAfterFee * liquidity) / (liquidity + amountInAfterFee);
                 
-                if (amountOut == 0) {
-                    amountOut = amountInAfterFee; // Simplified: 1:1 swap if no liquidity
+                // Fallback for testing: If liquidity is very low, use 1:1 swap
+                // Note: This is a simplified mock behavior for testing only
+                // In production, low liquidity would result in high slippage or revert
+                if (amountOut == 0 && liquidity < 1000) {
+                    amountOut = amountInAfterFee; // Emergency fallback for testing
                 }
                 
                 IERC20(token1).safeTransfer(recipient, amountOut);

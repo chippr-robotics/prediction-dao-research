@@ -359,21 +359,39 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             IERC20(market.collateralToken).approve(address(etcSwapIntegration), amount);
             
             // Calculate minimum output with slippage protection
-            // Note: Set to 0 for testing/flexibility, in production use proper quotes
-            uint256 minTokenAmount = 0;
-            
-            // Execute swap through ETCSwap integration
-            ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
-                marketId,
-                buyPass,
-                market.collateralToken,
-                outcomeToken,
-                amount,
-                minTokenAmount,
-                block.timestamp + 300 // 5 minute deadline
-            );
-            
-            tokenAmount = result.amountOut;
+            // Use quoter to estimate output and apply default slippage tolerance
+            try etcSwapIntegration.quoteBuyTokens(marketId, buyPass, amount) returns (uint256 estimatedOutput) {
+                // Apply default slippage tolerance (0.5%)
+                uint256 minTokenAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 50);
+                
+                // Execute swap with slippage protection
+                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
+                    marketId,
+                    buyPass,
+                    market.collateralToken,
+                    outcomeToken,
+                    amount,
+                    minTokenAmount,
+                    block.timestamp + 300 // 5 minute deadline
+                );
+                
+                tokenAmount = result.amountOut;
+            } catch {
+                // If quote fails, use conservative minimum (allow up to 5% slippage for edge cases)
+                uint256 minTokenAmount = (amount * 95) / 100;
+                
+                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
+                    marketId,
+                    buyPass,
+                    market.collateralToken,
+                    outcomeToken,
+                    amount,
+                    minTokenAmount,
+                    block.timestamp + 300
+                );
+                
+                tokenAmount = result.amountOut;
+            }
         } else {
             // Fallback: Simplified LMSR implementation for testing
             // Requires ETH collateral
@@ -425,21 +443,39 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             IERC20(outcomeToken).approve(address(etcSwapIntegration), tokenAmount);
             
             // Calculate minimum output with slippage protection
-            // Note: Set to 0 for testing/flexibility, in production use proper quotes
-            uint256 minCollateralAmount = 0;
-            
-            // Execute swap through ETCSwap integration
-            ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
-                marketId,
-                sellPass,
-                outcomeToken,
-                market.collateralToken,
-                tokenAmount,
-                minCollateralAmount,
-                block.timestamp + 300 // 5 minute deadline
-            );
-            
-            collateralAmount = result.amountOut;
+            // Use quoter to estimate output and apply default slippage tolerance
+            try etcSwapIntegration.quoteSellTokens(marketId, sellPass, tokenAmount) returns (uint256 estimatedOutput) {
+                // Apply default slippage tolerance (0.5%)
+                uint256 minCollateralAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 50);
+                
+                // Execute swap with slippage protection
+                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
+                    marketId,
+                    sellPass,
+                    outcomeToken,
+                    market.collateralToken,
+                    tokenAmount,
+                    minCollateralAmount,
+                    block.timestamp + 300 // 5 minute deadline
+                );
+                
+                collateralAmount = result.amountOut;
+            } catch {
+                // If quote fails, use conservative minimum (allow up to 5% slippage for edge cases)
+                uint256 minCollateralAmount = (tokenAmount * 95) / 100;
+                
+                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
+                    marketId,
+                    sellPass,
+                    outcomeToken,
+                    market.collateralToken,
+                    tokenAmount,
+                    minCollateralAmount,
+                    block.timestamp + 300
+                );
+                
+                collateralAmount = result.amountOut;
+            }
             
             // Transfer collateral to seller
             IERC20(market.collateralToken).transfer(msg.sender, collateralAmount);
