@@ -43,7 +43,22 @@
 .tile-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.header-left {
+  display: flex;
   align-items: center;
+  gap: 0.5rem;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 120px;
 }
 
 .category-badge {
@@ -55,16 +70,35 @@
   height: 40px;
   background: rgba(59, 130, 246, 0.1);
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
+.market-value {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.market-value-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.market-value-amount {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.moneyline-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
 }
 
 .tile-title {
@@ -80,7 +114,7 @@
   overflow: hidden;
 }
 
-.tile-description {
+.tile-secondary {
   font-size: 0.875rem;
   color: var(--text-secondary);
   line-height: 1.5;
@@ -91,17 +125,11 @@
   overflow: hidden;
 }
 
-.probability-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
 .probability-bar {
   width: 100%;
-  height: 8px;
-  background: rgba(239, 68, 68, 0.2);
-  border-radius: 4px;
+  height: 10px;
+  background: rgba(239, 68, 68, 0.3);
+  border-radius: 5px;
   overflow: hidden;
   position: relative;
 }
@@ -116,66 +144,7 @@
   transition: width 0.3s ease;
 }
 
-.probability-labels {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
 
-.prob-yes,
-.prob-no {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.prob-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 500;
-}
-
-.prob-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.prob-yes .prob-value {
-  color: #22c55e;
-}
-
-.prob-no .prob-value {
-  color: #ef4444;
-}
-
-.tile-footer {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(59, 130, 246, 0.1);
-}
-
-.footer-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.footer-label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 500;
-}
-
-.footer-value {
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  font-weight: 600;
-}
 
 .tile-action-btn {
   width: 100%;
@@ -204,7 +173,7 @@
 .market-tile.compact {
   padding: 1rem;
   gap: 0.75rem;
-  min-height: 220px;
+  min-height: 200px;
 }
 
 .market-tile.compact .tile-title {
@@ -219,21 +188,12 @@
   height: 36px;
 }
 
-.market-tile.compact .status-badge {
-  padding: 0.2rem 0.6rem;
-  font-size: 0.7rem;
+.market-tile.compact .market-value-amount {
+  font-size: 1rem;
 }
 
-.market-tile.compact .prob-value {
-  font-size: 1.1rem;
-}
-
-.market-tile.compact .footer-label {
-  font-size: 0.65rem;
-}
-
-.market-tile.compact .footer-value {
-  font-size: 0.85rem;
+.market-tile.compact .tile-secondary {
+  font-size: 0.8rem;
 }
 
 /* Responsive */
