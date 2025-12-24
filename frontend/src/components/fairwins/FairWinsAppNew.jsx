@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
-import { useIsMobile } from '../../hooks/useMediaQuery'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
-import MarketTile from './MarketTile'
 import CategoryRow from './CategoryRow'
+import MarketGrid from './MarketGrid'
 import './FairWinsAppNew.css'
 
 // Extended mock market data with more entries for scrolling demo
@@ -469,13 +468,14 @@ const getMockMarkets = () => {
 
 function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   const { account, isConnected } = useWeb3()
-  const isMobile = useIsMobile()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showCarousel, setShowCarousel] = useState(true)
-  const [isCarouselMinimized, setIsCarouselMinimized] = useState(false)
+  const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'category'
+  const [showHero, setShowHero] = useState(false) // Control hero visibility
+  const heroBackButtonRef = useRef(null)
+  const lastFocusedElementRef = useRef(null)
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -483,10 +483,7 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
       await new Promise(resolve => setTimeout(resolve, 500))
       const allMarkets = getMockMarkets()
       setMarkets(allMarkets)
-      // Auto-select first market
-      if (allMarkets.length > 0) {
-        setSelectedMarket(allMarkets[0])
-      }
+      // Don't auto-select market anymore - grid is primary view
       setLoading(false)
     } catch (error) {
       console.error('Error loading markets:', error)
@@ -498,50 +495,42 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     loadMarkets()
   }, [loadMarkets])
 
-  // Handle scroll to hide/show carousel - enhanced for mobile
+  // Handle Escape key to close hero
   useEffect(() => {
-    let scrollTimeout
-    const handleScroll = () => {
-      const scrollTop = window.scrollY || document.documentElement.scrollTop
-      
-      // On mobile, hide carousel when scrolling down past threshold
-      if (isMobile) {
-        if (scrollTop > 150) {
-          setShowCarousel(false)
-        } else {
-          setShowCarousel(true)
-        }
-      } else {
-        // Desktop behavior - hide when scrolling down past 100px
-        if (scrollTop > 100) {
-          setShowCarousel(false)
-        } else {
-          setShowCarousel(true)
-        }
-      }
-      
-      // Clear existing timeout
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout)
-      }
-      
-      // Show carousel again after user stops scrolling for 1 second (desktop only)
-      if (!isMobile) {
-        scrollTimeout = setTimeout(() => {
-          setShowCarousel(true)
-        }, 1000)
+    const handleKeyDown = (event) => {
+      if ((event.key === 'Escape' || event.key === 'Esc') && showHero) {
+        handleCloseHero()
       }
     }
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
-      window.removeEventListener('scroll', handleScroll)
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout)
-      }
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isMobile])
+  }, [showHero, handleCloseHero])
+
+  // Manage body scroll lock and focus when hero opens/closes
+  useEffect(() => {
+    if (showHero) {
+      // Prevent body scroll when hero is open
+      document.body.style.overflow = 'hidden'
+      
+      // Move focus to the back button after a short delay to ensure it's rendered
+      setTimeout(() => {
+        if (heroBackButtonRef.current) {
+          heroBackButtonRef.current.focus()
+        }
+      }, 100)
+    } else {
+      // Restore body scroll
+      document.body.style.overflow = ''
+    }
+
+    // Cleanup function
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [showHero])
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -562,16 +551,30 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
 
   const handleCategoryChange = (categoryId) => {
     setSelectedCategory(categoryId)
-    // When switching category, auto-select first market in that category
-    const categoryMarkets = markets.filter(m => m.category === categoryId)
-    if (categoryMarkets.length > 0) {
-      setSelectedMarket(categoryMarkets[0])
-    }
+    // Close hero when changing category
+    setShowHero(false)
+    setSelectedMarket(null)
+    // Scroll to top when changing category
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleMarketClick = (market) => {
+    // Store the currently focused element
+    lastFocusedElementRef.current = document.activeElement
     setSelectedMarket(market)
+    setShowHero(true) // Open hero view when clicking a market
+    // Scroll to top to show hero
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  const handleCloseHero = useCallback(() => {
+    setShowHero(false)
+    setSelectedMarket(null)
+    // Return focus to the element that opened the hero
+    if (lastFocusedElementRef.current) {
+      lastFocusedElementRef.current.focus()
+    }
+  }, [])
 
   const handleTrade = (tradeData) => {
     alert(`Trading functionality requires deployed contracts.
@@ -586,10 +589,27 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
 
   const marketsByCategory = getMarketsByCategory()
 
-  // Get markets for selected category carousel (always show current category)
-  const getCarouselMarkets = () => {
-    if (!selectedMarket) return []
-    return markets.filter(m => m.category === selectedMarket.category)
+  // Get markets for current category with sorting
+  const getFilteredAndSortedMarkets = () => {
+    let filteredMarkets = selectedCategory === 'all' 
+      ? markets 
+      : markets.filter(m => m.category === selectedCategory)
+    
+    // Sort markets based on selected sort option
+    const sortedMarkets = [...filteredMarkets].sort((a, b) => {
+      switch (sortBy) {
+        case 'endTime':
+          return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
+        case 'marketValue':
+          return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+        case 'category':
+          return a.category.localeCompare(b.category)
+        default:
+          return 0
+      }
+    })
+    
+    return sortedMarkets
   }
 
   if (loading) {
@@ -633,70 +653,100 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
 
       <main className="main-canvas">
         <div className="unified-view">
-          {/* Hero Card - Always visible at top */}
-          {selectedMarket && (
-            <div className="hero-section">
-              <MarketHeroCard 
-                market={selectedMarket}
-                onTrade={handleTrade}
-              />
+          {/* Hero Card - Only shown when showHero is true, as overlay */}
+          {showHero && selectedMarket && (
+            <div 
+              className="hero-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="hero-dialog-title"
+            >
+              <div className="hero-section">
+                <button 
+                  ref={heroBackButtonRef}
+                  className="hero-back-btn"
+                  onClick={handleCloseHero}
+                  aria-label="Close hero and return to grid"
+                >
+                  ← Back to Grid
+                </button>
+                <h2 id="hero-dialog-title" className="visually-hidden">
+                  Market details dialog
+                </h2>
+                <MarketHeroCard 
+                  market={selectedMarket}
+                  onTrade={handleTrade}
+                />
+              </div>
             </div>
           )}
 
-          {/* Category Rows - Each category gets its own horizontally scrolling row */}
-          <div className="categories-rows-container">
-            {categories.map((category) => {
-              const categoryMarkets = marketsByCategory[category.id]
-              if (categoryMarkets && categoryMarkets.length > 0) {
-                return (
-                  <CategoryRow
-                    key={category.id}
-                    title={category.name}
-                    icon={category.icon}
-                    markets={categoryMarkets}
-                    onMarketClick={handleMarketClick}
-                    selectedMarketId={selectedMarket?.id}
-                  />
-                )
-              }
-              return null
-            })}
-          </div>
-
-          {/* Fixed Bottom Carousel - Shows current category markets */}
-          {selectedMarket && (
-            <div className={`fixed-bottom-carousel ${showCarousel ? 'visible' : 'hidden'} ${isCarouselMinimized ? 'minimized' : ''}`}>
-              <div className="carousel-header">
-                <h3>More in {selectedMarket.category.replace('-', ' ').toUpperCase()}</h3>
-                <div className="carousel-controls">
-                  {isMobile && (
-                    <button 
-                      className="carousel-toggle-btn"
-                      onClick={() => setIsCarouselMinimized(!isCarouselMinimized)}
-                      aria-label={isCarouselMinimized ? "Expand carousel" : "Minimize carousel"}
-                      aria-expanded={!isCarouselMinimized}
-                    >
-                      {isCarouselMinimized ? '▲' : '▼'}
-                    </button>
-                  )}
-                  <span className="carousel-hint">Click any market to make it the hero ↑</span>
+          {/* Primary Grid View - Always visible unless hero is open */}
+          {!showHero && (
+            <>
+              {selectedCategory === 'all' ? (
+                /* Category Rows - Each category gets its own horizontally scrolling row */
+                <div className="categories-rows-container">
+                  {categories.map((category) => {
+                    const categoryMarkets = marketsByCategory[category.id]
+                    if (categoryMarkets && categoryMarkets.length > 0) {
+                      return (
+                        <CategoryRow
+                          key={category.id}
+                          title={category.name}
+                          icon={category.icon}
+                          markets={categoryMarkets}
+                          onMarketClick={handleMarketClick}
+                          selectedMarketId={selectedMarket?.id}
+                        />
+                      )
+                    }
+                    return null
+                  })}
                 </div>
-              </div>
-              {!isCarouselMinimized && (
-                <div className="carousel-scroller">
-                  {getCarouselMarkets().map((market) => (
-                    <div key={market.id} className="carousel-item">
-                      <MarketTile 
-                        market={market}
-                        onClick={handleMarketClick}
-                        isActive={selectedMarket?.id === market.id}
-                        compact={true}
+              ) : (
+                /* Full Grid View for specific category */
+                (() => {
+                  const selectedCategoryObj = categories.find(c => c.id === selectedCategory)
+                  return (
+                    <div className="grid-view-container">
+                      <div className="grid-controls">
+                        <div className="grid-header">
+                          <h2>
+                            {selectedCategoryObj?.icon}{' '}
+                            {selectedCategoryObj?.name} Markets
+                          </h2>
+                          <span className="market-count">
+                            ({getFilteredAndSortedMarkets().length} active markets)
+                          </span>
+                        </div>
+                        <div className="sort-controls">
+                          <label htmlFor="sort-select">Sort by:</label>
+                          <select 
+                            id="sort-select"
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="sort-select"
+                          >
+                            <option value="endTime">Ending Time</option>
+                            <option value="marketValue">Market Value</option>
+                            {selectedCategory === 'all' && (
+                              <option value="category">Category</option>
+                            )}
+                          </select>
+                        </div>
+                      </div>
+                      <MarketGrid 
+                        markets={getFilteredAndSortedMarkets()}
+                        onMarketClick={handleMarketClick}
+                        selectedMarketId={selectedMarket?.id}
+                        loading={loading}
                       />
                     </div>
-                  ))}
-                </div>
+                  )
+                })()
               )}
-            </div>
+            </>
           )}
         </div>
       </main>
