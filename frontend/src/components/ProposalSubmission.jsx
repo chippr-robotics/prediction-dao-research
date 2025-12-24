@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
+import './ProposalSubmission.css'
 
-function ProposalSubmission() {
+function ProposalSubmission({ daos = [] }) {
+  const [selectedDAO, setSelectedDAO] = useState(null)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -69,6 +71,11 @@ function ProposalSubmission() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    if (!selectedDAO) {
+      setErrors({ submit: 'Please select a DAO first' })
+      return
+    }
+    
     if (!validateForm()) {
       return
     }
@@ -109,7 +116,39 @@ function ProposalSubmission() {
 
   return (
     <div className="proposal-submission">
-      <form onSubmit={handleSubmit}>
+      {daos.length === 0 ? (
+        <div className="no-daos-message">
+          <div className="info-icon" aria-hidden="true">ℹ️</div>
+          <h3>No DAOs Available</h3>
+          <p>You need to be a member of at least one DAO to submit proposals.</p>
+          <p>Please join or create a DAO first from the other tabs.</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="daoSelect">
+              Select DAO
+              <span className="required" aria-label="required">*</span>
+            </label>
+            <select
+              id="daoSelect"
+              value={selectedDAO?.id || ''}
+              onChange={(e) => {
+                const dao = daos.find(d => d.id === e.target.value)
+                setSelectedDAO(dao)
+              }}
+              required
+              aria-required="true"
+            >
+              <option value="">Choose a DAO...</option>
+              {daos.map(dao => (
+                <option key={dao.id} value={dao.id}>
+                  {dao.name}
+                </option>
+              ))}
+            </select>
+            <small>Select which DAO this proposal is for</small>
+          </div>
         <div className="form-group">
           <label htmlFor="title">
             Proposal Title
@@ -333,6 +372,7 @@ function ProposalSubmission() {
           {submitting ? 'Submitting...' : 'Submit Proposal'}
         </button>
       </form>
+      )}
     </div>
   )
 }

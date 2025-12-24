@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import './ProposalDashboard.css'
 import { useEthers } from '../hooks/useWeb3'
+import ProposalDetailView from './ProposalDetailView'
 
 const ProposalRegistryABI = [
   "function getProposalCount() external view returns (uint256)",
@@ -13,6 +14,7 @@ function ProposalDashboard({ daos }) {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, pending, completed
+  const [selectedProposal, setSelectedProposal] = useState(null)
 
   useEffect(() => {
     if (provider && daos.length > 0) {
@@ -99,7 +101,17 @@ function ProposalDashboard({ daos }) {
   }
 
   return (
-    <div className="proposal-dashboard">
+    <>
+      {selectedProposal && (
+        <ProposalDetailView
+          proposalId={selectedProposal.id}
+          daoId={selectedProposal.daoId}
+          dao={selectedProposal.dao}
+          onClose={() => setSelectedProposal(null)}
+        />
+      )}
+      
+      <div className="proposal-dashboard">
       <div className="dashboard-controls">
         <div className="filter-buttons">
           <button
@@ -173,14 +185,21 @@ function ProposalDashboard({ daos }) {
               </div>
 
               <div className="proposal-actions">
-                <button className="action-btn view">View Details</button>
+                <button 
+                  className="action-btn view"
+                  onClick={() => setSelectedProposal({ id: proposal.id, daoId: proposal.daoId, dao: daos.find(d => d.id === proposal.daoId) })}
+                  aria-label={`View details for ${proposal.title}`}
+                >
+                  View Details
+                </button>
                 <button className="action-btn trade">Trade Market</button>
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 
