@@ -3,6 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
+import MarketTile from './MarketTile'
 import CategoryRow from './CategoryRow'
 import './FairWinsAppNew.css'
 
