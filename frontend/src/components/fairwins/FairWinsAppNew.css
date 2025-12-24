@@ -12,6 +12,7 @@
   padding: 2rem 2rem calc(25vh + 2rem) 2rem; /* Bottom padding for fixed carousel at 25vh */
   min-height: calc(100vh - 70px);
   transition: margin-left 0.3s ease;
+  position: relative;
 }
 
 /* When sidebar is collapsed */
@@ -27,8 +28,10 @@
 
 /* Hero Section at Top */
 .hero-section {
-  margin-bottom: 3rem;
+  margin-bottom: 1rem; /* Reduce margin for tighter layout */
   animation: fadeIn 0.4s ease-in;
+  position: relative;
+  z-index: 1; /* Hero at base level */
 }
 
 @keyframes fadeIn {
@@ -42,9 +45,37 @@
   }
 }
 
-/* Category Rows Container */
+/* Category Rows Container - Overlaid with transparency */
 .categories-rows-container {
+  position: relative;
+  max-height: 25vh; /* Limit to 25% of viewport height */
+  overflow-y: auto;
+  overflow-x: hidden;
   margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(15, 24, 16, 0.25); /* Very transparent - 25% opacity */
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  z-index: 2; /* Above hero */
+}
+
+/* Hide scrollbar for category rows */
+.categories-rows-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.categories-rows-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.categories-rows-container::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 3px;
+}
+
+.categories-rows-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
 }
 
 /* Fixed Bottom Carousel */
