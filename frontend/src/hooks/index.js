@@ -15,3 +15,11 @@ export {
   useModal, 
   useError 
 } from './useUI'
+
+// Blockchain event hooks
+export {
+  useContractEvent,
+  useContractEvents,
+  useAccountChange,
+  useChainChange
+} from './useBlockchainEvents'

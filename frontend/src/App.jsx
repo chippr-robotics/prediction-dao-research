@@ -7,7 +7,7 @@ import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
 import { ComponentExamples } from './components/ui'
 import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
-import { useAnnouncement } from './hooks/useUI'
+import { useAnnouncement, useNotification } from './hooks/useUI'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
@@ -17,14 +17,17 @@ function AppContent() {
   const { connectWallet, disconnectWallet } = useWallet()
   const { networkError, switchNetwork } = useNetwork()
   const { announce } = useAnnouncement()
+  const { showNotification } = useNotification()
   const navigate = useNavigate()
 
   const handleConnect = async () => {
     const success = await connectWallet()
     if (success) {
       announce('Wallet connected successfully')
+      showNotification('Wallet connected successfully', 'success')
     } else {
       announce('Wallet connection failed')
+      showNotification('Failed to connect wallet. Please try again.', 'error')
     }
     return success
   }
@@ -32,11 +35,13 @@ function AppContent() {
   const handleDisconnect = () => {
     disconnectWallet()
     announce('Wallet disconnected')
+    showNotification('Wallet disconnected', 'info')
   }
 
   const handleSwitchNetwork = async () => {
     await switchNetwork()
-    announce('Network switched')
+    announce('Attempting to switch network')
+    showNotification('Switching network...', 'info')
   }
 
   const handleBack = () => {

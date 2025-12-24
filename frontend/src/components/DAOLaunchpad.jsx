@@ -103,11 +103,12 @@ function DAOLaunchpad({ onDAOCreated }) {
         adminAddresses
       )
 
-      setSuccess('Transaction submitted! Waiting for confirmation...')
+      showNotification('Transaction submitted! Waiting for confirmation...', 'info', 0)
 
       const receipt = await tx.wait()
       
       setSuccess('DAO created successfully!')
+      showNotification('DAO created successfully!', 'success')
       
       // Reset form
       setFormData({
@@ -124,7 +125,9 @@ function DAOLaunchpad({ onDAOCreated }) {
 
     } catch (err) {
       console.error('Error creating DAO:', err)
-      setError(err.message || 'Failed to create DAO')
+      const errorMsg = err.message || 'Failed to create DAO'
+      setError(errorMsg)
+      showNotification(errorMsg, 'error')
     } finally {
       setCreating(false)
     }
