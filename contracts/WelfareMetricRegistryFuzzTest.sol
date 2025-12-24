@@ -8,7 +8,7 @@ import "./WelfareMetricRegistry.sol";
  * @notice Fuzz testing for WelfareMetricRegistry invariants
  */
 contract WelfareMetricRegistryFuzzTest {
-    WelfareMetricRegistry public registry;
+    WelfareMetricRegistry public immutable registry;
     uint256 private previousMetricCount;
     
     constructor() {

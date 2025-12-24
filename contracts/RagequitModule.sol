@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -11,6 +12,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev Implements Moloch-style ragequit for treasury protection
  */
 contract RagequitModule is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    
     struct RagequitEligibility {
         uint256 proposalId;
         uint256 snapshotTime;
@@ -138,8 +141,8 @@ contract RagequitModule is Ownable, ReentrancyGuard {
 
         hasRagequit[msg.sender][proposalId] = true;
 
-        // Burn governance tokens
-        IERC20(governanceToken).transferFrom(msg.sender, address(this), tokenAmount);
+        // Burn governance tokens - using safeTransferFrom for checked transfer
+        IERC20(governanceToken).safeTransferFrom(msg.sender, address(this), tokenAmount);
 
         // Transfer proportional treasury share
         // In production, this would interact with the treasury vault

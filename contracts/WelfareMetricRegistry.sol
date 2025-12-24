@@ -241,7 +241,8 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
         uint256 bettingWeight = 0;
         uint256 privateSectorWeight = 0;
 
-        for (uint256 i = 0; i < activeMetricIds.length; i++) {
+        uint256 length = activeMetricIds.length; // Cache array length
+        for (uint256 i = 0; i < length; i++) {
             uint256 metricId = activeMetricIds[i];
             WelfareMetric memory metric = metrics[metricId];
             uint256 value = latestMetricValues[0][metricId];
@@ -292,18 +293,19 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
     {
         uint256 count = 0;
         
-        // Count metrics in category
-        for (uint256 i = 0; i < activeMetricIds.length; i++) {
+        // Count metrics in category - cache array length
+        uint256 length = activeMetricIds.length;
+        for (uint256 i = 0; i < length; i++) {
             if (metrics[activeMetricIds[i]].category == category) {
                 count++;
             }
         }
         
-        // Populate result array
+        // Populate result array - reuse cached length
         uint256[] memory result = new uint256[](count);
         uint256 index = 0;
         
-        for (uint256 i = 0; i < activeMetricIds.length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             uint256 metricId = activeMetricIds[i];
             if (metrics[metricId].category == category) {
                 result[index] = metricId;

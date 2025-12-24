@@ -9,8 +9,8 @@ import "./WelfareMetricRegistry.sol";
  * @notice Fuzz testing for ProposalRegistry invariants
  */
 contract ProposalRegistryFuzzTest {
-    ProposalRegistry public proposalRegistry;
-    WelfareMetricRegistry public welfareRegistry;
+    ProposalRegistry public immutable proposalRegistry;
+    WelfareMetricRegistry public immutable welfareRegistry;
     
     uint256 private previousProposalCount;
     
