@@ -1,35 +1,192 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useWeb3, useWallet } from '../hooks/useWeb3'
+import Header from './Header'
 import './LandingPage.css'
 
 function LandingPage() {
   const navigate = useNavigate()
+  const { isConnected } = useWeb3()
+  const { connectWallet } = useWallet()
+  const [isClearPathMember, setIsClearPathMember] = useState(false)
 
-  const handleGetStarted = () => {
-    navigate('/select')
+  const handleConnectForClearPath = async () => {
+    const success = await connectWallet()
+    if (success) {
+      // In the future, this will check the ClearPath DAO contract for membership
+      // For now, we use the toggle state
+      if (isClearPathMember) {
+        navigate('/clearpath')
+      }
+    }
   }
+
+  const handleBrowseMarkets = () => {
+    navigate('/fairwins')
+  }
+
+  const showClearPathBranding = isConnected && isClearPathMember
 
   return (
     <div className="landing-page">
+      {/* Sticky Header */}
+      <Header showClearPathBranding={showClearPathBranding} />
+
+      {/* Temporary ClearPath Membership Toggle (for development) */}
+      {isConnected && (
+        <div className="dev-toggle-banner">
+          <label className="toggle-label">
+            <input 
+              type="checkbox" 
+              checked={isClearPathMember}
+              onChange={(e) => setIsClearPathMember(e.target.checked)}
+              className="toggle-checkbox"
+            />
+            <span className="toggle-text">
+              ClearPath Member (Dev Toggle)
+            </span>
+          </label>
+        </div>
+      )}
+
       {/* Hero Section */}
-      <section className="hero-section">
+      <section className="hero-section" id="hero">
         <div className="hero-content">
-          <h1 className="hero-title">ClearPath</h1>
+          <h1 className="hero-title">
+            {showClearPathBranding ? 'ClearPath' : 'Prediction DAO'}
+          </h1>
           <p className="hero-subtitle">
-            Institutional-Grade Governance Through Prediction Markets
+            {showClearPathBranding 
+              ? 'Institutional-Grade Governance Through Prediction Markets'
+              : 'Decentralized Decision-Making Powered by Collective Intelligence'
+            }
           </p>
           <p className="hero-description">
-            Harness collective intelligence for informed decision-making in private equity governance. 
-            ClearPath combines democratic voting with prediction markets to deliver transparent, 
-            data-driven outcomes for institutional investors.
+            {showClearPathBranding
+              ? 'Welcome back! Access your DAO governance dashboard and participate in futarchy-based decision-making.'
+              : 'Two powerful platforms working together: ClearPath for institutional governance and FairWins for open prediction markets. Connect your wallet to access ClearPath or browse FairWins markets.'
+            }
           </p>
-          <button onClick={handleGetStarted} className="cta-button">
-            Get Started
-          </button>
+          
+          {/* Dual CTA Buttons */}
+          <div className="hero-cta-group">
+            {!isConnected ? (
+              <>
+                <button 
+                  onClick={handleConnectForClearPath} 
+                  className="cta-button primary"
+                >
+                  <span className="button-icon">🔗</span>
+                  Connect Wallet for ClearPath
+                </button>
+                <button 
+                  onClick={handleBrowseMarkets} 
+                  className="cta-button secondary"
+                >
+                  <span className="button-icon">📊</span>
+                  Browse FairWins Markets
+                </button>
+              </>
+            ) : showClearPathBranding ? (
+              <button 
+                onClick={() => navigate('/clearpath')} 
+                className="cta-button primary"
+              >
+                Enter ClearPath Dashboard
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={handleBrowseMarkets} 
+                  className="cta-button primary"
+                >
+                  <span className="button-icon">📊</span>
+                  Browse FairWins Markets
+                </button>
+                <p className="membership-note">
+                  ClearPath membership required to access governance features.
+                </p>
+              </>
+            )}
+          </div>
         </div>
       </section>
 
+      {/* Dual Platform Section */}
+      {!showClearPathBranding && (
+        <section className="dual-platform-section" id="platforms">
+          <div className="container">
+            <h2 className="section-title">Two Complementary Platforms</h2>
+            <p className="section-intro">
+              Choose the platform that fits your needs—or use both together
+            </p>
+            <div className="platform-cards">
+              {/* FairWins Card */}
+              <div className="platform-card-landing fairwins">
+                <div className="platform-card-header">
+                  <img 
+                    src="/logo_fairwins.svg" 
+                    alt="FairWins" 
+                    className="platform-card-logo"
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                  <h3>FairWins</h3>
+                </div>
+                <p className="platform-card-tagline">Open Prediction Markets</p>
+                <p className="platform-card-description">
+                  Create and trade on prediction markets about any topic. Open to everyone,
+                  no membership required. Start trading immediately.
+                </p>
+                <ul className="platform-card-features">
+                  <li>✓ No wallet required to browse</li>
+                  <li>✓ Open to all participants</li>
+                  <li>✓ Flexible market creation</li>
+                  <li>✓ Fair resolution process</li>
+                </ul>
+                <button 
+                  onClick={handleBrowseMarkets}
+                  className="platform-card-button fairwins-button"
+                >
+                  Browse Markets
+                </button>
+              </div>
+
+              {/* ClearPath Card */}
+              <div className="platform-card-landing clearpath">
+                <div className="platform-card-header">
+                  <img 
+                    src="/logo_clearpath.svg" 
+                    alt="ClearPath" 
+                    className="platform-card-logo"
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                  <h3>ClearPath</h3>
+                </div>
+                <p className="platform-card-tagline">DAO Governance Platform</p>
+                <p className="platform-card-description">
+                  Institutional-grade governance through futarchy. Members vote on values
+                  and bet on outcomes for data-driven decision making.
+                </p>
+                <ul className="platform-card-features">
+                  <li>✓ Member-only governance</li>
+                  <li>✓ Treasury management</li>
+                  <li>✓ Futarchy-based decisions</li>
+                  <li>✓ Privacy-preserving voting</li>
+                </ul>
+                <button 
+                  onClick={handleConnectForClearPath}
+                  className="platform-card-button clearpath-button"
+                >
+                  {isConnected ? 'Access ClearPath' : 'Connect Wallet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* How It Works Section */}
-      <section className="how-it-works-section">
+      <section className="how-it-works-section" id="how-it-works">
         <div className="container">
           <h2 className="section-title">How Prediction DAO Works</h2>
           <p className="section-intro">
@@ -130,7 +287,7 @@ function LandingPage() {
       </section>
 
       {/* Use Cases Section */}
-      <section className="use-cases-section">
+      <section className="use-cases-section" id="use-cases">
         <div className="container">
           <h2 className="section-title">Real-World Applications</h2>
           <p className="section-intro">
@@ -193,7 +350,7 @@ function LandingPage() {
       </section>
 
       {/* Key Features Section */}
-      <section className="features-section">
+      <section className="features-section" id="features">
         <div className="container">
           <h2 className="section-title">Enterprise-Grade Governance</h2>
           <div className="features-grid">
@@ -303,7 +460,7 @@ function LandingPage() {
         <div className="container">
           <h2>Ready to Get Started?</h2>
           <p>Choose your platform to begin</p>
-          <button onClick={handleGetStarted} className="cta-button large">
+          <button onClick={() => navigate('/select')} className="cta-button large">
             Choose Platform
           </button>
         </div>
