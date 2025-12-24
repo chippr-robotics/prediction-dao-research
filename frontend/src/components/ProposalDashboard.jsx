@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import './ProposalDashboard.css'
+import { useEthers } from '../hooks/useWeb3'
 
 const ProposalRegistryABI = [
   "function getProposalCount() external view returns (uint256)",
   "function proposals(uint256) external view returns (tuple(string title, string description, uint256 fundingAmount, address recipient, uint256 welfareMetricId, uint256 submissionTime, uint256 activationTime, uint8 status, address proposer, uint256 bond, bool bondReturned))"
 ]
 
-function ProposalDashboard({ daos, provider, signer }) {
+function ProposalDashboard({ daos }) {
+  const { provider, signer } = useEthers()
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, pending, completed

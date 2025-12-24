@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { ethers } from 'ethers'
 import './DAOList.css'
 
-function DAOList({ daos, provider, account }) {
+function DAOList({ daos }) {
   const [selectedDAO, setSelectedDAO] = useState(null)
 
   const formatDate = (timestamp) => {
