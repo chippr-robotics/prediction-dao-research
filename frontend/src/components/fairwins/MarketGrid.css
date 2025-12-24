@@ -1,0 +1,130 @@
+.market-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem 0;
+  animation: fadeIn 0.4s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading State */
+.market-grid-loading {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-light) 0%,
+    rgba(59, 130, 246, 0.1) 50%,
+    var(--bg-light) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 12px;
+  height: 350px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Empty State */
+.market-grid-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  background: var(--bg-light);
+  border-radius: 12px;
+  border: 2px dashed rgba(59, 130, 246, 0.3);
+  min-height: 400px;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.market-grid-empty h3 {
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.market-grid-empty p {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  max-width: 400px;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1400px) {
+  .market-grid,
+  .market-grid-loading {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .market-grid,
+  .market-grid-loading {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .market-grid,
+  .market-grid-loading {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .market-grid-empty {
+    padding: 3rem 1.5rem;
+    min-height: 300px;
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+  }
+
+  .market-grid-empty h3 {
+    font-size: 1.25rem;
+  }
+
+  .market-grid-empty p {
+    font-size: 1rem;
+  }
+}
+
+/* Grid cell styling for accessibility */
+[role="gridcell"] {
+  display: flex;
+  flex-direction: column;
+}

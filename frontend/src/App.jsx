@@ -5,6 +5,7 @@ import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
+import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
@@ -95,6 +96,16 @@ function AppContent() {
         />
         <Route 
           path="/fairwins" 
+          element={
+            <FairWinsAppNew 
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onBack={handleBack}
+            />
+          } 
+        />
+        <Route 
+          path="/fairwins-old" 
           element={
             <FairWinsApp 
               onConnect={handleConnect}
