@@ -1,0 +1,43 @@
+.currency-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  background: var(--bg-secondary, #f5f5f5);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.currency-toggle:hover:not(:disabled) {
+  background: var(--bg-tertiary, #ebebeb);
+  border-color: var(--border-hover, #ccc);
+}
+
+.currency-toggle:focus {
+  outline: 2px solid var(--focus-color, #4a90e2);
+  outline-offset: 2px;
+}
+
+.currency-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.currency-option {
+  color: var(--text-secondary, #666);
+  transition: color 0.2s ease;
+}
+
+.currency-option.active {
+  color: var(--text-primary, #000);
+  font-weight: 600;
+}
+
+.currency-divider {
+  color: var(--border-color, #e0e0e0);
+}

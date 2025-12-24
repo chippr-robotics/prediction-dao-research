@@ -1,6 +1,9 @@
+import { usePrice } from '../../contexts/PriceContext'
 import './MarketTile.css'
 
 function MarketTile({ market, onClick, isActive = false, compact = false }) {
+  const { formatPrice } = usePrice()
+
   const calculateImpliedProbability = (passPrice) => {
     return (parseFloat(passPrice) * 100).toFixed(1)
   }
@@ -16,14 +19,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
       return `${days}d ${hours}h`
     }
     return `${hours}h`
-  }
-
-  const formatLiquidity = (liquidity) => {
-    const num = parseFloat(liquidity)
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(1)}K`
-    }
-    return num.toFixed(0)
   }
 
   const getCategoryIcon = (category) => {
@@ -71,7 +66,7 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
           </span>
           <div className="market-value">
             <span className="market-value-label">Market Value</span>
-            <span className="market-value-amount">${formatLiquidity(market.totalLiquidity)}</span>
+            <span className="market-value-amount">{formatPrice(market.totalLiquidity, { compact: true })}</span>
           </div>
         </div>
         <div className="header-right">

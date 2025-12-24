@@ -66,13 +66,22 @@
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
 }
 
 .header-main h2 {
   margin: 0;
   font-size: 1.75rem;
   color: var(--text-primary, #f1f5f9);
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 200px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .status-badge {
