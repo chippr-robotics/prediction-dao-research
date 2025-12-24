@@ -43,8 +43,9 @@ function usePriceConversion() {
     } catch (err) {
       console.error('Error fetching ETC price:', err)
       setError(err.message)
-      // Set a fallback rate if fetch fails
-      setEtcUsdRate(20) // Approximate fallback value
+      // Set a fallback rate if fetch fails (approximate historical average)
+      // In production, consider using environment variable or cached value
+      setEtcUsdRate(process.env.VITE_ETC_USD_FALLBACK || 20)
     } finally {
       setLoading(false)
     }
@@ -65,7 +66,7 @@ function usePriceConversion() {
   }, [])
 
   const convertToUsd = useCallback((etcAmount) => {
-    if (!etcUsdRate || !etcAmount) return 0
+    if (!etcUsdRate || etcAmount == null) return 0
     return parseFloat(etcAmount) * etcUsdRate
   }, [etcUsdRate])
 

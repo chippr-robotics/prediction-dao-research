@@ -9,7 +9,7 @@ function CurrencyToggle() {
       className="currency-toggle"
       onClick={toggleCurrency}
       aria-label={`Currently showing prices in ${showUsd ? 'USD' : 'ETC'}. Click to toggle to ${showUsd ? 'ETC' : 'USD'}`}
-      title={`Toggle between USD and ETC (1 ETC = $${etcUsdRate?.toFixed(2) || '...'})`}
+      title={`Toggle between USD and ETC${etcUsdRate ? ` (1 ETC = $${etcUsdRate.toFixed(2)})` : ''}`}
       disabled={loading}
     >
       <span className={`currency-option ${showUsd ? 'active' : ''}`}>USD</span>
