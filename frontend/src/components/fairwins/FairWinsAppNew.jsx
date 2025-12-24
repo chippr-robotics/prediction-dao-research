@@ -6,6 +6,7 @@ import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
 import MarketTile from './MarketTile'
 import CategoryRow from './CategoryRow'
+import MarketGrid from './MarketGrid'
 import './FairWinsAppNew.css'
 
 // Extended mock market data with more entries for scrolling demo
@@ -476,6 +477,7 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   const [loading, setLoading] = useState(true)
   const [showCarousel, setShowCarousel] = useState(true)
   const [isCarouselMinimized, setIsCarouselMinimized] = useState(false)
+  const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'category'
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -498,38 +500,16 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     loadMarkets()
   }, [loadMarkets])
 
-  // Handle scroll to hide/show carousel - enhanced for mobile
+  // Handle scroll to hide/show carousel - hide when not at top
   useEffect(() => {
-    let scrollTimeout
     const handleScroll = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop
       
-      // On mobile, hide carousel when scrolling down past threshold
-      if (isMobile) {
-        if (scrollTop > 150) {
-          setShowCarousel(false)
-        } else {
-          setShowCarousel(true)
-        }
+      // Hide carousel when scrolling down, show only when at top
+      if (scrollTop > 50) {
+        setShowCarousel(false)
       } else {
-        // Desktop behavior - hide when scrolling down past 100px
-        if (scrollTop > 100) {
-          setShowCarousel(false)
-        } else {
-          setShowCarousel(true)
-        }
-      }
-      
-      // Clear existing timeout
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout)
-      }
-      
-      // Show carousel again after user stops scrolling for 1 second (desktop only)
-      if (!isMobile) {
-        scrollTimeout = setTimeout(() => {
-          setShowCarousel(true)
-        }, 1000)
+        setShowCarousel(true)
       }
     }
 
@@ -537,11 +517,8 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     
     return () => {
       window.removeEventListener('scroll', handleScroll)
-      if (scrollTimeout) {
-        clearTimeout(scrollTimeout)
-      }
     }
-  }, [isMobile])
+  }, [])
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -563,10 +540,14 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   const handleCategoryChange = (categoryId) => {
     setSelectedCategory(categoryId)
     // When switching category, auto-select first market in that category
-    const categoryMarkets = markets.filter(m => m.category === categoryId)
+    const categoryMarkets = categoryId === 'all' 
+      ? markets 
+      : markets.filter(m => m.category === categoryId)
     if (categoryMarkets.length > 0) {
       setSelectedMarket(categoryMarkets[0])
     }
+    // Scroll to top when changing category
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleMarketClick = (market) => {
@@ -585,6 +566,29 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
   }
 
   const marketsByCategory = getMarketsByCategory()
+
+  // Get markets for current category with sorting
+  const getFilteredAndSortedMarkets = () => {
+    let filteredMarkets = selectedCategory === 'all' 
+      ? markets 
+      : markets.filter(m => m.category === selectedCategory)
+    
+    // Sort markets based on selected sort option
+    const sortedMarkets = [...filteredMarkets].sort((a, b) => {
+      switch (sortBy) {
+        case 'endTime':
+          return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
+        case 'marketValue':
+          return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+        case 'category':
+          return a.category.localeCompare(b.category)
+        default:
+          return 0
+      }
+    })
+    
+    return sortedMarkets
+  }
 
   // Get markets for selected category carousel (always show current category)
   const getCarouselMarkets = () => {
@@ -643,28 +647,65 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
             </div>
           )}
 
-          {/* Category Rows - Each category gets its own horizontally scrolling row */}
-          <div className="categories-rows-container">
-            {categories.map((category) => {
-              const categoryMarkets = marketsByCategory[category.id]
-              if (categoryMarkets && categoryMarkets.length > 0) {
-                return (
-                  <CategoryRow
-                    key={category.id}
-                    title={category.name}
-                    icon={category.icon}
-                    markets={categoryMarkets}
-                    onMarketClick={handleMarketClick}
-                    selectedMarketId={selectedMarket?.id}
-                  />
-                )
-              }
-              return null
-            })}
-          </div>
+          {/* Conditional rendering based on selected category */}
+          {selectedCategory === 'all' ? (
+            /* Category Rows - Each category gets its own horizontally scrolling row */
+            <div className="categories-rows-container">
+              {categories.map((category) => {
+                const categoryMarkets = marketsByCategory[category.id]
+                if (categoryMarkets && categoryMarkets.length > 0) {
+                  return (
+                    <CategoryRow
+                      key={category.id}
+                      title={category.name}
+                      icon={category.icon}
+                      markets={categoryMarkets}
+                      onMarketClick={handleMarketClick}
+                      selectedMarketId={selectedMarket?.id}
+                    />
+                  )
+                }
+                return null
+              })}
+            </div>
+          ) : (
+            /* Full Grid View for specific category */
+            <div className="grid-view-container">
+              <div className="grid-controls">
+                <div className="grid-header">
+                  <h2>
+                    {categories.find(c => c.id === selectedCategory)?.icon}{' '}
+                    {categories.find(c => c.id === selectedCategory)?.name} Markets
+                  </h2>
+                  <span className="market-count">
+                    ({getFilteredAndSortedMarkets().length} active markets)
+                  </span>
+                </div>
+                <div className="sort-controls">
+                  <label htmlFor="sort-select">Sort by:</label>
+                  <select 
+                    id="sort-select"
+                    value={sortBy} 
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="sort-select"
+                  >
+                    <option value="endTime">Ending Time</option>
+                    <option value="marketValue">Market Value</option>
+                    <option value="category">Category</option>
+                  </select>
+                </div>
+              </div>
+              <MarketGrid 
+                markets={getFilteredAndSortedMarkets()}
+                onMarketClick={handleMarketClick}
+                selectedMarketId={selectedMarket?.id}
+                loading={loading}
+              />
+            </div>
+          )}
 
-          {/* Fixed Bottom Carousel - Shows current category markets */}
-          {selectedMarket && (
+          {/* Fixed Bottom Carousel - Shows current category markets, only visible at top */}
+          {selectedMarket && selectedCategory === 'all' && (
             <div className={`fixed-bottom-carousel ${showCarousel ? 'visible' : 'hidden'} ${isCarouselMinimized ? 'minimized' : ''}`}>
               <div className="carousel-header">
                 <h3>More in {selectedMarket.category.replace('-', ' ').toUpperCase()}</h3>

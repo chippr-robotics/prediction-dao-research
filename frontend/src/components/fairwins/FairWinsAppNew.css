@@ -41,14 +41,13 @@
 
 /* Hero Section at Top - Full viewport minus header */
 .hero-section {
-  height: calc(100vh - 70px); /* Full viewport height minus header */
+  min-height: calc(100vh - 70px); /* Min height but can be smaller */
   width: 100%;
   padding: 2rem;
   box-sizing: border-box;
   animation: fadeIn 0.4s ease-in;
   position: relative;
   z-index: 1; /* Hero at base level */
-  overflow: hidden; /* Prevent hero from scrolling internally */
 }
 
 @keyframes fadeIn {
@@ -77,6 +76,82 @@
   border-top: 1px solid rgba(59, 130, 246, 0.15);
   z-index: 2; /* Above hero but below modals */
   transition: left 0.3s ease;
+}
+
+/* Grid View Container - replaces category rows for specific category */
+.grid-view-container {
+  width: 100%;
+  padding: 2rem;
+  background: var(--bg-primary);
+  min-height: 100vh;
+}
+
+.grid-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--bg-light);
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.grid-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.grid-header h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.grid-header .market-count {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sort-controls label {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.sort-select {
+  padding: 0.5rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.sort-select:hover {
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+}
+
+.sort-select:focus {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
 }
 
 /* Adjust when sidebar expands */
@@ -298,8 +373,33 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
 
   /* Hero section adjustments for mobile */
   .hero-section {
-    height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
+    min-height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
     padding: 1rem;
+  }
+
+  /* Grid view container for mobile */
+  .grid-view-container {
+    padding: 1rem;
+  }
+
+  .grid-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem;
+  }
+
+  .grid-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .grid-header .market-count {
+    font-size: 0.85rem;
+  }
+
+  .sort-controls {
+    width: 100%;
+    justify-content: space-between;
   }
 
   /* Category rows container for mobile */
