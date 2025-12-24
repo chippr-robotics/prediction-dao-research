@@ -5,6 +5,7 @@ import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
+import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
 import { useAnnouncement, useNotification } from './hooks/useUI'
@@ -81,6 +82,7 @@ function AppContent() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/select" element={<PlatformSelector onConnect={handleConnect} />} />
         <Route path="/ui-components" element={<ComponentExamples />} />
+        <Route path="/state-demo" element={<StateManagementDemo />} />
         <Route 
           path="/clearpath" 
           element={
