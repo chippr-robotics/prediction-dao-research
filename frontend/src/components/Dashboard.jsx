@@ -5,6 +5,7 @@ import DAOList from './DAOList'
 import ProposalDashboard from './ProposalDashboard'
 import DAOLaunchpad from './DAOLaunchpad'
 import MetricsDashboard from './MetricsDashboard'
+import ProposalSubmission from './ProposalSubmission'
 import { useEthers, useAccount } from '../hooks/useWeb3'
 import { useCallback } from 'react'
 
@@ -75,8 +76,8 @@ function Dashboard() {
 
   // Tab list for ARIA pattern
   const tabs = isAdmin 
-    ? ['daos', 'proposals', 'metrics', 'launchpad', 'admin']
-    : ['daos', 'proposals', 'metrics', 'launchpad']
+    ? ['daos', 'proposals', 'submit', 'metrics', 'launchpad', 'admin']
+    : ['daos', 'proposals', 'submit', 'metrics', 'launchpad']
 
   // Handle keyboard navigation for ARIA tabs pattern
   const handleTabKeyDown = (e, currentTab) => {
@@ -113,6 +114,8 @@ function Dashboard() {
         return <DAOList daos={userDAOs} />
       case 'proposals':
         return <ProposalDashboard daos={userDAOs} />
+      case 'submit':
+        return <ProposalSubmission daos={userDAOs} />
       case 'metrics':
         return <MetricsDashboard daos={userDAOs} />
       case 'launchpad':
@@ -156,6 +159,18 @@ function Dashboard() {
           onKeyDown={(e) => handleTabKeyDown(e, 'proposals')}
         >
           Active Proposals
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'submit'}
+          aria-controls="submit-panel"
+          id="submit-tab"
+          tabIndex={activeTab === 'submit' ? 0 : -1}
+          className={`tab-button ${activeTab === 'submit' ? 'active' : ''}`}
+          onClick={() => setActiveTab('submit')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'submit')}
+        >
+          Submit Proposal
         </button>
         <button
           role="tab"
