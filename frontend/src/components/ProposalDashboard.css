@@ -1,14 +1,19 @@
 .proposal-dashboard {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 300px); /* Leave space for dashboard header and tabs */
+  overflow: hidden;
 }
 
 .dashboard-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 16px;
+  flex-shrink: 0; /* Prevent controls from shrinking */
 }
 
 .filter-buttons {
@@ -104,6 +109,27 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 24px;
+  overflow-y: auto;
+  padding: 0 4px 24px 0; /* Add padding to prevent scrollbar from overlapping content */
+}
+
+/* Custom scrollbar styling */
+.proposals-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.proposals-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.proposals-list::-webkit-scrollbar-thumb {
+  background: rgba(97, 218, 251, 0.3);
+  border-radius: 4px;
+}
+
+.proposals-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(97, 218, 251, 0.5);
 }
 
 .proposal-card {
@@ -264,6 +290,15 @@
 @media (max-width: 768px) {
   .proposals-list {
     grid-template-columns: 1fr;
+  }
+
+  .proposal-dashboard {
+    max-height: none; /* Allow full height on mobile */
+  }
+
+  .proposals-list {
+    overflow-y: visible; /* Allow natural scrolling on mobile */
+    max-height: none;
   }
 
   .dashboard-controls {

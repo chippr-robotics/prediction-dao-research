@@ -4,6 +4,28 @@
   gap: 1.5rem;
   padding: 1rem 0;
   animation: fadeIn 0.4s ease-in;
+  max-height: calc(100vh - 400px); /* Leave space for headers and controls */
+  overflow-y: auto;
+  padding-right: 4px; /* Add padding to prevent scrollbar from overlapping content */
+}
+
+/* Custom scrollbar styling */
+.market-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.market-grid::-webkit-scrollbar-track {
+  background: var(--bg-light, rgba(255, 255, 255, 0.05));
+  border-radius: 4px;
+}
+
+.market-grid::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+}
+
+.market-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
 }
 
 @keyframes fadeIn {
@@ -23,6 +45,28 @@
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
   padding: 1rem 0;
+  max-height: calc(100vh - 400px); /* Match the main grid height */
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Custom scrollbar styling for loading state */
+.market-grid-loading::-webkit-scrollbar {
+  width: 8px;
+}
+
+.market-grid-loading::-webkit-scrollbar-track {
+  background: var(--bg-light, rgba(255, 255, 255, 0.05));
+  border-radius: 4px;
+}
+
+.market-grid-loading::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+}
+
+.market-grid-loading::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
 }
 
 .loading-skeleton {
@@ -103,6 +147,8 @@
   .market-grid-loading {
     grid-template-columns: 1fr;
     gap: 1rem;
+    max-height: none; /* Allow full height on mobile */
+    overflow-y: visible; /* Allow natural scrolling on mobile */
   }
 
   .market-grid-empty {

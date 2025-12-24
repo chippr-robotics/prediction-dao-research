@@ -1,5 +1,29 @@
 .metrics-dashboard {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 300px); /* Leave space for dashboard header and tabs */
+  overflow-y: auto;
+  padding: 0 4px 0 0; /* Add padding to prevent scrollbar from overlapping content */
+}
+
+/* Custom scrollbar styling */
+.metrics-dashboard::-webkit-scrollbar {
+  width: 8px;
+}
+
+.metrics-dashboard::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.metrics-dashboard::-webkit-scrollbar-thumb {
+  background: rgba(97, 218, 251, 0.3);
+  border-radius: 4px;
+}
+
+.metrics-dashboard::-webkit-scrollbar-thumb:hover {
+  background: rgba(97, 218, 251, 0.5);
 }
 
 .dao-selector {
@@ -11,6 +35,7 @@
   background: rgba(255, 255, 255, 0.03);
   border: 2px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
+  flex-shrink: 0; /* Prevent selector from shrinking */
 }
 
 .dao-selector label {
@@ -371,6 +396,11 @@
 
   .metrics-list {
     grid-template-columns: 1fr;
+  }
+
+  .metrics-dashboard {
+    max-height: none; /* Allow full height on mobile */
+    overflow-y: visible; /* Allow natural scrolling on mobile */
   }
 
   .dao-selector {
