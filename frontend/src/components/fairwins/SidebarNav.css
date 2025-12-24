@@ -144,7 +144,7 @@
   height: 64px;
   background: var(--bg-light);
   border-top: 2px solid rgba(59, 130, 246, 0.3);
-  z-index: 150;
+  z-index: 160;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
   display: none; /* Hidden by default, shown on mobile via media query */
 }
@@ -165,16 +165,13 @@
   align-items: center;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-}
-
-/* Hide scrollbar but keep functionality */
-.bottom-nav-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.bottom-nav-scroll {
+  /* Hide scrollbar but keep functionality */
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.bottom-nav-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .bottom-nav-item {

@@ -230,11 +230,11 @@
 
 @media (max-width: 768px) {
   .header-bar {
-    height: 56px; /* More compact on mobile */
+    height: var(--mobile-header-height, 56px);
   }
 
   .header-bar.header-scrolled {
-    height: 48px; /* Even more compact when scrolled */
+    height: var(--mobile-header-compact-height, 48px);
   }
 
   .header-content {

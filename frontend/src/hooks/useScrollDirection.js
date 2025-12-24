@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 /**
  * Custom hook to detect scroll direction
@@ -8,22 +8,27 @@ import { useState, useEffect } from 'react'
 export function useScrollDirection(threshold = 10) {
   const [scrollDirection, setScrollDirection] = useState('up')
   const [scrollY, setScrollY] = useState(0)
-  const [prevScrollY, setPrevScrollY] = useState(0)
+  const prevScrollYRef = useRef(0)
 
   useEffect(() => {
+    // Check for SSR compatibility
+    if (typeof window === 'undefined') {
+      return
+    }
+
     let ticking = false
 
     const updateScrollDirection = () => {
       const currentScrollY = window.scrollY
 
-      if (Math.abs(currentScrollY - prevScrollY) < threshold) {
+      if (Math.abs(currentScrollY - prevScrollYRef.current) < threshold) {
         ticking = false
         return
       }
 
-      setScrollDirection(currentScrollY > prevScrollY ? 'down' : 'up')
+      setScrollDirection(currentScrollY > prevScrollYRef.current ? 'down' : 'up')
       setScrollY(currentScrollY)
-      setPrevScrollY(currentScrollY)
+      prevScrollYRef.current = currentScrollY
       ticking = false
     }
 
@@ -37,7 +42,7 @@ export function useScrollDirection(threshold = 10) {
     window.addEventListener('scroll', onScroll, { passive: true })
 
     return () => window.removeEventListener('scroll', onScroll)
-  }, [prevScrollY, threshold])
+  }, [threshold])
 
   return {
     scrollDirection,
@@ -56,6 +61,11 @@ export function useScrollPast(offset = 100) {
   const [isPast, setIsPast] = useState(false)
 
   useEffect(() => {
+    // Check for SSR compatibility
+    if (typeof window === 'undefined') {
+      return
+    }
+
     const handleScroll = () => {
       setIsPast(window.scrollY > offset)
     }

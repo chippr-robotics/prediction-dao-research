@@ -6,9 +6,20 @@ import { useState, useEffect } from 'react'
  * @returns {boolean} - Whether the media query matches
  */
 export function useMediaQuery(query) {
-  const [matches, setMatches] = useState(false)
+  const getInitialMatch = () => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+    return window.matchMedia(query).matches
+  }
+
+  const [matches, setMatches] = useState(getInitialMatch)
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
     const mediaQuery = window.matchMedia(query)
     
     // Set initial value
@@ -19,26 +30,22 @@ export function useMediaQuery(query) {
       setMatches(event.matches)
     }
 
-    // Modern browsers
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handler)
-      return () => mediaQuery.removeEventListener('change', handler)
-    } else {
-      // Legacy browsers
-      mediaQuery.addListener(handler)
-      return () => mediaQuery.removeListener(handler)
-    }
+    // Register listener for media query changes
+    mediaQuery.addEventListener('change', handler)
+
+    // Cleanup listener on unmount or query change
+    return () => mediaQuery.removeEventListener('change', handler)
   }, [query])
 
   return matches
 }
 
 /**
- * Custom hook to detect if device is mobile (< 768px)
+ * Custom hook to detect if device is mobile (<= 768px)
  * @returns {boolean} - Whether the device is mobile
  */
 export function useIsMobile() {
-  return useMediaQuery('(max-width: 767px)')
+  return useMediaQuery('(max-width: 768px)')
 }
 
 /**
@@ -51,7 +58,7 @@ export function useIsTablet() {
 
 /**
  * Custom hook to detect device orientation
- * @returns {'portrait' | 'landscape'} - Current orientation
+ * @returns {'portrait'|'landscape'} - Current orientation
  */
 export function useOrientation() {
   const isPortrait = useMediaQuery('(orientation: portrait)')

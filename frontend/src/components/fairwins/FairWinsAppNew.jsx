@@ -674,6 +674,7 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
                       className="carousel-toggle-btn"
                       onClick={() => setIsCarouselMinimized(!isCarouselMinimized)}
                       aria-label={isCarouselMinimized ? "Expand carousel" : "Minimize carousel"}
+                      aria-expanded={!isCarouselMinimized}
                     >
                       {isCarouselMinimized ? '▲' : '▼'}
                     </button>
