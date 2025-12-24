@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import './theme.css'
 import './App.css'
 import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
@@ -7,9 +8,11 @@ import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
 import StateManagementDemo from './components/StateManagementDemo'
-import { ComponentExamples } from './components/ui'
+import { ComponentExamples, ThemeToggle } from './components/ui'
 import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
 import { useAnnouncement, useNotification } from './hooks/useUI'
+import { useTheme } from './hooks/useTheme'
+import { useEffect } from 'react'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
@@ -20,7 +23,18 @@ function AppContent() {
   const { networkError, switchNetwork } = useNetwork()
   const { announce } = useAnnouncement()
   const { showNotification } = useNotification()
+  const { setThemePlatform } = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Auto-detect platform based on route
+  useEffect(() => {
+    if (location.pathname.includes('/clearpath')) {
+      setThemePlatform('clearpath')
+    } else if (location.pathname.includes('/fairwins')) {
+      setThemePlatform('fairwins')
+    }
+  }, [location.pathname, setThemePlatform])
 
   const handleConnect = async () => {
     const success = await connectWallet()
@@ -60,6 +74,9 @@ function AppContent() {
       
       {/* Modal system */}
       <ModalSystem />
+
+      {/* Theme toggle */}
+      <ThemeToggle />
 
       {/* Network error banner */}
       {networkError && isConnected && (

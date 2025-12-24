@@ -7,6 +7,7 @@ import App from './App.jsx'
 import { config } from './wagmi'
 import { Web3Provider } from './contexts/Web3Context'
 import { UIProvider } from './contexts/UIContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 // Create query client for wagmi
@@ -17,11 +18,13 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
-          <Web3Provider>
-            <UIProvider>
-              <App />
-            </UIProvider>
-          </Web3Provider>
+          <ThemeProvider>
+            <Web3Provider>
+              <UIProvider>
+                <App />
+              </UIProvider>
+            </Web3Provider>
+          </ThemeProvider>
         </QueryClientProvider>
       </WagmiProvider>
     </ErrorBoundary>
