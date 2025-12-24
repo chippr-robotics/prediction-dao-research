@@ -5,6 +5,8 @@ import DAOList from './DAOList'
 import ProposalDashboard from './ProposalDashboard'
 import DAOLaunchpad from './DAOLaunchpad'
 import MetricsDashboard from './MetricsDashboard'
+import { useEthers, useAccount } from '../hooks/useWeb3'
+import { useCallback } from 'react'
 
 const DAOFactoryABI = [
   "function getUserDAOs(address user) external view returns (uint256[])",
@@ -18,19 +20,15 @@ const DAOFactoryABI = [
 // Replace with deployed factory address
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
-function Dashboard({ provider, signer, account }) {
+function Dashboard() {
+  const { provider } = useEthers()
+  const { account } = useAccount()
   const [activeTab, setActiveTab] = useState('daos')
   const [userDAOs, setUserDAOs] = useState([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (provider && account) {
-      loadUserDAOs()
-    }
-  }, [provider, account])
-
-  const loadUserDAOs = async () => {
+  const loadUserDAOs = useCallback(async () => {
     try {
       setLoading(true)
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
@@ -67,7 +65,13 @@ function Dashboard({ provider, signer, account }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [provider, account])
+
+  useEffect(() => {
+    if (provider && account) {
+      loadUserDAOs()
+    }
+  }, [provider, account, loadUserDAOs])
 
   const renderTabContent = () => {
     if (loading) {
@@ -80,13 +84,13 @@ function Dashboard({ provider, signer, account }) {
 
     switch (activeTab) {
       case 'daos':
-        return <DAOList daos={userDAOs} provider={provider} account={account} />
+        return <DAOList daos={userDAOs} />
       case 'proposals':
-        return <ProposalDashboard daos={userDAOs} provider={provider} signer={signer} />
+        return <ProposalDashboard daos={userDAOs} />
       case 'metrics':
-        return <MetricsDashboard daos={userDAOs} provider={provider} />
+        return <MetricsDashboard daos={userDAOs} />
       case 'launchpad':
-        return <DAOLaunchpad signer={signer} onDAOCreated={loadUserDAOs} />
+        return <DAOLaunchpad onDAOCreated={loadUserDAOs} />
       default:
         return null
     }

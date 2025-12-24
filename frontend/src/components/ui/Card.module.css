@@ -1,0 +1,57 @@
+/* Card Base Styles */
+.card {
+  background: #1a2820;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid #2D7A4F;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+/* Hover Effect */
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(45, 122, 79, 0.2);
+  border-color: #34A853;
+}
+
+/* Interactive Card */
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:active {
+  transform: translateY(-2px) scale(0.99);
+}
+
+/* Focus State - Accessibility */
+.card-interactive:focus-visible {
+  outline: 2px solid #2D7A4F;
+  outline-offset: 2px;
+}
+
+/* Fallback for browsers without :focus-visible */
+@supports not selector(:focus-visible) {
+  .card-interactive:focus {
+    outline: 2px solid #2D7A4F;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card-hover,
+  .card-interactive {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card {
+    padding: 1.5rem;
+  }
+}

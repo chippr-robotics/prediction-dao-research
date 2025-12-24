@@ -1,108 +1,48 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
-import { ethers } from 'ethers'
+import { useNavigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
-import { EXPECTED_CHAIN_ID, getExpectedChain } from './wagmi'
+import StateManagementDemo from './components/StateManagementDemo'
+import { ComponentExamples } from './components/ui'
+import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
+import { useAnnouncement, useNotification } from './hooks/useUI'
+import NotificationSystem from './components/ui/NotificationSystem'
+import ModalSystem from './components/ui/ModalSystem'
+import AnnouncementRegion from './components/ui/AnnouncementRegion'
 
 function AppContent() {
-  const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
-  const { disconnect } = useDisconnect()
-  const chainId = useChainId()
-  const { switchChain } = useSwitchChain()
+  const { isConnected } = useWeb3()
+  const { connectWallet, disconnectWallet } = useWallet()
+  const { networkError, switchNetwork } = useNetwork()
+  const { announce } = useAnnouncement()
+  const { showNotification } = useNotification()
   const navigate = useNavigate()
-  
-  const [provider, setProvider] = useState(null)
-  const [signer, setSigner] = useState(null)
-  const [networkError, setNetworkError] = useState(null)
-  const [announcement, setAnnouncement] = useState('')
 
-  // Update provider and signer when connection changes
-  useEffect(() => {
-    const updateProviderAndSigner = async () => {
-      if (isConnected && window.ethereum) {
-        try {
-          const ethersProvider = new ethers.BrowserProvider(window.ethereum)
-          const ethersSigner = await ethersProvider.getSigner()
-          setProvider(ethersProvider)
-          setSigner(ethersSigner)
-        } catch (error) {
-          console.error('Error creating provider/signer:', error)
-        }
-      } else {
-        setProvider(null)
-        setSigner(null)
-      }
-    }
-    
-    updateProviderAndSigner()
-  }, [isConnected, address])
-
-  // Check network compatibility
-  useEffect(() => {
-    if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
-      const expectedChain = getExpectedChain()
-      setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
-      setAnnouncement(`Network error: Connected to wrong network. Please switch to ${expectedChain.name}`)
+  const handleConnect = async () => {
+    const success = await connectWallet()
+    if (success) {
+      announce('Wallet connected successfully')
+      showNotification('Wallet connected successfully', 'success')
     } else {
-      setNetworkError(null)
+      announce('Wallet connection failed')
+      showNotification('Failed to connect wallet. Please try again.', 'error')
     }
-  }, [chainId, isConnected])
-
-  const connectWallet = async () => {
-    try {
-      if (!window.ethereum) {
-        alert('Please install MetaMask to use this application')
-        setAnnouncement('Wallet connection failed: MetaMask not installed')
-        return false
-      }
-
-      const connector = connectors.find(c => c.id === 'injected')
-      if (!connector) {
-        alert('No wallet connector available')
-        setAnnouncement('Wallet connection failed: No connector available')
-        return false
-      }
-
-      await connect({ connector })
-      setAnnouncement('Wallet connected successfully')
-      return true
-    } catch (error) {
-      console.error('Error connecting wallet:', error)
-      
-      // Check for user rejection via error code or name
-      if (error.code === 4001 || error.name === 'UserRejectedRequestError') {
-        alert('Please approve the connection request')
-        setAnnouncement('Connection rejected by user')
-      } else {
-        alert('Failed to connect wallet')
-        setAnnouncement('Wallet connection failed')
-      }
-      return false
-    }
+    return success
   }
 
-  const disconnectWallet = () => {
-    disconnect()
-    setAnnouncement('Wallet disconnected')
+  const handleDisconnect = () => {
+    disconnectWallet()
+    announce('Wallet disconnected')
+    showNotification('Wallet disconnected', 'info')
   }
 
   const handleSwitchNetwork = async () => {
-    try {
-      await switchChain({ chainId: EXPECTED_CHAIN_ID })
-      setAnnouncement('Network switched successfully')
-    } catch (error) {
-      console.error('Error switching network:', error)
-      setAnnouncement('Failed to switch network')
-      
-      // If switching failed, show instructions
-      alert(`Please manually switch to the correct network in MetaMask:\nNetwork: ${getExpectedChain().name}\nChain ID: ${EXPECTED_CHAIN_ID}`)
-    }
+    await switchNetwork()
+    announce('Attempting to switch network')
+    showNotification('Switching network...', 'info')
   }
 
   const handleBack = () => {
@@ -111,15 +51,14 @@ function AppContent() {
 
   return (
     <>
-      {/* Screen reader announcements */}
-      <div 
-        role="status" 
-        aria-live="polite" 
-        aria-atomic="true"
-        className="sr-only"
-      >
-        {announcement}
-      </div>
+      {/* Accessibility announcement region */}
+      <AnnouncementRegion />
+      
+      {/* Notification system */}
+      <NotificationSystem />
+      
+      {/* Modal system */}
+      <ModalSystem />
 
       {/* Network error banner */}
       {networkError && isConnected && (
@@ -141,18 +80,16 @@ function AppContent() {
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/select" element={<PlatformSelector onConnect={connectWallet} />} />
+        <Route path="/select" element={<PlatformSelector onConnect={handleConnect} />} />
+        <Route path="/ui-components" element={<ComponentExamples />} />
+        <Route path="/state-demo" element={<StateManagementDemo />} />
         <Route 
           path="/clearpath" 
           element={
             isConnected ? (
               <ClearPathApp 
-                provider={provider}
-                signer={signer}
-                account={address}
-                onDisconnect={disconnectWallet}
+                onDisconnect={handleDisconnect}
                 onBack={handleBack}
-                networkError={networkError}
               />
             ) : (
               <Navigate to="/select" replace />
@@ -164,10 +101,8 @@ function AppContent() {
           element={
             isConnected ? (
               <FairWinsApp 
-                account={address}
-                onDisconnect={disconnectWallet}
+                onDisconnect={handleDisconnect}
                 onBack={handleBack}
-                networkError={networkError}
               />
             ) : (
               <Navigate to="/select" replace />

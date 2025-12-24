@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import './FairWinsApp.css'
+import { useWeb3, useNetwork } from '../hooks/useWeb3'
 
-function FairWinsApp({ account, onDisconnect, onBack, networkError }) {
+function FairWinsApp({ onDisconnect, onBack }) {
+  const { account } = useWeb3()
+  const { networkError } = useNetwork()
   const [activeTab, setActiveTab] = useState('markets')
 
   const shortenAddress = (address) => {

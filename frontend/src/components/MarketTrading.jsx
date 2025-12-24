@@ -1,20 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useEthers } from '../hooks/useWeb3'
 
-function MarketTrading({ provider, signer }) {
+function MarketTrading() {
+  const { provider, signer } = useEthers()
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadMarkets()
-  }, [provider])
-
-  const loadMarkets = async () => {
+  const loadMarkets = useCallback(async () => {
     try {
       // Mock data for demonstration
       // In production, this would fetch from ConditionalMarketFactory contract
+      // Note: provider and signer will be used when contracts are deployed
       const mockMarkets = [
         {
           id: 0,
@@ -44,7 +43,13 @@ function MarketTrading({ provider, signer }) {
       console.error('Error loading markets:', error)
       setLoading(false)
     }
-  }
+    // Note: provider and signer will be used in production
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    loadMarkets()
+  }, [loadMarkets])
 
   const handleTrade = async (e) => {
     e.preventDefault()
