@@ -30,7 +30,7 @@ function LandingPage() {
   return (
     <div className="landing-page">
       {/* Sticky Header */}
-      <Header showClearPathBranding={showClearPathBranding} />
+      <Header showClearPathBranding={showClearPathBranding} hideWalletButton={true} />
 
       {/* Temporary ClearPath Membership Toggle (for development) */}
       {isConnected && (
@@ -52,7 +52,7 @@ function LandingPage() {
       {/* Hero Split Section - 66% Left / 33% Right */}
       <section className="hero-split-section" id="hero">
         <div className="hero-container">
-          {/* Left Column (66%) - Platform Cards + Enterprise Features */}
+          {/* Left Column (66%) - Platform Cards */}
           <div className="hero-left">
             {!showClearPathBranding && (
               <>
@@ -71,7 +71,7 @@ function LandingPage() {
                         />
                         <div>
                           <h3>FairWins</h3>
-                          <p className="platform-tagline-compact">Open Prediction Markets</p>
+                          <p className="platform-tagline-compact">Prediction Markets for Friends</p>
                         </div>
                       </div>
                       <p className="platform-description-compact">
@@ -106,43 +106,6 @@ function LandingPage() {
                         <li>✓ Treasury management</li>
                         <li>✓ Privacy-preserving voting</li>
                       </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Enterprise Features */}
-                <div className="enterprise-compact">
-                  <h2 className="section-title-compact">Enterprise-Grade Governance</h2>
-                  <div className="features-grid-compact">
-                    <div className="feature-card-compact">
-                      <div className="feature-icon-compact">🔒</div>
-                      <h3>Privacy-Preserving</h3>
-                      <p>Zero-knowledge proofs ensure confidentiality</p>
-                    </div>
-                    <div className="feature-card-compact">
-                      <div className="feature-icon-compact">🛡️</div>
-                      <h3>Anti-Collusion</h3>
-                      <p>MACI-style key-change mechanisms</p>
-                    </div>
-                    <div className="feature-card-compact">
-                      <div className="feature-icon-compact">📊</div>
-                      <h3>Market Mechanics</h3>
-                      <p>Automated liquidity with bounded losses</p>
-                    </div>
-                    <div className="feature-card-compact">
-                      <div className="feature-icon-compact">⚖️</div>
-                      <h3>Minority Protection</h3>
-                      <p>Ragequit functionality for stakeholders</p>
-                    </div>
-                    <div className="feature-card-compact">
-                      <div className="feature-icon-compact">🔍</div>
-                      <h3>Multi-Stage Oracle</h3>
-                      <p>Challenge period with dispute resolution</p>
-                    </div>
-                    <div className="feature-card-compact">
-                      <div className="feature-icon-compact">⏱️</div>
-                      <h3>Timelock Security</h3>
-                      <p>Delay periods and spending limits</p>
                     </div>
                   </div>
                 </div>
@@ -221,6 +184,47 @@ function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Enterprise-Grade Governance - Full Width Section */}
+      {!showClearPathBranding && (
+        <section className="enterprise-full-width" id="features">
+          <div className="container">
+            <h2 className="section-title">Enterprise-Grade Governance</h2>
+            <div className="features-grid">
+              <div className="feature-card">
+                <div className="feature-icon">🔒</div>
+                <h3>Privacy-Preserving</h3>
+                <p>Zero-knowledge proofs ensure confidentiality</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">🛡️</div>
+                <h3>Anti-Collusion</h3>
+                <p>MACI-style key-change mechanisms</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">📊</div>
+                <h3>Market Mechanics</h3>
+                <p>Automated liquidity with bounded losses</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">⚖️</div>
+                <h3>Minority Protection</h3>
+                <p>Ragequit functionality for stakeholders</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">🔍</div>
+                <h3>Multi-Stage Oracle</h3>
+                <p>Challenge period with dispute resolution</p>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">⏱️</div>
+                <h3>Timelock Security</h3>
+                <p>Delay periods and spending limits</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* How It Works Section */}
       <section className="how-it-works-section" id="how-it-works">

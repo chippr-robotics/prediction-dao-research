@@ -494,6 +494,12 @@
   padding: 0 2rem;
 }
 
+/* Enterprise Full Width Section */
+.enterprise-full-width {
+  padding: 6rem 2rem;
+  background-color: white;
+}
+
 /* Section Titles */
 .section-title {
   font-size: 2.5rem;

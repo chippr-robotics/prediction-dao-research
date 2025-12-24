@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useWeb3, useWallet } from '../hooks/useWeb3'
 import './Header.css'
 
-function Header({ showClearPathBranding = false }) {
+function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const navigate = useNavigate()
   const { isConnected, account } = useWeb3()
   const { connectWallet, disconnectWallet } = useWallet()
@@ -60,28 +60,32 @@ function Header({ showClearPathBranding = false }) {
 
         {/* Wallet Connection Section */}
         <div className="header-actions">
-          {!isConnected ? (
-            <button 
-              onClick={handleConnectWallet}
-              className="connect-wallet-button"
-              aria-label="Connect your crypto wallet"
-            >
-              <span className="button-icon">🔗</span>
-              Connect Wallet
-            </button>
-          ) : (
-            <div className="wallet-connected">
-              <span className="wallet-address" aria-label={`Connected wallet: ${account}`}>
-                {truncateAddress(account)}
-              </span>
-              <button 
-                onClick={handleDisconnect}
-                className="disconnect-button"
-                aria-label="Disconnect wallet"
-              >
-                Disconnect
-              </button>
-            </div>
+          {!hideWalletButton && (
+            <>
+              {!isConnected ? (
+                <button 
+                  onClick={handleConnectWallet}
+                  className="connect-wallet-button"
+                  aria-label="Connect your crypto wallet"
+                >
+                  <span className="button-icon">🔗</span>
+                  Connect Wallet
+                </button>
+              ) : (
+                <div className="wallet-connected">
+                  <span className="wallet-address" aria-label={`Connected wallet: ${account}`}>
+                    {truncateAddress(account)}
+                  </span>
+                  <button 
+                    onClick={handleDisconnect}
+                    className="disconnect-button"
+                    aria-label="Disconnect wallet"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {/* Mobile Menu Toggle */}
