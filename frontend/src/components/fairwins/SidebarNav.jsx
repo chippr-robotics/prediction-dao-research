@@ -14,7 +14,7 @@ const CATEGORIES = [
 ]
 
 function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const handleCategoryClick = (categoryId) => {
     if (onCategoryChange) {
@@ -31,21 +31,14 @@ function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
 
   return (
     <aside 
-      className={`sidebar-nav ${isCollapsed ? 'collapsed' : ''}`}
+      className={`sidebar-nav ${isExpanded ? 'expanded' : 'collapsed'}`}
       role="navigation"
       aria-label="Market categories"
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
     >
-      <button
-        className="collapse-toggle"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        aria-expanded={!isCollapsed}
-      >
-        {isCollapsed ? '→' : '←'}
-      </button>
-
       <div className="sidebar-header">
-        {!isCollapsed && <h2>Categories</h2>}
+        {isExpanded && <h2>Categories</h2>}
       </div>
 
       <nav className="category-list">
@@ -57,10 +50,10 @@ function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
             onKeyDown={(e) => handleKeyDown(e, category.id)}
             aria-current={selectedCategory === category.id ? 'page' : undefined}
             aria-label={`View ${category.name}`}
-            title={isCollapsed ? category.name : ''}
+            title={!isExpanded ? category.name : ''}
           >
             <span className="category-icon" aria-hidden="true">{category.icon}</span>
-            {!isCollapsed && <span className="category-name">{category.name}</span>}
+            {isExpanded && <span className="category-name">{category.name}</span>}
           </button>
         ))}
       </nav>
