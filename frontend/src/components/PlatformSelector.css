@@ -7,6 +7,33 @@
   color: #1a1a1a;
 }
 
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Global focus styles */
+*:focus-visible {
+  outline: 2px solid #2D7A4F;
+  outline-offset: 2px;
+}
+
+/* For browsers without :focus-visible support */
+@supports not selector(:focus-visible) {
+  *:focus {
+    outline: 2px solid #2D7A4F;
+    outline-offset: 2px;
+  }
+}
+
 /* Hero Section */
 .selector-hero {
   background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
@@ -85,11 +112,25 @@
   display: flex;
   flex-direction: column;
   border: 3px solid transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Keyboard focus state for platform cards */
+.platform-card:focus-visible {
+  outline: 3px solid #2D7A4F;
+  outline-offset: 4px;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
 .platform-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.platform-card:active {
+  transform: translateY(-4px);
 }
 
 .platform-card.clearpath {
@@ -178,18 +219,23 @@
   font-weight: 600;
   border: none;
   border-radius: 8px;
-  cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 1rem;
   color: white;
+  display: block;
+  text-align: center;
+  pointer-events: none; /* Button is decorative, card handles clicks */
+}
+
+.platform-button-wrapper {
+  margin-top: 1rem;
 }
 
 .clearpath-button {
   background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
 }
 
-.clearpath-button:hover {
-  transform: translateY(-2px);
+.platform-card:hover .clearpath-button {
   box-shadow: 0 6px 20px rgba(45, 122, 79, 0.4);
 }
 
@@ -197,8 +243,7 @@
   background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
 }
 
-.fairwins-button:hover {
-  transform: translateY(-2px);
+.platform-card:hover .fairwins-button {
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
@@ -381,5 +426,17 @@
 
   .logo-image {
     max-height: 140px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
