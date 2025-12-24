@@ -20,21 +20,18 @@ const hardhat = {
 
 // Get network ID from environment or default to Hardhat
 const networkId = import.meta.env.VITE_NETWORK_ID 
-  ? parseInt(import.meta.env.VITE_NETWORK_ID) 
+  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
   : 1337
 
 // Get RPC URL from environment
 const rpcUrl = import.meta.env.VITE_RPC_URL || 'http://localhost:8545'
 
-// Determine which chains to include
-const getChains = () => {
-  const chains = [hardhat, sepolia, mainnet]
-  return chains
-}
+// Define supported chains
+const chains = [hardhat, sepolia, mainnet]
 
 // Create wagmi config
 export const config = createConfig({
-  chains: getChains(),
+  chains,
   connectors: [
     injected({ target: 'metaMask' }),
   ],

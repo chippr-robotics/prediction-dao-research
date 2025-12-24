@@ -75,7 +75,8 @@ function AppContent() {
     } catch (error) {
       console.error('Error connecting wallet:', error)
       
-      if (error.message?.includes('User rejected')) {
+      // Check for user rejection via error code or name
+      if (error.code === 4001 || error.name === 'UserRejectedRequestError') {
         alert('Please approve the connection request')
         setAnnouncement('Connection rejected by user')
       } else {
@@ -163,8 +164,6 @@ function AppContent() {
           element={
             isConnected ? (
               <FairWinsApp 
-                provider={provider}
-                signer={signer}
                 account={address}
                 onDisconnect={disconnectWallet}
                 onBack={handleBack}
