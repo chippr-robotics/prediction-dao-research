@@ -176,15 +176,15 @@ jobs:
       - name: Run Manticore on ProposalRegistry
         run: |
           echo "Running Manticore on ProposalRegistry..."
-          timeout 300 manticore contracts/ProposalRegistry.sol \
-            --contract ProposalRegistry || echo "Manticore analysis completed with warnings/errors"
+          timeout 300 python scripts/run-manticore.py contracts/ProposalRegistry.sol \
+            --contract ProposalRegistry --timeout 300 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on WelfareMetricRegistry
         run: |
           echo "Running Manticore on WelfareMetricRegistry..."
-          timeout 300 manticore contracts/WelfareMetricRegistry.sol \
-            --contract WelfareMetricRegistry || echo "Manticore analysis completed with warnings/errors"
+          timeout 300 python scripts/run-manticore.py contracts/WelfareMetricRegistry.sol \
+            --contract WelfareMetricRegistry --timeout 300 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Collect Manticore results
