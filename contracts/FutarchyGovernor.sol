@@ -189,7 +189,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
         // Get resolution from oracle
         (
-            OracleResolver.ResolutionStage stage,
+            /* OracleResolver.ResolutionStage stage */,
             uint256 passValue,
             uint256 failValue,
             bool finalized
@@ -239,7 +239,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             uint256 fundingAmount,
             address recipient,
             ,
-            ProposalRegistry.ProposalStatus status,
+            /* ProposalRegistry.ProposalStatus status */,
             address fundingToken,
             uint256 startDate,
             uint256 executionDeadline

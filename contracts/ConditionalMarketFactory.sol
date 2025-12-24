@@ -815,12 +815,11 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     /**
      * @notice Internal function to update market indexes on status change
      * @param marketId Market ID
-     * @param oldStatus Old market status
      * @param newStatus New market status
      */
     function _updateMarketIndex(
         uint256 marketId,
-        MarketStatus oldStatus,
+        MarketStatus /* oldStatus */,
         MarketStatus newStatus
     ) internal {
         // Remove from old status index (skip for efficiency - historical data)
