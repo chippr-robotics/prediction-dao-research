@@ -124,15 +124,17 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
 
   const handleCameraChange = async (e) => {
     const newCameraId = e.target.value
-    setSelectedCamera(newCameraId)
     
     // If already scanning, restart with new camera
     if (scanning) {
       await stopScanning()
-      // Small delay to ensure cleanup
+      // Small delay to ensure cleanup, then set the new camera
       setTimeout(() => {
         setSelectedCamera(newCameraId)
       }, 100)
+    } else {
+      // If not scanning, set immediately
+      setSelectedCamera(newCameraId)
     }
   }
 
