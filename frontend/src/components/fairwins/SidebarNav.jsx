@@ -31,6 +31,17 @@ function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
     }
   }
 
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded)
+  }
+
+  const handleToggleKeyDown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      toggleExpanded()
+    }
+  }
+
   // On mobile, render as bottom navigation bar
   if (isMobile) {
     return (
@@ -62,12 +73,20 @@ function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
   return (
     <aside 
       className={`sidebar-nav ${isExpanded ? 'expanded' : 'collapsed'}`}
-      role="navigation"
       aria-label="Market categories"
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
     >
       <div className="sidebar-header">
+        <button
+          className="toggle-btn"
+          onClick={toggleExpanded}
+          onKeyDown={handleToggleKeyDown}
+          aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-expanded={isExpanded}
+        >
+          <span className="toggle-icon" aria-hidden="true">
+            {isExpanded ? '◀' : '▶'}
+          </span>
+        </button>
         {isExpanded && <h2>Categories</h2>}
       </div>
 
