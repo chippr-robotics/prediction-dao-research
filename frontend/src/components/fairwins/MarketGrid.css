@@ -4,9 +4,10 @@
   gap: 1.5rem;
   padding: 1rem 0;
   animation: fadeIn 0.4s ease-in;
-  max-height: calc(100vh - 400px); /* Leave space for headers and controls */
+  flex: 1; /* Take remaining space in flex container */
   overflow-y: auto;
   padding-right: 4px; /* Add padding to prevent scrollbar from overlapping content */
+  min-height: 0; /* Allow flex item to shrink below content size */
 }
 
 /* Custom scrollbar styling */
@@ -45,9 +46,10 @@
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
   padding: 1rem 0;
-  max-height: calc(100vh - 400px); /* Match the main grid height */
+  flex: 1; /* Take remaining space in flex container */
   overflow-y: auto;
   padding-right: 4px;
+  min-height: 0; /* Allow flex item to shrink below content size */
 }
 
 /* Custom scrollbar styling for loading state */
@@ -147,8 +149,7 @@
   .market-grid-loading {
     grid-template-columns: 1fr;
     gap: 1rem;
-    max-height: none; /* Allow full height on mobile */
-    overflow-y: visible; /* Allow natural scrolling on mobile */
+    /* Keep flex: 1 for dynamic sizing on mobile as well */
   }
 
   .market-grid-empty {
