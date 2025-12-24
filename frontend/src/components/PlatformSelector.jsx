@@ -1,14 +1,52 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './PlatformSelector.css'
 
-function PlatformSelector({ onSelectPlatform }) {
+function PlatformSelector({ onConnect }) {
+  const navigate = useNavigate()
+  const [announcement, setAnnouncement] = useState('')
+
+  const handlePlatformSelect = async (platform, platformName) => {
+    // Announce selection to screen readers
+    setAnnouncement(`Connecting to ${platformName}...`)
+    
+    // Connect wallet
+    const connected = await onConnect()
+    
+    if (connected) {
+      setAnnouncement(`Successfully connected. Navigating to ${platformName}.`)
+      // Navigate to platform route
+      setTimeout(() => navigate(`/${platform}`), 100)
+    } else {
+      setAnnouncement('Connection failed. Please try again.')
+    }
+  }
+
+  const handleCardKeyDown = (e, platform, platformName) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handlePlatformSelect(platform, platformName)
+    }
+  }
+
   return (
     <div className="platform-selector">
+      {/* Screen reader announcements */}
+      <div 
+        role="status" 
+        aria-live="polite" 
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </div>
+
       {/* Hero Section */}
       <section className="selector-hero">
         <div className="hero-content">
           <img 
             src="/logo_fwcp.png" 
-            alt="ClearPath & FairWins Logo" 
+            alt="ClearPath and FairWins combined logo" 
             className="hero-logo"
           />
           <h1 className="hero-title">Welcome to the Future of Decision-Making</h1>
@@ -19,15 +57,23 @@ function PlatformSelector({ onSelectPlatform }) {
       </section>
 
       {/* Platform Selection Cards */}
-      <section className="platforms-section">
+      <section className="platforms-section" aria-label="Platform Selection">
         <div className="container">
+          <h2 className="sr-only">Select a Platform</h2>
           <div className="platforms-grid">
             {/* ClearPath Card */}
-            <div className="platform-card clearpath">
-              <div className="platform-logo">
+            <article 
+              className="platform-card clearpath"
+              role="button"
+              tabIndex="0"
+              onClick={() => handlePlatformSelect('clearpath', 'ClearPath')}
+              onKeyDown={(e) => handleCardKeyDown(e, 'clearpath', 'ClearPath')}
+              aria-label="ClearPath: DAO Governance Platform - Institutional-grade governance through futarchy-based decision-making"
+            >
+              <div className="platform-logo" aria-hidden="true">
                 <img 
                   src="/logo_clearpath.png" 
-                  alt="ClearPath Logo" 
+                  alt="" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
                 />
@@ -41,29 +87,35 @@ function PlatformSelector({ onSelectPlatform }) {
                 data-driven outcomes in decentralized organizations.
               </p>
               <ul className="platform-features">
-                <li>✓ Futarchy-based governance</li>
-                <li>✓ Treasury management</li>
-                <li>✓ Proposal evaluation</li>
-                <li>✓ Welfare metrics tracking</li>
-                <li>✓ Privacy-preserving voting</li>
+                <li><span aria-hidden="true">✓</span> Futarchy-based governance</li>
+                <li><span aria-hidden="true">✓</span> Treasury management</li>
+                <li><span aria-hidden="true">✓</span> Proposal evaluation</li>
+                <li><span aria-hidden="true">✓</span> Welfare metrics tracking</li>
+                <li><span aria-hidden="true">✓</span> Privacy-preserving voting</li>
               </ul>
-              <button 
-                onClick={() => onSelectPlatform('clearpath')} 
-                className="platform-button clearpath-button"
-              >
-                Enter ClearPath
-              </button>
-              <div className="platform-footer">
-                <span className="badge">DAO Platform</span>
+              <div className="platform-button-wrapper">
+                <span className="platform-button clearpath-button" aria-hidden="true">
+                  Enter ClearPath
+                </span>
               </div>
-            </div>
+              <div className="platform-footer">
+                <span className="badge" aria-label="Category: DAO Platform">DAO Platform</span>
+              </div>
+            </article>
 
             {/* FairWins Card */}
-            <div className="platform-card fairwins">
-              <div className="platform-logo">
+            <article 
+              className="platform-card fairwins"
+              role="button"
+              tabIndex="0"
+              onClick={() => handlePlatformSelect('fairwins', 'FairWins')}
+              onKeyDown={(e) => handleCardKeyDown(e, 'fairwins', 'FairWins')}
+              aria-label="FairWins: Open Prediction Markets - Create, join, and resolve prediction markets on any topic"
+            >
+              <div className="platform-logo" aria-hidden="true">
                 <img 
                   src="/logo_fairwins.png" 
-                  alt="FairWins Logo" 
+                  alt="" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
                 />
@@ -77,54 +129,53 @@ function PlatformSelector({ onSelectPlatform }) {
                 from their knowledge with transparent, market-driven outcomes.
               </p>
               <ul className="platform-features">
-                <li>✓ Create custom markets</li>
-                <li>✓ Trade predictions</li>
-                <li>✓ Flexible resolution</li>
-                <li>✓ Open participation</li>
-                <li>✓ Fair market controls</li>
+                <li><span aria-hidden="true">✓</span> Create custom markets</li>
+                <li><span aria-hidden="true">✓</span> Trade predictions</li>
+                <li><span aria-hidden="true">✓</span> Flexible resolution</li>
+                <li><span aria-hidden="true">✓</span> Open participation</li>
+                <li><span aria-hidden="true">✓</span> Fair market controls</li>
               </ul>
-              <button 
-                onClick={() => onSelectPlatform('fairwins')} 
-                className="platform-button fairwins-button"
-              >
-                Enter FairWins
-              </button>
-              <div className="platform-footer">
-                <span className="badge">Prediction Market</span>
+              <div className="platform-button-wrapper">
+                <span className="platform-button fairwins-button" aria-hidden="true">
+                  Enter FairWins
+                </span>
               </div>
-            </div>
+              <div className="platform-footer">
+                <span className="badge" aria-label="Category: Prediction Market">Prediction Market</span>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
       {/* Shared Infrastructure Section */}
-      <section className="shared-section">
+      <section className="shared-section" aria-labelledby="shared-tech-heading">
         <div className="container">
-          <h2 className="section-title">Built on Shared, Proven Technology</h2>
+          <h2 id="shared-tech-heading" className="section-title">Built on Shared, Proven Technology</h2>
           <p className="section-intro">
             Both platforms leverage the same secure, privacy-preserving infrastructure
           </p>
           <div className="tech-grid">
-            <div className="tech-card">
-              <div className="tech-icon">🔒</div>
+            <article className="tech-card">
+              <div className="tech-icon" aria-hidden="true">🔒</div>
               <h3>Privacy-Preserving</h3>
               <p>Zero-knowledge proofs and encrypted voting protect participant privacy</p>
-            </div>
-            <div className="tech-card">
-              <div className="tech-icon">🛡️</div>
+            </article>
+            <article className="tech-card">
+              <div className="tech-icon" aria-hidden="true">🛡️</div>
               <h3>Anti-Collusion</h3>
               <p>MACI-style key-change mechanisms prevent coordinated manipulation</p>
-            </div>
-            <div className="tech-card">
-              <div className="tech-icon">📊</div>
+            </article>
+            <article className="tech-card">
+              <div className="tech-icon" aria-hidden="true">📊</div>
               <h3>Market Mechanics</h3>
               <p>Logarithmic Market Scoring Rule with automated liquidity</p>
-            </div>
-            <div className="tech-card">
-              <div className="tech-icon">🔍</div>
+            </article>
+            <article className="tech-card">
+              <div className="tech-icon" aria-hidden="true">🔍</div>
               <h3>Oracle Resolution</h3>
               <p>Multi-stage verification with challenge periods and dispute resolution</p>
-            </div>
+            </article>
           </div>
         </div>
       </section>
@@ -134,11 +185,11 @@ function PlatformSelector({ onSelectPlatform }) {
         <div className="container">
           <div className="footer-content">
             <div className="footer-section">
-              <h4>Platforms</h4>
+              <h3>Platforms</h3>
               <p>ClearPath DAO & FairWins Markets</p>
             </div>
             <div className="footer-section">
-              <h4>Technology</h4>
+              <h3>Technology</h3>
               <ul>
                 <li>Nightmarket Privacy</li>
                 <li>MACI Anti-Collusion</li>
@@ -146,7 +197,7 @@ function PlatformSelector({ onSelectPlatform }) {
               </ul>
             </div>
             <div className="footer-section">
-              <h4>Resources</h4>
+              <h3>Resources</h3>
               <ul>
                 <li>Documentation</li>
                 <li>Developer Guide</li>

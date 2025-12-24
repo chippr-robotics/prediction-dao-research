@@ -1,6 +1,13 @@
+import { useNavigate } from 'react-router-dom'
 import './LandingPage.css'
 
-function LandingPage({ onConnect }) {
+function LandingPage() {
+  const navigate = useNavigate()
+
+  const handleGetStarted = () => {
+    navigate('/select')
+  }
+
   return (
     <div className="landing-page">
       {/* Hero Section */}
@@ -15,8 +22,8 @@ function LandingPage({ onConnect }) {
             ClearPath combines democratic voting with prediction markets to deliver transparent, 
             data-driven outcomes for institutional investors.
           </p>
-          <button onClick={onConnect} className="cta-button">
-            Connect Wallet to Begin
+          <button onClick={handleGetStarted} className="cta-button">
+            Get Started
           </button>
         </div>
       </section>
@@ -295,9 +302,9 @@ function LandingPage({ onConnect }) {
       <section className="cta-section">
         <div className="container">
           <h2>Ready to Get Started?</h2>
-          <p>Connect your wallet to access the Clear Path governance platform</p>
-          <button onClick={onConnect} className="cta-button large">
-            Connect Wallet
+          <p>Choose your platform to begin</p>
+          <button onClick={handleGetStarted} className="cta-button large">
+            Choose Platform
           </button>
         </div>
       </section>
@@ -307,11 +314,11 @@ function LandingPage({ onConnect }) {
         <div className="container">
           <div className="footer-content">
             <div className="footer-section">
-              <h4>Clear Path</h4>
+              <h3>Clear Path</h3>
               <p>Institutional-grade governance through prediction markets</p>
             </div>
             <div className="footer-section">
-              <h4>Technology</h4>
+              <h3>Technology</h3>
               <ul>
                 <li>Nightmarket Privacy</li>
                 <li>MACI Anti-Collusion</li>
@@ -319,7 +326,7 @@ function LandingPage({ onConnect }) {
               </ul>
             </div>
             <div className="footer-section">
-              <h4>Documentation</h4>
+              <h3>Documentation</h3>
               <ul>
                 <li>User Guide</li>
                 <li>Developer Docs</li>
