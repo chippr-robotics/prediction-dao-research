@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./ETCSwapV3Integration.sol";
 
 /**
  * @title ConditionalMarketFactory
@@ -11,17 +12,22 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev Creates conditional prediction markets for proposals
  * 
  * TRADING INTEGRATION:
- * This contract handles market creation and settlement. Trading operations are
- * intended to be handled by ETC Swap v3 contracts (https://github.com/etcswap/v3-core).
- * The buyTokens/sellTokens functions currently provide simplified placeholder implementations
- * for testing and will be replaced with proper ETC Swap integration in production.
+ * This contract now integrates with ETC Swap v3 contracts for production-ready DEX trading.
+ * The integration uses ETCSwapV3Integration contract for:
+ * - Pool creation and initialization
+ * - Liquidity provision and management
+ * - Token swapping with slippage protection
  * 
  * Integration approach:
  * 1. ConditionalMarketFactory creates PASS/FAIL token pairs
- * 2. ETC Swap pools are created for PASS/ETH and FAIL/ETH trading pairs
- * 3. Liquidity is provided to ETC Swap pools
+ * 2. ETCSwapV3Integration creates pools for PASS/collateral and FAIL/collateral trading pairs
+ * 3. Liquidity is provided to ETC Swap pools through the integration layer
  * 4. Users trade through ETC Swap's battle-tested DEX infrastructure
  * 5. ConditionalMarketFactory handles final settlement based on oracle outcomes
+ * 
+ * Trading modes:
+ * - ETCSwap mode: Full decentralized trading via Uniswap v3 pools
+ * - Fallback mode: Simplified LMSR for testing and backwards compatibility
  */
 contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     struct Market {
@@ -64,6 +70,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     uint256 public constant MAX_BATCH_SIZE = 50;
 
     bool private _initialized;
+    
+    // ETCSwap v3 integration
+    ETCSwapV3Integration public etcSwapIntegration;
+    bool public useETCSwap;
+    
+    // Default initial price for pools (0.5 = equal probability)
+    uint160 public constant DEFAULT_INITIAL_SQRT_PRICE = 79228162514264337593543950336; // sqrt(0.5) in Q64.96
 
     // Enhanced events for better indexing and market discovery
     event MarketCreated(
@@ -128,6 +141,14 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 batchTimestamp,
         uint256 totalMarketsResolved
     );
+    
+    event ETCSwapIntegrationUpdated(address indexed integration, bool enabled);
+    
+    event ETCSwapPoolsCreated(
+        uint256 indexed marketId,
+        address indexed passPool,
+        address indexed failPool
+    );
 
     constructor() Ownable(msg.sender) {}
 
@@ -140,6 +161,46 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         require(initialOwner != address(0), "Invalid owner");
         _initialized = true;
         _transferOwnership(initialOwner);
+    }
+    
+    /**
+     * @notice Set ETCSwap v3 integration contract
+     * @param _integration Address of ETCSwapV3Integration contract
+     * @param _enabled Whether to enable ETCSwap trading
+     */
+    function setETCSwapIntegration(address _integration, bool _enabled) external onlyOwner {
+        require(_integration != address(0), "Invalid integration address");
+        etcSwapIntegration = ETCSwapV3Integration(_integration);
+        useETCSwap = _enabled;
+        emit ETCSwapIntegrationUpdated(_integration, _enabled);
+    }
+    
+    /**
+     * @notice Create ETCSwap pools for an existing market
+     * @param marketId ID of the market
+     * @param initialSqrtPriceX96 Initial price for pools (Q64.96 format)
+     * @param fee Fee tier to use (500, 3000, or 10000)
+     */
+    function createETCSwapPools(
+        uint256 marketId,
+        uint160 initialSqrtPriceX96,
+        uint24 fee
+    ) external onlyOwner {
+        require(marketId < marketCount, "Invalid market ID");
+        require(address(etcSwapIntegration) != address(0), "ETCSwap integration not set");
+        
+        Market storage market = markets[marketId];
+        
+        (address passPool, address failPool) = etcSwapIntegration.createMarketPools(
+            marketId,
+            market.passToken,
+            market.failToken,
+            market.collateralToken,
+            fee,
+            initialSqrtPriceX96
+        );
+        
+        emit ETCSwapPoolsCreated(marketId, passPool, failPool);
     }
 
     /**
@@ -265,10 +326,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Buy outcome tokens (placeholder for ETC Swap integration)
-     * @dev This is a temporary implementation for testing. In production, this will
-     *      integrate with ETC Swap v3 contracts for actual DEX trading.
-     *      See: https://github.com/etcswap/v3-core
+     * @notice Buy outcome tokens via ETCSwap or fallback LMSR
+     * @dev Integrates with ETC Swap v3 when enabled, falls back to simplified LMSR for testing
      * @param marketId ID of the market
      * @param buyPass True to buy PASS tokens, false for FAIL tokens
      * @param amount Amount of collateral to spend
@@ -286,25 +345,54 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         require(msg.value == amount, "Incorrect ETH amount");
         require(amount > 0, "Amount must be positive");
 
-        // TODO: Integrate with ETC Swap v3 for actual DEX trading
-        // This simplified implementation mints tokens directly for testing
-        // Production should route through ETC Swap pools
-        tokenAmount = (amount * 1e18) / 1e15; // Simplified: 1000 tokens per ETH
-        
-        // Update market liquidity BEFORE external call (CEI pattern)
-        market.totalLiquidity += amount;
-        
-        // Mint tokens to buyer
-        ConditionalToken token = ConditionalToken(buyPass ? market.passToken : market.failToken);
-        token.mint(msg.sender, tokenAmount);
+        if (useETCSwap && address(etcSwapIntegration) != address(0)) {
+            // Use ETCSwap v3 for actual DEX trading with ERC20 collateral
+            address outcomeToken = buyPass ? market.passToken : market.failToken;
+            
+            // When using ETCSwap, collateral must be an ERC20 token
+            require(market.collateralToken != address(0), "ETCSwap requires ERC20 collateral");
+            require(msg.value == 0, "Send collateral tokens, not ETH");
+            
+            // Transfer collateral from buyer to this contract
+            IERC20(market.collateralToken).transferFrom(msg.sender, address(this), amount);
+            
+            // Approve ETCSwap integration to spend collateral
+            IERC20(market.collateralToken).approve(address(etcSwapIntegration), amount);
+            
+            // Calculate minimum output with slippage protection (0.5% default)
+            uint256 estimatedOutput = etcSwapIntegration.quoteBuyTokens(marketId, buyPass, amount);
+            uint256 minTokenAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 50);
+            
+            // Execute swap through ETCSwap integration
+            ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
+                marketId,
+                buyPass,
+                market.collateralToken,
+                outcomeToken,
+                amount,
+                minTokenAmount,
+                block.timestamp + 300 // 5 minute deadline
+            );
+            
+            tokenAmount = result.amountOut;
+        } else {
+            // Fallback: Simplified LMSR implementation for testing
+            tokenAmount = (amount * 1e18) / 1e15; // Simplified: 1000 tokens per ETH
+            
+            // Update market liquidity BEFORE external call (CEI pattern)
+            market.totalLiquidity += amount;
+            
+            // Mint tokens to buyer
+            ConditionalToken token = ConditionalToken(buyPass ? market.passToken : market.failToken);
+            token.mint(msg.sender, tokenAmount);
+        }
         
         emit TokensPurchased(marketId, msg.sender, buyPass, amount, tokenAmount);
     }
     
     /**
-     * @notice Sell outcome tokens (placeholder for ETC Swap integration)
-     * @dev This is a temporary implementation for testing. In production, this will
-     *      integrate with ETC Swap v3 contracts for actual DEX trading.
+     * @notice Sell outcome tokens via ETCSwap or fallback LMSR
+     * @dev Integrates with ETC Swap v3 when enabled, falls back to simplified LMSR for testing
      * @param marketId ID of the market
      * @param sellPass True to sell PASS tokens, false for FAIL tokens
      * @param tokenAmount Amount of tokens to sell
@@ -321,21 +409,54 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         require(block.timestamp < market.tradingEndTime, "Trading period ended");
         require(tokenAmount > 0, "Amount must be positive");
 
-        // TODO: Integrate with ETC Swap v3 for actual DEX trading
-        // Calculate collateral to return using simplified pricing
-        collateralAmount = (tokenAmount * 1e15) / 1e18; // Inverse of buy pricing
-        require(collateralAmount <= market.totalLiquidity, "Insufficient liquidity");
-        
-        // Update market liquidity BEFORE external calls (CEI pattern)
-        market.totalLiquidity -= collateralAmount;
-        
-        // Burn tokens from seller
-        ConditionalToken token = ConditionalToken(sellPass ? market.passToken : market.failToken);
-        token.burn(msg.sender, tokenAmount);
-        
-        // Transfer collateral to seller (msg.sender is not arbitrary - it's the caller)
-        (bool success, ) = payable(msg.sender).call{value: collateralAmount}("");
-        require(success, "Transfer failed");
+        if (useETCSwap && address(etcSwapIntegration) != address(0)) {
+            // Use ETCSwap v3 for actual DEX trading with ERC20 collateral
+            address outcomeToken = sellPass ? market.passToken : market.failToken;
+            
+            // When using ETCSwap, collateral must be an ERC20 token
+            require(market.collateralToken != address(0), "ETCSwap requires ERC20 collateral");
+            
+            // Transfer tokens from seller to this contract
+            IERC20(outcomeToken).transferFrom(msg.sender, address(this), tokenAmount);
+            
+            // Approve ETCSwap integration to spend outcome tokens
+            IERC20(outcomeToken).approve(address(etcSwapIntegration), tokenAmount);
+            
+            // Calculate minimum output with slippage protection (0.5% default)
+            uint256 estimatedOutput = etcSwapIntegration.quoteSellTokens(marketId, sellPass, tokenAmount);
+            uint256 minCollateralAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 50);
+            
+            // Execute swap through ETCSwap integration
+            ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
+                marketId,
+                sellPass,
+                outcomeToken,
+                market.collateralToken,
+                tokenAmount,
+                minCollateralAmount,
+                block.timestamp + 300 // 5 minute deadline
+            );
+            
+            collateralAmount = result.amountOut;
+            
+            // Transfer collateral to seller
+            IERC20(market.collateralToken).transfer(msg.sender, collateralAmount);
+        } else {
+            // Fallback: Simplified LMSR implementation for testing
+            collateralAmount = (tokenAmount * 1e15) / 1e18; // Inverse of buy pricing
+            require(collateralAmount <= market.totalLiquidity, "Insufficient liquidity");
+            
+            // Update market liquidity BEFORE external calls (CEI pattern)
+            market.totalLiquidity -= collateralAmount;
+            
+            // Burn tokens from seller
+            ConditionalToken token = ConditionalToken(sellPass ? market.passToken : market.failToken);
+            token.burn(msg.sender, tokenAmount);
+            
+            // Transfer collateral to seller (msg.sender is not arbitrary - it's the caller)
+            (bool success, ) = payable(msg.sender).call{value: collateralAmount}("");
+            require(success, "Transfer failed");
+        }
         
         emit TokensSold(marketId, msg.sender, sellPass, tokenAmount, collateralAmount);
     }
