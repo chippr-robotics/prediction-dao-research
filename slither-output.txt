@@ -1,0 +1,289 @@
+'npx hardhat clean' running (wd: /home/runner/work/prediction-dao-research/prediction-dao-research)
+'npx hardhat clean --global' running (wd: /home/runner/work/prediction-dao-research/prediction-dao-research)
+'npx hardhat compile --force' running (wd: /home/runner/work/prediction-dao-research/prediction-dao-research)
+
+FutarchyGovernor.executeProposal(uint256) (contracts/FutarchyGovernor.sol#223-273) uses arbitrary from in transferFrom: IERC20(fundingToken).safeTransferFrom(treasuryVault,recipient,fundingAmount) (contracts/FutarchyGovernor.sol#262)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#arbitrary-from-in-transferfrom
+
+ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#313-341) sends eth to arbitrary user
+	Dangerous calls:
+	- (success,None) = address(msg.sender).call{value: collateralAmount}() (contracts/ConditionalMarketFactory.sol#337)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+
+RagequitModule.ragequit(uint256,uint256) (contracts/RagequitModule.sol#125-151) ignores return value by IERC20(governanceToken).transferFrom(msg.sender,address(this),tokenAmount) (contracts/RagequitModule.sol#142)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unchecked-transfer
+
+DAOFactory.userDAOs (contracts/DAOFactory.sol#46) is never initialized. It is used in:
+	- DAOFactory.getUserDAOs(address) (contracts/DAOFactory.sol#312-314)
+	- DAOFactory._grantDAORole(uint256,address,bytes32) (contracts/DAOFactory.sol#368-385)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-state-variables
+
+Reentrancy in ConditionalMarketFactory.buyTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#277-302):
+	External calls:
+	- token.mint(msg.sender,tokenAmount) (contracts/ConditionalMarketFactory.sol#296)
+	State variables written after the call(s):
+	- market.totalLiquidity += amount (contracts/ConditionalMarketFactory.sol#299)
+	ConditionalMarketFactory.markets (contracts/ConditionalMarketFactory.sol#49) can be used in cross function reentrancies:
+	- ConditionalMarketFactory.batchDeployMarkets(ConditionalMarketFactory.MarketCreationParams[]) (contracts/ConditionalMarketFactory.sol#207-265)
+	- ConditionalMarketFactory.cancelMarketWithReason(uint256,string) (contracts/ConditionalMarketFactory.sol#477-488)
+	- ConditionalMarketFactory.deployMarketPair(uint256,address,uint256,uint256,uint256) (contracts/ConditionalMarketFactory.sol#154-200)
+	- ConditionalMarketFactory.endTrading(uint256) (contracts/ConditionalMarketFactory.sol#347-358)
+	- ConditionalMarketFactory.getMarket(uint256) (contracts/ConditionalMarketFactory.sol#494-497)
+	- ConditionalMarketFactory.markets (contracts/ConditionalMarketFactory.sol#49)
+Reentrancy in FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217):
+	External calls:
+	- marketFactory.resolveMarket(govProposal.marketId,passValue,failValue) (contracts/FutarchyGovernor.sol#199)
+	State variables written after the call(s):
+	- govProposal.phase = ProposalPhase.Execution (contracts/FutarchyGovernor.sol#203)
+	FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49) can be used in cross function reentrancies:
+	- FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#135-163)
+	- FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217)
+	- FutarchyGovernor.getGovernanceProposal(uint256) (contracts/FutarchyGovernor.sol#298-315)
+	- FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49)
+	- FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178)
+	- govProposal.executionTime = block.timestamp + MIN_TIMELOCK (contracts/FutarchyGovernor.sol#204)
+	FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49) can be used in cross function reentrancies:
+	- FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#135-163)
+	- FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217)
+	- FutarchyGovernor.getGovernanceProposal(uint256) (contracts/FutarchyGovernor.sol#298-315)
+	- FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49)
+	- FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178)
+	- govProposal.phase = ProposalPhase.Rejected (contracts/FutarchyGovernor.sol#213)
+	FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49) can be used in cross function reentrancies:
+	- FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#135-163)
+	- FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217)
+	- FutarchyGovernor.getGovernanceProposal(uint256) (contracts/FutarchyGovernor.sol#298-315)
+	- FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49)
+	- FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178)
+Reentrancy in FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178):
+	External calls:
+	- marketFactory.endTrading(govProposal.marketId) (contracts/FutarchyGovernor.sol#174)
+	State variables written after the call(s):
+	- govProposal.phase = ProposalPhase.Resolution (contracts/FutarchyGovernor.sol#176)
+	FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49) can be used in cross function reentrancies:
+	- FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#135-163)
+	- FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217)
+	- FutarchyGovernor.getGovernanceProposal(uint256) (contracts/FutarchyGovernor.sol#298-315)
+	- FutarchyGovernor.governanceProposals (contracts/FutarchyGovernor.sol#49)
+	- FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178)
+Reentrancy in ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#313-341):
+	External calls:
+	- token.burn(msg.sender,tokenAmount) (contracts/ConditionalMarketFactory.sol#327)
+	State variables written after the call(s):
+	- market.totalLiquidity -= collateralAmount (contracts/ConditionalMarketFactory.sol#334)
+	ConditionalMarketFactory.markets (contracts/ConditionalMarketFactory.sol#49) can be used in cross function reentrancies:
+	- ConditionalMarketFactory.batchDeployMarkets(ConditionalMarketFactory.MarketCreationParams[]) (contracts/ConditionalMarketFactory.sol#207-265)
+	- ConditionalMarketFactory.cancelMarketWithReason(uint256,string) (contracts/ConditionalMarketFactory.sol#477-488)
+	- ConditionalMarketFactory.deployMarketPair(uint256,address,uint256,uint256,uint256) (contracts/ConditionalMarketFactory.sol#154-200)
+	- ConditionalMarketFactory.endTrading(uint256) (contracts/ConditionalMarketFactory.sol#347-358)
+	- ConditionalMarketFactory.getMarket(uint256) (contracts/ConditionalMarketFactory.sol#494-497)
+	- ConditionalMarketFactory.markets (contracts/ConditionalMarketFactory.sol#49)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+
+OracleResolver.finalizeResolution(uint256).bondRecipient (contracts/OracleResolver.sol#184) is a local variable never initialized
+OracleResolver.finalizeResolution(uint256).passValue (contracts/OracleResolver.sol#182) is a local variable never initialized
+OracleResolver.finalizeResolution(uint256).bondAmount (contracts/OracleResolver.sol#185) is a local variable never initialized
+OracleResolver.finalizeResolution(uint256).failValue (contracts/OracleResolver.sol#183) is a local variable never initialized
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
+
+FutarchyGovernor.executeProposal(uint256) (contracts/FutarchyGovernor.sol#223-273) ignores return value by (None,None,None,fundingAmount,recipient,None,status,fundingToken,startDate,executionDeadline) = proposalRegistry.getProposal(govProposal.proposalId) (contracts/FutarchyGovernor.sol#230-241)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+
+ProposalRegistry.updateBondAmount(uint256) (contracts/ProposalRegistry.sol#255-257) should emit an event for: 
+	- bondAmount = newBondAmount (contracts/ProposalRegistry.sol#256) 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#missing-events-arithmetic
+
+WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) has external calls inside a loop: metric = registry.getMetric(i) (contracts/WelfareMetricRegistryFuzzTest.sol#40)
+WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) has external calls inside a loop: metric.weight > registry.TOTAL_WEIGHT() (contracts/WelfareMetricRegistryFuzzTest.sol#41)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
+
+Reentrancy in DAOFactory.createDAO(string,string,address,address[]) (contracts/DAOFactory.sol#116-159):
+	External calls:
+	- (futarchyGovernor,welfareRegistry,proposalRegistry,marketFactory,privacyCoordinator,oracleResolver,ragequitModule) = _deployDAOComponents(treasuryVault) (contracts/DAOFactory.sol#128-136)
+		- WelfareMetricRegistry(welfareRegistry).initialize(address(this)) (contracts/DAOFactory.sol#188)
+		- ProposalRegistry(proposalRegistry).initialize(address(this)) (contracts/DAOFactory.sol#189)
+		- ConditionalMarketFactory(marketFactory).initialize(address(this)) (contracts/DAOFactory.sol#190)
+		- PrivacyCoordinator(privacyCoordinator).initialize(address(this)) (contracts/DAOFactory.sol#191)
+		- OracleResolver(oracleResolver).initialize(address(this)) (contracts/DAOFactory.sol#192)
+		- RagequitModule(ragequitModule).initialize(address(this),address(this),treasuryVault) (contracts/DAOFactory.sol#193-197)
+		- FutarchyGovernor(futarchyGovernor).initialize(address(this),welfareRegistry,proposalRegistry,marketFactory,privacyCoordinator,oracleResolver,ragequitModule,treasuryVault) (contracts/DAOFactory.sol#200-209)
+		- WelfareMetricRegistry(welfareRegistry).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#212)
+		- ProposalRegistry(proposalRegistry).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#213)
+		- ConditionalMarketFactory(marketFactory).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#214)
+		- OracleResolver(oracleResolver).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#215)
+		- RagequitModule(ragequitModule).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#216)
+	State variables written after the call(s):
+	- _setupDAORoles(daoId,admins) (contracts/DAOFactory.sol#156)
+		- daoRoles[daoId][user][role] = true (contracts/DAOFactory.sol#369)
+	- daos[daoId] = DAOInstance({name:name,description:description,futarchyGovernor:futarchyGovernor,welfareRegistry:welfareRegistry,proposalRegistry:proposalRegistry,marketFactory:marketFactory,privacyCoordinator:privacyCoordinator,oracleResolver:oracleResolver,ragequitModule:ragequitModule,treasuryVault:treasuryVault,creator:msg.sender,createdAt:block.timestamp,active:true}) (contracts/DAOFactory.sol#139-153)
+Reentrancy in FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#135-163):
+	External calls:
+	- marketId = marketFactory.deployMarketPair(proposalId,address(0),liquidityAmount,liquidityParameter,tradingPeriod) (contracts/FutarchyGovernor.sol#142-148)
+	State variables written after the call(s):
+	- governanceProposalId = governanceProposalCount ++ (contracts/FutarchyGovernor.sol#150)
+	- governanceProposals[governanceProposalId] = GovernanceProposal({proposalId:proposalId,marketId:marketId,phase:ProposalPhase.MarketTrading,createdAt:block.timestamp,executionTime:0,executed:false}) (contracts/FutarchyGovernor.sol#152-159)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+
+Reentrancy in FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#135-163):
+	External calls:
+	- marketId = marketFactory.deployMarketPair(proposalId,address(0),liquidityAmount,liquidityParameter,tradingPeriod) (contracts/FutarchyGovernor.sol#142-148)
+	Event emitted after the call(s):
+	- GovernanceProposalCreated(governanceProposalId,proposalId,marketId) (contracts/FutarchyGovernor.sol#161)
+	- ProposalPhaseChanged(governanceProposalId,ProposalPhase.MarketTrading) (contracts/FutarchyGovernor.sol#162)
+Reentrancy in FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217):
+	External calls:
+	- marketFactory.resolveMarket(govProposal.marketId,passValue,failValue) (contracts/FutarchyGovernor.sol#199)
+	- ragequitModule.openRagequitWindow(govProposal.proposalId,block.timestamp,govProposal.executionTime) (contracts/FutarchyGovernor.sol#207-211)
+	Event emitted after the call(s):
+	- ProposalPhaseChanged(governanceProposalId,govProposal.phase) (contracts/FutarchyGovernor.sol#216)
+Reentrancy in FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178):
+	External calls:
+	- marketFactory.endTrading(govProposal.marketId) (contracts/FutarchyGovernor.sol#174)
+	Event emitted after the call(s):
+	- ProposalPhaseChanged(governanceProposalId,ProposalPhase.Resolution) (contracts/FutarchyGovernor.sol#177)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+
+ConditionalMarketFactory.buyTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#277-302) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(market.status == MarketStatus.Active,Market not active) (contracts/ConditionalMarketFactory.sol#284)
+	- require(bool,string)(block.timestamp < market.tradingEndTime,Trading period ended) (contracts/ConditionalMarketFactory.sol#285)
+ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#313-341) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(market.status == MarketStatus.Active,Market not active) (contracts/ConditionalMarketFactory.sol#320)
+	- require(bool,string)(block.timestamp < market.tradingEndTime,Trading period ended) (contracts/ConditionalMarketFactory.sol#321)
+	- require(bool,string)(collateralAmount <= market.totalLiquidity,Insufficient liquidity) (contracts/ConditionalMarketFactory.sol#331)
+ConditionalMarketFactory.endTrading(uint256) (contracts/ConditionalMarketFactory.sol#347-358) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(market.status == MarketStatus.Active,Market not active) (contracts/ConditionalMarketFactory.sol#350)
+	- require(bool,string)(block.timestamp >= market.tradingEndTime,Trading period not ended) (contracts/ConditionalMarketFactory.sol#351)
+ConditionalMarketFactory.resolveMarket(uint256,uint256,uint256) (contracts/ConditionalMarketFactory.sol#366-392) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(market.status == MarketStatus.TradingEnded,Trading not ended) (contracts/ConditionalMarketFactory.sol#373)
+	- require(bool,string)(! market.resolved,Already resolved) (contracts/ConditionalMarketFactory.sol#374)
+ConditionalMarketFactory.cancelMarketWithReason(uint256,string) (contracts/ConditionalMarketFactory.sol#477-488) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(market.status == MarketStatus.Active,Market not active) (contracts/ConditionalMarketFactory.sol#480)
+FutarchyGovernor.moveToResolution(uint256) (contracts/FutarchyGovernor.sol#169-178) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(govProposal.phase == ProposalPhase.MarketTrading,Invalid phase) (contracts/FutarchyGovernor.sol#171)
+FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#184-217) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(govProposal.phase == ProposalPhase.Resolution,Invalid phase) (contracts/FutarchyGovernor.sol#186)
+FutarchyGovernor.executeProposal(uint256) (contracts/FutarchyGovernor.sol#223-273) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(govProposal.phase == ProposalPhase.Execution,Invalid phase) (contracts/FutarchyGovernor.sol#225)
+	- require(bool,string)(block.timestamp >= govProposal.executionTime,Timelock not expired) (contracts/FutarchyGovernor.sol#226)
+	- require(bool,string)(! govProposal.executed,Already executed) (contracts/FutarchyGovernor.sol#227)
+	- require(bool,string)(block.timestamp >= startDate,Execution start date not reached) (contracts/FutarchyGovernor.sol#244)
+	- require(bool,string)(block.timestamp <= executionDeadline,Execution deadline passed) (contracts/FutarchyGovernor.sol#245)
+	- require(bool,string)(dailySpending[today] + fundingAmount <= MAX_DAILY_SPENDING,Daily limit exceeded) (contracts/FutarchyGovernor.sol#249)
+OracleResolver.submitReport(uint256,uint256,uint256,bytes) (contracts/OracleResolver.sol#100-123) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(resolution.stage == ResolutionStage.Unreported,Already reported) (contracts/OracleResolver.sol#109)
+OracleResolver.challengeReport(uint256,uint256,uint256,bytes) (contracts/OracleResolver.sol#132-154) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(resolution.stage == ResolutionStage.DesignatedReporting,Not in challenge period) (contracts/OracleResolver.sol#140)
+	- require(bool,string)(block.timestamp <= resolution.report.timestamp + CHALLENGE_PERIOD,Challenge period ended) (contracts/OracleResolver.sol#141)
+OracleResolver.escalateToUMA(uint256) (contracts/OracleResolver.sol#160-166) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(resolution.stage == ResolutionStage.OpenChallenge,Not in challenge stage) (contracts/OracleResolver.sol#162)
+OracleResolver.finalizeResolution(uint256) (contracts/OracleResolver.sol#172-220) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(! resolution.finalized,Already finalized) (contracts/OracleResolver.sol#174)
+	- require(bool,string)(resolution.stage == ResolutionStage.DesignatedReporting || resolution.stage == ResolutionStage.OpenChallenge || resolution.stage == ResolutionStage.Dispute,Invalid stage) (contracts/OracleResolver.sol#175-180)
+	- require(bool,string)(block.timestamp > resolution.report.timestamp + CHALLENGE_PERIOD,Challenge period not ended) (contracts/OracleResolver.sol#189)
+PrivacyCoordinator.advanceEpoch() (contracts/PrivacyCoordinator.sol#294-298) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(block.timestamp >= epochStartTime + EPOCH_DURATION,Epoch not ended) (contracts/PrivacyCoordinator.sol#295)
+PrivacyCoordinator.verifyPositionProof(uint256) (contracts/PrivacyCoordinator.sol#341-346) uses timestamp for comparisons
+	Dangerous comparisons:
+	- positionCommitments[positionId].zkProof.length > 0 (contracts/PrivacyCoordinator.sol#345)
+ProposalRegistry.submitProposal(string,string,uint256,address,uint256,address,uint256,uint256) (contracts/ProposalRegistry.sol#107-147) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(executionDeadline > block.timestamp,Deadline must be in future) (contracts/ProposalRegistry.sol#121)
+	- require(bool,string)(effectiveStartDate >= block.timestamp,Start date cannot be in past) (contracts/ProposalRegistry.sol#126)
+ProposalRegistry.addMilestone(uint256,string,uint256,string,uint256) (contracts/ProposalRegistry.sol#157-177) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(msg.sender == proposal.proposer,Not proposer) (contracts/ProposalRegistry.sol#166)
+	- require(bool,string)(proposal.status == ProposalStatus.Reviewing,Not in review) (contracts/ProposalRegistry.sol#167)
+ProposalRegistry.cancelProposal(uint256) (contracts/ProposalRegistry.sol#183-196) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(msg.sender == proposal.proposer,Not proposer) (contracts/ProposalRegistry.sol#185)
+	- require(bool,string)(proposal.status == ProposalStatus.Reviewing,Not in review) (contracts/ProposalRegistry.sol#186)
+ProposalRegistry.activateProposal(uint256) (contracts/ProposalRegistry.sol#212-219) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(proposal.status == ProposalStatus.Reviewing,Not in review) (contracts/ProposalRegistry.sol#214)
+	- require(bool,string)(block.timestamp >= proposal.reviewEndsAt,Review period not ended) (contracts/ProposalRegistry.sol#215)
+ProposalRegistry.forfeitBond(uint256) (contracts/ProposalRegistry.sol#225-232) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(proposal.status == ProposalStatus.Reviewing || proposal.status == ProposalStatus.Active,Invalid status) (contracts/ProposalRegistry.sol#227)
+ProposalRegistry.returnBond(uint256) (contracts/ProposalRegistry.sol#238-249) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(proposal.bondAmount > 0,Bond already returned) (contracts/ProposalRegistry.sol#240)
+RagequitModule.ragequit(uint256,uint256) (contracts/RagequitModule.sol#125-151) uses timestamp for comparisons
+	Dangerous comparisons:
+	- require(bool,string)(block.timestamp < window.executionTime,Window closed) (contracts/RagequitModule.sol#133)
+RagequitModule.getRagequitWindow(uint256) (contracts/RagequitModule.sol#199-214) uses timestamp for comparisons
+	Dangerous comparisons:
+	- (window.snapshotTime,window.executionTime,window.executed,window.snapshotTime > 0 && ! window.executed && block.timestamp < window.executionTime) (contracts/RagequitModule.sol#206-213)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
+
+ConditionalMarketFactory.batchDeployMarkets(ConditionalMarketFactory.MarketCreationParams[]) (contracts/ConditionalMarketFactory.sol#207-265) has costly operations inside a loop:
+	- marketId = marketCount ++ (contracts/ConditionalMarketFactory.sol#223)
+PrivacyCoordinator.batchSubmitPositions(bytes32[],bytes[],uint256[]) (contracts/PrivacyCoordinator.sol#161-210) has costly operations inside a loop:
+	- positionId = positionCount ++ (contracts/PrivacyCoordinator.sol#178)
+WelfareMetricRegistry.deactivateMetric(uint256) (contracts/WelfareMetricRegistry.sol#132-147) has costly operations inside a loop:
+	- activeMetricIds.pop() (contracts/WelfareMetricRegistry.sol#141)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#costly-operations-inside-a-loop
+
+Low level call in ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#313-341):
+	- (success,None) = address(msg.sender).call{value: collateralAmount}() (contracts/ConditionalMarketFactory.sol#337)
+Low level call in FutarchyGovernor.executeProposal(uint256) (contracts/FutarchyGovernor.sol#223-273):
+	- (success,None) = address(recipient).call{value: fundingAmount}() (contracts/FutarchyGovernor.sol#258)
+Low level call in FutarchyGovernor.emergencyWithdraw() (contracts/FutarchyGovernor.sol#325-328):
+	- (success,None) = address(owner()).call{value: address(this).balance}() (contracts/FutarchyGovernor.sol#326)
+Low level call in OracleResolver.finalizeResolution(uint256) (contracts/OracleResolver.sol#172-220):
+	- (success,None) = address(bondRecipient).call{value: bondAmount}() (contracts/OracleResolver.sol#215)
+Low level call in ProposalRegistry.cancelProposal(uint256) (contracts/ProposalRegistry.sol#183-196):
+	- (success,None) = address(proposal.proposer).call{value: proposal.bondAmount}() (contracts/ProposalRegistry.sol#191)
+Low level call in ProposalRegistry.returnBond(uint256) (contracts/ProposalRegistry.sol#238-249):
+	- (success,None) = address(proposal.proposer).call{value: amount}() (contracts/ProposalRegistry.sol#245)
+Low level call in RagequitModule.ragequit(uint256,uint256) (contracts/RagequitModule.sol#125-151):
+	- (success,None) = address(msg.sender).call{value: treasuryShare}() (contracts/RagequitModule.sol#147)
+Low level call in RagequitModule.emergencyWithdraw() (contracts/RagequitModule.sol#228-231):
+	- (success,None) = address(owner()).call{value: address(this).balance}() (contracts/RagequitModule.sol#229)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#low-level-calls
+
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._welfareRegistry (contracts/FutarchyGovernor.sol#97) is not in mixedCase
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._proposalRegistry (contracts/FutarchyGovernor.sol#98) is not in mixedCase
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._marketFactory (contracts/FutarchyGovernor.sol#99) is not in mixedCase
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._privacyCoordinator (contracts/FutarchyGovernor.sol#100) is not in mixedCase
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._oracleResolver (contracts/FutarchyGovernor.sol#101) is not in mixedCase
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._ragequitModule (contracts/FutarchyGovernor.sol#102) is not in mixedCase
+Parameter FutarchyGovernor.initialize(address,address,address,address,address,address,address,address)._treasuryVault (contracts/FutarchyGovernor.sol#103) is not in mixedCase
+Parameter ProposalRegistry.setGovernor(address)._governor (contracts/ProposalRegistry.sol#202) is not in mixedCase
+Function ProposalRegistryFuzzTest.property_proposal_count_never_decreases() (contracts/ProposalRegistryFuzzTest.sol#28-33) is not in mixedCase
+Function ProposalRegistryFuzzTest.property_bond_amount_positive() (contracts/ProposalRegistryFuzzTest.sol#38-40) is not in mixedCase
+Function ProposalRegistryFuzzTest.property_submission_parameters_valid(string,uint256,address) (contracts/ProposalRegistryFuzzTest.sol#47-69) is not in mixedCase
+Parameter RagequitModule.initialize(address,address,address)._governanceToken (contracts/RagequitModule.sol#64) is not in mixedCase
+Parameter RagequitModule.initialize(address,address,address)._treasuryVault (contracts/RagequitModule.sol#65) is not in mixedCase
+Parameter RagequitModule.setGovernor(address)._governor (contracts/RagequitModule.sol#81) is not in mixedCase
+Function WelfareMetricRegistryFuzzTest.property_metric_count_never_decreases() (contracts/WelfareMetricRegistryFuzzTest.sol#24-29) is not in mixedCase
+Function WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) is not in mixedCase
+Function WelfareMetricRegistryFuzzTest.property_metric_weight_bounded(uint256) (contracts/WelfareMetricRegistryFuzzTest.sol#51-53) is not in mixedCase
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions
+
+FutarchyGovernor.slitherConstructorConstantVariables() (contracts/FutarchyGovernor.sol#21-329) uses literals with too many digits:
+	- MAX_DAILY_SPENDING = 100000000000000000000000 (contracts/FutarchyGovernor.sol#54)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#too-many-digits
+
+Loop condition i < activeMetricIds.length (contracts/WelfareMetricRegistry.sol#244) should use cached array length instead of referencing `length` member of the storage array.
+ Loop condition i < activeMetricIds.length (contracts/WelfareMetricRegistry.sol#296) should use cached array length instead of referencing `length` member of the storage array.
+ Loop condition i_scope_0 < activeMetricIds.length (contracts/WelfareMetricRegistry.sol#306) should use cached array length instead of referencing `length` member of the storage array.
+ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#cache-array-length
+
+ProposalRegistryFuzzTest.proposalRegistry (contracts/ProposalRegistryFuzzTest.sol#12) should be immutable 
+ProposalRegistryFuzzTest.welfareRegistry (contracts/ProposalRegistryFuzzTest.sol#13) should be immutable 
+WelfareMetricRegistryFuzzTest.registry (contracts/WelfareMetricRegistryFuzzTest.sol#11) should be immutable 
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#state-variables-that-could-be-declared-immutable
+. analyzed (30 contracts with 100 detectors), 78 result(s) found
