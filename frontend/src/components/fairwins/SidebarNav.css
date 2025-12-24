@@ -28,10 +28,54 @@
   border-bottom: 1px solid rgba(59, 130, 246, 0.2);
   margin-bottom: 1rem;
   min-height: 3rem; /* Reserve space for header */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sidebar-nav.collapsed .sidebar-header {
   padding: 0 0 1rem;
+  justify-content: center;
+}
+
+.sidebar-nav.expanded .sidebar-header {
+  justify-content: flex-start;
+}
+
+.toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--brand-primary);
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.toggle-btn:hover {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  transform: scale(1.1);
+}
+
+.toggle-btn:focus {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
 }
 
 .sidebar-header h2 {
