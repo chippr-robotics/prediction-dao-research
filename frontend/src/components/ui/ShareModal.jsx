@@ -120,6 +120,7 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
                 className="logo-image"
               />
             </div>
+            <h2 className="brand-name">FairWins</h2>
             <p className="brand-tagline">Prediction Markets for Friends.</p>
           </div>
 

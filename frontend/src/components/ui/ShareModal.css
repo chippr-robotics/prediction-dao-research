@@ -166,6 +166,16 @@
   }
 }
 
+.brand-name {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #36B37E;
+  letter-spacing: 0.05em;
+  margin: 8px 0;
+  text-shadow: 0 0 20px rgba(54, 179, 126, 0.4);
+}
+
 .brand-tagline {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 1.125rem;
