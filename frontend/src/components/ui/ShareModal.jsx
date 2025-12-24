@@ -62,7 +62,7 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
         })
       }
       
-      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+      img.src = 'data:image/svg+xml;base64,' + btoa(decodeURIComponent(encodeURIComponent(svgData)))
     } catch (err) {
       console.error('Failed to download QR code:', err)
     }

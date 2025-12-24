@@ -40,7 +40,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
           .catch((err) => console.error('Error stopping scanner:', err))
       }
     }
-  }, [isOpen])
+  }, [isOpen, scanning])
 
   const startScanning = async () => {
     if (!selectedCamera || html5QrCodeRef.current) return

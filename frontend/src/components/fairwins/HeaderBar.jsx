@@ -30,6 +30,7 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
         onScanMarket(marketId)
       }
     } else {
+      // TODO: Replace with proper toast notification system
       alert(`Scanned: ${decodedText}`)
     }
   }
