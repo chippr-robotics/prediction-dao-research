@@ -113,22 +113,23 @@ solc --version
 manticore contracts/ProposalRegistry.sol --contract ProposalRegistry
 ```
 
-### With Timeout
+### With Timeout (Using Shell Timeout)
+
+Since `--timeout` flag may not be supported in all Manticore versions, use the shell's timeout command:
 
 ```bash
-manticore contracts/ProposalRegistry.sol \
-  --contract ProposalRegistry \
-  --timeout 300
+timeout 300 manticore contracts/ProposalRegistry.sol \
+  --contract ProposalRegistry
 ```
 
-### Quick Mode
+### Quick Mode (Version Dependent)
 
-Quick mode provides faster analysis with reduced depth:
+**Note:** `--quick-mode` is not available in all Manticore versions. In recent versions, quick mode may be the default for Ethereum analysis. Check your version with `manticore --help` to see available options.
 
+If supported:
 ```bash
 manticore contracts/ProposalRegistry.sol \
   --contract ProposalRegistry \
-  --timeout 300 \
   --quick-mode
 ```
 
@@ -145,8 +146,9 @@ manticore contracts/ProposalRegistry.sol \
 
 ### Common Options
 
-- `--timeout SECONDS`: Maximum execution time
-- `--quick-mode`: Faster analysis with less coverage
+**Note:** Option availability depends on your Manticore version. Run `manticore --help` to see supported options.
+
+- `--contract NAME`: Specify which contract to analyze (required for multi-contract files)
 - `--txlimit N`: Maximum number of transactions to explore
 - `--txnocoverage`: Don't track transaction coverage
 - `--avoid-constant`: Skip constant functions
@@ -157,7 +159,11 @@ manticore contracts/ProposalRegistry.sol \
 - `--procs N`: Number of parallel workers
 - `--depth N`: Maximum symbolic execution depth
 - `--avoid-constant`: Skip view/pure functions
-- `--thorough-mode`: More comprehensive analysis (slower)
+
+**Deprecated/Version-Dependent Options:**
+- `--timeout SECONDS`: May not be supported; use shell `timeout` command instead
+- `--quick-mode`: May not be available in all versions
+- `--thorough-mode`: May not be available in all versions
 
 ## CI/CD Integration
 
@@ -179,10 +185,8 @@ Manticore runs automatically in the GitHub Actions workflow:
 
 - name: Run Manticore on ProposalRegistry
   run: |
-    manticore contracts/ProposalRegistry.sol \
-      --contract ProposalRegistry \
-      --timeout 300 \
-      --quick-mode || true
+    timeout 300 manticore contracts/ProposalRegistry.sol \
+      --contract ProposalRegistry || true
 ```
 
 Currently analyzed contracts:

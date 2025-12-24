@@ -131,10 +131,8 @@ manticore-analysis:
     - run: solc-select install 0.8.24 && solc-select use 0.8.24
     - run: manticore --version && solc --version
     - run: |
-        manticore contracts/ProposalRegistry.sol \
-          --contract ProposalRegistry \
-          --timeout 300 \
-          --quick-mode || echo "Analysis completed with warnings"
+        timeout 300 manticore contracts/ProposalRegistry.sol \
+          --contract ProposalRegistry || echo "Analysis completed with warnings"
     - run: |
         mkdir -p manticore-results
         find . -name "mcore_*" -exec cp -r {} manticore-results/ \;
@@ -264,10 +262,8 @@ Update workflow for Manticore:
 ```yaml
 - name: Run Manticore on NewContract
   run: |
-    manticore contracts/NewContract.sol \
-      --contract NewContract \
-      --timeout 300 \
-      --quick-mode || true
+    timeout 300 manticore contracts/NewContract.sol \
+      --contract NewContract || true
 ```
 
 ### Adjusting Timeouts
@@ -281,8 +277,8 @@ timeout-minutes: 60  # Increase from 30
 Or for individual tools:
 
 ```bash
-manticore ... --timeout 600  # Increase from 300
-medusa fuzz --timeout 600    # Increase from 300
+timeout 600 manticore ...  # Use shell timeout, increase from 300
+medusa fuzz --timeout 600  # Increase from 300
 ```
 
 ## Artifacts
@@ -478,8 +474,10 @@ timeout-minutes: 30  # Prevent runaway jobs
 
 Use resource-efficient modes:
 ```bash
-manticore --quick-mode  # Faster analysis
-medusa --workers 5      # Fewer parallel workers
+# Note: --quick-mode may not be available in all Manticore versions
+# Use shell timeout to limit execution time
+timeout 300 manticore ...   # 5-minute timeout
+medusa --workers 5          # Fewer parallel workers
 ```
 
 ## Maintenance Schedule

@@ -78,8 +78,8 @@ npm run test:coverage
 # Run Slither analysis
 slither . --config-file slither.config.json
 
-# Run Manticore symbolic execution
-manticore contracts/ProposalRegistry.sol --contract ProposalRegistry --timeout 300
+# Run Manticore symbolic execution (using shell timeout)
+timeout 300 manticore contracts/ProposalRegistry.sol --contract ProposalRegistry
 
 # Run Medusa fuzzing
 medusa fuzz --timeout 300
