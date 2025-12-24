@@ -12,6 +12,8 @@ function MyPositions() {
     try {
       // Mock data for demonstration
       // In production, this would fetch from PrivacyCoordinator and ConditionalMarketFactory
+      // Note: Dependencies omitted intentionally - this is mock data that doesn't need to re-fetch
+      // In production implementation, add contract dependencies when using real data
       const mockPositions = [
         {
           id: 0,

@@ -81,9 +81,11 @@ function MarketCreation() {
     // Focus first error field
     if (Object.keys(newErrors).length > 0) {
       const firstErrorField = Object.keys(newErrors)[0]
+      // Focus the first field with an error
       if (firstErrorField === 'question' && questionRef.current) {
         questionRef.current.focus()
       }
+      // Additional field refs can be added here as needed for complete focus management
     }
 
     return Object.keys(newErrors).length === 0
@@ -100,7 +102,9 @@ function MarketCreation() {
 
     try {
       // In production, this would interact with ConditionalMarketFactory contract
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Mock delay to simulate transaction processing
+      const MOCK_TRANSACTION_DELAY_MS = 1500
+      await new Promise(resolve => setTimeout(resolve, MOCK_TRANSACTION_DELAY_MS))
 
       alert(`Market Creation functionality requires deployed contracts.
 

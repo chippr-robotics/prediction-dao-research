@@ -58,9 +58,7 @@ function MarketTrading() {
     
     if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
       newErrors.tradeAmount = 'Please enter a valid amount greater than 0'
-    }
-    
-    if (parseFloat(tradeAmount) > 10000) {
+    } else if (parseFloat(tradeAmount) > 10000) {
       newErrors.tradeAmount = 'Amount exceeds maximum trade size (10,000 ETC)'
     }
     
