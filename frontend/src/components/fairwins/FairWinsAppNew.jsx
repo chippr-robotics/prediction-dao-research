@@ -495,6 +495,15 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     loadMarkets()
   }, [loadMarkets])
 
+  const handleCloseHero = useCallback(() => {
+    setShowHero(false)
+    setSelectedMarket(null)
+    // Return focus to the element that opened the hero
+    if (lastFocusedElementRef.current) {
+      lastFocusedElementRef.current.focus()
+    }
+  }, [])
+
   // Handle Escape key to close hero
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -567,15 +576,6 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleCloseHero = useCallback(() => {
-    setShowHero(false)
-    setSelectedMarket(null)
-    // Return focus to the element that opened the hero
-    if (lastFocusedElementRef.current) {
-      lastFocusedElementRef.current.focus()
-    }
-  }, [])
-
   const handleTrade = (tradeData) => {
     alert(`Trading functionality requires deployed contracts.
 
@@ -585,6 +585,16 @@ Trade Details:
 - Amount: ${tradeData.amount} ETC
 
 This would submit an encrypted position through the PrivacyCoordinator contract.`)
+  }
+
+  const handleScanMarket = (marketId) => {
+    // Find the market by ID
+    const market = markets.find(m => m.id === parseInt(marketId))
+    if (market) {
+      handleMarketClick(market)
+    } else {
+      alert(`Market with ID ${marketId} not found`)
+    }
   }
 
   const marketsByCategory = getMarketsByCategory()
@@ -649,6 +659,7 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
         onBack={onBack}
         isConnected={isConnected}
         account={account}
+        onScanMarket={handleScanMarket}
       />
 
       <main className="main-canvas">

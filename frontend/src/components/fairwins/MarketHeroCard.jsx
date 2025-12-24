@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
 import CurrencyToggle from '../ui/CurrencyToggle'
+import ShareModal from '../ui/ShareModal'
 import './MarketHeroCard.css'
 
 function MarketHeroCard({ market, onTrade }) {
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
+  const [showShareModal, setShowShareModal] = useState(false)
   const { formatPrice } = usePrice()
 
   if (!market) {
@@ -71,7 +73,11 @@ function MarketHeroCard({ market, onTrade }) {
         </div>
         <div className="hero-actions">
           <CurrencyToggle />
-          <button className="hero-action-btn share" aria-label="Share market">
+          <button 
+            className="hero-action-btn share" 
+            aria-label="Share market"
+            onClick={() => setShowShareModal(true)}
+          >
             <span aria-hidden="true">🔗</span> Share
           </button>
         </div>
@@ -179,6 +185,12 @@ function MarketHeroCard({ market, onTrade }) {
           </div>
         </form>
       </div>
+
+      <ShareModal 
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        market={market}
+      />
     </div>
   )
 }

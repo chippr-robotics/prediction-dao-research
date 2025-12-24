@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
+import QRScanner from '../ui/QRScanner'
 import './HeaderBar.css'
 
-function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
+function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onScanMarket }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
+  const [showScanner, setShowScanner] = useState(false)
 
   const shortenAddress = (address) => {
     if (!address) return ''
@@ -15,6 +18,20 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
   const handleConnectClick = async () => {
     if (onConnect) {
       await onConnect()
+    }
+  }
+
+  const handleScanSuccess = (decodedText, url) => {
+    setShowScanner(false)
+    
+    if (url && url.pathname.includes('/market/')) {
+      const marketId = url.pathname.split('/market/')[1]
+      if (onScanMarket) {
+        onScanMarket(marketId)
+      }
+    } else {
+      // TODO: Replace with proper toast notification system
+      alert(`Scanned: ${decodedText}`)
     }
   }
 
@@ -63,6 +80,16 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
         </div>
 
         <div className="header-right">
+          <button 
+            className="scan-qr-btn"
+            onClick={() => setShowScanner(true)}
+            aria-label="Scan QR code to open market"
+            title="Scan QR Code"
+          >
+            <span aria-hidden="true">📷</span>
+            {!isMobile && <span className="btn-text">Scan</span>}
+          </button>
+          
           {isConnected ? (
             <div className="wallet-connected">
               <div className="wallet-info">
@@ -90,6 +117,12 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
           )}
         </div>
       </div>
+
+      <QRScanner 
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanSuccess={handleScanSuccess}
+      />
     </header>
   )
 }

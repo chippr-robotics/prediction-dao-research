@@ -217,6 +217,35 @@
   box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
 }
 
+.scan-qr-btn {
+  background-color: rgba(99, 102, 241, 0.2);
+  color: white;
+  padding: 0.625rem 1rem;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 1rem;
+}
+
+.scan-qr-btn:hover {
+  background-color: rgba(99, 102, 241, 0.4);
+  border-color: rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.scan-qr-btn:focus {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .header-content {
