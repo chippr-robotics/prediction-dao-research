@@ -12,12 +12,44 @@ function FairWinsApp({ onDisconnect, onBack }) {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
+  // Handle keyboard navigation for ARIA tabs pattern
+  const tabs = ['markets', 'create', 'my-positions']
+  
+  const handleTabKeyDown = (e, currentTab) => {
+    const currentIndex = tabs.indexOf(currentTab)
+    
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      const nextIndex = (currentIndex + 1) % tabs.length
+      setActiveTab(tabs[nextIndex])
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
+      setActiveTab(tabs[prevIndex])
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setActiveTab(tabs[0])
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setActiveTab(tabs[tabs.length - 1])
+    }
+  }
+
   return (
     <div className="fairwins-app">
+      {/* Skip to main content link for keyboard navigation */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+      
       <header className="fairwins-header">
         <div className="header-content">
           <div className="header-left">
-            <button onClick={onBack} className="back-button" title="Back to platform selection">
+            <button 
+              onClick={onBack} 
+              className="back-button" 
+              aria-label="Back to platform selection"
+            >
               ← Back
             </button>
             <div className="branding">
@@ -44,7 +76,11 @@ function FairWinsApp({ onDisconnect, onBack }) {
                   <span className="wallet-address">{shortenAddress(account)}</span>
                 </span>
               </div>
-              <button onClick={onDisconnect} className="disconnect-button">
+              <button 
+                onClick={onDisconnect} 
+                className="disconnect-button"
+                aria-label="Disconnect wallet"
+              >
                 Disconnect
               </button>
             </div>
@@ -52,7 +88,7 @@ function FairWinsApp({ onDisconnect, onBack }) {
         </div>
       </header>
 
-      <main className="fairwins-main">
+      <main id="main-content" className="fairwins-main" tabIndex="-1">
         {networkError ? (
           <div className="network-error-message" role="alert">
             <div className="error-icon" aria-hidden="true">⚠️</div>
@@ -70,28 +106,52 @@ function FairWinsApp({ onDisconnect, onBack }) {
               </p>
             </div>
 
-            <div className="fairwins-tabs">
+            <div className="fairwins-tabs" role="tablist" aria-label="FairWins Navigation">
               <button
+                role="tab"
+                aria-selected={activeTab === 'markets'}
+                aria-controls="markets-panel"
+                id="markets-tab"
+                tabIndex={activeTab === 'markets' ? 0 : -1}
                 className={`tab-button ${activeTab === 'markets' ? 'active' : ''}`}
                 onClick={() => setActiveTab('markets')}
+                onKeyDown={(e) => handleTabKeyDown(e, 'markets')}
               >
                 Browse Markets
               </button>
               <button
+                role="tab"
+                aria-selected={activeTab === 'create'}
+                aria-controls="create-panel"
+                id="create-tab"
+                tabIndex={activeTab === 'create' ? 0 : -1}
                 className={`tab-button ${activeTab === 'create' ? 'active' : ''}`}
                 onClick={() => setActiveTab('create')}
+                onKeyDown={(e) => handleTabKeyDown(e, 'create')}
               >
                 Create Market
               </button>
               <button
+                role="tab"
+                aria-selected={activeTab === 'my-positions'}
+                aria-controls="my-positions-panel"
+                id="my-positions-tab"
+                tabIndex={activeTab === 'my-positions' ? 0 : -1}
                 className={`tab-button ${activeTab === 'my-positions' ? 'active' : ''}`}
                 onClick={() => setActiveTab('my-positions')}
+                onKeyDown={(e) => handleTabKeyDown(e, 'my-positions')}
               >
                 My Positions
               </button>
             </div>
 
-            <div className="fairwins-content">
+            <div 
+              className="fairwins-content"
+              role="tabpanel"
+              id={`${activeTab}-panel`}
+              aria-labelledby={`${activeTab}-tab`}
+              tabIndex="0"
+            >
               {activeTab === 'markets' && (
                 <div className="markets-section">
                   <h3>Active Prediction Markets</h3>

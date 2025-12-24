@@ -73,6 +73,40 @@ function Dashboard() {
     }
   }, [provider, account, loadUserDAOs])
 
+  // Tab list for ARIA pattern
+  const tabs = isAdmin 
+    ? ['daos', 'proposals', 'metrics', 'launchpad', 'admin']
+    : ['daos', 'proposals', 'metrics', 'launchpad']
+
+  const tabLabels = {
+    daos: 'My DAOs',
+    proposals: 'Active Proposals',
+    metrics: 'Welfare Metrics',
+    launchpad: 'Launch DAO',
+    admin: 'Admin'
+  }
+
+  // Handle keyboard navigation for ARIA tabs pattern
+  const handleTabKeyDown = (e, currentTab) => {
+    const currentIndex = tabs.indexOf(currentTab)
+    
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      const nextIndex = (currentIndex + 1) % tabs.length
+      setActiveTab(tabs[nextIndex])
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      const prevIndex = (currentIndex - 1 + tabs.length) % tabs.length
+      setActiveTab(tabs[prevIndex])
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setActiveTab(tabs[0])
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setActiveTab(tabs[tabs.length - 1])
+    }
+  }
+
   const renderTabContent = () => {
     if (loading) {
       return (
@@ -106,42 +140,78 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="dashboard-tabs">
+      <div className="dashboard-tabs" role="tablist" aria-label="Dashboard Navigation">
         <button
+          role="tab"
+          aria-selected={activeTab === 'daos'}
+          aria-controls="daos-panel"
+          id="daos-tab"
+          tabIndex={activeTab === 'daos' ? 0 : -1}
           className={`tab-button ${activeTab === 'daos' ? 'active' : ''}`}
           onClick={() => setActiveTab('daos')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'daos')}
         >
           My DAOs
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'proposals'}
+          aria-controls="proposals-panel"
+          id="proposals-tab"
+          tabIndex={activeTab === 'proposals' ? 0 : -1}
           className={`tab-button ${activeTab === 'proposals' ? 'active' : ''}`}
           onClick={() => setActiveTab('proposals')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'proposals')}
         >
           Active Proposals
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'metrics'}
+          aria-controls="metrics-panel"
+          id="metrics-tab"
+          tabIndex={activeTab === 'metrics' ? 0 : -1}
           className={`tab-button ${activeTab === 'metrics' ? 'active' : ''}`}
           onClick={() => setActiveTab('metrics')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'metrics')}
         >
           Welfare Metrics
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'launchpad'}
+          aria-controls="launchpad-panel"
+          id="launchpad-tab"
+          tabIndex={activeTab === 'launchpad' ? 0 : -1}
           className={`tab-button ${activeTab === 'launchpad' ? 'active' : ''}`}
           onClick={() => setActiveTab('launchpad')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'launchpad')}
         >
           Launch DAO
         </button>
         {isAdmin && (
           <button
+            role="tab"
+            aria-selected={activeTab === 'admin'}
+            aria-controls="admin-panel"
+            id="admin-tab"
+            tabIndex={activeTab === 'admin' ? 0 : -1}
             className={`tab-button ${activeTab === 'admin' ? 'active' : ''}`}
             onClick={() => setActiveTab('admin')}
+            onKeyDown={(e) => handleTabKeyDown(e, 'admin')}
           >
             Admin
           </button>
         )}
       </div>
 
-      <div className="dashboard-content">
+      <div 
+        className="dashboard-content"
+        role="tabpanel"
+        id={`${activeTab}-panel`}
+        aria-labelledby={`${activeTab}-tab`}
+        tabIndex="0"
+      >
         {renderTabContent()}
       </div>
     </div>

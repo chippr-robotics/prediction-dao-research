@@ -13,10 +13,19 @@ function ClearPathApp({ onDisconnect, onBack }) {
 
   return (
     <div className="clearpath-app">
+      {/* Skip to main content link for keyboard navigation */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+      
       <header className="clearpath-header">
         <div className="header-content">
           <div className="header-left">
-            <button onClick={onBack} className="back-button" title="Back to platform selection">
+            <button 
+              onClick={onBack} 
+              className="back-button" 
+              aria-label="Back to platform selection"
+            >
               ← Back
             </button>
             <div className="branding">
@@ -43,7 +52,11 @@ function ClearPathApp({ onDisconnect, onBack }) {
                   <span className="wallet-address">{shortenAddress(account)}</span>
                 </span>
               </div>
-              <button onClick={onDisconnect} className="disconnect-button">
+              <button 
+                onClick={onDisconnect} 
+                className="disconnect-button"
+                aria-label="Disconnect wallet"
+              >
                 Disconnect
               </button>
             </div>
@@ -51,7 +64,7 @@ function ClearPathApp({ onDisconnect, onBack }) {
         </div>
       </header>
 
-      <main className="clearpath-main">
+      <main id="main-content" className="clearpath-main" tabIndex="-1">
         {networkError ? (
           <div className="network-error-message" role="alert">
             <div className="error-icon" aria-hidden="true">⚠️</div>

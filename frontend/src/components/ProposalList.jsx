@@ -39,15 +39,15 @@ function ProposalList({ provider, signer }) {
     }
   }
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'Reviewing': '#ffa500',
-      'Active': '#4caf50',
-      'Cancelled': '#9e9e9e',
-      'Executed': '#2196f3',
-      'Forfeited': '#f44336'
+  const getStatusConfig = (status) => {
+    const configs = {
+      'Reviewing': { icon: '⏳', color: 'status-reviewing', label: 'Under Review' },
+      'Active': { icon: '✓', color: 'status-active', label: 'Active' },
+      'Cancelled': { icon: '⛔', color: 'status-cancelled', label: 'Cancelled' },
+      'Executed': { icon: '✅', color: 'status-executed', label: 'Executed' },
+      'Forfeited': { icon: '❌', color: 'status-forfeited', label: 'Forfeited' }
     }
-    return colors[status] || '#9e9e9e'
+    return configs[status] || { icon: '●', color: 'status-default', label: status }
   }
 
   if (loading) {
@@ -60,35 +60,49 @@ function ProposalList({ provider, signer }) {
 
   return (
     <div className="proposal-list">
-      {proposals.map((proposal) => (
-        <div key={proposal.id} className="proposal-card">
-          <div className="proposal-header">
-            <h3>{proposal.title}</h3>
-            <span 
-              className="proposal-status"
-              style={{ backgroundColor: getStatusColor(proposal.status) }}
-            >
-              {proposal.status}
-            </span>
-          </div>
-          
-          <p className="proposal-description">{proposal.description}</p>
-          
-          <div className="proposal-details">
-            <div className="detail-item">
-              <strong>Funding Amount:</strong> {proposal.fundingAmount} ETC
+      {proposals.map((proposal) => {
+        const statusConfig = getStatusConfig(proposal.status)
+        
+        return (
+          <div key={proposal.id} className="proposal-card">
+            <div className="proposal-header">
+              <h3>{proposal.title}</h3>
+              <span className={`proposal-status ${statusConfig.color}`}>
+                <span className="status-icon" aria-hidden="true">
+                  {statusConfig.icon}
+                </span>
+                {statusConfig.label}
+              </span>
             </div>
-            <div className="detail-item">
-              <strong>Proposer:</strong> {proposal.proposer}
+            
+            <p className="proposal-description">{proposal.description}</p>
+            
+            <div className="proposal-details">
+              <div className="detail-item">
+                <strong>Funding Amount:</strong> {proposal.fundingAmount} ETC
+              </div>
+              <div className="detail-item">
+                <strong>Proposer:</strong> {proposal.proposer}
+              </div>
             </div>
-          </div>
 
-          <div className="proposal-actions">
-            <button className="view-button">View Details</button>
-            <button className="trade-button">Trade on Market</button>
+            <div className="proposal-actions">
+              <button 
+                className="view-button"
+                aria-label={`View details for ${proposal.title}`}
+              >
+                View Details
+              </button>
+              <button 
+                className="trade-button"
+                aria-label={`Trade on market for ${proposal.title}`}
+              >
+                Trade on Market
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
