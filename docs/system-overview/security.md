@@ -66,8 +66,6 @@ When you submit a proposal, you post a 50 ETC bond. This bond gets returned if y
 
 This creates a simple calculation: is the potential gain from spamming the system worth losing 50 ETC? For genuine proposers, the bond represents a recoverable deposit. For spammers, it becomes an expensive barrier.
 
-This creates a simple calculation: is the potential gain from spamming the system worth losing 50 ETC? For genuine proposers, the bond represents a recoverable deposit. For spammers, it becomes an expensive barrier.
-
 Oracle reporters face a similar dynamic but with higher stakes. Reporting welfare metric values requires a 100 ETC bond. If the community accepts your report, you get the bond back. If someone successfully challenges your report as inaccurate, you lose the bond.
 
 The interesting part comes with challenges. To challenge an oracle report, you must post a 150 ETC bond that exceeds the reporter's stake. This asymmetry serves a purpose. Challenging should be accessible enough that false reports get caught, but expensive enough that frivolous challenges don't clog the system.
@@ -139,10 +137,6 @@ Wherever possible, the contracts use OpenZeppelin libraries. These libraries hav
 ### Reentrancy Guards
 
 All functions that involve external calls or value transfers include reentrancy guards. These guards prevent the classic attack where a malicious contract calls back into your contract during execution, potentially executing critical functions multiple times in an unexpected way.
-
-### Integer Overflow Protection
-
-Solidity 0.8 and later includes built-in overflow checking, automatically reverting transactions that would overflow or underflow. This eliminates an entire class of vulnerabilities that plagued earlier contracts.
 
 ### Integer Overflow Protection
 

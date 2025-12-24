@@ -12,8 +12,6 @@ The contracts live on-chain, so every interaction happens through blockchain tra
 
 After compiling the contracts with `npx hardhat compile`, you'll find complete ABI files in the `artifacts/contracts/` directory. These JSON files contain function signatures, events, and everything needed to interact with deployed contracts.
 
-After compiling the contracts with `npx hardhat compile`, you'll find complete ABI files in the `artifacts/contracts/` directory. These JSON files contain function signatures, events, and everything needed to interact with deployed contracts.
-
 ## Submitting Proposals
 
 Proposals start the entire governance process. When you have an idea that requires DAO resources, you package it as a proposal that goes through market validation.
@@ -194,10 +192,6 @@ The `isPass` boolean indicates which side you're buying.
 **Return value:**
 
 The function returns the total cost in wei for purchasing that amount of tokens at current prices.
-
-**Example scenario:**
-
-You believe a proposal to upgrade oracle infrastructure will improve treasury value. The PASS token currently trades at 0.45, suggesting the market is skeptical. You disagree and want to bet on the proposal succeeding.
 
 **Example scenario:**
 
