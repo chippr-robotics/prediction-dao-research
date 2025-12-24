@@ -1,6 +1,6 @@
 .market-tile {
   background: var(--bg-light);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
   border-radius: 12px;
   padding: 1.25rem;
   display: flex;
@@ -14,13 +14,13 @@
 
 .market-tile:hover {
   transform: translateY(-4px);
-  border-color: #3B82F6;
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+  border-color: var(--brand-primary);
+  box-shadow: 0 8px 24px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
 }
 
 .market-tile.active {
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 8px 24px rgba(59, 130, 246, 0.2);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3), 0 8px 24px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
 }
 
 .market-tile::before {
@@ -30,7 +30,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #3B82F6, #2563EB);
+  background: linear-gradient(90deg, var(--brand-primary), var(--primary-button-hover));
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -180,7 +180,7 @@
 .tile-action-btn {
   width: 100%;
   padding: 0.75rem;
-  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  background: linear-gradient(135deg, var(--brand-primary), var(--primary-button-hover));
   color: white;
   border: none;
   border-radius: 8px;

@@ -35,7 +35,7 @@
 }
 
 .sidebar-header h2 {
-  color: #3B82F6;
+  color: var(--brand-primary);
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
@@ -71,13 +71,13 @@
 }
 
 .category-item:hover {
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
   color: var(--text-primary);
 }
 
 .category-item.active {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3B82F6;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  color: var(--brand-primary);
   font-weight: 600;
 }
 
@@ -89,7 +89,7 @@
   transform: translateY(-50%);
   width: 3px;
   height: 60%;
-  background: #3B82F6;
+  background: var(--brand-primary);
   border-radius: 0 3px 3px 0;
 }
 

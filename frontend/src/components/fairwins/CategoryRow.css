@@ -61,8 +61,8 @@
 }
 
 .scroll-btn:hover {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: #3B82F6;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  border-color: var(--brand-primary);
   transform: scale(1.05);
 }
 

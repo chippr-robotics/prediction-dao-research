@@ -1,0 +1,171 @@
+/**
+ * Theme Variables - ClearPath & FairWins Color Palettes
+ * 
+ * This file defines all color variables for both platforms in light and dark modes.
+ * The default theme is light mode.
+ */
+
+/* ===================================
+   BASE/SHARED NEUTRAL COLORS
+   (Used by both ClearPath and FairWins for ecosystem cohesion)
+   =================================== */
+
+:root {
+  /* Light Mode Neutrals (Default) */
+  --bg-primary: #F7F9FA;        /* Porcelain - Background */
+  --bg-secondary: #FFFFFF;      /* White Sand - Surface/Card */
+  --text-primary: #1F2933;      /* Deep Slate - Primary text */
+  --text-secondary: #5A6772;    /* Steel Gray - Secondary text */
+  --border-color: #E3E7EB;      /* Soft Gray - Borders/Dividers */
+}
+
+.theme-dark {
+  /* Dark Mode Neutrals */
+  --bg-primary: #0E141B;        /* Midnight Slate - Background */
+  --bg-secondary: #141C24;      /* Charcoal - Surface/Card */
+  --text-primary: #E6EDF3;      /* Cloud White - Primary text */
+  --text-secondary: #AAB6C2;    /* Cool Gray - Secondary text */
+  --border-color: #23303D;      /* Graphite - Borders/Dividers */
+}
+
+/* ===================================
+   CLEARPATH THEME COLORS
+   =================================== */
+
+.platform-clearpath {
+  /* ClearPath Brand Colors */
+  --brand-primary: #2FA4A9;     /* Signal Teal */
+  --brand-secondary: #6BCF9C;   /* Path Green */
+  --brand-highlight: #F5C16C;   /* Insight Gold */
+
+  /* ClearPath Chart Colors */
+  --chart-series-a: #2FA4A9;
+  --chart-series-b: #6BCF9C;
+  --chart-series-c: #F5C16C;
+  --chart-series-d: #4C9AFF;
+  --chart-series-e: #9AA6B2;
+}
+
+/* ClearPath Light Mode */
+.theme-light.platform-clearpath {
+  --primary-button: #2FA4A9;    /* Signal Teal */
+  --primary-button-hover: #248A8E; /* Deep Teal */
+  --primary-button-text: #FFFFFF;
+  --accent-color: #6BCF9C;
+  --highlight-color: #F5C16C;
+}
+
+/* ClearPath Dark Mode */
+.theme-dark.platform-clearpath {
+  --primary-button: #3BC1C7;    /* Soft Teal */
+  --primary-button-hover: #4FD4DA; /* Bright Teal */
+  --primary-button-text: #0E141B;
+  --accent-color: #6BCF9C;
+  --highlight-color: #F5C16C;
+}
+
+/* ===================================
+   FAIRWINS THEME COLORS
+   =================================== */
+
+.platform-fairwins {
+  /* FairWins Brand Colors */
+  --brand-primary: #36B37E;     /* Winning Green */
+  --brand-primary-rgb: 54, 179, 126; /* RGB values for rgba usage */
+  --brand-secondary: #4C9AFF;   /* Odds Blue */
+  --brand-accent: #7BDCB5;      /* Momentum Mint */
+
+  /* FairWins Semantic Colors */
+  --semantic-win: #2ECC71;      /* Win/Success */
+  --semantic-active: #4C9AFF;   /* Active Bet */
+  --semantic-warning: #F5A623;  /* Risk/Warning */
+  --semantic-loss: #E5533D;     /* Loss/Error */
+
+  /* FairWins Chart Colors */
+  --chart-series-a: #36B37E;
+  --chart-series-b: #4C9AFF;
+  --chart-series-c: #7BDCB5;
+  --chart-series-d: #F5A623;
+  --chart-series-e: #9AA6B2;
+}
+
+/* FairWins Light Mode */
+.theme-light.platform-fairwins {
+  --primary-button: #36B37E;    /* Winning Green */
+  --primary-button-hover: #2F9E6E; /* Deep Green */
+  --primary-button-text: #FFFFFF;
+  --accent-color: #4C9AFF;
+  --highlight-color: #7BDCB5;
+}
+
+/* FairWins Dark Mode */
+.theme-dark.platform-fairwins {
+  --primary-button: #45C492;    /* Bright Green */
+  --primary-button-hover: #5ED6A6; /* Neon Mint */
+  --primary-button-text: #0E141B;
+  --accent-color: #4C9AFF;
+  --highlight-color: #7BDCB5;
+}
+
+/* ===================================
+   SHARED SEMANTIC COLORS
+   (Available to both platforms)
+   =================================== */
+
+:root {
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --danger-color: #dc2626;
+  --info-color: #3b82f6;
+}
+
+/* Adjust semantic colors for dark mode if needed */
+.theme-dark {
+  --success-color: #2ECC71;
+  --warning-color: #F5A623;
+  --danger-color: #E5533D;
+  --info-color: #4C9AFF;
+}
+
+/* ===================================
+   LEGACY SUPPORT
+   (For backward compatibility during transition)
+   =================================== */
+
+:root {
+  /* Legacy variables mapped to new theme system */
+  --primary-color: var(--brand-primary);
+  --secondary-color: var(--brand-secondary);
+  --bg-dark: var(--bg-primary);
+  --bg-light: var(--bg-secondary);
+  --hover-color: var(--primary-button-hover);
+}
+
+/* ===================================
+   COMPONENT-SPECIFIC VARIABLES
+   =================================== */
+
+:root {
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.3s ease;
+  --transition-slow: 0.5s ease;
+}
+
+.theme-dark {
+  /* Stronger shadows for dark mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+}

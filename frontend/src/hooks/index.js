@@ -16,6 +16,9 @@ export {
   useError 
 } from './useUI'
 
+// Theme hooks
+export { useTheme } from './useTheme'
+
 // Blockchain event hooks
 export {
   useContractEvent,

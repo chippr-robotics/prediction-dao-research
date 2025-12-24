@@ -1,17 +1,3 @@
-:root {
-  --primary-color: #2D7A4F;
-  --secondary-color: #34A853;
-  --success-color: #22c55e;
-  --warning-color: #f59e0b;
-  --danger-color: #dc2626;
-  --bg-dark: #0f1810;
-  --bg-light: #1a2820;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border-color: #2D7A4F;
-  --hover-color: #245c3d;
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -20,14 +6,14 @@
 
 /* Global focus styles for accessibility */
 *:focus-visible {
-  outline: 2px solid var(--primary-color);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 /* For browsers without :focus-visible support */
 @supports not selector(:focus-visible) {
   *:focus {
-    outline: 2px solid var(--primary-color);
+    outline: 2px solid var(--brand-primary);
     outline-offset: 2px;
   }
 }
@@ -38,7 +24,7 @@ a:focus,
 input:focus,
 textarea:focus,
 select:focus {
-  outline: 2px solid var(--primary-color);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
@@ -48,7 +34,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-dark);
+  background-color: var(--bg-primary);
   color: var(--text-primary);
 }
 
@@ -59,21 +45,23 @@ body {
 }
 
 .App-header {
-  background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--primary-button-hover) 100%);
   padding: 2rem;
   text-align: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .App-header h1 {
   font-size: 2.5rem;
   margin-bottom: 0.5rem;
+  color: white;
 }
 
 .subtitle {
   font-size: 1.1rem;
   opacity: 0.9;
   margin-bottom: 1.5rem;
+  color: white;
 }
 
 .wallet-section {
@@ -84,20 +72,20 @@ body {
   padding: 0.75rem 2rem;
   font-size: 1rem;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .connect-button {
-  background-color: white;
-  color: var(--primary-color);
+  background-color: var(--bg-secondary);
+  color: var(--brand-primary);
 }
 
 .connect-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .connected-wallet {
@@ -107,7 +95,7 @@ body {
   gap: 1rem;
   background: rgba(255, 255, 255, 0.1);
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: inline-flex;
 }
 
@@ -118,11 +106,13 @@ body {
 
 .wallet-address {
   font-weight: 600;
+  color: white;
 }
 
 .chain-id {
   opacity: 0.8;
   font-size: 0.9rem;
+  color: white;
 }
 
 .disconnect-button {
@@ -146,13 +136,13 @@ body {
 .not-connected {
   text-align: center;
   padding: 4rem 2rem;
-  background: var(--bg-light);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .not-connected h2 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   margin-bottom: 1rem;
 }
 
@@ -164,6 +154,7 @@ body {
 .not-connected li {
   padding: 0.75rem;
   font-size: 1.1rem;
+  color: var(--text-secondary);
 }
 
 .dashboard {
@@ -173,14 +164,14 @@ body {
 }
 
 .section {
-  background: var(--bg-light);
+  background: var(--bg-secondary);
   padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .section h2 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   margin-bottom: 1.5rem;
   border-bottom: 2px solid var(--border-color);
   padding-bottom: 0.5rem;
@@ -209,8 +200,8 @@ body {
 .form-group select {
   padding: 0.75rem;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-dark);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 1rem;
 }
@@ -219,7 +210,7 @@ body {
 .form-group textarea:focus,
 .form-group select:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: var(--brand-primary);
 }
 
 .form-group small {
@@ -255,27 +246,28 @@ select[aria-invalid="true"] {
   padding: 1rem;
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid var(--warning-color);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--warning-color);
 }
 
 .submit-button,
 .trade-submit-button {
   padding: 0.75rem 2rem;
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  color: white;
+  background: var(--primary-button);
+  color: var(--primary-button-text);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .submit-button:hover,
 .trade-submit-button:hover {
+  background: var(--primary-button-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .submit-button:disabled {
@@ -292,17 +284,17 @@ select[aria-invalid="true"] {
 }
 
 .proposal-card {
-  background: var(--bg-dark);
+  background: var(--bg-secondary);
   padding: 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .proposal-card:hover {
-  border-color: var(--primary-color);
+  border-color: var(--brand-primary);
   transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .proposal-header {
@@ -313,7 +305,7 @@ select[aria-invalid="true"] {
 }
 
 .proposal-header h3 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   font-size: 1.2rem;
   flex: 1;
 }
@@ -387,18 +379,18 @@ select[aria-invalid="true"] {
 .trade-button {
   flex: 1;
   padding: 0.5rem;
-  border: 1px solid var(--primary-color);
+  border: 1px solid var(--brand-primary);
   background: transparent;
-  color: var(--primary-color);
-  border-radius: 6px;
+  color: var(--brand-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .view-button:hover {
-  background: var(--primary-color);
-  color: white;
+  background: var(--brand-primary);
+  color: var(--bg-secondary);
 }
 
 .trade-button {
@@ -408,7 +400,7 @@ select[aria-invalid="true"] {
 
 .trade-button:hover {
   background: var(--success-color);
-  color: white;
+  color: var(--bg-secondary);
 }
 
 /* Welfare Metrics */
@@ -420,9 +412,9 @@ select[aria-invalid="true"] {
 }
 
 .metric-card {
-  background: var(--bg-dark);
+  background: var(--bg-secondary);
   padding: 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
 }
 
@@ -434,7 +426,7 @@ select[aria-invalid="true"] {
 }
 
 .metric-header h3 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   font-size: 1.1rem;
 }
 
@@ -474,18 +466,18 @@ select[aria-invalid="true"] {
 .stat .value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--primary-color);
+  color: var(--brand-primary);
 }
 
 .metrics-info {
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(var(--brand-primary-rgb, 47, 164, 169), 0.1);
   padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--brand-primary);
 }
 
 .metrics-info h4 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -503,25 +495,25 @@ select[aria-invalid="true"] {
 }
 
 .market-card {
-  background: var(--bg-dark);
+  background: var(--bg-secondary);
   padding: 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 2px solid var(--border-color);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .market-card:hover {
-  border-color: var(--primary-color);
+  border-color: var(--brand-primary);
 }
 
 .market-card.selected {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  border-color: var(--brand-primary);
+  box-shadow: var(--shadow-lg);
 }
 
 .market-card h3 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   margin-bottom: 1rem;
   font-size: 1.1rem;
 }
@@ -593,15 +585,15 @@ select[aria-invalid="true"] {
 }
 
 .trading-panel {
-  background: var(--bg-dark);
+  background: var(--bg-secondary);
   padding: 2rem;
-  border-radius: 8px;
-  border: 2px solid var(--primary-color);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--brand-primary);
+  box-shadow: var(--shadow-lg);
 }
 
 .trading-panel h3 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   margin-bottom: 1.5rem;
 }
 
@@ -614,18 +606,18 @@ select[aria-invalid="true"] {
 .token-button {
   padding: 1rem;
   border: 2px solid var(--border-color);
-  background: var(--bg-light);
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .token-button.active {
-  border-color: var(--primary-color);
-  background: rgba(99, 102, 241, 0.2);
-  color: var(--primary-color);
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb, 47, 164, 169), 0.2);
+  color: var(--brand-primary);
 }
 
 .token-button:hover {
@@ -634,15 +626,15 @@ select[aria-invalid="true"] {
 
 .privacy-notice {
   padding: 1rem;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid var(--secondary-color);
-  border-radius: 8px;
-  color: var(--secondary-color);
+  background: rgba(var(--brand-secondary-rgb, 107, 207, 156), 0.1);
+  border: 1px solid var(--brand-secondary);
+  border-radius: var(--radius-md);
+  color: var(--brand-secondary);
   text-align: center;
 }
 
 .App-footer {
-  background: var(--bg-light);
+  background: var(--bg-secondary);
   padding: 2rem;
   text-align: center;
   color: var(--text-secondary);
@@ -724,19 +716,19 @@ select[aria-invalid="true"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-dark);
+  background: var(--bg-primary);
 }
 
 .loading-content {
   text-align: center;
   padding: 3rem;
-  background: var(--bg-light);
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .loading-content h2 {
-  color: var(--primary-color);
+  color: var(--brand-primary);
   margin-bottom: 1rem;
 }
 
@@ -775,19 +767,19 @@ select[aria-invalid="true"] {
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--primary-color);
-  color: white;
+  background: var(--brand-primary);
+  color: var(--bg-secondary);
   padding: 0.5rem 1rem;
   text-decoration: none;
   font-weight: 600;
   z-index: 9999;
-  border-radius: 0 0 4px 0;
-  transition: top 0.3s;
+  border-radius: 0 0 var(--radius-sm) 0;
+  transition: top var(--transition-base);
 }
 
 .skip-to-content:focus {
   top: 0;
-  outline: 2px solid white;
+  outline: 2px solid var(--bg-secondary);
   outline-offset: 2px;
 }
 
@@ -814,21 +806,21 @@ select[aria-invalid="true"] {
 
 .switch-network-button {
   padding: 0.5rem 1rem;
-  background: white;
+  background: var(--bg-secondary);
   color: var(--danger-color);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all var(--transition-base);
 }
 
 .switch-network-button:hover {
   transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .switch-network-button:focus-visible {
-  outline: 2px solid white;
+  outline: 2px solid var(--bg-secondary);
   outline-offset: 2px;
 }

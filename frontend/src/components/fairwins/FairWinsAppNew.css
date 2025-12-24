@@ -1,6 +1,6 @@
 .fairwins-app-new {
   min-height: 100vh;
-  background: var(--bg-dark);
+  background: var(--bg-primary);
   display: flex;
 }
 
@@ -89,12 +89,13 @@
 }
 
 .categories-rows-container::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.3);
+  background: var(--brand-secondary);
+  opacity: 0.3;
   border-radius: 3px;
 }
 
 .categories-rows-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.5);
+  opacity: 0.5;
 }
 
 /* Fixed Bottom Carousel */
@@ -171,17 +172,18 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
 }
 
 .carousel-scroller::-webkit-scrollbar-track {
-  background: var(--bg-dark);
+  background: var(--bg-primary);
   border-radius: 3px;
 }
 
 .carousel-scroller::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.4);
+  background: var(--brand-secondary);
+  opacity: 0.4;
   border-radius: 3px;
 }
 
 .carousel-scroller::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.6);
+  opacity: 0.6;
 }
 
 .carousel-item {
@@ -207,8 +209,8 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
 .loading-spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid rgba(59, 130, 246, 0.2);
-  border-top: 4px solid #3B82F6;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--brand-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
