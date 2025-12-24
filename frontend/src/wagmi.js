@@ -1,8 +1,45 @@
 import { http, createConfig } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
-// Define Hardhat local network
+// Define Ethereum Classic mainnet
+const ethereumClassic = {
+  id: 61,
+  name: 'Ethereum Classic',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETC',
+  },
+  rpcUrls: {
+    default: { http: ['https://etc.rivet.link'] },
+    public: { http: ['https://etc.rivet.link'] },
+  },
+  blockExplorers: {
+    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mainnet' },
+  },
+  testnet: false,
+}
+
+// Define Mordor testnet
+const mordor = {
+  id: 63,
+  name: 'Mordor',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Mordor Ether',
+    symbol: 'METC',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc.mordor.etccooperative.org'] },
+    public: { http: ['https://rpc.mordor.etccooperative.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mordor' },
+  },
+  testnet: true,
+}
+
+// Define Hardhat local network (for development)
 const hardhat = {
   id: 1337,
   name: 'Hardhat',
@@ -18,16 +55,16 @@ const hardhat = {
   testnet: true,
 }
 
-// Get network ID from environment or default to Hardhat
+// Get network ID from environment or default to Mordor testnet
 const networkId = import.meta.env.VITE_NETWORK_ID 
   ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
-  : 1337
+  : 63
 
 // Get RPC URL from environment
-const rpcUrl = import.meta.env.VITE_RPC_URL || 'http://localhost:8545'
+const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
 
 // Define supported chains
-const chains = [hardhat, sepolia, mainnet]
+const chains = [ethereumClassic, mordor, hardhat]
 
 // Create wagmi config
 export const config = createConfig({
@@ -36,22 +73,23 @@ export const config = createConfig({
     injected({ target: 'metaMask' }),
   ],
   transports: {
-    [hardhat.id]: http(rpcUrl),
-    [sepolia.id]: http(),
-    [mainnet.id]: http(),
+    [ethereumClassic.id]: http(),
+    [mordor.id]: http(rpcUrl),
+    [hardhat.id]: http('http://localhost:8545'),
   },
 })
 
 // Helper to get expected chain info
 export const getExpectedChain = () => {
   switch (networkId) {
-    case 1:
-      return mainnet
-    case 11155111:
-      return sepolia
+    case 61:
+      return ethereumClassic
+    case 63:
+      return mordor
     case 1337:
-    default:
       return hardhat
+    default:
+      return mordor
   }
 }
 
