@@ -1,0 +1,126 @@
+.fairwins-app-new {
+  min-height: 100vh;
+  background: var(--bg-dark);
+  display: flex;
+}
+
+/* Main canvas area (content area) */
+.main-canvas {
+  margin-left: 240px;
+  margin-top: 70px;
+  flex: 1;
+  padding: 2rem;
+  min-height: calc(100vh - 70px);
+  transition: margin-left 0.3s ease;
+}
+
+/* When sidebar is collapsed */
+.sidebar-nav.collapsed ~ .main-canvas {
+  margin-left: 70px;
+}
+
+/* Grid View */
+.grid-view {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.view-header {
+  margin-bottom: 2rem;
+}
+
+.view-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.view-description {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Focus View */
+.focus-view {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.back-to-grid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 2rem;
+}
+
+.back-to-grid-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3B82F6;
+  transform: translateX(-4px);
+}
+
+/* Responsive Layout */
+@media (max-width: 1024px) {
+  .main-canvas {
+    margin-left: 200px;
+  }
+
+  .sidebar-nav.collapsed ~ .main-canvas {
+    margin-left: 60px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-canvas {
+    margin-left: 0;
+    margin-top: 70px;
+    padding: 1rem;
+  }
+
+  .sidebar-nav.collapsed ~ .main-canvas {
+    margin-left: 0;
+  }
+
+  .view-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .view-description {
+    font-size: 1rem;
+  }
+
+  .focus-view {
+    max-width: 100%;
+  }
+}
+
+/* Ensure proper stacking context */
+.fairwins-app-new {
+  position: relative;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: margin, padding;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+}
+
+/* Prevent transition on non-layout properties */
+.market-tile,
+.market-tile *,
+button,
+input {
+  transition-property: transform, opacity, background-color, border-color, box-shadow, color;
+}
