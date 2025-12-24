@@ -495,6 +495,15 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     loadMarkets()
   }, [loadMarkets])
 
+  const handleCloseHero = useCallback(() => {
+    setShowHero(false)
+    setSelectedMarket(null)
+    // Return focus to the element that opened the hero
+    if (lastFocusedElementRef.current) {
+      lastFocusedElementRef.current.focus()
+    }
+  }, [])
+
   // Handle Escape key to close hero
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -566,15 +575,6 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     // Scroll to top to show hero
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-
-  const handleCloseHero = useCallback(() => {
-    setShowHero(false)
-    setSelectedMarket(null)
-    // Return focus to the element that opened the hero
-    if (lastFocusedElementRef.current) {
-      lastFocusedElementRef.current.focus()
-    }
-  }, [])
 
   const handleTrade = (tradeData) => {
     alert(`Trading functionality requires deployed contracts.
