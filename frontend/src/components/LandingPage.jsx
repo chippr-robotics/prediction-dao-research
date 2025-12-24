@@ -9,6 +9,7 @@ function LandingPage() {
   const { isConnected } = useWeb3()
   const { connectWallet } = useWallet()
   const [isClearPathMember, setIsClearPathMember] = useState(false)
+  const [logoErrors, setLogoErrors] = useState({ fairwins: false, clearpath: false })
 
   const handleConnectForClearPath = async () => {
     const success = await connectWallet()
@@ -25,7 +26,12 @@ function LandingPage() {
     navigate('/fairwins')
   }
 
+  const handleLogoError = (platform) => {
+    setLogoErrors(prev => ({ ...prev, [platform]: true }))
+  }
+
   const showClearPathBranding = isConnected && isClearPathMember
+  const isDevelopment = import.meta.env.DEV
 
   return (
     <div className="landing-page">
@@ -33,7 +39,7 @@ function LandingPage() {
       <Header showClearPathBranding={showClearPathBranding} hideWalletButton={true} />
 
       {/* Temporary ClearPath Membership Toggle (for development) */}
-      {isConnected && (
+      {isDevelopment && isConnected && (
         <div className="dev-toggle-banner">
           <label className="toggle-label">
             <input 

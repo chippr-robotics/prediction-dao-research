@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useWeb3, useWallet } from '../hooks/useWeb3'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isConnected, account } = useWeb3()
   const { connectWallet, disconnectWallet } = useWallet()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false)
 
   const handleConnectWallet = async () => {
     await connectWallet()
@@ -21,9 +23,32 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
     setIsMenuOpen(!isMenuOpen)
   }
 
+  const closeMenu = () => {
+    setIsMenuOpen(false)
+  }
+
+  const scrollToSection = (sectionId) => {
+    closeMenu()
+    
+    // If we're on the landing page, scroll to section
+    if (location.pathname === '/') {
+      const element = document.getElementById(sectionId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' })
+      }
+    } else {
+      // Navigate to landing page with hash
+      navigate(`/#${sectionId}`)
+    }
+  }
+
   const truncateAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  }
+
+  const handleLogoError = () => {
+    setLogoError(true)
   }
 
   return (
@@ -31,25 +56,31 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
       <div className="header-container">
         {/* Logo Section */}
         <div className="header-logo" onClick={() => navigate('/')}>
-          <img 
-            src={showClearPathBranding ? "/logo_clearpath.svg" : "/logo_fwcp.svg"} 
-            alt={showClearPathBranding ? "ClearPath" : "FairWins & ClearPath"} 
-            className="header-logo-image"
-            onError={(e) => { 
-              e.target.style.display = 'none'
-              e.target.nextSibling.style.display = 'block'
-            }}
-          />
-          <span className="header-logo-text" style={{display: 'none'}}>
-            {showClearPathBranding ? 'ClearPath' : 'Prediction DAO'}
-          </span>
+          {!logoError ? (
+            <img 
+              src={showClearPathBranding ? "/logo_clearpath.svg" : "/logo_fwcp.svg"} 
+              alt={showClearPathBranding ? "ClearPath" : "FairWins & ClearPath"} 
+              className="header-logo-image"
+              onError={handleLogoError}
+            />
+          ) : (
+            <span className="header-logo-text">
+              {showClearPathBranding ? 'ClearPath' : 'Prediction DAO'}
+            </span>
+          )}
         </div>
 
         {/* Desktop Navigation */}
         <nav className="header-nav desktop-nav" aria-label="Main navigation">
-          <a href="/#how-it-works" className="nav-link">How It Works</a>
-          <a href="/#features" className="nav-link">Features</a>
-          <a href="/#use-cases" className="nav-link">Use Cases</a>
+          <button onClick={() => scrollToSection('how-it-works')} className="nav-link nav-button">
+            How It Works
+          </button>
+          <button onClick={() => scrollToSection('features')} className="nav-link nav-button">
+            Features
+          </button>
+          <button onClick={() => scrollToSection('use-cases')} className="nav-link nav-button">
+            Use Cases
+          </button>
           <button 
             onClick={() => navigate('/select')} 
             className="nav-link nav-button"
@@ -68,7 +99,12 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
                   className="connect-wallet-button"
                   aria-label="Connect your crypto wallet"
                 >
-                  <span className="button-icon">🔗</span>
+                  <span className="button-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </span>
                   Connect Wallet
                 </button>
               ) : (
@@ -109,13 +145,19 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
         className={`mobile-nav ${isMenuOpen ? 'open' : ''}`}
         aria-label="Mobile navigation"
       >
-        <a href="/#how-it-works" className="mobile-nav-link">How It Works</a>
-        <a href="/#features" className="mobile-nav-link">Features</a>
-        <a href="/#use-cases" className="mobile-nav-link">Use Cases</a>
+        <button onClick={() => scrollToSection('how-it-works')} className="mobile-nav-link">
+          How It Works
+        </button>
+        <button onClick={() => scrollToSection('features')} className="mobile-nav-link">
+          Features
+        </button>
+        <button onClick={() => scrollToSection('use-cases')} className="mobile-nav-link">
+          Use Cases
+        </button>
         <button 
           onClick={() => {
             navigate('/select')
-            setIsMenuOpen(false)
+            closeMenu()
           }} 
           className="mobile-nav-link"
         >
