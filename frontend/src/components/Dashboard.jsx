@@ -11,6 +11,7 @@ import { useCallback } from 'react'
 
 const DAOFactoryABI = [
   "function getUserDAOs(address user) external view returns (uint256[])",
+  "function getAllDAOs() external view returns (uint256[])",
   "function getDAO(uint256 daoId) external view returns (tuple(string name, string description, address futarchyGovernor, address welfareRegistry, address proposalRegistry, address marketFactory, address privacyCoordinator, address oracleResolver, address ragequitModule, address treasuryVault, address creator, uint256 createdAt, bool active))",
   "function hasDAORole(uint256 daoId, address user, bytes32 role) external view returns (bool)",
   "function DAO_ADMIN_ROLE() external view returns (bytes32)",
@@ -26,12 +27,17 @@ function Dashboard() {
   const { account } = useAccount()
   const [activeTab, setActiveTab] = useState('daos')
   const [userDAOs, setUserDAOs] = useState([])
+  const [allDAOs, setAllDAOs] = useState([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [browseLoading, setBrowseLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [browseError, setBrowseError] = useState(null)
 
   const loadUserDAOs = useCallback(async () => {
     try {
       setLoading(true)
+      setError(null)
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
       
       // Get user's DAO IDs
@@ -63,8 +69,46 @@ function Dashboard() {
       
     } catch (error) {
       console.error('Error loading user DAOs:', error)
+      setError(error.message || 'Failed to load your DAOs')
     } finally {
       setLoading(false)
+    }
+  }, [provider, account])
+
+  const loadAllDAOs = useCallback(async () => {
+    try {
+      setBrowseLoading(true)
+      setBrowseError(null)
+      const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
+      
+      // Get all DAO IDs
+      const allDaoIds = await factory.getAllDAOs()
+      
+      // Get user's DAO IDs to filter out
+      const userDaoIds = await factory.getUserDAOs(account)
+      const userDaoIdSet = new Set(userDaoIds.map(id => id.toString()))
+      
+      // Load DAO details for DAOs user hasn't joined
+      const daos = []
+      for (let i = 0; i < allDaoIds.length; i++) {
+        const daoId = allDaoIds[i].toString()
+        // Only include DAOs the user hasn't joined
+        if (!userDaoIdSet.has(daoId)) {
+          const dao = await factory.getDAO(allDaoIds[i])
+          daos.push({
+            id: daoId,
+            ...dao
+          })
+        }
+      }
+      
+      setAllDAOs(daos)
+      
+    } catch (error) {
+      console.error('Error loading all DAOs:', error)
+      setBrowseError(error.message || 'Failed to load available DAOs')
+    } finally {
+      setBrowseLoading(false)
     }
   }, [provider, account])
 
@@ -74,10 +118,23 @@ function Dashboard() {
     }
   }, [provider, account, loadUserDAOs])
 
+  useEffect(() => {
+    if (provider && account && activeTab === 'browse') {
+      loadAllDAOs()
+    }
+  }, [provider, account, activeTab, loadAllDAOs])
+
+  const handleRefresh = () => {
+    loadUserDAOs()
+    if (activeTab === 'browse') {
+      loadAllDAOs()
+    }
+  }
+
   // Tab list for ARIA pattern
   const tabs = isAdmin 
-    ? ['daos', 'proposals', 'submit', 'metrics', 'launchpad', 'admin']
-    : ['daos', 'proposals', 'submit', 'metrics', 'launchpad']
+    ? ['daos', 'browse', 'proposals', 'submit', 'metrics', 'launchpad', 'admin']
+    : ['daos', 'browse', 'proposals', 'submit', 'metrics', 'launchpad']
 
   // Handle keyboard navigation for ARIA tabs pattern
   const handleTabKeyDown = (e, currentTab) => {
@@ -101,17 +158,27 @@ function Dashboard() {
   }
 
   const renderTabContent = () => {
-    if (loading) {
-      return (
-        <div className="loading">
-          <p>Loading your DAOs...</p>
-        </div>
-      )
-    }
-
     switch (activeTab) {
       case 'daos':
-        return <DAOList daos={userDAOs} />
+        return (
+          <DAOList 
+            daos={userDAOs} 
+            loading={loading} 
+            error={error}
+            onRefresh={handleRefresh}
+            showJoinButton={false}
+          />
+        )
+      case 'browse':
+        return (
+          <DAOList 
+            daos={allDAOs} 
+            loading={browseLoading} 
+            error={browseError}
+            onRefresh={handleRefresh}
+            showJoinButton={true}
+          />
+        )
       case 'proposals':
         return <ProposalDashboard daos={userDAOs} />
       case 'submit':
@@ -119,7 +186,7 @@ function Dashboard() {
       case 'metrics':
         return <MetricsDashboard daos={userDAOs} />
       case 'launchpad':
-        return <DAOLaunchpad onDAOCreated={loadUserDAOs} />
+        return <DAOLaunchpad onDAOCreated={handleRefresh} />
       default:
         return null
     }
@@ -147,6 +214,18 @@ function Dashboard() {
           onKeyDown={(e) => handleTabKeyDown(e, 'daos')}
         >
           My DAOs
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'browse'}
+          aria-controls="browse-panel"
+          id="browse-tab"
+          tabIndex={activeTab === 'browse' ? 0 : -1}
+          className={`tab-button ${activeTab === 'browse' ? 'active' : ''}`}
+          onClick={() => setActiveTab('browse')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'browse')}
+        >
+          Browse DAOs
         </button>
         <button
           role="tab"
