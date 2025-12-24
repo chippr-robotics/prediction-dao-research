@@ -40,7 +40,7 @@ def main():
     
     # Read remappings from remappings.txt
     remappings = []
-    with open(remappings_file, 'r') as f:
+    with open(remappings_file, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith('#'):
@@ -98,14 +98,15 @@ def main():
         print(f"\n⚠ Manticore analysis timed out after {args.timeout}s")
         print("Partial results may be available in mcore_* directories")
         
-        # Don't fail on timeout - partial results are still useful
+        # Use exit code 124 (standard timeout exit code) instead of 0
+        # This allows CI systems to distinguish timeouts from successful completion
         mcore_dirs = list(project_root.glob("mcore_*"))
         if mcore_dirs:
             print(f"\nPartial results found in:")
             for mcore_dir in mcore_dirs:
                 print(f"  - {mcore_dir.relative_to(project_root)}")
         
-        sys.exit(0)  # Exit successfully even on timeout
+        sys.exit(124)  # Standard timeout exit code
         
     except FileNotFoundError:
         print(f"\n✗ Error: manticore command not found", file=sys.stderr)
