@@ -28,7 +28,7 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
           <div className="header-branding">
             <div className="brand-logo">
               <img 
-                src="/logo_fairwins.png" 
+                src="/logo_fairwins.svg" 
                 alt="FairWins Logo" 
                 className="logo-image"
                 onError={(e) => { e.target.style.display = 'none' }}
