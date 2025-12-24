@@ -587,7 +587,7 @@ Trade Details:
 - Type: ${tradeData.type}
 - Amount: ${tradeData.amount} ETC
 
-This would submit an encrypted position through the PrivacyCoordinator contract.`)
+This is a transparent market - all trades are publicly visible on the blockchain.`)
   }
 
   const handleScanMarket = (marketId) => {

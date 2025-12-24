@@ -179,9 +179,9 @@ function MarketHeroCard({ market, onTrade }) {
             Execute Trade
           </button>
 
-          <div className="privacy-notice">
-            <span aria-hidden="true">🔐</span>
-            <span>Your position will be encrypted using zero-knowledge proofs</span>
+          <div className="transparency-notice">
+            <span aria-hidden="true">👁️</span>
+            <span>Transparent market - all trades are publicly visible on the blockchain</span>
           </div>
         </form>
       </div>
