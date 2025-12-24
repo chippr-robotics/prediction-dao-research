@@ -92,9 +92,19 @@ const tx = await proposalRegistry.submitProposal(
 );
 
 const receipt = await tx.wait();
-const proposalId = receipt.events
-    .find(e => e.event === 'ProposalSubmitted')
-    .args.proposalId;
+
+// Parse the logs to find ProposalSubmitted event
+const proposalSubmittedEvent = receipt.logs
+    .map(log => {
+        try {
+            return proposalRegistry.interface.parseLog(log);
+        } catch (e) {
+            return null;
+        }
+    })
+    .find(event => event && event.name === 'ProposalSubmitted');
+
+const proposalId = proposalSubmittedEvent.args.proposalId;
 
 console.log(`Proposal submitted with ID: ${proposalId}`);
 ```
@@ -162,7 +172,8 @@ const failPrice = await marketFactory.getMarketPrice(marketId, false);
 
 console.log(`PASS token price: ${ethers.formatEther(passPrice)}`);
 console.log(`FAIL token price: ${ethers.formatEther(failPrice)}`);
-console.log(`Market believes ${ethers.formatEther(passPrice) * 100}% chance PASS scenario improves welfare`);
+const passPriceNum = parseFloat(ethers.formatEther(passPrice));
+console.log(`Market believes ${passPriceNum * 100}% chance PASS scenario improves welfare`);
 ```
 
 Prices always sum to 1 (technically 10^18 after scaling). If PASS trades at 0.65, FAIL trades at 0.35. This makes sense because one outcome must happen.
@@ -206,7 +217,7 @@ console.log(`Buying 100 PASS tokens will cost: ${ethers.formatEther(cost)} ETC`)
 
 // Check if this fits your budget
 const yourBalance = await ethers.provider.getBalance(yourAddress);
-if (cost.lt(yourBalance)) {
+if (cost < yourBalance) {
     console.log("You can afford this trade");
 } else {
     console.log("Insufficient funds");
@@ -704,7 +715,7 @@ When building applications on top of these contracts, several practices improve 
 
 ```javascript
 const gasEstimate = await contract.estimateGas.functionName(params);
-const gasLimit = gasEstimate.mul(120).div(100); // Add 20% buffer
+const gasLimit = (gasEstimate * 120n) / 100n; // Add 20% buffer
 const tx = await contract.functionName(params, { gasLimit });
 ```
 
@@ -761,7 +772,7 @@ function validateProposal(title, description, amount, recipient) {
     if (!description || description.length < 50) {
         throw new Error("Description too short, provide details");
     }
-    if (amount <= 0 || amount > ethers.parseEther("50000")) {
+    if (amount <= 0n || amount > ethers.parseEther("50000")) {
         throw new Error("Amount must be between 0 and 50,000 ETC");
     }
     if (!ethers.isAddress(recipient)) {
