@@ -114,19 +114,11 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
           {/* Branding Section */}
           <div className="brand-section">
             <div className="brand-logo">
-              <svg className="clover-icon" width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Right leaf */}
-                <path d="M24 24C24 19.5817 27.5817 16 32 16C36.4183 16 40 19.5817 40 24C40 28.4183 36.4183 32 32 32C27.5817 32 24 28.4183 24 24Z" fill="currentColor" opacity="0.9"/>
-                {/* Left leaf */}
-                <path d="M24 24C24 19.5817 20.4183 16 16 16C11.5817 16 8 19.5817 8 24C8 28.4183 11.5817 32 16 32C20.4183 32 24 28.4183 24 24Z" fill="currentColor" opacity="0.9"/>
-                {/* Top leaf */}
-                <path d="M24 24C19.5817 24 16 20.4183 16 16C16 11.5817 19.5817 8 24 8C28.4183 8 32 11.5817 32 16C32 20.4183 28.4183 24 24 24Z" fill="currentColor" opacity="0.9"/>
-                {/* Bottom leaf */}
-                <path d="M24 24C19.5817 24 16 27.5817 16 32C16 36.4183 19.5817 40 24 40C28.4183 40 32 36.4183 32 32C32 27.5817 28.4183 24 24 24Z" fill="currentColor" opacity="0.9"/>
-                {/* Center */}
-                <circle cx="24" cy="24" r="3" fill="currentColor"/>
-              </svg>
-              <span className="brand-name">FAIRWINS</span>
+              <img 
+                src="/logo_fairwins.svg" 
+                alt="FairWins" 
+                className="logo-image"
+              />
             </div>
             <p className="brand-tagline">Prediction Markets for Friends.</p>
           </div>
@@ -140,7 +132,7 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
                   size={240}
                   level="H"
                   includeMargin={false}
-                  fgColor="#5eead4"
+                  fgColor="#36B37E"
                   bgColor="transparent"
                   aria-label="QR code for market link"
                   imageSettings={{
