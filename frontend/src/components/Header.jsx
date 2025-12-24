@@ -1,0 +1,171 @@
+import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useWeb3, useWallet } from '../hooks/useWeb3'
+import './Header.css'
+
+function Header({ showClearPathBranding = false, hideWalletButton = false }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { isConnected, account } = useWeb3()
+  const { connectWallet, disconnectWallet } = useWallet()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [logoError, setLogoError] = useState(false)
+
+  const handleConnectWallet = async () => {
+    await connectWallet()
+  }
+
+  const handleDisconnect = () => {
+    disconnectWallet()
+  }
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen)
+  }
+
+  const closeMenu = () => {
+    setIsMenuOpen(false)
+  }
+
+  const scrollToSection = (sectionId) => {
+    closeMenu()
+    
+    // If we're on the landing page, scroll to section
+    if (location.pathname === '/') {
+      const element = document.getElementById(sectionId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' })
+      }
+    } else {
+      // Navigate to landing page with hash
+      navigate(`/#${sectionId}`)
+    }
+  }
+
+  const truncateAddress = (address) => {
+    if (!address) return ''
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  }
+
+  const handleLogoError = () => {
+    setLogoError(true)
+  }
+
+  return (
+    <header className="site-header" role="banner">
+      <div className="header-container">
+        {/* Logo Section */}
+        <div className="header-logo" onClick={() => navigate('/')}>
+          {!logoError ? (
+            <img 
+              src={showClearPathBranding ? "/logo_clearpath.svg" : "/logo_fwcp.svg"} 
+              alt={showClearPathBranding ? "ClearPath" : "FairWins & ClearPath"} 
+              className="header-logo-image"
+              onError={handleLogoError}
+            />
+          ) : (
+            <span className="header-logo-text">
+              {showClearPathBranding ? 'ClearPath' : 'Prediction DAO'}
+            </span>
+          )}
+        </div>
+
+        {/* Desktop Navigation */}
+        <nav className="header-nav desktop-nav" aria-label="Main navigation">
+          <button onClick={() => scrollToSection('how-it-works')} className="nav-link nav-button">
+            How It Works
+          </button>
+          <button onClick={() => scrollToSection('features')} className="nav-link nav-button">
+            Features
+          </button>
+          <button onClick={() => scrollToSection('use-cases')} className="nav-link nav-button">
+            Use Cases
+          </button>
+          <button 
+            onClick={() => navigate('/select')} 
+            className="nav-link nav-button"
+          >
+            Platforms
+          </button>
+        </nav>
+
+        {/* Wallet Connection Section */}
+        <div className="header-actions">
+          {!hideWalletButton && (
+            <>
+              {!isConnected ? (
+                <button 
+                  onClick={handleConnectWallet}
+                  className="connect-wallet-button"
+                  aria-label="Connect your crypto wallet"
+                >
+                  <span className="button-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </span>
+                  Connect Wallet
+                </button>
+              ) : (
+                <div className="wallet-connected">
+                  <span className="wallet-address" aria-label={`Connected wallet: ${account}`}>
+                    {truncateAddress(account)}
+                  </span>
+                  <button 
+                    onClick={handleDisconnect}
+                    className="disconnect-button"
+                    aria-label="Disconnect wallet"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Mobile Menu Toggle */}
+          <button 
+            className="mobile-menu-toggle"
+            onClick={toggleMenu}
+            aria-label="Toggle navigation menu"
+            aria-expanded={isMenuOpen}
+          >
+            <span className={`hamburger ${isMenuOpen ? 'open' : ''}`}>
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Navigation */}
+      <nav 
+        className={`mobile-nav ${isMenuOpen ? 'open' : ''}`}
+        aria-label="Mobile navigation"
+      >
+        <button onClick={() => scrollToSection('how-it-works')} className="mobile-nav-link">
+          How It Works
+        </button>
+        <button onClick={() => scrollToSection('features')} className="mobile-nav-link">
+          Features
+        </button>
+        <button onClick={() => scrollToSection('use-cases')} className="mobile-nav-link">
+          Use Cases
+        </button>
+        <button 
+          onClick={() => {
+            navigate('/select')
+            closeMenu()
+          }} 
+          className="mobile-nav-link"
+        >
+          Platforms
+        </button>
+      </nav>
+    </header>
+  )
+}
+
+export default Header
