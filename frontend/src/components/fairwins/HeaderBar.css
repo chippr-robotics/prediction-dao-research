@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   height: 70px;
-  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--primary-button-hover) 100%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   z-index: 200;
   display: flex;

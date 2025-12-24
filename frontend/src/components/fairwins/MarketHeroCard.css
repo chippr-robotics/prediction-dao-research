@@ -46,7 +46,7 @@
 .hero-category-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #3B82F6;
+  color: var(--brand-primary);
   letter-spacing: 0.5px;
 }
 
@@ -300,14 +300,14 @@
 
 .trade-input-group input:focus {
   outline: none;
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
 }
 
 .trade-submit-btn {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  background: linear-gradient(135deg, var(--brand-primary), var(--primary-button-hover));
   color: white;
   border: none;
   border-radius: 8px;

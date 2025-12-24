@@ -71,6 +71,7 @@
 .platform-fairwins {
   /* FairWins Brand Colors */
   --brand-primary: #36B37E;     /* Winning Green */
+  --brand-primary-rgb: 54, 179, 126; /* RGB values for rgba usage */
   --brand-secondary: #4C9AFF;   /* Odds Blue */
   --brand-accent: #7BDCB5;      /* Momentum Mint */
 
