@@ -9,6 +9,19 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Smooth scroll behavior for anchor links */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px; /* Offset for sticky header */
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 a {
   font-weight: 500;
   color: var(--brand-primary);
