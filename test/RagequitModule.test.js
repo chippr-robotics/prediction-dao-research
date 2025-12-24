@@ -265,7 +265,7 @@ describe("RagequitModule", function () {
       const treasuryBalance = await ethers.provider.getBalance(testVault.address);
       
       const expectedShare = (treasuryBalance * tokenAmount) / totalSupply;
-      const calculatedShare = await testModule.calculateTreasuryShare(testUser.address, tokenAmount);
+      const calculatedShare = await testModule.calculateTreasuryShare(tokenAmount);
       
       expect(calculatedShare).to.equal(expectedShare);
     });
@@ -289,7 +289,7 @@ describe("RagequitModule", function () {
       );
       
       await expect(
-        testModule.calculateTreasuryShare(testUser.address, 0)
+        testModule.calculateTreasuryShare(0)
       ).to.be.revertedWith("Invalid token amount");
     });
 
@@ -316,7 +316,7 @@ describe("RagequitModule", function () {
       const totalSupply = await testToken.totalSupply();
       const expectedShare = (treasuryBalance * tokenAmount) / totalSupply;
       
-      const share = await newRagequitModule.calculateTreasuryShare(testUser.address, tokenAmount);
+      const share = await newRagequitModule.calculateTreasuryShare(tokenAmount);
       
       // With zero or minimal treasury balance, share should match calculation
       expect(share).to.equal(expectedShare);

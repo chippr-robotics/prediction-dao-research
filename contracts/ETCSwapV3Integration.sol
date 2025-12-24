@@ -314,7 +314,6 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
      */
     function buyTokens(
         uint256 marketId,
-        bool /* buyPass */,
         address collateralToken,
         address outcomeToken,
         uint256 collateralAmount,
@@ -382,7 +381,6 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
      */
     function sellTokens(
         uint256 marketId,
-        bool /* sellPass */,
         address outcomeToken,
         address collateralToken,
         uint256 tokenAmount,
