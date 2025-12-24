@@ -138,6 +138,9 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         uint256 liquidityParameter,
         uint256 tradingPeriod
     ) external onlyOwner whenNotPaused returns (uint256 governanceProposalId) {
+        // Allocate governance proposal ID first
+        governanceProposalId = governanceProposalCount++;
+
         // Deploy conditional market
         uint256 marketId = marketFactory.deployMarketPair(
             proposalId,
@@ -147,8 +150,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             tradingPeriod
         );
 
-        governanceProposalId = governanceProposalCount++;
-
+        // Store governance proposal after external call
         governanceProposals[governanceProposalId] = GovernanceProposal({
             proposalId: proposalId,
             marketId: marketId,
@@ -239,11 +241,14 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             uint256 fundingAmount,
             address recipient,
             ,
-            ,
+            ProposalRegistry.ProposalStatus status,
             address fundingToken,
             uint256 startDate,
             uint256 executionDeadline
         ) = proposalRegistry.getProposal(govProposal.proposalId);
+        
+        // Verify proposal is still active (not cancelled or expired)
+        require(status == ProposalRegistry.ProposalStatus.Active, "Proposal must be active");
 
         // Check execution constraints
         require(block.timestamp >= startDate, "Execution start date not reached");
