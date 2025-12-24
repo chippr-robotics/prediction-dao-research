@@ -35,7 +35,7 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
             <div className="branding">
               <div className="brand-logo">
                 <img 
-                  src="/logo_clearpath.png" 
+                  src="/logo_clearpath.svg" 
                   alt="ClearPath Logo" 
                   className="logo-image"
                   onError={(e) => { e.target.style.display = 'none' }}
