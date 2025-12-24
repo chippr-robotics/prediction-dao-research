@@ -4,6 +4,29 @@
   gap: 1.5rem;
   padding: 1rem 0;
   animation: fadeIn 0.4s ease-in;
+  flex: 1; /* Take remaining space in flex container */
+  overflow-y: auto;
+  padding-right: 4px; /* Add padding to prevent scrollbar from overlapping content */
+  min-height: 0; /* Allow flex item to shrink below content size */
+}
+
+/* Custom scrollbar styling */
+.market-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.market-grid::-webkit-scrollbar-track {
+  background: var(--bg-light, rgba(255, 255, 255, 0.05));
+  border-radius: 4px;
+}
+
+.market-grid::-webkit-scrollbar-thumb {
+  background: rgba(97, 218, 251, 0.3);
+  border-radius: 4px;
+}
+
+.market-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(97, 218, 251, 0.5);
 }
 
 @keyframes fadeIn {
@@ -23,6 +46,29 @@
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
   padding: 1rem 0;
+  flex: 1; /* Take remaining space in flex container */
+  overflow-y: auto;
+  padding-right: 4px;
+  min-height: 0; /* Allow flex item to shrink below content size */
+}
+
+/* Custom scrollbar styling for loading state */
+.market-grid-loading::-webkit-scrollbar {
+  width: 8px;
+}
+
+.market-grid-loading::-webkit-scrollbar-track {
+  background: var(--bg-light, rgba(255, 255, 255, 0.05));
+  border-radius: 4px;
+}
+
+.market-grid-loading::-webkit-scrollbar-thumb {
+  background: rgba(97, 218, 251, 0.3);
+  border-radius: 4px;
+}
+
+.market-grid-loading::-webkit-scrollbar-thumb:hover {
+  background: rgba(97, 218, 251, 0.5);
 }
 
 .loading-skeleton {
@@ -103,6 +149,7 @@
   .market-grid-loading {
     grid-template-columns: 1fr;
     gap: 1rem;
+    /* Keep flex: 1 for dynamic sizing on mobile as well */
   }
 
   .market-grid-empty {
