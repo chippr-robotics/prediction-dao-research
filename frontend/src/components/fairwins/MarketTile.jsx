@@ -89,7 +89,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
       <h3 className="tile-title">{market.proposalTitle}</h3>
 
       <p className="tile-secondary">
-        {market.description ? `${market.description.substring(0, 50)}... • ` : ''}
         {formatTimeRemaining(market.tradingEndTime)} remaining
       </p>
 
