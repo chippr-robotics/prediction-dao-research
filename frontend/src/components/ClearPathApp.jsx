@@ -1,8 +1,7 @@
-import { useState } from 'react'
 import './ClearPathApp.css'
 import Dashboard from './Dashboard'
 
-function ClearPathApp({ provider, signer, account, onDisconnect, onBack }) {
+function ClearPathApp({ provider, signer, account, onDisconnect, onBack, networkError }) {
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
@@ -35,7 +34,10 @@ function ClearPathApp({ provider, signer, account, onDisconnect, onBack }) {
           <div className="wallet-section">
             <div className="connected-wallet">
               <div className="wallet-info">
-                <span className="wallet-address">{shortenAddress(account)}</span>
+                <span className="connection-status" aria-label="Wallet connected">
+                  <span className="status-indicator" aria-hidden="true">●</span>
+                  <span className="wallet-address">{shortenAddress(account)}</span>
+                </span>
               </div>
               <button onClick={onDisconnect} className="disconnect-button">
                 Disconnect
@@ -46,7 +48,16 @@ function ClearPathApp({ provider, signer, account, onDisconnect, onBack }) {
       </header>
 
       <main className="clearpath-main">
-        <Dashboard provider={provider} signer={signer} account={account} />
+        {networkError ? (
+          <div className="network-error-message" role="alert">
+            <div className="error-icon" aria-hidden="true">⚠️</div>
+            <h2>Network Mismatch</h2>
+            <p>{networkError}</p>
+            <p className="error-help">Please switch to the correct network to continue.</p>
+          </div>
+        ) : (
+          <Dashboard provider={provider} signer={signer} account={account} />
+        )}
       </main>
 
       <footer className="clearpath-footer">
