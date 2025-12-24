@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useEthers } from '../hooks/useWeb3'
+import './MarketTrading.css'
 
 function MarketTrading() {
   const { provider, signer } = useEthers()
@@ -8,6 +9,7 @@ function MarketTrading() {
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [loading, setLoading] = useState(true)
+  const [errors, setErrors] = useState({})
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -51,11 +53,28 @@ function MarketTrading() {
     loadMarkets()
   }, [loadMarkets])
 
+  const validateTrade = () => {
+    const newErrors = {}
+    
+    if (!tradeAmount || parseFloat(tradeAmount) <= 0) {
+      newErrors.tradeAmount = 'Please enter a valid amount greater than 0'
+    } else if (parseFloat(tradeAmount) > 10000) {
+      newErrors.tradeAmount = 'Amount exceeds maximum trade size (10,000 ETC)'
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleTrade = async (e) => {
     e.preventDefault()
 
-    if (!selectedMarket || !tradeAmount) {
-      alert('Please select a market and enter a trade amount')
+    if (!selectedMarket) {
+      alert('Please select a market first')
+      return
+    }
+
+    if (!validateTrade()) {
       return
     }
 
@@ -68,6 +87,7 @@ Trade Details:
 - Market: ${selectedMarket.proposalTitle}
 - Type: ${tradeType}
 - Amount: ${tradeAmount} ETC
+- Price: ${tradeType === 'PASS' ? selectedMarket.passTokenPrice : selectedMarket.failTokenPrice} ETC
 
 This would submit an encrypted position through the PrivacyCoordinator contract using:
 - Poseidon encryption for position privacy
@@ -75,6 +95,7 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
 - MACI-style key-change capability`)
 
       setTradeAmount('')
+      setErrors({})
     } catch (error) {
       console.error('Error executing trade:', error)
       alert('Failed to execute trade: ' + error.message)
@@ -95,34 +116,62 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
   }
 
   if (loading) {
-    return <div className="loading">Loading prediction markets...</div>
+    return (
+      <div className="loading" role="status" aria-live="polite">
+        <span className="sr-only">Loading prediction markets...</span>
+        Loading prediction markets...
+      </div>
+    )
   }
 
   if (markets.length === 0) {
-    return <div className="no-markets">No active markets. Markets will appear when proposals are created.</div>
+    return (
+      <div className="no-markets" role="status">
+        <div className="placeholder-icon" aria-hidden="true">🎯</div>
+        <p>No active markets. Markets will appear when proposals are created.</p>
+      </div>
+    )
   }
 
   return (
     <div className="market-trading">
+      <h2>Active Prediction Markets</h2>
+      
       <div className="markets-grid">
         {markets.map((market) => (
           <div 
             key={market.id} 
             className={`market-card ${selectedMarket?.id === market.id ? 'selected' : ''}`}
             onClick={() => setSelectedMarket(market)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setSelectedMarket(market)
+              }
+            }}
+            role="button"
+            tabIndex="0"
+            aria-label={`Select market: ${market.proposalTitle}`}
+            aria-pressed={selectedMarket?.id === market.id}
           >
             <h3>{market.proposalTitle}</h3>
             
             <div className="market-prices">
               <div className="price-item pass">
-                <label>PASS Token</label>
+                <label>
+                  <span className="sr-only">Upward arrow icon indicating PASS token</span>
+                  PASS Token
+                </label>
                 <div className="price">{market.passTokenPrice} ETC</div>
                 <div className="probability">
                   {calculateImpliedProbability(market.passTokenPrice)}% implied
                 </div>
               </div>
               <div className="price-item fail">
-                <label>FAIL Token</label>
+                <label>
+                  <span className="sr-only">Downward arrow icon indicating FAIL token</span>
+                  FAIL Token
+                </label>
                 <div className="price">{market.failTokenPrice} ETC</div>
                 <div className="probability">
                   {calculateImpliedProbability(market.failTokenPrice)}% implied
@@ -132,10 +181,19 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
 
             <div className="market-info">
               <div className="info-item">
-                <strong>Liquidity:</strong> {market.totalLiquidity} ETC
+                <strong>Liquidity:</strong> 
+                <span>{market.totalLiquidity} ETC</span>
               </div>
               <div className="info-item">
-                <strong>Time Remaining:</strong> {formatTimeRemaining(market.tradingEndTime)}
+                <strong>Time Remaining:</strong> 
+                <span>{formatTimeRemaining(market.tradingEndTime)}</span>
+              </div>
+              <div className="info-item">
+                <strong>Status:</strong>
+                <span className="status-badge">
+                  <span className="sr-only">Checkmark icon indicating active status</span>
+                  {market.status}
+                </span>
               </div>
             </div>
           </div>
@@ -148,41 +206,70 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
           
           <form onSubmit={handleTrade}>
             <div className="form-group">
-              <label>Token Type</label>
-              <div className="token-selector">
+              <label id="token-type-label">Token Type</label>
+              <div className="token-selector" role="group" aria-labelledby="token-type-label">
                 <button
                   type="button"
                   className={`token-button ${tradeType === 'PASS' ? 'active' : ''}`}
                   onClick={() => setTradeType('PASS')}
+                  aria-pressed={tradeType === 'PASS'}
+                  aria-label={`Select PASS token at ${selectedMarket.passTokenPrice} ETC`}
                 >
-                  PASS ({selectedMarket.passTokenPrice} ETC)
+                  <span aria-hidden="true">↑</span> PASS ({selectedMarket.passTokenPrice} ETC)
                 </button>
                 <button
                   type="button"
                   className={`token-button ${tradeType === 'FAIL' ? 'active' : ''}`}
                   onClick={() => setTradeType('FAIL')}
+                  aria-pressed={tradeType === 'FAIL'}
+                  aria-label={`Select FAIL token at ${selectedMarket.failTokenPrice} ETC`}
                 >
-                  FAIL ({selectedMarket.failTokenPrice} ETC)
+                  <span aria-hidden="true">↓</span> FAIL ({selectedMarket.failTokenPrice} ETC)
                 </button>
               </div>
             </div>
 
             <div className="form-group">
-              <label htmlFor="tradeAmount">Amount (ETC)</label>
+              <label htmlFor="tradeAmount">
+                Amount (ETC)
+                <span className="required" aria-label="required">*</span>
+              </label>
               <input
                 type="number"
                 id="tradeAmount"
                 value={tradeAmount}
-                onChange={(e) => setTradeAmount(e.target.value)}
+                onChange={(e) => {
+                  setTradeAmount(e.target.value)
+                  if (errors.tradeAmount) {
+                    setErrors({})
+                  }
+                }}
                 placeholder="Enter amount"
                 step="0.01"
                 min="0"
                 required
+                aria-required="true"
+                aria-invalid={errors.tradeAmount ? "true" : "false"}
+                aria-describedby={errors.tradeAmount ? "tradeAmount-error" : "tradeAmount-help"}
               />
+              <small id="tradeAmount-help" className="helper-text">
+                Minimum: 0.01 ETC, Maximum: 10,000 ETC
+              </small>
+              {errors.tradeAmount && (
+                <span 
+                  id="tradeAmount-error"
+                  className="error-text" 
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  {errors.tradeAmount}
+                </span>
+              )}
             </div>
 
-            <div className="privacy-notice">
-              🔐 Your position will be encrypted using Nightmarket-style zero-knowledge encryption
+            <div className="privacy-notice" role="note">
+              <span aria-hidden="true">🔐</span>
+              <span>Your position will be encrypted using Nightmarket-style zero-knowledge encryption</span>
             </div>
 
             <button type="submit" className="trade-submit-button">
