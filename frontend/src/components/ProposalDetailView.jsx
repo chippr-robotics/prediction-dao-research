@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
+import { usePrice } from '../contexts/PriceContext'
+import CurrencyToggle from './ui/CurrencyToggle'
 import './ProposalDetailView.css'
 import { useEthers } from '../hooks/useWeb3'
 
@@ -18,6 +20,7 @@ const FutarchyMarketABI = [
 
 function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
   const { provider } = useEthers()
+  const { formatPrice } = usePrice()
   const [proposal, setProposal] = useState(null)
   const [marketData, setMarketData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -167,10 +170,13 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
         <div className="proposal-detail-header">
           <div className="header-main">
             <h2>{proposal.title}</h2>
-            <span className={`status-badge status-${getStatusText(proposal.status).toLowerCase()}`}>
-              <span aria-hidden="true">{getStatusIcon(proposal.status)}</span>
-              {getStatusText(proposal.status)}
-            </span>
+            <div className="header-actions">
+              <CurrencyToggle />
+              <span className={`status-badge status-${getStatusText(proposal.status).toLowerCase()}`}>
+                <span aria-hidden="true">{getStatusIcon(proposal.status)}</span>
+                {getStatusText(proposal.status)}
+              </span>
+            </div>
           </div>
           <div className="proposal-meta">
             <span className="meta-item">
@@ -244,7 +250,7 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
                   <span className="detail-icon" aria-hidden="true">💰</span>
                   <div className="detail-content">
                     <span className="detail-label">Funding Amount</span>
-                    <span className="detail-value">{formatAmount(proposal.fundingAmount)} ETC</span>
+                    <span className="detail-value">{formatPrice(formatAmount(proposal.fundingAmount), { showBoth: true })}</span>
                   </div>
                 </div>
 
@@ -272,7 +278,7 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
                   <span className="detail-icon" aria-hidden="true">🔒</span>
                   <div className="detail-content">
                     <span className="detail-label">Bond</span>
-                    <span className="detail-value">{formatAmount(proposal.bond)} ETC</span>
+                    <span className="detail-value">{formatPrice(formatAmount(proposal.bond), { showBoth: true })}</span>
                   </div>
                 </div>
               </div>
@@ -308,7 +314,7 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
                       <span className="stat-icon success" aria-hidden="true">↑</span>
                       <div className="stat-content">
                         <span className="stat-label">PASS Token Price</span>
-                        <span className="stat-value">{formatAmount(marketData.passPrice)} ETC</span>
+                        <span className="stat-value">{formatPrice(formatAmount(marketData.passPrice), { showBoth: true, decimals: 4 })}</span>
                       </div>
                     </div>
 
@@ -316,7 +322,7 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
                       <span className="stat-icon danger" aria-hidden="true">↓</span>
                       <div className="stat-content">
                         <span className="stat-label">FAIL Token Price</span>
-                        <span className="stat-value">{formatAmount(marketData.failPrice)} ETC</span>
+                        <span className="stat-value">{formatPrice(formatAmount(marketData.failPrice), { showBoth: true, decimals: 4 })}</span>
                       </div>
                     </div>
 
@@ -324,7 +330,7 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
                       <span className="stat-icon" aria-hidden="true">💧</span>
                       <div className="stat-content">
                         <span className="stat-label">Total Liquidity</span>
-                        <span className="stat-value">{formatAmount(marketData.liquidity)} ETC</span>
+                        <span className="stat-value">{formatPrice(formatAmount(marketData.liquidity), { showBoth: true })}</span>
                       </div>
                     </div>
 
@@ -332,7 +338,7 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
                       <span className="stat-icon" aria-hidden="true">📊</span>
                       <div className="stat-content">
                         <span className="stat-label">Trading Volume</span>
-                        <span className="stat-value">{formatAmount(marketData.volume)} ETC</span>
+                        <span className="stat-value">{formatPrice(formatAmount(marketData.volume), { showBoth: true })}</span>
                       </div>
                     </div>
                   </div>

@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
+import { usePrice } from '../contexts/PriceContext'
+import CurrencyToggle from './ui/CurrencyToggle'
 import './MarketTrading.css'
 
 function MarketTrading() {
   const { isConnected } = useWeb3()
+  const { formatPrice } = usePrice()
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeAmount, setTradeAmount] = useState('')
@@ -327,20 +330,23 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
     <div className="market-trading">
       <div className="markets-header">
         <h2>Explore Prediction Markets</h2>
-        <div className="search-container">
-          <label htmlFor="market-search" className="sr-only">
-            Search markets by name, category, or tags
-          </label>
-          <input
-            id="market-search"
-            type="text"
-            className="search-input"
-            placeholder="Search markets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search prediction markets by name, category, or tags"
-          />
-          <span className="search-icon" aria-hidden="true">🔍</span>
+        <div className="header-controls">
+          <CurrencyToggle />
+          <div className="search-container">
+            <label htmlFor="market-search" className="sr-only">
+              Search markets by name, category, or tags
+            </label>
+            <input
+              id="market-search"
+              type="text"
+              className="search-input"
+              placeholder="Search markets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search prediction markets by name, category, or tags"
+            />
+            <span className="search-icon" aria-hidden="true">🔍</span>
+          </div>
         </div>
       </div>
 
@@ -421,7 +427,7 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
                       <div className="market-meta">
                         <div className="meta-item">
                           <span className="meta-label">Liquidity</span>
-                          <span className="meta-value">{(parseFloat(market.totalLiquidity) / 1000).toFixed(1)}K</span>
+                          <span className="meta-value">{formatPrice(market.totalLiquidity, { compact: true })}</span>
                         </div>
                         <div className="meta-item">
                           <span className="meta-label">Ends in</span>
@@ -461,18 +467,20 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
                   className={`token-button ${tradeType === 'PASS' ? 'active' : ''}`}
                   onClick={() => setTradeType('PASS')}
                   aria-pressed={tradeType === 'PASS'}
-                  aria-label={`Select PASS token at ${selectedMarket.passTokenPrice} ETC`}
+                  aria-label={`Select PASS token at ${formatPrice(selectedMarket.passTokenPrice, { showBoth: true })}`}
                 >
-                  <span aria-hidden="true">↑</span> PASS ({selectedMarket.passTokenPrice} ETC)
+                  <span aria-hidden="true">↑</span> PASS<br />
+                  <small>{formatPrice(selectedMarket.passTokenPrice, { showBoth: true })}</small>
                 </button>
                 <button
                   type="button"
                   className={`token-button ${tradeType === 'FAIL' ? 'active' : ''}`}
                   onClick={() => setTradeType('FAIL')}
                   aria-pressed={tradeType === 'FAIL'}
-                  aria-label={`Select FAIL token at ${selectedMarket.failTokenPrice} ETC`}
+                  aria-label={`Select FAIL token at ${formatPrice(selectedMarket.failTokenPrice, { showBoth: true })}`}
                 >
-                  <span aria-hidden="true">↓</span> FAIL ({selectedMarket.failTokenPrice} ETC)
+                  <span aria-hidden="true">↓</span> FAIL<br />
+                  <small>{formatPrice(selectedMarket.failTokenPrice, { showBoth: true })}</small>
                 </button>
               </div>
             </div>

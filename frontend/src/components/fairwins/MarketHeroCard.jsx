@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { usePrice } from '../../contexts/PriceContext'
+import CurrencyToggle from '../ui/CurrencyToggle'
 import './MarketHeroCard.css'
 
 function MarketHeroCard({ market, onTrade }) {
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
+  const { formatPrice } = usePrice()
 
   if (!market) {
     return null
@@ -11,17 +14,6 @@ function MarketHeroCard({ market, onTrade }) {
 
   const calculateImpliedProbability = (passPrice) => {
     return (parseFloat(passPrice) * 100).toFixed(1)
-  }
-
-  const formatLiquidity = (liquidity) => {
-    const num = parseFloat(liquidity)
-    if (num >= 1000000) {
-      return `$${(num / 1000000).toFixed(2)}M`
-    }
-    if (num >= 1000) {
-      return `$${(num / 1000).toFixed(1)}K`
-    }
-    return `$${num.toFixed(0)}`
   }
 
   const formatTimeRemaining = (endTime) => {
@@ -78,6 +70,7 @@ function MarketHeroCard({ market, onTrade }) {
           </span>
         </div>
         <div className="hero-actions">
+          <CurrencyToggle />
           <button className="hero-action-btn share" aria-label="Share market">
             <span aria-hidden="true">🔗</span> Share
           </button>
@@ -107,7 +100,7 @@ function MarketHeroCard({ market, onTrade }) {
 
         <div className="stat-card">
           <span className="stat-label">Total Volume</span>
-          <span className="stat-number">{formatLiquidity(market.totalLiquidity)}</span>
+          <span className="stat-number">{formatPrice(market.totalLiquidity, { compact: true })}</span>
         </div>
 
         <div className="stat-card">
@@ -145,7 +138,7 @@ function MarketHeroCard({ market, onTrade }) {
               <span className="btn-icon">↑</span>
               <div className="btn-content">
                 <span className="btn-label">Buy YES</span>
-                <span className="btn-price">{market.passTokenPrice} ETC</span>
+                <span className="btn-price">{formatPrice(market.passTokenPrice, { showBoth: true, decimals: 4 })}</span>
               </div>
             </button>
             <button
@@ -157,7 +150,7 @@ function MarketHeroCard({ market, onTrade }) {
               <span className="btn-icon">↓</span>
               <div className="btn-content">
                 <span className="btn-label">Buy NO</span>
-                <span className="btn-price">{market.failTokenPrice} ETC</span>
+                <span className="btn-price">{formatPrice(market.failTokenPrice, { showBoth: true, decimals: 4 })}</span>
               </div>
             </button>
           </div>

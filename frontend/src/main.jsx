@@ -8,6 +8,7 @@ import { config } from './wagmi'
 import { Web3Provider } from './contexts/Web3Context'
 import { UIProvider } from './contexts/UIContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { PriceProvider } from './contexts/PriceContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 // Create query client for wagmi
@@ -21,7 +22,9 @@ createRoot(document.getElementById('root')).render(
           <ThemeProvider>
             <Web3Provider>
               <UIProvider>
-                <App />
+                <PriceProvider>
+                  <App />
+                </PriceProvider>
               </UIProvider>
             </Web3Provider>
           </ThemeProvider>

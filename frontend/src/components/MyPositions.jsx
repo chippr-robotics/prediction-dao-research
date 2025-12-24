@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
+import { usePrice } from '../contexts/PriceContext'
+import CurrencyToggle from './ui/CurrencyToggle'
 import './MyPositions.css'
 
 function MyPositions() {
   const { isConnected } = useWeb3()
+  const { formatPrice } = usePrice()
   const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, settled
@@ -145,16 +148,19 @@ This would:
   return (
     <div className="my-positions">
       <div className="positions-header">
-        <h2>My Positions</h2>
+        <div className="positions-header-top">
+          <h2>My Positions</h2>
+          <CurrencyToggle />
+        </div>
         <div className="portfolio-summary">
           <div className="summary-card">
             <div className="summary-label">Total Value</div>
-            <div className="summary-value">{calculateTotalValue()} ETC</div>
+            <div className="summary-value">{formatPrice(calculateTotalValue())}</div>
           </div>
           <div className="summary-card">
             <div className="summary-label">Total P&L</div>
             <div className={`summary-value ${parseFloat(calculateTotalPnL()) >= 0 ? 'profit' : 'loss'}`}>
-              {calculateTotalPnL()} ETC
+              {formatPrice(calculateTotalPnL())}
             </div>
           </div>
           <div className="summary-card">
@@ -229,11 +235,11 @@ This would:
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Entry Price</span>
-                  <span className="detail-value">{position.entryPrice} ETC</span>
+                  <span className="detail-value">{formatPrice(position.entryPrice, { showBoth: true, decimals: 4 })}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Current Price</span>
-                  <span className="detail-value">{position.currentPrice} ETC</span>
+                  <span className="detail-value">{formatPrice(position.currentPrice, { showBoth: true, decimals: 4 })}</span>
                 </div>
               </div>
 
@@ -245,7 +251,7 @@ This would:
                 <div className="detail-item">
                   <span className="detail-label">Position Value</span>
                   <span className="detail-value">
-                    {(parseFloat(position.amount) * parseFloat(position.currentPrice)).toFixed(2)} ETC
+                    {formatPrice((parseFloat(position.amount) * parseFloat(position.currentPrice)).toFixed(2), { showBoth: true })}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -254,7 +260,7 @@ This would:
                     <span aria-hidden="true">
                       {parseFloat(position.unrealizedPnL) >= 0 ? '▲' : '▼'}
                     </span>
-                    {position.unrealizedPnL} ETC ({position.unrealizedPnLPercent}%)
+                    {formatPrice(position.unrealizedPnL, { showBoth: true })} ({position.unrealizedPnLPercent}%)
                   </span>
                 </div>
               </div>
