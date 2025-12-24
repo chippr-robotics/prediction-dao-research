@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -468,11 +469,13 @@ const getMockMarkets = () => {
 
 function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   const { account, isConnected } = useWeb3()
+  const isMobile = useIsMobile()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCarousel, setShowCarousel] = useState(true)
+  const [isCarouselMinimized, setIsCarouselMinimized] = useState(false)
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -495,17 +498,26 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
     loadMarkets()
   }, [loadMarkets])
 
-  // Handle scroll to hide/show carousel
+  // Handle scroll to hide/show carousel - enhanced for mobile
   useEffect(() => {
     let scrollTimeout
     const handleScroll = () => {
       const scrollTop = window.scrollY || document.documentElement.scrollTop
       
-      // Hide carousel when scrolling down past 100px
-      if (scrollTop > 100) {
-        setShowCarousel(false)
+      // On mobile, hide carousel when scrolling down past threshold
+      if (isMobile) {
+        if (scrollTop > 150) {
+          setShowCarousel(false)
+        } else {
+          setShowCarousel(true)
+        }
       } else {
-        setShowCarousel(true)
+        // Desktop behavior - hide when scrolling down past 100px
+        if (scrollTop > 100) {
+          setShowCarousel(false)
+        } else {
+          setShowCarousel(true)
+        }
       }
       
       // Clear existing timeout
@@ -513,10 +525,12 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
         clearTimeout(scrollTimeout)
       }
       
-      // Show carousel again after user stops scrolling for 1 second
-      scrollTimeout = setTimeout(() => {
-        setShowCarousel(true)
-      }, 1000)
+      // Show carousel again after user stops scrolling for 1 second (desktop only)
+      if (!isMobile) {
+        scrollTimeout = setTimeout(() => {
+          setShowCarousel(true)
+        }, 1000)
+      }
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -527,7 +541,7 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
         clearTimeout(scrollTimeout)
       }
     }
-  }, [])
+  }, [isMobile])
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -651,23 +665,36 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
 
           {/* Fixed Bottom Carousel - Shows current category markets */}
           {selectedMarket && (
-            <div className={`fixed-bottom-carousel ${showCarousel ? 'visible' : 'hidden'}`}>
+            <div className={`fixed-bottom-carousel ${showCarousel ? 'visible' : 'hidden'} ${isCarouselMinimized ? 'minimized' : ''}`}>
               <div className="carousel-header">
                 <h3>More in {selectedMarket.category.replace('-', ' ').toUpperCase()}</h3>
-                <span className="carousel-hint">Click any market to make it the hero ↑</span>
+                <div className="carousel-controls">
+                  {isMobile && (
+                    <button 
+                      className="carousel-toggle-btn"
+                      onClick={() => setIsCarouselMinimized(!isCarouselMinimized)}
+                      aria-label={isCarouselMinimized ? "Expand carousel" : "Minimize carousel"}
+                    >
+                      {isCarouselMinimized ? '▲' : '▼'}
+                    </button>
+                  )}
+                  <span className="carousel-hint">Click any market to make it the hero ↑</span>
+                </div>
               </div>
-              <div className="carousel-scroller">
-                {getCarouselMarkets().map((market) => (
-                  <div key={market.id} className="carousel-item">
-                    <MarketTile 
-                      market={market}
-                      onClick={handleMarketClick}
-                      isActive={selectedMarket?.id === market.id}
-                      compact={true}
-                    />
-                  </div>
-                ))}
-              </div>
+              {!isCarouselMinimized && (
+                <div className="carousel-scroller">
+                  {getCarouselMarkets().map((market) => (
+                    <div key={market.id} className="carousel-item">
+                      <MarketTile 
+                        market={market}
+                        onClick={handleMarketClick}
+                        isActive={selectedMarket?.id === market.id}
+                        compact={true}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

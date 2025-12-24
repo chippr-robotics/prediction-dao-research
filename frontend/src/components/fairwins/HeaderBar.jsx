@@ -1,6 +1,12 @@
+import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import './HeaderBar.css'
 
 function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
+  const { isScrollingDown } = useScrollDirection(10)
+  const hasScrolled = useScrollPast(50)
+  const isMobile = useIsMobile()
+
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
@@ -12,8 +18,11 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account }) {
     }
   }
 
+  // Hide header on mobile when scrolling down
+  const shouldHideHeader = isMobile && isScrollingDown && hasScrolled
+
   return (
-    <header className="header-bar">
+    <header className={`header-bar ${shouldHideHeader ? 'header-hidden' : ''} ${hasScrolled ? 'header-scrolled' : ''}`}>
       <div className="header-content">
         <div className="header-left">
           {onBack && (
