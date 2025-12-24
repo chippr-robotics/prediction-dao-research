@@ -367,7 +367,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 // Execute swap with slippage protection
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
                     marketId,
-                    buyPass,
                     market.collateralToken,
                     outcomeToken,
                     amount,
@@ -386,7 +385,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
                     marketId,
-                    buyPass,
                     market.collateralToken,
                     outcomeToken,
                     amount,
@@ -458,7 +456,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 // Execute swap with slippage protection
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
                     marketId,
-                    sellPass,
                     outcomeToken,
                     market.collateralToken,
                     tokenAmount,
@@ -473,7 +470,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
                     marketId,
-                    sellPass,
                     outcomeToken,
                     market.collateralToken,
                     tokenAmount,
@@ -518,7 +514,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
 
         MarketStatus oldStatus = market.status;
         market.status = MarketStatus.TradingEnded;
-        _updateMarketIndex(marketId, oldStatus, MarketStatus.TradingEnded);
+        _updateMarketIndex(marketId, MarketStatus.TradingEnded);
         
         emit MarketStatusChanged(marketId, oldStatus, MarketStatus.TradingEnded, block.timestamp);
     }
@@ -544,7 +540,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         market.failValue = failValue;
         MarketStatus oldStatus = market.status;
         market.status = MarketStatus.Resolved;
-        _updateMarketIndex(marketId, oldStatus, MarketStatus.Resolved);
+        _updateMarketIndex(marketId, MarketStatus.Resolved);
 
         emit MarketResolved(
             marketId,
@@ -596,7 +592,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             market.failValue = params[i].failValue;
             MarketStatus oldStatus = market.status;
             market.status = MarketStatus.Resolved;
-            _updateMarketIndex(marketId, oldStatus, MarketStatus.Resolved);
+            _updateMarketIndex(marketId, MarketStatus.Resolved);
             
             emit MarketResolved(
                 marketId,
@@ -647,7 +643,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
 
         MarketStatus oldStatus = market.status;
         market.status = MarketStatus.Cancelled;
-        _updateMarketIndex(marketId, oldStatus, MarketStatus.Cancelled);
+        _updateMarketIndex(marketId, MarketStatus.Cancelled);
         
         emit MarketCancelled(marketId, market.proposalId, reason, block.timestamp);
         emit MarketStatusChanged(marketId, oldStatus, MarketStatus.Cancelled, block.timestamp);
@@ -810,24 +806,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         // Add to time-based index
         uint256 day = block.timestamp / 1 days;
         marketsByDay[day].push(marketId);
-    }
-    
-    /**
-     * @notice Internal function to update market indexes on status change
-     * @param marketId Market ID
-     * @param oldStatus Old market status
-     * @param newStatus New market status
-     */
-    function _updateMarketIndex(
-        uint256 marketId,
-        MarketStatus oldStatus,
-        MarketStatus newStatus
-    ) internal {
-        // Remove from old status index (skip for efficiency - historical data)
-        // In production, consider implementing if cleanup is needed
-        
-        // Add to new status index
-        marketsByStatus[newStatus].push(marketId);
     }
     
     /**

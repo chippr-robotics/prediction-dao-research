@@ -397,7 +397,6 @@ describe("Integration: Ragequit Protection Flow", function () {
       const treasuryBalance = await ethers.provider.getBalance(treasuryVault);
 
       const calculatedShare = await ragequitModule.calculateTreasuryShare(
-        trader1.address,
         ragequitAmount
       );
 
@@ -504,7 +503,6 @@ describe("Integration: Ragequit Protection Flow", function () {
       const expectedShare = (treasuryBalance * ragequitAmount) / totalSupply;
 
       const calculatedShare = await ragequitModule.calculateTreasuryShare(
-        trader1.address,
         ragequitAmount
       );
 

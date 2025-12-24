@@ -136,7 +136,7 @@ contract RagequitModule is Ownable, ReentrancyGuard {
         require(block.timestamp < window.executionTime, "Window closed");
 
         // Calculate proportional treasury share
-        uint256 treasuryShare = calculateTreasuryShare(msg.sender, tokenAmount);
+        uint256 treasuryShare = calculateTreasuryShare(tokenAmount);
         require(treasuryShare > 0, "No treasury share");
 
         hasRagequit[msg.sender][proposalId] = true;
@@ -155,12 +155,10 @@ contract RagequitModule is Ownable, ReentrancyGuard {
 
     /**
      * @notice Calculate proportional treasury share for ragequit
-     * @param user Address of the user
      * @param tokenAmount Amount of tokens to burn
      * @return uint256 Proportional treasury share
      */
     function calculateTreasuryShare(
-        address user,
         uint256 tokenAmount
     ) public view returns (uint256) {
         require(tokenAmount > 0, "Invalid token amount");

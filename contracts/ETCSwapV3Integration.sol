@@ -305,7 +305,6 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
      * @notice Buy outcome tokens using collateral via ETCSwap
      * @dev Executes a swap from collateral to outcome token (PASS or FAIL)
      * @param marketId Market identifier
-     * @param buyPass True to buy PASS tokens, false for FAIL tokens
      * @param collateralToken Address of collateral token
      * @param outcomeToken Address of outcome token (PASS or FAIL)
      * @param collateralAmount Amount of collateral to spend
@@ -315,7 +314,6 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
      */
     function buyTokens(
         uint256 marketId,
-        bool buyPass,
         address collateralToken,
         address outcomeToken,
         uint256 collateralAmount,
@@ -374,7 +372,6 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
      * @notice Sell outcome tokens for collateral via ETCSwap
      * @dev Executes a swap from outcome token (PASS or FAIL) to collateral
      * @param marketId Market identifier
-     * @param sellPass True to sell PASS tokens, false for FAIL tokens
      * @param outcomeToken Address of outcome token (PASS or FAIL)
      * @param collateralToken Address of collateral token
      * @param tokenAmount Amount of outcome tokens to sell
@@ -384,7 +381,6 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
      */
     function sellTokens(
         uint256 marketId,
-        bool sellPass,
         address outcomeToken,
         address collateralToken,
         uint256 tokenAmount,
