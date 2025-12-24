@@ -587,6 +587,16 @@ Trade Details:
 This would submit an encrypted position through the PrivacyCoordinator contract.`)
   }
 
+  const handleScanMarket = (marketId) => {
+    // Find the market by ID
+    const market = markets.find(m => m.id === parseInt(marketId))
+    if (market) {
+      handleMarketClick(market)
+    } else {
+      alert(`Market with ID ${marketId} not found`)
+    }
+  }
+
   const marketsByCategory = getMarketsByCategory()
 
   // Get markets for current category with sorting
@@ -649,6 +659,7 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
         onBack={onBack}
         isConnected={isConnected}
         account={account}
+        onScanMarket={handleScanMarket}
       />
 
       <main className="main-canvas">
