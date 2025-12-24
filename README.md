@@ -9,6 +9,12 @@
 
 Both platforms integrate privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
 
+## Build Status
+
+[![Frontend Testing](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/frontend-testing.yml/badge.svg)](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/frontend-testing.yml)
+[![Smart Contract Tests](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/test.yml/badge.svg)](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/test.yml)
+[![Torture Testing](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/torture-test.yml/badge.svg)](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/torture-test.yml)
+
 ## 📚 Documentation
 
 **[View the full documentation →](https://chippr-robotics.github.io/prediction-dao-research/)**
