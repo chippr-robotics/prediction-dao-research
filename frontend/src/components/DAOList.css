@@ -333,15 +333,12 @@
 }
 
 @media (max-width: 768px) {
-  .dao-grid {
-    grid-template-columns: 1fr;
-  }
-
   .dao-list-container {
     max-height: none; /* Allow full height on mobile */
   }
 
   .dao-grid {
+    grid-template-columns: 1fr;
     overflow-y: visible; /* Allow natural scrolling on mobile */
     max-height: none;
   }
