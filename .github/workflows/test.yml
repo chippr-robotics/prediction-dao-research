@@ -77,6 +77,43 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
+  frontend-tests:
+    name: Frontend Unit Tests
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --run
+
+      - name: Generate coverage report
+        run: npm run test:coverage -- --run
+        continue-on-error: true
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-test-coverage
+          path: frontend/coverage/
+          retention-days: 30
+
   frontend-build:
     name: Frontend Build
     runs-on: ubuntu-latest

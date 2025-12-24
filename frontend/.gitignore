@@ -22,3 +22,16 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.env
+
+# Test coverage
+coverage
+.nyc_output
+*.lcov
+
+# Lighthouse CI
+.lighthouseci
+
+# Vitest
+.vitest

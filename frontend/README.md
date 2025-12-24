@@ -153,6 +153,107 @@ See [FRONTEND_BUILD_BOOK.md](../FRONTEND_BUILD_BOOK.md) for comprehensive develo
 4. **Accessibility First**: WCAG 2.1 AA compliance required
 5. **Mobile-First**: Responsive design starting from mobile screens
 
+## Testing
+
+The project includes comprehensive testing for UI components, Web3 integration, and accessibility compliance.
+
+### Running Tests
+
+```bash
+# Run all tests once
+npm test
+
+# Run tests in watch mode (for development)
+npm test -- --watch
+
+# Run with coverage report
+npm run test:coverage
+
+# Run tests with interactive UI
+npm run test:ui
+
+# Run specific test file
+npm test Button.test
+```
+
+### Test Structure
+
+```
+src/test/
+├── setup.js                    # Test configuration and mocks
+├── Button.test.jsx             # Button component unit tests
+├── StatusIndicator.test.jsx    # Status indicator tests
+├── accessibility.test.jsx      # WCAG compliance tests
+└── web3-integration.test.js    # Web3 wallet integration tests
+```
+
+### Test Coverage
+
+Current test coverage:
+- **UI Components**: 30 tests for buttons, status indicators, forms
+- **Accessibility**: 24 tests for WCAG AA compliance with axe-core
+- **Web3 Integration**: 17 tests for wallet connection flows
+- **Total**: 67 tests, all passing ✅
+
+### Writing New Tests
+
+Tests use Vitest, React Testing Library, and axe-core:
+
+```javascript
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { axe } from 'vitest-axe'
+import MyComponent from './MyComponent'
+
+describe('MyComponent', () => {
+  it('renders correctly', () => {
+    render(<MyComponent />)
+    expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<MyComponent />)
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+})
+```
+
+### Accessibility Testing
+
+#### Automated Testing
+
+- **axe-core**: Integrated in unit tests for WCAG compliance
+- **Lighthouse CI**: Automated in CI/CD pipeline
+- **Target**: Lighthouse accessibility score of 100
+
+Run accessibility tests specifically:
+```bash
+npm test accessibility.test
+```
+
+#### Manual Testing
+
+For comprehensive manual accessibility testing procedures, see:
+- [MANUAL_ACCESSIBILITY_TESTING.md](../MANUAL_ACCESSIBILITY_TESTING.md)
+
+Manual testing includes:
+- Keyboard navigation (Tab, Enter, Escape)
+- Screen reader testing (NVDA, JAWS, VoiceOver)
+- Color contrast verification
+- Color blindness simulation
+- Motion preferences testing
+- Mobile accessibility on iOS and Android
+
+### CI/CD Testing
+
+Tests run automatically on:
+- Every pull request to `main` or `develop`
+- Every push to `main` or `develop`
+- Before deployment to production
+
+See [CI_CD_PIPELINE.md](../CI_CD_PIPELINE.md) for complete CI/CD documentation.
+
 ## Docker Build
 
 This frontend can be containerized and deployed to Google Cloud Run.
