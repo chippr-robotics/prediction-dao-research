@@ -6,6 +6,7 @@ import ProposalDashboard from './ProposalDashboard'
 import DAOLaunchpad from './DAOLaunchpad'
 import MetricsDashboard from './MetricsDashboard'
 import { useEthers, useAccount } from '../hooks/useWeb3'
+import { useCallback } from 'react'
 
 const DAOFactoryABI = [
   "function getUserDAOs(address user) external view returns (uint256[])",
@@ -27,13 +28,7 @@ function Dashboard() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (provider && account) {
-      loadUserDAOs()
-    }
-  }, [provider, account])
-
-  const loadUserDAOs = async () => {
+  const loadUserDAOs = useCallback(async () => {
     try {
       setLoading(true)
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
@@ -70,7 +65,13 @@ function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [provider, account])
+
+  useEffect(() => {
+    if (provider && account) {
+      loadUserDAOs()
+    }
+  }, [provider, account, loadUserDAOs])
 
   const renderTabContent = () => {
     if (loading) {

@@ -105,7 +105,7 @@ function DAOLaunchpad({ onDAOCreated }) {
 
       showNotification('Transaction submitted! Waiting for confirmation...', 'info', 0)
 
-      const receipt = await tx.wait()
+      await tx.wait()
       
       setSuccess('DAO created successfully!')
       showNotification('DAO created successfully!', 'success')
