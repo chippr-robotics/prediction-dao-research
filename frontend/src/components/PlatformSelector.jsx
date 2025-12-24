@@ -2,24 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './PlatformSelector.css'
 
-function PlatformSelector({ onConnect }) {
+function PlatformSelector() {
   const navigate = useNavigate()
   const [announcement, setAnnouncement] = useState('')
 
   const handlePlatformSelect = async (platform, platformName) => {
-    // Announce selection to screen readers
-    setAnnouncement(`Connecting to ${platformName}...`)
-    
-    // Connect wallet
-    const connected = await onConnect()
-    
-    if (connected) {
-      setAnnouncement(`Successfully connected. Navigating to ${platformName}.`)
-      // Navigate to platform route
-      setTimeout(() => navigate(`/${platform}`), 100)
-    } else {
-      setAnnouncement('Connection failed. Please try again.')
-    }
+    // Both platforms can be accessed without wallet connection
+    // Users will be prompted to connect when they need to interact
+    setAnnouncement(`Navigating to ${platformName}...`)
+    navigate(`/${platform}`)
   }
 
   const handleCardKeyDown = (e, platform, platformName) => {

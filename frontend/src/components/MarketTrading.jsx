@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useEthers } from '../hooks/useWeb3'
+import { useWeb3 } from '../hooks/useWeb3'
 import './MarketTrading.css'
 
 function MarketTrading() {
-  const { provider, signer } = useEthers()
+  const { isConnected } = useWeb3()
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeAmount, setTradeAmount] = useState('')
@@ -45,8 +45,6 @@ function MarketTrading() {
       console.error('Error loading markets:', error)
       setLoading(false)
     }
-    // Note: provider and signer will be used in production
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -68,6 +66,11 @@ function MarketTrading() {
 
   const handleTrade = async (e) => {
     e.preventDefault()
+
+    if (!isConnected) {
+      alert('Please connect your wallet to trade')
+      return
+    }
 
     if (!selectedMarket) {
       alert('Please select a market first')

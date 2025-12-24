@@ -2,13 +2,17 @@ import './ClearPathApp.css'
 import Dashboard from './Dashboard'
 import { useWeb3, useNetwork } from '../hooks/useWeb3'
 
-function ClearPathApp({ onDisconnect, onBack }) {
-  const { account } = useWeb3()
+function ClearPathApp({ onConnect, onDisconnect, onBack }) {
+  const { account, isConnected } = useWeb3()
   const { networkError } = useNetwork()
 
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  }
+
+  const handleConnectClick = async () => {
+    await onConnect()
   }
 
   return (
@@ -45,21 +49,31 @@ function ClearPathApp({ onDisconnect, onBack }) {
           </div>
           
           <div className="wallet-section">
-            <div className="connected-wallet">
-              <div className="wallet-info">
-                <span className="connection-status" aria-label="Wallet connected">
-                  <span className="status-indicator" aria-hidden="true">●</span>
-                  <span className="wallet-address">{shortenAddress(account)}</span>
-                </span>
+            {isConnected ? (
+              <div className="connected-wallet">
+                <div className="wallet-info">
+                  <span className="connection-status" aria-label="Wallet connected">
+                    <span className="status-indicator" aria-hidden="true">●</span>
+                    <span className="wallet-address">{shortenAddress(account)}</span>
+                  </span>
+                </div>
+                <button 
+                  onClick={onDisconnect} 
+                  className="disconnect-button"
+                  aria-label="Disconnect wallet"
+                >
+                  Disconnect
+                </button>
               </div>
+            ) : (
               <button 
-                onClick={onDisconnect} 
-                className="disconnect-button"
-                aria-label="Disconnect wallet"
+                onClick={handleConnectClick} 
+                className="connect-button"
+                aria-label="Connect wallet"
               >
-                Disconnect
+                Connect Wallet
               </button>
-            </div>
+            )}
           </div>
         </div>
       </header>

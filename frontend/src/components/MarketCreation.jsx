@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
-import { useEthers } from '../hooks/useWeb3'
+import { useWeb3 } from '../hooks/useWeb3'
 import './MarketCreation.css'
 
 function MarketCreation() {
-  const { provider, signer, account } = useEthers()
+  const { isConnected } = useWeb3()
   const [formData, setFormData] = useState({
     question: '',
     description: '',
@@ -93,6 +93,11 @@ function MarketCreation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!isConnected) {
+      alert('Please connect your wallet to create a market')
+      return
+    }
 
     if (!validateForm()) {
       return

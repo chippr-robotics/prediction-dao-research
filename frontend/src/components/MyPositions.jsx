@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useEthers } from '../hooks/useWeb3'
+import { useWeb3 } from '../hooks/useWeb3'
 import './MyPositions.css'
 
 function MyPositions() {
-  const { provider, signer, account } = useEthers()
+  const { isConnected } = useWeb3()
   const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, settled
@@ -63,8 +63,6 @@ function MyPositions() {
       console.error('Error loading positions:', error)
       setLoading(false)
     }
-    // Note: provider, signer, account will be used in production
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -122,6 +120,15 @@ This would:
       <div className="loading" role="status" aria-live="polite">
         <span className="sr-only">Loading your positions...</span>
         Loading your positions...
+      </div>
+    )
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="no-positions" role="status">
+        <div className="placeholder-icon" aria-hidden="true">🔒</div>
+        <p>Please connect your wallet to view your positions.</p>
       </div>
     )
   }

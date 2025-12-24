@@ -5,14 +5,18 @@ import MarketTrading from './MarketTrading'
 import MyPositions from './MyPositions'
 import MarketCreation from './MarketCreation'
 
-function FairWinsApp({ onDisconnect, onBack }) {
-  const { account } = useWeb3()
+function FairWinsApp({ onConnect, onDisconnect, onBack }) {
+  const { account, isConnected } = useWeb3()
   const { networkError } = useNetwork()
   const [activeTab, setActiveTab] = useState('markets')
 
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  }
+
+  const handleConnectClick = async () => {
+    await onConnect()
   }
 
   // Handle keyboard navigation for ARIA tabs pattern
@@ -72,21 +76,31 @@ function FairWinsApp({ onDisconnect, onBack }) {
           </div>
           
           <div className="wallet-section">
-            <div className="connected-wallet">
-              <div className="wallet-info">
-                <span className="connection-status" aria-label="Wallet connected">
-                  <span className="status-indicator" aria-hidden="true">●</span>
-                  <span className="wallet-address">{shortenAddress(account)}</span>
-                </span>
+            {isConnected ? (
+              <div className="connected-wallet">
+                <div className="wallet-info">
+                  <span className="connection-status" aria-label="Wallet connected">
+                    <span className="status-indicator" aria-hidden="true">●</span>
+                    <span className="wallet-address">{shortenAddress(account)}</span>
+                  </span>
+                </div>
+                <button 
+                  onClick={onDisconnect} 
+                  className="disconnect-button"
+                  aria-label="Disconnect wallet"
+                >
+                  Disconnect
+                </button>
               </div>
+            ) : (
               <button 
-                onClick={onDisconnect} 
-                className="disconnect-button"
-                aria-label="Disconnect wallet"
+                onClick={handleConnectClick} 
+                className="connect-button"
+                aria-label="Connect wallet"
               >
-                Disconnect
+                Connect Wallet
               </button>
-            </div>
+            )}
           </div>
         </div>
       </header>

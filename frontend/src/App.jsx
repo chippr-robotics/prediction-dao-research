@@ -80,33 +80,27 @@ function AppContent() {
 
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/select" element={<PlatformSelector onConnect={handleConnect} />} />
+        <Route path="/select" element={<PlatformSelector />} />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
         <Route 
           path="/clearpath" 
           element={
-            isConnected ? (
-              <ClearPathApp 
-                onDisconnect={handleDisconnect}
-                onBack={handleBack}
-              />
-            ) : (
-              <Navigate to="/select" replace />
-            )
+            <ClearPathApp 
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onBack={handleBack}
+            />
           } 
         />
         <Route 
           path="/fairwins" 
           element={
-            isConnected ? (
-              <FairWinsApp 
-                onDisconnect={handleDisconnect}
-                onBack={handleBack}
-              />
-            ) : (
-              <Navigate to="/select" replace />
-            )
+            <FairWinsApp 
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              onBack={handleBack}
+            />
           } 
         />
         <Route path="*" element={<Navigate to="/" replace />} />
