@@ -32,8 +32,8 @@ App.jsx (Root)
 
 ## Tech Stack
 
-- **Framework**: React 18+ with hooks
-- **Build Tool**: Vite 5.x
+- **Framework**: React 19.2.x with hooks
+- **Build Tool**: Vite 7.2.4
 - **Blockchain**: ethers.js v6
 - **Styling**: CSS Modules (scoped CSS)
 - **Language**: JavaScript (ES6+)
