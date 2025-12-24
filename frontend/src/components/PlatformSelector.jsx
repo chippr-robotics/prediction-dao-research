@@ -82,7 +82,7 @@ function PlatformSelector() {
                 <li><span aria-hidden="true">✓</span> Treasury management</li>
                 <li><span aria-hidden="true">✓</span> Proposal evaluation</li>
                 <li><span aria-hidden="true">✓</span> Welfare metrics tracking</li>
-                <li><span aria-hidden="true">✓</span> Privacy-preserving voting</li>
+                <li><span aria-hidden="true">✓</span> Shielded transaction privacy</li>
               </ul>
               <div className="platform-button-wrapper">
                 <span className="platform-button clearpath-button" aria-hidden="true">
@@ -124,7 +124,7 @@ function PlatformSelector() {
                 <li><span aria-hidden="true">✓</span> Trade predictions</li>
                 <li><span aria-hidden="true">✓</span> Flexible resolution</li>
                 <li><span aria-hidden="true">✓</span> Open participation</li>
-                <li><span aria-hidden="true">✓</span> Fair market controls</li>
+                <li><span aria-hidden="true">✓</span> Fully transparent trading</li>
               </ul>
               <div className="platform-button-wrapper">
                 <span className="platform-button fairwins-button" aria-hidden="true">
@@ -144,13 +144,13 @@ function PlatformSelector() {
         <div className="container">
           <h2 id="shared-tech-heading" className="section-title">Built on Shared, Proven Technology</h2>
           <p className="section-intro">
-            Both platforms leverage the same secure, privacy-preserving infrastructure
+            Both platforms leverage the same secure infrastructure with conditional privacy features
           </p>
           <div className="tech-grid">
             <article className="tech-card">
               <div className="tech-icon" aria-hidden="true">🔒</div>
-              <h3>Privacy-Preserving</h3>
-              <p>Zero-knowledge proofs and encrypted voting protect participant privacy</p>
+              <h3>Conditional Privacy</h3>
+              <p>ClearPath DAOs use shielded transactions; FairWins markets are transparent</p>
             </article>
             <article className="tech-card">
               <div className="tech-icon" aria-hidden="true">🛡️</div>

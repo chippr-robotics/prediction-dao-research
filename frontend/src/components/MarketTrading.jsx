@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { usePrice } from '../contexts/PriceContext'
+import { useTheme } from '../hooks/useTheme'
 import CurrencyToggle from './ui/CurrencyToggle'
 import './MarketTrading.css'
 
 function MarketTrading() {
   const { isConnected } = useWeb3()
   const { formatPrice } = usePrice()
+  const { isClearPath } = useTheme()
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeAmount, setTradeAmount] = useState('')
@@ -235,19 +237,20 @@ function MarketTrading() {
 
     try {
       // In production, this would interact with the ConditionalMarketFactory contract
-      // and PrivacyCoordinator for encrypted positions
+      const privacyNote = isClearPath 
+        ? `\n\nThis would submit an encrypted position through the PrivacyCoordinator contract using:
+- Poseidon encryption for position privacy
+- zkSNARK proofs for validity
+- MACI-style key-change capability`
+        : `\n\nThis is a transparent market - all trades are publicly visible on the blockchain.`
+      
       alert(`Trading functionality requires deployed contracts. 
       
 Trade Details:
 - Market: ${selectedMarket.proposalTitle}
 - Type: ${tradeType}
 - Amount: ${tradeAmount} ETC
-- Price: ${tradeType === 'PASS' ? selectedMarket.passTokenPrice : selectedMarket.failTokenPrice} ETC
-
-This would submit an encrypted position through the PrivacyCoordinator contract using:
-- Poseidon encryption for position privacy
-- zkSNARK proofs for validity
-- MACI-style key-change capability`)
+- Price: ${tradeType === 'PASS' ? selectedMarket.passTokenPrice : selectedMarket.failTokenPrice} ETC${privacyNote}`)
 
       setTradeAmount('')
       setErrors({})
@@ -523,10 +526,19 @@ This would submit an encrypted position through the PrivacyCoordinator contract 
               )}
             </div>
 
-            <div className="privacy-notice" role="note">
-              <span aria-hidden="true">🔐</span>
-              <span>Your position will be encrypted using Nightmarket-style zero-knowledge encryption</span>
-            </div>
+            {isClearPath && (
+              <div className="privacy-notice" role="note">
+                <span aria-hidden="true">🔐</span>
+                <span>Your position will be encrypted using zero-knowledge proofs for privacy</span>
+              </div>
+            )}
+
+            {!isClearPath && (
+              <div className="transparency-notice" role="note">
+                <span aria-hidden="true">👁️</span>
+                <span>This is a transparent market - all trades are publicly visible</span>
+              </div>
+            )}
 
             <button type="submit" className="trade-submit-button">
               Execute Trade

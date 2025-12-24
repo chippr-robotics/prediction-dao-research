@@ -118,7 +118,7 @@ function LandingPage() {
                       <ul className="platform-features-compact">
                         <li>✓ Member-only governance</li>
                         <li>✓ Treasury management</li>
-                        <li>✓ Privacy-preserving voting</li>
+                        <li>✓ Shielded transactions</li>
                       </ul>
                     </div>
                   </div>
@@ -229,8 +229,8 @@ function LandingPage() {
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </div>
-                <h3>Privacy-Preserving</h3>
-                <p>Zero-knowledge proofs ensure confidentiality</p>
+                <h3>Conditional Privacy</h3>
+                <p>ClearPath uses shielded transactions; FairWins is transparent</p>
               </div>
               <div className="feature-card">
                 <div className="feature-icon" aria-hidden="true">
