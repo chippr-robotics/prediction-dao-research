@@ -247,8 +247,8 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             uint256 executionDeadline
         ) = proposalRegistry.getProposal(govProposal.proposalId);
         
-        // Verify proposal is still active (not cancelled)
-        require(status == ProposalRegistry.ProposalStatus.Active, "Proposal not active");
+        // Verify proposal is still active (not cancelled or expired)
+        require(status == ProposalRegistry.ProposalStatus.Active, "Proposal must be active");
 
         // Check execution constraints
         require(block.timestamp >= startDate, "Execution start date not reached");
