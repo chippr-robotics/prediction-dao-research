@@ -93,6 +93,27 @@
   align-items: center;
 }
 
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-indicator {
+  color: #22c55e;
+  font-size: 0.75rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 .wallet-address {
   font-weight: 600;
   color: white;
@@ -312,6 +333,39 @@
   color: var(--text-secondary);
 }
 
+/* Network Error Message */
+.network-error-message {
+  max-width: 600px;
+  margin: 3rem auto;
+  padding: 3rem 2rem;
+  background: var(--bg-light);
+  border-radius: 12px;
+  border: 2px solid var(--danger-color);
+  text-align: center;
+}
+
+.network-error-message .error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.network-error-message h2 {
+  color: var(--danger-color);
+  margin-bottom: 1rem;
+}
+
+.network-error-message p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+}
+
+.network-error-message .error-help {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 1rem;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .header-content {
@@ -348,5 +402,10 @@
 
   .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .network-error-message {
+    margin: 2rem 1rem;
+    padding: 2rem 1rem;
   }
 }

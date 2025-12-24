@@ -1,95 +1,158 @@
-import { useState } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import './App.css'
 import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
+import { EXPECTED_CHAIN_ID, getExpectedChain } from './wagmi'
 
-function App() {
+function AppContent() {
+  const { address, isConnected } = useAccount()
+  const { connect, connectors } = useConnect()
+  const { disconnect } = useDisconnect()
+  const chainId = useChainId()
+  const { switchChain } = useSwitchChain()
+  const navigate = useNavigate()
+  
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
-  const [account, setAccount] = useState(null)
-  const [connected, setConnected] = useState(false)
+  const [networkError, setNetworkError] = useState(null)
+  const [announcement, setAnnouncement] = useState('')
+
+  // Update provider and signer when connection changes
+  useEffect(() => {
+    const updateProviderAndSigner = async () => {
+      if (isConnected && window.ethereum) {
+        try {
+          const ethersProvider = new ethers.BrowserProvider(window.ethereum)
+          const ethersSigner = await ethersProvider.getSigner()
+          setProvider(ethersProvider)
+          setSigner(ethersSigner)
+        } catch (error) {
+          console.error('Error creating provider/signer:', error)
+        }
+      } else {
+        setProvider(null)
+        setSigner(null)
+      }
+    }
+    
+    updateProviderAndSigner()
+  }, [isConnected, address])
+
+  // Check network compatibility
+  useEffect(() => {
+    if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
+      const expectedChain = getExpectedChain()
+      setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
+      setAnnouncement(`Network error: Connected to wrong network. Please switch to ${expectedChain.name}`)
+    } else {
+      setNetworkError(null)
+    }
+  }, [chainId, isConnected])
 
   const connectWallet = async () => {
     try {
       if (!window.ethereum) {
         alert('Please install MetaMask to use this application')
+        setAnnouncement('Wallet connection failed: MetaMask not installed')
         return false
       }
 
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      await provider.send("eth_requestAccounts", [])
-      
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
-      const network = await provider.getNetwork()
-
-      setProvider(provider)
-      setSigner(signer)
-      setAccount(address)
-      setConnected(true)
-
-      // Listen for account changes
-      if (!window.ethereum._events || !window.ethereum._events.accountsChanged) {
-        window.ethereum.on('accountsChanged', handleAccountsChanged)
-        window.ethereum.on('chainChanged', () => window.location.reload())
+      const connector = connectors.find(c => c.id === 'injected')
+      if (!connector) {
+        alert('No wallet connector available')
+        setAnnouncement('Wallet connection failed: No connector available')
+        return false
       }
-      
+
+      await connect({ connector })
+      setAnnouncement('Wallet connected successfully')
       return true
     } catch (error) {
       console.error('Error connecting wallet:', error)
-      if (error.code === 4001) {
+      
+      // Check for user rejection via error code or name
+      if (error.code === 4001 || error.name === 'UserRejectedRequestError') {
         alert('Please approve the connection request')
+        setAnnouncement('Connection rejected by user')
       } else {
         alert('Failed to connect wallet')
+        setAnnouncement('Wallet connection failed')
       }
       return false
     }
   }
 
-  const handleAccountsChanged = async (accounts) => {
-    if (accounts.length === 0) {
-      // User disconnected
-      setProvider(null)
-      setSigner(null)
-      setAccount(null)
-      setConnected(false)
-    } else {
-      // Account changed
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
+  const disconnectWallet = () => {
+    disconnect()
+    setAnnouncement('Wallet disconnected')
+  }
+
+  const handleSwitchNetwork = async () => {
+    try {
+      await switchChain({ chainId: EXPECTED_CHAIN_ID })
+      setAnnouncement('Network switched successfully')
+    } catch (error) {
+      console.error('Error switching network:', error)
+      setAnnouncement('Failed to switch network')
       
-      setProvider(provider)
-      setSigner(signer)
-      setAccount(address)
+      // If switching failed, show instructions
+      alert(`Please manually switch to the correct network in MetaMask:\nNetwork: ${getExpectedChain().name}\nChain ID: ${EXPECTED_CHAIN_ID}`)
     }
   }
 
-  const disconnectWallet = () => {
-    setProvider(null)
-    setSigner(null)
-    setAccount(null)
-    setConnected(false)
+  const handleBack = () => {
+    navigate('/select')
   }
 
   return (
-    <Router>
+    <>
+      {/* Screen reader announcements */}
+      <div 
+        role="status" 
+        aria-live="polite" 
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
+      </div>
+
+      {/* Network error banner */}
+      {networkError && isConnected && (
+        <div 
+          className="network-error-banner" 
+          role="alert"
+          aria-live="assertive"
+        >
+          <span>{networkError}</span>
+          <button 
+            onClick={handleSwitchNetwork}
+            className="switch-network-button"
+            aria-label="Switch to correct network"
+          >
+            Switch Network
+          </button>
+        </div>
+      )}
+
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/select" element={<PlatformSelector onConnect={connectWallet} />} />
         <Route 
           path="/clearpath" 
           element={
-            connected ? (
+            isConnected ? (
               <ClearPathApp 
                 provider={provider}
                 signer={signer}
-                account={account}
+                account={address}
                 onDisconnect={disconnectWallet}
+                onBack={handleBack}
+                networkError={networkError}
               />
             ) : (
               <Navigate to="/select" replace />
@@ -99,12 +162,12 @@ function App() {
         <Route 
           path="/fairwins" 
           element={
-            connected ? (
+            isConnected ? (
               <FairWinsApp 
-                provider={provider}
-                signer={signer}
-                account={account}
+                account={address}
                 onDisconnect={disconnectWallet}
+                onBack={handleBack}
+                networkError={networkError}
               />
             ) : (
               <Navigate to="/select" replace />
@@ -113,6 +176,14 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   )
 }

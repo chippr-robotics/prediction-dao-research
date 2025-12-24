@@ -1,0 +1,96 @@
+import { http, createConfig } from 'wagmi'
+import { injected } from 'wagmi/connectors'
+
+// Define Ethereum Classic mainnet
+const ethereumClassic = {
+  id: 61,
+  name: 'Ethereum Classic',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETC',
+  },
+  rpcUrls: {
+    default: { http: ['https://etc.rivet.link'] },
+    public: { http: ['https://etc.rivet.link'] },
+  },
+  blockExplorers: {
+    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mainnet' },
+  },
+  testnet: false,
+}
+
+// Define Mordor testnet
+const mordor = {
+  id: 63,
+  name: 'Mordor',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Mordor Ether',
+    symbol: 'METC',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc.mordor.etccooperative.org'] },
+    public: { http: ['https://rpc.mordor.etccooperative.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mordor' },
+  },
+  testnet: true,
+}
+
+// Define Hardhat local network (for development)
+const hardhat = {
+  id: 1337,
+  name: 'Hardhat',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: { http: ['http://127.0.0.1:8545'] },
+    public: { http: ['http://127.0.0.1:8545'] },
+  },
+  testnet: true,
+}
+
+// Get network ID from environment or default to Mordor testnet
+const networkId = import.meta.env.VITE_NETWORK_ID 
+  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
+  : 63
+
+// Get RPC URL from environment
+const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
+
+// Define supported chains
+const chains = [ethereumClassic, mordor, hardhat]
+
+// Create wagmi config
+export const config = createConfig({
+  chains,
+  connectors: [
+    injected({ target: 'metaMask' }),
+  ],
+  transports: {
+    [ethereumClassic.id]: http(),
+    [mordor.id]: http(rpcUrl),
+    [hardhat.id]: http('http://localhost:8545'),
+  },
+})
+
+// Helper to get expected chain info
+export const getExpectedChain = () => {
+  switch (networkId) {
+    case 61:
+      return ethereumClassic
+    case 63:
+      return mordor
+    case 1337:
+      return hardhat
+    default:
+      return mordor
+  }
+}
+
+export const EXPECTED_CHAIN_ID = networkId
