@@ -49,6 +49,13 @@ manticore contracts/ProposalRegistry.sol --contract ProposalRegistry
 python scripts/run-manticore.py contracts/ProposalRegistry.sol --contract ProposalRegistry --timeout 300
 ```
 
+The wrapper reads remappings and passes them to Manticore:
+```bash
+manticore contracts/ProposalRegistry.sol --contract ProposalRegistry \
+  --solc-remaps @openzeppelin/=node_modules/@openzeppelin/ \
+  -v
+```
+
 ## Usage
 
 ### Local Testing

@@ -57,9 +57,6 @@ def main():
     for remap in remappings:
         cmd.extend(['--solc-remaps', remap])
     
-    # Add optimization flags (matching hardhat config)
-    cmd.extend(['--solc-optimize-runs', '200'])
-    
     # Set verbosity
     cmd.extend(['-v'])
     
