@@ -124,6 +124,19 @@
   background: var(--bg-primary);
 }
 
+/* Swap View Container */
+.swap-view-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: var(--bg-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
 /* Grid View Container - replaces category rows for specific category */
 .grid-view-container {
   width: 100%;
