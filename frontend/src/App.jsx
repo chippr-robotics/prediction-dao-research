@@ -7,6 +7,7 @@ import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
+import { ComponentExamples } from './components/ui'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from './wagmi'
 
 function AppContent() {
@@ -142,6 +143,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/select" element={<PlatformSelector onConnect={connectWallet} />} />
+        <Route path="/ui-components" element={<ComponentExamples />} />
         <Route 
           path="/clearpath" 
           element={

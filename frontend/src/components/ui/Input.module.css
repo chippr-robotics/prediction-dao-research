@@ -1,0 +1,73 @@
+/* Input Base Styles */
+.input {
+  padding: 0.75rem;
+  border: 1px solid #2D7A4F;
+  border-radius: 8px;
+  background: #0f1810;
+  color: #f1f5f9;
+  font-size: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+/* Focus State - Accessibility */
+.input:focus {
+  outline: none;
+  border-color: #34A853;
+  box-shadow: 0 0 0 3px rgba(45, 122, 79, 0.1);
+}
+
+.input:focus-visible {
+  outline: 2px solid #2D7A4F;
+  outline-offset: 2px;
+}
+
+/* Fallback for browsers without :focus-visible */
+@supports not selector(:focus-visible) {
+  .input:focus {
+    outline: 2px solid #2D7A4F;
+    outline-offset: 2px;
+  }
+}
+
+/* Disabled State */
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #1a2820;
+}
+
+/* Error State */
+.input-error {
+  border-color: #dc2626;
+}
+
+.input-error:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .input {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 0.875rem;
+  }
+}
