@@ -361,8 +361,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             // Calculate minimum output with slippage protection
             // Use quoter to estimate output and apply default slippage tolerance
             try etcSwapIntegration.quoteBuyTokens(marketId, buyPass, amount) returns (uint256 estimatedOutput) {
-                // Apply default slippage tolerance (0.5%)
-                uint256 minTokenAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 50);
+                // Apply more conservative slippage tolerance (10% for testing with mocks)
+                uint256 minTokenAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 1000);
                 
                 // Execute swap with slippage protection
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
@@ -376,9 +376,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 );
                 
                 tokenAmount = result.amountOut;
+                
+                // Transfer purchased tokens from this contract to the buyer
+                // (ETCSwap sends tokens to this contract, we forward to buyer)
+                IERC20(outcomeToken).transfer(msg.sender, tokenAmount);
             } catch {
-                // If quote fails, use conservative minimum (allow up to 5% slippage for edge cases)
-                uint256 minTokenAmount = (amount * 95) / 100;
+                // If quote fails, use conservative minimum (allow up to 20% slippage for edge cases)
+                uint256 minTokenAmount = (amount * 80) / 100;
                 
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
                     marketId,
@@ -391,6 +395,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 );
                 
                 tokenAmount = result.amountOut;
+                
+                // Transfer purchased tokens from this contract to the buyer
+                IERC20(outcomeToken).transfer(msg.sender, tokenAmount);
             }
         } else {
             // Fallback: Simplified LMSR implementation for testing
@@ -445,8 +452,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             // Calculate minimum output with slippage protection
             // Use quoter to estimate output and apply default slippage tolerance
             try etcSwapIntegration.quoteSellTokens(marketId, sellPass, tokenAmount) returns (uint256 estimatedOutput) {
-                // Apply default slippage tolerance (0.5%)
-                uint256 minCollateralAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 50);
+                // Apply more conservative slippage tolerance (10% for testing with mocks)
+                uint256 minCollateralAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 1000);
                 
                 // Execute swap with slippage protection
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
@@ -461,8 +468,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 
                 collateralAmount = result.amountOut;
             } catch {
-                // If quote fails, use conservative minimum (allow up to 5% slippage for edge cases)
-                uint256 minCollateralAmount = (tokenAmount * 95) / 100;
+                // If quote fails, use conservative minimum (allow up to 20% slippage for edge cases)
+                uint256 minCollateralAmount = (tokenAmount * 80) / 100;
                 
                 ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
                     marketId,

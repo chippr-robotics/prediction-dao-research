@@ -112,19 +112,35 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
             // Exact input swap
             if (zeroForOne) {
                 // Swapping token0 for token1
+                // Get pool token balances BEFORE receiving input tokens
+                uint256 balance1Before = IERC20(token1).balanceOf(address(this));
+                
                 IERC20(token0).safeTransferFrom(msg.sender, address(this), absAmountSpecified);
                 
-                // Simplified: constant product with fee
+                // Simplified mock: Use actual token balances for realistic swaps
+                // Apply fee and use simple constant product formula
                 uint256 feeAmount = (absAmountSpecified * fee) / 1e6;
                 uint256 amountInAfterFee = absAmountSpecified - feeAmount;
-                uint256 amountOut = (amountInAfterFee * liquidity) / (liquidity + amountInAfterFee);
                 
-                // Fallback for testing: If liquidity is very low, use 1:1 swap
-                // Note: This is a simplified mock behavior for testing only
-                // In production, low liquidity would result in high slippage or revert
-                if (amountOut == 0 && liquidity < 1000) {
-                    amountOut = amountInAfterFee; // Emergency fallback for testing
+                // Simplified constant product: output = balance * amountIn / (balance + amountIn)
+                // This gives reasonable output based on actual pool reserves
+                uint256 amountOut;
+                if (balance1Before > 0) {
+                    amountOut = (balance1Before * amountInAfterFee) / (balance1Before + amountInAfterFee);
+                    // Cap output at available balance minus 1 for safety
+                    if (amountOut > balance1Before - 1) {
+                        amountOut = balance1Before - 1;
+                    }
+                } else if (liquidity > 0) {
+                    // Fallback to liquidity-based calculation
+                    amountOut = (amountInAfterFee * liquidity) / (liquidity + amountInAfterFee);
+                } else {
+                    // Emergency fallback for testing: near 1:1 with slight slippage
+                    amountOut = (amountInAfterFee * 99) / 100;
                 }
+                
+                // Ensure we have a reasonable output
+                require(amountOut > 0, "Insufficient pool liquidity");
                 
                 IERC20(token1).safeTransfer(recipient, amountOut);
                 
@@ -132,15 +148,28 @@ contract MockUniswapV3Pool is IUniswapV3Pool {
                 amount1 = -int256(amountOut);
             } else {
                 // Swapping token1 for token0
+                // Get pool token balances BEFORE receiving input tokens
+                uint256 balance0Before = IERC20(token0).balanceOf(address(this));
+                
                 IERC20(token1).safeTransferFrom(msg.sender, address(this), absAmountSpecified);
                 
                 uint256 feeAmount = (absAmountSpecified * fee) / 1e6;
                 uint256 amountInAfterFee = absAmountSpecified - feeAmount;
-                uint256 amountOut = (amountInAfterFee * liquidity) / (liquidity + amountInAfterFee);
                 
-                if (amountOut == 0) {
-                    amountOut = amountInAfterFee;
+                uint256 amountOut;
+                if (balance0Before > 0) {
+                    amountOut = (balance0Before * amountInAfterFee) / (balance0Before + amountInAfterFee);
+                    // Cap output at available balance minus 1 for safety
+                    if (amountOut > balance0Before - 1) {
+                        amountOut = balance0Before - 1;
+                    }
+                } else if (liquidity > 0) {
+                    amountOut = (amountInAfterFee * liquidity) / (liquidity + amountInAfterFee);
+                } else {
+                    amountOut = (amountInAfterFee * 99) / 100;
                 }
+                
+                require(amountOut > 0, "Insufficient pool liquidity");
                 
                 IERC20(token0).safeTransfer(recipient, amountOut);
                 

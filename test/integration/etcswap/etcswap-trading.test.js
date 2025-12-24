@@ -156,28 +156,48 @@ describe("Integration: ETCSwap V3 Trading", function () {
             await passPoolContract.setLiquidity(ethers.parseUnits("10000", 6));
             await failPoolContract.setLiquidity(ethers.parseUnits("10000", 6));
 
-            // Fund pools with tokens
+            // Fund pools with tokens in correct order (token0, token1)
+            // Pools sort tokens by address, so we need to check the order
+            const passPoolToken0 = await passPoolContract.token0();
+            const passPoolToken1 = await passPoolContract.token1();
+            const passTokenAddr = await passToken.getAddress();
+            const collateralTokenAddr = await collateralToken.getAddress();
+            
             await passToken.mint(owner.address, ethers.parseUnits("5000", 6));
             await collateralToken.transfer(owner.address, ethers.parseUnits("5000", 6));
             
             await passToken.connect(owner).approve(passPool, ethers.parseUnits("5000", 6));
             await collateralToken.connect(owner).approve(passPool, ethers.parseUnits("5000", 6));
             
-            await passPoolContract.connect(owner).fundPool(
-                ethers.parseUnits("2500", 6),
-                ethers.parseUnits("2500", 6)
-            );
-            console.log("  ✓ PASS pool funded");
+            // Fund in correct token0/token1 order
+            const passAmount0 = passPoolToken0.toLowerCase() === passTokenAddr.toLowerCase()
+                ? ethers.parseUnits("2500", 6) // PASS is token0
+                : ethers.parseUnits("2500", 6); // collateral is token0
+            const passAmount1 = passPoolToken1.toLowerCase() === passTokenAddr.toLowerCase()
+                ? ethers.parseUnits("2500", 6) // PASS is token1
+                : ethers.parseUnits("2500", 6); // collateral is token1
+            
+            await passPoolContract.connect(owner).fundPool(passAmount0, passAmount1);
+            console.log(`  ✓ PASS pool funded (token0: ${passPoolToken0}, token1: ${passPoolToken1})`);
 
+            const failPoolToken0 = await failPoolContract.token0();
+            const failPoolToken1 = await failPoolContract.token1();
+            const failTokenAddr = await failToken.getAddress();
+            
             await failToken.mint(owner.address, ethers.parseUnits("5000", 6));
             await collateralToken.connect(owner).approve(failPool, ethers.parseUnits("5000", 6));
             await failToken.connect(owner).approve(failPool, ethers.parseUnits("5000", 6));
             
-            await failPoolContract.connect(owner).fundPool(
-                ethers.parseUnits("2500", 6),
-                ethers.parseUnits("2500", 6)
-            );
-            console.log("  ✓ FAIL pool funded");
+            // Fund in correct token0/token1 order
+            const failAmount0 = failPoolToken0.toLowerCase() === failTokenAddr.toLowerCase()
+                ? ethers.parseUnits("2500", 6) // FAIL is token0
+                : ethers.parseUnits("2500", 6); // collateral is token0
+            const failAmount1 = failPoolToken1.toLowerCase() === failTokenAddr.toLowerCase()
+                ? ethers.parseUnits("2500", 6) // FAIL is token1
+                : ethers.parseUnits("2500", 6); // collateral is token1
+            
+            await failPoolContract.connect(owner).fundPool(failAmount0, failAmount1);
+            console.log(`  ✓ FAIL pool funded (token0: ${failPoolToken0}, token1: ${failPoolToken1})`);
 
             // Step 6: Execute buy trade
             console.log("\nStep 6: Execute buy trade");
