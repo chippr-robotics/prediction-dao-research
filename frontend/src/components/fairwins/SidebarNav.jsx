@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import './SidebarNav.css'
 
 const CATEGORIES = [
@@ -15,6 +16,7 @@ const CATEGORIES = [
 
 function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const isMobile = useIsMobile()
 
   const handleCategoryClick = (categoryId) => {
     if (onCategoryChange) {
@@ -29,6 +31,34 @@ function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
     }
   }
 
+  // On mobile, render as bottom navigation bar
+  if (isMobile) {
+    return (
+      <nav 
+        className="bottom-nav-bar"
+        role="navigation"
+        aria-label="Market categories"
+      >
+        <div className="bottom-nav-scroll">
+          {CATEGORIES.map((category) => (
+            <button
+              key={category.id}
+              className={`bottom-nav-item ${selectedCategory === category.id ? 'active' : ''}`}
+              onClick={() => handleCategoryClick(category.id)}
+              onKeyDown={(e) => handleKeyDown(e, category.id)}
+              aria-current={selectedCategory === category.id ? 'page' : undefined}
+              aria-label={`View ${category.name}`}
+            >
+              <span className="bottom-nav-icon" aria-hidden="true">{category.icon}</span>
+              <span className="bottom-nav-label">{category.name}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+    )
+  }
+
+  // Desktop: render as sidebar
   return (
     <aside 
       className={`sidebar-nav ${isExpanded ? 'expanded' : 'collapsed'}`}

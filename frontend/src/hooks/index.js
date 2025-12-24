@@ -26,3 +26,18 @@ export {
   useAccountChange,
   useChainChange
 } from './useBlockchainEvents'
+
+// Responsive hooks
+export {
+  useMediaQuery,
+  useIsMobile,
+  useIsTablet,
+  useOrientation,
+  useDeviceInfo
+} from './useMediaQuery'
+
+// Scroll hooks
+export {
+  useScrollDirection,
+  useScrollPast
+} from './useScrollDirection'

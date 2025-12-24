@@ -1,4 +1,9 @@
 .fairwins-app-new {
+  /* Mobile layout height variables */
+  --mobile-header-height: 56px;
+  --mobile-header-compact-height: 48px;
+  --bottom-nav-height: 64px;
+  
   min-height: 100vh;
   background: var(--bg-primary);
   display: flex;
@@ -11,7 +16,7 @@
   flex: 1;
   padding: 0; /* Remove padding for full viewport hero */
   min-height: calc(100vh - 70px);
-  transition: margin-left 0.3s ease;
+  transition: margin-left 0.3s ease, margin-top 0.3s ease;
   position: relative;
   overflow-y: auto;
 }
@@ -129,6 +134,15 @@
   pointer-events: none;
 }
 
+/* Minimized state (mobile) */
+.fixed-bottom-carousel.minimized {
+  height: auto;
+}
+
+.fixed-bottom-carousel.minimized .carousel-scroller {
+  display: none;
+}
+
 /* When sidebar is collapsed */
 .sidebar-nav.collapsed ~ .fairwins-app-new .fixed-bottom-carousel,
 body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
@@ -148,6 +162,30 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+.carousel-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.carousel-toggle-btn {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  color: var(--brand-primary);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carousel-toggle-btn:hover {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
 }
 
 .carousel-hint {
@@ -245,20 +283,46 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
 }
 
 @media (max-width: 768px) {
+  /* Adjust main canvas for mobile with bottom nav */
   .main-canvas {
     margin-left: 0;
-    margin-top: 70px;
-    padding: 1rem 1rem calc(25vh + 1rem) 1rem; /* Adjusted for 25vh carousel */
+    margin-top: var(--mobile-header-height);
+    padding: 0;
+    min-height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
+    padding-bottom: var(--bottom-nav-height);
   }
 
   .sidebar-nav.collapsed ~ .main-canvas {
     margin-left: 0;
   }
 
+  /* Hero section adjustments for mobile */
+  .hero-section {
+    height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
+    padding: 1rem;
+  }
+
+  /* Category rows container for mobile */
+  .categories-rows-container {
+    left: 0;
+    max-height: 20vh;
+    padding: 0.5rem 1rem;
+    bottom: var(--bottom-nav-height);
+  }
+
+  /* Fixed bottom carousel for mobile */
   .fixed-bottom-carousel {
     left: 0;
+    right: 0;
+    bottom: var(--bottom-nav-height);
     padding: 0.75rem 1rem;
-    height: 30vh; /* Slightly taller on mobile for better usability */
+    height: auto;
+    max-height: 35vh;
+  }
+
+  .fixed-bottom-carousel.minimized {
+    height: auto;
+    padding: 0.5rem 1rem;
   }
 
   .sidebar-nav.collapsed ~ .fairwins-app-new .fixed-bottom-carousel {
@@ -274,14 +338,43 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
   }
 
   .carousel-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
     margin-bottom: 0.5rem;
   }
 
+  .carousel-header h3 {
+    font-size: 1rem;
+  }
+
   .carousel-hint {
-    font-size: 0.8rem;
+    display: none; /* Hide hint on mobile to save space */
+  }
+
+  .carousel-toggle-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 480px) {
+  .hero-section {
+    padding: 0.5rem;
+  }
+
+  .carousel-item {
+    flex: 0 0 200px;
+  }
+
+  .carousel-item .market-tile {
+    width: 200px;
+  }
+
+  .fixed-bottom-carousel {
+    max-height: 30vh;
+  }
+
+  .carousel-header h3 {
+    font-size: 0.9rem;
   }
 }
 
