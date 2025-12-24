@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
-import { useIsMobile } from '../../hooks/useMediaQuery'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
-import MarketTile from './MarketTile'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
 import './FairWinsAppNew.css'
@@ -470,13 +468,14 @@ const getMockMarkets = () => {
 
 function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   const { account, isConnected } = useWeb3()
-  const isMobile = useIsMobile()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'category'
   const [showHero, setShowHero] = useState(false) // Control hero visibility
+  const heroBackButtonRef = useRef(null)
+  const lastFocusedElementRef = useRef(null)
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -495,6 +494,43 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   useEffect(() => {
     loadMarkets()
   }, [loadMarkets])
+
+  // Handle Escape key to close hero
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.key === 'Escape' || event.key === 'Esc') && showHero) {
+        handleCloseHero()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showHero, handleCloseHero])
+
+  // Manage body scroll lock and focus when hero opens/closes
+  useEffect(() => {
+    if (showHero) {
+      // Prevent body scroll when hero is open
+      document.body.style.overflow = 'hidden'
+      
+      // Move focus to the back button after a short delay to ensure it's rendered
+      setTimeout(() => {
+        if (heroBackButtonRef.current) {
+          heroBackButtonRef.current.focus()
+        }
+      }, 100)
+    } else {
+      // Restore body scroll
+      document.body.style.overflow = ''
+    }
+
+    // Cleanup function
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [showHero])
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -523,16 +559,22 @@ function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
   }
 
   const handleMarketClick = (market) => {
+    // Store the currently focused element
+    lastFocusedElementRef.current = document.activeElement
     setSelectedMarket(market)
     setShowHero(true) // Open hero view when clicking a market
     // Scroll to top to show hero
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleCloseHero = () => {
+  const handleCloseHero = useCallback(() => {
     setShowHero(false)
     setSelectedMarket(null)
-  }
+    // Return focus to the element that opened the hero
+    if (lastFocusedElementRef.current) {
+      lastFocusedElementRef.current.focus()
+    }
+  }, [])
 
   const handleTrade = (tradeData) => {
     alert(`Trading functionality requires deployed contracts.
@@ -613,15 +655,24 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
         <div className="unified-view">
           {/* Hero Card - Only shown when showHero is true, as overlay */}
           {showHero && selectedMarket && (
-            <div className="hero-overlay">
+            <div 
+              className="hero-overlay"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="hero-dialog-title"
+            >
               <div className="hero-section">
                 <button 
+                  ref={heroBackButtonRef}
                   className="hero-back-btn"
                   onClick={handleCloseHero}
                   aria-label="Close hero and return to grid"
                 >
                   ← Back to Grid
                 </button>
+                <h2 id="hero-dialog-title" className="visually-hidden">
+                  Market details dialog
+                </h2>
                 <MarketHeroCard 
                   market={selectedMarket}
                   onTrade={handleTrade}
@@ -655,38 +706,45 @@ This would submit an encrypted position through the PrivacyCoordinator contract.
                 </div>
               ) : (
                 /* Full Grid View for specific category */
-                <div className="grid-view-container">
-                  <div className="grid-controls">
-                    <div className="grid-header">
-                      <h2>
-                        {categories.find(c => c.id === selectedCategory)?.icon}{' '}
-                        {categories.find(c => c.id === selectedCategory)?.name} Markets
-                      </h2>
-                      <span className="market-count">
-                        ({getFilteredAndSortedMarkets().length} active markets)
-                      </span>
+                (() => {
+                  const selectedCategoryObj = categories.find(c => c.id === selectedCategory)
+                  return (
+                    <div className="grid-view-container">
+                      <div className="grid-controls">
+                        <div className="grid-header">
+                          <h2>
+                            {selectedCategoryObj?.icon}{' '}
+                            {selectedCategoryObj?.name} Markets
+                          </h2>
+                          <span className="market-count">
+                            ({getFilteredAndSortedMarkets().length} active markets)
+                          </span>
+                        </div>
+                        <div className="sort-controls">
+                          <label htmlFor="sort-select">Sort by:</label>
+                          <select 
+                            id="sort-select"
+                            value={sortBy} 
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="sort-select"
+                          >
+                            <option value="endTime">Ending Time</option>
+                            <option value="marketValue">Market Value</option>
+                            {selectedCategory === 'all' && (
+                              <option value="category">Category</option>
+                            )}
+                          </select>
+                        </div>
+                      </div>
+                      <MarketGrid 
+                        markets={getFilteredAndSortedMarkets()}
+                        onMarketClick={handleMarketClick}
+                        selectedMarketId={selectedMarket?.id}
+                        loading={loading}
+                      />
                     </div>
-                    <div className="sort-controls">
-                      <label htmlFor="sort-select">Sort by:</label>
-                      <select 
-                        id="sort-select"
-                        value={sortBy} 
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="sort-select"
-                      >
-                        <option value="endTime">Ending Time</option>
-                        <option value="marketValue">Market Value</option>
-                        <option value="category">Category</option>
-                      </select>
-                    </div>
-                  </div>
-                  <MarketGrid 
-                    markets={getFilteredAndSortedMarkets()}
-                    onMarketClick={handleMarketClick}
-                    selectedMarketId={selectedMarket?.id}
-                    loading={loading}
-                  />
-                </div>
+                  )
+                })()
               )}
             </>
           )}
