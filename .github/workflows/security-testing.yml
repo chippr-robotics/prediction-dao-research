@@ -309,7 +309,7 @@ jobs:
                         echo "- Instructions visited: $visited_count" >> $GITHUB_STEP_SUMMARY
                       fi
                       
-                      # List other files
+                      # List other files (up to 10 for brevity)
                       echo "- Files generated:" >> $GITHUB_STEP_SUMMARY
                       ls -1 "$mcore_dir" | head -10 | sed 's/^/  - /' >> $GITHUB_STEP_SUMMARY
                     fi
