@@ -1,6 +1,6 @@
 import './MarketTile.css'
 
-function MarketTile({ market, onClick, isActive = false }) {
+function MarketTile({ market, onClick, isActive = false, compact = false }) {
   const calculateImpliedProbability = (passPrice) => {
     return (parseFloat(passPrice) * 100).toFixed(1)
   }
@@ -69,7 +69,7 @@ function MarketTile({ market, onClick, isActive = false }) {
 
   return (
     <div 
-      className={`market-tile ${isActive ? 'active' : ''}`}
+      className={`market-tile ${isActive ? 'active' : ''} ${compact ? 'compact' : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
@@ -92,7 +92,7 @@ function MarketTile({ market, onClick, isActive = false }) {
 
       <h3 className="tile-title">{market.proposalTitle}</h3>
 
-      {market.description && (
+      {!compact && market.description && (
         <p className="tile-description">{market.description}</p>
       )}
 
@@ -127,16 +127,18 @@ function MarketTile({ market, onClick, isActive = false }) {
         </div>
       </div>
 
-      <button 
-        className="tile-action-btn"
-        onClick={(e) => {
-          e.stopPropagation()
-          handleClick()
-        }}
-        aria-label={`Trade on ${market.proposalTitle}`}
-      >
-        View Market
-      </button>
+      {!compact && (
+        <button 
+          className="tile-action-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleClick()
+          }}
+          aria-label={`Trade on ${market.proposalTitle}`}
+        >
+          View Market
+        </button>
+      )}
     </div>
   )
 }
