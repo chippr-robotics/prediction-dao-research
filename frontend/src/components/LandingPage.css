@@ -289,6 +289,9 @@
   color: #4b5563;
   transition: all 0.3s ease;
   text-decoration: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
 .social-link:hover {
@@ -296,6 +299,20 @@
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(45, 122, 79, 0.3);
+}
+
+/* Logo Fallback */
+.platform-logo-fallback {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2D7A4F;
+  color: white;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.125rem;
 }
 
 .membership-note {
