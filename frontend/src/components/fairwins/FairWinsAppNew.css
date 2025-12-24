@@ -9,7 +9,7 @@
   margin-left: 240px;
   margin-top: 70px;
   flex: 1;
-  padding: 2rem 2rem calc(260px + 2rem) 2rem; /* Bottom padding for fixed carousel */
+  padding: 2rem 2rem calc(25vh + 2rem) 2rem; /* Bottom padding for fixed carousel at 25vh */
   min-height: calc(100vh - 70px);
   transition: margin-left 0.3s ease;
 }
@@ -53,13 +53,29 @@
   bottom: 0;
   left: 240px;
   right: 0;
-  background: rgba(15, 24, 16, 0.98);
-  backdrop-filter: blur(10px);
-  border-top: 2px solid rgba(59, 130, 246, 0.3);
-  padding: 1.25rem 2rem;
+  height: 25vh; /* 25% of viewport height */
+  background: rgba(15, 24, 16, 0.75); /* More transparent - was 0.98 */
+  backdrop-filter: blur(12px);
+  border-top: 2px solid rgba(59, 130, 246, 0.25);
+  padding: 1rem 2rem;
   z-index: 150;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-  transition: left 0.3s ease;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s ease, opacity 0.3s ease, left 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Hide/Show carousel states */
+.fixed-bottom-carousel.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.fixed-bottom-carousel.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* When sidebar is collapsed */
@@ -72,7 +88,8 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
 }
 
 .carousel-header h3 {
@@ -95,6 +112,8 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
   overflow-y: hidden;
   scroll-behavior: smooth;
   padding-bottom: 0.5rem;
+  flex: 1;
+  min-height: 0; /* Allow flexbox to shrink */
 }
 
 .carousel-scroller::-webkit-scrollbar {
@@ -177,7 +196,7 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
   .main-canvas {
     margin-left: 0;
     margin-top: 70px;
-    padding: 1rem 1rem calc(240px + 1rem) 1rem;
+    padding: 1rem 1rem calc(25vh + 1rem) 1rem; /* Adjusted for 25vh carousel */
   }
 
   .sidebar-nav.collapsed ~ .main-canvas {
@@ -186,7 +205,8 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
 
   .fixed-bottom-carousel {
     left: 0;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
+    height: 30vh; /* Slightly taller on mobile for better usability */
   }
 
   .sidebar-nav.collapsed ~ .fairwins-app-new .fixed-bottom-carousel {
@@ -205,6 +225,7 @@ body:has(.sidebar-nav.collapsed) .fixed-bottom-carousel {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+    margin-bottom: 0.5rem;
   }
 
   .carousel-hint {
