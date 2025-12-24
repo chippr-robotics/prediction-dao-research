@@ -179,10 +179,11 @@ contract OracleResolver is Ownable, ReentrancyGuard {
             "Invalid stage"
         );
 
-        uint256 passValue;
-        uint256 failValue;
-        address bondRecipient;
-        uint256 bondAmount;
+        // Initialize variables to prevent uninitialized variable warnings
+        uint256 passValue = 0;
+        uint256 failValue = 0;
+        address bondRecipient = address(0);
+        uint256 bondAmount = 0;
 
         if (resolution.stage == ResolutionStage.DesignatedReporting) {
             // No challenge, use reporter's values

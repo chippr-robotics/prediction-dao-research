@@ -74,6 +74,7 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     event BondForfeited(uint256 indexed proposalId, address indexed proposer);
     event BondReturned(uint256 indexed proposalId, address indexed proposer);
     event GovernorSet(address indexed governor);
+    event BondAmountUpdated(uint256 oldAmount, uint256 newAmount);
 
     modifier onlyOwnerOrGovernor() {
         require(msg.sender == owner() || msg.sender == governor, "Not authorized");
@@ -253,7 +254,9 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
      * @param newBondAmount New bond amount in wei
      */
     function updateBondAmount(uint256 newBondAmount) external onlyOwner {
+        uint256 oldAmount = bondAmount;
         bondAmount = newBondAmount;
+        emit BondAmountUpdated(oldAmount, newBondAmount);
     }
 
     /**

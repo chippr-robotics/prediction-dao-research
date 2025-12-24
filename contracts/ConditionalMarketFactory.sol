@@ -291,12 +291,12 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         // Production should route through ETC Swap pools
         tokenAmount = (amount * 1e18) / 1e15; // Simplified: 1000 tokens per ETH
         
+        // Update market liquidity BEFORE external call (CEI pattern)
+        market.totalLiquidity += amount;
+        
         // Mint tokens to buyer
         ConditionalToken token = ConditionalToken(buyPass ? market.passToken : market.failToken);
         token.mint(msg.sender, tokenAmount);
-        
-        // Update market liquidity
-        market.totalLiquidity += amount;
         
         emit TokensPurchased(marketId, msg.sender, buyPass, amount, tokenAmount);
     }
@@ -322,18 +322,18 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         require(tokenAmount > 0, "Amount must be positive");
 
         // TODO: Integrate with ETC Swap v3 for actual DEX trading
-        // Burn tokens from seller
-        ConditionalToken token = ConditionalToken(sellPass ? market.passToken : market.failToken);
-        token.burn(msg.sender, tokenAmount);
-        
         // Calculate collateral to return using simplified pricing
         collateralAmount = (tokenAmount * 1e15) / 1e18; // Inverse of buy pricing
         require(collateralAmount <= market.totalLiquidity, "Insufficient liquidity");
         
-        // Update market liquidity
+        // Update market liquidity BEFORE external calls (CEI pattern)
         market.totalLiquidity -= collateralAmount;
         
-        // Transfer collateral to seller
+        // Burn tokens from seller
+        ConditionalToken token = ConditionalToken(sellPass ? market.passToken : market.failToken);
+        token.burn(msg.sender, tokenAmount);
+        
+        // Transfer collateral to seller (msg.sender is not arbitrary - it's the caller)
         (bool success, ) = payable(msg.sender).call{value: collateralAmount}("");
         require(success, "Transfer failed");
         

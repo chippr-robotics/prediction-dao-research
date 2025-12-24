@@ -51,7 +51,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
     // Treasury management
     address public treasuryVault;
-    uint256 public constant MAX_DAILY_SPENDING = 100000 ether; // 100k ETC
+    uint256 public constant MAX_DAILY_SPENDING = 100_000 ether; // 100k ETC
     mapping(uint256 => uint256) public dailySpending; // day => amount
 
     // Timelock
@@ -170,10 +170,12 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         GovernanceProposal storage govProposal = governanceProposals[governanceProposalId];
         require(govProposal.phase == ProposalPhase.MarketTrading, "Invalid phase");
 
+        // Update state BEFORE external call (CEI pattern)
+        govProposal.phase = ProposalPhase.Resolution;
+        
         // End market trading
         marketFactory.endTrading(govProposal.marketId);
 
-        govProposal.phase = ProposalPhase.Resolution;
         emit ProposalPhaseChanged(governanceProposalId, ProposalPhase.Resolution);
     }
 
@@ -195,22 +197,25 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
         require(finalized, "Resolution not finalized");
 
-        // Resolve market
-        marketFactory.resolveMarket(govProposal.marketId, passValue, failValue);
-
         // Decide based on market prediction (simplified: pass if passValue > failValue)
+        // Update state BEFORE external calls (CEI pattern)
         if (passValue > failValue) {
             govProposal.phase = ProposalPhase.Execution;
             govProposal.executionTime = block.timestamp + MIN_TIMELOCK;
+        } else {
+            govProposal.phase = ProposalPhase.Rejected;
+        }
+        
+        // Resolve market AFTER state updates
+        marketFactory.resolveMarket(govProposal.marketId, passValue, failValue);
 
-            // Open ragequit window
+        // Open ragequit window if proposal passed
+        if (passValue > failValue) {
             ragequitModule.openRagequitWindow(
                 govProposal.proposalId,
                 block.timestamp,
                 govProposal.executionTime
             );
-        } else {
-            govProposal.phase = ProposalPhase.Rejected;
         }
 
         emit ProposalPhaseChanged(governanceProposalId, govProposal.phase);
@@ -258,8 +263,10 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
             (bool success, ) = payable(recipient).call{value: fundingAmount}("");
             require(success, "Transfer failed");
         } else {
-            // ERC20 token
-            IERC20(fundingToken).safeTransferFrom(treasuryVault, recipient, fundingAmount);
+            // ERC20 token - Transfer from this contract (not treasuryVault) 
+            // Treasury should transfer approved funds to this contract before execution
+            // This prevents arbitrary transferFrom vulnerability
+            IERC20(fundingToken).safeTransfer(recipient, fundingAmount);
         }
 
         // Mark ragequit window as closed
