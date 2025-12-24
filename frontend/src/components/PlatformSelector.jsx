@@ -182,17 +182,17 @@ function PlatformSelector() {
             <div className="footer-section">
               <h3>Technology</h3>
               <ul>
-                <li>Nightmarket Privacy</li>
-                <li>MACI Anti-Collusion</li>
-                <li>Gnosis Conditional Tokens</li>
+                <li><a href="https://blog.zkga.me/nightmarket" target="_blank" rel="noopener noreferrer">Nightmarket Privacy</a></li>
+                <li><a href="https://github.com/privacy-scaling-explorations/maci" target="_blank" rel="noopener noreferrer">MACI Anti-Collusion</a></li>
+                <li><a href="https://docs.gnosis.io/conditionaltokens/" target="_blank" rel="noopener noreferrer">Gnosis Conditional Tokens</a></li>
               </ul>
             </div>
             <div className="footer-section">
               <h3>Resources</h3>
               <ul>
-                <li>Documentation</li>
-                <li>Developer Guide</li>
-                <li>Security Audits</li>
+                <li><a href="https://chippr-robotics.github.io/prediction-dao-research/" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+                <li><a href="https://chippr-robotics.github.io/prediction-dao-research/developer-guide/setup/" target="_blank" rel="noopener noreferrer">Developer Guide</a></li>
+                <li><a href="https://chippr-robotics.github.io/prediction-dao-research/security/" target="_blank" rel="noopener noreferrer">Security Audits</a></li>
               </ul>
             </div>
           </div>
