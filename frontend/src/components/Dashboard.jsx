@@ -5,6 +5,7 @@ import DAOList from './DAOList'
 import ProposalDashboard from './ProposalDashboard'
 import DAOLaunchpad from './DAOLaunchpad'
 import MetricsDashboard from './MetricsDashboard'
+import { useEthers, useAccount } from '../hooks/useWeb3'
 
 const DAOFactoryABI = [
   "function getUserDAOs(address user) external view returns (uint256[])",
@@ -18,7 +19,9 @@ const DAOFactoryABI = [
 // Replace with deployed factory address
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
-function Dashboard({ provider, signer, account }) {
+function Dashboard() {
+  const { provider } = useEthers()
+  const { account } = useAccount()
   const [activeTab, setActiveTab] = useState('daos')
   const [userDAOs, setUserDAOs] = useState([])
   const [isAdmin, setIsAdmin] = useState(false)
@@ -80,13 +83,13 @@ function Dashboard({ provider, signer, account }) {
 
     switch (activeTab) {
       case 'daos':
-        return <DAOList daos={userDAOs} provider={provider} account={account} />
+        return <DAOList daos={userDAOs} />
       case 'proposals':
-        return <ProposalDashboard daos={userDAOs} provider={provider} signer={signer} />
+        return <ProposalDashboard daos={userDAOs} />
       case 'metrics':
-        return <MetricsDashboard daos={userDAOs} provider={provider} />
+        return <MetricsDashboard daos={userDAOs} />
       case 'launchpad':
-        return <DAOLaunchpad signer={signer} onDAOCreated={loadUserDAOs} />
+        return <DAOLaunchpad onDAOCreated={loadUserDAOs} />
       default:
         return null
     }

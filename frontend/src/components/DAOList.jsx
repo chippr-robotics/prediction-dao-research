@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { ethers } from 'ethers'
 import './DAOList.css'
+import { useEthers, useAccount } from '../hooks/useWeb3'
 
-function DAOList({ daos, provider, account }) {
+function DAOList({ daos }) {
+  const { provider } = useEthers()
+  const { account } = useAccount()
   const [selectedDAO, setSelectedDAO] = useState(null)
 
   const formatDate = (timestamp) => {

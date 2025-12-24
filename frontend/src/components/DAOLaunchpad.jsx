@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { ethers } from 'ethers'
 import './DAOLaunchpad.css'
+import { useEthers } from '../hooks/useWeb3'
+import { useNotification } from '../hooks/useUI'
 
 const DAOFactoryABI = [
   "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
@@ -8,7 +10,9 @@ const DAOFactoryABI = [
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
-function DAOLaunchpad({ signer, onDAOCreated }) {
+function DAOLaunchpad({ onDAOCreated }) {
+  const { signer } = useEthers()
+  const { showNotification } = useNotification()
   const [formData, setFormData] = useState({
     name: '',
     description: '',

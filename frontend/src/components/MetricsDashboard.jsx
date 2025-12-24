@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ethers } from 'ethers'
 import './MetricsDashboard.css'
+import { useEthers } from '../hooks/useWeb3'
 
 const WelfareMetricRegistryABI = [
   "function getActiveMetrics() external view returns (uint256[])",
@@ -9,7 +10,8 @@ const WelfareMetricRegistryABI = [
   "function getMetricsByCategory(uint8 category) external view returns (uint256[])"
 ]
 
-function MetricsDashboard({ daos, provider }) {
+function MetricsDashboard({ daos }) {
+  const { provider } = useEthers()
   const [metrics, setMetrics] = useState([])
   const [aggregatedMetrics, setAggregatedMetrics] = useState(null)
   const [selectedDAO, setSelectedDAO] = useState(null)

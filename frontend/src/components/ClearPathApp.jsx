@@ -1,7 +1,11 @@
 import './ClearPathApp.css'
 import Dashboard from './Dashboard'
+import { useWeb3, useNetwork } from '../hooks/useWeb3'
 
-function ClearPathApp({ provider, signer, account, onDisconnect, onBack, networkError }) {
+function ClearPathApp({ onDisconnect, onBack }) {
+  const { account } = useWeb3()
+  const { networkError } = useNetwork()
+
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
@@ -56,7 +60,7 @@ function ClearPathApp({ provider, signer, account, onDisconnect, onBack, network
             <p className="error-help">Please switch to the correct network to continue.</p>
           </div>
         ) : (
-          <Dashboard provider={provider} signer={signer} account={account} />
+          <Dashboard />
         )}
       </main>
 
