@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import './App.css'
@@ -9,12 +9,13 @@ import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from './wagmi'
 
-function App() {
+function AppContent() {
   const { address, isConnected } = useAccount()
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
+  const navigate = useNavigate()
   
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
@@ -103,8 +104,12 @@ function App() {
     }
   }
 
+  const handleBack = () => {
+    navigate('/select')
+  }
+
   return (
-    <Router>
+    <>
       {/* Screen reader announcements */}
       <div 
         role="status" 
@@ -145,6 +150,7 @@ function App() {
                 signer={signer}
                 account={address}
                 onDisconnect={disconnectWallet}
+                onBack={handleBack}
                 networkError={networkError}
               />
             ) : (
@@ -161,6 +167,7 @@ function App() {
                 signer={signer}
                 account={address}
                 onDisconnect={disconnectWallet}
+                onBack={handleBack}
                 networkError={networkError}
               />
             ) : (
@@ -170,6 +177,14 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   )
 }
