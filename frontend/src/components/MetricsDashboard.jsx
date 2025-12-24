@@ -118,6 +118,92 @@ function MetricsDashboard({ daos }) {
       {aggregatedMetrics && (
         <div className="aggregated-section">
           <h3>Overall Performance</h3>
+          
+          {/* Visual Score Chart */}
+          <div className="score-chart">
+            <div className="chart-bar-group">
+              <div className="chart-bar-item">
+                <div className="chart-bar-label">
+                  <span className="chart-icon" aria-hidden="true">🏛️</span>
+                  <span>Governance</span>
+                </div>
+                <div className="chart-bar-container">
+                  <div 
+                    className="chart-bar governance"
+                    style={{ width: `${Math.min((Number(aggregatedMetrics.governanceScore) / 10000) * 100, 100)}%` }}
+                    role="progressbar"
+                    aria-valuenow={Number(aggregatedMetrics.governanceScore)}
+                    aria-valuemin="0"
+                    aria-valuemax="10000"
+                    aria-label={`Governance score: ${formatScore(aggregatedMetrics.governanceScore)}`}
+                  >
+                    <span className="chart-bar-value">{formatScore(aggregatedMetrics.governanceScore)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="chart-bar-item">
+                <div className="chart-bar-label">
+                  <span className="chart-icon" aria-hidden="true">💰</span>
+                  <span>Financial</span>
+                </div>
+                <div className="chart-bar-container">
+                  <div 
+                    className="chart-bar financial"
+                    style={{ width: `${Math.min((Number(aggregatedMetrics.financialScore) / 10000) * 100, 100)}%` }}
+                    role="progressbar"
+                    aria-valuenow={Number(aggregatedMetrics.financialScore)}
+                    aria-valuemin="0"
+                    aria-valuemax="10000"
+                    aria-label={`Financial score: ${formatScore(aggregatedMetrics.financialScore)}`}
+                  >
+                    <span className="chart-bar-value">{formatScore(aggregatedMetrics.financialScore)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="chart-bar-item">
+                <div className="chart-bar-label">
+                  <span className="chart-icon" aria-hidden="true">📊</span>
+                  <span>Betting</span>
+                </div>
+                <div className="chart-bar-container">
+                  <div 
+                    className="chart-bar betting"
+                    style={{ width: `${Math.min((Number(aggregatedMetrics.bettingScore) / 10000) * 100, 100)}%` }}
+                    role="progressbar"
+                    aria-valuenow={Number(aggregatedMetrics.bettingScore)}
+                    aria-valuemin="0"
+                    aria-valuemax="10000"
+                    aria-label={`Betting score: ${formatScore(aggregatedMetrics.bettingScore)}`}
+                  >
+                    <span className="chart-bar-value">{formatScore(aggregatedMetrics.bettingScore)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="chart-bar-item">
+                <div className="chart-bar-label">
+                  <span className="chart-icon" aria-hidden="true">🏢</span>
+                  <span>Private Sector</span>
+                </div>
+                <div className="chart-bar-container">
+                  <div 
+                    className="chart-bar private"
+                    style={{ width: `${Math.min((Number(aggregatedMetrics.privateSectorScore) / 10000) * 100, 100)}%` }}
+                    role="progressbar"
+                    aria-valuenow={Number(aggregatedMetrics.privateSectorScore)}
+                    aria-valuemin="0"
+                    aria-valuemax="10000"
+                    aria-label={`Private sector score: ${formatScore(aggregatedMetrics.privateSectorScore)}`}
+                  >
+                    <span className="chart-bar-value">{formatScore(aggregatedMetrics.privateSectorScore)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="score-grid">
             <div className="score-card overall">
               <div className="score-icon">⭐</div>
