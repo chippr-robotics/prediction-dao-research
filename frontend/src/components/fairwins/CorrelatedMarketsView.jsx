@@ -70,9 +70,31 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     const height = 500
     const centerX = width / 2
     const centerY = height / 2
-    const maxRadius = 150 // Exterior is 100%
+    const maxRadius = 150 // Exterior is max scale
     const levels = 5 // Number of concentric circles
     const angleSlice = (Math.PI * 2) / radarData.length
+
+    // Calculate dynamic scale based on market probabilities
+    // Use average as baseline, with padding for visual distinction
+    const probabilities = radarData.map(d => d.probability)
+    const avgProb = probabilities.reduce((a, b) => a + b, 0) / probabilities.length
+    const maxProb = Math.max(...probabilities)
+    const minProb = Math.min(...probabilities)
+    const range = maxProb - minProb
+    
+    // Dynamic scale: if markets are close (range < 20%), zoom in for better comparison
+    // Otherwise use full 0-100 scale
+    let scaleMin = 0
+    let scaleMax = 100
+    
+    if (range < 20 && range > 0) {
+      // Close match: center scale around average with padding
+      const padding = Math.max(range * 0.5, 5) // At least 5% padding
+      scaleMin = Math.max(0, avgProb - padding - range / 2)
+      scaleMax = Math.min(100, avgProb + padding + range / 2)
+    }
+    
+    const scaleRange = scaleMax - scaleMin
 
     // Clear previous content
     d3.select(svgRef.current).selectAll('*').remove()
@@ -86,7 +108,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     const g = svg.append('g')
       .attr('transform', `translate(${centerX},${centerY})`)
 
-    // Draw concentric circles (grid)
+    // Draw concentric circles (grid) with dynamic scale labels
     const gridLevels = d3.range(1, levels + 1).reverse()
     gridLevels.forEach((level) => {
       g.append('circle')
@@ -94,6 +116,15 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .attr('fill', 'none')
         .attr('stroke', 'rgba(54, 179, 126, 0.15)')
         .attr('stroke-width', 1)
+      
+      // Add percentage labels with dynamic scale
+      const labelValue = scaleMin + (scaleRange / levels) * level
+      g.append('text')
+        .attr('x', 5)
+        .attr('y', -(maxRadius / levels) * level + 5)
+        .attr('font-size', '12px')
+        .attr('fill', 'rgba(54, 179, 126, 0.6)')
+        .text(`${labelValue.toFixed(0)}%`)
     })
 
     // Draw radial axes
@@ -113,23 +144,47 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .attr('stroke-width', 1)
     })
 
+    // Create enhanced data with artificial anchor points between options for petal effect
+    // This makes the petals arch outward toward each option and curve back inward between them
+    const enhancedData = []
+    const innerCircleRadius = 0.15 // 15% inner circle where petals meet
+    
+    radarData.forEach((d, i) => {
+      const nextIndex = (i + 1) % radarData.length
+      const nextData = radarData[nextIndex]
+      
+      // Add the main data point (arches outward to this option)
+      enhancedData.push({
+        angle: angleSlice * i,
+        radius: (d.probability - scaleMin) / scaleRange,
+        name: d.name
+      })
+      
+      // Add anchor point between this option and the next (curves back to inner circle)
+      enhancedData.push({
+        angle: angleSlice * i + angleSlice / 2,
+        radius: innerCircleRadius, // Pull back to inner circle between options
+        name: null // Anchor point, not a real market
+      })
+    })
+    
     // Create data polygon with smooth curves for flower petal effect
     const radarLine = d3.lineRadial()
-      .angle((d, i) => angleSlice * i)
-      .radius(d => (d.probability / 100) * maxRadius)
+      .angle(d => d.angle)
+      .radius(d => d.radius * maxRadius)
       .curve(d3.curveCatmullRomClosed.alpha(0.5))
 
     g.append('path')
-      .datum(radarData)
+      .datum(enhancedData)
       .attr('d', radarLine)
       .attr('fill', 'rgba(54, 179, 126, 0.3)')
       .attr('stroke', 'rgba(54, 179, 126, 1)')
       .attr('stroke-width', 2)
 
-    // Draw data points
+    // Draw data points (only for actual markets, not anchor points)
     radarData.forEach((d, i) => {
       const angle = angleSlice * i - Math.PI / 2
-      const radius = (d.probability / 100) * maxRadius
+      const radius = ((d.probability - scaleMin) / scaleRange) * maxRadius
       const x = radius * Math.cos(angle)
       const y = radius * Math.sin(angle)
 
