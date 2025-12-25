@@ -1,0 +1,66 @@
+.dev-warning-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.dev-warning-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 1200px;
+  width: 100%;
+}
+
+.dev-warning-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.dev-warning-text {
+  flex: 1;
+  text-align: center;
+}
+
+.dev-warning-link {
+  color: white;
+  text-decoration: underline;
+  font-weight: 600;
+  transition: opacity 0.2s ease;
+}
+
+.dev-warning-link:hover {
+  opacity: 0.8;
+}
+
+.dev-warning-link:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (max-width: 768px) {
+  .dev-warning-banner {
+    font-size: 0.875rem;
+    padding: 0.625rem 0.75rem;
+  }
+  
+  .dev-warning-content {
+    gap: 0.5rem;
+  }
+  
+  .dev-warning-icon {
+    font-size: 1rem;
+  }
+}
