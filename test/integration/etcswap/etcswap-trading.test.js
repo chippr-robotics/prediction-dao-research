@@ -13,6 +13,21 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
  * 5. Execute trades (buy/sell)
  * 6. Verify correct behavior
  */
+
+// Enum values for BetType (must match Solidity enum order)
+const BetType = {
+  YesNo: 0,
+  PassFail: 1,
+  AboveBelow: 2,
+  HigherLower: 3,
+  InOut: 4,
+  OverUnder: 5,
+  ForAgainst: 6,
+  TrueFalse: 7,
+  WinLose: 8,
+  UpDown: 9
+};
+
 describe("Integration: ETCSwap V3 Trading", function () {
     async function deployETCSwapFixture() {
         const [owner, liquidityProvider, trader1, trader2] = await ethers.getSigners();
@@ -88,7 +103,7 @@ describe("Integration: ETCSwap V3 Trading", function () {
                 liquidityAmount,
                 1000,
                 tradingPeriod,
-          0
+          BetType.YesNo
             );
             await createTx.wait();
 
@@ -272,7 +287,7 @@ describe("Integration: ETCSwap V3 Trading", function () {
                 ethers.parseEther("1"),
                 1000,
                 tradingPeriod,
-          0
+          BetType.YesNo
             );
 
             const marketId = 0;

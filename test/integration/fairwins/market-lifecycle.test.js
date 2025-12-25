@@ -2,6 +2,20 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
 
+// Enum values for BetType (must match Solidity enum order)
+const BetType = {
+  YesNo: 0,
+  PassFail: 1,
+  AboveBelow: 2,
+  HigherLower: 3,
+  InOut: 4,
+  OverUnder: 5,
+  ForAgainst: 6,
+  TrueFalse: 7,
+  WinLose: 8,
+  UpDown: 9
+};
+
 /**
  * Simplified deployment fixture for FairWins standalone markets
  * Unlike governance proposals, FairWins markets are standalone predictions
@@ -76,7 +90,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
         initialLiquidity,
         1000, // liquidity parameter for LMSR
         tradingPeriod,
-          0
+          BetType.YesNo
       );
       
       const createReceipt = await createTx.wait();
@@ -213,7 +227,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.parseEther("50"),
         1000,
         tradingPeriod,
-          0
+          BetType.YesNo
       );
       
       const createReceipt = await createTx.wait();
@@ -291,7 +305,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
         initialLiquidity,
         liquidityParam,
         tradingPeriod,
-          0
+          BetType.YesNo
       );
 
       await expect(tx).to.emit(marketFactory, "MarketCreated");
@@ -325,7 +339,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
           ethers.ZeroAddress,
           ethers.parseEther("50"),
           1000,
-          tooShort
+          tooShort,
+          BetType.YesNo
         )
       ).to.be.revertedWith("Invalid trading period");
     });
@@ -344,7 +359,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.parseEther("50"),
         1000,
         tradingPeriod,
-          0
+          BetType.YesNo
       );
       
       const receipt = await createTx.wait();
@@ -404,7 +419,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.ZeroAddress,
         ethers.parseEther("50"),
         1000,
-        7 * 24 * 3600
+        7 * 24 * 3600,
+        BetType.YesNo
       );
       
       const receipt = await createTx.wait();
@@ -457,7 +473,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.ZeroAddress,
         ethers.parseEther("100"),
         1000,
-        7 * 24 * 3600
+        7 * 24 * 3600,
+        BetType.YesNo
       );
       
       const receipt = await createTx.wait();

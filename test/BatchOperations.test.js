@@ -9,6 +9,20 @@ describe("Batch Operations", function () {
   let addr1;
   let addr2;
 
+  // Enum values for BetType (must match Solidity enum order)
+  const BetType = {
+    YesNo: 0,
+    PassFail: 1,
+    AboveBelow: 2,
+    HigherLower: 3,
+    InOut: 4,
+    OverUnder: 5,
+    ForAgainst: 6,
+    TrueFalse: 7,
+    WinLose: 8,
+    UpDown: 9
+  };
+
   beforeEach(async function () {
     [owner, addr1, addr2] = await ethers.getSigners();
     
@@ -32,7 +46,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         },
         {
           proposalId: 2,
@@ -40,7 +54,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 10 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         },
         {
           proposalId: 3,
@@ -48,7 +62,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1500"),
           liquidityParameter: ethers.parseEther("150"),
           tradingPeriod: 14 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         }
       ];
 
@@ -87,7 +101,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         },
         {
           proposalId: 2,
@@ -95,7 +109,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 10 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         }
       ];
 
@@ -132,7 +146,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         });
       }
 
@@ -149,7 +163,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         },
         {
           proposalId: 1, // Duplicate proposal ID
@@ -157,7 +171,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 10 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         }
       ];
 
@@ -177,7 +191,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         },
         {
           proposalId: 2,
@@ -185,7 +199,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         },
         {
           proposalId: 3,
@@ -193,7 +207,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1500"),
           liquidityParameter: ethers.parseEther("150"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         }
       ];
       
@@ -538,7 +552,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         });
       }
       await marketFactory.batchDeployMarkets(params);
@@ -654,7 +668,7 @@ describe("Batch Operations", function () {
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
-          betType: 1
+          betType: BetType.PassFail
         });
       }
       
