@@ -531,9 +531,9 @@ function LandingPage() {
             <div className="footer-section">
               <h3>Documentation</h3>
               <ul>
-                <li><a href="https://chippr-robotics.github.io/prediction-dao-research/user-guide/getting-started/" target="_blank" rel="noopener noreferrer">User Guide</a></li>
-                <li><a href="https://chippr-robotics.github.io/prediction-dao-research/developer-guide/setup/" target="_blank" rel="noopener noreferrer">Developer Docs</a></li>
-                <li><a href="https://chippr-robotics.github.io/prediction-dao-research/security/" target="_blank" rel="noopener noreferrer">Security Audits</a></li>
+                <li><a href="https://docs.FairWins.app/user-guide/getting-started/" target="_blank" rel="noopener noreferrer">User Guide</a></li>
+                <li><a href="https://docs.FairWins.app/developer-guide/setup/" target="_blank" rel="noopener noreferrer">Developer Docs</a></li>
+                <li><a href="https://docs.FairWins.app/security/" target="_blank" rel="noopener noreferrer">Security Audits</a></li>
               </ul>
             </div>
           </div>

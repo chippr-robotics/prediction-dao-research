@@ -17,7 +17,7 @@ Both platforms integrate privacy-preserving mechanisms from Nightmarket (zero-kn
 
 ## 📚 Documentation
 
-**[View the full documentation →](https://chippr-robotics.github.io/prediction-dao-research/)**
+**[View the full documentation →](https://docs.FairWins.app)**
 
 The documentation site provides comprehensive guides for both platforms:
 - **User Experience**: Complete narrative guides walking through user journeys, practical scenarios, and interface understanding
@@ -334,14 +334,14 @@ npm run test:coverage
 
 For comprehensive documentation on all testing and security analysis:
 
-**[View Security Testing Documentation →](https://chippr-robotics.github.io/prediction-dao-research/security/)**
+**[View Security Testing Documentation →](https://docs.FairWins.app/security/)**
 
 The security testing documentation covers:
-- **[Unit Testing](https://chippr-robotics.github.io/prediction-dao-research/security/unit-testing/)**: Hardhat test suite with gas reporting
-- **[Static Analysis](https://chippr-robotics.github.io/prediction-dao-research/security/static-analysis/)**: Slither for vulnerability detection
-- **[Symbolic Execution](https://chippr-robotics.github.io/prediction-dao-research/security/symbolic-execution/)**: Manticore for path exploration
-- **[Fuzz Testing](https://chippr-robotics.github.io/prediction-dao-research/security/fuzz-testing/)**: Medusa for property-based testing
-- **[CI/CD Configuration](https://chippr-robotics.github.io/prediction-dao-research/security/ci-configuration/)**: GitHub Actions workflow maintenance
+- **[Unit Testing](https://docs.FairWins.app/security/unit-testing/)**: Hardhat test suite with gas reporting
+- **[Static Analysis](https://docs.FairWins.app/security/static-analysis/)**: Slither for vulnerability detection
+- **[Symbolic Execution](https://docs.FairWins.app/security/symbolic-execution/)**: Manticore for path exploration
+- **[Fuzz Testing](https://docs.FairWins.app/security/fuzz-testing/)**: Medusa for property-based testing
+- **[CI/CD Configuration](https://docs.FairWins.app/security/ci-configuration/)**: GitHub Actions workflow maintenance
 
 ### Test Structure
 
@@ -520,7 +520,7 @@ Contributions welcome! Please:
 
 ## Security
 
-For security concerns, please email security@example.com
+For general inquiries, please email howdy@FairWins.app. For security concerns, please email security@example.com
 
 ## Acknowledgments
 
