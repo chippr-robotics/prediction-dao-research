@@ -59,12 +59,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
       aria-label={`View market: ${market.proposalTitle}`}
       aria-pressed={isActive}
     >
-      {market.correlationGroupId && (
-        <div className="correlation-badge" title={market.correlationGroupName}>
-          <span className="correlation-icon" aria-hidden="true">🔗</span>
-          <span className="correlation-text">{market.correlationGroupName}</span>
-        </div>
-      )}
       <div className="tile-header">
         <div className="header-left">
           <span className="category-badge" aria-hidden="true">
@@ -86,6 +80,13 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
           </div>
         </div>
       </div>
+
+      {market.correlationGroupId && (
+        <div className="correlation-badge" title={market.correlationGroupName}>
+          <span className="correlation-icon" aria-hidden="true">🔗</span>
+          <span className="correlation-text">{market.correlationGroupName}</span>
+        </div>
+      )}
 
       <h3 className="tile-title">{market.proposalTitle}</h3>
 

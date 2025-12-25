@@ -3,6 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
+import CorrelatedMarketsView from './CorrelatedMarketsView'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
 import SwapPanel from './SwapPanel'
@@ -811,10 +812,18 @@ This is a transparent market - all trades are publicly visible on the blockchain
                 <h2 id="hero-dialog-title" className="visually-hidden">
                   Market details dialog
                 </h2>
-                <MarketHeroCard 
-                  market={selectedMarket}
-                  onTrade={handleTrade}
-                />
+                {selectedMarket.correlationGroupId ? (
+                  <CorrelatedMarketsView 
+                    market={selectedMarket}
+                    correlatedMarkets={markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId)}
+                    onTrade={handleTrade}
+                  />
+                ) : (
+                  <MarketHeroCard 
+                    market={selectedMarket}
+                    onTrade={handleTrade}
+                  />
+                )}
               </div>
             </div>
           )}
