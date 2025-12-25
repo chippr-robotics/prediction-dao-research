@@ -115,6 +115,7 @@ nav:
     - CI/CD Configuration: security/ci-configuration.md
   - System Overview:
     - Introduction: system-overview/introduction.md
+    - Concepts and Architecture: system-overview/concepts-and-architecture.md
     - How It Works: system-overview/how-it-works.md
     - FairWins Markets: system-overview/fairwins-markets.md
     - Privacy Mechanisms: system-overview/privacy.md
