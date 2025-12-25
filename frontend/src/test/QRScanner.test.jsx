@@ -147,8 +147,8 @@ describe('QRScanner Component', () => {
         />
       )
 
-      const modal = screen.getByRole('dialog')
-      await user.click(modal)
+      const modalContent = document.querySelector('.qr-scanner-modal')
+      await user.click(modalContent)
 
       expect(mockOnClose).not.toHaveBeenCalled()
     })

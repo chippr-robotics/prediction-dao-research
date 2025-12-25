@@ -42,6 +42,22 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }, [isOpen, scanning])
 
+  // Handle Escape key press
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
   const startScanning = async () => {
     if (!selectedCamera || html5QrCodeRef.current) return
 
@@ -116,12 +132,6 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
-      handleClose()
-    }
-  }
-
   const handleCameraChange = async (e) => {
     const newCameraId = e.target.value
     
@@ -144,12 +154,12 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     <div
       className="qr-scanner-backdrop"
       onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
       role="dialog"
       aria-modal="true"
       aria-labelledby="qr-scanner-title"
+      tabIndex={-1}
     >
-      <div className="qr-scanner-modal">
+      <div className="qr-scanner-modal" onClick={(e) => e.stopPropagation()}>
         <div className="qr-scanner-header">
           <h2 id="qr-scanner-title">Scan QR Code</h2>
           <button
