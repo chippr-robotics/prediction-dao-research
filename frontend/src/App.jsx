@@ -16,6 +16,8 @@ import { useEffect } from 'react'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
+import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
+import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
 
 function AppContent() {
   const { isConnected } = useWeb3()
@@ -62,6 +64,12 @@ function AppContent() {
 
   return (
     <>
+      {/* Development warning banner - always visible */}
+      <DevelopmentWarningBanner />
+      
+      {/* Development warning modal - shows once per session */}
+      <DevelopmentWarningModal />
+      
       {/* Accessibility announcement region */}
       <AnnouncementRegion />
       

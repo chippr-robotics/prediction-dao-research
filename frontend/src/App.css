@@ -824,3 +824,14 @@ select[aria-invalid="true"] {
   outline: 2px solid var(--bg-secondary);
   outline-offset: 2px;
 }
+
+/* Adjust body padding to account for fixed development warning banner */
+body {
+  padding-top: 45px; /* Approximate height of the dev warning banner */
+}
+
+@media (max-width: 768px) {
+  body {
+    padding-top: 42px; /* Adjusted for mobile banner height */
+  }
+}
