@@ -722,7 +722,9 @@ This is a transparent market - all trades are publicly visible on the blockchain
     // Flatten grouped markets (put grouped markets together)
     const groupedMarkets = []
     Object.keys(grouped).forEach(groupId => {
-      // Sort within each group by pass token price (descending)
+      // Sort within each group by pass token price (descending) to show most likely outcomes first
+      // This is intentional - grouped markets represent mutually exclusive outcomes,
+      // so displaying them by probability helps users understand the market sentiment
       const sortedGroup = grouped[groupId].sort((a, b) => 
         parseFloat(b.passTokenPrice) - parseFloat(a.passTokenPrice)
       )

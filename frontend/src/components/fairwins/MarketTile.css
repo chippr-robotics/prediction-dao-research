@@ -13,10 +13,6 @@
 }
 
 /* Grouped market styling */
-.market-tile.grouped {
-  border-left: 3px solid var(--brand-primary);
-}
-
 .market-tile.grouped::after {
   content: '';
   position: absolute;
