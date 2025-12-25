@@ -235,12 +235,12 @@
   transform: translateY(-2px);
 }
 
-.trade-type-btn.active.yes {
+.trade-type-btn.active.buy {
   border-color: #22c55e;
   background: rgba(34, 197, 94, 0.1);
 }
 
-.trade-type-btn.active.no {
+.trade-type-btn.active.sell {
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.1);
 }
@@ -250,11 +250,11 @@
   font-weight: bold;
 }
 
-.trade-type-btn.yes .btn-icon {
+.trade-type-btn.buy .btn-icon {
   color: #22c55e;
 }
 
-.trade-type-btn.no .btn-icon {
+.trade-type-btn.sell .btn-icon {
   color: #ef4444;
 }
 
@@ -302,6 +302,28 @@
   outline: none;
   border-color: var(--brand-primary);
   box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+}
+
+.potential-win-display {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
+.win-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.win-amount {
+  font-size: 1rem;
+  color: #22c55e;
+  font-weight: 700;
 }
 
 .trade-submit-btn {

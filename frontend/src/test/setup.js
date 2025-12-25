@@ -1,4 +1,4 @@
-import { expect, afterEach, vi } from 'vitest'
+import { expect, afterEach, beforeEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import * as matchers from 'vitest-axe/matchers'
@@ -34,3 +34,56 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 })
+
+// Create clipboard mock
+const writeTextMock = vi.fn(() => Promise.resolve())
+const readTextMock = vi.fn(() => Promise.resolve(''))
+
+// Mock clipboard API globally
+Object.defineProperty(navigator, 'clipboard', {
+  writable: true,
+  configurable: true,
+  value: {
+    writeText: writeTextMock,
+    readText: readTextMock,
+  },
+})
+
+// Reset clipboard mocks before each test
+beforeEach(() => {
+  writeTextMock.mockClear()
+  readTextMock.mockClear()
+})
+
+// Mock HTMLCanvasElement.getContext for QR code and accessibility tests
+HTMLCanvasElement.prototype.getContext = function(contextType) {
+  if (contextType === '2d') {
+    return {
+      fillStyle: '',
+      fillRect: vi.fn(),
+      clearRect: vi.fn(),
+      getImageData: vi.fn(() => ({ data: [] })),
+      putImageData: vi.fn(),
+      createImageData: vi.fn(() => []),
+      setTransform: vi.fn(),
+      drawImage: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      stroke: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      rotate: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      measureText: vi.fn(() => ({ width: 0 })),
+      transform: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+    }
+  }
+  return null
+}

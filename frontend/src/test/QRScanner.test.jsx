@@ -5,12 +5,20 @@ import { axe } from 'vitest-axe'
 import QRScanner from '../components/ui/QRScanner'
 
 // Mock html5-qrcode
-vi.mock('html5-qrcode', () => ({
-  Html5Qrcode: vi.fn().mockImplementation(() => ({
+vi.mock('html5-qrcode', () => {
+  const MockHtml5Qrcode = vi.fn().mockImplementation(() => ({
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
-  })),
-}))
+  }))
+  MockHtml5Qrcode.getCameras = vi.fn().mockResolvedValue([
+    { id: 'camera1', label: 'Mock Camera 1' },
+    { id: 'camera2', label: 'Mock Back Camera' }
+  ])
+  
+  return {
+    Html5Qrcode: MockHtml5Qrcode
+  }
+})
 
 describe('QRScanner Component', () => {
   const mockOnClose = vi.fn()
@@ -139,8 +147,8 @@ describe('QRScanner Component', () => {
         />
       )
 
-      const modal = screen.getByRole('dialog')
-      await user.click(modal)
+      const modalContent = document.querySelector('.qr-scanner-modal')
+      await user.click(modalContent)
 
       expect(mockOnClose).not.toHaveBeenCalled()
     })

@@ -20,6 +20,22 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
     }
   }, [isOpen])
 
+  // Handle Escape key press
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   if (!isOpen || !market) return null
 
   const url = marketUrl || `${window.location.origin}/market/${market.id}`
@@ -86,17 +102,10 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
     }
   }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape') {
-      onClose()
-    }
-  }
-
   return (
     <div 
       className="share-modal-backdrop" 
       onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
       role="dialog"
       aria-modal="true"
       aria-labelledby="share-modal-title"
