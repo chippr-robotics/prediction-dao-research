@@ -29,9 +29,10 @@
   flex: 1;
   padding: 0; /* Remove padding for full viewport hero */
   min-height: calc(100vh - 70px);
+  height: calc(100vh - 70px);
   transition: margin-left 0.3s ease, margin-top 0.3s ease;
   position: relative;
-  overflow-y: auto;
+  overflow: hidden; /* Prevent main canvas from scrolling - individual sections scroll instead */
 }
 
 /* When sidebar is expanded */
@@ -120,21 +121,26 @@
 /* Category Rows Container - Primary view, not overlaid */
 .categories-rows-container {
   width: 100%;
+  height: 100%;
   padding: 2rem;
   background: var(--bg-primary);
+  overflow-y: auto; /* Enable vertical scrolling for the entire category rows view */
+  overflow-x: hidden;
 }
 
 /* Swap View Container */
 .swap-view-container {
   width: 100%;
+  height: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
   background: var(--bg-primary);
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Grid View Container - replaces category rows for specific category */
@@ -142,10 +148,9 @@
   width: 100%;
   padding: 2rem;
   background: var(--bg-primary);
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 70px); /* Full viewport height minus header */
+  height: 100%; /* Use full available height from parent */
   overflow: hidden;
 }
 
@@ -272,8 +277,10 @@
     margin-left: 0;
     margin-top: var(--mobile-header-height);
     padding: 0;
+    height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
     min-height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
     padding-bottom: var(--bottom-nav-height);
+    overflow: hidden;
   }
 
   .sidebar-nav.collapsed ~ .main-canvas {
@@ -306,7 +313,7 @@
   /* Grid view container for mobile */
   .grid-view-container {
     padding: 1rem;
-    height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
+    height: 100%;
   }
 
   .grid-controls {
