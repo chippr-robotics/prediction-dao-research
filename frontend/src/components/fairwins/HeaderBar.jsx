@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import { useModal } from '../../hooks/useUI'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import QRScanner from '../ui/QRScanner'
 import UserManagementModal from '../ui/UserManagementModal'
 import './HeaderBar.css'
 
@@ -13,24 +11,9 @@ function HeaderBar({ onBack, isConnected, onScanMarket }) {
   const isMobile = useIsMobile()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
-  const [showScanner, setShowScanner] = useState(false)
-
-  const handleScanSuccess = (decodedText, url) => {
-    setShowScanner(false)
-    
-    if (url && url.pathname.includes('/market/')) {
-      const marketId = url.pathname.split('/market/')[1]
-      if (onScanMarket) {
-        onScanMarket(marketId)
-      }
-    } else {
-      // TODO: Replace with proper toast notification system
-      alert(`Scanned: ${decodedText}`)
-    }
-  }
 
   const handleOpenUserManagement = () => {
-    showModal(<UserManagementModal />, {
+    showModal(<UserManagementModal onScanMarket={onScanMarket} />, {
       title: null,
       size: 'large',
       closable: true
@@ -82,16 +65,6 @@ function HeaderBar({ onBack, isConnected, onScanMarket }) {
         </div>
 
         <div className="header-right">
-          <button 
-            className="scan-qr-btn"
-            onClick={() => setShowScanner(true)}
-            aria-label="Scan QR code to open market"
-            title="Scan QR Code"
-          >
-            <span aria-hidden="true">📷</span>
-            {!isMobile && <span className="btn-text">Scan</span>}
-          </button>
-          
           <button
             className="user-management-btn"
             onClick={handleOpenUserManagement}
@@ -105,12 +78,6 @@ function HeaderBar({ onBack, isConnected, onScanMarket }) {
           </button>
         </div>
       </div>
-
-      <QRScanner 
-        isOpen={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScanSuccess={handleScanSuccess}
-      />
     </header>
   )
 }

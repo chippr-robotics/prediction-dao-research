@@ -2,16 +2,20 @@ import { useState } from 'react'
 import { useWeb3, useWallet } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
+import { useTheme } from '../../hooks/useTheme'
 import SwapPanel from '../fairwins/SwapPanel'
+import QRScanner from './QRScanner'
 import './UserManagementModal.css'
 
-function UserManagementModal() {
+function UserManagementModal({ onScanMarket }) {
   const { account, isConnected } = useWeb3()
   const { connectWallet, disconnectWallet } = useWallet()
   const { hideModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
+  const { toggleMode, isDark } = useTheme()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showScanner, setShowScanner] = useState(false)
 
   const handleConnect = async () => {
     await connectWallet()
@@ -36,6 +40,20 @@ function UserManagementModal() {
     // TODO: Implement launch market navigation
     hideModal()
     console.log('Navigate to launch market')
+  }
+
+  const handleScanSuccess = (decodedText, url) => {
+    setShowScanner(false)
+    
+    if (url && url.pathname.includes('/market/')) {
+      const marketId = url.pathname.split('/market/')[1]
+      if (onScanMarket) {
+        onScanMarket(marketId)
+      }
+    } else {
+      // TODO: Replace with proper toast notification system
+      alert(`Scanned: ${decodedText}`)
+    }
   }
 
   const shortenAddress = (address) => {
@@ -83,11 +101,27 @@ function UserManagementModal() {
             </button>
             <button
               role="tab"
+              aria-selected={activeTab === 'settings'}
+              className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              Settings
+            </button>
+            <button
+              role="tab"
               aria-selected={activeTab === 'search'}
               className={`tab ${activeTab === 'search' ? 'active' : ''}`}
               onClick={() => setActiveTab('search')}
             >
-              Search Markets
+              Search
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'scan'}
+              className={`tab ${activeTab === 'scan' ? 'active' : ''}`}
+              onClick={() => setActiveTab('scan')}
+            >
+              Scan QR
             </button>
             <button
               role="tab"
@@ -95,7 +129,7 @@ function UserManagementModal() {
               className={`tab ${activeTab === 'swap' ? 'active' : ''}`}
               onClick={() => setActiveTab('swap')}
             >
-              Swap Tokens
+              Swap
             </button>
             <button
               role="tab"
@@ -103,7 +137,7 @@ function UserManagementModal() {
               className={`tab ${activeTab === 'launch' ? 'active' : ''}`}
               onClick={() => setActiveTab('launch')}
             >
-              Launch Market
+              Launch
             </button>
           </div>
 
@@ -171,6 +205,52 @@ function UserManagementModal() {
               </div>
             )}
 
+            {activeTab === 'settings' && (
+              <div className="settings-section" role="tabpanel">
+                <h3>Settings</h3>
+                
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>Theme</h4>
+                    <p>Switch between light and dark mode</p>
+                  </div>
+                  <button 
+                    className="theme-toggle-btn"
+                    onClick={toggleMode}
+                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                  >
+                    <span className="theme-icon" aria-hidden="true">
+                      {isDark ? '☀️' : '🌙'}
+                    </span>
+                    <span className="theme-label">{isDark ? 'Light' : 'Dark'} Mode</span>
+                  </button>
+                </div>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>ClearPath Status</h4>
+                    <p>Toggle your ClearPath governance access</p>
+                  </div>
+                  <button 
+                    onClick={handleToggleClearPath}
+                    className={`status-toggle-btn ${preferences.clearPathStatus.active ? 'active' : ''}`}
+                  >
+                    <span className={`status-badge ${preferences.clearPathStatus.active ? 'active' : 'inactive'}`}>
+                      {preferences.clearPathStatus.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>Default Slippage</h4>
+                    <p>Your preferred slippage tolerance for swaps</p>
+                  </div>
+                  <span className="setting-value">{preferences.defaultSlippage}%</span>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'search' && (
               <div className="search-section" role="tabpanel">
                 <h3>Search Markets</h3>
@@ -211,6 +291,32 @@ function UserManagementModal() {
                 <div className="search-help">
                   <p>Search for prediction markets by title, category, or description.</p>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'scan' && (
+              <div className="scan-section" role="tabpanel">
+                <h3>Scan QR Code</h3>
+                <p className="scan-description">
+                  Scan a QR code to quickly navigate to a market or share content.
+                </p>
+                <button 
+                  className="open-scanner-btn"
+                  onClick={() => setShowScanner(true)}
+                >
+                  <span aria-hidden="true">📷</span>
+                  Open QR Scanner
+                </button>
+                
+                {showScanner && (
+                  <div className="scanner-container">
+                    <QRScanner 
+                      isOpen={showScanner}
+                      onClose={() => setShowScanner(false)}
+                      onScanSuccess={handleScanSuccess}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

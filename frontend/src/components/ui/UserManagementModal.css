@@ -513,3 +513,131 @@
     width: 100%;
   }
 }
+
+/* Settings Section */
+.settings-section h3 {
+  margin: 0 0 24px;
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  margin-bottom: 16px;
+  background: var(--color-surface-secondary);
+  border-radius: 8px;
+  gap: 16px;
+}
+
+.setting-info h4 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.setting-info p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha, rgba(54, 179, 126, 0.1));
+}
+
+.theme-icon {
+  font-size: 20px;
+}
+
+.theme-label {
+  white-space: nowrap;
+}
+
+.status-toggle-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-toggle-btn:hover {
+  background: var(--color-surface);
+}
+
+.setting-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+/* Scan Section */
+.scan-section h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.scan-description {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.open-scanner-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.open-scanner-btn:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-1px);
+}
+
+.open-scanner-btn:active {
+  transform: translateY(0);
+}
+
+.open-scanner-btn span[aria-hidden="true"] {
+  font-size: 24px;
+}
+
+.scanner-container {
+  margin-top: 24px;
+}
