@@ -4,7 +4,6 @@ import './ShareModal.css'
 
 function ShareModal({ isOpen, onClose, market, marketUrl }) {
   const [copied, setCopied] = useState(false)
-  const [downloadSuccess, setDownloadSuccess] = useState(false)
   const qrRef = useRef(null)
 
   // Focus management
@@ -49,51 +48,6 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
     } catch (err) {
       console.error('Failed to copy:', err)
     }
-  }
-
-  const handleDownloadQR = () => {
-    try {
-      const svg = qrRef.current.querySelector('svg')
-      const svgData = new XMLSerializer().serializeToString(svg)
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      const img = new Image()
-      
-      img.onload = () => {
-        canvas.width = img.width
-        canvas.height = img.height
-        ctx.fillStyle = 'white'
-        ctx.fillRect(0, 0, canvas.width, canvas.height)
-        ctx.drawImage(img, 0, 0)
-        
-        canvas.toBlob((blob) => {
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = `market-${market.id}-qr.png`
-          link.click()
-          URL.revokeObjectURL(url)
-          setDownloadSuccess(true)
-          setTimeout(() => setDownloadSuccess(false), 2000)
-        })
-      }
-      
-      img.src = 'data:image/svg+xml;base64,' + btoa(decodeURIComponent(encodeURIComponent(svgData)))
-    } catch (err) {
-      console.error('Failed to download QR code:', err)
-    }
-  }
-
-  const handleShareSMS = () => {
-    const smsUrl = `sms:?body=${encodeURIComponent(`${shareText}\n${url}`)}`
-    window.location.href = smsUrl
-  }
-
-  const handleShareEmail = () => {
-    const subject = encodeURIComponent(market.proposalTitle)
-    const body = encodeURIComponent(`${shareText}\n\n${url}`)
-    const emailUrl = `mailto:?subject=${subject}&body=${body}`
-    window.location.href = emailUrl
   }
 
   const handleNativeShare = async () => {
@@ -190,45 +144,9 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
             onClick={handleNativeShare}
             aria-label="Share market"
           >
-            <span className="share-icon">📤</span>
+            <span className="share-icon">🍀</span>
             <span className="share-btn-text">Share</span>
           </button>
-
-          {/* Hidden action buttons - accessible but minimal */}
-          <div className="share-actions-minimal">
-            <button 
-              className="action-btn"
-              onClick={handleDownloadQR}
-              aria-label="Download QR code"
-              title="Download QR Code"
-            >
-              {downloadSuccess ? '✓' : '⬇'}
-            </button>
-            <button 
-              className="action-btn"
-              onClick={handleCopyLink}
-              aria-label="Copy link"
-              title="Copy Link"
-            >
-              {copied ? '✓' : '🔗'}
-            </button>
-            <button 
-              className="action-btn"
-              onClick={handleShareSMS}
-              aria-label="Share via SMS"
-              title="Share via SMS"
-            >
-              💬
-            </button>
-            <button 
-              className="action-btn"
-              onClick={handleShareEmail}
-              aria-label="Share via email"
-              title="Share via Email"
-            >
-              ✉
-            </button>
-          </div>
         </div>
 
         {/* Decorative elements */}

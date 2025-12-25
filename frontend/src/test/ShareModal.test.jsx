@@ -62,13 +62,11 @@ describe('ShareModal Component', () => {
       expect(qrCode).toBeInTheDocument()
     })
 
-    it('displays share buttons', () => {
+    it('displays primary share button', () => {
       render(
         <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
       )
-      expect(screen.getByLabelText('Copy link')).toBeInTheDocument()
-      expect(screen.getByLabelText('Share via SMS')).toBeInTheDocument()
-      expect(screen.getByLabelText('Share via email')).toBeInTheDocument()
+      expect(screen.getByLabelText('Share market')).toBeInTheDocument()
     })
 
     it('displays scan to share hint', () => {
@@ -149,88 +147,6 @@ describe('ShareModal Component', () => {
       // The fallback should trigger clipboard write
       // We can verify by checking if navigator.clipboard.writeText was called
       // (which is tested in the copy link test)
-    })
-
-    it('copies link to clipboard when copy button is clicked', async () => {
-      const user = userEvent.setup()
-      render(
-        <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
-      )
-
-      const copyButton = screen.getByLabelText('Copy link')
-      // Button should show link icon initially
-      expect(copyButton.textContent).toContain('🔗')
-      
-      await user.click(copyButton)
-
-      // After clicking, button should show checkmark
-      await waitFor(() => {
-        expect(copyButton.textContent).toContain('✓')
-      })
-    })
-
-    it('shows copied confirmation and reverts after timeout', async () => {
-      const user = userEvent.setup()
-      render(
-        <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
-      )
-
-      const copyButton = screen.getByLabelText('Copy link')
-      
-      // Button should initially show link icon
-      expect(copyButton.textContent).toContain('🔗')
-      
-      // Click to copy
-      await user.click(copyButton)
-      
-      // Button should show checkmark after copy
-      await waitFor(() => {
-        expect(copyButton.textContent).toContain('✓')
-      })
-      
-      // Wait for the timeout to revert (2000ms + some buffer)
-      await waitFor(() => {
-        expect(copyButton.textContent).toContain('🔗')
-      }, { timeout: 3000 })
-    })
-
-    it('changes window.location.href when SMS button is clicked', async () => {
-      const user = userEvent.setup()
-      render(
-        <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
-      )
-
-      const smsButton = screen.getByLabelText('Share via SMS')
-      await user.click(smsButton)
-
-      expect(window.location.href).toContain('sms:')
-      expect(window.location.href).toContain(encodeURIComponent(mockMarket.proposalTitle))
-    })
-
-    it('changes window.location.href when email button is clicked', async () => {
-      const user = userEvent.setup()
-      render(
-        <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
-      )
-
-      const emailButton = screen.getByLabelText('Share via email')
-      await user.click(emailButton)
-
-      expect(window.location.href).toContain('mailto:')
-      expect(window.location.href).toContain('subject=')
-    })
-
-    it('downloads QR code when download button is clicked', async () => {
-      const user = userEvent.setup()
-      render(
-        <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
-      )
-
-      const downloadButton = screen.getByLabelText('Download QR code')
-      await user.click(downloadButton)
-
-      // Just verify the button exists and is clickable - actual download is hard to test
-      expect(downloadButton).toBeInTheDocument()
     })
   })
 
