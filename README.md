@@ -186,6 +186,19 @@ npx hardhat node
 npx hardhat run scripts/deploy.js --network localhost
 ```
 
+### Testnet Seeding (Garden of Eden)
+
+To populate the testnet with market data and simulated trading:
+
+1. Configure seed accounts in `.env` (see `.env.example`)
+2. Run the seeding service:
+```bash
+npm run seed:testnet  # For Mordor testnet
+npm run seed:local    # For local development
+```
+
+See [Garden of Eden Quick Start](GARDEN_OF_EDEN_QUICKSTART.md) for detailed instructions.
+
 ### Frontend
 
 1. Navigate to frontend directory:
