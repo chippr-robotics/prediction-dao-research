@@ -1,20 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
-
-// Enum values for BetType (must match Solidity enum order)
-const BetType = {
-  YesNo: 0,
-  PassFail: 1,
-  AboveBelow: 2,
-  HigherLower: 3,
-  InOut: 4,
-  OverUnder: 5,
-  ForAgainst: 6,
-  TrueFalse: 7,
-  WinLose: 8,
-  UpDown: 9
-};
+const { BetType } = require("../../constants/BetType");
 
 /**
  * Simplified deployment fixture for FairWins standalone markets

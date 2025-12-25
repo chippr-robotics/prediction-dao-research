@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { BetType } = require("../../constants/BetType");
 
 /**
  * Integration tests for ETCSwap v3 trading through ConditionalMarketFactory
@@ -13,20 +14,6 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
  * 5. Execute trades (buy/sell)
  * 6. Verify correct behavior
  */
-
-// Enum values for BetType (must match Solidity enum order)
-const BetType = {
-  YesNo: 0,
-  PassFail: 1,
-  AboveBelow: 2,
-  HigherLower: 3,
-  InOut: 4,
-  OverUnder: 5,
-  ForAgainst: 6,
-  TrueFalse: 7,
-  WinLose: 8,
-  UpDown: 9
-};
 
 describe("Integration: ETCSwap V3 Trading", function () {
     async function deployETCSwapFixture() {

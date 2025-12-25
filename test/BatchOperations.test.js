@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { BetType } = require("./constants/BetType");
 
 describe("Batch Operations", function () {
   let marketFactory;
@@ -8,20 +9,6 @@ describe("Batch Operations", function () {
   let owner;
   let addr1;
   let addr2;
-
-  // Enum values for BetType (must match Solidity enum order)
-  const BetType = {
-    YesNo: 0,
-    PassFail: 1,
-    AboveBelow: 2,
-    HigherLower: 3,
-    InOut: 4,
-    OverUnder: 5,
-    ForAgainst: 6,
-    TrueFalse: 7,
-    WinLose: 8,
-    UpDown: 9
-  };
 
   beforeEach(async function () {
     [owner, addr1, addr2] = await ethers.getSigners();
