@@ -1,29 +1,23 @@
-import { useState } from 'react'
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
-import QRScanner from '../ui/QRScanner'
-import SettingsModal from '../ui/SettingsModal'
+import { useModal } from '../../hooks/useUI'
+import { useUserPreferences } from '../../hooks/useUserPreferences'
+import UserManagementModal from '../ui/UserManagementModal'
 import './HeaderBar.css'
 
-function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onScanMarket }) {
+function HeaderBar({ isConnected, onScanMarket }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
-  const [showScanner, setShowScanner] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
+  const { showModal } = useModal()
+  const { preferences } = useUserPreferences()
 
-  const handleScanSuccess = (decodedText, url) => {
-    setShowScanner(false)
-    
-    if (url && url.pathname.includes('/market/')) {
-      const marketId = url.pathname.split('/market/')[1]
-      if (onScanMarket) {
-        onScanMarket(marketId)
-      }
-    } else {
-      // TODO: Replace with proper toast notification system
-      alert(`Scanned: ${decodedText}`)
-    }
+  const handleOpenUserManagement = () => {
+    showModal(<UserManagementModal onScanMarket={onScanMarket} />, {
+      title: null,
+      size: 'large',
+      closable: true
+    })
   }
 
   // Hide header on mobile when scrolling down
@@ -67,49 +61,19 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
         </div>
 
         <div className="header-right">
-          <button 
-            className="scan-qr-btn"
-            onClick={() => setShowScanner(true)}
-            aria-label="Scan QR code to open market"
-            title="Scan QR Code"
+          <button
+            className="user-management-btn"
+            onClick={handleOpenUserManagement}
+            aria-label="Open user management"
+            title="User Management"
           >
-            <span aria-hidden="true">📷</span>
-            {!isMobile && <span className="btn-text">Scan</span>}
-          </button>
-          
-          {isConnected && (
-            <div className="wallet-info-compact">
-              <span className="status-dot" aria-label="Wallet connected"></span>
-              <span className="wallet-address">{shortenAddress(account)}</span>
-            </div>
-          )}
-
-          <button 
-            className="settings-btn"
-            onClick={() => setShowSettings(true)}
-            aria-label="Open settings"
-            title="Settings"
-          >
-            <span aria-hidden="true">⚙️</span>
-            {!isMobile && <span className="btn-text">Settings</span>}
+            <span className="user-icon" aria-hidden="true">👤</span>
+            {isConnected && preferences.clearPathStatus.active && (
+              <span className="clearpath-badge" aria-label="ClearPath Active">✓</span>
+            )}
           </button>
         </div>
       </div>
-
-      <QRScanner 
-        isOpen={showScanner}
-        onClose={() => setShowScanner(false)}
-        onScanSuccess={handleScanSuccess}
-      />
-
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        onConnect={onConnect}
-        onDisconnect={onDisconnect}
-        isConnected={isConnected}
-        account={account}
-      />
     </header>
   )
 }

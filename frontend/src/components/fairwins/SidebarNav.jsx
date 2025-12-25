@@ -4,7 +4,6 @@ import './SidebarNav.css'
 
 const CATEGORIES = [
   { id: 'all', name: 'All Markets', icon: '🌐' },
-  { id: 'swap', name: 'Token Swap', icon: '🔄', isSpecial: true },
   { id: 'trending', name: 'Trending', icon: '🔥' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
