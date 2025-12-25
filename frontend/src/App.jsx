@@ -60,10 +60,6 @@ function AppContent() {
     showNotification('Switching network...', 'info')
   }
 
-  const handleBack = () => {
-    navigate('/select')
-  }
-
   return (
     <>
       {/* Accessibility announcement region */}
@@ -104,7 +100,24 @@ function AppContent() {
             <ClearPathApp 
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
-              onBack={handleBack}
+            />
+          } 
+        />
+        <Route 
+          path="/app" 
+          element={
+            <FairWinsAppNew 
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+            />
+          } 
+        />
+        <Route 
+          path="/main" 
+          element={
+            <FairWinsAppNew 
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
             />
           } 
         />
@@ -114,7 +127,6 @@ function AppContent() {
             <FairWinsAppNew 
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
-              onBack={handleBack}
             />
           } 
         />
@@ -124,7 +136,6 @@ function AppContent() {
             <FairWinsApp 
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
-              onBack={handleBack}
             />
           } 
         />

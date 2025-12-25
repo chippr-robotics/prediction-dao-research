@@ -469,7 +469,7 @@ const getMockMarkets = () => {
   return baseMarkets
 }
 
-function FairWinsAppNew({ onConnect, onDisconnect, onBack }) {
+function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [markets, setMarkets] = useState([])
@@ -635,7 +635,6 @@ This is a transparent market - all trades are publicly visible on the blockchain
         <HeaderBar 
           onConnect={onConnect}
           onDisconnect={onDisconnect}
-          onBack={onBack}
           isConnected={isConnected}
           account={account}
         />
@@ -659,7 +658,6 @@ This is a transparent market - all trades are publicly visible on the blockchain
       <HeaderBar 
         onConnect={onConnect}
         onDisconnect={onDisconnect}
-        onBack={onBack}
         isConnected={isConnected}
         account={account}
         onScanMarket={handleScanMarket}

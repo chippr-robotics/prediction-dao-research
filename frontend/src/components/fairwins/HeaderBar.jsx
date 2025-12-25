@@ -5,7 +5,7 @@ import { useUserPreferences } from '../../hooks/useUserPreferences'
 import UserManagementModal from '../ui/UserManagementModal'
 import './HeaderBar.css'
 
-function HeaderBar({ onBack, isConnected, onScanMarket }) {
+function HeaderBar({ isConnected, onScanMarket }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
@@ -27,15 +27,6 @@ function HeaderBar({ onBack, isConnected, onScanMarket }) {
     <header className={`header-bar ${shouldHideHeader ? 'header-hidden' : ''} ${hasScrolled ? 'header-scrolled' : ''}`}>
       <div className="header-content">
         <div className="header-left">
-          {onBack && (
-            <button 
-              onClick={onBack} 
-              className="back-button" 
-              aria-label="Back to platform selection"
-            >
-              ← Back
-            </button>
-          )}
           <div className="header-branding">
             <div className="brand-logo">
               <img 
