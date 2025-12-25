@@ -74,4 +74,4 @@ The Medusa configuration is in `medusa.json` with the following key settings:
 ## Further Reading
 
 - [Medusa Documentation](https://github.com/crytic/medusa)
-- [Fuzz Testing Best Practices](https://chippr-robotics.github.io/prediction-dao-research/security/fuzz-testing/)
+- [Fuzz Testing Best Practices](https://docs.FairWins.app/security/fuzz-testing/)
