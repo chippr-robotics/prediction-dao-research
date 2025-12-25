@@ -27,6 +27,7 @@ describe('ShareModal Component', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers() // Ensure timers are restored after each test
   })
 
   describe('Rendering', () => {
@@ -134,26 +135,28 @@ describe('ShareModal Component', () => {
     })
 
     it('shows copied confirmation and reverts after timeout', async () => {
-      vi.useFakeTimers()
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
       render(
         <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
       )
 
       const copyButton = screen.getByLabelText('Copy link')
+      
+      // Button should initially show link icon
+      expect(copyButton.textContent).toContain('🔗')
+      
+      // Click to copy
       await user.click(copyButton)
-
-      // Verify button changes to checkmark after copy
+      
+      // Button should show checkmark after copy
       await waitFor(() => {
         expect(copyButton.textContent).toContain('✓')
       })
-
-      vi.advanceTimersByTime(2000)
+      
+      // Wait for the timeout to revert (2000ms + some buffer)
       await waitFor(() => {
         expect(copyButton.textContent).toContain('🔗')
-      })
-
-      vi.useRealTimers()
+      }, { timeout: 3000 })
     })
 
     it('changes window.location.href when SMS button is clicked', async () => {
