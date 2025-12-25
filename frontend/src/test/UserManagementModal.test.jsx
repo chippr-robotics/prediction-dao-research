@@ -5,6 +5,7 @@ import UserManagementModal from '../components/ui/UserManagementModal'
 import { Web3Provider } from '../contexts/Web3Context'
 import { UserPreferencesProvider } from '../contexts/UserPreferencesContext'
 import { UIProvider } from '../contexts/UIContext'
+import { ThemeProvider } from '../contexts/ThemeContext'
 
 // Mock wagmi hooks
 vi.mock('wagmi', () => ({
@@ -24,6 +25,13 @@ vi.mock('wagmi', () => ({
     switchChain: vi.fn()
   }),
   WagmiProvider: ({ children }) => children,
+  createConfig: vi.fn(() => ({})),
+  http: vi.fn(() => ({})),
+}))
+
+// Mock wagmi/connectors
+vi.mock('wagmi/connectors', () => ({
+  injected: vi.fn(() => ({})),
 }))
 
 // Mock window.ethereum
@@ -35,13 +43,15 @@ global.window.ethereum = {
 
 const renderWithProviders = (ui, { isConnected = true } = {}) => {
   return render(
-    <UIProvider>
-      <Web3Provider>
-        <UserPreferencesProvider>
-          {ui}
-        </UserPreferencesProvider>
-      </Web3Provider>
-    </UIProvider>
+    <ThemeProvider>
+      <UIProvider>
+        <Web3Provider>
+          <UserPreferencesProvider>
+            {ui}
+          </UserPreferencesProvider>
+        </Web3Provider>
+      </UIProvider>
+    </ThemeProvider>
   )
 }
 
