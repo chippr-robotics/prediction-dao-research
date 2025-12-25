@@ -165,7 +165,7 @@ async function createMarkets(marketFactory, deployer) {
         params.liquidity,
         params.liquidityParam,
         params.tradingPeriod,
-        { value: params.liquidity, gasLimit: 5000000 }
+        { gasLimit: 5000000 }
       );
       
       const receipt = await tx.wait();
