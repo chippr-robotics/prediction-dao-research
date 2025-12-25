@@ -21,12 +21,35 @@ const { ethers } = require("hardhat");
  * 4. Run continuously as a service
  */
 
+/**
+ * Safely parse an integer from an environment variable.
+ * Falls back to the provided default if the variable is unset, empty, or invalid.
+ */
+function parseEnvInt(envVarName, defaultValue) {
+  const raw = process.env[envVarName];
+
+  if (raw === undefined || raw === "") {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+
+  if (Number.isNaN(parsed)) {
+    console.warn(
+      `Invalid integer value for ${envVarName}="${raw}", using default ${defaultValue}.`
+    );
+    return defaultValue;
+  }
+
+  return parsed;
+}
+
 // Configuration
 const CONFIG = {
   // Timing
-  intervalMs: parseInt(process.env.SEED_INTERVAL_MS) || 300000, // 5 minutes default
-  marketsPerCycle: parseInt(process.env.SEED_MARKETS_PER_CYCLE) || 3,
-  tradesPerCycle: parseInt(process.env.SEED_TRADES_PER_CYCLE) || 5,
+  intervalMs: parseEnvInt("SEED_INTERVAL_MS", 300000), // 5 minutes default
+  marketsPerCycle: parseEnvInt("SEED_MARKETS_PER_CYCLE", 3),
+  tradesPerCycle: parseEnvInt("SEED_TRADES_PER_CYCLE", 5),
   
   // Trading parameters
   minTradeAmount: ethers.parseEther("0.1"), // 0.1 ETH minimum
@@ -45,16 +68,16 @@ const CONFIG = {
 
 // Market templates for variety
 const MARKET_TEMPLATES = [
-  { question: "Will ETH price exceed $5000 by Q2 2025?", category: "crypto" },
-  { question: "Will Bitcoin dominance fall below 40% this year?", category: "crypto" },
-  { question: "Will Ethereum Classic reach 100 TPS by end of year?", category: "tech" },
+  { question: "Will ETH price exceed $5000 in the next 6 months?", category: "crypto" },
+  { question: "Will Bitcoin dominance fall below 40% within 12 months?", category: "crypto" },
+  { question: "Will Ethereum Classic reach 100 TPS within the next year?", category: "tech" },
   { question: "Will DAO treasury grow by 20% in 6 months?", category: "governance" },
   { question: "Will new DEX integration complete successfully?", category: "tech" },
   { question: "Will community proposal #X pass?", category: "governance" },
   { question: "Will TVL exceed $10M within 3 months?", category: "defi" },
   { question: "Will next protocol upgrade deploy on time?", category: "tech" },
-  { question: "Will monthly active users double?", category: "adoption" },
-  { question: "Will gas fees average below 50 gwei?", category: "network" },
+  { question: "Will monthly active users double in the next 6 months?", category: "adoption" },
+  { question: "Will average gas fees fall below 50 gwei within 3 months?", category: "network" },
 ];
 
 // State tracking
@@ -63,15 +86,39 @@ let totalMarkets = 0;
 let totalTrades = 0;
 let isRunning = true;
 
+// Well-known example keys that should never be used on real networks
+const EXAMPLE_KEYS = [
+  "0x0000000000000000000000000000000000000000000000000000000000000001",
+  "0x0000000000000000000000000000000000000000000000000000000000000002",
+  "0x0000000000000000000000000000000000000000000000000000000000000003",
+  "0x0000000000000000000000000000000000000000000000000000000000000004",
+  "0x0000000000000000000000000000000000000000000000000000000000000005",
+  "0x0000000000000000000000000000000000000000000000000000000000000006",
+  "0x0000000000000000000000000000000000000000000000000000000000000007",
+  "0x0000000000000000000000000000000000000000000000000000000000000008",
+  "0x0000000000000000000000000000000000000000000000000000000000000009",
+  "0x000000000000000000000000000000000000000000000000000000000000000a",
+];
+
 /**
  * Get seed player wallets from environment variables
  */
 function getSeedPlayers() {
   const players = [];
+  const network = hre.network.name;
   
   for (let i = 1; i <= 10; i++) {
     const privateKey = process.env[`SEED_PLAYER_${i}`];
     if (privateKey) {
+      // Check for example keys on non-local networks
+      if (network !== "localhost" && network !== "hardhat" && EXAMPLE_KEYS.includes(privateKey.toLowerCase())) {
+        throw new Error(
+          `SEED_PLAYER_${i} is using an example private key from .env.example. ` +
+          `These well-known keys are insecure and must not be used on ${network}. ` +
+          `Please generate secure private keys for testnet deployment.`
+        );
+      }
+      
       try {
         const wallet = new ethers.Wallet(privateKey, ethers.provider);
         players.push(wallet);
@@ -95,7 +142,22 @@ function getSeedPlayers() {
 async function getMarketFactory(deployer) {
   if (CONFIG.marketFactoryAddress) {
     console.log(`Connecting to existing MarketFactory at ${CONFIG.marketFactoryAddress}`);
-    const factory = await ethers.getContractAt("ConditionalMarketFactory", CONFIG.marketFactoryAddress);
+    const factory = await ethers.getContractAt(
+      "ConditionalMarketFactory",
+      CONFIG.marketFactoryAddress,
+      deployer
+    );
+
+    const owner = await factory.owner();
+    if (owner.toLowerCase() !== deployer.address.toLowerCase()) {
+      throw new Error(
+        `Configured MARKET_FACTORY_ADDRESS ${CONFIG.marketFactoryAddress} is owned by ${owner}, ` +
+        `but the current deployer is ${deployer.address}. Use the correct deployer key or a factory ` +
+        `address owned by this deployer.`
+      );
+    }
+
+    console.log(`✓ Verified MarketFactory ownership for deployer ${deployer.address}`);
     return factory;
   }
   
@@ -164,8 +226,7 @@ async function createMarkets(marketFactory, deployer) {
         params.collateralToken,
         params.liquidity,
         params.liquidityParam,
-        params.tradingPeriod,
-        { gasLimit: 5000000 }
+        params.tradingPeriod
       );
       
       const receipt = await tx.wait();
@@ -235,9 +296,10 @@ async function executeTrades(marketFactory, players) {
         const buyPass = Math.random() > 0.5; // 50/50 chance
         const amount = randomInRange(CONFIG.minTradeAmount, CONFIG.maxTradeAmount);
         
-        // Check player balance
+        // Check player balance (include buffer for gas costs)
         const balance = await ethers.provider.getBalance(player.address);
-        if (balance < amount) {
+        const gasBuffer = ethers.parseEther("0.01"); // Reserve 0.01 ETH for gas
+        if (balance < amount + gasBuffer) {
           console.log(`  ⚠ Player ${player.address.slice(0, 8)}... has insufficient balance, skipping trade`);
           continue;
         }
