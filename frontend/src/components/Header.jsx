@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useWeb3, useWallet } from '../hooks/useWeb3'
+import { useModal } from '../hooks/useUI'
+import { useUserPreferences } from '../hooks/useUserPreferences'
+import UserManagementModal from './ui/UserManagementModal'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
@@ -8,6 +11,8 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const location = useLocation()
   const { isConnected, account } = useWeb3()
   const { connectWallet, disconnectWallet } = useWallet()
+  const { showModal } = useModal()
+  const { preferences } = useUserPreferences()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
 
@@ -49,6 +54,14 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
 
   const handleLogoError = () => {
     setLogoError(true)
+  }
+
+  const handleOpenUserManagement = () => {
+    showModal(<UserManagementModal />, {
+      title: null,
+      size: 'large',
+      closable: true
+    })
   }
 
   return (
@@ -93,34 +106,17 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
         <div className="header-actions">
           {!hideWalletButton && (
             <>
-              {!isConnected ? (
-                <button 
-                  onClick={handleConnectWallet}
-                  className="connect-wallet-button"
-                  aria-label="Connect your crypto wallet"
-                >
-                  <span className="button-icon" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                    </svg>
-                  </span>
-                  Connect Wallet
-                </button>
-              ) : (
-                <div className="wallet-connected">
-                  <span className="wallet-address" aria-label={`Connected wallet: ${account}`}>
-                    {truncateAddress(account)}
-                  </span>
-                  <button 
-                    onClick={handleDisconnect}
-                    className="disconnect-button"
-                    aria-label="Disconnect wallet"
-                  >
-                    Disconnect
-                  </button>
-                </div>
-              )}
+              <button
+                className="user-panel-btn"
+                onClick={handleOpenUserManagement}
+                aria-label="Open user management"
+                title="User Management"
+              >
+                <span className="user-icon" aria-hidden="true">👤</span>
+                {isConnected && preferences.clearPathStatus.active && (
+                  <span className="clearpath-indicator" aria-label="ClearPath Active">✓</span>
+                )}
+              </button>
             </>
           )}
 

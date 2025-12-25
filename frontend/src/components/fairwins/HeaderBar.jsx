@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
+import { useModal } from '../../hooks/useUI'
+import { useUserPreferences } from '../../hooks/useUserPreferences'
 import QRScanner from '../ui/QRScanner'
+import UserManagementModal from '../ui/UserManagementModal'
 import './HeaderBar.css'
 
 function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onScanMarket }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
+  const { showModal } = useModal()
+  const { preferences } = useUserPreferences()
   const [showScanner, setShowScanner] = useState(false)
 
   const shortenAddress = (address) => {
@@ -33,6 +38,14 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
       // TODO: Replace with proper toast notification system
       alert(`Scanned: ${decodedText}`)
     }
+  }
+
+  const handleOpenUserManagement = () => {
+    showModal(<UserManagementModal />, {
+      title: null,
+      size: 'large',
+      closable: true
+    })
   }
 
   // Hide header on mobile when scrolling down
@@ -90,31 +103,17 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
             {!isMobile && <span className="btn-text">Scan</span>}
           </button>
           
-          {isConnected ? (
-            <div className="wallet-connected">
-              <div className="wallet-info">
-                <span className="connection-status" aria-label="Wallet connected">
-                  <span className="status-dot" aria-hidden="true"></span>
-                  <span className="wallet-address">{shortenAddress(account)}</span>
-                </span>
-              </div>
-              <button 
-                onClick={onDisconnect} 
-                className="disconnect-btn"
-                aria-label="Disconnect wallet"
-              >
-                Disconnect
-              </button>
-            </div>
-          ) : (
-            <button 
-              onClick={handleConnectClick} 
-              className="connect-btn"
-              aria-label="Connect wallet"
-            >
-              Connect Wallet
-            </button>
-          )}
+          <button
+            className="user-management-btn"
+            onClick={handleOpenUserManagement}
+            aria-label="Open user management"
+            title="User Management"
+          >
+            <span className="user-icon" aria-hidden="true">👤</span>
+            {isConnected && preferences.clearPathStatus.active && (
+              <span className="clearpath-badge" aria-label="ClearPath Active">✓</span>
+            )}
+          </button>
         </div>
       </div>
 

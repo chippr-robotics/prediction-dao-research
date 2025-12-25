@@ -325,11 +325,64 @@
   }
 }
 
+/* User Panel Button */
+.user-panel-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-primary-dark, var(--color-primary));
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.user-panel-btn:hover {
+  background: var(--color-primary-dark, var(--color-primary));
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.user-panel-btn:active {
+  transform: scale(0.98);
+}
+
+.user-panel-btn .user-icon {
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: grayscale(0);
+}
+
+.clearpath-indicator {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  background: var(--color-success);
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .site-header,
   .nav-link,
   .connect-wallet-button,
+  .user-panel-btn,
   .hamburger span {
     transition: none;
   }
