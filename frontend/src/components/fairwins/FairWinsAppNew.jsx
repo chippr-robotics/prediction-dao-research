@@ -3,6 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
+import CorrelatedMarketsView from './CorrelatedMarketsView'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
 import SwapPanel from './SwapPanel'
@@ -13,17 +14,58 @@ import './FairWinsAppNew.css'
 // Extended mock market data with more entries for scrolling demo
 const getMockMarkets = () => {
   const baseMarkets = [
-    // Sports Markets (8 items for good scrolling)
+    // Sports Markets - NFL Super Bowl 2025 Correlation Group (4 top contenders)
     {
       id: 0,
-      proposalTitle: 'NFL: Chiefs win Super Bowl 2025',
+      proposalTitle: 'NFL Super Bowl 2025: Chiefs win',
       description: 'Will the Kansas City Chiefs win the Super Bowl in the 2025 season?',
       category: 'sports',
-      passTokenPrice: '0.65',
-      failTokenPrice: '0.35',
-      totalLiquidity: '12500',
+      passTokenPrice: '0.35',
+      failTokenPrice: '0.65',
+      totalLiquidity: '25000',
       tradingEndTime: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'Active'
+      status: 'Active',
+      correlationGroupId: 'nfl-superbowl-2025',
+      correlationGroupName: 'NFL Super Bowl 2025'
+    },
+    {
+      id: 44,
+      proposalTitle: 'NFL Super Bowl 2025: 49ers win',
+      description: 'Will the San Francisco 49ers win the Super Bowl in the 2025 season?',
+      category: 'sports',
+      passTokenPrice: '0.28',
+      failTokenPrice: '0.72',
+      totalLiquidity: '22000',
+      tradingEndTime: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'nfl-superbowl-2025',
+      correlationGroupName: 'NFL Super Bowl 2025'
+    },
+    {
+      id: 45,
+      proposalTitle: 'NFL Super Bowl 2025: Bills win',
+      description: 'Will the Buffalo Bills win the Super Bowl in the 2025 season?',
+      category: 'sports',
+      passTokenPrice: '0.22',
+      failTokenPrice: '0.78',
+      totalLiquidity: '18000',
+      tradingEndTime: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'nfl-superbowl-2025',
+      correlationGroupName: 'NFL Super Bowl 2025'
+    },
+    {
+      id: 46,
+      proposalTitle: 'NFL Super Bowl 2025: Ravens win',
+      description: 'Will the Baltimore Ravens win the Super Bowl in the 2025 season?',
+      category: 'sports',
+      passTokenPrice: '0.15',
+      failTokenPrice: '0.85',
+      totalLiquidity: '15000',
+      tradingEndTime: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'nfl-superbowl-2025',
+      correlationGroupName: 'NFL Super Bowl 2025'
     },
     {
       id: 1,
@@ -104,16 +146,71 @@ const getMockMarkets = () => {
     },
     
     // Politics Markets (6 items)
+    // 2024 US Presidential Election - Correlated Group Example (5 candidates)
     {
       id: 4,
-      proposalTitle: 'US: Democrats win House 2024',
-      description: 'Will the Democratic Party control the House of Representatives after the 2024 election?',
+      proposalTitle: '2024 President: Candidate A wins',
+      description: 'Will Candidate A win the 2024 US Presidential Election?',
       category: 'politics',
-      passTokenPrice: '0.51',
-      failTokenPrice: '0.49',
-      totalLiquidity: '32000',
+      passTokenPrice: '0.32',
+      failTokenPrice: '0.68',
+      totalLiquidity: '45000',
       tradingEndTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'Active'
+      status: 'Active',
+      correlationGroupId: 'election-2024-president',
+      correlationGroupName: '2024 Presidential Election'
+    },
+    {
+      id: 40,
+      proposalTitle: '2024 President: Candidate B wins',
+      description: 'Will Candidate B win the 2024 US Presidential Election?',
+      category: 'politics',
+      passTokenPrice: '0.28',
+      failTokenPrice: '0.72',
+      totalLiquidity: '38000',
+      tradingEndTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'election-2024-president',
+      correlationGroupName: '2024 Presidential Election'
+    },
+    {
+      id: 41,
+      proposalTitle: '2024 President: Candidate C wins',
+      description: 'Will Candidate C win the 2024 US Presidential Election?',
+      category: 'politics',
+      passTokenPrice: '0.15',
+      failTokenPrice: '0.85',
+      totalLiquidity: '22000',
+      tradingEndTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'election-2024-president',
+      correlationGroupName: '2024 Presidential Election'
+    },
+    {
+      id: 42,
+      proposalTitle: '2024 President: Candidate D wins',
+      description: 'Will Candidate D win the 2024 US Presidential Election?',
+      category: 'politics',
+      passTokenPrice: '0.18',
+      failTokenPrice: '0.82',
+      totalLiquidity: '28000',
+      tradingEndTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'election-2024-president',
+      correlationGroupName: '2024 Presidential Election'
+    },
+    {
+      id: 43,
+      proposalTitle: '2024 President: Candidate E wins',
+      description: 'Will Candidate E win the 2024 US Presidential Election?',
+      category: 'politics',
+      passTokenPrice: '0.07',
+      failTokenPrice: '0.93',
+      totalLiquidity: '15000',
+      tradingEndTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'Active',
+      correlationGroupId: 'election-2024-president',
+      correlationGroupName: '2024 Presidential Election'
     },
     {
       id: 5,
@@ -602,14 +699,53 @@ This is a transparent market - all trades are publicly visible on the blockchain
 
   const marketsByCategory = getMarketsByCategory()
 
-  // Get markets for current category with sorting
+  // Get markets for current category with sorting and grouping
   const getFilteredAndSortedMarkets = () => {
     let filteredMarkets = selectedCategory === 'all' 
       ? markets 
       : markets.filter(m => m.category === selectedCategory)
     
-    // Sort markets based on selected sort option
-    const sortedMarkets = [...filteredMarkets].sort((a, b) => {
+    // Group markets by correlation
+    const grouped = {}
+    const ungrouped = []
+    
+    filteredMarkets.forEach(market => {
+      if (market.correlationGroupId) {
+        if (!grouped[market.correlationGroupId]) {
+          grouped[market.correlationGroupId] = []
+        }
+        grouped[market.correlationGroupId].push(market)
+      } else {
+        ungrouped.push(market)
+      }
+    })
+    
+    // Flatten grouped markets
+    const groupedMarkets = []
+    Object.keys(grouped).forEach(groupId => {
+      // Sort grouped markets based on the selected sort option.
+      // If no specific sort is selected, fall back to sorting by pass token price
+      // (descending) to show the most likely outcomes first. Grouped markets represent
+      // mutually exclusive outcomes, so displaying them by probability by default
+      // helps users understand the market sentiment while still respecting explicit
+      // sort choices.
+      const sortedGroup = [...grouped[groupId]].sort((a, b) => {
+        switch (sortBy) {
+          case 'endTime':
+            return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
+          case 'marketValue':
+            return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+          case 'category':
+            return a.category.localeCompare(b.category)
+          default:
+            return parseFloat(b.passTokenPrice) - parseFloat(a.passTokenPrice)
+        }
+      })
+      groupedMarkets.push(...sortedGroup)
+    })
+    
+    // Sort ungrouped markets based on selected sort option
+    const sortedUngrouped = [...ungrouped].sort((a, b) => {
       switch (sortBy) {
         case 'endTime':
           return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
@@ -622,7 +758,8 @@ This is a transparent market - all trades are publicly visible on the blockchain
       }
     })
     
-    return sortedMarkets
+    // Return grouped markets first, then ungrouped markets
+    return [...groupedMarkets, ...sortedUngrouped]
   }
 
   if (loading) {
@@ -685,10 +822,18 @@ This is a transparent market - all trades are publicly visible on the blockchain
                 <h2 id="hero-dialog-title" className="visually-hidden">
                   Market details dialog
                 </h2>
-                <MarketHeroCard 
-                  market={selectedMarket}
-                  onTrade={handleTrade}
-                />
+                {selectedMarket.correlationGroupId ? (
+                  <CorrelatedMarketsView 
+                    market={selectedMarket}
+                    correlatedMarkets={markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId)}
+                    onTrade={handleTrade}
+                  />
+                ) : (
+                  <MarketHeroCard 
+                    market={selectedMarket}
+                    onTrade={handleTrade}
+                  />
+                )}
               </div>
             </div>
           )}

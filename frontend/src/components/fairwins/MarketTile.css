@@ -12,6 +12,56 @@
   overflow: hidden;
 }
 
+/* Grouped market styling */
+.market-tile.grouped::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--brand-primary), var(--primary-button-hover));
+}
+
+.correlation-badge {
+  background: linear-gradient(135deg, rgba(var(--brand-primary-rgb, 54, 179, 126), 0.15), rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1));
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-primary);
+  margin-bottom: 0.5rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.correlation-icon {
+  font-size: 0.85rem;
+  display: inline-block;
+}
+
+.correlation-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .correlation-badge {
+    max-width: 120px;
+  }
+  
+  .correlation-text {
+    display: none;
+  }
+}
+
 .market-tile:hover {
   transform: translateY(-4px);
   border-color: var(--brand-primary);
