@@ -37,12 +37,12 @@ function DevelopmentWarningModal() {
               Please check back soon for updates!
             </p>
             <a 
-              href="https://chipprhots.com" 
+              href="https://chipprbots.com" 
               target="_blank" 
               rel="noopener noreferrer"
               className="dev-warning-modal-link"
             >
-              Visit chipprhots.com for more information
+              Visit chipprbots.com for more information
             </a>
             <button 
               className="dev-warning-modal-button"

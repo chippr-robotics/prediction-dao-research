@@ -16,12 +16,12 @@ function DevelopmentWarningBanner() {
         <span className="dev-warning-text">
           This site is under active development. Check back soon!{' '}
           <a 
-            href="https://chipprhots.com" 
+            href="https://chipprbots.com" 
             target="_blank" 
             rel="noopener noreferrer"
             className="dev-warning-link"
           >
-            Visit chipprhots.com
+            Visit chipprbots.com
           </a>
           {' '}for updates.
         </span>
