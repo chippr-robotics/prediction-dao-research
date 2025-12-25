@@ -75,7 +75,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.ZeroAddress, // collateral token (ETH)
         initialLiquidity,
         1000, // liquidity parameter for LMSR
-        tradingPeriod
+        tradingPeriod,
+          0
       );
       
       const createReceipt = await createTx.wait();
@@ -211,7 +212,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.ZeroAddress,
         ethers.parseEther("50"),
         1000,
-        tradingPeriod
+        tradingPeriod,
+          0
       );
       
       const createReceipt = await createTx.wait();
@@ -288,7 +290,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.ZeroAddress,
         initialLiquidity,
         liquidityParam,
-        tradingPeriod
+        tradingPeriod,
+          0
       );
 
       await expect(tx).to.emit(marketFactory, "MarketCreated");
@@ -340,7 +343,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
         ethers.ZeroAddress,
         ethers.parseEther("50"),
         1000,
-        tradingPeriod
+        tradingPeriod,
+          0
       );
       
       const receipt = await createTx.wait();

@@ -87,7 +87,8 @@ describe("Integration: ETCSwap V3 Trading", function () {
                 await collateralToken.getAddress(),
                 liquidityAmount,
                 1000,
-                tradingPeriod
+                tradingPeriod,
+          0
             );
             await createTx.wait();
 
@@ -270,7 +271,8 @@ describe("Integration: ETCSwap V3 Trading", function () {
                 ethers.ZeroAddress, // ETH as collateral for fallback
                 ethers.parseEther("1"),
                 1000,
-                tradingPeriod
+                tradingPeriod,
+          0
             );
 
             const marketId = 0;
