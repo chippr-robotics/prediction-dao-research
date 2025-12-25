@@ -133,6 +133,34 @@
   gap: 0.5rem;
 }
 
+.option-controls {
+  display: flex;
+  gap: 0.25rem;
+  margin-right: 0.5rem;
+}
+
+.pin-btn,
+.visibility-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.pin-btn:hover,
+.visibility-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.option-card.hidden-market {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
 .option-name {
   font-size: 0.95rem;
   font-weight: 600;
@@ -278,5 +306,94 @@
 
   .option-stat .stat-value {
     font-size: 0.9rem;
+  }
+}
+
+/* Timeline Section */
+.timeline-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.timeline-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.time-horizon-controls {
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+
+.horizon-btn {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.horizon-btn:hover {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  color: var(--text-primary);
+}
+
+.horizon-btn.active {
+  background: var(--brand-primary);
+  color: white;
+  box-shadow: 0 2px 4px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+}
+
+.timeline-chart-container {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-chart {
+  width: 100%;
+  height: auto;
+}
+
+.radar-labels-group text {
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (max-width: 768px) {
+  .timeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .time-horizon-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .horizon-btn {
+    flex: 1;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.75rem;
   }
 }

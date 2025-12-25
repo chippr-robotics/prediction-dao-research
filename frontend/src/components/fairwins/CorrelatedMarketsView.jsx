@@ -5,22 +5,62 @@ import './CorrelatedMarketsView.css'
 
 function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
   const [selectedOption, setSelectedOption] = useState(market.id)
+  const [visibleMarkets, setVisibleMarkets] = useState(
+    correlatedMarkets.reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
+  )
+  const [pinnedMarkets, setPinnedMarkets] = useState(new Set())
+  const [timeHorizon, setTimeHorizon] = useState('7d') // 7d, 30d, 90d, all
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
+  const timelineRef = useRef(null)
 
   const selectedMarket = useMemo(() => {
     return correlatedMarkets.find(m => m.id === selectedOption) || market
   }, [selectedOption, correlatedMarkets, market])
 
-  // Prepare radar chart data
+  // Toggle market visibility
+  const toggleMarketVisibility = (marketId) => {
+    setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
+  }
+
+  // Toggle pin status
+  const togglePin = (marketId) => {
+    setPinnedMarkets(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(marketId)) {
+        newSet.delete(marketId)
+      } else {
+        newSet.add(marketId)
+      }
+      return newSet
+    })
+  }
+
+  // Prepare radar chart data (only visible markets)
   const radarData = useMemo(() => {
-    return correlatedMarkets.map(m => ({
-      id: m.id,
-      label: m.proposalTitle.split(':')[1]?.trim() || m.proposalTitle,
-      probability: parseFloat(m.passTokenPrice) * 100,
-      totalLiquidity: parseFloat(m.totalLiquidity)
+    return correlatedMarkets
+      .filter(m => visibleMarkets[m.id])
+      .map(m => ({
+        id: m.id,
+        label: m.proposalTitle.split(':')[1]?.trim() || m.proposalTitle,
+        probability: parseFloat(m.passTokenPrice) * 100,
+        totalLiquidity: parseFloat(m.totalLiquidity),
+        isPinned: pinnedMarkets.has(m.id)
+      }))
+  }, [correlatedMarkets, visibleMarkets, pinnedMarkets])
+
+  // Generate mock historical data for timeline
+  const generateTimelineData = (market, horizon) => {
+    const now = Date.now()
+    const dataPoints = horizon === '7d' ? 7 : horizon === '30d' ? 30 : horizon === '90d' ? 90 : 365
+    const dayMs = 24 * 60 * 60 * 1000
+    const baseProb = parseFloat(market.passTokenPrice) * 100
+    
+    return Array.from({ length: dataPoints }, (_, i) => ({
+      date: new Date(now - (dataPoints - i - 1) * dayMs),
+      probability: baseProb + (Math.random() - 0.5) * 15 // Mock variance
     }))
-  }, [correlatedMarkets])
+  }
 
   // Create radar chart using D3.js
   useEffect(() => {
@@ -116,14 +156,18 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         })
     })
 
-    // Draw labels around the perimeter
+    // Draw labels around the perimeter with high z-order
+    const labelsGroup = g.append('g')
+      .attr('class', 'radar-labels-group')
+      .style('pointer-events', 'none') // Ensure labels don't interfere with interactions
+    
     radarData.forEach((d, i) => {
       const angle = angleSlice * i - Math.PI / 2
       const labelRadius = maxRadius + 40
       const x = labelRadius * Math.cos(angle)
       const y = labelRadius * Math.sin(angle)
 
-      g.append('text')
+      labelsGroup.append('text')
         .attr('x', x)
         .attr('y', y)
         .attr('text-anchor', x > 0.5 ? 'start' : x < -0.5 ? 'end' : 'middle')
@@ -131,6 +175,10 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .attr('font-size', '14px')
         .attr('font-weight', '600')
         .attr('fill', 'var(--text-primary)')
+        .style('paint-order', 'stroke fill') // Ensure text renders on top
+        .style('stroke', 'white')
+        .style('stroke-width', '3px')
+        .style('stroke-linejoin', 'round')
         .text(d.label)
     })
 
@@ -193,6 +241,126 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
 
   }, [radarData, selectedOption])
 
+  // Create timeline chart using D3.js
+  useEffect(() => {
+    if (!timelineRef.current || radarData.length === 0) return
+
+    const width = 900
+    const height = 200
+    const margin = { top: 20, right: 80, bottom: 40, left: 60 }
+    const chartWidth = width - margin.left - margin.right
+    const chartHeight = height - margin.top - margin.bottom
+
+    // Clear previous content
+    d3.select(timelineRef.current).selectAll('*').remove()
+
+    const svg = d3.select(timelineRef.current)
+      .attr('width', width)
+      .attr('height', height)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+
+    const g = svg.append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`)
+
+    // Generate timeline data for each visible market
+    const allTimelines = radarData.map(market => ({
+      id: market.id,
+      label: market.label,
+      data: generateTimelineData(
+        correlatedMarkets.find(m => m.id === market.id),
+        timeHorizon
+      ),
+      isPinned: market.isPinned
+    }))
+
+    // Create scales
+    const allDates = allTimelines.flatMap(t => t.data.map(d => d.date))
+    const xScale = d3.scaleTime()
+      .domain(d3.extent(allDates))
+      .range([0, chartWidth])
+
+    const yScale = d3.scaleLinear()
+      .domain([0, 100])
+      .range([chartHeight, 0])
+
+    // Color scale
+    const colorScale = d3.scaleOrdinal()
+      .domain(radarData.map(d => d.id))
+      .range(d3.schemeCategory10)
+
+    // Add axes
+    const xAxis = d3.axisBottom(xScale)
+      .ticks(timeHorizon === '7d' ? 7 : timeHorizon === '30d' ? 6 : 5)
+      .tickFormat(d3.timeFormat('%m/%d'))
+
+    const yAxis = d3.axisLeft(yScale)
+      .ticks(5)
+      .tickFormat(d => `${d}%`)
+
+    g.append('g')
+      .attr('transform', `translate(0,${chartHeight})`)
+      .call(xAxis)
+      .style('color', 'var(--text-secondary)')
+
+    g.append('g')
+      .call(yAxis)
+      .style('color', 'var(--text-secondary)')
+
+    // Draw lines for each market
+    const line = d3.line()
+      .x(d => xScale(d.date))
+      .y(d => yScale(d.probability))
+      .curve(d3.curveMonotoneX)
+
+    allTimelines.forEach(timeline => {
+      g.append('path')
+        .datum(timeline.data)
+        .attr('fill', 'none')
+        .attr('stroke', colorScale(timeline.id))
+        .attr('stroke-width', timeline.id === selectedOption ? 3 : 2)
+        .attr('opacity', timeline.id === selectedOption ? 1 : 0.6)
+        .attr('d', line)
+        .style('cursor', 'pointer')
+        .on('click', () => setSelectedOption(timeline.id))
+        .on('mouseover', function() {
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .attr('stroke-width', 3)
+            .attr('opacity', 1)
+        })
+        .on('mouseout', function() {
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .attr('stroke-width', timeline.id === selectedOption ? 3 : 2)
+            .attr('opacity', timeline.id === selectedOption ? 1 : 0.6)
+        })
+
+      // Add end point label
+      const lastPoint = timeline.data[timeline.data.length - 1]
+      g.append('text')
+        .attr('x', chartWidth + 5)
+        .attr('y', yScale(lastPoint.probability))
+        .attr('dy', '0.35em')
+        .attr('font-size', '11px')
+        .attr('fill', colorScale(timeline.id))
+        .style('font-weight', timeline.id === selectedOption ? 'bold' : 'normal')
+        .text(timeline.label)
+    })
+
+    // Add grid lines
+    g.append('g')
+      .attr('class', 'grid')
+      .attr('opacity', 0.1)
+      .call(d3.axisLeft(yScale)
+        .ticks(5)
+        .tickSize(-chartWidth)
+        .tickFormat('')
+      )
+
+  }, [radarData, timeHorizon, selectedOption, correlatedMarkets])
+
   return (
     <div className="correlated-markets-view">
       <div className="correlation-header">
@@ -218,10 +386,32 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
             {correlatedMarkets.map((option) => (
               <button
                 key={option.id}
-                className={`option-card ${selectedOption === option.id ? 'selected' : ''}`}
+                className={`option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
                 onClick={() => setSelectedOption(option.id)}
               >
                 <div className="option-header">
+                  <div className="option-controls">
+                    <button
+                      className="pin-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        togglePin(option.id)
+                      }}
+                      title={pinnedMarkets.has(option.id) ? 'Unpin market' : 'Pin market'}
+                    >
+                      {pinnedMarkets.has(option.id) ? '📌' : '📍'}
+                    </button>
+                    <button
+                      className="visibility-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleMarketVisibility(option.id)
+                      }}
+                      title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
+                    >
+                      {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
                   <span className="option-name">
                     {option.proposalTitle.split(':')[1]?.trim() || option.proposalTitle}
                   </span>
@@ -268,6 +458,42 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
               Trade on {selectedMarket.proposalTitle.split(':')[1]?.trim() || 'this option'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Timeline View */}
+      <div className="timeline-section">
+        <div className="timeline-header">
+          <h3 className="timeline-title">Market Sentiment Over Time</h3>
+          <div className="time-horizon-controls">
+            <button 
+              className={`horizon-btn ${timeHorizon === '7d' ? 'active' : ''}`}
+              onClick={() => setTimeHorizon('7d')}
+            >
+              7 Days
+            </button>
+            <button 
+              className={`horizon-btn ${timeHorizon === '30d' ? 'active' : ''}`}
+              onClick={() => setTimeHorizon('30d')}
+            >
+              30 Days
+            </button>
+            <button 
+              className={`horizon-btn ${timeHorizon === '90d' ? 'active' : ''}`}
+              onClick={() => setTimeHorizon('90d')}
+            >
+              90 Days
+            </button>
+            <button 
+              className={`horizon-btn ${timeHorizon === 'all' ? 'active' : ''}`}
+              onClick={() => setTimeHorizon('all')}
+            >
+              All Time
+            </button>
+          </div>
+        </div>
+        <div className="timeline-chart-container">
+          <svg ref={timelineRef} className="timeline-chart"></svg>
         </div>
       </div>
     </div>
