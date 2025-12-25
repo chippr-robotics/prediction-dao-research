@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useWeb3, useWallet } from '../hooks/useWeb3'
+import { useWeb3 } from '../hooks/useWeb3'
 import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import UserManagementModal from './ui/UserManagementModal'
@@ -9,20 +9,11 @@ import './Header.css'
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isConnected, account } = useWeb3()
-  const { connectWallet, disconnectWallet } = useWallet()
+  const { isConnected } = useWeb3()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
-
-  const handleConnectWallet = async () => {
-    await connectWallet()
-  }
-
-  const handleDisconnect = () => {
-    disconnectWallet()
-  }
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen)
@@ -45,11 +36,6 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
       // Navigate to landing page with hash
       navigate(`/#${sectionId}`)
     }
-  }
-
-  const truncateAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
   const handleLogoError = () => {

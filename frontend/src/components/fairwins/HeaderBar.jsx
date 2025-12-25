@@ -7,24 +7,13 @@ import QRScanner from '../ui/QRScanner'
 import UserManagementModal from '../ui/UserManagementModal'
 import './HeaderBar.css'
 
-function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onScanMarket }) {
+function HeaderBar({ onBack, isConnected, onScanMarket }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
   const [showScanner, setShowScanner] = useState(false)
-
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
-  }
-
-  const handleConnectClick = async () => {
-    if (onConnect) {
-      await onConnect()
-    }
-  }
 
   const handleScanSuccess = (decodedText, url) => {
     setShowScanner(false)
