@@ -47,7 +47,7 @@ const CONFIG = {
 const MARKET_TEMPLATES = [
   { question: "Will ETH price exceed $5000 by Q2 2025?", category: "crypto" },
   { question: "Will Bitcoin dominance fall below 40% this year?", category: "crypto" },
-  { question: "Will ETC Classic reach 100 TPS by end of year?", category: "tech" },
+  { question: "Will Ethereum Classic reach 100 TPS by end of year?", category: "tech" },
   { question: "Will DAO treasury grow by 20% in 6 months?", category: "governance" },
   { question: "Will new DEX integration complete successfully?", category: "tech" },
   { question: "Will community proposal #X pass?", category: "governance" },
@@ -242,12 +242,12 @@ async function executeTrades(marketFactory, players) {
           continue;
         }
         
-        // Execute trade
+        // Execute trade with automatic gas estimation
         const tx = await marketFactory.connect(player).buyTokens(
           marketId,
           buyPass,
           amount,
-          { value: amount, gasLimit: 500000 }
+          { value: amount }
         );
         
         await tx.wait();
@@ -256,10 +256,16 @@ async function executeTrades(marketFactory, players) {
         totalTrades++;
       } catch (error) {
         // Silently skip failed trades to avoid spam
-        if (error.message.includes("Trading period ended")) {
-          // Market has ended, this is expected
+        // Common expected errors: "Trading period ended", "Market not active", "Insufficient balance"
+        const errorMsg = error.message || error.toString();
+        if (errorMsg.includes("Trading period ended") || 
+            errorMsg.includes("Market not active")) {
+          // Market has ended or inactive, this is expected
+        } else if (errorMsg.includes("Insufficient balance") || 
+                   errorMsg.includes("insufficient funds")) {
+          // Low balance, already logged elsewhere
         } else {
-          console.error(`  ✗ Trade failed:`, error.message.split('\n')[0]);
+          console.error(`  ✗ Trade failed:`, errorMsg.split('\n')[0]);
         }
       }
       
