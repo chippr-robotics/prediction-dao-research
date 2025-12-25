@@ -1,4 +1,4 @@
-import { expect, afterEach, vi } from 'vitest'
+import { expect, afterEach, beforeEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import * as matchers from 'vitest-axe/matchers'
@@ -33,4 +33,24 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
+})
+
+// Create clipboard mock
+const writeTextMock = vi.fn(() => Promise.resolve())
+const readTextMock = vi.fn(() => Promise.resolve(''))
+
+// Mock clipboard API globally
+Object.defineProperty(navigator, 'clipboard', {
+  writable: true,
+  configurable: true,
+  value: {
+    writeText: writeTextMock,
+    readText: readTextMock,
+  },
+})
+
+// Reset clipboard mocks before each test
+beforeEach(() => {
+  writeTextMock.mockClear()
+  readTextMock.mockClear()
 })
