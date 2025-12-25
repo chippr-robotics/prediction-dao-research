@@ -51,7 +51,7 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
 
   return (
     <div 
-      className={`market-tile ${isActive ? 'active' : ''} ${compact ? 'compact' : ''}`}
+      className={`market-tile ${isActive ? 'active' : ''} ${compact ? 'compact' : ''} ${market.correlationGroupId ? 'grouped' : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
@@ -59,6 +59,12 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
       aria-label={`View market: ${market.proposalTitle}`}
       aria-pressed={isActive}
     >
+      {market.correlationGroupId && (
+        <div className="correlation-badge" title={market.correlationGroupName}>
+          <span className="correlation-icon" aria-hidden="true">🔗</span>
+          <span className="correlation-text">{market.correlationGroupName}</span>
+        </div>
+      )}
       <div className="tile-header">
         <div className="header-left">
           <span className="category-badge" aria-hidden="true">
