@@ -132,6 +132,10 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }
 
+  const handleModalClick = (e) => {
+    e.stopPropagation()
+  }
+
   const handleCameraChange = async (e) => {
     const newCameraId = e.target.value
     
@@ -159,7 +163,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
       aria-labelledby="qr-scanner-title"
       tabIndex={-1}
     >
-      <div className="qr-scanner-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="qr-scanner-modal" onClick={handleModalClick}>
         <div className="qr-scanner-header">
           <h2 id="qr-scanner-title">Scan QR Code</h2>
           <button
