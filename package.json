@@ -17,6 +17,8 @@
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "deploy:mordor": "hardhat run scripts/deploy-deterministic.js --network mordor",
     "deploy:deterministic": "hardhat run scripts/deploy-deterministic.js",
+    "seed:testnet": "hardhat run scripts/seed-testnet.js --network mordor",
+    "seed:local": "hardhat run scripts/seed-testnet.js --network localhost",
     "node": "hardhat node",
     "clean": "hardhat clean",
     "frontend": "cd frontend && npm run dev"
