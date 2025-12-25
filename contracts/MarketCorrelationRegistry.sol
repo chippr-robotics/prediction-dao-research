@@ -78,7 +78,10 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
         _;
     }
     
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable(msg.sender) {
+        // Mark as initialized for non-proxy deployments to prevent unauthorized initialization
+        _initialized = true;
+    }
     
     /**
      * @notice Initialize the contract (used for clones)
@@ -136,7 +139,7 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
     function addMarketToGroup(
         uint256 groupId,
         uint256 marketId
-    ) external groupExists(groupId) {
+    ) external onlyOwner groupExists(groupId) {
         require(correlationGroups[groupId].active, "Group is not active");
         require(_marketToGroupPlusOne[marketId] == 0, "Market already in a group");
         
@@ -150,7 +153,7 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
      * @notice Remove a market from its correlation group
      * @param marketId ID of the market to remove
      */
-    function removeMarketFromGroup(uint256 marketId) external {
+    function removeMarketFromGroup(uint256 marketId) external onlyOwner {
         uint256 groupIdPlusOne = _marketToGroupPlusOne[marketId];
         require(groupIdPlusOne > 0, "Market not in any group");
         

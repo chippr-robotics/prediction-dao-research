@@ -150,13 +150,13 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     const innerCircleRadius = 0.15 // 15% inner circle where petals meet
     
     radarData.forEach((d, i) => {
-      const nextIndex = (i + 1) % radarData.length
-      const nextData = radarData[nextIndex]
-      
       // Add the main data point (arches outward to this option)
+      // Prevent division by zero when all probabilities are identical
+      const radius = scaleRange > 0 ? (d.probability - scaleMin) / scaleRange : 0.5
+      
       enhancedData.push({
         angle: angleSlice * i,
-        radius: (d.probability - scaleMin) / scaleRange,
+        radius: radius,
         name: d.name
       })
       
@@ -184,7 +184,9 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     // Draw data points (only for actual markets, not anchor points)
     radarData.forEach((d, i) => {
       const angle = angleSlice * i - Math.PI / 2
-      const radius = ((d.probability - scaleMin) / scaleRange) * maxRadius
+      // Prevent division by zero when all probabilities are identical
+      const normalizedRadius = scaleRange > 0 ? (d.probability - scaleMin) / scaleRange : 0.5
+      const radius = normalizedRadius * maxRadius
       const x = radius * Math.cos(angle)
       const y = radius * Math.sin(angle)
 
@@ -235,17 +237,6 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .style('stroke-width', '3px')
         .style('stroke-linejoin', 'round')
         .text(d.label)
-    })
-
-    // Add percentage labels on circles
-    gridLevels.forEach((level) => {
-      const percentage = (level / levels) * 100
-      g.append('text')
-        .attr('x', 5)
-        .attr('y', -(maxRadius / levels) * level)
-        .attr('font-size', '10px')
-        .attr('fill', 'var(--text-secondary)')
-        .text(`${percentage}%`)
     })
 
     // Embed SVG logo in center

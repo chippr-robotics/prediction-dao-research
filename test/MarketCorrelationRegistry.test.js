@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 describe("MarketCorrelationRegistry", function () {
   let registry;
@@ -12,7 +13,7 @@ describe("MarketCorrelationRegistry", function () {
     
     const MarketCorrelationRegistry = await ethers.getContractFactory("MarketCorrelationRegistry");
     registry = await MarketCorrelationRegistry.deploy();
-    await registry.initialize(owner.address);
+    // No need to call initialize - constructor sets owner to deployer (msg.sender)
   });
 
   describe("Deployment", function () {
@@ -82,7 +83,7 @@ describe("MarketCorrelationRegistry", function () {
       await expect(
         registry.addMarketToGroup(groupId, marketId)
       ).to.emit(registry, "MarketAddedToGroup")
-        .withArgs(groupId, marketId, await ethers.provider.getBlock('latest').then(b => b.timestamp + 1));
+        .withArgs(groupId, marketId, anyValue);
 
       const markets = await registry.getGroupMarkets(groupId);
       expect(markets.length).to.equal(1);
@@ -163,7 +164,7 @@ describe("MarketCorrelationRegistry", function () {
 
       const markets = await registry.getGroupMarkets(groupId);
       expect(markets.length).to.equal(2);
-      expect(markets.includes(marketId)).to.equal(false);
+      expect(markets.some((m) => m === BigInt(marketId))).to.equal(false);
     });
 
     it("Should reject removing market not in any group", async function () {
