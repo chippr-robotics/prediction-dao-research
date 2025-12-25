@@ -96,6 +96,27 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
     window.location.href = emailUrl
   }
 
+  const handleNativeShare = async () => {
+    // Check if Web Share API is supported
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: market.proposalTitle,
+          text: shareText,
+          url: url,
+        })
+      } catch (err) {
+        // User cancelled or error occurred
+        if (err.name !== 'AbortError') {
+          console.error('Error sharing:', err)
+        }
+      }
+    } else {
+      // Fallback to copy link
+      handleCopyLink()
+    }
+  }
+
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       onClose()
@@ -163,14 +184,15 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
             <span className="chevron-right">«</span>
           </div>
 
-          {/* Progress dots */}
-          <div className="progress-dots">
-            <span className="dot active"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-            <span className="dot"></span>
-          </div>
+          {/* Web Share API Button */}
+          <button 
+            className="share-btn-primary"
+            onClick={handleNativeShare}
+            aria-label="Share market"
+          >
+            <span className="share-icon">📤</span>
+            <span className="share-btn-text">Share</span>
+          </button>
 
           {/* Hidden action buttons - accessible but minimal */}
           <div className="share-actions-minimal">
