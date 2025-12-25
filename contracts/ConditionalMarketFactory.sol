@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "./ETCSwapV3Integration.sol";
 
 /**
@@ -280,8 +281,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         (string memory positiveLabel, string memory negativeLabel) = getOutcomeLabels(betType);
 
         // Create conditional tokens with bet-type-specific names
-        address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", _uint2str(marketId)))));
-        address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", _uint2str(marketId)))));
+        address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", Strings.toString(marketId)))));
+        address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", Strings.toString(marketId)))));
 
         markets[marketId] = Market({
             proposalId: proposalId,
@@ -345,8 +346,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             (string memory positiveLabel, string memory negativeLabel) = getOutcomeLabels(params[i].betType);
             
             // Create conditional tokens with bet-type-specific names
-            address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", _uint2str(marketId)))));
-            address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", _uint2str(marketId)))));
+            address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", Strings.toString(marketId)))));
+            address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", Strings.toString(marketId)))));
             
             markets[marketId] = Market({
                 proposalId: params[i].proposalId,
@@ -889,33 +890,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 marketId;
         uint256 passValue;
         uint256 failValue;
-    }
-
-    /**
-     * @notice Internal helper to convert uint to string
-     * @param _i Number to convert
-     * @return _uintAsString String representation
-     */
-    function _uint2str(uint256 _i) internal pure returns (string memory _uintAsString) {
-        if (_i == 0) {
-            return "0";
-        }
-        uint256 j = _i;
-        uint256 len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        uint256 k = len;
-        while (_i != 0) {
-            k = k - 1;
-            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
-            bytes1 b1 = bytes1(temp);
-            bstr[k] = b1;
-            _i /= 10;
-        }
-        return string(bstr);
     }
 }
 
