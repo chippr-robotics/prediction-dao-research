@@ -8,7 +8,7 @@ import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
 import StateManagementDemo from './components/StateManagementDemo'
-import { ComponentExamples, ThemeToggle } from './components/ui'
+import { ComponentExamples } from './components/ui'
 import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
 import { useAnnouncement, useNotification } from './hooks/useUI'
 import { useTheme } from './hooks/useTheme'
@@ -74,9 +74,6 @@ function AppContent() {
       
       {/* Modal system */}
       <ModalSystem />
-
-      {/* Theme toggle */}
-      <ThemeToggle />
 
       {/* Network error banner */}
       {networkError && isConnected && (

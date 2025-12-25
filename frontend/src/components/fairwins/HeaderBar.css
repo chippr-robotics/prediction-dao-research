@@ -131,7 +131,61 @@
 .header-right {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
   flex-shrink: 0;
+}
+
+.wallet-info-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.wallet-info-compact .status-dot {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.wallet-info-compact .wallet-address {
+  font-weight: 600;
+  color: white;
+  font-size: 0.9rem;
+}
+
+.settings-btn {
+  background-color: rgba(168, 85, 247, 0.2);
+  color: white;
+  padding: 0.625rem 1rem;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-btn:hover {
+  background-color: rgba(168, 85, 247, 0.4);
+  border-color: rgba(168, 85, 247, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.settings-btn:focus {
+  outline: 2px solid rgba(168, 85, 247, 0.6);
+  outline-offset: 2px;
 }
 
 .wallet-connected {
@@ -231,7 +285,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-right: 1rem;
 }
 
 .scan-qr-btn:hover {
@@ -296,6 +349,15 @@
     display: none;
   }
 
+  .wallet-info-compact {
+    padding: 0.35rem 0.6rem;
+    gap: 0.4rem;
+  }
+
+  .wallet-info-compact .wallet-address {
+    font-size: 0.75rem;
+  }
+
   .wallet-connected {
     padding: 0.35rem 0.6rem;
     gap: 0.5rem;
@@ -308,6 +370,16 @@
   .disconnect-btn, .connect-btn {
     padding: 0.4rem 0.75rem;
     font-size: 0.8rem;
+  }
+
+  .settings-btn, .scan-qr-btn {
+    padding: 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  .settings-btn .btn-text,
+  .scan-qr-btn .btn-text {
+    display: none;
   }
 
   /* Further compact when scrolled */
