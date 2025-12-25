@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { BetType } = require("./constants/BetType");
 
 describe("Batch Operations", function () {
   let marketFactory;
@@ -31,21 +32,24 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         },
         {
           proposalId: 2,
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
-          tradingPeriod: 10 * 24 * 60 * 60
+          tradingPeriod: 10 * 24 * 60 * 60,
+          betType: BetType.PassFail
         },
         {
           proposalId: 3,
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1500"),
           liquidityParameter: ethers.parseEther("150"),
-          tradingPeriod: 14 * 24 * 60 * 60
+          tradingPeriod: 14 * 24 * 60 * 60,
+          betType: BetType.PassFail
         }
       ];
 
@@ -83,14 +87,16 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         },
         {
           proposalId: 2,
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
-          tradingPeriod: 10 * 24 * 60 * 60
+          tradingPeriod: 10 * 24 * 60 * 60,
+          betType: BetType.PassFail
         }
       ];
 
@@ -126,7 +132,8 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         });
       }
 
@@ -142,14 +149,16 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         },
         {
           proposalId: 1, // Duplicate proposal ID
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
-          tradingPeriod: 10 * 24 * 60 * 60
+          tradingPeriod: 10 * 24 * 60 * 60,
+          betType: BetType.PassFail
         }
       ];
 
@@ -168,21 +177,24 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         },
         {
           proposalId: 2,
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         },
         {
           proposalId: 3,
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1500"),
           liquidityParameter: ethers.parseEther("150"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         }
       ];
       
@@ -526,7 +538,8 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         });
       }
       await marketFactory.batchDeployMarkets(params);
@@ -641,7 +654,8 @@ describe("Batch Operations", function () {
           collateralToken: ethers.ZeroAddress,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
-          tradingPeriod: 7 * 24 * 60 * 60
+          tradingPeriod: 7 * 24 * 60 * 60,
+          betType: BetType.PassFail
         });
       }
       
@@ -663,7 +677,8 @@ describe("Batch Operations", function () {
           ethers.ZeroAddress,
           ethers.parseEther("1000"),
           ethers.parseEther("100"),
-          7 * 24 * 60 * 60
+          7 * 24 * 60 * 60,
+          1 // BetType.PassFail
         );
         const receipt = await tx.wait();
         totalIndividualGas += receipt.gasUsed;

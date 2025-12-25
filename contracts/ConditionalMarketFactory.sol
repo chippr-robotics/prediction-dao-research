@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "./ETCSwapV3Integration.sol";
 
 /**
@@ -30,6 +31,23 @@ import "./ETCSwapV3Integration.sol";
  * - Fallback mode: Simplified LMSR for testing and backwards compatibility
  */
 contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
+    /**
+     * @notice Enum defining different types of binary outcomes for prediction markets
+     * @dev Each bet type represents a different way to frame binary predictions
+     */
+    enum BetType {
+        YesNo,          // Standard Yes / No outcome
+        PassFail,       // Pass / Fail outcome (default for governance)
+        AboveBelow,     // Above / Below a threshold
+        HigherLower,    // Higher / Lower than reference
+        InOut,          // In / Out of range
+        OverUnder,      // Over / Under a value
+        ForAgainst,     // For / Against a proposal
+        TrueFalse,      // True / False statement
+        WinLose,        // Win / Lose outcome
+        UpDown          // Up / Down movement
+    }
+
     struct Market {
         uint256 proposalId;
         address passToken;
@@ -42,6 +60,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 passValue;
         uint256 failValue;
         MarketStatus status;
+        BetType betType;
     }
 
     enum MarketStatus {
@@ -88,7 +107,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingEndTime,
         uint256 liquidityParameter,
         uint256 createdAt,
-        address creator
+        address creator,
+        BetType betType
     );
     
     event TokensPurchased(
@@ -153,6 +173,37 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) {}
 
     /**
+     * @notice Get outcome labels for a specific bet type
+     * @param betType The type of bet
+     * @return positiveOutcome Label for the positive outcome token
+     * @return negativeOutcome Label for the negative outcome token
+     */
+    function getOutcomeLabels(BetType betType) public pure returns (string memory positiveOutcome, string memory negativeOutcome) {
+        if (betType == BetType.YesNo) {
+            return ("YES", "NO");
+        } else if (betType == BetType.PassFail) {
+            return ("PASS", "FAIL");
+        } else if (betType == BetType.AboveBelow) {
+            return ("ABOVE", "BELOW");
+        } else if (betType == BetType.HigherLower) {
+            return ("HIGHER", "LOWER");
+        } else if (betType == BetType.InOut) {
+            return ("IN", "OUT");
+        } else if (betType == BetType.OverUnder) {
+            return ("OVER", "UNDER");
+        } else if (betType == BetType.ForAgainst) {
+            return ("FOR", "AGAINST");
+        } else if (betType == BetType.TrueFalse) {
+            return ("TRUE", "FALSE");
+        } else if (betType == BetType.WinLose) {
+            return ("WIN", "LOSE");
+        } else if (betType == BetType.UpDown) {
+            return ("UP", "DOWN");
+        }
+        return ("PASS", "FAIL"); // Default fallback
+    }
+
+    /**
      * @notice Initialize the contract (used for clones)
      * @param initialOwner Address of the initial owner
      */
@@ -210,6 +261,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
      * @param liquidityAmount Initial liquidity amount
      * @param liquidityParameter Beta parameter for LMSR (higher = more liquidity)
      * @param tradingPeriod Trading period in seconds
+     * @param betType Type of binary bet (YesNo, PassFail, AboveBelow, etc.)
      * @return marketId ID of the created market
      */
     function deployMarketPair(
@@ -217,16 +269,20 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         address collateralToken,
         uint256 liquidityAmount,
         uint256 liquidityParameter,
-        uint256 tradingPeriod
+        uint256 tradingPeriod,
+        BetType betType
     ) external onlyOwner returns (uint256 marketId) {
         require(_proposalToMarketPlusOne[proposalId] == 0, "Market already exists");
         require(tradingPeriod >= MIN_TRADING_PERIOD && tradingPeriod <= MAX_TRADING_PERIOD, "Invalid trading period");
 
         marketId = marketCount++;
 
-        // Create conditional tokens (simplified - in production use Gnosis CTF)
-        address passToken = address(new ConditionalToken("PASS", "P"));
-        address failToken = address(new ConditionalToken("FAIL", "F"));
+        // Get outcome labels based on bet type
+        (string memory positiveLabel, string memory negativeLabel) = getOutcomeLabels(betType);
+
+        // Create conditional tokens with bet-type-specific names
+        address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", Strings.toString(marketId)))));
+        address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", Strings.toString(marketId)))));
 
         markets[marketId] = Market({
             proposalId: proposalId,
@@ -239,7 +295,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             resolved: false,
             passValue: 0,
             failValue: 0,
-            status: MarketStatus.Active
+            status: MarketStatus.Active,
+            betType: betType
         });
 
         _proposalToMarketPlusOne[proposalId] = marketId + 1;
@@ -256,7 +313,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             markets[marketId].tradingEndTime,
             liquidityParameter,
             block.timestamp,
-            msg.sender
+            msg.sender,
+            betType
         );
     }
     
@@ -284,9 +342,12 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             uint256 marketId = marketCount++;
             marketIds[i] = marketId;
             
-            // Create conditional tokens
-            address passToken = address(new ConditionalToken("PASS", "P"));
-            address failToken = address(new ConditionalToken("FAIL", "F"));
+            // Get outcome labels based on bet type
+            (string memory positiveLabel, string memory negativeLabel) = getOutcomeLabels(params[i].betType);
+            
+            // Create conditional tokens with bet-type-specific names
+            address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", Strings.toString(marketId)))));
+            address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", Strings.toString(marketId)))));
             
             markets[marketId] = Market({
                 proposalId: params[i].proposalId,
@@ -299,7 +360,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 resolved: false,
                 passValue: 0,
                 failValue: 0,
-                status: MarketStatus.Active
+                status: MarketStatus.Active,
+                betType: params[i].betType
             });
             
             _proposalToMarketPlusOne[params[i].proposalId] = marketId + 1;
@@ -316,7 +378,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 markets[marketId].tradingEndTime,
                 params[i].liquidityParameter,
                 block.timestamp,
-                msg.sender
+                msg.sender,
+                params[i].betType
             );
             
             unchecked { ++i; }
@@ -817,6 +880,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 liquidityAmount;
         uint256 liquidityParameter;
         uint256 tradingPeriod;
+        BetType betType;
     }
     
     /**

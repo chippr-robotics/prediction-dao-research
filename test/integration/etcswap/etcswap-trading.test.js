@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+const { BetType } = require("../../constants/BetType");
 
 /**
  * Integration tests for ETCSwap v3 trading through ConditionalMarketFactory
@@ -13,6 +14,7 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
  * 5. Execute trades (buy/sell)
  * 6. Verify correct behavior
  */
+
 describe("Integration: ETCSwap V3 Trading", function () {
     async function deployETCSwapFixture() {
         const [owner, liquidityProvider, trader1, trader2] = await ethers.getSigners();
@@ -87,7 +89,8 @@ describe("Integration: ETCSwap V3 Trading", function () {
                 await collateralToken.getAddress(),
                 liquidityAmount,
                 1000,
-                tradingPeriod
+                tradingPeriod,
+          BetType.YesNo
             );
             await createTx.wait();
 
@@ -270,7 +273,8 @@ describe("Integration: ETCSwap V3 Trading", function () {
                 ethers.ZeroAddress, // ETH as collateral for fallback
                 ethers.parseEther("1"),
                 1000,
-                tradingPeriod
+                tradingPeriod,
+          BetType.YesNo
             );
 
             const marketId = 0;

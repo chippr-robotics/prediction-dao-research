@@ -141,13 +141,14 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         // Allocate governance proposal ID first
         governanceProposalId = governanceProposalCount++;
 
-        // Deploy conditional market
+        // Deploy conditional market with PassFail bet type (appropriate for governance)
         uint256 marketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH as collateral
             liquidityAmount,
             liquidityParameter,
-            tradingPeriod
+            tradingPeriod,
+            ConditionalMarketFactory.BetType.PassFail
         );
 
         // Store governance proposal after external call

@@ -120,14 +120,30 @@ function getProposal(uint256 proposalId) external view returns (Proposal memory)
 
 ### ConditionalMarketFactory.sol
 
-**Purpose**: Creates and manages prediction markets
+**Purpose**: Creates and manages prediction markets with flexible binary outcome types
 
 **Key Features**:
 
-- Deploys PASS/FAIL token pairs
+- Deploys outcome token pairs with configurable bet types
+- Support for multiple binary bet formats (Yes/No, Above/Below, Pass/Fail, etc.)
 - LMSR automated market making
 - Gnosis CTF compatibility
 - Token redemption logic
+
+**Supported Bet Types**:
+
+The contract supports the following binary bet types through the `BetType` enum:
+
+- `YesNo` - Standard Yes / No outcomes
+- `PassFail` - Pass / Fail outcomes (default for governance)
+- `AboveBelow` - Above / Below a threshold
+- `HigherLower` - Higher / Lower than reference
+- `InOut` - In / Out of range
+- `OverUnder` - Over / Under a value
+- `ForAgainst` - For / Against a proposal
+- `TrueFalse` - True / False statement
+- `WinLose` - Win / Lose outcome
+- `UpDown` - Up / Down movement
 
 **Market Structure**:
 
@@ -140,8 +156,25 @@ struct Market {
     uint256 startTime;
     uint256 endTime;
     bool resolved;
-    bool outcome; // true = PASS wins
+    bool outcome; // true = positive outcome wins
+    BetType betType; // Type of binary bet
 }
+```
+
+**Key Functions**:
+
+```solidity
+function getOutcomeLabels(BetType betType) 
+    public pure returns (string memory positiveOutcome, string memory negativeOutcome)
+
+function deployMarketPair(
+    uint256 proposalId,
+    address collateralToken,
+    uint256 liquidityAmount,
+    uint256 liquidityParameter,
+    uint256 tradingPeriod,
+    BetType betType
+) external returns (uint256 marketId)
 ```
 
 **LMSR Pricing**:

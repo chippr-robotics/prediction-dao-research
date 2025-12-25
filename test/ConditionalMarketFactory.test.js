@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { BetType } = require("./constants/BetType");
 
 describe("ConditionalMarketFactory", function () {
   let marketFactory;
@@ -42,7 +43,8 @@ describe("ConditionalMarketFactory", function () {
           collateralToken,
           liquidityAmount,
           liquidityParameter,
-          tradingPeriod
+          tradingPeriod,
+          BetType.PassFail
         )
       ).to.emit(marketFactory, "MarketCreated");
     });
@@ -60,7 +62,8 @@ describe("ConditionalMarketFactory", function () {
           collateralToken,
           liquidityAmount,
           liquidityParameter,
-          tradingPeriod
+          tradingPeriod,
+          BetType.PassFail
         )
       ).to.be.revertedWith("Invalid trading period");
     });
@@ -77,7 +80,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       expect(await marketFactory.marketCount()).to.equal(1);
@@ -96,7 +100,8 @@ describe("ConditionalMarketFactory", function () {
           collateralToken,
           liquidityAmount,
           liquidityParameter,
-          tradingPeriod
+          tradingPeriod,
+          BetType.PassFail
         )
       ).to.be.revertedWithCustomError(marketFactory, "OwnableUnauthorizedAccount");
     });
@@ -113,7 +118,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       // This test actually reveals a bug in the contract: proposalToMarket uses 0 to indicate
@@ -124,7 +130,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       // Now test with proposalId 2 to check duplicate detection works when marketId != 0
@@ -133,7 +140,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       await expect(
@@ -142,7 +150,8 @@ describe("ConditionalMarketFactory", function () {
           collateralToken,
           liquidityAmount,
           liquidityParameter,
-          tradingPeriod
+          tradingPeriod,
+          BetType.PassFail
         )
       ).to.be.revertedWith("Market already exists");
     });
@@ -160,7 +169,8 @@ describe("ConditionalMarketFactory", function () {
           collateralToken,
           liquidityAmount,
           liquidityParameter,
-          tradingPeriod
+          tradingPeriod,
+          BetType.PassFail
         )
       ).to.be.revertedWith("Invalid trading period");
     });
@@ -177,7 +187,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       const market = await marketFactory.getMarket(0);
@@ -203,7 +214,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
     });
 
@@ -265,7 +277,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       // Fast forward and end trading
@@ -303,7 +316,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       const passValue = ethers.parseEther("100");
@@ -358,7 +372,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
     });
 
@@ -409,7 +424,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       const marketId = await marketFactory.getMarketForProposal(proposalId);
@@ -444,7 +460,8 @@ describe("ConditionalMarketFactory", function () {
         collateralToken,
         liquidityAmount,
         liquidityParameter,
-        tradingPeriod
+        tradingPeriod,
+          BetType.PassFail
       );
 
       const market = await marketFactory.getMarket(0);
@@ -456,9 +473,9 @@ describe("ConditionalMarketFactory", function () {
     describe("Token Properties", function () {
       it("Should have correct name and symbol", async function () {
         expect(await passToken.name()).to.equal("PASS");
-        expect(await passToken.symbol()).to.equal("P");
+        expect(await passToken.symbol()).to.equal("PASS-0");
         expect(await failToken.name()).to.equal("FAIL");
-        expect(await failToken.symbol()).to.equal("F");
+        expect(await failToken.symbol()).to.equal("FAIL-0");
       });
 
       it("Should have 18 decimals", async function () {

@@ -93,9 +93,32 @@ interface IProposalRegistry {
 
 ```solidity
 interface IConditionalMarketFactory {
-    function createMarket(uint256 proposalId) 
+    enum BetType {
+        YesNo,
+        PassFail,
+        AboveBelow,
+        HigherLower,
+        InOut,
+        OverUnder,
+        ForAgainst,
+        TrueFalse,
+        WinLose,
+        UpDown
+    }
+    
+    function getOutcomeLabels(BetType betType) 
         external 
-        returns (uint256 marketId);
+        pure 
+        returns (string memory positiveOutcome, string memory negativeOutcome);
+    
+    function deployMarketPair(
+        uint256 proposalId,
+        address collateralToken,
+        uint256 liquidityAmount,
+        uint256 liquidityParameter,
+        uint256 tradingPeriod,
+        BetType betType
+    ) external returns (uint256 marketId);
     
     function getMarketPrice(uint256 marketId, bool isPass) 
         external 
@@ -110,7 +133,18 @@ interface IConditionalMarketFactory {
     
     function redeemTokens(uint256 marketId) external;
     
-    event MarketCreated(uint256 indexed proposalId, uint256 indexed marketId);
+    event MarketCreated(
+        uint256 indexed marketId,
+        uint256 indexed proposalId,
+        address indexed collateralToken,
+        address passToken,
+        address failToken,
+        uint256 tradingEndTime,
+        uint256 liquidityParameter,
+        uint256 createdAt,
+        address creator,
+        BetType betType
+    );
     event TradeExecuted(uint256 indexed marketId, address indexed trader);
     event MarketResolved(uint256 indexed marketId, bool outcome);
 }
