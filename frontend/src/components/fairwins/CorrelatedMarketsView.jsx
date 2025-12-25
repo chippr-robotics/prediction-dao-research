@@ -113,11 +113,11 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .attr('stroke-width', 1)
     })
 
-    // Create data polygon
+    // Create data polygon with smooth curves for flower petal effect
     const radarLine = d3.lineRadial()
       .angle((d, i) => angleSlice * i)
       .radius(d => (d.probability / 100) * maxRadius)
-      .curve(d3.curveLinearClosed)
+      .curve(d3.curveCatmullRomClosed.alpha(0.5))
 
     g.append('path')
       .datum(radarData)
