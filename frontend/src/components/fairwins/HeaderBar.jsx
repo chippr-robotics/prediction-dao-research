@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import QRScanner from '../ui/QRScanner'
+import SettingsModal from '../ui/SettingsModal'
 import './HeaderBar.css'
 
 function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onScanMarket }) {
@@ -9,17 +10,7 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
   const [showScanner, setShowScanner] = useState(false)
-
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
-  }
-
-  const handleConnectClick = async () => {
-    if (onConnect) {
-      await onConnect()
-    }
-  }
+  const [showSettings, setShowSettings] = useState(false)
 
   const handleScanSuccess = (decodedText, url) => {
     setShowScanner(false)
@@ -38,19 +29,15 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
   // Hide header on mobile when scrolling down
   const shouldHideHeader = isMobile && isScrollingDown && hasScrolled
 
+  const shortenAddress = (address) => {
+    if (!address) return ''
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  }
+
   return (
     <header className={`header-bar ${shouldHideHeader ? 'header-hidden' : ''} ${hasScrolled ? 'header-scrolled' : ''}`}>
       <div className="header-content">
         <div className="header-left">
-          {onBack && (
-            <button 
-              onClick={onBack} 
-              className="back-button" 
-              aria-label="Back to platform selection"
-            >
-              ← Back
-            </button>
-          )}
           <div className="header-branding">
             <div className="brand-logo">
               <img 
@@ -90,31 +77,22 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
             {!isMobile && <span className="btn-text">Scan</span>}
           </button>
           
-          {isConnected ? (
-            <div className="wallet-connected">
-              <div className="wallet-info">
-                <span className="connection-status" aria-label="Wallet connected">
-                  <span className="status-dot" aria-hidden="true"></span>
-                  <span className="wallet-address">{shortenAddress(account)}</span>
-                </span>
-              </div>
-              <button 
-                onClick={onDisconnect} 
-                className="disconnect-btn"
-                aria-label="Disconnect wallet"
-              >
-                Disconnect
-              </button>
+          {isConnected && (
+            <div className="wallet-info-compact">
+              <span className="status-dot" aria-label="Wallet connected"></span>
+              <span className="wallet-address">{shortenAddress(account)}</span>
             </div>
-          ) : (
-            <button 
-              onClick={handleConnectClick} 
-              className="connect-btn"
-              aria-label="Connect wallet"
-            >
-              Connect Wallet
-            </button>
           )}
+
+          <button 
+            className="settings-btn"
+            onClick={() => setShowSettings(true)}
+            aria-label="Open settings"
+            title="Settings"
+          >
+            <span aria-hidden="true">⚙️</span>
+            {!isMobile && <span className="btn-text">Settings</span>}
+          </button>
         </div>
       </div>
 
@@ -122,6 +100,15 @@ function HeaderBar({ onConnect, onDisconnect, onBack, isConnected, account, onSc
         isOpen={showScanner}
         onClose={() => setShowScanner(false)}
         onScanSuccess={handleScanSuccess}
+      />
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onConnect={onConnect}
+        onDisconnect={onDisconnect}
+        isConnected={isConnected}
+        account={account}
       />
     </header>
   )

@@ -137,32 +137,32 @@ function MarketHeroCard({ market, onTrade }) {
           <div className="trade-type-selector">
             <button
               type="button"
-              className={`trade-type-btn yes ${tradeType === 'PASS' ? 'active' : ''}`}
+              className={`trade-type-btn buy ${tradeType === 'PASS' ? 'active' : ''}`}
               onClick={() => setTradeType('PASS')}
               aria-pressed={tradeType === 'PASS'}
             >
               <span className="btn-icon">↑</span>
               <div className="btn-content">
-                <span className="btn-label">Buy YES</span>
-                <span className="btn-price">{formatPrice(market.passTokenPrice, { showBoth: true, decimals: 4 })}</span>
+                <span className="btn-label">Buy</span>
+                <span className="btn-price">${(parseFloat(market.passTokenPrice) * 1).toFixed(2)}</span>
               </div>
             </button>
             <button
               type="button"
-              className={`trade-type-btn no ${tradeType === 'FAIL' ? 'active' : ''}`}
+              className={`trade-type-btn sell ${tradeType === 'FAIL' ? 'active' : ''}`}
               onClick={() => setTradeType('FAIL')}
               aria-pressed={tradeType === 'FAIL'}
             >
               <span className="btn-icon">↓</span>
               <div className="btn-content">
-                <span className="btn-label">Buy NO</span>
-                <span className="btn-price">{formatPrice(market.failTokenPrice, { showBoth: true, decimals: 4 })}</span>
+                <span className="btn-label">Sell</span>
+                <span className="btn-price">${(parseFloat(market.failTokenPrice) * 1).toFixed(2)}</span>
               </div>
             </button>
           </div>
 
           <div className="trade-input-group">
-            <label htmlFor="hero-trade-amount">Amount (ETC)</label>
+            <label htmlFor="hero-trade-amount">Amount (USD)</label>
             <input
               type="number"
               id="hero-trade-amount"
@@ -173,6 +173,14 @@ function MarketHeroCard({ market, onTrade }) {
               min="0"
               required
             />
+            {tradeAmount && (
+              <div className="potential-win-display">
+                <span className="win-label">Potential win:</span>
+                <span className="win-amount">
+                  ${(parseFloat(tradeAmount) * (1 / (tradeType === 'PASS' ? parseFloat(market.passTokenPrice) : parseFloat(market.failTokenPrice)))).toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
 
           <button type="submit" className="trade-submit-btn">
