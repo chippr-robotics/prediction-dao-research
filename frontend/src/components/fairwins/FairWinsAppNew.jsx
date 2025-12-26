@@ -5,6 +5,7 @@ import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
 import CorrelatedMarketsView from './CorrelatedMarketsView'
+import MarketModal from './MarketModal'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
 import SwapPanel from './SwapPanel'
@@ -248,8 +249,8 @@ This is a transparent market - all trades are publicly visible on the blockchain
 
       <main className="main-canvas">
         <div className="unified-view">
-          {/* Hero Card - Only shown when showHero is true, as overlay */}
-          {showHero && selectedMarket && (
+          {/* Correlated Markets View - Full page for correlation groups */}
+          {showHero && selectedMarket && selectedMarket.correlationGroupId && (
             <div 
               className="hero-overlay"
               role="dialog"
@@ -261,28 +262,29 @@ This is a transparent market - all trades are publicly visible on the blockchain
                   ref={heroBackButtonRef}
                   className="hero-back-btn"
                   onClick={handleCloseHero}
-                  aria-label="Close hero and return to grid"
+                  aria-label="Close and return to grid"
                 >
                   ← Back to Grid
                 </button>
                 <h2 id="hero-dialog-title" className="visually-hidden">
-                  Market details dialog
+                  Correlated markets view
                 </h2>
-                {selectedMarket.correlationGroupId ? (
-                  <CorrelatedMarketsView 
-                    market={selectedMarket}
-                    correlatedMarkets={markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId)}
-                    onTrade={handleTrade}
-                  />
-                ) : (
-                  <MarketHeroCard 
-                    market={selectedMarket}
-                    onTrade={handleTrade}
-                  />
-                )}
+                <CorrelatedMarketsView 
+                  market={selectedMarket}
+                  correlatedMarkets={markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId)}
+                  onTrade={handleTrade}
+                />
               </div>
             </div>
           )}
+
+          {/* Market Modal - For individual markets (non-correlated) */}
+          <MarketModal
+            isOpen={showHero && selectedMarket && !selectedMarket.correlationGroupId}
+            onClose={handleCloseHero}
+            market={selectedMarket}
+            onTrade={handleTrade}
+          />
 
           {/* Primary Grid View - Always visible unless hero is open */}
           {!showHero && (

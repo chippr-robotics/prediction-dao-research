@@ -87,6 +87,15 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Verify build output
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Error: dist directory not found after build"
+            exit 1
+          fi
+          echo "Build output verified. Contents of dist:"
+          ls -la dist/
+
       - name: Run Lighthouse CI
         run: lhci autorun
 
