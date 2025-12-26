@@ -1,5 +1,5 @@
-import { useRoles } from '../../hooks/useRoles'
-import { useWeb3 } from '../../hooks/useWeb3'
+import { useWallet, useWalletRoles } from '../../hooks'
+import { ROLE_INFO } from '../../contexts/RoleContext'
 import './RoleGate.css'
 
 /**
@@ -18,8 +18,8 @@ function RoleGate({
   showPurchase = true,
   onPurchase = null
 }) {
-  const { hasAnyRole, hasAllRoles, getRoleInfo } = useRoles()
-  const { isConnected } = useWeb3()
+  const { isConnected } = useWallet()
+  const { hasAnyRole, hasAllRoles } = useWalletRoles()
 
   // If not connected, show connection requirement
   if (!isConnected) {
@@ -62,7 +62,7 @@ function RoleGate({
       <p>This feature requires one of the following roles:</p>
       <ul className="required-roles-list">
         {rolesToShow.map(role => {
-          const info = getRoleInfo(role)
+          const info = ROLE_INFO[role] || { name: role, description: 'Premium access' }
           return (
             <li key={role} className="required-role-item">
               <strong>{info.name}</strong>

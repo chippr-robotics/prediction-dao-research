@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
-import { useWeb3 } from '../hooks/useWeb3'
+import { useWallet } from '../hooks'
 import './MarketCreation.css'
 
 function MarketCreation() {
-  const { isConnected } = useWeb3()
+  const { isConnected } = useWallet()
   const [formData, setFormData] = useState({
     question: '',
     description: '',

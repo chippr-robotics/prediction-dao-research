@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useETCswap } from '../../hooks/useETCswap'
 import { TOKENS, SLIPPAGE_OPTIONS, getExplorerUrl } from '../../constants/etcswap'
-import { useWeb3 } from '../../hooks/useWeb3'
+import { useWallet } from '../../hooks'
 import './SwapPanel.css'
 
 function SwapPanel() {
@@ -18,7 +18,7 @@ function SwapPanel() {
     addresses 
   } = useETCswap()
   
-  const { isConnected, chainId } = useWeb3()
+  const { isConnected, chainId } = useWallet()
   
   const [swapMode, setSwapMode] = useState('wrap') // 'wrap', 'unwrap', 'swap'
   const [fromToken, setFromToken] = useState('ETC')
