@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
-import { useWeb3 } from '../../hooks/useWeb3'
 import './MarketModal.css'
 
 /**
@@ -20,11 +19,12 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [price, setPrice] = useState('')
   const modalRef = useRef(null)
   const { formatPrice } = usePrice()
-  const { account, balances } = useWeb3()
 
-  // Reset state when modal opens/closes
+  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
+      // Reset to defaults when modal closes
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedOutcome('YES')
       setOrderType('market')
       setAmount('')
