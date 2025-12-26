@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { usePrice } from '../contexts/PriceContext'
+import { getMockPositions } from '../utils/mockDataLoader'
 import CurrencyToggle from './ui/CurrencyToggle'
 import './MyPositions.css'
 
@@ -13,52 +14,11 @@ function MyPositions() {
 
   const loadPositions = useCallback(async () => {
     try {
-      // Mock data for demonstration
+      // Load mock data from centralized source
       // In production, this would fetch from PrivacyCoordinator and ConditionalMarketFactory
       // Note: Dependencies omitted intentionally - this is mock data that doesn't need to re-fetch
       // In production implementation, add contract dependencies when using real data
-      const mockPositions = [
-        {
-          id: 0,
-          marketId: 0,
-          proposalTitle: 'Fund Core Protocol Development',
-          tokenType: 'PASS',
-          amount: '100',
-          entryPrice: '0.60',
-          currentPrice: '0.62',
-          unrealizedPnL: '+3.33',
-          unrealizedPnLPercent: '+3.33',
-          status: 'Active',
-          entryTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 1,
-          marketId: 1,
-          proposalTitle: 'Security Audit Funding',
-          tokenType: 'FAIL',
-          amount: '50',
-          entryPrice: '0.50',
-          currentPrice: '0.45',
-          unrealizedPnL: '-10.00',
-          unrealizedPnLPercent: '-10.00',
-          status: 'Active',
-          entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: 2,
-          marketId: 2,
-          proposalTitle: 'Marketing Campaign Initiative',
-          tokenType: 'PASS',
-          amount: '75',
-          entryPrice: '0.55',
-          currentPrice: '1.00',
-          unrealizedPnL: '+61.36',
-          unrealizedPnLPercent: '+81.82',
-          status: 'Settled',
-          entryTimestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-          settlementTimestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      ]
+      const mockPositions = getMockPositions()
 
       setPositions(mockPositions)
       setLoading(false)
