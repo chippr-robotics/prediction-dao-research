@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Card, Badge, StatusIndicator, FormGroup, Input, HelperText } from './index'
+import { Button, Card, Badge, StatusIndicator, FormGroup, Input, HelperText, LoadingScreen } from './index'
 import './ComponentExamples.css'
 
 /**
@@ -16,6 +16,8 @@ function ComponentExamples() {
   })
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false)
+  const [showInlineLoading, setShowInlineLoading] = useState(false)
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -251,6 +253,78 @@ function MyComponent() {
         Submit
       </Button>
     </Card>
+  )
+}`}</pre>
+            </div>
+          </Card>
+        </section>
+
+        {/* LoadingScreen Section */}
+        <section className="example-section">
+          <h2>Loading Screen</h2>
+          <p>Animated 4-leaf clover loading indicator for FairWins.</p>
+          
+          <div className="example-grid">
+            <div className="example-item">
+              <h3>Fullscreen Loading</h3>
+              <Button onClick={() => {
+                setShowLoadingScreen(true)
+                setTimeout(() => setShowLoadingScreen(false), 4000)
+              }}>
+                Show Fullscreen Loading (4s)
+              </Button>
+              <LoadingScreen visible={showLoadingScreen} />
+            </div>
+
+            <div className="example-item">
+              <h3>Inline Loading - Small</h3>
+              <Button onClick={() => {
+                setShowInlineLoading(true)
+                setTimeout(() => setShowInlineLoading(false), 3000)
+              }}>
+                Toggle Inline Loading
+              </Button>
+              <div style={{ marginTop: '1rem', minHeight: '120px', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '1rem' }}>
+                {showInlineLoading ? (
+                  <LoadingScreen visible={true} inline size="small" text="Loading data" />
+                ) : (
+                  <p>Content loaded!</p>
+                )}
+              </div>
+            </div>
+
+            <div className="example-item">
+              <h3>Different Sizes</h3>
+              <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>Small</p>
+                  <LoadingScreen visible={true} inline size="small" text="" />
+                </div>
+                <div>
+                  <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>Medium</p>
+                  <LoadingScreen visible={true} inline size="medium" text="" />
+                </div>
+                <div>
+                  <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>Large</p>
+                  <LoadingScreen visible={true} inline size="large" text="" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Card style={{ marginTop: '2rem' }}>
+            <h3>Usage Example</h3>
+            <div className="code-example">
+              <pre>{`import { LoadingScreen } from './components/ui'
+
+function MyComponent() {
+  const [isLoading, setIsLoading] = useState(true)
+
+  return (
+    <>
+      <LoadingScreen visible={isLoading} text="Loading data" />
+      {/* Your content */}
+    </>
   )
 }`}</pre>
             </div>
