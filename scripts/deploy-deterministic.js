@@ -196,6 +196,7 @@ async function main() {
 
   // 6. Deploy RagequitModule
   // Note: RagequitModule uses initialize pattern - deploy without constructor args
+  // Using deployer address as placeholder for both governanceToken and treasuryVault in development
   console.log("\n⚠️  Using deployer address as temporary placeholder for governance token and treasury");
   console.log("    In production, update RagequitModule initialization with actual token and treasury addresses");
   const PLACEHOLDER_ADDRESS = deployer.address;
@@ -213,8 +214,8 @@ async function main() {
     console.log("Initializing RagequitModule...");
     const tx = await ragequitModule.contract.initialize(
       deployer.address, // initialOwner
-      PLACEHOLDER_ADDRESS, // governanceToken
-      PLACEHOLDER_ADDRESS  // treasuryVault
+      PLACEHOLDER_ADDRESS, // governanceToken - same as deployer for development
+      PLACEHOLDER_ADDRESS  // treasuryVault - same as deployer for development
     );
     await tx.wait();
     console.log("  ✓ RagequitModule initialized");

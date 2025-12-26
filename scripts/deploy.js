@@ -47,6 +47,7 @@ async function main() {
   // Deploy mock governance token (for RagequitModule)
   console.log("\nDeploying mock governance token...");
   // In production, this would be the actual governance token address
+  // Using deployer address as a placeholder for both token and treasury in development
   const mockGovernanceToken = deployer.address; // Using deployer address as placeholder
 
   // Deploy RagequitModule
@@ -60,8 +61,8 @@ async function main() {
   console.log("Initializing RagequitModule...");
   await ragequitModule.initialize(
     deployer.address, // initialOwner
-    mockGovernanceToken,
-    deployer.address // Using deployer as treasury vault placeholder
+    mockGovernanceToken, // governanceToken - placeholder
+    deployer.address // treasuryVault - placeholder (same as deployer for development)
   );
   console.log("RagequitModule initialized");
 
