@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { getMockMarkets } from '../../utils/mockDataLoader'
 import SidebarNav from './SidebarNav'
@@ -148,11 +148,26 @@ This is a transparent market - all trades are publicly visible on the blockchain
 
   const marketsByCategory = getMarketsByCategory()
 
+  // Memoize trending markets to avoid recalculation on every render
+  const trendingMarkets = useMemo(() => {
+    const getSafeLiquidity = (value) => {
+      const parsed = parseFloat(value)
+      return Number.isNaN(parsed) ? 0 : parsed
+    }
+    return [...markets].sort((a, b) => {
+      return getSafeLiquidity(b.totalLiquidity) - getSafeLiquidity(a.totalLiquidity)
+    })
+  }, [markets])
+
+  // Memoize category-filtered markets
+  const categoryFilteredMarkets = useMemo(() => {
+    return markets.filter(m => m.category === selectedCategory)
+  }, [markets, selectedCategory])
+
   // Get markets for current category with sorting and grouping
-  const getFilteredAndSortedMarkets = () => {
-    let filteredMarkets = selectedCategory === 'all' 
-      ? markets 
-      : markets.filter(m => m.category === selectedCategory)
+  const getFilteredAndSortedMarkets = useCallback(() => {
+    // Use categoryFilteredMarkets for specific categories
+    const filteredMarkets = categoryFilteredMarkets
     
     // Group markets by correlation
     const grouped = {}
@@ -209,7 +224,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
     
     // Return grouped markets first, then ungrouped markets
     return [...groupedMarkets, ...sortedUngrouped]
-  }
+  }, [categoryFilteredMarkets, sortBy])
 
   if (loading) {
     return (
@@ -309,68 +324,55 @@ This is a transparent market - all trades are publicly visible on the blockchain
                 </div>
               ) : selectedCategory === 'trending' ? (
                 /* Trending View - Show all markets sorted by activity */
-                (() => {
-                  const trendingMarkets = [...markets].sort((a, b) => {
-                    return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
-                  })
-                  return (
-                    <div className="grid-view-container">
-                      <div className="grid-controls">
-                        <div className="grid-header">
-                          <h2>🔥 Trending Markets</h2>
-                          <span className="market-count">
-                            ({trendingMarkets.length} markets)
-                          </span>
-                        </div>
-                      </div>
-                      <MarketGrid 
-                        markets={trendingMarkets}
-                        onMarketClick={handleMarketClick}
-                        selectedMarketId={selectedMarket?.id}
-                        loading={loading}
-                      />
+                <div className="grid-view-container">
+                  <div className="grid-controls">
+                    <div className="grid-header">
+                      <h2>🔥 Trending Markets</h2>
+                      <span className="market-count">
+                        ({trendingMarkets.length} markets)
+                      </span>
                     </div>
-                  )
-                })()
+                  </div>
+                  <MarketGrid 
+                    markets={trendingMarkets}
+                    onMarketClick={handleMarketClick}
+                    selectedMarketId={selectedMarket?.id}
+                    loading={loading}
+                  />
+                </div>
               ) : (
                 /* Full Grid View for specific category */
-                (() => {
-                  const selectedCategoryObj = categories.find(c => c.id === selectedCategory)
-                  const filteredMarkets = markets.filter(m => m.category === selectedCategory)
-                  return (
-                    <div className="grid-view-container">
-                      <div className="grid-controls">
-                        <div className="grid-header">
-                          <h2>
-                            {selectedCategoryObj?.icon}{' '}
-                            {selectedCategoryObj?.name} Markets
-                          </h2>
-                          <span className="market-count">
-                            ({filteredMarkets.length} active markets)
-                          </span>
-                        </div>
-                        <div className="sort-controls">
-                          <label htmlFor="sort-select">Sort by:</label>
-                          <select 
-                            id="sort-select"
-                            value={sortBy} 
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="sort-select"
-                          >
-                            <option value="endTime">Ending Time</option>
-                            <option value="marketValue">Market Value</option>
-                          </select>
-                        </div>
-                      </div>
-                      <MarketGrid 
-                        markets={getFilteredAndSortedMarkets()}
-                        onMarketClick={handleMarketClick}
-                        selectedMarketId={selectedMarket?.id}
-                        loading={loading}
-                      />
+                <div className="grid-view-container">
+                  <div className="grid-controls">
+                    <div className="grid-header">
+                      <h2>
+                        {categories.find(c => c.id === selectedCategory)?.icon}{' '}
+                        {categories.find(c => c.id === selectedCategory)?.name} Markets
+                      </h2>
+                      <span className="market-count">
+                        ({categoryFilteredMarkets.length} active markets)
+                      </span>
                     </div>
-                  )
-                })()
+                    <div className="sort-controls">
+                      <label htmlFor="sort-select">Sort by:</label>
+                      <select 
+                        id="sort-select"
+                        value={sortBy} 
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="sort-select"
+                      >
+                        <option value="endTime">Ending Time</option>
+                        <option value="marketValue">Market Value</option>
+                      </select>
+                    </div>
+                  </div>
+                  <MarketGrid 
+                    markets={getFilteredAndSortedMarkets()}
+                    onMarketClick={handleMarketClick}
+                    selectedMarketId={selectedMarket?.id}
+                    loading={loading}
+                  />
+                </div>
               )}
             </>
           )}

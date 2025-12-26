@@ -8,7 +8,7 @@ import './Dashboard.css'
 
 function Dashboard() {
   const { account, isConnected } = useWeb3()
-  const { roles, hasRole } = useRoles()
+  const { roles } = useRoles()
   const [platformMetrics, setPlatformMetrics] = useState({
     transactions24h: 0,
     openMarkets: 0,
@@ -29,10 +29,18 @@ function Dashboard() {
     // Calculate metrics
     const totalLiq = activeMarkets.reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0)
     
+    // Use stable mock data based on date seed for consistency
+    const dateSeed = new Date().toDateString()
+    const hash = dateSeed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const stableRandom = (seed) => {
+      const x = Math.sin(seed) * 10000
+      return x - Math.floor(x)
+    }
+    
     setPlatformMetrics({
-      transactions24h: Math.floor(Math.random() * 500) + 200, // Mock data
+      transactions24h: Math.floor(stableRandom(hash) * 500) + 200,
       openMarkets: activeMarkets.length,
-      activeUsers: Math.floor(Math.random() * 150) + 50, // Mock data
+      activeUsers: Math.floor(stableRandom(hash + 1) * 150) + 50,
       totalLiquidity: totalLiq,
       totalVolume: totalLiq * 1.5 // Estimate
     })
@@ -47,17 +55,18 @@ function Dashboard() {
     ]
     setRecentActivity(activities)
 
-    // Generate historical data for charts (mock 30 days)
+    // Generate historical data for charts (mock 30 days) with stable values
     const historical = []
     const today = new Date()
     for (let i = 29; i >= 0; i--) {
       const date = new Date(today)
       date.setDate(date.getDate() - i)
+      const daySeed = hash + i
       historical.push({
         date,
-        markets: Math.floor(Math.random() * 10) + activeMarkets.length - 15 + i,
-        liquidity: Math.floor(Math.random() * 5000) + totalLiq - 10000 + (i * 500),
-        users: Math.floor(Math.random() * 20) + 30 + i
+        markets: Math.floor(stableRandom(daySeed) * 10) + activeMarkets.length - 15 + i,
+        liquidity: Math.floor(stableRandom(daySeed + 100) * 5000) + totalLiq - 10000 + (i * 500),
+        users: Math.floor(stableRandom(daySeed + 200) * 20) + 30 + i
       })
     }
     setHistoricalData(historical)
@@ -67,128 +76,200 @@ function Dashboard() {
   useEffect(() => {
     if (!historicalData.length || !marketChartRef.current) return
 
-    // Clear previous chart
-    d3.select(marketChartRef.current).selectAll('*').remove()
+    const container = marketChartRef.current
 
-    const margin = { top: 20, right: 30, bottom: 40, left: 50 }
-    const width = marketChartRef.current.clientWidth - margin.left - margin.right
-    const height = 250 - margin.top - margin.bottom
+    const renderChart = () => {
+      if (!historicalData.length || !container) return
 
-    const svg = d3.select(marketChartRef.current)
-      .append('svg')
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom)
-      .append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`)
+      // Clear previous chart
+      d3.select(container).selectAll('*').remove()
 
-    // X scale
-    const x = d3.scaleTime()
-      .domain(d3.extent(historicalData, d => d.date))
-      .range([0, width])
+      const margin = { top: 20, right: 30, bottom: 40, left: 50 }
+      const width = container.clientWidth - margin.left - margin.right
+      const height = 250 - margin.top - margin.bottom
 
-    // Y scale
-    const y = d3.scaleLinear()
-      .domain([0, d3.max(historicalData, d => d.markets)])
-      .nice()
-      .range([height, 0])
+      const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`)
 
-    // Line generator
-    const line = d3.line()
-      .x(d => x(d.date))
-      .y(d => y(d.markets))
-      .curve(d3.curveMonotoneX)
+      // X scale
+      const x = d3.scaleTime()
+        .domain(d3.extent(historicalData, d => d.date))
+        .range([0, width])
 
-    // Add X axis
-    svg.append('g')
-      .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(5))
-      .style('color', 'var(--text-secondary)')
+      // Y scale
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(historicalData, d => d.markets)])
+        .nice()
+        .range([height, 0])
 
-    // Add Y axis
-    svg.append('g')
-      .call(d3.axisLeft(y))
-      .style('color', 'var(--text-secondary)')
+      // Line generator
+      const line = d3.line()
+        .x(d => x(d.date))
+        .y(d => y(d.markets))
+        .curve(d3.curveMonotoneX)
 
-    // Add line
-    svg.append('path')
-      .datum(historicalData)
-      .attr('fill', 'none')
-      .attr('stroke', 'var(--primary-color, #00b894)')
-      .attr('stroke-width', 2)
-      .attr('d', line)
+      // Add X axis
+      svg.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(5))
+        .style('color', 'var(--text-secondary)')
 
-    // Add dots
-    svg.selectAll('.dot')
-      .data(historicalData)
-      .enter()
-      .append('circle')
-      .attr('cx', d => x(d.date))
-      .attr('cy', d => y(d.markets))
-      .attr('r', 3)
-      .attr('fill', 'var(--primary-color, #00b894)')
+      // Add Y axis
+      svg.append('g')
+        .call(d3.axisLeft(y))
+        .style('color', 'var(--text-secondary)')
+
+      // Add line
+      svg.append('path')
+        .datum(historicalData)
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--primary-color, #00b894)')
+        .attr('stroke-width', 2)
+        .attr('d', line)
+
+      // Add dots
+      svg.selectAll('.dot')
+        .data(historicalData)
+        .enter()
+        .append('circle')
+        .attr('cx', d => x(d.date))
+        .attr('cy', d => y(d.markets))
+        .attr('r', 3)
+        .attr('fill', 'var(--primary-color, #00b894)')
+    }
+
+    // Initial render
+    renderChart()
+
+    // Add resize observer for responsive charts
+    let resizeObserver
+    let handleResize
+
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        renderChart()
+      })
+      resizeObserver.observe(container)
+    } else {
+      // Fallback for browsers without ResizeObserver
+      handleResize = () => {
+        renderChart()
+      }
+      window.addEventListener('resize', handleResize)
+    }
+
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      }
+      if (handleResize) {
+        window.removeEventListener('resize', handleResize)
+      }
+    }
   }, [historicalData])
 
   // Render liquidity chart
   useEffect(() => {
     if (!historicalData.length || !liquidityChartRef.current) return
 
-    // Clear previous chart
-    d3.select(liquidityChartRef.current).selectAll('*').remove()
+    const container = liquidityChartRef.current
 
-    const margin = { top: 20, right: 30, bottom: 40, left: 60 }
-    const width = liquidityChartRef.current.clientWidth - margin.left - margin.right
-    const height = 250 - margin.top - margin.bottom
+    const renderChart = () => {
+      if (!historicalData.length || !container) return
 
-    const svg = d3.select(liquidityChartRef.current)
-      .append('svg')
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom)
-      .append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`)
+      // Clear previous chart
+      d3.select(container).selectAll('*').remove()
 
-    // X scale
-    const x = d3.scaleTime()
-      .domain(d3.extent(historicalData, d => d.date))
-      .range([0, width])
+      const margin = { top: 20, right: 30, bottom: 40, left: 60 }
+      const width = container.clientWidth - margin.left - margin.right
+      const height = 250 - margin.top - margin.bottom
 
-    // Y scale
-    const y = d3.scaleLinear()
-      .domain([0, d3.max(historicalData, d => d.liquidity)])
-      .nice()
-      .range([height, 0])
+      const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`)
 
-    // Area generator
-    const area = d3.area()
-      .x(d => x(d.date))
-      .y0(height)
-      .y1(d => y(d.liquidity))
-      .curve(d3.curveMonotoneX)
+      // X scale
+      const x = d3.scaleTime()
+        .domain(d3.extent(historicalData, d => d.date))
+        .range([0, width])
 
-    // Add X axis
-    svg.append('g')
-      .attr('transform', `translate(0,${height})`)
-      .call(d3.axisBottom(x).ticks(5))
-      .style('color', 'var(--text-secondary)')
+      // Y scale
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(historicalData, d => d.liquidity)])
+        .nice()
+        .range([height, 0])
 
-    // Add Y axis
-    svg.append('g')
-      .call(d3.axisLeft(y).tickFormat(d => `${(d / 1000).toFixed(0)}k`))
-      .style('color', 'var(--text-secondary)')
+      // Area generator
+      const area = d3.area()
+        .x(d => x(d.date))
+        .y0(height)
+        .y1(d => y(d.liquidity))
+        .curve(d3.curveMonotoneX)
 
-    // Add area
-    svg.append('path')
-      .datum(historicalData)
-      .attr('fill', 'var(--primary-color, #00b894)')
-      .attr('fill-opacity', 0.3)
-      .attr('stroke', 'var(--primary-color, #00b894)')
-      .attr('stroke-width', 2)
-      .attr('d', area)
+      // Add X axis
+      svg.append('g')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(5))
+        .style('color', 'var(--text-secondary)')
+
+      // Add Y axis
+      svg.append('g')
+        .call(d3.axisLeft(y).tickFormat(d => `${(d / 1000).toFixed(0)}k`))
+        .style('color', 'var(--text-secondary)')
+
+      // Add area
+      svg.append('path')
+        .datum(historicalData)
+        .attr('fill', 'var(--primary-color, #00b894)')
+        .attr('fill-opacity', 0.3)
+        .attr('stroke', 'var(--primary-color, #00b894)')
+        .attr('stroke-width', 2)
+        .attr('d', area)
+    }
+
+    // Initial render
+    renderChart()
+
+    // Add resize observer for responsive charts
+    let resizeObserver
+    let handleResize
+
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        renderChart()
+      })
+      resizeObserver.observe(container)
+    } else {
+      // Fallback for browsers without ResizeObserver
+      handleResize = () => {
+        renderChart()
+      }
+      window.addEventListener('resize', handleResize)
+    }
+
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect()
+      }
+      if (handleResize) {
+        window.removeEventListener('resize', handleResize)
+      }
+    }
   }, [historicalData])
 
   const formatNumber = (num) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
-    return num.toString()
+    const n = parseFloat(num)
+    if (Number.isNaN(n) || n == null) return '0'
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+    return parseFloat(n.toFixed(2)).toString()
   }
 
   const getActivityIcon = (type) => {
@@ -323,7 +404,7 @@ function Dashboard() {
                     logoName = 'clearpath'
                   } else if (role === ROLES.TOKENMINT) {
                     logoName = 'tokenmint'
-                  } else if (role === ROLES.MARKET_MAKER) {
+                  } else if (role === ROLES.MARKET_MAKER || role === ROLES.ADMIN) {
                     logoName = 'fairwins'
                   }
 

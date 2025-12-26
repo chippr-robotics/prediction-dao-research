@@ -269,7 +269,7 @@
 }
 
 .view-button:hover {
-  background: var(--primary-hover-color);
+  background: var(--primary-hover-color, #009979);
   transform: translateY(-1px);
 }
 

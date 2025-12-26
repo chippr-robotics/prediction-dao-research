@@ -69,7 +69,9 @@ function MarketsTable({ markets = [], onMarketClick }) {
         
         case 'tradingEndTime':
           aVal = new Date(a.tradingEndTime).getTime()
+          if (Number.isNaN(aVal)) aVal = 0
           bVal = new Date(b.tradingEndTime).getTime()
+          if (Number.isNaN(bVal)) bVal = 0
           return sortDirection === 'asc' ? aVal - bVal : bVal - aVal
         
         case 'status':
@@ -98,6 +100,9 @@ function MarketsTable({ markets = [], onMarketClick }) {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) {
+      return 'N/A'
+    }
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -109,9 +114,10 @@ function MarketsTable({ markets = [], onMarketClick }) {
 
   const formatNumber = (num) => {
     const n = parseFloat(num)
+    if (Number.isNaN(n) || n == null) return '0.00'
     if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
     if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
-    return n.toFixed(2)
+    return parseFloat(n.toFixed(2))
   }
 
   const getCategoryIcon = (category) => {
@@ -121,7 +127,8 @@ function MarketsTable({ markets = [], onMarketClick }) {
       finance: '💰',
       tech: '💻',
       crypto: '₿',
-      'pop-culture': '🎬'
+      'pop-culture': '🎬',
+      other: '🌐'
     }
     return icons[category] || '📊'
   }
@@ -282,7 +289,7 @@ function MarketsTable({ markets = [], onMarketClick }) {
           <tbody>
             {filteredAndSortedMarkets.length === 0 ? (
               <tr>
-                <td colSpan="7" className="no-results">
+                <td colSpan={7} className="no-results">
                   No markets found matching your criteria
                 </td>
               </tr>
@@ -303,9 +310,9 @@ function MarketsTable({ markets = [], onMarketClick }) {
                   </td>
                   <td className="price-cell">
                     <div className="price-display">
-                      <span className="pass-price">{parseFloat(market.passTokenPrice).toFixed(2)}</span>
+                      <span className="pass-price">{formatNumber(market.passTokenPrice || 0)}</span>
                       <span className="price-separator">/</span>
-                      <span className="fail-price">{parseFloat(market.failTokenPrice).toFixed(2)}</span>
+                      <span className="fail-price">{formatNumber(market.failTokenPrice || 0)}</span>
                     </div>
                   </td>
                   <td className="time-cell">
