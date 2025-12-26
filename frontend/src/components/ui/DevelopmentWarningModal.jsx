@@ -25,7 +25,7 @@ function DevelopmentWarningModal() {
           <div className="dev-warning-modal-content">
             <div className="dev-warning-modal-header">
               <img 
-                src="/logo_fairwins.svg" 
+                src="/assets/fairwins_no-text_logo.svg" 
                 alt="FairWins" 
                 className="dev-warning-modal-logo"
                 width="64"
@@ -51,35 +51,35 @@ function DevelopmentWarningModal() {
                 <ul className="addons-list">
                   <li>
                     <img 
-                      src="/logo_clearpath.svg" 
+                      src="/assets/clearpath_no-text_logo.svg" 
                       alt="ClearPath" 
                       className="addon-logo"
                       onError={(e) => { e.target.style.display = 'none' }}
                     />
                     <div className="addon-content">
-                      <strong>ClearPath</strong> - DAO governance platform with futarchy-based decision-making (RBAC managed)
+                      <strong>ClearPath</strong> - DAO governance platform with futarchy-based decision-making
                     </div>
                   </li>
                   <li>
                     <img 
-                      src="/logo_fairwins.svg" 
+                      src="/assets/tokenmint_no-text_logo.svg" 
                       alt="TokenMint" 
                       className="addon-logo"
                       onError={(e) => { e.target.style.display = 'none' }}
                     />
                     <div className="addon-content">
-                      <strong>TokenMint</strong> - Token creation and management tools (RBAC managed)
+                      <strong>TokenMint</strong> - Token creation and management tools
                     </div>
                   </li>
                   <li>
                     <img 
-                      src="/logo_fairwins.svg" 
+                      src="/assets/spindletop_no-text_logo.svg" 
                       alt="SpindleTop" 
                       className="addon-logo"
                       onError={(e) => { e.target.style.display = 'none' }}
                     />
                     <div className="addon-content">
-                      <strong>SpindleTop</strong> - Liquidity and poll management system where users can manage their payouts and mining related activities (RBAC managed)
+                      <strong>SpindleTop</strong> - Liquidity and poll management system where users can manage their payouts and mining related activities
                     </div>
                   </li>
                 </ul>
