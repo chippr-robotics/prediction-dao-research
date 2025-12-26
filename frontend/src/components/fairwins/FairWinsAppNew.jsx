@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { getMockMarkets } from '../../utils/mockDataLoader'
 import SidebarNav from './SidebarNav'
@@ -11,11 +11,13 @@ import MarketGrid from './MarketGrid'
 import SwapPanel from './SwapPanel'
 import BalanceDisplay from './BalanceDisplay'
 import BalanceChart from './BalanceChart'
+import Dashboard from './Dashboard'
+import MarketsTable from './MarketsTable'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -146,11 +148,26 @@ This is a transparent market - all trades are publicly visible on the blockchain
 
   const marketsByCategory = getMarketsByCategory()
 
+  // Memoize trending markets to avoid recalculation on every render
+  const trendingMarkets = useMemo(() => {
+    const getSafeLiquidity = (value) => {
+      const parsed = parseFloat(value)
+      return Number.isNaN(parsed) ? 0 : parsed
+    }
+    return [...markets].sort((a, b) => {
+      return getSafeLiquidity(b.totalLiquidity) - getSafeLiquidity(a.totalLiquidity)
+    })
+  }, [markets])
+
+  // Memoize category-filtered markets
+  const categoryFilteredMarkets = useMemo(() => {
+    return markets.filter(m => m.category === selectedCategory)
+  }, [markets, selectedCategory])
+
   // Get markets for current category with sorting and grouping
-  const getFilteredAndSortedMarkets = () => {
-    let filteredMarkets = selectedCategory === 'all' 
-      ? markets 
-      : markets.filter(m => m.category === selectedCategory)
+  const getFilteredAndSortedMarkets = useCallback(() => {
+    // Use categoryFilteredMarkets for specific categories
+    const filteredMarkets = categoryFilteredMarkets
     
     // Group markets by correlation
     const grouped = {}
@@ -207,7 +224,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
     
     // Return grouped markets first, then ungrouped markets
     return [...groupedMarkets, ...sortedUngrouped]
-  }
+  }, [categoryFilteredMarkets, sortBy])
 
   if (loading) {
     return (
@@ -289,77 +306,73 @@ This is a transparent market - all trades are publicly visible on the blockchain
           {/* Primary Grid View - Always visible unless hero is open */}
           {!showHero && (
             <>
-              {selectedCategory === 'swap' ? (
+              {selectedCategory === 'dashboard' ? (
+                /* Dashboard View - Landing Page */
+                <Dashboard />
+              ) : selectedCategory === 'all-table' ? (
+                /* All Markets Table View - Power User Screen */
+                <MarketsTable 
+                  markets={markets}
+                  onMarketClick={handleMarketClick}
+                />
+              ) : selectedCategory === 'swap' ? (
                 /* Swap Panel View */
                 <div className="swap-view-container">
                   <BalanceDisplay />
                   <SwapPanel />
                   <BalanceChart />
                 </div>
-              ) : selectedCategory === 'all' ? (
-                /* Category Rows - Each category gets its own horizontally scrolling row */
-                <div className="categories-rows-container">
-                  {categories.map((category) => {
-                    // Skip special categories like swap
-                    if (category.isSpecial) return null
-                    
-                    const categoryMarkets = marketsByCategory[category.id]
-                    if (categoryMarkets && categoryMarkets.length > 0) {
-                      return (
-                        <CategoryRow
-                          key={category.id}
-                          title={category.name}
-                          icon={category.icon}
-                          markets={categoryMarkets}
-                          onMarketClick={handleMarketClick}
-                          selectedMarketId={selectedMarket?.id}
-                        />
-                      )
-                    }
-                    return null
-                  })}
+              ) : selectedCategory === 'trending' ? (
+                /* Trending View - Show all markets sorted by activity */
+                <div className="grid-view-container">
+                  <div className="grid-controls">
+                    <div className="grid-header">
+                      <h2>🔥 Trending Markets</h2>
+                      <span className="market-count">
+                        ({trendingMarkets.length} markets)
+                      </span>
+                    </div>
+                  </div>
+                  <MarketGrid 
+                    markets={trendingMarkets}
+                    onMarketClick={handleMarketClick}
+                    selectedMarketId={selectedMarket?.id}
+                    loading={loading}
+                  />
                 </div>
               ) : (
                 /* Full Grid View for specific category */
-                (() => {
-                  const selectedCategoryObj = categories.find(c => c.id === selectedCategory)
-                  return (
-                    <div className="grid-view-container">
-                      <div className="grid-controls">
-                        <div className="grid-header">
-                          <h2>
-                            {selectedCategoryObj?.icon}{' '}
-                            {selectedCategoryObj?.name} Markets
-                          </h2>
-                          <span className="market-count">
-                            ({getFilteredAndSortedMarkets().length} active markets)
-                          </span>
-                        </div>
-                        <div className="sort-controls">
-                          <label htmlFor="sort-select">Sort by:</label>
-                          <select 
-                            id="sort-select"
-                            value={sortBy} 
-                            onChange={(e) => setSortBy(e.target.value)}
-                            className="sort-select"
-                          >
-                            <option value="endTime">Ending Time</option>
-                            <option value="marketValue">Market Value</option>
-                            {selectedCategory === 'all' && (
-                              <option value="category">Category</option>
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                      <MarketGrid 
-                        markets={getFilteredAndSortedMarkets()}
-                        onMarketClick={handleMarketClick}
-                        selectedMarketId={selectedMarket?.id}
-                        loading={loading}
-                      />
+                <div className="grid-view-container">
+                  <div className="grid-controls">
+                    <div className="grid-header">
+                      <h2>
+                        {categories.find(c => c.id === selectedCategory)?.icon}{' '}
+                        {categories.find(c => c.id === selectedCategory)?.name} Markets
+                      </h2>
+                      <span className="market-count">
+                        ({categoryFilteredMarkets.length} active markets)
+                      </span>
                     </div>
-                  )
-                })()
+                    <div className="sort-controls">
+                      <label htmlFor="sort-select">Sort by:</label>
+                      <select 
+                        id="sort-select"
+                        value={sortBy} 
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="sort-select"
+                      >
+                        <option value="endTime">Ending Time</option>
+                        <option value="marketValue">Market Value</option>
+                      </select>
+                    </div>
+                  </div>
+                  <MarketGrid 
+                    markets={getFilteredAndSortedMarkets()}
+                    onMarketClick={handleMarketClick}
+                    selectedMarketId={selectedMarket?.id}
+                    loading={loading}
+                  />
+                </div>
               )}
             </>
           )}
