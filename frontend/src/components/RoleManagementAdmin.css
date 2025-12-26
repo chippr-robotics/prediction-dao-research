@@ -1,0 +1,571 @@
+.role-management-admin {
+  min-height: 100vh;
+  background: var(--background-primary);
+  padding-bottom: 4rem;
+}
+
+/* Header */
+.admin-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: 2rem 1rem;
+}
+
+.admin-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.admin-header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  color: var(--color-text);
+}
+
+.admin-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+/* Message Banners */
+.message-banner {
+  max-width: 1200px;
+  margin: 1rem auto;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.message-banner.success {
+  background: var(--color-success-bg, rgba(72, 187, 120, 0.1));
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.message-banner.error {
+  background: var(--color-error-bg, rgba(245, 101, 101, 0.1));
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.message-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* Tabs */
+.admin-tabs {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 1rem 0;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.admin-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-tab:hover {
+  color: var(--color-text);
+  background: var(--color-surface-secondary);
+}
+
+.admin-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.tab-icon {
+  font-size: 1.25rem;
+}
+
+/* Content */
+.admin-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Users Tab */
+.search-section {
+  margin-bottom: 1.5rem;
+}
+
+.admin-search-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.admin-search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.user-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.user-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.user-address-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-address {
+  font-family: monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.current-user-badge {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--color-primary-alpha, rgba(54, 179, 126, 0.1));
+  color: var(--color-primary);
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.user-role-count {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.user-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.user-role-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.role-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.revoke-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: var(--color-error-bg, rgba(245, 101, 101, 0.1));
+  border: none;
+  border-radius: 4px;
+  color: var(--color-error);
+  font-size: 1.25rem;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.revoke-btn:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-text-secondary);
+}
+
+/* Grant Tab */
+.grant-tab {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.grant-form {
+  background: var(--color-surface);
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+
+.grant-form h3 {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+  color: var(--color-text);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.admin-input,
+.admin-select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.admin-input:focus,
+.admin-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+.grant-role-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.grant-role-btn:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-1px);
+}
+
+.role-info-cards h4 {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  color: var(--color-text);
+}
+
+.role-info-card {
+  background: var(--color-surface);
+  padding: 1.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  margin-bottom: 1rem;
+}
+
+.role-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.role-card-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.premium-indicator {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #000;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.role-card-description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+/* Stats Tab */
+.stats-tab h3 {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+  color: var(--color-text);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: var(--color-surface);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.stat-role-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stat-premium {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #000;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.stat-count {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1rem;
+}
+
+.stat-description {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.total-stats {
+  background: var(--color-surface);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid var(--color-primary);
+}
+
+.total-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-label {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.total-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Unauthorized */
+.role-admin-unauthorized {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  padding: 2rem;
+}
+
+.unauthorized-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.role-admin-unauthorized h2 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+  color: var(--color-text);
+}
+
+.role-admin-unauthorized p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .admin-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-tab {
+    flex-shrink: 0;
+  }
+
+  .grant-tab {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Confirmation Dialog */
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.confirm-dialog {
+  background: var(--color-surface);
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.confirm-dialog h3 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  color: var(--color-text);
+}
+
+.confirm-dialog p {
+  margin: 0 0 1.5rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.confirm-dialog code {
+  background: var(--color-surface-secondary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.confirm-yes-btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: var(--color-error);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-yes-btn:hover {
+  background: var(--color-error-dark, #c53030);
+}
+
+.confirm-no-btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-no-btn:hover {
+  background: var(--color-surface-tertiary, var(--color-surface));
+  border-color: var(--color-text-secondary);
+}

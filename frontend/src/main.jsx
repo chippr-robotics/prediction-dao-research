@@ -11,6 +11,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { PriceProvider } from './contexts/PriceContext'
 import { ETCswapProvider } from './contexts/ETCswapContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
+import { RoleProvider } from './contexts/RoleContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
 // Create query client for wagmi
@@ -24,13 +25,15 @@ createRoot(document.getElementById('root')).render(
           <ThemeProvider>
             <Web3Provider>
               <UserPreferencesProvider>
-                <ETCswapProvider>
-                  <UIProvider>
-                    <PriceProvider>
-                      <App />
-                    </PriceProvider>
-                  </UIProvider>
-                </ETCswapProvider>
+                <RoleProvider>
+                  <ETCswapProvider>
+                    <UIProvider>
+                      <PriceProvider>
+                        <App />
+                      </PriceProvider>
+                    </UIProvider>
+                  </ETCswapProvider>
+                </RoleProvider>
               </UserPreferencesProvider>
             </Web3Provider>
           </ThemeProvider>
