@@ -1,15 +1,20 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useWeb3, useWallet } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
+import { useRoles } from '../../hooks/useRoles'
 import SwapPanel from '../fairwins/SwapPanel'
+import RolePurchaseModal from './RolePurchaseModal'
 import './UserManagementModal.css'
 
 function UserManagementModal({ onScanMarket }) {
   const { account, isConnected } = useWeb3()
   const { connectWallet, disconnectWallet } = useWallet()
-  const { hideModal } = useModal()
+  const { hideModal, showModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
+  const { roles, hasRole, ROLES, ROLE_INFO } = useRoles()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -36,6 +41,24 @@ function UserManagementModal({ onScanMarket }) {
     // TODO: Implement launch market navigation
     hideModal()
     console.log('Navigate to launch market')
+  }
+
+  const handleOpenPurchaseModal = () => {
+    showModal(<RolePurchaseModal onClose={hideModal} />, {
+      title: '',
+      size: 'large',
+      closable: false
+    })
+  }
+
+  const handleNavigateToClearPath = () => {
+    hideModal()
+    navigate('/clearpath')
+  }
+
+  const handleNavigateToAdmin = () => {
+    hideModal()
+    navigate('/admin/roles')
   }
 
   const shortenAddress = (address) => {
@@ -167,6 +190,66 @@ function UserManagementModal({ onScanMarket }) {
                     </div>
                   </div>
                 </div>
+
+                <div className="section">
+                  <h3>Your Roles</h3>
+                  {roles.length > 0 ? (
+                    <div className="user-roles-list">
+                      {roles.map(role => {
+                        const roleInfo = ROLE_INFO[role]
+                        return (
+                          <div key={role} className="user-role-item">
+                            <div className="role-header">
+                              <span className="role-badge">{roleInfo?.name || role}</span>
+                              {roleInfo?.premium && <span className="premium-badge">Premium</span>}
+                            </div>
+                            <p className="role-desc">{roleInfo?.description || 'No description'}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="no-roles-message">
+                      <p>You don't have any special roles yet.</p>
+                      <button 
+                        onClick={handleOpenPurchaseModal}
+                        className="get-roles-btn"
+                      >
+                        Get Premium Access
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {hasRole(ROLES.CLEARPATH_USER) && (
+                  <div className="section clearpath-management-section">
+                    <h3>ClearPath Management</h3>
+                    <p className="section-description">
+                      Access DAO governance and management features
+                    </p>
+                    <button 
+                      onClick={handleNavigateToClearPath}
+                      className="manage-org-btn"
+                    >
+                      Manage Organizations
+                    </button>
+                  </div>
+                )}
+
+                {hasRole(ROLES.ADMIN) && (
+                  <div className="section admin-section">
+                    <h3>Administration</h3>
+                    <p className="section-description">
+                      Manage roles and permissions for users
+                    </p>
+                    <button 
+                      onClick={handleNavigateToAdmin}
+                      className="admin-panel-btn"
+                    >
+                      Role Management
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

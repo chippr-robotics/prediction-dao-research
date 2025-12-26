@@ -1,10 +1,16 @@
 import './ClearPathApp.css'
 import Dashboard from './Dashboard'
+import RoleGate from './ui/RoleGate'
+import RolePurchaseModal from './ui/RolePurchaseModal'
 import { useWeb3, useNetwork } from '../hooks/useWeb3'
+import { useRoles } from '../hooks/useRoles'
+import { useModal } from '../hooks/useUI'
 
 function ClearPathApp({ onConnect, onDisconnect, onBack }) {
   const { account, isConnected } = useWeb3()
   const { networkError } = useNetwork()
+  const { ROLES } = useRoles()
+  const { showModal } = useModal()
 
   const shortenAddress = (address) => {
     if (!address) return ''
@@ -13,6 +19,14 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
 
   const handleConnectClick = async () => {
     await onConnect()
+  }
+
+  const handlePurchaseClick = () => {
+    showModal(<RolePurchaseModal />, {
+      title: '',
+      size: 'large',
+      closable: true
+    })
   }
 
   return (
@@ -89,7 +103,13 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
             <p className="error-help">Please switch to the correct network to continue.</p>
           </div>
         ) : (
-          <Dashboard />
+          <RoleGate 
+            requiredRoles={[ROLES.CLEARPATH_USER]} 
+            showPurchase={true}
+            onPurchase={handlePurchaseClick}
+          >
+            <Dashboard />
+          </RoleGate>
         )}
       </main>
 
