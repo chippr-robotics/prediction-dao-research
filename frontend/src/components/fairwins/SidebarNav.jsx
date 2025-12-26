@@ -3,7 +3,7 @@ import { useIsMobile } from '../../hooks/useMediaQuery'
 import './SidebarNav.css'
 
 const CATEGORIES = [
-  { id: 'all', name: 'All Markets', icon: '🌐' },
+  { id: 'dashboard', name: 'Dashboard', icon: '📊' },
   { id: 'trending', name: 'Trending', icon: '🔥' },
   { id: 'politics', name: 'Politics', icon: '🏛️' },
   { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -11,10 +11,11 @@ const CATEGORIES = [
   { id: 'tech', name: 'Tech', icon: '💻' },
   { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
   { id: 'crypto', name: 'Crypto', icon: '₿' },
-  { id: 'other', name: 'Other Markets', icon: '📊' }
+  { id: 'other', name: 'Other Markets', icon: '🌐' },
+  { id: 'all-table', name: 'All Markets Table', icon: '📋', powerUser: true }
 ]
 
-function SidebarNav({ selectedCategory = 'all', onCategoryChange }) {
+function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isMobile = useIsMobile()
 

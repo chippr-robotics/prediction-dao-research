@@ -11,11 +11,13 @@ import MarketGrid from './MarketGrid'
 import SwapPanel from './SwapPanel'
 import BalanceDisplay from './BalanceDisplay'
 import BalanceChart from './BalanceChart'
+import Dashboard from './Dashboard'
+import MarketsTable from './MarketsTable'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -289,40 +291,52 @@ This is a transparent market - all trades are publicly visible on the blockchain
           {/* Primary Grid View - Always visible unless hero is open */}
           {!showHero && (
             <>
-              {selectedCategory === 'swap' ? (
+              {selectedCategory === 'dashboard' ? (
+                /* Dashboard View - Landing Page */
+                <Dashboard />
+              ) : selectedCategory === 'all-table' ? (
+                /* All Markets Table View - Power User Screen */
+                <MarketsTable 
+                  markets={markets}
+                  onMarketClick={handleMarketClick}
+                />
+              ) : selectedCategory === 'swap' ? (
                 /* Swap Panel View */
                 <div className="swap-view-container">
                   <BalanceDisplay />
                   <SwapPanel />
                   <BalanceChart />
                 </div>
-              ) : selectedCategory === 'all' ? (
-                /* Category Rows - Each category gets its own horizontally scrolling row */
-                <div className="categories-rows-container">
-                  {categories.map((category) => {
-                    // Skip special categories like swap
-                    if (category.isSpecial) return null
-                    
-                    const categoryMarkets = marketsByCategory[category.id]
-                    if (categoryMarkets && categoryMarkets.length > 0) {
-                      return (
-                        <CategoryRow
-                          key={category.id}
-                          title={category.name}
-                          icon={category.icon}
-                          markets={categoryMarkets}
-                          onMarketClick={handleMarketClick}
-                          selectedMarketId={selectedMarket?.id}
-                        />
-                      )
-                    }
-                    return null
-                  })}
-                </div>
+              ) : selectedCategory === 'trending' ? (
+                /* Trending View - Show all markets sorted by activity */
+                (() => {
+                  const trendingMarkets = [...markets].sort((a, b) => {
+                    return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+                  })
+                  return (
+                    <div className="grid-view-container">
+                      <div className="grid-controls">
+                        <div className="grid-header">
+                          <h2>🔥 Trending Markets</h2>
+                          <span className="market-count">
+                            ({trendingMarkets.length} markets)
+                          </span>
+                        </div>
+                      </div>
+                      <MarketGrid 
+                        markets={trendingMarkets}
+                        onMarketClick={handleMarketClick}
+                        selectedMarketId={selectedMarket?.id}
+                        loading={loading}
+                      />
+                    </div>
+                  )
+                })()
               ) : (
                 /* Full Grid View for specific category */
                 (() => {
                   const selectedCategoryObj = categories.find(c => c.id === selectedCategory)
+                  const filteredMarkets = markets.filter(m => m.category === selectedCategory)
                   return (
                     <div className="grid-view-container">
                       <div className="grid-controls">
@@ -332,7 +346,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
                             {selectedCategoryObj?.name} Markets
                           </h2>
                           <span className="market-count">
-                            ({getFilteredAndSortedMarkets().length} active markets)
+                            ({filteredMarkets.length} active markets)
                           </span>
                         </div>
                         <div className="sort-controls">
@@ -345,9 +359,6 @@ This is a transparent market - all trades are publicly visible on the blockchain
                           >
                             <option value="endTime">Ending Time</option>
                             <option value="marketValue">Market Value</option>
-                            {selectedCategory === 'all' && (
-                              <option value="category">Category</option>
-                            )}
                           </select>
                         </div>
                       </div>
