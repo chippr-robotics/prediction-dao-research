@@ -1,0 +1,390 @@
+/* Modal Backdrop */
+.market-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+/* Modal Container - Handles Flip Animation */
+.market-modal-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  height: 700px;
+  perspective: 1500px;
+}
+
+.market-modal-container.flipped .market-modal-front {
+  transform: rotateY(180deg);
+}
+
+.market-modal-container.flipped .market-modal-back {
+  transform: rotateY(0deg);
+}
+
+/* Front and Back Cards */
+.market-modal-front,
+.market-modal-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.market-modal-front {
+  transform: rotateY(0deg);
+}
+
+.market-modal-back {
+  transform: rotateY(-180deg);
+}
+
+/* Modal Card Styling */
+.market-modal {
+  background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%);
+  border-radius: 24px;
+  padding: 2rem;
+  color: white;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+  position: relative;
+}
+
+.back-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Header */
+.market-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.modal-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.close-btn {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+/* Branding Section */
+.modal-brand-section {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.modal-brand-logo {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1rem;
+  background: rgba(54, 179, 126, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.modal-brand-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  margin: 0 0 0.5rem 0;
+  color: #36B37E;
+}
+
+.modal-brand-tagline {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+/* Market Question */
+.modal-market-question {
+  text-align: center;
+  padding: 1rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-market-question h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.4;
+}
+
+.market-description {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Trading Options */
+.modal-trading-options {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.trade-option-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 1.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.trade-option-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.yes-btn {
+  border-color: #36B37E;
+}
+
+.yes-btn:hover {
+  background: rgba(54, 179, 126, 0.2);
+  border-color: #36B37E;
+  box-shadow: 0 8px 24px rgba(54, 179, 126, 0.4);
+}
+
+.no-btn {
+  border-color: #EF4444;
+}
+
+.no-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #EF4444;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.option-label {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.option-arrow {
+  font-size: 1.75rem;
+}
+
+.yes-btn .option-arrow {
+  color: #36B37E;
+}
+
+.no-btn .option-arrow {
+  color: #EF4444;
+}
+
+.option-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.option-percentage {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+}
+
+.option-amount {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Market Metrics */
+.modal-market-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metric-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.metric-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+}
+
+/* Info Section */
+.modal-info-section {
+  margin-top: auto;
+}
+
+.info-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(54, 179, 126, 0.1);
+  border: 1px solid rgba(54, 179, 126, 0.3);
+  border-radius: 12px;
+}
+
+.info-icon {
+  font-size: 1.25rem;
+}
+
+.info-text {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Back View - Share Modal Integration */
+.embedded-share-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem;
+  height: 100%;
+}
+
+.qr-code-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.qr-code-frame {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.scan-instruction {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #36B37E;
+}
+
+.scan-chevron {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.scan-label {
+  color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .market-modal-container {
+    height: 650px;
+  }
+
+  .market-modal {
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+
+  .modal-brand-logo {
+    width: 60px;
+    height: 60px;
+  }
+
+  .modal-brand-name {
+    font-size: 1.5rem;
+  }
+
+  .modal-market-question h3 {
+    font-size: 1.1rem;
+  }
+
+  .modal-trading-options {
+    flex-direction: column;
+  }
+
+  .option-label {
+    font-size: 1.25rem;
+  }
+
+  .option-arrow {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-height: 750px) {
+  .market-modal-container {
+    height: 90vh;
+  }
+}
