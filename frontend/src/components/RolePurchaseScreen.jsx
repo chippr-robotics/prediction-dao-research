@@ -41,7 +41,7 @@ function RolePurchaseScreen() {
         price: ROLE_PRICES[roleKey],
         owned: hasRole(roleKey)
       }))
-  }, [hasRole, ROLE_INFO])
+  }, [hasRole])
 
   // Calculate bundle options
   const bundleOptions = useMemo(() => {
@@ -86,7 +86,7 @@ function RolePurchaseScreen() {
     })
 
     return bundles
-  }, [availableRoles, ROLE_INFO])
+  }, [availableRoles])
 
   // Calculate total price
   const calculateTotal = useMemo(() => {
