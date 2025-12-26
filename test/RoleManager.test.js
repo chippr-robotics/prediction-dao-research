@@ -163,8 +163,9 @@ describe("RoleManager - Unit Tests", function () {
 
   describe("Timelock & Multisig - Role Actions", function () {
     beforeEach(async function () {
-      // Setup role hierarchy
+      // Setup role hierarchy - owner (DEFAULT_ADMIN) can directly grant CORE_SYSTEM_ADMIN_ROLE
       await roleManager.grantRole(CORE_SYSTEM_ADMIN_ROLE, coreAdmin.address);
+      // CORE_SYSTEM_ADMIN can directly grant roles under its hierarchy
       await roleManager.connect(coreAdmin).grantRole(OPERATIONS_ADMIN_ROLE, opsAdmin.address);
     });
 
