@@ -13,18 +13,34 @@ afterEach(() => {
 
 // Mock window.ethereum for Web3 tests
 global.window = global.window || {}
-global.window.ethereum = {
-  request: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890'),
+
+// Create a mock that returns proper responses for ethers.js
+const mockEthereumProvider = {
+  request: vi.fn().mockImplementation(async ({ method }) => {
+    switch (method) {
+      case 'eth_requestAccounts':
+      case 'eth_accounts':
+        return ['0x1234567890123456789012345678901234567890']
+      case 'eth_chainId':
+        return '0x3d' // Chain ID 61 (ETC)
+      default:
+        return null
+    }
+  }),
   on: vi.fn(),
   removeListener: vi.fn(),
   isMetaMask: true,
   selectedAddress: '0x1234567890123456789012345678901234567890',
   // Mock methods needed by ethers BrowserProvider
-  send: vi.fn().mockResolvedValue({}),
-  getSigner: vi.fn().mockResolvedValue({
-    getAddress: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890')
+  send: vi.fn().mockImplementation(async (method, params) => {
+    if (method === 'eth_accounts') {
+      return ['0x1234567890123456789012345678901234567890']
+    }
+    return {}
   })
 }
+
+global.window.ethereum = mockEthereumProvider
 
 // Mock matchMedia for responsive design tests
 Object.defineProperty(window, 'matchMedia', {
