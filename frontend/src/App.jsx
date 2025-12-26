@@ -7,6 +7,7 @@ import FairWinsApp from './components/FairWinsApp'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
 import StateManagementDemo from './components/StateManagementDemo'
 import RoleManagementAdmin from './components/RoleManagementAdmin'
+import RolePurchaseScreen from './components/RolePurchaseScreen'
 import { ComponentExamples } from './components/ui'
 import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
 import { useAnnouncement, useNotification } from './hooks/useUI'
@@ -154,6 +155,7 @@ function AppContent() {
           } 
         />
         <Route path="/admin/roles" element={<RoleManagementAdmin />} />
+        <Route path="/purchase-roles" element={<RolePurchaseScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
