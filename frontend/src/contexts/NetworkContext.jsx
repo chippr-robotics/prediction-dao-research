@@ -1,35 +1,33 @@
 import { createContext, useState, useEffect, useCallback, useContext } from 'react'
-import { NETWORKS, getNetworkKey, getRpcUrl } from '../utils/networkConfig'
+import { NETWORKS, getRpcUrl } from '../utils/networkConfig'
 
 const NetworkContext = createContext(null)
 
 const STORAGE_KEY = 'network_preferences'
 
 /**
+ * Load preferences from localStorage
+ * @returns {Object} Saved preferences or defaults
+ */
+function loadSavedPreferences() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (error) {
+    console.error('Error loading network preferences:', error)
+  }
+  return { selectedNetwork: 'mordor', customRpcUrl: null }
+}
+
+/**
  * NetworkProvider component
  * Manages network selection and RPC endpoint preferences
  */
 export function NetworkProvider({ children }) {
-  const [selectedNetwork, setSelectedNetwork] = useState('mordor')
-  const [customRpcUrl, setCustomRpcUrl] = useState(null)
-
-  // Load preferences from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const prefs = JSON.parse(stored)
-        if (prefs.selectedNetwork) {
-          setSelectedNetwork(prefs.selectedNetwork)
-        }
-        if (prefs.customRpcUrl) {
-          setCustomRpcUrl(prefs.customRpcUrl)
-        }
-      }
-    } catch (error) {
-      console.error('Error loading network preferences:', error)
-    }
-  }, [])
+  const [selectedNetwork, setSelectedNetwork] = useState(() => loadSavedPreferences().selectedNetwork)
+  const [customRpcUrl, setCustomRpcUrl] = useState(() => loadSavedPreferences().customRpcUrl)
 
   // Save preferences to localStorage whenever they change
   useEffect(() => {
@@ -108,6 +106,7 @@ export function NetworkProvider({ children }) {
  * Hook to use network context
  * @returns {Object} Network context value
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNetworkContext() {
   const context = useContext(NetworkContext)
   if (!context) {

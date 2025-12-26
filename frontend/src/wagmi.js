@@ -1,6 +1,6 @@
 import { http, createConfig } from 'wagmi'
 import { injected } from 'wagmi/connectors'
-import { NETWORKS, getRpcUrl, getCurrentNetworkConfig } from './utils/networkConfig'
+import { NETWORKS, getRpcUrl } from './utils/networkConfig'
 
 // Define Ethereum Classic mainnet
 const ethereumClassic = {

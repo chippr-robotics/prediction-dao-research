@@ -15,7 +15,7 @@ function UserManagementModal({ onScanMarket }) {
   const { hideModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
   const { toggleMode, isDark } = useTheme()
-  const { selectedNetwork, switchNetwork, currentNetwork, currentRpcUrl, setCustomRpc } = useNetworkContext()
+  const { selectedNetwork, switchNetwork, currentNetwork, currentRpcUrl } = useNetworkContext()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
   const [showScanner, setShowScanner] = useState(false)
