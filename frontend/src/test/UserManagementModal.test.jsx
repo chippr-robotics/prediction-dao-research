@@ -5,43 +5,62 @@ import UserManagementModal from '../components/ui/UserManagementModal'
 import { Web3Provider } from '../contexts/Web3Context'
 import { UserPreferencesProvider } from '../contexts/UserPreferencesContext'
 import { UIProvider } from '../contexts/UIContext'
+import { ThemeProvider } from '../contexts/ThemeContext'
+import { ETCswapProvider } from '../contexts/ETCswapContext'
 
-// Mock wagmi hooks
+// Create mockable functions for wagmi hooks
+const mockUseAccount = vi.fn()
+const mockUseConnect = vi.fn()
+const mockUseDisconnect = vi.fn()
+const mockUseChainId = vi.fn()
+const mockUseSwitchChain = vi.fn()
+
 vi.mock('wagmi', () => ({
-  useAccount: () => ({
-    address: '0x1234567890123456789012345678901234567890',
-    isConnected: true
-  }),
-  useConnect: () => ({
-    connect: vi.fn(),
-    connectors: [{ id: 'injected', name: 'MetaMask' }]
-  }),
-  useDisconnect: () => ({
-    disconnect: vi.fn()
-  }),
-  useChainId: () => 61,
-  useSwitchChain: () => ({
-    switchChain: vi.fn()
-  }),
+  useAccount: () => mockUseAccount(),
+  useConnect: () => mockUseConnect(),
+  useDisconnect: () => mockUseDisconnect(),
+  useChainId: () => mockUseChainId(),
+  useSwitchChain: () => mockUseSwitchChain(),
   WagmiProvider: ({ children }) => children,
+  createConfig: vi.fn(() => ({})),
+  http: vi.fn(() => ({})),
 }))
 
-// Mock window.ethereum
-global.window.ethereum = {
-  request: vi.fn(),
-  on: vi.fn(),
-  removeListener: vi.fn(),
-}
+// Mock wagmi/connectors
+vi.mock('wagmi/connectors', () => ({
+  injected: vi.fn(() => ({})),
+}))
 
 const renderWithProviders = (ui, { isConnected = true } = {}) => {
+  // Set up mocks based on connection state
+  mockUseAccount.mockReturnValue({
+    address: isConnected ? '0x1234567890123456789012345678901234567890' : null,
+    isConnected
+  })
+  mockUseConnect.mockReturnValue({
+    connect: vi.fn(),
+    connectors: [{ id: 'injected', name: 'MetaMask' }]
+  })
+  mockUseDisconnect.mockReturnValue({
+    disconnect: vi.fn()
+  })
+  mockUseChainId.mockReturnValue(61)
+  mockUseSwitchChain.mockReturnValue({
+    switchChain: vi.fn()
+  })
+  
   return render(
-    <UIProvider>
-      <Web3Provider>
-        <UserPreferencesProvider>
-          {ui}
-        </UserPreferencesProvider>
-      </Web3Provider>
-    </UIProvider>
+    <ThemeProvider>
+      <UIProvider>
+        <Web3Provider>
+          <ETCswapProvider>
+            <UserPreferencesProvider>
+              {ui}
+            </UserPreferencesProvider>
+          </ETCswapProvider>
+        </Web3Provider>
+      </UIProvider>
+    </ThemeProvider>
   )
 }
 
@@ -54,24 +73,14 @@ describe('UserManagementModal', () => {
 
   describe('When wallet is not connected', () => {
     it('should render connect wallet prompt', () => {
-      vi.mock('../hooks/useWeb3', () => ({
-        useWeb3: () => ({ account: null, isConnected: false }),
-        useWallet: () => ({ connectWallet: vi.fn(), disconnectWallet: vi.fn() })
-      }))
-
-      renderWithProviders(<UserManagementModal />)
+      renderWithProviders(<UserManagementModal />, { isConnected: false })
       
       expect(screen.getByText(/Connect Your Wallet/i)).toBeInTheDocument()
       expect(screen.getByText(/Connect your Web3 wallet to access all features/i)).toBeInTheDocument()
     })
 
     it('should show connect wallet button', () => {
-      vi.mock('../hooks/useWeb3', () => ({
-        useWeb3: () => ({ account: null, isConnected: false }),
-        useWallet: () => ({ connectWallet: vi.fn(), disconnectWallet: vi.fn() })
-      }))
-
-      renderWithProviders(<UserManagementModal />)
+      renderWithProviders(<UserManagementModal />, { isConnected: false })
       
       const connectButton = screen.getByText('Connect Wallet')
       expect(connectButton).toBeInTheDocument()

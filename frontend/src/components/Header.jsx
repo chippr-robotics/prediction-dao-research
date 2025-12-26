@@ -44,7 +44,7 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
 
   const handleOpenUserManagement = () => {
     showModal(<UserManagementModal />, {
-      title: null,
+      title: 'User Management',
       size: 'large',
       closable: true
     })
