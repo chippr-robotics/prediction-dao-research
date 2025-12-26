@@ -82,16 +82,25 @@
   font-size: 0.95rem;
   color: var(--text-secondary);
   line-height: 1.5;
-  padding-left: 1.25rem;
+  padding-left: 2.5rem;
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
-.addons-list li::before {
-  content: "•";
+.addon-logo {
   position: absolute;
   left: 0;
-  color: var(--brand-primary);
-  font-weight: bold;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.addon-content {
+  flex: 1;
 }
 
 .dev-warning-notice {
@@ -194,6 +203,11 @@
   
   .addons-list li {
     font-size: 0.9rem;
+  }
+  
+  .addon-logo {
+    width: 20px;
+    height: 20px;
   }
   
   .dev-warning-modal-button {

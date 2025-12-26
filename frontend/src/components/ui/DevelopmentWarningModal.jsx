@@ -50,13 +50,37 @@ function DevelopmentWarningModal() {
                 <h3 className="addons-title">Platform Add-ons:</h3>
                 <ul className="addons-list">
                   <li>
-                    <strong>ClearPath</strong> - DAO governance platform with futarchy-based decision-making (RBAC managed)
+                    <img 
+                      src="/logo_clearpath.svg" 
+                      alt="ClearPath" 
+                      className="addon-logo"
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                    <div className="addon-content">
+                      <strong>ClearPath</strong> - DAO governance platform with futarchy-based decision-making (RBAC managed)
+                    </div>
                   </li>
                   <li>
-                    <strong>TokenMint</strong> - Token creation and management tools (RBAC managed)
+                    <img 
+                      src="/logo_fairwins.svg" 
+                      alt="TokenMint" 
+                      className="addon-logo"
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                    <div className="addon-content">
+                      <strong>TokenMint</strong> - Token creation and management tools (RBAC managed)
+                    </div>
                   </li>
                   <li>
-                    <strong>SpindleTop</strong> - Advanced treasury management (RBAC managed)
+                    <img 
+                      src="/logo_fairwins.svg" 
+                      alt="SpindleTop" 
+                      className="addon-logo"
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                    <div className="addon-content">
+                      <strong>SpindleTop</strong> - Liquidity and poll management system where users can manage their payouts and mining related activities (RBAC managed)
+                    </div>
                   </li>
                 </ul>
               </div>
