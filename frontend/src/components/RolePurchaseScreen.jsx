@@ -183,7 +183,7 @@ function RolePurchaseScreen() {
       if (import.meta.env.PROD) {
         throw new Error('Mock transaction hash generation is not allowed in production environment.')
       } else {
-        txHash = 'MOCK_TX_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+        txHash = 'MOCK_TX_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
       }
 
       for (const role of rolesToGrant) {
