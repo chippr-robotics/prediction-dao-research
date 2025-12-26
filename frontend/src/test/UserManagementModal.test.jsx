@@ -54,17 +54,17 @@ const renderWithProviders = (ui, { isConnected = true } = {}) => {
   return render(
     <BrowserRouter>
       <ThemeProvider>
-        <UIProvider>
-          <Web3Provider>
-            <UserPreferencesProvider>
-              <RoleProvider>
-                <ETCswapProvider>
+        <Web3Provider>
+          <UserPreferencesProvider>
+            <RoleProvider>
+              <ETCswapProvider>
+                <UIProvider>
                   {ui}
-                </ETCswapProvider>
-              </RoleProvider>
-            </UserPreferencesProvider>
-          </Web3Provider>
-        </UIProvider>
+                </UIProvider>
+              </ETCswapProvider>
+            </RoleProvider>
+          </UserPreferencesProvider>
+        </Web3Provider>
       </ThemeProvider>
     </BrowserRouter>
   )
