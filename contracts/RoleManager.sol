@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./MembershipPaymentManager.sol";
+import "./ZKKeyManager.sol";
 
 /**
  * @title RoleManager
@@ -42,6 +43,10 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     // ========== Payment Integration ==========
     
     MembershipPaymentManager public paymentManager;
+    
+    // ========== ZK Key Management ==========
+    
+    ZKKeyManager public zkKeyManager;
     
     // ========== Role Metadata ==========
     
@@ -102,6 +107,8 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     event EmergencyPaused(address indexed guardian);
     event EmergencyUnpaused(address indexed admin);
     event PaymentManagerUpdated(address indexed oldManager, address indexed newManager);
+    event ZKKeyManagerUpdated(address indexed oldManager, address indexed newManager);
+    event ZKKeyRotated(address indexed user, string newZKPublicKey);
     
     // ========== Constructor ==========
     
@@ -317,9 +324,49 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
         require(bytes(zkPublicKey).length > 0, "Invalid ZK key");
         
+        // If ZKKeyManager is set, use production key management
+        if (address(zkKeyManager) != address(0)) {
+            // Register key with ZKKeyManager for production verification
+            zkKeyManager.registerKeyFor(msg.sender, zkPublicKey);
+        }
+        
+        // Store in local purchases mapping for backward compatibility
         purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey = zkPublicKey;
         
         emit ZKKeyRegistered(msg.sender, CLEARPATH_USER_ROLE, zkPublicKey);
+    }
+    
+    /**
+     * @notice Rotate ZK public key to a new key
+     * @param newZKPublicKey The new zero-knowledge public key
+     */
+    function rotateZKKey(string memory newZKPublicKey) external whenNotPaused {
+        require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
+        require(bytes(newZKPublicKey).length > 0, "Invalid ZK key");
+        require(address(zkKeyManager) != address(0), "ZK key manager not set");
+        
+        // Rotate key using ZKKeyManager
+        zkKeyManager.rotateKeyFor(msg.sender, newZKPublicKey);
+        
+        // Update local purchases mapping
+        purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey = newZKPublicKey;
+        
+        emit ZKKeyRotated(msg.sender, newZKPublicKey);
+    }
+    
+    /**
+     * @notice Revoke ZK public key
+     */
+    function revokeZKKey() external whenNotPaused {
+        require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
+        require(address(zkKeyManager) != address(0), "ZK key manager not set");
+        
+        // Revoke key using ZKKeyManager - pass msg.sender as the user
+        // Note: This works because ZKKeyManager allows key owner to revoke their own key
+        zkKeyManager.revokeKey(msg.sender);
+        
+        // Clear local purchases mapping
+        purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey = "";
     }
     
     // ========== Timelock & Multisig Functions ==========
@@ -467,6 +514,17 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     }
     
     /**
+     * @notice Set the ZK key manager contract
+     * @param _zkKeyManager Address of ZKKeyManager contract
+     */
+    function setZKKeyManager(address _zkKeyManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_zkKeyManager != address(0), "Invalid ZK key manager address");
+        address oldManager = address(zkKeyManager);
+        zkKeyManager = ZKKeyManager(_zkKeyManager);
+        emit ZKKeyManagerUpdated(oldManager, _zkKeyManager);
+    }
+    
+    /**
      * @notice Update role metadata (Core System Admin only)
      */
     function updateRoleMetadata(
@@ -605,7 +663,23 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @notice Get ZK public key for user
      */
     function getZKPublicKey(address user) external view returns (string memory) {
+        // If ZKKeyManager is set, get key from there
+        if (address(zkKeyManager) != address(0)) {
+            return zkKeyManager.getPublicKey(user);
+        }
+        // Otherwise fall back to local storage
         return purchases[user][CLEARPATH_USER_ROLE].zkPublicKey;
+    }
+    
+    /**
+     * @notice Check if user has a valid ZK key
+     */
+    function hasValidZKKey(address user) external view returns (bool) {
+        if (address(zkKeyManager) != address(0)) {
+            return zkKeyManager.hasValidKey(user);
+        }
+        // Fall back to checking local storage
+        return bytes(purchases[user][CLEARPATH_USER_ROLE].zkPublicKey).length > 0;
     }
     
     /**
