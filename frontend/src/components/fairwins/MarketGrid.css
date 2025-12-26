@@ -1,6 +1,6 @@
 .market-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
   padding: 1rem 0;
   animation: fadeIn 0.4s ease-in;
@@ -21,7 +21,7 @@
 /* Loading State */
 .market-grid-loading {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
   padding: 1rem 0;
   /* Remove internal scrolling - let container handle it */
@@ -87,7 +87,7 @@
 @media (max-width: 1400px) {
   .market-grid,
   .market-grid-loading {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 1.25rem;
   }
 }
@@ -95,7 +95,7 @@
 @media (max-width: 1024px) {
   .market-grid,
   .market-grid-loading {
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 1rem;
   }
 }
