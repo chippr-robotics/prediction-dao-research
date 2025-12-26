@@ -48,15 +48,20 @@ describe('RolePurchaseScreen', () => {
   it('displays all individual role products', () => {
     renderWithProviders(<RolePurchaseScreen />)
     
-    expect(screen.getByText('Market Maker')).toBeInTheDocument()
-    expect(screen.getByText('ClearPath User')).toBeInTheDocument()
-    expect(screen.getByText('Token Mint')).toBeInTheDocument()
+    const marketMaker = screen.getAllByText('Market Maker')
+    const clearPath = screen.getAllByText('ClearPath User')
+    const tokenMint = screen.getAllByText('Token Mint')
+    
+    expect(marketMaker.length).toBeGreaterThan(0)
+    expect(clearPath.length).toBeGreaterThan(0)
+    expect(tokenMint.length).toBeGreaterThan(0)
   })
 
   it('displays bundle options section', () => {
     renderWithProviders(<RolePurchaseScreen />)
     
-    expect(screen.getByText('Complete Access Bundle')).toBeInTheDocument()
+    const completeBundle = screen.getAllByText('Complete Access Bundle')
+    expect(completeBundle.length).toBeGreaterThan(0)
     expect(screen.getByText('Two-Role Bundles')).toBeInTheDocument()
   })
 

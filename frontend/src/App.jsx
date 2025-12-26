@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import './theme.css'
 import './App.css'
@@ -26,7 +26,6 @@ function AppContent() {
   const { announce } = useAnnouncement()
   const { showNotification } = useNotification()
   const { setThemePlatform } = useTheme()
-  const navigate = useNavigate()
   const location = useLocation()
 
   // Auto-detect platform based on route
