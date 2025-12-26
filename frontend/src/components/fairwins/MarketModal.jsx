@@ -72,17 +72,19 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const yesProb = (parseFloat(market.passTokenPrice) * 100).toFixed(1)
   const noProb = (parseFloat(market.failTokenPrice) * 100).toFixed(1)
   
-  // Get user balance (mock for now)
+  // Get user balance (TODO: Replace with actual balance from context/props)
   const userBalance = 1000.00 // USD
 
   // Calculate values for market order
   const currentPrice = selectedOutcome === 'YES' ? parseFloat(market.passTokenPrice) : parseFloat(market.failTokenPrice)
-  const averagePrice = amount ? currentPrice * parseFloat(amount) / 100 : 0
-  const reward = amount && currentPrice > 0 ? (parseFloat(amount) / currentPrice) - parseFloat(amount) : 0
+  const estimatedShares = amount && currentPrice > 0 ? parseFloat(amount) / currentPrice : 0
+  const averagePrice = currentPrice
+  const reward = estimatedShares > 0 ? estimatedShares - parseFloat(amount || 0) : 0
 
   // Calculate values for limit order
+  const SHARES_PAYOUT_VALUE = 1.0 // Each winning share pays out $1
   const totalAmount = shares && price ? parseFloat(shares) * parseFloat(price) : 0
-  const limitReward = shares && price ? (parseFloat(shares) * 1.0) - totalAmount : 0
+  const limitReward = shares && price ? (parseFloat(shares) * SHARES_PAYOUT_VALUE) - totalAmount : 0
 
   // Validation
   const isMarketOrderValid = amount && parseFloat(amount) > 0 && parseFloat(amount) <= userBalance
