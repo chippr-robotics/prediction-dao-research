@@ -39,6 +39,8 @@ function PlatformSelector() {
             src="/logo_fwcp.svg" 
             alt="ClearPath and FairWins combined logo" 
             className="hero-logo"
+            width="120"
+            height="120"
           />
           <h1 className="hero-title">Welcome to the Future of Decision-Making</h1>
           <p className="hero-subtitle">
@@ -66,6 +68,8 @@ function PlatformSelector() {
                   src="/logo_clearpath.svg" 
                   alt="" 
                   className="logo-image"
+                  width="60"
+                  height="60"
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
                 />
                 <div className="platform-icon" style={{display: 'none'}}>🏛️</div>
@@ -108,6 +112,8 @@ function PlatformSelector() {
                   src="/logo_fairwins.svg" 
                   alt="" 
                   className="logo-image"
+                  width="60"
+                  height="60"
                   onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }}
                 />
                 <div className="platform-icon" style={{display: 'none'}}>🎯</div>

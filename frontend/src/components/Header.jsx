@@ -60,6 +60,8 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
               src={showClearPathBranding ? "/logo_clearpath.svg" : "/logo_fwcp.svg"} 
               alt={showClearPathBranding ? "ClearPath" : "FairWins & ClearPath"} 
               className="header-logo-image"
+              width="48"
+              height="48"
               onError={handleLogoError}
             />
           ) : (

@@ -65,6 +65,8 @@ function FairWinsApp({ onConnect, onDisconnect, onBack }) {
                   src="/logo_fairwins.svg" 
                   alt="FairWins Logo" 
                   className="logo-image"
+                  width="40"
+                  height="40"
                   onError={(e) => { e.target.style.display = 'none' }}
                 />
               </div>
