@@ -203,6 +203,156 @@
   border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: 12px;
   padding: 1.5rem;
+  margin-bottom: 2rem; /* Add spacing since it's now at the top */
+}
+
+.hero-visual-row {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  align-items: start;
+}
+
+.probability-gauge-container {
+  background: var(--bg-dark);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.probability-gauge-container h3 {
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  margin: 0 0 1rem;
+  text-align: center;
+}
+
+.probability-gauge {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.chart-section {
+  background: var(--bg-dark);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.chart-section h3 {
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.chart-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 1rem;
+}
+
+.price-history-chart {
+  width: 100%;
+  min-height: 200px;
+}
+
+.activity-heatmap {
+  width: 100%;
+  min-height: 240px;
+  overflow-x: auto;
+}
+
+.holder-distribution {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.distribution-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.distribution-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.distribution-title.yes-title {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.distribution-title.no-title {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.holder-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: var(--bg-light);
+  border-radius: 6px;
+}
+
+.holder-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 80px;
+}
+
+.holder-range {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.holder-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.holder-bar-bg {
+  flex: 1;
+  height: 24px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.holder-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease-out;
+}
+
+.holder-bar.yes-bar {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.holder-bar.no-bar {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.holder-percentage {
+  min-width: 45px;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .hero-trade-panel h3 {
@@ -382,6 +532,14 @@
   .stat-card.primary {
     grid-column: span 2;
   }
+
+  .hero-visual-row {
+    grid-template-columns: 1fr;
+  }
+
+  .holder-distribution {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
@@ -413,5 +571,17 @@
 
   .trade-type-selector {
     grid-template-columns: 1fr;
+  }
+
+  .hero-visual-row {
+    grid-template-columns: 1fr;
+  }
+
+  .holder-distribution {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-section {
+    padding: 1rem;
   }
 }
