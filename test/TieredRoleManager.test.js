@@ -92,7 +92,7 @@ describe("TieredRoleManager - Unit Tests", function () {
     });
 
     it("Should allow upgrading to higher tier", async function () {
-      const upgradeprice = ethers.parseEther("150");
+      const upgradePrice = ethers.parseEther("150");
       
       await expect(
         tieredRoleManager.connect(user1).upgradeTier(MARKET_MAKER_ROLE, Tier.SILVER, { value: upgradePrice })

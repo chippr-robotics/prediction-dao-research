@@ -2,7 +2,6 @@ import { createContext, useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { 
   getUserRoles, 
-  saveUserRoles, 
   hasRole as checkRole,
   addUserRole,
   removeUserRole

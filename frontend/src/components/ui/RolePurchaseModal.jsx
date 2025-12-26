@@ -40,10 +40,17 @@ function RolePurchaseModal({ onClose }) {
       
       if (success) {
         // Record the purchase
+        let txHash
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('Mock transaction hash generation is not allowed in production environment.')
+        } else {
+          txHash = 'MOCK_TX_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) // Mock tx hash for non-production use
+        }
+
         recordRolePurchase(account, selectedRole, {
           price: ROLE_PRICES[selectedRole],
           currency: 'USDC',
-          txHash: 'MOCK_TX_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9), // Mock tx hash - DO NOT USE IN PRODUCTION
+          txHash: txHash,
         })
 
         showNotification(`Successfully purchased ${ROLE_INFO[selectedRole].name}!`, 'success')

@@ -58,7 +58,7 @@ contract TieredRoleManager is RoleManager {
         uint256 weeklyBetsCount;
         uint256 monthlyMarketsCreated;
         uint256 dailyWithdrawals;
-        uint256 activeMar ketsCount;
+        uint256 activeMarketsCount;
         uint256 lastDailyReset;
         uint256 lastWeeklyReset;
         uint256 lastMonthlyReset;

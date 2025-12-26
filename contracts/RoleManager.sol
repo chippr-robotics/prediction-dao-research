@@ -437,6 +437,80 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         payable(msg.sender).transfer(balance);
     }
     
+    // ========== Override AccessControl Functions to Enforce Governance ==========
+    
+    /**
+     * @notice Override grantRole to enforce timelock/multisig governance
+     * @dev Only allows direct grants for premium roles via purchaseRole or internal grants via executeRoleAction
+     */
+    function grantRole(bytes32 role, address account) public virtual override {
+        // Only allow direct grants in specific scenarios:
+        // 1. During contract initialization (for setting up initial admin hierarchy)
+        // 2. For premium roles purchased via purchaseRole (checked by msg.sender == this)
+        // 3. For roles with no timelock delay (executed immediately in proposeRoleAction)
+        
+        RoleMetadata storage metadata = roleMetadata[role];
+        
+        // Allow if called internally (from purchaseRole or executeRoleAction)
+        if (msg.sender == address(this)) {
+            super.grantRole(role, account);
+            return;
+        }
+        
+        // For premium roles, users must use purchaseRole
+        if (metadata.isPremium) {
+            revert("Premium roles must be purchased via purchaseRole");
+        }
+        
+        // For non-premium administrative roles, must use governance flow
+        if (metadata.timelockDelay > 0 || metadata.minApprovals > 1) {
+            revert("Administrative roles must use proposeRoleAction/executeRoleAction for governance");
+        }
+        
+        // If no timelock and single approval, defer to normal access control
+        require(hasRole(getRoleAdmin(role), msg.sender), "AccessControl: account is missing role");
+        super.grantRole(role, account);
+    }
+    
+    /**
+     * @notice Override revokeRole to enforce timelock/multisig governance
+     * @dev Only allows direct revocations via internal calls or for roles without governance requirements
+     */
+    function revokeRole(bytes32 role, address account) public virtual override {
+        RoleMetadata storage metadata = roleMetadata[role];
+        
+        // Allow if called internally (from executeRoleAction)
+        if (msg.sender == address(this)) {
+            super.revokeRole(role, account);
+            return;
+        }
+        
+        // For roles with governance requirements, must use governance flow
+        if (metadata.timelockDelay > 0 || metadata.minApprovals > 1) {
+            revert("Administrative roles must use proposeRoleAction/executeRoleAction for governance");
+        }
+        
+        // If no timelock and single approval, defer to normal access control
+        require(hasRole(getRoleAdmin(role), msg.sender), "AccessControl: account is missing role");
+        super.revokeRole(role, account);
+    }
+    
+    /**
+     * @notice Internal function to grant role (bypasses checks)
+     * @dev Used by executeRoleAction and purchaseRole
+     */
+    function _internalGrantRole(bytes32 role, address account) internal {
+        super.grantRole(role, account);
+    }
+    
+    /**
+     * @notice Internal function to revoke role (bypasses checks)
+     * @dev Used by executeRoleAction
+     */
+    function _internalRevokeRole(bytes32 role, address account) internal {
+        super.revokeRole(role, account);
+    }
+    
     // ========== View Functions ==========
     
     /**

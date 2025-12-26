@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
-import { getAllUsersWithRoles, getUserRoles } from '../utils/roleStorage'
+import { getAllUsersWithRoles } from '../utils/roleStorage'
 import { isValidEthereumAddress } from '../utils/validation'
 import './RoleManagementAdmin.css'
 
@@ -11,7 +11,6 @@ function RoleManagementAdmin() {
   const { account } = useWeb3()
   const { showNotification } = useNotification()
   const [allUsers, setAllUsers] = useState({})
-  const [selectedUser, setSelectedUser] = useState(null)
   const [newUserAddress, setNewUserAddress] = useState('')
   const [selectedRole, setSelectedRole] = useState(ROLES.CLEARPATH_USER)
   const [searchQuery, setSearchQuery] = useState('')
