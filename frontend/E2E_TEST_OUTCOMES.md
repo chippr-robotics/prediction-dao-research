@@ -1,5 +1,27 @@
 # E2E Test Coverage Summary
 
+## Latest Update: Deployment Build Fix (December 26, 2024)
+
+### Issue Resolved ✅
+The E2E test infrastructure was blocked by deployment script errors. The issue has been **resolved**.
+
+**Root Cause**: Deployment scripts (`scripts/deploy.js` and `scripts/deploy-deterministic.js`) were using constructor arguments for `RagequitModule` and `FutarchyGovernor` contracts, which had been changed to use the initialize pattern (parameterless constructor + separate initialize function).
+
+**Fix Applied**: 
+- Updated both deployment scripts to deploy contracts without constructor arguments
+- Added initialize() calls after deployment with proper parameters
+- Verified DAOFactory already uses the pattern correctly
+
+**Impact**:
+- ✅ Contracts now deploy successfully
+- ✅ Hardhat node works correctly
+- ✅ E2E tests can execute
+- ⚠️ Some test failures remain due to UI element changes (test maintenance needed)
+
+For detailed information, see [E2E_DEPLOYMENT_FIX_SUMMARY.md](../E2E_DEPLOYMENT_FIX_SUMMARY.md)
+
+---
+
 ## Overview
 
 This document provides a summary of the Cypress E2E test coverage, test outcomes, and known limitations for the ClearPath and FairWins prediction markets platform.
