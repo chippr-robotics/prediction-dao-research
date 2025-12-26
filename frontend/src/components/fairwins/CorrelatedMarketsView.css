@@ -36,27 +36,32 @@
   margin: 0;
 }
 
+/* Single card container for radar and options */
+.correlation-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
 .correlation-content {
   display: flex;
   gap: 2rem;
   align-items: flex-start;
 }
 
-/* Radar Chart Section - 75% */
+/* Radar Chart Section - Smaller, 50% width */
 .radar-section {
-  flex: 0 0 75%;
+  flex: 0 0 50%;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 1rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .radar-chart {
   width: 100%;
-  max-width: 500px;
+  max-width: 350px;
   height: auto;
 }
 
@@ -74,9 +79,9 @@
   pointer-events: none;
 }
 
-/* Options Section - 25% */
+/* Options Section - 50% width */
 .options-section {
-  flex: 0 0 25%;
+  flex: 0 0 50%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -232,50 +237,20 @@
   color: var(--text-secondary);
 }
 
-/* Trade Action */
-.trade-action {
-  margin-top: auto;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
-}
-
-.trade-btn {
-  width: 100%;
-  padding: 0.875rem;
-  background: linear-gradient(135deg, var(--brand-primary), var(--primary-button-hover));
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.trade-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.4);
-}
-
-.trade-btn:active {
-  transform: translateY(0);
-}
-
 /* Responsive */
 @media (max-width: 1024px) {
   .correlation-content {
     flex-direction: column;
   }
 
-  .radar-section {
+  .radar-section,
+  .options-section {
     flex: 1 1 auto;
     width: 100%;
   }
 
-  .options-section {
-    flex: 1 1 auto;
-    width: 100%;
-    max-width: none;
+  .radar-chart {
+    max-width: 400px;
   }
 
   .options-list {

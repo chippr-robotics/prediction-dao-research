@@ -66,11 +66,11 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
   useEffect(() => {
     if (!svgRef.current || radarData.length === 0) return
 
-    const width = 500
-    const height = 500
+    const width = 350
+    const height = 350
     const centerX = width / 2
     const centerY = height / 2
-    const maxRadius = 150 // Exterior is max scale
+    const maxRadius = 120 // Smaller exterior radius
     const levels = 5 // Number of concentric circles
     const angleSlice = (Math.PI * 2) / radarData.length
 
@@ -220,7 +220,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     
     radarData.forEach((d, i) => {
       const angle = angleSlice * i - Math.PI / 2
-      const labelRadius = maxRadius + 40
+      const labelRadius = maxRadius + 30
       const x = labelRadius * Math.cos(angle)
       const y = labelRadius * Math.sin(angle)
 
@@ -229,7 +229,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .attr('y', y)
         .attr('text-anchor', x > 0.5 ? 'start' : x < -0.5 ? 'end' : 'middle')
         .attr('dominant-baseline', y > 0.5 ? 'hanging' : y < -0.5 ? 'auto' : 'middle')
-        .attr('font-size', '14px')
+        .attr('font-size', '12px')
         .attr('font-weight', '600')
         .attr('fill', 'var(--text-primary)')
         .style('paint-order', 'stroke fill') // Ensure text renders on top
@@ -243,7 +243,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     fetch('/docs/assets/logo_fairwins.svg')
       .then(response => response.text())
       .then(svgText => {
-        const logoSize = 80
+        const logoSize = 60
         const logoGroup = g.append('g')
           .attr('transform', `translate(${-logoSize/2}, ${-logoSize/2})`)
         
@@ -254,7 +254,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
       })
       .catch(() => {
         // Fallback: Draw clover logo if SVG fetch fails
-        const cloverSize = 40
+        const cloverSize = 30
         const cloverGroup = g.append('g')
         
         // Background circle
@@ -266,22 +266,22 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
 
         // Four-leaf clover design
         const leafPositions = [
-          { x: 0, y: -15 },
-          { x: 15, y: 0 },
-          { x: 0, y: 15 },
-          { x: -15, y: 0 }
+          { x: 0, y: -12 },
+          { x: 12, y: 0 },
+          { x: 0, y: 12 },
+          { x: -12, y: 0 }
         ]
 
         leafPositions.forEach(pos => {
           cloverGroup.append('circle')
             .attr('cx', pos.x)
             .attr('cy', pos.y)
-            .attr('r', 12)
+            .attr('r', 10)
             .attr('fill', 'rgba(54, 179, 126, 0.8)')
         })
 
         cloverGroup.append('circle')
-          .attr('r', 8)
+          .attr('r', 6)
           .attr('fill', 'rgba(54, 179, 126, 1)')
       })
 
@@ -419,90 +419,83 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         </p>
       </div>
 
-      <div className="correlation-content">
-        {/* Radar Chart - 75% width */}
-        <div className="radar-section">
-          <svg ref={svgRef} className="radar-chart"></svg>
-        </div>
-
-        {/* Options Cards - 25% width */}
-        <div className="options-section">
-          <h3 className="options-title">Options</h3>
-          <div className="options-list">
-            {correlatedMarkets.map((option) => (
-              <button
-                key={option.id}
-                className={`option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
-                onClick={() => setSelectedOption(option.id)}
-              >
-                <div className="option-header">
-                  <div className="option-controls">
-                    <button
-                      className="pin-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        togglePin(option.id)
-                      }}
-                      title={pinnedMarkets.has(option.id) ? 'Unpin market' : 'Pin market'}
-                    >
-                      {pinnedMarkets.has(option.id) ? '📌' : '📍'}
-                    </button>
-                    <button
-                      className="visibility-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleMarketVisibility(option.id)
-                      }}
-                      title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
-                    >
-                      {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
-                    </button>
-                  </div>
-                  <span className="option-name">
-                    {option.proposalTitle.split(':')[1]?.trim() || option.proposalTitle}
-                  </span>
-                  {selectedOption === option.id && (
-                    <span className="selected-indicator">✓</span>
-                  )}
-                </div>
-                
-                <div className="option-stats">
-                  <div className="option-stat">
-                    <span className="stat-label">Probability</span>
-                    <span className="stat-value">{(parseFloat(option.passTokenPrice) * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="option-stat">
-                    <span className="stat-label">Volume</span>
-                    <span className="stat-value">{formatPrice(option.totalLiquidity, { compact: true })}</span>
-                  </div>
-                </div>
-
-                {/* Histogram bar showing current price */}
-                <div className="price-histogram">
-                  <div className="histogram-bar-container">
-                    <div 
-                      className="histogram-bar"
-                      style={{ width: `${parseFloat(option.passTokenPrice) * 100}%` }}
-                    />
-                  </div>
-                  <div className="histogram-labels">
-                    <span className="histogram-label">0%</span>
-                    <span className="histogram-label">50%</span>
-                    <span className="histogram-label">100%</span>
-                  </div>
-                </div>
-              </button>
-            ))}
+      {/* Single card containing both radar and options */}
+      <div className="correlation-card">
+        <div className="correlation-content">
+          {/* Radar Chart - Smaller size */}
+          <div className="radar-section">
+            <svg ref={svgRef} className="radar-chart"></svg>
           </div>
 
-          {/* Trade button for selected option */}
-          <div className="trade-action">
-            <button 
-              className="trade-btn"
-              onClick={() => onTrade && onTrade({ market: selectedMarket, type: 'PASS', amount: '100' })}
-            >
-              Trade on {selectedMarket.proposalTitle.split(':')[1]?.trim() || 'this option'}
-            </button>
+          {/* Options Cards */}
+          <div className="options-section">
+            <h3 className="options-title">Options</h3>
+            <div className="options-list">
+              {correlatedMarkets.map((option) => (
+                <button
+                  key={option.id}
+                  className={`option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
+                  onClick={() => setSelectedOption(option.id)}
+                >
+                  <div className="option-header">
+                    <div className="option-controls">
+                      <button
+                        className="pin-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          togglePin(option.id)
+                        }}
+                        title={pinnedMarkets.has(option.id) ? 'Unpin market' : 'Pin market'}
+                      >
+                        {pinnedMarkets.has(option.id) ? '📌' : '📍'}
+                      </button>
+                      <button
+                        className="visibility-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleMarketVisibility(option.id)
+                        }}
+                        title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
+                      >
+                        {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                    </div>
+                    <span className="option-name">
+                      {option.proposalTitle.split(':')[1]?.trim() || option.proposalTitle}
+                    </span>
+                    {selectedOption === option.id && (
+                      <span className="selected-indicator">✓</span>
+                    )}
+                  </div>
+                  
+                  <div className="option-stats">
+                    <div className="option-stat">
+                      <span className="stat-label">Probability</span>
+                      <span className="stat-value">{(parseFloat(option.passTokenPrice) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="option-stat">
+                      <span className="stat-label">Volume</span>
+                      <span className="stat-value">{formatPrice(option.totalLiquidity, { compact: true })}</span>
+                    </div>
+                  </div>
+
+                  {/* Histogram bar showing current price */}
+                  <div className="price-histogram">
+                    <div className="histogram-bar-container">
+                      <div 
+                        className="histogram-bar"
+                        style={{ width: `${parseFloat(option.passTokenPrice) * 100}%` }}
+                      />
+                    </div>
+                    <div className="histogram-labels">
+                      <span className="histogram-label">0%</span>
+                      <span className="histogram-label">50%</span>
+                      <span className="histogram-label">100%</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
