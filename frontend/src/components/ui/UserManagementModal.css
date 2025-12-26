@@ -641,3 +641,85 @@
 .scanner-container {
   margin-top: 24px;
 }
+
+/* Network Selector Styles */
+.network-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.network-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.network-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text);
+}
+
+.network-btn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.network-btn.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.network-icon {
+  font-size: 24px;
+}
+
+.network-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rpc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--color-background);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.rpc-label {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rpc-url {
+  font-family: monospace;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.setting-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}

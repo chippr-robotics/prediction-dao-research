@@ -27,10 +27,16 @@ module.exports = {
     },
     localhost: {
       url: "http://127.0.0.1:8545",
+      chainId: 1337,
     },
     mordor: {
-      url: "https://rpc.mordor.etccooperative.org",
+      url: process.env.MORDOR_RPC_URL || "https://rpc.mordor.etccooperative.org",
       chainId: 63,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    },
+    mainnet: {
+      url: process.env.MAINNET_RPC_URL || "https://etc.rivet.link",
+      chainId: 61,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
   },

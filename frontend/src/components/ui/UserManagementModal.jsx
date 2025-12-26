@@ -3,6 +3,8 @@ import { useWeb3, useWallet } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { useTheme } from '../../hooks/useTheme'
+import { useNetworkContext } from '../../contexts/NetworkContext'
+import { NETWORKS, PUBLIC_RPC_ENDPOINTS } from '../../utils/networkConfig'
 import SwapPanel from '../fairwins/SwapPanel'
 import QRScanner from './QRScanner'
 import './UserManagementModal.css'
@@ -13,6 +15,7 @@ function UserManagementModal({ onScanMarket }) {
   const { hideModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
   const { toggleMode, isDark } = useTheme()
+  const { selectedNetwork, switchNetwork, currentNetwork, currentRpcUrl, setCustomRpc } = useNetworkContext()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
   const [showScanner, setShowScanner] = useState(false)
@@ -54,6 +57,10 @@ function UserManagementModal({ onScanMarket }) {
       // TODO: Replace with proper toast notification system
       alert(`Scanned: ${decodedText}`)
     }
+  }
+
+  const handleNetworkSwitch = (networkKey) => {
+    switchNetwork(networkKey)
   }
 
   const shortenAddress = (address) => {
@@ -209,6 +216,46 @@ function UserManagementModal({ onScanMarket }) {
               <div className="settings-section" role="tabpanel">
                 <h3>Settings</h3>
                 
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>Network</h4>
+                    <p>Select blockchain network for markets</p>
+                    <p className="setting-note">Current: {currentNetwork?.name} ({currentNetwork?.nativeCurrency.symbol})</p>
+                  </div>
+                  <div className="network-selector">
+                    <div className="network-buttons">
+                      <button 
+                        className={`network-btn ${selectedNetwork === 'mainnet' ? 'active' : ''}`}
+                        onClick={() => handleNetworkSwitch('mainnet')}
+                        aria-label="Switch to Ethereum Classic Mainnet"
+                      >
+                        <span className="network-icon" aria-hidden="true">⚡</span>
+                        <span className="network-label">Mainnet</span>
+                      </button>
+                      <button 
+                        className={`network-btn ${selectedNetwork === 'mordor' ? 'active' : ''}`}
+                        onClick={() => handleNetworkSwitch('mordor')}
+                        aria-label="Switch to Mordor Testnet"
+                      >
+                        <span className="network-icon" aria-hidden="true">🧪</span>
+                        <span className="network-label">Mordor</span>
+                      </button>
+                      <button 
+                        className={`network-btn ${selectedNetwork === 'hardhat' ? 'active' : ''}`}
+                        onClick={() => handleNetworkSwitch('hardhat')}
+                        aria-label="Switch to Hardhat Local"
+                      >
+                        <span className="network-icon" aria-hidden="true">🔧</span>
+                        <span className="network-label">Local</span>
+                      </button>
+                    </div>
+                    <div className="rpc-info">
+                      <span className="rpc-label">RPC:</span>
+                      <span className="rpc-url">{currentRpcUrl}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="setting-item">
                   <div className="setting-info">
                     <h4>Theme</h4>

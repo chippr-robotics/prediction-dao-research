@@ -1,58 +1,34 @@
 import { http, createConfig } from 'wagmi'
 import { injected } from 'wagmi/connectors'
+import { NETWORKS, getRpcUrl, getCurrentNetworkConfig } from './utils/networkConfig'
 
 // Define Ethereum Classic mainnet
 const ethereumClassic = {
-  id: 61,
-  name: 'Ethereum Classic',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Ether',
-    symbol: 'ETC',
-  },
-  rpcUrls: {
-    default: { http: ['https://etc.rivet.link'] },
-    public: { http: ['https://etc.rivet.link'] },
-  },
-  blockExplorers: {
-    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mainnet' },
-  },
-  testnet: false,
+  id: NETWORKS.mainnet.chainId,
+  name: NETWORKS.mainnet.name,
+  nativeCurrency: NETWORKS.mainnet.nativeCurrency,
+  rpcUrls: NETWORKS.mainnet.rpcUrls,
+  blockExplorers: NETWORKS.mainnet.blockExplorers,
+  testnet: NETWORKS.mainnet.testnet,
 }
 
 // Define Mordor testnet
 const mordor = {
-  id: 63,
-  name: 'Mordor',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Mordor Ether',
-    symbol: 'METC',
-  },
-  rpcUrls: {
-    default: { http: ['https://rpc.mordor.etccooperative.org'] },
-    public: { http: ['https://rpc.mordor.etccooperative.org'] },
-  },
-  blockExplorers: {
-    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mordor' },
-  },
-  testnet: true,
+  id: NETWORKS.mordor.chainId,
+  name: NETWORKS.mordor.name,
+  nativeCurrency: NETWORKS.mordor.nativeCurrency,
+  rpcUrls: NETWORKS.mordor.rpcUrls,
+  blockExplorers: NETWORKS.mordor.blockExplorers,
+  testnet: NETWORKS.mordor.testnet,
 }
 
 // Define Hardhat local network (for development)
 const hardhat = {
-  id: 1337,
-  name: 'Hardhat',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Ether',
-    symbol: 'ETH',
-  },
-  rpcUrls: {
-    default: { http: ['http://127.0.0.1:8545'] },
-    public: { http: ['http://127.0.0.1:8545'] },
-  },
-  testnet: true,
+  id: NETWORKS.hardhat.chainId,
+  name: NETWORKS.hardhat.name,
+  nativeCurrency: NETWORKS.hardhat.nativeCurrency,
+  rpcUrls: NETWORKS.hardhat.rpcUrls,
+  testnet: NETWORKS.hardhat.testnet,
 }
 
 // Get network ID from environment or default to Mordor testnet
@@ -60,8 +36,10 @@ const networkId = import.meta.env.VITE_NETWORK_ID
   ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
   : 63
 
-// Get RPC URL from environment
-const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
+// Get RPC URL from environment or use network default
+const mainnetRpcUrl = import.meta.env.VITE_MAINNET_RPC_URL || getRpcUrl('mainnet')
+const mordorRpcUrl = import.meta.env.VITE_MORDOR_RPC_URL || getRpcUrl('mordor')
+const hardhatRpcUrl = import.meta.env.VITE_HARDHAT_RPC_URL || getRpcUrl('hardhat')
 
 // Define supported chains
 const chains = [ethereumClassic, mordor, hardhat]
@@ -73,9 +51,9 @@ export const config = createConfig({
     injected({ target: 'metaMask' }),
   ],
   transports: {
-    [ethereumClassic.id]: http(),
-    [mordor.id]: http(rpcUrl),
-    [hardhat.id]: http('http://localhost:8545'),
+    [ethereumClassic.id]: http(mainnetRpcUrl),
+    [mordor.id]: http(mordorRpcUrl),
+    [hardhat.id]: http(hardhatRpcUrl),
   },
 })
 
