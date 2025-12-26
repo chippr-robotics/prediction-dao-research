@@ -641,3 +641,145 @@
 .scanner-container {
   margin-top: 24px;
 }
+
+/* User Roles Section */
+.user-roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-role-item {
+  padding: 16px;
+  background: var(--color-surface-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.role-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 12px;
+  background: var(--color-primary-alpha, rgba(54, 179, 126, 0.1));
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.premium-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #000;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.role-desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.no-roles-message {
+  text-align: center;
+  padding: 24px;
+  background: var(--color-surface-secondary);
+  border-radius: 8px;
+  border: 2px dashed var(--color-border);
+}
+
+.no-roles-message p {
+  margin: 0 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.get-roles-btn {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent, #667eea));
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.get-roles-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ClearPath Management Section */
+.clearpath-management-section {
+  background: linear-gradient(135deg, rgba(54, 179, 126, 0.05), rgba(102, 126, 234, 0.05));
+  padding: 20px !important;
+  border-radius: 8px;
+  border: 1px solid var(--color-primary);
+}
+
+.section-description {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.manage-org-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.manage-org-btn:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-1px);
+}
+
+/* Admin Section */
+.admin-section {
+  background: linear-gradient(135deg, rgba(237, 100, 166, 0.05), rgba(255, 77, 77, 0.05));
+  padding: 20px !important;
+  border-radius: 8px;
+  border: 1px solid var(--color-error, #f56565);
+}
+
+.admin-panel-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  background: var(--color-error);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-panel-btn:hover {
+  background: var(--color-error-dark, #c53030);
+  transform: translateY(-1px);
+}
+

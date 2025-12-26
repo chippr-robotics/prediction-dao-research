@@ -44,3 +44,6 @@ export {
   useScrollDirection,
   useScrollPast
 } from './useScrollDirection'
+
+// Role hooks
+export { useRoles } from './useRoles'
