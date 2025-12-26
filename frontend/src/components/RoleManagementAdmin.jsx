@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
+import { useNotification } from '../hooks/useUI'
 import { getAllUsersWithRoles, getUserRoles } from '../utils/roleStorage'
+import { isValidEthereumAddress } from '../utils/validation'
 import './RoleManagementAdmin.css'
 
 function RoleManagementAdmin() {
   const { hasRole, ROLES, ROLE_INFO, grantRoleToUser, revokeRoleFromUser } = useRoles()
   const { account } = useWeb3()
+  const { showNotification } = useNotification()
   const [allUsers, setAllUsers] = useState({})
   const [selectedUser, setSelectedUser] = useState(null)
   const [newUserAddress, setNewUserAddress] = useState('')
@@ -15,6 +18,7 @@ function RoleManagementAdmin() {
   const [activeTab, setActiveTab] = useState('users')
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [confirmRevoke, setConfirmRevoke] = useState(null)
 
   // Check if user has admin role
   const isAdmin = hasRole(ROLES.ADMIN)
@@ -33,39 +37,55 @@ function RoleManagementAdmin() {
   const handleGrantRole = () => {
     if (!newUserAddress || !selectedRole) {
       setErrorMessage('Please provide both wallet address and role')
+      showNotification('Please provide both wallet address and role', 'error')
       return
     }
 
-    // Basic validation for Ethereum address
-    if (!/^0x[a-fA-F0-9]{40}$/.test(newUserAddress)) {
+    // Validate Ethereum address
+    if (!isValidEthereumAddress(newUserAddress)) {
       setErrorMessage('Invalid Ethereum address format')
+      showNotification('Invalid Ethereum address format', 'error')
       return
     }
 
     const success = grantRoleToUser(newUserAddress.toLowerCase(), selectedRole)
     if (success) {
-      setSuccessMessage(`Successfully granted ${ROLE_INFO[selectedRole].name} to ${shortenAddress(newUserAddress)}`)
+      const message = `Successfully granted ${ROLE_INFO[selectedRole].name} to ${shortenAddress(newUserAddress)}`
+      setSuccessMessage(message)
+      showNotification(message, 'success')
       setNewUserAddress('')
       loadUsers()
       setTimeout(() => setSuccessMessage(''), 5000)
     } else {
-      setErrorMessage('Failed to grant role. Please check permissions.')
+      const message = 'Failed to grant role. Please check permissions.'
+      setErrorMessage(message)
+      showNotification(message, 'error')
       setTimeout(() => setErrorMessage(''), 5000)
     }
   }
 
   const handleRevokeRole = (userAddress, role) => {
-    if (window.confirm(`Are you sure you want to revoke ${ROLE_INFO[role].name} from ${shortenAddress(userAddress)}?`)) {
-      const success = revokeRoleFromUser(userAddress, role)
-      if (success) {
-        setSuccessMessage(`Successfully revoked ${ROLE_INFO[role].name} from ${shortenAddress(userAddress)}`)
-        loadUsers()
-        setTimeout(() => setSuccessMessage(''), 5000)
-      } else {
-        setErrorMessage('Failed to revoke role. Please check permissions.')
-        setTimeout(() => setErrorMessage(''), 5000)
-      }
+    setConfirmRevoke({ userAddress, role })
+  }
+
+  const confirmRevokeRole = () => {
+    if (!confirmRevoke) return
+    
+    const { userAddress, role } = confirmRevoke
+    const success = revokeRoleFromUser(userAddress, role)
+    if (success) {
+      const message = `Successfully revoked ${ROLE_INFO[role].name} from ${shortenAddress(userAddress)}`
+      setSuccessMessage(message)
+      showNotification(message, 'success')
+      loadUsers()
+      setTimeout(() => setSuccessMessage(''), 5000)
+    } else {
+      const message = 'Failed to revoke role. Please check permissions.'
+      setErrorMessage(message)
+      showNotification(message, 'error')
+      setTimeout(() => setErrorMessage(''), 5000)
     }
+    setConfirmRevoke(null)
   }
 
   const shortenAddress = (address) => {
@@ -126,6 +146,26 @@ function RoleManagementAdmin() {
         <div className="message-banner error" role="alert">
           <span className="message-icon">⚠</span>
           {errorMessage}
+        </div>
+      )}
+
+      {confirmRevoke && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog">
+            <h3>Confirm Revoke Role</h3>
+            <p>
+              Are you sure you want to revoke <strong>{ROLE_INFO[confirmRevoke.role].name}</strong> from{' '}
+              <code>{shortenAddress(confirmRevoke.userAddress)}</code>?
+            </p>
+            <div className="confirm-actions">
+              <button onClick={confirmRevokeRole} className="confirm-yes-btn">
+                Yes, Revoke
+              </button>
+              <button onClick={() => setConfirmRevoke(null)} className="confirm-no-btn">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

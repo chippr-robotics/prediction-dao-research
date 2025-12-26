@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
+import { useNotification } from '../../hooks/useUI'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import './RolePurchaseModal.css'
 
 function RolePurchaseModal({ onClose }) {
   const { ROLES, ROLE_INFO, grantRole } = useRoles()
   const { account, isConnected } = useWeb3()
+  const { showNotification } = useNotification()
   const [selectedRole, setSelectedRole] = useState(ROLES.CLEARPATH_USER)
   const [zkPublicKey, setZkPublicKey] = useState('')
   const [isPurchasing, setIsPurchasing] = useState(false)
@@ -21,7 +23,7 @@ function RolePurchaseModal({ onClose }) {
 
   const handlePurchase = async () => {
     if (!isConnected || !account) {
-      alert('Please connect your wallet first')
+      showNotification('Please connect your wallet first', 'error')
       return
     }
 
@@ -41,8 +43,10 @@ function RolePurchaseModal({ onClose }) {
         recordRolePurchase(account, selectedRole, {
           price: ROLE_PRICES[selectedRole],
           currency: 'USDC',
-          txHash: '0x' + Math.random().toString(16).substr(2, 64), // Mock tx hash
+          txHash: 'MOCK_TX_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9), // Mock tx hash - DO NOT USE IN PRODUCTION
         })
+
+        showNotification(`Successfully purchased ${ROLE_INFO[selectedRole].name}!`, 'success')
 
         // Move to registration step for ClearPath
         if (selectedRole === ROLES.CLEARPATH_USER) {
@@ -51,12 +55,12 @@ function RolePurchaseModal({ onClose }) {
           setPurchaseStep('complete')
         }
       } else {
-        alert('Failed to grant role')
+        showNotification('Failed to grant role', 'error')
         setPurchaseStep('select')
       }
     } catch (error) {
       console.error('Purchase error:', error)
-      alert('Purchase failed: ' + error.message)
+      showNotification('Purchase failed: ' + error.message, 'error')
       setPurchaseStep('select')
     } finally {
       setIsPurchasing(false)
@@ -65,7 +69,7 @@ function RolePurchaseModal({ onClose }) {
 
   const handleRegisterKey = async () => {
     if (!zkPublicKey.trim()) {
-      alert('Please enter your ZK public key')
+      showNotification('Please enter your ZK public key', 'error')
       return
     }
 
@@ -76,10 +80,11 @@ function RolePurchaseModal({ onClose }) {
       // In a real implementation, this would register the key with the ClearPath system
       await new Promise(resolve => setTimeout(resolve, 1500))
 
+      showNotification('ZK key registered successfully!', 'success')
       setPurchaseStep('complete')
     } catch (error) {
       console.error('Registration error:', error)
-      alert('Registration failed: ' + error.message)
+      showNotification('Registration failed: ' + error.message, 'error')
     } finally {
       setIsPurchasing(false)
     }
