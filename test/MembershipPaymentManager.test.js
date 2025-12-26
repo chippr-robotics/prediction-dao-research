@@ -355,9 +355,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
     it("Should process payment successfully", async function () {
       const amount = ethers.parseUnits("100", 6);
       
-      const tx = await paymentManager.processPayment(
-        buyer1.address,
-        MARKET_MAKER_ROLE,
+      const tx = await paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
         await mockToken1.getAddress(),
         amount,
         0 // tier 0
@@ -393,9 +391,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
       );
       
       await expect(
-        paymentManager.processPayment(
-          buyer1.address,
-          MARKET_MAKER_ROLE,
+        paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
           await mockToken1.getAddress(),
           ethers.parseUnits("100", 6),
           0
@@ -405,9 +401,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
 
     it("Should reject payment with insufficient amount", async function () {
       await expect(
-        paymentManager.processPayment(
-          buyer1.address,
-          MARKET_MAKER_ROLE,
+        paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
           await mockToken1.getAddress(),
           ethers.parseUnits("50", 6), // Less than required 100
           0
@@ -417,9 +411,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
 
     it("Should reject payment for role with no price set", async function () {
       await expect(
-        paymentManager.processPayment(
-          buyer1.address,
-          CLEARPATH_USER_ROLE, // No price set
+        paymentManager.processPayment(buyer1.address, buyer1.address, CLEARPATH_USER_ROLE, // No price set
           await mockToken1.getAddress(),
           ethers.parseUnits("100", 6),
           0
@@ -434,9 +426,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
       
       const amount = ethers.parseUnits("100", 6);
       
-      await paymentManager.processPayment(
-        buyer1.address,
-        MARKET_MAKER_ROLE,
+      await paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
         await mockToken1.getAddress(),
         amount,
         0
@@ -450,9 +440,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
     it("Should track user payment history", async function () {
       const amount = ethers.parseUnits("100", 6);
       
-      await paymentManager.processPayment(
-        buyer1.address,
-        MARKET_MAKER_ROLE,
+      await paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
         await mockToken1.getAddress(),
         amount,
         0
@@ -465,9 +453,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
     it("Should handle multiple payments from same user", async function () {
       const amount = ethers.parseUnits("100", 6);
       
-      await paymentManager.processPayment(
-        buyer1.address,
-        MARKET_MAKER_ROLE,
+      await paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
         await mockToken1.getAddress(),
         amount,
         0
@@ -480,9 +466,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
         ethers.parseUnits("250", 6)
       );
       
-      await paymentManager.processPayment(
-        buyer1.address,
-        CLEARPATH_USER_ROLE,
+      await paymentManager.processPayment(buyer1.address, buyer1.address, CLEARPATH_USER_ROLE,
         await mockToken1.getAddress(),
         ethers.parseUnits("250", 6),
         1 // tier 1
@@ -518,9 +502,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
       );
       
       // Process payment and get ID from event
-      const tx = await paymentManager.processPayment(
-        buyer1.address,
-        MARKET_MAKER_ROLE,
+      const tx = await paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
         await mockToken1.getAddress(),
         price,
         0
@@ -722,9 +704,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
       await paymentManager.connect(paymentAdmin).pause();
       
       await expect(
-        paymentManager.processPayment(
-          buyer1.address,
-          MARKET_MAKER_ROLE,
+        paymentManager.processPayment(buyer1.address, buyer1.address, MARKET_MAKER_ROLE,
           await mockToken1.getAddress(),
           price,
           0

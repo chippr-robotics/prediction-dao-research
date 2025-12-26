@@ -289,7 +289,8 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
     
     /**
      * @notice Process payment for a role purchase
-     * @param buyer Address of the buyer
+     * @param payer Address that will transfer the tokens (usually msg.sender or contract holding tokens)
+     * @param buyer Address of the actual buyer (for tracking purposes)
      * @param role Role identifier
      * @param paymentToken Token used for payment
      * @param amount Amount to pay
@@ -297,6 +298,7 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
      * @return paymentId Unique payment identifier
      */
     function processPayment(
+        address payer,
         address buyer,
         bytes32 role,
         address paymentToken,
@@ -311,8 +313,8 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
         require(requiredAmount > 0, "Price not set for this token");
         require(amount >= requiredAmount, "Insufficient payment amount");
         
-        // Transfer tokens from buyer to this contract
-        IERC20(paymentToken).safeTransferFrom(buyer, address(this), amount);
+        // Transfer tokens from payer to this contract
+        IERC20(paymentToken).safeTransferFrom(payer, address(this), amount);
         
         // Generate payment ID
         bytes32 paymentId = keccak256(

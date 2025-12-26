@@ -4,6 +4,9 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./MembershipPaymentManager.sol";
 
 /**
  * @title RoleManager
@@ -19,6 +22,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
  * 6. OVERSIGHT_COMMITTEE_ROLE - Independent verification body
  */
 contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
     
     // ========== Role Definitions ==========
     
@@ -34,6 +38,10 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     
     // Oversight & Verification
     bytes32 public constant OVERSIGHT_COMMITTEE_ROLE = keccak256("OVERSIGHT_COMMITTEE_ROLE");
+    
+    // ========== Payment Integration ==========
+    
+    MembershipPaymentManager public paymentManager;
     
     // ========== Role Metadata ==========
     
@@ -85,6 +93,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     
     event RoleMetadataUpdated(bytes32 indexed role, string name, uint256 minApprovals, uint256 timelockDelay);
     event RolePurchased(address indexed buyer, bytes32 indexed role, uint256 price, uint256 timestamp);
+    event RolePurchasedWithToken(address indexed buyer, bytes32 indexed role, address indexed paymentToken, uint256 price, uint256 timestamp);
     event ZKKeyRegistered(address indexed user, bytes32 indexed role, string zkPublicKey);
     event ActionProposed(bytes32 indexed actionId, bytes32 indexed role, address indexed target, bool isGrant);
     event ActionApproved(bytes32 indexed actionId, address indexed approver);
@@ -92,6 +101,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     event ActionCancelled(bytes32 indexed actionId, address indexed canceller);
     event EmergencyPaused(address indexed guardian);
     event EmergencyUnpaused(address indexed admin);
+    event PaymentManagerUpdated(address indexed oldManager, address indexed newManager);
     
     // ========== Constructor ==========
     
@@ -210,7 +220,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     // ========== Role Purchase Functions ==========
     
     /**
-     * @notice Purchase a premium role
+     * @notice Purchase a premium role with ETH (legacy method)
      * @param role The role to purchase
      */
     function purchaseRole(bytes32 role) external payable nonReentrant whenNotPaused {
@@ -243,6 +253,60 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         if (msg.value > metadata.price) {
             payable(msg.sender).transfer(msg.value - metadata.price);
         }
+    }
+    
+    /**
+     * @notice Purchase a premium role with ERC20 token
+     * @param role The role to purchase
+     * @param paymentToken The ERC20 token to use for payment
+     * @param amount The amount of tokens to pay
+     */
+    function purchaseRoleWithToken(
+        bytes32 role,
+        address paymentToken,
+        uint256 amount
+    ) external nonReentrant whenNotPaused {
+        require(address(paymentManager) != address(0), "Payment manager not set");
+        
+        RoleMetadata storage metadata = roleMetadata[role];
+        
+        require(metadata.isActive, "Role is not active");
+        require(metadata.isPremium, "Role is not purchasable");
+        require(!hasRole(role, msg.sender), "Already has role");
+        require(metadata.maxMembers == 0 || metadata.currentMembers < metadata.maxMembers, "Role at max capacity");
+        
+        // Transfer tokens from buyer to this contract
+        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Approve payment manager to transfer tokens from this contract
+        IERC20(paymentToken).safeIncreaseAllowance(address(paymentManager), amount);
+        
+        // Process payment through payment manager (payment manager will transfer from this contract)
+        bytes32 paymentId = paymentManager.processPayment(
+            address(this), // payer is this contract (we already have the tokens)
+            msg.sender,    // buyer is the actual user
+            role,
+            paymentToken,
+            amount,
+            0 // tier 0 for non-tiered purchases
+        );
+        
+        // Record purchase
+        purchases[msg.sender][role] = RolePurchase({
+            buyer: msg.sender,
+            role: role,
+            timestamp: block.timestamp,
+            price: amount,
+            zkPublicKey: "" // Can be set later via registerZKKey
+        });
+        
+        userPurchasedRoles[msg.sender].push(role);
+        
+        // Grant role immediately (no timelock for purchases)
+        _grantRole(role, msg.sender);
+        metadata.currentMembers++;
+        
+        emit RolePurchasedWithToken(msg.sender, role, paymentToken, amount, block.timestamp);
     }
     
     /**
@@ -390,6 +454,17 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     }
     
     // ========== Admin Functions ==========
+    
+    /**
+     * @notice Set the payment manager contract
+     * @param _paymentManager Address of MembershipPaymentManager contract
+     */
+    function setPaymentManager(address _paymentManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_paymentManager != address(0), "Invalid payment manager address");
+        address oldManager = address(paymentManager);
+        paymentManager = MembershipPaymentManager(_paymentManager);
+        emit PaymentManagerUpdated(oldManager, _paymentManager);
+    }
     
     /**
      * @notice Update role metadata (Core System Admin only)
