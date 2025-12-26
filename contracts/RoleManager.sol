@@ -327,7 +327,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         // If ZKKeyManager is set, use production key management
         if (address(zkKeyManager) != address(0)) {
             // Register key with ZKKeyManager for production verification
-            zkKeyManager.registerKey(zkPublicKey);
+            zkKeyManager.registerKeyFor(msg.sender, zkPublicKey);
         }
         
         // Store in local purchases mapping for backward compatibility
@@ -346,7 +346,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         require(address(zkKeyManager) != address(0), "ZK key manager not set");
         
         // Rotate key using ZKKeyManager
-        zkKeyManager.rotateKey(newZKPublicKey);
+        zkKeyManager.rotateKeyFor(msg.sender, newZKPublicKey);
         
         // Update local purchases mapping
         purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey = newZKPublicKey;
@@ -361,7 +361,8 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
         require(address(zkKeyManager) != address(0), "ZK key manager not set");
         
-        // Revoke key using ZKKeyManager
+        // Revoke key using ZKKeyManager - pass msg.sender as the user
+        // Note: This works because ZKKeyManager allows key owner to revoke their own key
         zkKeyManager.revokeKey(msg.sender);
         
         // Clear local purchases mapping

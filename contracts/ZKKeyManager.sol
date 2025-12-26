@@ -22,6 +22,7 @@ contract ZKKeyManager is AccessControl, Pausable {
     
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant CLEARPATH_USER_ROLE = keccak256("CLEARPATH_USER_ROLE");
+    bytes32 public constant DELEGATE_ROLE = keccak256("DELEGATE_ROLE"); // For contracts acting on behalf of users
     
     // ========== Key Status ==========
     
@@ -130,12 +131,30 @@ contract ZKKeyManager is AccessControl, Pausable {
      * @dev Validates key format and creates new key entry
      */
     function registerKey(string memory publicKey) external whenNotPaused {
+        _registerKeyFor(msg.sender, publicKey);
+    }
+    
+    /**
+     * @notice Register a new ZK public key for a user (delegate call)
+     * @param user The user to register the key for
+     * @param publicKey The zero-knowledge public key
+     * @dev Can only be called by contracts with DELEGATE_ROLE
+     */
+    function registerKeyFor(address user, string memory publicKey) external whenNotPaused {
+        require(hasRole(DELEGATE_ROLE, msg.sender), "Not authorized delegate");
+        _registerKeyFor(user, publicKey);
+    }
+    
+    /**
+     * @dev Internal function to register a key for a user
+     */
+    function _registerKeyFor(address user, string memory publicKey) internal {
         // Check user doesn't already have an active key
-        bytes32 existingKeyHash = currentKeyHash[msg.sender];
+        bytes32 existingKeyHash = currentKeyHash[user];
         if (existingKeyHash != bytes32(0)) {
             ZKKey storage existingKey = keys[existingKeyHash];
             if (existingKey.status == KeyStatus.ACTIVE && !_isExpired(existingKey)) {
-                revert KeyAlreadyExists(msg.sender);
+                revert KeyAlreadyExists(user);
             }
         }
         
@@ -143,7 +162,7 @@ contract ZKKeyManager is AccessControl, Pausable {
         _validateKeyFormat(publicKey);
         
         // Create key hash
-        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender, publicKey, block.timestamp));
+        bytes32 keyHash = keccak256(abi.encodePacked(user, publicKey, block.timestamp));
         
         // Calculate expiration
         uint256 expiresAt = requireKeyExpiration 
@@ -162,17 +181,17 @@ contract ZKKeyManager is AccessControl, Pausable {
         });
         
         // Update current key
-        currentKeyHash[msg.sender] = keyHash;
+        currentKeyHash[user] = keyHash;
         
         // Add to history
-        userKeyHistory[msg.sender].push(keyHash);
+        userKeyHistory[user].push(keyHash);
         
         // Initialize rate limiting
-        if (yearStartTime[msg.sender] == 0) {
-            yearStartTime[msg.sender] = block.timestamp;
+        if (yearStartTime[user] == 0) {
+            yearStartTime[user] = block.timestamp;
         }
         
-        emit KeyRegistered(msg.sender, keyHash, expiresAt, block.timestamp);
+        emit KeyRegistered(user, keyHash, expiresAt, block.timestamp);
     }
     
     // ========== Key Rotation ==========
@@ -183,9 +202,27 @@ contract ZKKeyManager is AccessControl, Pausable {
      * @dev Marks old key as ROTATED and registers new key
      */
     function rotateKey(string memory newPublicKey) external whenNotPaused {
-        bytes32 oldKeyHash = currentKeyHash[msg.sender];
+        _rotateKeyFor(msg.sender, newPublicKey);
+    }
+    
+    /**
+     * @notice Rotate to a new ZK public key for a user (delegate call)
+     * @param user The user to rotate the key for
+     * @param newPublicKey The new zero-knowledge public key
+     * @dev Can only be called by contracts with DELEGATE_ROLE
+     */
+    function rotateKeyFor(address user, string memory newPublicKey) external whenNotPaused {
+        require(hasRole(DELEGATE_ROLE, msg.sender), "Not authorized delegate");
+        _rotateKeyFor(user, newPublicKey);
+    }
+    
+    /**
+     * @dev Internal function to rotate a key for a user
+     */
+    function _rotateKeyFor(address user, string memory newPublicKey) internal {
+        bytes32 oldKeyHash = currentKeyHash[user];
         if (oldKeyHash == bytes32(0)) {
-            revert NoKeyRegistered(msg.sender);
+            revert NoKeyRegistered(user);
         }
         
         ZKKey storage oldKey = keys[oldKeyHash];
@@ -194,13 +231,13 @@ contract ZKKeyManager is AccessControl, Pausable {
         }
         
         // Check rate limiting
-        _checkRotationRateLimit(msg.sender);
+        _checkRotationRateLimit(user);
         
         // Validate new key format
         _validateKeyFormat(newPublicKey);
         
         // Create new key hash
-        bytes32 newKeyHash = keccak256(abi.encodePacked(msg.sender, newPublicKey, block.timestamp));
+        bytes32 newKeyHash = keccak256(abi.encodePacked(user, newPublicKey, block.timestamp));
         
         // Calculate expiration
         uint256 expiresAt = requireKeyExpiration 
@@ -222,15 +259,15 @@ contract ZKKeyManager is AccessControl, Pausable {
         });
         
         // Update current key
-        currentKeyHash[msg.sender] = newKeyHash;
+        currentKeyHash[user] = newKeyHash;
         
         // Add to history
-        userKeyHistory[msg.sender].push(newKeyHash);
+        userKeyHistory[user].push(newKeyHash);
         
         // Update rate limiting
-        rotationsThisYear[msg.sender]++;
+        rotationsThisYear[user]++;
         
-        emit KeyRotated(msg.sender, oldKeyHash, newKeyHash, block.timestamp);
+        emit KeyRotated(user, oldKeyHash, newKeyHash, block.timestamp);
     }
     
     // ========== Key Revocation ==========
@@ -238,11 +275,11 @@ contract ZKKeyManager is AccessControl, Pausable {
     /**
      * @notice Revoke a ZK public key
      * @param user Address of the key owner
-     * @dev Can be called by key owner or admin
+     * @dev Can be called by key owner, admin, or delegate (e.g., RoleManager)
      */
     function revokeKey(address user) external whenNotPaused {
-        // Check authorization
-        if (msg.sender != user && !hasRole(ADMIN_ROLE, msg.sender)) {
+        // Check authorization: user themselves, admin, or delegate
+        if (msg.sender != user && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(DELEGATE_ROLE, msg.sender)) {
             revert UnauthorizedRevocation(msg.sender, user);
         }
         
