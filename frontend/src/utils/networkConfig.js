@@ -22,6 +22,21 @@ export const PUBLIC_RPC_ENDPOINTS = {
   ],
 }
 
+// WebSocket endpoints for real-time event monitoring
+// Note: WebSocket support varies by provider - these are converted from HTTP URLs
+export const PUBLIC_WS_ENDPOINTS = {
+  mainnet: [
+    { url: 'wss://0xrpc.io/etc', name: '0xRPC WS' },
+  ],
+  mordor: [
+    // Most Mordor endpoints don't publicly expose WebSocket
+    // Will fallback to HTTP polling if WS not available
+  ],
+  hardhat: [
+    { url: 'ws://127.0.0.1:8545', name: 'Local Hardhat WS' },
+  ],
+}
+
 // Network configurations
 export const NETWORKS = {
   mainnet: {
@@ -133,6 +148,32 @@ export function getRpcUrl(networkKey) {
  */
 export function getAvailableEndpoints(networkKey) {
   return PUBLIC_RPC_ENDPOINTS[networkKey] || []
+}
+
+/**
+ * Get WebSocket URL from environment or default for a network
+ * @param {string} networkKey - The network key (mainnet, mordor, hardhat)
+ * @returns {string|null} WebSocket URL or null if not available
+ */
+export function getWsUrl(networkKey) {
+  // Check for environment variable override
+  const envKey = `VITE_${networkKey.toUpperCase()}_WS_URL`
+  if (import.meta.env[envKey]) {
+    return import.meta.env[envKey]
+  }
+  
+  // Return first available WebSocket endpoint for the network
+  const wsEndpoints = PUBLIC_WS_ENDPOINTS[networkKey]
+  return wsEndpoints && wsEndpoints.length > 0 ? wsEndpoints[0].url : null
+}
+
+/**
+ * Get all available WebSocket endpoints for a network
+ * @param {string} networkKey - The network key (mainnet, mordor, hardhat)
+ * @returns {Array} Array of WebSocket endpoint objects
+ */
+export function getAvailableWsEndpoints(networkKey) {
+  return PUBLIC_WS_ENDPOINTS[networkKey] || []
 }
 
 /**
