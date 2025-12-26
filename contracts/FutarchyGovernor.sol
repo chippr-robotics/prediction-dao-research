@@ -11,12 +11,18 @@ import "./ConditionalMarketFactory.sol";
 import "./PrivacyCoordinator.sol";
 import "./OracleResolver.sol";
 import "./RagequitModule.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title FutarchyGovernor
- * @notice Main governance coordinator integrating all futarchy components
+ * @notice Main governance coordinator with comprehensive role-based access control
  * @dev Coordinates prediction markets, privacy mechanisms, and proposal execution
  * Supports both native token and ERC20 token funding
+ * 
+ * RBAC INTEGRATION:
+ * - Proposal execution requires governance approval
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
+ * - CLEARPATH_USER_ROLE for DAO governance features
  */
 contract FutarchyGovernor is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -62,6 +68,9 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
     mapping(address => bool) public guardians;
 
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     event GovernanceProposalCreated(uint256 indexed governanceProposalId, uint256 indexed proposalId, uint256 indexed marketId);
     event ProposalPhaseChanged(uint256 indexed governanceProposalId, ProposalPhase newPhase);
@@ -80,6 +89,16 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
     }
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
 
     /**
      * @notice Initialize the contract (used for clones)

@@ -5,12 +5,18 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title ProposalRegistry
- * @notice Permissionless submission interface for funding requests
+ * @notice Permissionless submission interface for funding requests with role-based admin controls
  * @dev Manages proposals with standardized metadata and collateral bonding
  * Supports both native token (ETH/ETC) and ERC20 token funding
+ * 
+ * RBAC INTEGRATION:
+ * - Proposal submission is permissionless (anyone can submit with bond)
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
+ * - ClearPath users with CLEARPATH_USER_ROLE get benefits
  */
 contract ProposalRegistry is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -60,6 +66,9 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     address public governor;
 
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     event ProposalSubmitted(
         uint256 indexed proposalId,
@@ -82,6 +91,16 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     }
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
 
     /**
      * @notice Initialize the contract (used for clones)

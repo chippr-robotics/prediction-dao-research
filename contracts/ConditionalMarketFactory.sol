@@ -6,11 +6,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./ETCSwapV3Integration.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title ConditionalMarketFactory
  * @notice Automated deployment of pass-fail market pairs using Gnosis CTF standards
- * @dev Creates conditional prediction markets for proposals
+ * @dev Creates conditional prediction markets for proposals with role-based access control
  * 
  * TRADING INTEGRATION:
  * This contract now integrates with ETC Swap v3 contracts for production-ready DEX trading.
@@ -29,6 +30,11 @@ import "./ETCSwapV3Integration.sol";
  * Trading modes:
  * - ETCSwap mode: Full decentralized trading via Uniswap v3 pools
  * - Fallback mode: Simplified LMSR for testing and backwards compatibility
+ * 
+ * RBAC INTEGRATION:
+ * - Market creation requires MARKET_MAKER_ROLE
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
+ * - Tier limits enforced on market creation and trading
  */
 contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     /**
@@ -93,6 +99,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     // ETCSwap v3 integration
     ETCSwapV3Integration public etcSwapIntegration;
     bool public useETCSwap;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
     
     // Default initial price for pools (0.5 = equal probability)
     uint160 public constant DEFAULT_INITIAL_SQRT_PRICE = 79228162514264337593543950336; // sqrt(0.5) in Q64.96
@@ -171,6 +180,35 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     );
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
+    
+    /**
+     * @notice Modifier to check if user has MARKET_MAKER_ROLE
+     */
+    modifier onlyMarketMaker() {
+        require(address(roleManager) != address(0), "Role manager not set");
+        require(roleManager.hasRole(roleManager.MARKET_MAKER_ROLE(), msg.sender), "Requires MARKET_MAKER_ROLE");
+        _;
+    }
+    
+    /**
+     * @notice Modifier to check market creation limits for tiered members
+     */
+    modifier checkMarketCreationLimit() {
+        if (address(roleManager) != address(0) && roleManager.hasRole(roleManager.MARKET_MAKER_ROLE(), msg.sender)) {
+            require(roleManager.checkMarketCreationLimit(roleManager.MARKET_MAKER_ROLE()), "Market creation limit exceeded");
+        }
+        _;
+    }
 
     /**
      * @notice Get outcome labels for a specific bet type
@@ -271,7 +309,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 liquidityParameter,
         uint256 tradingPeriod,
         BetType betType
-    ) external onlyOwner returns (uint256 marketId) {
+    ) external checkMarketCreationLimit returns (uint256 marketId) {
+        // Allow either owner or market maker role
+        require(
+            msg.sender == owner() || 
+            (address(roleManager) != address(0) && roleManager.hasRole(roleManager.MARKET_MAKER_ROLE(), msg.sender)),
+            "Requires owner or MARKET_MAKER_ROLE"
+        );
         require(_proposalToMarketPlusOne[proposalId] == 0, "Market already exists");
         require(tradingPeriod >= MIN_TRADING_PERIOD && tradingPeriod <= MAX_TRADING_PERIOD, "Invalid trading period");
 
@@ -325,7 +369,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
      */
     function batchDeployMarkets(
         MarketCreationParams[] calldata params
-    ) external onlyOwner returns (uint256[] memory marketIds) {
+    ) external checkMarketCreationLimit returns (uint256[] memory marketIds) {
+        // Allow either owner or market maker role
+        require(
+            msg.sender == owner() || 
+            (address(roleManager) != address(0) && roleManager.hasRole(roleManager.MARKET_MAKER_ROLE(), msg.sender)),
+            "Requires owner or MARKET_MAKER_ROLE"
+        );
         require(params.length > 0, "Empty batch");
         require(params.length <= MAX_BATCH_SIZE, "Batch too large");
         

@@ -5,11 +5,16 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title RagequitModule
- * @notice Minority exit mechanism allowing dissenting token holders to exit
+ * @notice Minority exit mechanism with role-aware processing
  * @dev Implements Moloch-style ragequit for treasury protection
+ * 
+ * RBAC INTEGRATION:
+ * - Ragequit available to all token holders
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
  */
 contract RagequitModule is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -37,6 +42,9 @@ contract RagequitModule is Ownable, ReentrancyGuard {
     uint256 public constant RAGEQUIT_WINDOW = 7 days;
 
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     event RagequitWindowOpened(uint256 indexed proposalId, uint256 snapshotTime, uint256 executionTime);
     event RagequitExecuted(
@@ -55,6 +63,16 @@ contract RagequitModule is Ownable, ReentrancyGuard {
     }
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
 
     /**
      * @notice Initialize the contract (used for clones)

@@ -3,12 +3,17 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title WelfareMetricRegistry
- * @notice On-chain storage of democratically-selected protocol success measures
+ * @notice On-chain storage of democratically-selected protocol success measures with role-based management
  * @dev Manages welfare metrics with versioning and update mechanisms
  * Supports multiple metric categories: governance, financial, betting, and private-sector style
+ * 
+ * RBAC INTEGRATION:
+ * - Metric registration requires OPERATIONS_ADMIN_ROLE
+ * - Metric updates require OPERATIONS_ADMIN_ROLE
  */
 contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
     enum MetricCategory {
@@ -59,6 +64,9 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
     uint256 public constant TOTAL_WEIGHT = 10000; // 100% in basis points
 
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     event MetricProposed(uint256 indexed metricId, string name, string description, uint256 weight, MetricCategory category);
     event MetricActivated(uint256 indexed metricId);
@@ -67,6 +75,16 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
     event MetricValueRecorded(uint256 indexed metricId, uint256 value, uint256 timestamp, address reporter);
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
 
     /**
      * @notice Initialize the contract (used for clones)

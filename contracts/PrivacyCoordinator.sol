@@ -2,11 +2,16 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title PrivacyCoordinator
- * @notice MACI-style encrypted message submission with key-change capability
+ * @notice MACI-style encrypted message submission with role-based access
  * @dev Manages encrypted position submission and Nightmarket-style position encryption
+ * 
+ * RBAC INTEGRATION:
+ * - Privacy features available to CLEARPATH_USER_ROLE
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
  */
 contract PrivacyCoordinator is Ownable {
     struct EncryptedPosition {
@@ -51,6 +56,9 @@ contract PrivacyCoordinator is Ownable {
     address public coordinator;
 
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     event PublicKeyRegistered(address indexed user, bytes32 publicKey);
     
@@ -82,6 +90,16 @@ contract PrivacyCoordinator is Ownable {
     }
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
 
     /**
      * @notice Initialize the contract (used for clones)

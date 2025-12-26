@@ -3,11 +3,16 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title OracleResolver
- * @notice Multi-stage resolution with dispute mechanisms
+ * @notice Multi-stage resolution with dispute mechanisms and role-based oracle management
  * @dev Implements UMA-style escalation for oracle resolution
+ * 
+ * RBAC INTEGRATION:
+ * - Oracle reporting functions for designated reporters or role holders
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
  */
 contract OracleResolver is Ownable, ReentrancyGuard {
     enum ResolutionStage {
@@ -58,6 +63,9 @@ contract OracleResolver is Ownable, ReentrancyGuard {
     mapping(address => bool) public designatedReporters;
 
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     event ReportSubmitted(
         uint256 indexed proposalId,
@@ -77,6 +85,16 @@ contract OracleResolver is Ownable, ReentrancyGuard {
     event ReporterRemoved(address indexed reporter);
 
     constructor() Ownable(msg.sender) {}
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
+    }
 
     /**
      * @notice Initialize the contract (used for clones)
