@@ -309,7 +309,8 @@ describe("Real Payments Processing - E2E Tests", function () {
       await paymentManager.pause();
       
       // Purchases should fail
-      const [, , , , , , testUser] = await ethers.getSigners();
+      const signers = await ethers.getSigners();
+      const testUser = signers[6];
       await mockUSDC.mint(testUser.address, ethers.parseUnits("1000", 6));
       
       const price = ethers.parseUnits("200", 6); // Use current price
@@ -339,7 +340,8 @@ describe("Real Payments Processing - E2E Tests", function () {
 
   describe("E2E Scenario 8: Legacy ETH Compatibility", function () {
     it("Users can still purchase with ETH alongside ERC20", async function () {
-      const [, , , , , , , ethUser] = await ethers.getSigners();
+      const signers = await ethers.getSigners();
+      const ethUser = signers[7];
       const ethPrice = ethers.parseEther("250"); // Match metadata price for CLEARPATH
       
       // Purchase with ETH (legacy method) - using CLEARPATH to avoid duplicate
@@ -348,7 +350,7 @@ describe("Real Payments Processing - E2E Tests", function () {
       expect(await roleManager.hasRole(CLEARPATH_USER_ROLE, ethUser.address)).to.equal(true);
       
       // Verify both payment methods work in same system
-      const [, , , , , , , , tokenUser] = await ethers.getSigners();
+      const tokenUser = signers[8];
       await mockUSDC.mint(tokenUser.address, ethers.parseUnits("1000", 6));
       
       const usdcPrice = ethers.parseUnits("200", 6); // Use current price for MARKET_MAKER

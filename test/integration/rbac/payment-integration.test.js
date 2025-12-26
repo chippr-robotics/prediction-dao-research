@@ -373,7 +373,7 @@ describe("RoleManager + MembershipPaymentManager Integration Tests", function ()
       const payments = await paymentManager.getUserPayments(buyer1.address);
       const paymentId = payments[0];
       
-      // Mint tokens to payment manager for refund
+      // Mint tokens to payment manager for refund (simulating accumulated contract balance for refunds)
       await mockToken.mint(await paymentManager.getAddress(), ethers.parseUnits("100", 6));
       
       const balanceBefore = await mockToken.balanceOf(buyer1.address);
