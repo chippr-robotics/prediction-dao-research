@@ -1,9 +1,107 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useId } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
 import CurrencyToggle from '../ui/CurrencyToggle'
 import ShareModal from '../ui/ShareModal'
 import * as d3 from 'd3'
 import './MarketHeroCard.css'
+
+// Visualization constants
+const PRICE_CHART_CONFIG = {
+  DAYS: 30,
+  HEIGHT: 200,
+  MARGIN: { top: 20, right: 30, bottom: 30, left: 40 },
+  STROKE_WIDTH: 2.5,
+  INITIAL_OFFSET: 0.15,
+  RANDOM_OFFSET: 0.1,
+  DRIFT_FACTOR: 0.05,
+  RANDOM_CHANGE: 0.05,
+  MIN_PRICE: 0.1,
+  MAX_PRICE: 0.9
+}
+
+const ACTIVITY_CONFIG = {
+  HOURS: 24,
+  BASE_ACTIVITY: 20,
+  WEEKDAY_BUSINESS_HOURS_ACTIVITY: 70,
+  EVENING_ACTIVITY: 40,
+  BUSINESS_HOURS_START: 9,
+  BUSINESS_HOURS_END: 17,
+  EVENING_START: 6,
+  EVENING_END: 22,
+  RANDOM_VARIANCE: 30,
+  CELL_PADDING: 1,
+  LABEL_OFFSET: 35,
+  HOUR_LABEL_INTERVAL: 3
+}
+
+const GAUGE_CONFIG = {
+  SIZE: 200,
+  STROKE_WIDTH: 20,
+  ANIMATION_DURATION: 1000
+}
+
+// Mock data generators (outside component to prevent recreation)
+const generatePriceHistory = (currentPrice) => {
+  const data = []
+  let price = currentPrice - PRICE_CHART_CONFIG.INITIAL_OFFSET + Math.random() * PRICE_CHART_CONFIG.RANDOM_OFFSET
+  
+  for (let i = 0; i < PRICE_CHART_CONFIG.DAYS; i++) {
+    const date = new Date()
+    date.setDate(date.getDate() - (PRICE_CHART_CONFIG.DAYS - i))
+    
+    // Random walk with drift toward current price
+    const drift = (currentPrice - price) * PRICE_CHART_CONFIG.DRIFT_FACTOR
+    const randomChange = (Math.random() - 0.5) * PRICE_CHART_CONFIG.RANDOM_CHANGE
+    price = Math.max(PRICE_CHART_CONFIG.MIN_PRICE, Math.min(PRICE_CHART_CONFIG.MAX_PRICE, price + drift + randomChange))
+    
+    data.push({
+      date,
+      price: price * 100
+    })
+  }
+  
+  return data
+}
+
+const generateActivityData = () => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const data = []
+  
+  days.forEach((day, dayIndex) => {
+    for (let hour = 0; hour < ACTIVITY_CONFIG.HOURS; hour++) {
+      // Higher activity during business hours (9am-5pm) on weekdays
+      let baseActivity = ACTIVITY_CONFIG.BASE_ACTIVITY
+      if (dayIndex > 0 && dayIndex < 6 && hour >= ACTIVITY_CONFIG.BUSINESS_HOURS_START && hour <= ACTIVITY_CONFIG.BUSINESS_HOURS_END) {
+        baseActivity = ACTIVITY_CONFIG.WEEKDAY_BUSINESS_HOURS_ACTIVITY
+      } else if (hour >= ACTIVITY_CONFIG.EVENING_START && hour <= ACTIVITY_CONFIG.EVENING_END) {
+        baseActivity = ACTIVITY_CONFIG.EVENING_ACTIVITY
+      }
+      
+      const activity = baseActivity + Math.random() * ACTIVITY_CONFIG.RANDOM_VARIANCE
+      data.push({
+        day: dayIndex,
+        hour,
+        dayName: day,
+        value: activity
+      })
+    }
+  })
+  
+  return data
+}
+
+const generateHolderDistribution = () => {
+  return [
+    { range: '< 10', count: 145, percentage: 45, type: 'PASS' },
+    { range: '10-100', count: 89, percentage: 28, type: 'PASS' },
+    { range: '100-1K', count: 54, percentage: 17, type: 'PASS' },
+    { range: '> 1K', count: 32, percentage: 10, type: 'PASS' },
+    { range: '< 10', count: 112, percentage: 42, type: 'FAIL' },
+    { range: '10-100', count: 76, percentage: 29, type: 'FAIL' },
+    { range: '100-1K', count: 48, percentage: 18, type: 'FAIL' },
+    { range: '> 1K', count: 29, percentage: 11, type: 'FAIL' }
+  ]
+}
 
 function MarketHeroCard({ market, onTrade }) {
   const [tradeAmount, setTradeAmount] = useState('')
@@ -13,7 +111,12 @@ function MarketHeroCard({ market, onTrade }) {
   const priceChartRef = useRef(null)
   const activityHeatmapRef = useRef(null)
   const probabilityGaugeRef = useRef(null)
+  
+  // Generate unique IDs for SVG elements to avoid conflicts with multiple instances
+  const gradientId = useId()
+  const uniqueGradientId = `line-gradient-${gradientId}`
 
+  
   if (!market) {
     return null
   }
@@ -63,113 +166,52 @@ function MarketHeroCard({ market, onTrade }) {
 
   const yesProb = calculateImpliedProbability(market.passTokenPrice)
   const noProb = calculateImpliedProbability(market.failTokenPrice)
-
-  // Generate mock price history data
-  const generatePriceHistory = () => {
-    const days = 30
-    const data = []
-    const currentPrice = parseFloat(market.passTokenPrice)
-    let price = currentPrice - 0.15 + Math.random() * 0.1
-    
-    for (let i = 0; i < days; i++) {
-      const date = new Date()
-      date.setDate(date.getDate() - (days - i))
-      
-      // Random walk with drift toward current price
-      const drift = (currentPrice - price) * 0.05
-      const randomChange = (Math.random() - 0.5) * 0.05
-      price = Math.max(0.1, Math.min(0.9, price + drift + randomChange))
-      
-      data.push({
-        date,
-        price: price * 100
-      })
-    }
-    
-    return data
-  }
-
-  // Generate mock activity heatmap data
-  const generateActivityData = () => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const hours = 24
-    const data = []
-    
-    days.forEach((day, dayIndex) => {
-      for (let hour = 0; hour < hours; hour++) {
-        // Higher activity during business hours (9am-5pm) on weekdays
-        let baseActivity = 20
-        if (dayIndex > 0 && dayIndex < 6 && hour >= 9 && hour <= 17) {
-          baseActivity = 70
-        } else if (hour >= 6 && hour <= 22) {
-          baseActivity = 40
-        }
-        
-        const activity = baseActivity + Math.random() * 30
-        data.push({
-          day: dayIndex,
-          hour,
-          dayName: day,
-          value: activity
-        })
-      }
-    })
-    
-    return data
-  }
-
-  // Generate mock holder distribution data
-  const generateHolderDistribution = () => {
-    return [
-      { range: '< 10', count: 145, percentage: 45, type: 'PASS' },
-      { range: '10-100', count: 89, percentage: 28, type: 'PASS' },
-      { range: '100-1K', count: 54, percentage: 17, type: 'PASS' },
-      { range: '> 1K', count: 32, percentage: 10, type: 'PASS' },
-      { range: '< 10', count: 112, percentage: 42, type: 'FAIL' },
-      { range: '10-100', count: 76, percentage: 29, type: 'FAIL' },
-      { range: '100-1K', count: 48, percentage: 18, type: 'FAIL' },
-      { range: '> 1K', count: 29, percentage: 11, type: 'FAIL' }
-    ]
-  }
+  
+  // Memoize mock data to prevent regeneration on every render
+  const holderDistribution = useMemo(() => generateHolderDistribution(), [])
+  const totalTrades = useMemo(() => Math.floor(Math.random() * 1000) + 100, [])
 
   // Render price history chart
+  // Updates when passTokenPrice changes to regenerate chart with new probability data
   useEffect(() => {
     if (!priceChartRef.current) return
 
-    const data = generatePriceHistory()
+    const currentPrice = parseFloat(market.passTokenPrice)
+    const data = generatePriceHistory(currentPrice)
     const container = priceChartRef.current
     const width = container.clientWidth
-    const height = 200
-    const margin = { top: 20, right: 30, bottom: 30, left: 40 }
+    const { HEIGHT, MARGIN, STROKE_WIDTH } = PRICE_CHART_CONFIG
 
-    // Clear previous chart
+    // Clear previous chart to prevent overlapping renders
     d3.select(container).selectAll('*').remove()
 
     const svg = d3.select(container)
       .append('svg')
       .attr('width', width)
-      .attr('height', height)
+      .attr('height', HEIGHT)
       .attr('role', 'img')
       .attr('aria-label', 'Price history chart showing market probability over time')
 
     const g = svg.append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`)
+      .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`)
 
-    const chartWidth = width - margin.left - margin.right
-    const chartHeight = height - margin.top - margin.bottom
+    const chartWidth = width - MARGIN.left - MARGIN.right
+    const chartHeight = HEIGHT - MARGIN.top - MARGIN.bottom
 
+    // X axis: time scale mapping dates to horizontal position
     const x = d3.scaleTime()
       .domain(d3.extent(data, d => d.date))
       .range([0, chartWidth])
 
+    // Y axis: linear scale for probability percentage (0-100%)
     const y = d3.scaleLinear()
       .domain([0, 100])
       .range([chartHeight, 0])
 
-    // Add gradient
+    // Add gradient fill for area under the line
     const gradient = svg.append('defs')
       .append('linearGradient')
-      .attr('id', 'line-gradient')
+      .attr('id', uniqueGradientId)
       .attr('x1', '0%')
       .attr('y1', '0%')
       .attr('x2', '0%')
@@ -185,7 +227,7 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('stop-color', '#3b82f6')
       .attr('stop-opacity', 0.1)
 
-    // Add area under line
+    // Create area generator for filled region under line
     const area = d3.area()
       .x(d => x(d.date))
       .y0(chartHeight)
@@ -194,10 +236,10 @@ function MarketHeroCard({ market, onTrade }) {
 
     g.append('path')
       .datum(data)
-      .attr('fill', 'url(#line-gradient)')
+      .attr('fill', `url(#${uniqueGradientId})`)
       .attr('d', area)
 
-    // Add line
+    // Create line generator for probability trend line
     const line = d3.line()
       .x(d => x(d.date))
       .y(d => y(d.price))
@@ -207,30 +249,35 @@ function MarketHeroCard({ market, onTrade }) {
       .datum(data)
       .attr('fill', 'none')
       .attr('stroke', '#3b82f6')
-      .attr('stroke-width', 2.5)
+      .attr('stroke-width', STROKE_WIDTH)
       .attr('d', line)
 
-    // Add axes
+    // Add X axis with date labels
     g.append('g')
       .attr('transform', `translate(0,${chartHeight})`)
       .call(d3.axisBottom(x).ticks(5))
       .attr('color', '#9ca3af')
 
+    // Add Y axis with percentage labels
     g.append('g')
       .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'))
       .attr('color', '#9ca3af')
 
-  }, [market])
+  }, [market.passTokenPrice, uniqueGradientId])
 
   // Render activity heatmap
+  // Regenerates when market changes to show updated activity patterns
   useEffect(() => {
     if (!activityHeatmapRef.current) return
 
     const data = generateActivityData()
     const container = activityHeatmapRef.current
     const width = container.clientWidth
-    const cellSize = Math.floor(width / 25) // 24 hours + label space
-    const height = cellSize * 8 // 7 days + label
+    const { CELL_PADDING, LABEL_OFFSET, HOUR_LABEL_INTERVAL } = ACTIVITY_CONFIG
+    
+    // Calculate cell size based on container width (24 hours + label space)
+    const cellSize = Math.floor(width / 25)
+    const height = cellSize * 8 // 7 days + label row
 
     // Clear previous chart
     d3.select(container).selectAll('*').remove()
@@ -242,12 +289,13 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('role', 'img')
       .attr('aria-label', 'Activity heatmap showing market trading activity by day and hour')
 
+    // Color scale: higher activity values map to darker blue
     const colorScale = d3.scaleSequential(d3.interpolateBlues)
       .domain([0, 100])
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-    // Add day labels
+    // Add day labels on left side
     svg.selectAll('.day-label')
       .data(days)
       .enter()
@@ -259,26 +307,26 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('fill', '#9ca3af')
       .text(d => d)
 
-    // Add cells
+    // Add heatmap cells with activity data
     svg.selectAll('.activity-cell')
       .data(data)
       .enter()
       .append('rect')
       .attr('class', 'activity-cell')
-      .attr('x', d => (d.hour + 1) * cellSize + 35)
+      .attr('x', d => (d.hour + 1) * cellSize + LABEL_OFFSET)
       .attr('y', d => d.day * cellSize + cellSize)
-      .attr('width', cellSize - 1)
-      .attr('height', cellSize - 1)
+      .attr('width', cellSize - CELL_PADDING)
+      .attr('height', cellSize - CELL_PADDING)
       .attr('rx', 2)
       .attr('fill', d => colorScale(d.value))
       .attr('opacity', 0.8)
       .append('title')
       .text(d => `${d.dayName} ${d.hour}:00 - Activity: ${Math.round(d.value)}`)
 
-    // Add hour labels (every 3 hours)
-    for (let i = 0; i < 24; i += 3) {
+    // Add hour labels at top (every 3 hours to avoid crowding)
+    for (let i = 0; i < ACTIVITY_CONFIG.HOURS; i += HOUR_LABEL_INTERVAL) {
       svg.append('text')
-        .attr('x', (i + 1) * cellSize + 35 + cellSize / 2)
+        .attr('x', (i + 1) * cellSize + LABEL_OFFSET + cellSize / 2)
         .attr('y', 12)
         .attr('text-anchor', 'middle')
         .attr('font-size', '11px')
@@ -289,13 +337,13 @@ function MarketHeroCard({ market, onTrade }) {
   }, [market])
 
   // Render probability gauge
+  // Updates when passTokenPrice changes to show current market sentiment
   useEffect(() => {
     if (!probabilityGaugeRef.current) return
 
     const container = probabilityGaugeRef.current
-    const size = 200
-    const strokeWidth = 20
-    const radius = (size - strokeWidth) / 2
+    const { SIZE, STROKE_WIDTH, ANIMATION_DURATION } = GAUGE_CONFIG
+    const radius = (SIZE - STROKE_WIDTH) / 2
     const circumference = 2 * Math.PI * radius
     const probability = parseFloat(market.passTokenPrice)
 
@@ -304,38 +352,43 @@ function MarketHeroCard({ market, onTrade }) {
 
     const svg = d3.select(container)
       .append('svg')
-      .attr('width', size)
-      .attr('height', size)
+      .attr('width', SIZE)
+      .attr('height', SIZE)
       .attr('role', 'img')
       .attr('aria-label', `Market probability gauge showing ${(probability * 100).toFixed(1)}% chance`)
 
+    // Center group for circular gauge
     const g = svg.append('g')
-      .attr('transform', `translate(${size / 2},${size / 2})`)
+      .attr('transform', `translate(${SIZE / 2},${SIZE / 2})`)
 
-    // Background circle
+    // Background circle (full ring)
     g.append('circle')
       .attr('r', radius)
       .attr('fill', 'none')
       .attr('stroke', '#1f2937')
-      .attr('stroke-width', strokeWidth)
+      .attr('stroke-width', STROKE_WIDTH)
 
-    // Probability circle
+    // Probability circle (animated progress ring)
     const progressCircle = g.append('circle')
       .attr('r', radius)
       .attr('fill', 'none')
       .attr('stroke', probability >= 0.5 ? '#22c55e' : '#ef4444')
-      .attr('stroke-width', strokeWidth)
+      .attr('stroke-width', STROKE_WIDTH)
       .attr('stroke-linecap', 'round')
-      .attr('transform', 'rotate(-90)')
+      .attr('transform', 'rotate(-90)') // Start from top
       .attr('stroke-dasharray', circumference)
       .attr('stroke-dashoffset', circumference)
 
-    // Animate
+    // Check for reduced motion preference for accessibility
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const animationDuration = prefersReducedMotion ? 0 : ANIMATION_DURATION
+
+    // Animate progress ring to show probability
     progressCircle.transition()
-      .duration(1000)
+      .duration(animationDuration)
       .attr('stroke-dashoffset', circumference * (1 - probability))
 
-    // Center text
+    // Center percentage text
     g.append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '-0.2em')
@@ -344,6 +397,7 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('fill', probability >= 0.5 ? '#22c55e' : '#ef4444')
       .text(`${(probability * 100).toFixed(0)}%`)
 
+    // Label below percentage
     g.append('text')
       .attr('text-anchor', 'middle')
       .attr('dy', '1.5em')
@@ -351,7 +405,7 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('fill', '#9ca3af')
       .text('YES Probability')
 
-  }, [market])
+  }, [market.passTokenPrice])
 
   return (
     <div className="market-hero-card">
@@ -466,7 +520,7 @@ function MarketHeroCard({ market, onTrade }) {
 
           <div className="stat-card">
             <span className="stat-label">Total Trades</span>
-            <span className="stat-number">{Math.floor(Math.random() * 1000) + 100}</span>
+            <span className="stat-number">{totalTrades}</span>
           </div>
 
           <div className="stat-card">
@@ -485,7 +539,7 @@ function MarketHeroCard({ market, onTrade }) {
       {/* Activity Heatmap */}
       <div className="chart-section">
         <h3>Market Activity Heatmap</h3>
-        <p className="chart-description">Trading activity by day and hour (lighter = more active)</p>
+        <p className="chart-description">Trading activity by day and hour (darker = more active)</p>
         <div ref={activityHeatmapRef} className="activity-heatmap"></div>
       </div>
 
@@ -495,7 +549,7 @@ function MarketHeroCard({ market, onTrade }) {
         <div className="holder-distribution">
           <div className="distribution-column">
             <h4 className="distribution-title yes-title">YES Token Holders</h4>
-            {generateHolderDistribution().filter(h => h.type === 'PASS').map((holder, idx) => (
+            {holderDistribution.filter(h => h.type === 'PASS').map((holder, idx) => (
               <div key={idx} className="holder-bar-container">
                 <div className="holder-label">
                   <span className="holder-range">{holder.range}</span>
@@ -514,7 +568,7 @@ function MarketHeroCard({ market, onTrade }) {
 
           <div className="distribution-column">
             <h4 className="distribution-title no-title">NO Token Holders</h4>
-            {generateHolderDistribution().filter(h => h.type === 'FAIL').map((holder, idx) => (
+            {holderDistribution.filter(h => h.type === 'FAIL').map((holder, idx) => (
               <div key={idx} className="holder-bar-container">
                 <div className="holder-label">
                   <span className="holder-range">{holder.range}</span>
