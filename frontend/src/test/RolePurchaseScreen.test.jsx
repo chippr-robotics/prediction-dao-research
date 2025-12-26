@@ -93,8 +93,12 @@ describe('RolePurchaseScreen', () => {
       </Web3Context.Provider>
     )
     
-    expect(screen.getByText('Connect Your Wallet')).toBeInTheDocument()
-    expect(screen.getByText(/Please connect your wallet to purchase roles/i)).toBeInTheDocument()
+    // Should still show the products but with a warning
+    expect(screen.getByText('Unlock Premium Access')).toBeInTheDocument()
+    expect(screen.getByText(/Connect your wallet to purchase roles/i)).toBeInTheDocument()
+    // Products should still be visible
+    const marketMakerElements = screen.getAllByText('Market Maker')
+    expect(marketMakerElements.length).toBeGreaterThan(0)
   })
 
   it('shows features list for each role', () => {

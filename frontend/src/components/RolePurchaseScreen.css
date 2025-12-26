@@ -27,9 +27,27 @@
 }
 
 .header-subtitle {
-  margin: 0;
+  margin: 0 0 1rem;
   font-size: 1.125rem;
   color: var(--color-text-secondary);
+}
+
+.wallet-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  color: #f59e0b;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.warning-icon {
+  font-size: 1.25rem;
 }
 
 /* Connect Wallet Prompt */

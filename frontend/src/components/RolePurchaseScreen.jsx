@@ -222,20 +222,6 @@ function RolePurchaseScreen() {
     setPurchaseStep('select')
   }
 
-  if (!isConnected) {
-    return (
-      <div className="role-purchase-screen">
-        <div className="purchase-container">
-          <div className="connect-wallet-prompt">
-            <div className="prompt-icon">🔌</div>
-            <h2>Connect Your Wallet</h2>
-            <p>Please connect your wallet to purchase roles and access premium features.</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="role-purchase-screen">
       <div className="purchase-container">
@@ -245,6 +231,12 @@ function RolePurchaseScreen() {
           <p className="header-subtitle">
             Choose individual roles or save with bundle packages
           </p>
+          {!isConnected && (
+            <div className="wallet-warning">
+              <span className="warning-icon">⚠️</span>
+              Connect your wallet to purchase roles
+            </div>
+          )}
         </header>
 
         {purchaseStep === 'select' && (
@@ -371,10 +363,15 @@ function RolePurchaseScreen() {
                   </div>
                   <button
                     onClick={handlePurchase}
-                    disabled={isPurchasing}
+                    disabled={isPurchasing || !isConnected}
                     className="purchase-button"
                   >
-                    {isPurchasing ? 'Processing...' : 'Complete Purchase'}
+                    {!isConnected 
+                      ? 'Connect Wallet to Purchase'
+                      : isPurchasing 
+                        ? 'Processing...' 
+                        : 'Complete Purchase'
+                    }
                   </button>
                 </div>
               </div>
