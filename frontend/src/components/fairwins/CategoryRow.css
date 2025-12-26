@@ -1,13 +1,16 @@
 .category-row {
-  margin-bottom: 1.5rem; /* Reduced from 2.5rem for more compact layout */
+  margin-bottom: 1rem; /* Compact spacing between rows */
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden; /* Prevent horizontal overflow from this row */
 }
 
 .category-row-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem; /* Reduced from 1rem */
-  padding: 0 0.5rem; /* Reduced from 1rem */
+  margin-bottom: 0.5rem; /* Reduced spacing between header and cards */
+  padding: 0 0.5rem;
 }
 
 .category-title-group {
@@ -74,11 +77,11 @@
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;
-  padding: 0.5rem 0 1rem;
-  margin: 0 -0.5rem;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
+  padding: 0.25rem 0 0.5rem; /* Reduced padding */
   cursor: grab;
+  width: 100%;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch; /* Better touch scrolling on iOS */
 }
 
 .category-scroller:active {
@@ -104,43 +107,59 @@
   background: rgba(59, 130, 246, 0.5);
 }
 
-.scroller-track-infinite {
+.scroller-track {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem; /* Reduced gap */
   width: max-content;
+  padding: 0 0.5rem; /* Add some padding at start/end */
 }
 
 .scroller-item-small {
-  flex: 0 0 280px;
+  flex: 0 0 auto; /* Don't grow/shrink, use natural size */
+  width: 260px; /* Fixed width for cards */
+  min-width: 260px;
+  max-width: 260px;
   scroll-snap-align: start;
 }
 
 .scroller-item-small .market-tile {
-  width: 280px;
+  width: 100%;
   height: 100%;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .category-row-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
+    flex-direction: row; /* Keep horizontal on mobile too */
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem;
   }
 
   .category-row-header h2 {
-    font-size: 1.25rem;
+    font-size: 1rem;
+  }
+
+  .market-count {
+    font-size: 0.7rem;
   }
 
   .scroll-controls {
-    align-self: flex-end;
+    display: none; /* Hide scroll buttons on mobile - use swipe instead */
   }
 
   .scroller-item-small {
-    flex: 0 0 240px;
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
   }
+}
 
-  .scroller-item-small .market-tile {
-    width: 240px;
+/* Large screens - cards span nicely */
+@media (min-width: 1200px) {
+  .scroller-item-small {
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
   }
 }
