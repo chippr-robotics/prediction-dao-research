@@ -34,68 +34,25 @@
   justify-content: center;
 }
 
-/* SVG container */
+/* SVG/Image container */
 .clover-svg {
   width: 100%;
   height: 100%;
-}
-
-/* Clover leaf animation - expanding from center */
-.clover-leaf {
-  transform-origin: center;
-  animation: expandLeaf 1.5s ease-out forwards;
+  animation: logoFadeIn 1.5s ease-out forwards;
   opacity: 0;
 }
 
-.clover-leaf:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.clover-leaf:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.clover-leaf:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-.clover-leaf:nth-child(4) {
-  animation-delay: 0.45s;
-}
-
-@keyframes expandLeaf {
+@keyframes logoFadeIn {
   0% {
-    transform: scale(0) rotate(-45deg);
+    transform: scale(0.3);
     opacity: 0;
   }
   60% {
-    transform: scale(1.1) rotate(0deg);
+    transform: scale(1.05);
     opacity: 1;
   }
   100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-/* Checkmark animation - draws in after leaves expand */
-.checkmark {
-  stroke-dasharray: 50;
-  stroke-dashoffset: 50;
-  animation: drawCheckmark 0.6s ease-out 1.2s forwards;
-  opacity: 0;
-}
-
-@keyframes drawCheckmark {
-  0% {
-    stroke-dashoffset: 50;
-    opacity: 0;
-  }
-  1% {
-    opacity: 1;
-  }
-  100% {
-    stroke-dashoffset: 0;
+    transform: scale(1);
     opacity: 1;
   }
 }
@@ -151,8 +108,7 @@
 
 /* Accessibility: Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .clover-leaf,
-  .checkmark {
+  .clover-svg {
     animation: none;
     opacity: 1;
     transform: none;

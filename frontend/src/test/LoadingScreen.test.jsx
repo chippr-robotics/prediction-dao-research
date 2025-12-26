@@ -62,24 +62,18 @@ describe('LoadingScreen Component', () => {
   })
 
   describe('SVG Animation Elements', () => {
-    it('renders clover with four leaves', () => {
+    it('renders logo image', () => {
       const { container } = render(<LoadingScreen visible={true} />)
-      // Count circles with className containing 'clover-leaf'
-      const leaves = container.querySelectorAll('circle')
-      // 4 leaf circles + 1 center circle = 5 total circles
-      expect(leaves.length).toBeGreaterThanOrEqual(4)
+      const logo = container.querySelector('img')
+      expect(logo).toBeTruthy()
+      expect(logo).toHaveAttribute('src', '/assets/fairwins_no-text_logo.svg')
     })
 
-    it('renders checkmark path', () => {
+    it('logo has proper alt attribute for accessibility', () => {
       const { container } = render(<LoadingScreen visible={true} />)
-      const checkmark = container.querySelector('path')
-      expect(checkmark).toBeTruthy()
-    })
-
-    it('renders SVG with proper viewBox', () => {
-      const { container } = render(<LoadingScreen visible={true} />)
-      const svg = container.querySelector('svg')
-      expect(svg).toHaveAttribute('viewBox', '0 0 120 120')
+      const logo = container.querySelector('img')
+      expect(logo).toHaveAttribute('alt', '')
+      expect(logo).toHaveAttribute('aria-hidden', 'true')
     })
   })
 

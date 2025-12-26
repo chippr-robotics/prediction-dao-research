@@ -71,10 +71,6 @@ const LoadingScreen = ({
     animated ? styles.animated : ''
   ].filter(Boolean).join(' ')
 
-  // FairWins brand color - Kelly Green from design system
-  const cloverColor = 'var(--brand-primary, #2D7A4F)'
-  const checkColor = 'var(--brand-secondary, #34A853)'
-
   return (
     <div 
       className={containerClasses}
@@ -85,70 +81,12 @@ const LoadingScreen = ({
       aria-label={`${text}...`}
     >
       <div className={logoClasses}>
-        <svg 
+        <img 
+          src="/assets/fairwins_no-text_logo.svg"
+          alt=""
           className={styles['clover-svg']}
-          viewBox="0 0 120 120" 
-          fill="none" 
-          xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
-        >
-          {/* Four-leaf clover - each leaf is a circle positioned at cardinal points */}
-          
-          {/* Top leaf */}
-          <circle 
-            className={styles['clover-leaf']}
-            cx="60" 
-            cy="30" 
-            r="18" 
-            fill={cloverColor}
-          />
-          
-          {/* Right leaf */}
-          <circle 
-            className={styles['clover-leaf']}
-            cx="90" 
-            cy="60" 
-            r="18" 
-            fill={cloverColor}
-          />
-          
-          {/* Bottom leaf */}
-          <circle 
-            className={styles['clover-leaf']}
-            cx="60" 
-            cy="90" 
-            r="18" 
-            fill={cloverColor}
-          />
-          
-          {/* Left leaf */}
-          <circle 
-            className={styles['clover-leaf']}
-            cx="30" 
-            cy="60" 
-            r="18" 
-            fill={cloverColor}
-          />
-          
-          {/* Center circle to create clover shape */}
-          <circle 
-            cx="60" 
-            cy="60" 
-            r="12" 
-            fill={cloverColor}
-          />
-          
-          {/* Checkmark in center - drawn with stroke animation */}
-          <path 
-            className={styles.checkmark}
-            d="M 52 60 L 57 66 L 70 50" 
-            stroke={checkColor}
-            strokeWidth="4" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </svg>
+        />
       </div>
       
       {text && (
