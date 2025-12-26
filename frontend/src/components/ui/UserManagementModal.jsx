@@ -6,7 +6,6 @@ import { useTheme } from '../../hooks/useTheme'
 import { useNetworkContext } from '../../contexts/NetworkContext'
 import { NETWORKS, PUBLIC_RPC_ENDPOINTS } from '../../utils/networkConfig'
 import SwapPanel from '../fairwins/SwapPanel'
-import QRScanner from './QRScanner'
 import './UserManagementModal.css'
 
 function UserManagementModal({ onScanMarket }) {
@@ -18,7 +17,6 @@ function UserManagementModal({ onScanMarket }) {
   const { selectedNetwork, switchNetwork, currentNetwork, currentRpcUrl } = useNetworkContext()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
-  const [showScanner, setShowScanner] = useState(false)
 
   const handleConnect = async () => {
     await connectWallet()
@@ -70,15 +68,14 @@ function UserManagementModal({ onScanMarket }) {
 
   return (
     <div className="user-management-modal">
-      <div className="modal-header-section">
-        <h2>User Management</h2>
-        {isConnected && (
+      {isConnected && (
+        <div className="modal-header-section">
           <div className="wallet-info-header">
             <span className="wallet-address-display">{shortenAddress(account)}</span>
             <span className={`status-dot ${isConnected ? 'connected' : ''}`} aria-hidden="true"></span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {!isConnected ? (
         <div className="connect-section">
@@ -108,27 +105,11 @@ function UserManagementModal({ onScanMarket }) {
             </button>
             <button
               role="tab"
-              aria-selected={activeTab === 'settings'}
-              className={`tab ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
-            >
-              Settings
-            </button>
-            <button
-              role="tab"
               aria-selected={activeTab === 'search'}
               className={`tab ${activeTab === 'search' ? 'active' : ''}`}
               onClick={() => setActiveTab('search')}
             >
-              Search
-            </button>
-            <button
-              role="tab"
-              aria-selected={activeTab === 'scan'}
-              className={`tab ${activeTab === 'scan' ? 'active' : ''}`}
-              onClick={() => setActiveTab('scan')}
-            >
-              Scan QR
+              Search Markets
             </button>
             <button
               role="tab"
@@ -136,7 +117,7 @@ function UserManagementModal({ onScanMarket }) {
               className={`tab ${activeTab === 'swap' ? 'active' : ''}`}
               onClick={() => setActiveTab('swap')}
             >
-              Swap
+              Swap Tokens
             </button>
             <button
               role="tab"
@@ -144,7 +125,7 @@ function UserManagementModal({ onScanMarket }) {
               className={`tab ${activeTab === 'launch' ? 'active' : ''}`}
               onClick={() => setActiveTab('launch')}
             >
-              Launch
+              Launch Market
             </button>
           </div>
 
@@ -338,32 +319,6 @@ function UserManagementModal({ onScanMarket }) {
                 <div className="search-help">
                   <p>Search for prediction markets by title, category, or description.</p>
                 </div>
-              </div>
-            )}
-
-            {activeTab === 'scan' && (
-              <div className="scan-section" role="tabpanel">
-                <h3>Scan QR Code</h3>
-                <p className="scan-description">
-                  Scan a QR code to quickly navigate to a market or share content.
-                </p>
-                <button 
-                  className="open-scanner-btn"
-                  onClick={() => setShowScanner(true)}
-                >
-                  <span aria-hidden="true">📷</span>
-                  Open QR Scanner
-                </button>
-                
-                {showScanner && (
-                  <div className="scanner-container">
-                    <QRScanner 
-                      isOpen={showScanner}
-                      onClose={() => setShowScanner(false)}
-                      onScanSuccess={handleScanSuccess}
-                    />
-                  </div>
-                )}
               </div>
             )}
 

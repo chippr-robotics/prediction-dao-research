@@ -14,10 +14,16 @@ afterEach(() => {
 // Mock window.ethereum for Web3 tests
 global.window = global.window || {}
 global.window.ethereum = {
-  request: vi.fn(),
+  request: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890'),
   on: vi.fn(),
   removeListener: vi.fn(),
   isMetaMask: true,
+  selectedAddress: '0x1234567890123456789012345678901234567890',
+  // Mock methods needed by ethers BrowserProvider
+  send: vi.fn().mockResolvedValue({}),
+  getSigner: vi.fn().mockResolvedValue({
+    getAddress: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890')
+  })
 }
 
 // Mock matchMedia for responsive design tests

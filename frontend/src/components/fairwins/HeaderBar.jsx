@@ -14,7 +14,7 @@ function HeaderBar({ isConnected, onScanMarket }) {
 
   const handleOpenUserManagement = () => {
     showModal(<UserManagementModal onScanMarket={onScanMarket} />, {
-      title: null,
+      title: 'User Management',
       size: 'large',
       closable: true
     })
