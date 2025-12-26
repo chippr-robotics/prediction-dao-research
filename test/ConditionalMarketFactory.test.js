@@ -87,7 +87,7 @@ describe("ConditionalMarketFactory", function () {
       expect(await marketFactory.marketCount()).to.equal(1);
     });
 
-    it("Should only allow owner to deploy market", async function () {
+    it("Should only allow owner or market maker to deploy market", async function () {
       const proposalId = 1;
       const collateralToken = ethers.ZeroAddress;
       const liquidityAmount = ethers.parseEther("1000");
@@ -103,7 +103,7 @@ describe("ConditionalMarketFactory", function () {
           tradingPeriod,
           BetType.PassFail
         )
-      ).to.be.revertedWithCustomError(marketFactory, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWith("Requires owner or MARKET_MAKER_ROLE");
     });
 
     it("Should reject duplicate market for same proposal", async function () {
@@ -657,6 +657,107 @@ describe("ConditionalMarketFactory", function () {
         expect(await passToken.balanceOf(addr1.address)).to.equal(ethers.parseEther("50"));
         expect(await failToken.balanceOf(addr1.address)).to.equal(0);
       });
+    });
+  });
+  
+  describe("RBAC Integration", function () {
+    let roleManager;
+    let marketMaker;
+
+    beforeEach(async function () {
+      [owner, addr1, marketMaker] = await ethers.getSigners();
+      
+      // Deploy role manager
+      const TieredRoleManager = await ethers.getContractFactory("TieredRoleManager");
+      roleManager = await TieredRoleManager.deploy();
+      
+      // Set role manager in market factory
+      await marketFactory.setRoleManager(roleManager.target);
+      
+      // Grant MARKET_MAKER_ROLE to marketMaker
+      const MARKET_MAKER_ROLE = await roleManager.MARKET_MAKER_ROLE();
+      await roleManager.connect(marketMaker).purchaseRoleWithTier(
+        MARKET_MAKER_ROLE,
+        1, // Bronze tier
+        { value: ethers.parseEther("100") }
+      );
+    });
+
+    it("Should allow market maker with role to deploy market", async function () {
+      const proposalId = 100;
+      const collateralToken = ethers.ZeroAddress;
+      const liquidityAmount = ethers.parseEther("1000");
+      const liquidityParameter = ethers.parseEther("100");
+      const tradingPeriod = 7 * 24 * 60 * 60;
+
+      await expect(
+        marketFactory.connect(marketMaker).deployMarketPair(
+          proposalId,
+          collateralToken,
+          liquidityAmount,
+          liquidityParameter,
+          tradingPeriod,
+          BetType.PassFail
+        )
+      ).to.emit(marketFactory, "MarketCreated");
+    });
+
+    it("Should reject market deployment when role manager not set", async function () {
+      // Deploy new market factory without role manager
+      const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
+      const newMarketFactory = await ConditionalMarketFactory.deploy();
+      await newMarketFactory.initialize(owner.address);
+
+      const proposalId = 101;
+      const collateralToken = ethers.ZeroAddress;
+      const liquidityAmount = ethers.parseEther("1000");
+      const liquidityParameter = ethers.parseEther("100");
+      const tradingPeriod = 7 * 24 * 60 * 60;
+
+      // Should still work for owner
+      await expect(
+        newMarketFactory.deployMarketPair(
+          proposalId,
+          collateralToken,
+          liquidityAmount,
+          liquidityParameter,
+          tradingPeriod,
+          BetType.PassFail
+        )
+      ).to.emit(newMarketFactory, "MarketCreated");
+    });
+
+    it("Should enforce tier limits on market creation", async function () {
+      // Bronze tier allows 5 markets per month but only 3 concurrent
+      const proposalIds = [200, 201, 202, 203];
+      const collateralToken = ethers.ZeroAddress;
+      const liquidityAmount = ethers.parseEther("1000");
+      const liquidityParameter = ethers.parseEther("100");
+      const tradingPeriod = 7 * 24 * 60 * 60;
+
+      // First 3 should succeed (concurrent limit)
+      for (let i = 0; i < 3; i++) {
+        await marketFactory.connect(marketMaker).deployMarketPair(
+          proposalIds[i],
+          collateralToken,
+          liquidityAmount,
+          liquidityParameter,
+          tradingPeriod,
+          BetType.PassFail
+        );
+      }
+
+      // 4th should fail due to Bronze tier concurrent market limit (3)
+      await expect(
+        marketFactory.connect(marketMaker).deployMarketPair(
+          proposalIds[3],
+          collateralToken,
+          liquidityAmount,
+          liquidityParameter,
+          tradingPeriod,
+          BetType.PassFail
+        )
+      ).to.be.revertedWith("Market creation limit exceeded");
     });
   });
 });

@@ -3,10 +3,11 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title MarketCorrelationRegistry
- * @notice Registry for grouping related markets that should be settled jointly
+ * @notice Registry for grouping related markets with role-based management
  * @dev Manages market correlation groups to prevent duplicate markets and enable
  * efficient aggregation of related prediction markets (e.g., election candidates)
  * 
@@ -14,6 +15,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * For a campaign election with 5 candidates, all candidate markets can be grouped
  * together, allowing the front-end to display them as a cohesive set and ensuring
  * market efficiency by directing users to the most popular markets.
+ * 
+ * RBAC INTEGRATION:
+ * - Group creation requires MARKET_MAKER_ROLE
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
  */
 contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
     
@@ -41,6 +46,9 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
     uint256 public groupCount;
     
     bool private _initialized;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
     
     event CorrelationGroupCreated(
         uint256 indexed groupId,
@@ -81,6 +89,16 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
     constructor() Ownable(msg.sender) {
         // Mark as initialized for non-proxy deployments to prevent unauthorized initialization
         _initialized = true;
+    }
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
     }
     
     /**

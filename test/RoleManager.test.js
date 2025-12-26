@@ -61,9 +61,13 @@ describe("RoleManager - Unit Tests", function () {
     it("Should allow users to purchase premium roles", async function () {
       const price = ethers.parseEther("100");
       
-      await expect(roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: price }))
+      const tx = await roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: price });
+      const receipt = await tx.wait();
+      const block = await ethers.provider.getBlock(receipt.blockNumber);
+      
+      await expect(tx)
         .to.emit(roleManager, "RolePurchased")
-        .withArgs(user1.address, MARKET_MAKER_ROLE, price, await time.latest() + 1);
+        .withArgs(user1.address, MARKET_MAKER_ROLE, price, block.timestamp);
       
       expect(await roleManager.hasRole(MARKET_MAKER_ROLE, user1.address)).to.equal(true);
     });
@@ -163,8 +167,9 @@ describe("RoleManager - Unit Tests", function () {
 
   describe("Timelock & Multisig - Role Actions", function () {
     beforeEach(async function () {
-      // Setup role hierarchy
+      // Setup role hierarchy - owner (DEFAULT_ADMIN) can directly grant CORE_SYSTEM_ADMIN_ROLE
       await roleManager.grantRole(CORE_SYSTEM_ADMIN_ROLE, coreAdmin.address);
+      // CORE_SYSTEM_ADMIN can directly grant roles under its hierarchy
       await roleManager.connect(coreAdmin).grantRole(OPERATIONS_ADMIN_ROLE, opsAdmin.address);
     });
 
@@ -190,51 +195,66 @@ describe("RoleManager - Unit Tests", function () {
     });
 
     it("Should require multiple approvals before execution", async function () {
-      // Setup: Grant oversight committee roles
-      await roleManager.grantRole(OVERSIGHT_COMMITTEE_ROLE, committee1.address);
-      await roleManager.grantRole(OVERSIGHT_COMMITTEE_ROLE, committee2.address);
+      // Setup: Grant CORE_SYSTEM_ADMIN to multiple admins (requires 3 approvals)
+      await roleManager.grantRole(CORE_SYSTEM_ADMIN_ROLE, coreAdmin.address);
+      await roleManager.grantRole(CORE_SYSTEM_ADMIN_ROLE, user2.address);
+      await roleManager.grantRole(CORE_SYSTEM_ADMIN_ROLE, user3.address);
       
-      // Propose action (requires 2 approvals for oversight committee)
-      const actionId = await roleManager.connect(owner).proposeRoleAction.staticCall(
-        OVERSIGHT_COMMITTEE_ROLE,
+      // Propose action by one core admin to grant OPERATIONS_ADMIN_ROLE (proposer = coreAdmin)
+      const tx = await roleManager.connect(coreAdmin).proposeRoleAction(
+        OPERATIONS_ADMIN_ROLE,
         user1.address,
         true
       );
       
-      await roleManager.connect(owner).proposeRoleAction(
-        OVERSIGHT_COMMITTEE_ROLE,
-        user1.address,
-        true
-      );
+      const receipt = await tx.wait();
+      const event = receipt.logs.find(log => {
+        try {
+          const parsed = roleManager.interface.parseLog(log);
+          return parsed && parsed.name === "ActionProposed";
+        } catch (e) {
+          return false;
+        }
+      });
       
-      // Advance time past timelock (1 day)
-      await time.increase(24 * 60 * 60 + 1);
+      const actionId = event ? roleManager.interface.parseLog(event).args[0] : null;
+      expect(actionId).to.not.be.null;
       
-      // Should fail with only 1 approval (proposer)
+      // Advance time past timelock (2 days for OPERATIONS_ADMIN_ROLE)
+      await time.increase(2 * 24 * 60 * 60 + 1);
+      
+      // Should fail with only 1 approval (proposer) - OPERATIONS_ADMIN needs 2
       await expect(
-        roleManager.connect(owner).executeRoleAction(actionId)
+        roleManager.connect(coreAdmin).executeRoleAction(actionId)
       ).to.be.revertedWith("Insufficient approvals");
       
-      // Add second approval
-      await roleManager.connect(committee1).approveRoleAction(actionId);
+      // Add second approval from user2
+      await roleManager.connect(user2).approveRoleAction(actionId);
       
-      // Now execution should succeed
-      await expect(roleManager.connect(owner).executeRoleAction(actionId))
+      // Now execution should succeed with 2 approvals
+      await expect(roleManager.connect(coreAdmin).executeRoleAction(actionId))
         .to.emit(roleManager, "ActionExecuted");
     });
 
     it("Should enforce timelock delay", async function () {
-      const actionId = await roleManager.connect(opsAdmin).proposeRoleAction.staticCall(
+      const tx = await roleManager.connect(opsAdmin).proposeRoleAction(
         EMERGENCY_GUARDIAN_ROLE,
         guardian.address,
         true
       );
       
-      await roleManager.connect(opsAdmin).proposeRoleAction(
-        EMERGENCY_GUARDIAN_ROLE,
-        guardian.address,
-        true
-      );
+      const receipt = await tx.wait();
+      const event = receipt.logs.find(log => {
+        try {
+          const parsed = roleManager.interface.parseLog(log);
+          return parsed && parsed.name === "ActionProposed";
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      const actionId = event ? roleManager.interface.parseLog(event).args[0] : null;
+      expect(actionId).to.not.be.null;
       
       // Try to execute immediately (should fail)
       await expect(
@@ -254,17 +274,24 @@ describe("RoleManager - Unit Tests", function () {
       await roleManager.connect(opsAdmin).grantRole(EMERGENCY_GUARDIAN_ROLE, guardian.address);
       
       // Propose an action
-      const actionId = await roleManager.connect(opsAdmin).proposeRoleAction.staticCall(
+      const tx = await roleManager.connect(opsAdmin).proposeRoleAction(
         EMERGENCY_GUARDIAN_ROLE,
         user1.address,
         true
       );
       
-      await roleManager.connect(opsAdmin).proposeRoleAction(
-        EMERGENCY_GUARDIAN_ROLE,
-        user1.address,
-        true
-      );
+      const receipt = await tx.wait();
+      const event = receipt.logs.find(log => {
+        try {
+          const parsed = roleManager.interface.parseLog(log);
+          return parsed && parsed.name === "ActionProposed";
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      const actionId = event ? roleManager.interface.parseLog(event).args[0] : null;
+      expect(actionId).to.not.be.null;
       
       // Guardian cancels the action
       await expect(roleManager.connect(guardian).cancelRoleAction(actionId))
@@ -281,17 +308,24 @@ describe("RoleManager - Unit Tests", function () {
     });
 
     it("Should prevent duplicate approvals", async function () {
-      const actionId = await roleManager.connect(opsAdmin).proposeRoleAction.staticCall(
+      const tx = await roleManager.connect(opsAdmin).proposeRoleAction(
         EMERGENCY_GUARDIAN_ROLE,
         guardian.address,
         true
       );
       
-      await roleManager.connect(opsAdmin).proposeRoleAction(
-        EMERGENCY_GUARDIAN_ROLE,
-        guardian.address,
-        true
-      );
+      const receipt = await tx.wait();
+      const event = receipt.logs.find(log => {
+        try {
+          const parsed = roleManager.interface.parseLog(log);
+          return parsed && parsed.name === "ActionProposed";
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      const actionId = event ? roleManager.interface.parseLog(event).args[0] : null;
+      expect(actionId).to.not.be.null;
       
       // Try to approve again as proposer
       await expect(

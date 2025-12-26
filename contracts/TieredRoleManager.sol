@@ -442,23 +442,33 @@ contract TieredRoleManager is RoleManager {
      * @return allowed Whether the action is allowed
      */
     function checkMarketCreationLimit(bytes32 role) external returns (bool allowed) {
-        _resetUsageIfNeeded(msg.sender, role);
+        return checkMarketCreationLimitFor(msg.sender, role);
+    }
+    
+    /**
+     * @notice Check and enforce market creation limit for a specific user
+     * @param user The user to check limits for
+     * @param role The role to check
+     * @return allowed Whether the action is allowed
+     */
+    function checkMarketCreationLimitFor(address user, bytes32 role) public returns (bool allowed) {
+        _resetUsageIfNeeded(user, role);
         
-        MembershipTier tier = userTiers[msg.sender][role];
+        MembershipTier tier = userTiers[user][role];
         require(tier != MembershipTier.NONE, "No tier found");
         
         TierLimits storage limits = tierMetadata[role][tier].limits;
-        UsageStats storage stats = usageStats[msg.sender][role];
+        UsageStats storage stats = usageStats[user][role];
         
         if (stats.monthlyMarketsCreated >= limits.monthlyMarketCreation || 
             stats.activeMarketsCount >= limits.maxConcurrentMarkets) {
-            emit UsageLimitExceeded(msg.sender, role, "market_creation");
+            emit UsageLimitExceeded(user, role, "market_creation");
             return false;
         }
         
         stats.monthlyMarketsCreated++;
         stats.activeMarketsCount++;
-        emit UsageRecorded(msg.sender, role, "market_created");
+        emit UsageRecorded(user, role, "market_created");
         
         return true;
     }

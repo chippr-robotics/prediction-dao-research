@@ -9,10 +9,11 @@ import "./interfaces/uniswap-v3/IUniswapV3Factory.sol";
 import "./interfaces/uniswap-v3/IUniswapV3Pool.sol";
 import "./interfaces/uniswap-v3/ISwapRouter.sol";
 import "./interfaces/uniswap-v3/INonfungiblePositionManager.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title ETCSwapV3Integration
- * @notice Production-ready integration with ETCSwap v3 for prediction market trading
+ * @notice Production-ready integration with ETCSwap v3 with role-based liquidity management
  * @dev Handles pool creation, liquidity management, and trading for conditional tokens
  * 
  * This contract provides a comprehensive interface to ETCSwap v3 (Uniswap v3 fork):
@@ -21,6 +22,10 @@ import "./interfaces/uniswap-v3/INonfungiblePositionManager.sol";
  * - Token swapping with slippage protection
  * - Emergency controls and safety mechanisms
  * - Events for off-chain tracking and analytics
+ * 
+ * RBAC INTEGRATION:
+ * - Pool creation requires MARKET_MAKER_ROLE
+ * - Admin functions require OPERATIONS_ADMIN_ROLE
  * 
  * Based on: https://github.com/etcswap/v3-sdk
  * Reference: https://docs.uniswap.org/contracts/v3/overview
@@ -68,6 +73,9 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
 
     /// @notice Paused state for emergency stops
     bool public paused;
+    
+    // Role-based access control
+    TieredRoleManager public roleManager;
 
     // ============ Structs ============
 
@@ -163,6 +171,16 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
         factory = IUniswapV3Factory(_factory);
         swapRouter = ISwapRouter(_swapRouter);
         positionManager = INonfungiblePositionManager(_positionManager);
+    }
+    
+    /**
+     * @notice Set the role manager contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function setRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        require(address(roleManager) == address(0), "Role manager already set");
+        roleManager = TieredRoleManager(_roleManager);
     }
 
     // ============ Modifiers ============

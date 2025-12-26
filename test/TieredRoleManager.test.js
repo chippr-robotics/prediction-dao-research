@@ -142,21 +142,27 @@ describe("TieredRoleManager - Unit Tests", function () {
     it("Should enforce daily bet limit for Bronze tier", async function () {
       // Make 10 bets (Bronze limit)
       for (let i = 0; i < 10; i++) {
-        expect(await tieredRoleManager.connect(user1).checkBetLimit(MARKET_MAKER_ROLE)).to.equal(true);
+        const result = await tieredRoleManager.connect(user1).checkBetLimit.staticCall(MARKET_MAKER_ROLE);
+        expect(result).to.equal(true);
+        await tieredRoleManager.connect(user1).checkBetLimit(MARKET_MAKER_ROLE);
       }
       
       // 11th bet should fail
-      expect(await tieredRoleManager.connect(user1).checkBetLimit(MARKET_MAKER_ROLE)).to.equal(false);
+      const result = await tieredRoleManager.connect(user1).checkBetLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result).to.equal(false);
     });
 
     it("Should allow more bets for higher tiers", async function () {
       // Gold can make 100 bets
       for (let i = 0; i < 100; i++) {
-        expect(await tieredRoleManager.connect(user2).checkBetLimit(MARKET_MAKER_ROLE)).to.equal(true);
+        const result = await tieredRoleManager.connect(user2).checkBetLimit.staticCall(MARKET_MAKER_ROLE);
+        expect(result).to.equal(true);
+        await tieredRoleManager.connect(user2).checkBetLimit(MARKET_MAKER_ROLE);
       }
       
       // 101st should fail
-      expect(await tieredRoleManager.connect(user2).checkBetLimit(MARKET_MAKER_ROLE)).to.equal(false);
+      const result = await tieredRoleManager.connect(user2).checkBetLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result).to.equal(false);
     });
 
     it("Should reset limits after 24 hours", async function () {
@@ -165,13 +171,15 @@ describe("TieredRoleManager - Unit Tests", function () {
         await tieredRoleManager.connect(user1).checkBetLimit(MARKET_MAKER_ROLE);
       }
       
-      expect(await tieredRoleManager.connect(user1).checkBetLimit(MARKET_MAKER_ROLE)).to.equal(false);
+      const result1 = await tieredRoleManager.connect(user1).checkBetLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result1).to.equal(false);
       
       // Advance time 24 hours
       await time.increase(24 * 60 * 60 + 1);
       
       // Should be able to bet again
-      expect(await tieredRoleManager.connect(user1).checkBetLimit(MARKET_MAKER_ROLE)).to.equal(true);
+      const result2 = await tieredRoleManager.connect(user1).checkBetLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result2).to.equal(true);
     });
   });
 
@@ -185,13 +193,28 @@ describe("TieredRoleManager - Unit Tests", function () {
     });
 
     it("Should enforce monthly market creation limit", async function () {
-      // Create 5 markets (Bronze limit)
-      for (let i = 0; i < 5; i++) {
-        expect(await tieredRoleManager.connect(user1).checkMarketCreationLimit(MARKET_MAKER_ROLE)).to.equal(true);
+      // Bronze allows 5 monthly markets but only 3 concurrent
+      // Create 3 markets
+      for (let i = 0; i < 3; i++) {
+        const result = await tieredRoleManager.connect(user1).checkMarketCreationLimit.staticCall(MARKET_MAKER_ROLE);
+        expect(result).to.equal(true);
+        await tieredRoleManager.connect(user1).checkMarketCreationLimit(MARKET_MAKER_ROLE);
       }
       
-      // 6th should fail
-      expect(await tieredRoleManager.connect(user1).checkMarketCreationLimit(MARKET_MAKER_ROLE)).to.equal(false);
+      // Close 2 markets to free up concurrent slots
+      await tieredRoleManager.connect(user1).recordMarketClosure(MARKET_MAKER_ROLE);
+      await tieredRoleManager.connect(user1).recordMarketClosure(MARKET_MAKER_ROLE);
+      
+      // Create 2 more (total 5 monthly)
+      for (let i = 0; i < 2; i++) {
+        const result = await tieredRoleManager.connect(user1).checkMarketCreationLimit.staticCall(MARKET_MAKER_ROLE);
+        expect(result).to.equal(true);
+        await tieredRoleManager.connect(user1).checkMarketCreationLimit(MARKET_MAKER_ROLE);
+      }
+      
+      // 6th should fail (monthly limit reached)
+      const result = await tieredRoleManager.connect(user1).checkMarketCreationLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result).to.equal(false);
     });
 
     it("Should enforce concurrent market limit", async function () {
@@ -201,13 +224,15 @@ describe("TieredRoleManager - Unit Tests", function () {
       }
       
       // 4th should fail (concurrent limit)
-      expect(await tieredRoleManager.connect(user1).checkMarketCreationLimit(MARKET_MAKER_ROLE)).to.equal(false);
+      const result1 = await tieredRoleManager.connect(user1).checkMarketCreationLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result1).to.equal(false);
       
       // Close one market
       await tieredRoleManager.connect(user1).recordMarketClosure(MARKET_MAKER_ROLE);
       
       // Should be able to create another
-      expect(await tieredRoleManager.connect(user1).checkMarketCreationLimit(MARKET_MAKER_ROLE)).to.equal(true);
+      const result2 = await tieredRoleManager.connect(user1).checkMarketCreationLimit.staticCall(MARKET_MAKER_ROLE);
+      expect(result2).to.equal(true);
     });
   });
 
