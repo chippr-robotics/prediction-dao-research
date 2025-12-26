@@ -1,15 +1,16 @@
 .category-row {
-  margin-bottom: 1rem; /* Compact spacing between rows */
+  margin-bottom: 0.75rem; /* Compact spacing between rows */
   width: 100%;
   max-width: 100%;
-  overflow: hidden; /* Prevent horizontal overflow from this row */
+  overflow: hidden !important; /* Prevent horizontal overflow from this row */
+  position: relative;
 }
 
 .category-row-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem; /* Reduced spacing between header and cards */
+  margin-bottom: 0.25rem; /* Minimal spacing between header and cards */
   padding: 0 0.5rem;
 }
 
@@ -74,14 +75,15 @@
 }
 
 .category-scroller {
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: scroll !important;
+  overflow-y: hidden !important;
   scroll-behavior: smooth;
-  padding: 0.25rem 0 0.5rem; /* Reduced padding */
+  padding: 0.25rem 0 0.5rem;
   cursor: grab;
   width: 100%;
   max-width: 100%;
-  -webkit-overflow-scrolling: touch; /* Better touch scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
 }
 
 .category-scroller:active {
@@ -108,15 +110,14 @@
 }
 
 .scroller-track {
-  display: flex;
-  gap: 0.75rem; /* Reduced gap */
-  width: max-content;
-  padding: 0 0.5rem; /* Add some padding at start/end */
+  display: inline-flex;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
 }
 
 .scroller-item-small {
-  flex: 0 0 auto; /* Don't grow/shrink, use natural size */
-  width: 260px; /* Fixed width for cards */
+  flex: 0 0 260px;
+  width: 260px;
   min-width: 260px;
   max-width: 260px;
   scroll-snap-align: start;
