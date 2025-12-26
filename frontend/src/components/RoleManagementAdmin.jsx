@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useRoles } from '../../hooks/useRoles'
-import { useWeb3 } from '../../hooks/useWeb3'
-import { getAllUsersWithRoles, getUserRoles } from '../../utils/roleStorage'
+import { useRoles } from '../hooks/useRoles'
+import { useWeb3 } from '../hooks/useWeb3'
+import { getAllUsersWithRoles, getUserRoles } from '../utils/roleStorage'
 import './RoleManagementAdmin.css'
 
 function RoleManagementAdmin() {
