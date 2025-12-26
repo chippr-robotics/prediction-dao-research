@@ -205,7 +205,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
      */
     modifier checkMarketCreationLimit() {
         if (address(roleManager) != address(0) && roleManager.hasRole(roleManager.MARKET_MAKER_ROLE(), msg.sender)) {
-            require(roleManager.checkMarketCreationLimit(roleManager.MARKET_MAKER_ROLE()), "Market creation limit exceeded");
+            require(roleManager.checkMarketCreationLimitFor(msg.sender, roleManager.MARKET_MAKER_ROLE()), "Market creation limit exceeded");
         }
         _;
     }
