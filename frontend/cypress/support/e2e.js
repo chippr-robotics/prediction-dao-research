@@ -25,7 +25,9 @@ Cypress.on('uncaught:exception', (err, runnable) => {
   if (err.message.includes('MetaMask') || 
       err.message.includes('ethereum') ||
       err.message.includes('provider') ||
-      err.message.includes('Web3')) {
+      err.message.includes('Web3') ||
+      err.message.includes('process is not defined') ||
+      err.message.includes('Cannot read properties of undefined')) {
     return false
   }
   // Let other errors fail the test

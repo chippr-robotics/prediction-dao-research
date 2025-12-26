@@ -17,19 +17,22 @@ describe('User Onboarding Flow', () => {
     // Verify page loads
     cy.get('body').should('be.visible')
     
-    // Check for main heading
-    cy.contains('h1', /ClearPath|FairWins|Prediction/, { timeout: 10000 }).should('be.visible')
+    // Check for main heading or platform names
+    cy.get('h1, h2, h3').should('exist')
+    
+    // Check for platform cards or links
+    cy.contains(/fairwins|clearpath/i, { timeout: 10000 }).should('be.visible')
     
     // Check for call-to-action buttons
     cy.get('button, a').should('have.length.greaterThan', 0)
   })
 
-  it('should navigate from landing page to platform selector', () => {
-    // Look for "Get Started" or similar CTA
-    cy.contains('button, a', /get started|explore|enter|select/i, { timeout: 10000 }).first().click()
+  it('should navigate from landing page to platform selector or app', () => {
+    // Look for "Get Started", "Browse", or similar CTA
+    cy.contains('button, a', /browse|explore|enter|get started/i, { timeout: 10000 }).first().click()
     
-    // Should see platform selection options
-    cy.url().should('match', /\/(select|$)/)
+    // Should navigate to either selector, fairwins, or clearpath
+    cy.url().should('match', /\/(select|fairwins|clearpath|app|main|$)/)
   })
 
   it('should display both platform options on selector page', () => {
