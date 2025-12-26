@@ -47,22 +47,36 @@ async function main() {
   // Deploy mock governance token (for RagequitModule)
   console.log("\nDeploying mock governance token...");
   // In production, this would be the actual governance token address
+  // Using deployer address as a placeholder for both token and treasury in development
   const mockGovernanceToken = deployer.address; // Using deployer address as placeholder
 
   // Deploy RagequitModule
   console.log("\nDeploying RagequitModule...");
   const RagequitModule = await hre.ethers.getContractFactory("RagequitModule");
-  const ragequitModule = await RagequitModule.deploy(
-    mockGovernanceToken,
-    deployer.address // Using deployer as treasury vault placeholder
-  );
+  const ragequitModule = await RagequitModule.deploy();
   await ragequitModule.waitForDeployment();
   console.log("RagequitModule deployed to:", await ragequitModule.getAddress());
+  
+  // Initialize RagequitModule
+  console.log("Initializing RagequitModule...");
+  await ragequitModule.initialize(
+    deployer.address, // initialOwner
+    mockGovernanceToken, // governanceToken - placeholder
+    deployer.address // treasuryVault - placeholder (same as deployer for development)
+  );
+  console.log("RagequitModule initialized");
 
   // Deploy FutarchyGovernor
   console.log("\nDeploying FutarchyGovernor...");
   const FutarchyGovernor = await hre.ethers.getContractFactory("FutarchyGovernor");
-  const futarchyGovernor = await FutarchyGovernor.deploy(
+  const futarchyGovernor = await FutarchyGovernor.deploy();
+  await futarchyGovernor.waitForDeployment();
+  console.log("FutarchyGovernor deployed to:", await futarchyGovernor.getAddress());
+  
+  // Initialize FutarchyGovernor
+  console.log("Initializing FutarchyGovernor...");
+  await futarchyGovernor.initialize(
+    deployer.address, // initialOwner
     await welfareRegistry.getAddress(),
     await proposalRegistry.getAddress(),
     await marketFactory.getAddress(),
@@ -71,8 +85,7 @@ async function main() {
     await ragequitModule.getAddress(),
     deployer.address // Using deployer as treasury vault placeholder
   );
-  await futarchyGovernor.waitForDeployment();
-  console.log("FutarchyGovernor deployed to:", await futarchyGovernor.getAddress());
+  console.log("FutarchyGovernor initialized");
 
   // Setup initial configuration
   console.log("\n\nSetting up initial configuration...");
