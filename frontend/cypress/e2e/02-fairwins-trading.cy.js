@@ -10,9 +10,9 @@
 
 describe('FairWins Market Trading Flow', () => {
   beforeEach(() => {
-    cy.visit('/fairwins')
-    // Mock wallet connection before each test
+    // Mock wallet connection BEFORE visiting the page
     cy.mockWeb3Provider()
+    cy.visit('/fairwins')
   })
 
   it('should display market categories and navigation', () => {

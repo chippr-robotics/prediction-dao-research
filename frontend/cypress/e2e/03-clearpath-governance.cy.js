@@ -11,9 +11,9 @@
 
 describe('ClearPath DAO Governance Flow', () => {
   beforeEach(() => {
-    cy.visit('/clearpath')
-    // Mock wallet connection
+    // Mock wallet connection BEFORE visiting the page
     cy.mockWeb3Provider()
+    cy.visit('/clearpath')
   })
 
   it('should display the ClearPath dashboard', () => {

@@ -9,13 +9,18 @@
  */
 
 describe('Complete User Journey Integration', () => {
+  // Set up mock provider once before all tests
+  before(() => {
+    cy.mockWeb3Provider()
+  })
+  
   it('should complete full onboarding to trading journey', () => {
     // Start from landing page
     cy.visit('/')
     cy.get('body', { timeout: 10000 }).should('be.visible')
     
     // Navigate to platform selector
-    cy.contains('button, a', /get started|explore|enter/i).first().click()
+    cy.contains('button, a', /get started|explore|enter|browse/i).first().click()
     
     // Select FairWins
     cy.selectPlatform('fairwins')
@@ -36,6 +41,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should switch between platforms maintaining wallet connection', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     // Start on FairWins
     cy.visit('/fairwins')
     cy.connectWallet()
@@ -57,6 +65,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should handle complete governance workflow on ClearPath', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     // Navigate to ClearPath
     cy.visit('/clearpath')
     cy.connectWallet()
@@ -79,6 +90,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should browse and interact with multiple markets', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     cy.visit('/fairwins')
     cy.connectWallet()
     cy.wait(2000)
@@ -100,6 +114,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should handle disconnection and reconnection flow', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     cy.visit('/fairwins')
     cy.connectWallet()
     
@@ -116,8 +133,10 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should maintain state across page reloads', () => {
-    cy.visit('/fairwins')
+    // Mock provider before visit
     cy.mockWeb3Provider()
+    
+    cy.visit('/fairwins')
     cy.connectWallet()
     cy.wait(1000)
     
@@ -134,6 +153,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should handle navigation using browser back button', () => {
+    // Mock provider for session
+    cy.mockWeb3Provider()
+    
     // Start at home
     cy.visit('/')
     cy.wait(1000)
@@ -159,6 +181,9 @@ describe('Complete User Journey Integration', () => {
   it('should work across different viewport sizes', () => {
     const viewports = ['iphone-x', 'ipad-2', [1280, 720], [1920, 1080]]
     
+    // Mock provider once for all viewport tests
+    cy.mockWeb3Provider()
+    
     viewports.forEach((viewport) => {
       if (Array.isArray(viewport)) {
         cy.viewport(viewport[0], viewport[1])
@@ -178,6 +203,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should handle rapid navigation between sections', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     cy.visit('/fairwins')
     cy.connectWallet()
     cy.wait(1000)
@@ -195,6 +223,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should gracefully handle network errors', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     // Visit with a mock error scenario
     cy.visit('/fairwins')
     
@@ -204,6 +235,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should display appropriate feedback for user actions', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     cy.visit('/fairwins')
     cy.connectWallet()
     cy.wait(1000)
@@ -217,6 +251,9 @@ describe('Complete User Journey Integration', () => {
   })
 
   it('should handle concurrent actions gracefully', () => {
+    // Mock provider before visit
+    cy.mockWeb3Provider()
+    
     cy.visit('/fairwins')
     cy.connectWallet()
     cy.wait(1000)
@@ -238,6 +275,9 @@ describe('Complete User Journey Integration', () => {
   it('should complete accessibility checks across key pages', () => {
     const pages = ['/', '/select', '/clearpath', '/fairwins']
     
+    // Mock provider once for all pages
+    cy.mockWeb3Provider()
+    
     pages.forEach((page) => {
       cy.visit(page)
       cy.wait(1000)
@@ -251,6 +291,9 @@ describe('Complete User Journey Integration', () => {
 
   it('should demonstrate full feature integration', () => {
     // Complete user journey demonstrating all features
+    
+    // Mock provider for entire journey
+    cy.mockWeb3Provider()
     
     // 1. Landing
     cy.visit('/')

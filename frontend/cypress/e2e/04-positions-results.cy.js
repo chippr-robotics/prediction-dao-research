@@ -10,8 +10,9 @@
 
 describe('Position Management and Results Flow', () => {
   beforeEach(() => {
-    cy.visit('/fairwins')
+    // Inject Web3 provider BEFORE visiting the page
     cy.mockWeb3Provider()
+    cy.visit('/fairwins')
   })
 
   it('should display user balance when connected', () => {

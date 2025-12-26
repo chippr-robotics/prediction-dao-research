@@ -11,13 +11,14 @@
 /**
  * Custom command to inject a mock Web3 provider into the page
  * This simulates a wallet connection without requiring browser extensions
+ * IMPORTANT: Call this BEFORE cy.visit() to ensure provider is available when app loads
  */
 Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
   const networkId = options.networkId || Cypress.env('NETWORK_ID') || 1337
   const rpcUrl = options.rpcUrl || Cypress.env('RPC_URL') || 'http://localhost:8545'
   const account = options.account || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // Hardhat account #0
   
-  cy.window().then((win) => {
+  cy.on('window:before:load', (win) => {
     // Create a mock ethereum provider
     win.ethereum = {
       isMetaMask: true,
@@ -101,10 +102,15 @@ Cypress.Commands.add('waitForWalletConnection', () => {
 
 /**
  * Custom command to connect wallet via UI
+ * Note: mockWeb3Provider should be called BEFORE cy.visit() in most cases
  */
 Cypress.Commands.add('connectWallet', () => {
-  // First, inject the mock provider
-  cy.mockWeb3Provider()
+  // If provider not already injected, inject it
+  cy.window().then((win) => {
+    if (!win.ethereum) {
+      cy.mockWeb3Provider()
+    }
+  })
   
   // Then click the connect button
   cy.contains('button', /connect wallet/i, { timeout: 10000 }).click()

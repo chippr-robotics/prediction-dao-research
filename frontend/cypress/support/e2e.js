@@ -21,6 +21,9 @@ import './commands'
 
 // Disable uncaught exception failures for Web3 errors
 Cypress.on('uncaught:exception', (err, runnable) => {
+  // Log errors for debugging
+  console.error('Uncaught exception:', err.message)
+  
   // Ignore Web3 provider errors during testing
   if (err.message.includes('MetaMask') || 
       err.message.includes('ethereum') ||
@@ -32,4 +35,13 @@ Cypress.on('uncaught:exception', (err, runnable) => {
   }
   // Let other errors fail the test
   return true
+})
+
+// Add beforeEach hook to check for console errors (optional)
+beforeEach(() => {
+  cy.window().then((win) => {
+    // Optionally stub console.error to catch app errors
+    // Commented out by default to avoid false positives
+    // cy.stub(win.console, 'error').as('consoleError')
+  })
 })

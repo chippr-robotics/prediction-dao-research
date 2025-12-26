@@ -162,15 +162,24 @@ jobs:
 
       - name: Start Hardhat node
         run: |
-          npm run node &
+          npm run node > /tmp/hardhat-node.log 2>&1 &
           echo "HARDHAT_PID=$!" >> $GITHUB_ENV
         
       - name: Wait for Hardhat to start
-        run: sleep 15
+        run: |
+          echo "Waiting for Hardhat node to be ready..."
+          sleep 15
+          # Check if Hardhat node is responding
+          curl -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+            http://localhost:8545 || echo "Hardhat node may not be ready yet"
 
       - name: Deploy contracts to local network
-        run: npm run deploy:local
-        continue-on-error: true
+        run: |
+          echo "Deploying contracts to local Hardhat network..."
+          npm run deploy:local
+          echo "Contract deployment completed"
+        continue-on-error: false
 
       - name: Run Cypress E2E tests
         working-directory: frontend
