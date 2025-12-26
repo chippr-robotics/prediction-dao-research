@@ -7,13 +7,14 @@ import './RolePurchaseScreen.css'
 
 // Payment configuration
 const PAYMENT_RECEIVER_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' // Example payment address
-const PAYMENT_TOKEN = 'USDC' // USDC for payments
+const PAYMENT_TOKEN = 'ETC' // ETC for payments
 
-// Individual role prices in USDC
+// Individual role prices in ETC - Bronze tier (entry level from RBAC_SMART_CONTRACTS.md)
+// Higher tiers (Silver, Gold, Platinum) available with increased limits
 const ROLE_PRICES = {
-  MARKET_MAKER: 100,
-  CLEARPATH_USER: 250,
-  TOKENMINT: 150,
+  MARKET_MAKER: 100,      // Bronze: 100 ETC (Silver: 150, Gold: 250, Platinum: 500)
+  CLEARPATH_USER: 250,    // Bronze: 250 ETC (Silver: 200, Gold: 350, Platinum: 750)  
+  TOKENMINT: 150,         // Bronze: 150 ETC (Silver: 200, Gold: 350, Platinum: 600)
 }
 
 // Bundle discount percentage
@@ -259,9 +260,9 @@ function RolePurchaseScreen() {
                       </p>
                     </div>
                     <div className="bundle-pricing">
-                      <div className="original-price">${bundle.basePrice}</div>
-                      <div className="bundle-price">${bundle.price} {PAYMENT_TOKEN}</div>
-                      <div className="savings-badge">Save ${bundle.savings} ({Math.round(bundle.discount * 100)}% off)</div>
+                      <div className="original-price">{bundle.basePrice} {PAYMENT_TOKEN}</div>
+                      <div className="bundle-price">{bundle.price} {PAYMENT_TOKEN}</div>
+                      <div className="savings-badge">Save {bundle.savings} {PAYMENT_TOKEN} ({Math.round(bundle.discount * 100)}% off)</div>
                     </div>
                   </div>
                   
@@ -283,6 +284,7 @@ function RolePurchaseScreen() {
             {/* Individual Products */}
             <section className="products-section">
               <h2>Individual Roles</h2>
+              <p className="section-description">Bronze tier pricing shown. Higher tiers (Silver, Gold, Platinum) available with increased limits and benefits.</p>
               <div className="products-grid">
                 {availableRoles.map(role => (
                   <div
@@ -293,11 +295,12 @@ function RolePurchaseScreen() {
                     {role.owned && <div className="owned-badge">Owned</div>}
                     <div className="product-header">
                       <h3>{role.name}</h3>
-                      <div className="product-price">${role.price} {PAYMENT_TOKEN}</div>
+                      <div className="product-price">{role.price} {PAYMENT_TOKEN}</div>
                     </div>
                     <p className="product-description">{role.description}</p>
+                    <div className="product-tier-badge">Bronze Tier</div>
                     <div className="product-features">
-                      <h4>Features:</h4>
+                      <h4>Bronze Tier Limits:</h4>
                       <ul>
                         {getFeaturesList(role.key).map((feature, idx) => (
                           <li key={idx}>{feature}</li>
@@ -323,11 +326,11 @@ function RolePurchaseScreen() {
                     <div className="bundle-header">
                       <h3>{bundle.name}</h3>
                       <div className="bundle-pricing">
-                        <div className="original-price">${bundle.basePrice}</div>
-                        <div className="bundle-price">${bundle.price} {PAYMENT_TOKEN}</div>
+                        <div className="original-price">{bundle.basePrice} {PAYMENT_TOKEN}</div>
+                        <div className="bundle-price">{bundle.price} {PAYMENT_TOKEN}</div>
                       </div>
                     </div>
-                    <div className="bundle-savings">Save ${bundle.savings}</div>
+                    <div className="bundle-savings">Save {bundle.savings} {PAYMENT_TOKEN}</div>
                     <div className="bundle-includes-list">
                       {bundle.roles.map(roleKey => (
                         <div key={roleKey} className="include-item">
@@ -348,17 +351,17 @@ function RolePurchaseScreen() {
                   <div className="summary-details">
                     <div className="summary-row">
                       <span>Subtotal:</span>
-                      <span>${calculateTotal.subtotal}</span>
+                      <span>{calculateTotal.subtotal} {PAYMENT_TOKEN}</span>
                     </div>
                     {calculateTotal.discount > 0 && (
                       <div className="summary-row discount">
                         <span>Bundle Discount:</span>
-                        <span>-${calculateTotal.discount}</span>
+                        <span>-{calculateTotal.discount} {PAYMENT_TOKEN}</span>
                       </div>
                     )}
                     <div className="summary-row total">
                       <span>Total:</span>
-                      <span>${calculateTotal.total} {PAYMENT_TOKEN}</span>
+                      <span>{calculateTotal.total} {PAYMENT_TOKEN}</span>
                     </div>
                   </div>
                   <button
@@ -389,7 +392,7 @@ function RolePurchaseScreen() {
             <div className="payment-details">
               <div className="detail-row">
                 <span>Amount:</span>
-                <span>${calculateTotal.total} {PAYMENT_TOKEN}</span>
+                <span>{calculateTotal.total} {PAYMENT_TOKEN}</span>
               </div>
               <div className="detail-row">
                 <span>Recipient:</span>
@@ -432,25 +435,26 @@ function RolePurchaseScreen() {
 }
 
 // Helper function to get features list for each role
+// Helper function to get features list for each role (Bronze tier)
 function getFeaturesList(roleKey) {
   const features = {
     MARKET_MAKER: [
-      'Create prediction markets',
-      'Set custom market parameters',
-      'Earn fees from market activity',
-      'Manage market liquidity'
+      '10 daily bets',
+      '5 monthly markets',
+      'Up to 10 ETC max position',
+      '50 ETC daily withdrawal limit'
     ],
     CLEARPATH_USER: [
-      'Access DAO governance',
-      'Submit and vote on proposals',
-      'Participate in futarchy markets',
-      'View governance analytics'
+      '5 daily bets on proposals',
+      '2 monthly market participations',
+      'Up to 5 ETC max position',
+      '25 ETC daily withdrawal limit'
     ],
     TOKENMINT: [
-      'Mint ERC20 tokens',
-      'Create NFT collections',
-      'Manage token metadata',
-      'Integrate with ETC swap'
+      '10 monthly token mints',
+      '5 active contracts',
+      'Up to 100 ETC mint value',
+      '50 ETC daily withdrawal limit'
     ]
   }
   return features[roleKey] || []

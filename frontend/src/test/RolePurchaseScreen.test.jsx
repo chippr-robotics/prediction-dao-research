@@ -69,15 +69,20 @@ describe('RolePurchaseScreen', () => {
     renderWithProviders(<RolePurchaseScreen />)
     
     expect(screen.getByText('🌟 BEST VALUE')).toBeInTheDocument()
-    expect(screen.getByText(/Save \$\d+ \(25% off\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Save \d+ ETC \(25% off\)/)).toBeInTheDocument()
   })
 
   it('shows individual role prices', () => {
     renderWithProviders(<RolePurchaseScreen />)
     
-    expect(screen.getByText('$100 USDC')).toBeInTheDocument()
-    expect(screen.getByText('$250 USDC')).toBeInTheDocument()
-    expect(screen.getByText('$150 USDC')).toBeInTheDocument()
+    // Check for ETC prices (may appear multiple times in bundles too)
+    const etc100 = screen.getAllByText('100 ETC')
+    const etc250 = screen.getAllByText('250 ETC')
+    const etc150 = screen.getAllByText('150 ETC')
+    
+    expect(etc100.length).toBeGreaterThan(0)
+    expect(etc250.length).toBeGreaterThan(0)
+    expect(etc150.length).toBeGreaterThan(0)
   })
 
   it('displays connect wallet prompt when not connected', () => {
@@ -104,9 +109,10 @@ describe('RolePurchaseScreen', () => {
   it('shows features list for each role', () => {
     renderWithProviders(<RolePurchaseScreen />)
     
-    expect(screen.getByText('Create prediction markets')).toBeInTheDocument()
-    expect(screen.getByText('Access DAO governance')).toBeInTheDocument()
-    expect(screen.getByText('Mint ERC20 tokens')).toBeInTheDocument()
+    // Check for Bronze tier features
+    expect(screen.getByText('10 daily bets')).toBeInTheDocument()
+    expect(screen.getByText('5 daily bets on proposals')).toBeInTheDocument()
+    expect(screen.getByText('10 monthly token mints')).toBeInTheDocument()
   })
 
   it('displays two-role bundle options', () => {
