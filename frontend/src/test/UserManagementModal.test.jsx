@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
+import { BrowserRouter } from 'react-router-dom'
 import UserManagementModal from '../components/ui/UserManagementModal'
 import { Web3Provider } from '../contexts/Web3Context'
 import { UserPreferencesProvider } from '../contexts/UserPreferencesContext'
 import { UIProvider } from '../contexts/UIContext'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { ETCswapProvider } from '../contexts/ETCswapContext'
+import { RoleProvider } from '../contexts/RoleContext'
+import { PriceProvider } from '../contexts/PriceContext'
 
 // Create mockable functions for wagmi hooks
 const mockUseAccount = vi.fn()
@@ -50,17 +53,23 @@ const renderWithProviders = (ui, { isConnected = true } = {}) => {
   })
   
   return render(
-    <ThemeProvider>
-      <UIProvider>
+    <BrowserRouter>
+      <ThemeProvider>
         <Web3Provider>
-          <ETCswapProvider>
-            <UserPreferencesProvider>
-              {ui}
-            </UserPreferencesProvider>
-          </ETCswapProvider>
+          <UserPreferencesProvider>
+            <RoleProvider>
+              <ETCswapProvider>
+                <UIProvider>
+                  <PriceProvider>
+                    {ui}
+                  </PriceProvider>
+                </UIProvider>
+              </ETCswapProvider>
+            </RoleProvider>
+          </UserPreferencesProvider>
         </Web3Provider>
-      </UIProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   )
 }
 
