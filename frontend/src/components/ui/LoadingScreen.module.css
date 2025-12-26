@@ -1,0 +1,158 @@
+/**
+ * LoadingScreen Component Styles
+ * 
+ * Animated loading screen featuring the FairWins 4-leaf clover logo.
+ * Optimized for performance and accessibility.
+ */
+
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary);
+  z-index: 9999;
+  transition: opacity 0.3s ease-out;
+}
+
+.loading-screen[aria-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.logo-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SVG/Image container */
+.clover-svg {
+  width: 100%;
+  height: 100%;
+  animation: logoFadeIn 1.5s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes logoFadeIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Continuous pulsing after initial animation */
+.logo-container.animated {
+  animation: pulse 2s ease-in-out 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Loading text */
+.loading-text {
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Loading dots animation */
+.loading-dots {
+  display: inline-block;
+  margin-left: 0.25rem;
+}
+
+.loading-dots::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% {
+    content: '';
+  }
+  40% {
+    content: '.';
+  }
+  60% {
+    content: '..';
+  }
+  80%, 100% {
+    content: '...';
+  }
+}
+
+/* Accessibility: Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .clover-svg {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  
+  .logo-container.animated {
+    animation: none;
+  }
+  
+  .loading-dots::after {
+    animation: none;
+    content: '...';
+  }
+  
+  .loading-screen {
+    transition: none;
+  }
+}
+
+/* Size variants */
+.loading-screen.small .logo-container {
+  width: 60px;
+  height: 60px;
+}
+
+.loading-screen.small .loading-text {
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.loading-screen.large .logo-container {
+  width: 180px;
+  height: 180px;
+}
+
+.loading-screen.large .loading-text {
+  font-size: 1.125rem;
+  margin-top: 2rem;
+}
+
+/* Inline variant - for embedding in components */
+.loading-screen.inline {
+  position: relative;
+  background-color: transparent;
+  min-height: 200px;
+  z-index: auto;
+}
