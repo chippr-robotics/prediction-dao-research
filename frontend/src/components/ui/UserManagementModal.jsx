@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useWeb3, useWallet } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
+import { useTheme } from '../../hooks/useTheme'
+import { useNetworkContext } from '../../contexts/NetworkContext'
+import { NETWORKS, PUBLIC_RPC_ENDPOINTS } from '../../utils/networkConfig'
 import SwapPanel from '../fairwins/SwapPanel'
 import './UserManagementModal.css'
 
@@ -10,6 +13,8 @@ function UserManagementModal({ onScanMarket }) {
   const { connectWallet, disconnectWallet } = useWallet()
   const { hideModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
+  const { toggleMode, isDark } = useTheme()
+  const { selectedNetwork, switchNetwork, currentNetwork, currentRpcUrl } = useNetworkContext()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -36,6 +41,24 @@ function UserManagementModal({ onScanMarket }) {
     // TODO: Implement launch market navigation
     hideModal()
     console.log('Navigate to launch market')
+  }
+
+  const handleScanSuccess = (decodedText, url) => {
+    setShowScanner(false)
+    
+    if (url && url.pathname.includes('/market/')) {
+      const marketId = url.pathname.split('/market/')[1]
+      if (onScanMarket) {
+        onScanMarket(marketId)
+      }
+    } else {
+      // TODO: Replace with proper toast notification system
+      alert(`Scanned: ${decodedText}`)
+    }
+  }
+
+  const handleNetworkSwitch = (networkKey) => {
+    switchNetwork(networkKey)
   }
 
   const shortenAddress = (address) => {
@@ -166,6 +189,92 @@ function UserManagementModal({ onScanMarket }) {
                       <span className="pref-value">{preferences.defaultSlippage}%</span>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'settings' && (
+              <div className="settings-section" role="tabpanel">
+                <h3>Settings</h3>
+                
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>Network</h4>
+                    <p>Select blockchain network for markets</p>
+                    <p className="setting-note">Current: {currentNetwork?.name} ({currentNetwork?.nativeCurrency.symbol})</p>
+                  </div>
+                  <div className="network-selector">
+                    <div className="network-buttons">
+                      <button 
+                        className={`network-btn ${selectedNetwork === 'mainnet' ? 'active' : ''}`}
+                        onClick={() => handleNetworkSwitch('mainnet')}
+                        aria-label="Switch to Ethereum Classic Mainnet"
+                      >
+                        <span className="network-icon" aria-hidden="true">⚡</span>
+                        <span className="network-label">Mainnet</span>
+                      </button>
+                      <button 
+                        className={`network-btn ${selectedNetwork === 'mordor' ? 'active' : ''}`}
+                        onClick={() => handleNetworkSwitch('mordor')}
+                        aria-label="Switch to Mordor Testnet"
+                      >
+                        <span className="network-icon" aria-hidden="true">🧪</span>
+                        <span className="network-label">Mordor</span>
+                      </button>
+                      <button 
+                        className={`network-btn ${selectedNetwork === 'hardhat' ? 'active' : ''}`}
+                        onClick={() => handleNetworkSwitch('hardhat')}
+                        aria-label="Switch to Hardhat Local"
+                      >
+                        <span className="network-icon" aria-hidden="true">🔧</span>
+                        <span className="network-label">Local</span>
+                      </button>
+                    </div>
+                    <div className="rpc-info">
+                      <span className="rpc-label">RPC:</span>
+                      <span className="rpc-url">{currentRpcUrl}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>Theme</h4>
+                    <p>Switch between light and dark mode</p>
+                  </div>
+                  <button 
+                    className="theme-toggle-btn"
+                    onClick={toggleMode}
+                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                  >
+                    <span className="theme-icon" aria-hidden="true">
+                      {isDark ? '☀️' : '🌙'}
+                    </span>
+                    <span className="theme-label">{isDark ? 'Light' : 'Dark'} Mode</span>
+                  </button>
+                </div>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>ClearPath Status</h4>
+                    <p>Toggle your ClearPath governance access</p>
+                  </div>
+                  <button 
+                    onClick={handleToggleClearPath}
+                    className={`status-toggle-btn ${preferences.clearPathStatus.active ? 'active' : ''}`}
+                  >
+                    <span className={`status-badge ${preferences.clearPathStatus.active ? 'active' : 'inactive'}`}>
+                      {preferences.clearPathStatus.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <h4>Default Slippage</h4>
+                    <p>Your preferred slippage tolerance for swaps</p>
+                  </div>
+                  <span className="setting-value">{preferences.defaultSlippage}%</span>
                 </div>
               </div>
             )}
