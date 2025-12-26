@@ -68,6 +68,7 @@ function ModalSystem() {
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? 'modal-title' : undefined}
+        aria-label={!title ? 'Dialog' : undefined}
         tabIndex={-1}
       >
         {title && (

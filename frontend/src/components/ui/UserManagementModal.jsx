@@ -45,15 +45,14 @@ function UserManagementModal({ onScanMarket }) {
 
   return (
     <div className="user-management-modal">
-      <div className="modal-header-section">
-        <h2>User Management</h2>
-        {isConnected && (
+      {isConnected && (
+        <div className="modal-header-section">
           <div className="wallet-info-header">
             <span className="wallet-address-display">{shortenAddress(account)}</span>
             <span className={`status-dot ${isConnected ? 'connected' : ''}`} aria-hidden="true"></span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {!isConnected ? (
         <div className="connect-section">
