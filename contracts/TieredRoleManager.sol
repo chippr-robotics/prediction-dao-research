@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./RoleManager.sol";
 
 /**
@@ -9,6 +11,7 @@ import "./RoleManager.sol";
  * @dev Each product role can have multiple tiers with different permissions and limits
  */
 contract TieredRoleManager is RoleManager {
+    using SafeERC20 for IERC20;
     
     // ========== Tier Definitions ==========
     
@@ -336,7 +339,7 @@ contract TieredRoleManager is RoleManager {
     // ========== Tier Purchase & Upgrade Functions ==========
     
     /**
-     * @notice Purchase a role at specific tier
+     * @notice Purchase a role at specific tier with ETH (legacy method)
      * @param role The role to purchase
      * @param tier The membership tier
      */
@@ -370,7 +373,59 @@ contract TieredRoleManager is RoleManager {
     }
     
     /**
-     * @notice Upgrade to a higher tier
+     * @notice Purchase a role at specific tier with ERC20 token
+     * @param role The role to purchase
+     * @param tier The membership tier
+     * @param paymentToken The ERC20 token to use for payment
+     * @param amount The amount of tokens to pay
+     */
+    function purchaseRoleWithTierToken(
+        bytes32 role,
+        MembershipTier tier,
+        address paymentToken,
+        uint256 amount
+    ) external nonReentrant whenNotPaused {
+        require(address(paymentManager) != address(0), "Payment manager not set");
+        require(tier != MembershipTier.NONE, "Invalid tier");
+        require(userTiers[msg.sender][role] == MembershipTier.NONE, "Already has role, use upgradeTier");
+        
+        TierMetadata storage tierMeta = tierMetadata[role][tier];
+        require(tierMeta.isActive, "Tier not active");
+        
+        RoleMetadata storage roleMeta = roleMetadata[role];
+        require(roleMeta.isPremium, "Role is not purchasable");
+        require(roleMeta.maxMembers == 0 || roleMeta.currentMembers < roleMeta.maxMembers, "Role at max capacity");
+        
+        // Transfer tokens from buyer to this contract
+        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Approve payment manager to transfer tokens from this contract
+        IERC20(paymentToken).safeIncreaseAllowance(address(paymentManager), amount);
+        
+        // Process payment through payment manager (payment manager will transfer from this contract)
+        bytes32 paymentId = paymentManager.processPayment(
+            address(this), // payer is this contract (we already have the tokens)
+            msg.sender,    // buyer is the actual user
+            role,
+            paymentToken,
+            amount,
+            uint8(tier)
+        );
+        
+        // Grant role and set tier
+        _grantRole(role, msg.sender);
+        userTiers[msg.sender][role] = tier;
+        tierPurchases[msg.sender][role][tier] = block.timestamp;
+        roleMeta.currentMembers++;
+        
+        // Initialize usage stats
+        _initializeUsageStats(msg.sender, role);
+        
+        emit TierPurchased(msg.sender, role, tier, amount);
+    }
+    
+    /**
+     * @notice Upgrade to a higher tier with ETH (legacy method)
      * @param role The role to upgrade
      * @param newTier The new tier
      */
@@ -393,6 +448,51 @@ contract TieredRoleManager is RoleManager {
         if (msg.value > tierMeta.price) {
             payable(msg.sender).transfer(msg.value - tierMeta.price);
         }
+    }
+    
+    /**
+     * @notice Upgrade to a higher tier with ERC20 token
+     * @param role The role to upgrade
+     * @param newTier The new tier
+     * @param paymentToken The ERC20 token to use for payment
+     * @param amount The amount of tokens to pay
+     */
+    function upgradeTierWithToken(
+        bytes32 role,
+        MembershipTier newTier,
+        address paymentToken,
+        uint256 amount
+    ) external nonReentrant whenNotPaused {
+        require(address(paymentManager) != address(0), "Payment manager not set");
+        
+        MembershipTier currentTier = userTiers[msg.sender][role];
+        require(currentTier != MembershipTier.NONE, "Must have role first");
+        require(newTier > currentTier, "Can only upgrade to higher tier");
+        
+        TierMetadata storage tierMeta = tierMetadata[role][newTier];
+        require(tierMeta.isActive, "Tier not active");
+        
+        // Transfer tokens from buyer to this contract
+        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
+        
+        // Approve payment manager to transfer tokens from this contract
+        IERC20(paymentToken).safeIncreaseAllowance(address(paymentManager), amount);
+        
+        // Process payment through payment manager (payment manager will transfer from this contract)
+        bytes32 paymentId = paymentManager.processPayment(
+            address(this), // payer is this contract (we already have the tokens)
+            msg.sender,    // buyer is the actual user
+            role,
+            paymentToken,
+            amount,
+            uint8(newTier)
+        );
+        
+        // Upgrade tier
+        userTiers[msg.sender][role] = newTier;
+        tierPurchases[msg.sender][role][newTier] = block.timestamp;
+        
+        emit TierUpgraded(msg.sender, role, currentTier, newTier);
     }
     
     // ========== Usage Tracking & Enforcement ==========
