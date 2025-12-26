@@ -23,36 +23,71 @@ function DevelopmentWarningModal() {
       const timer = setTimeout(() => {
         showModal(
           <div className="dev-warning-modal-content">
-            <div className="dev-warning-modal-icon" aria-hidden="true">
-              ⚠️
+            <div className="dev-warning-modal-header">
+              <img 
+                src="/logo_fairwins.svg" 
+                alt="FairWins" 
+                className="dev-warning-modal-logo"
+                width="64"
+                height="64"
+                onError={(e) => { e.target.style.display = 'none' }}
+              />
+              <h2 className="dev-warning-modal-title">
+                Welcome to FairWins
+              </h2>
+              <p className="dev-warning-modal-subtitle">
+                Prediction Markets for Friends
+              </p>
             </div>
-            <h2 className="dev-warning-modal-title">
-              Pardon Our Dust
-            </h2>
-            <p className="dev-warning-modal-message">
-              This site is under active development. We're working hard to bring you 
-              exciting new features and improvements.
-            </p>
-            <p className="dev-warning-modal-message">
-              Please check back soon for updates!
-            </p>
-            <a 
-              href="https://chipprbots.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="dev-warning-modal-link"
-            >
-              Visit chipprbots.com for more information
-            </a>
-            <button 
-              className="dev-warning-modal-button"
-              onClick={() => {
-                sessionStorage.setItem(DEV_WARNING_SEEN_KEY, 'true')
-                hideModal()
-              }}
-            >
-              Continue to Site
-            </button>
+            
+            <div className="dev-warning-modal-body">
+              <p className="dev-warning-modal-message">
+                <strong>FairWins</strong> is the core platform for creating and trading on prediction markets 
+                about any topic. Open to everyone, with transparent market-driven outcomes.
+              </p>
+              
+              <div className="platform-addons">
+                <h3 className="addons-title">Platform Add-ons:</h3>
+                <ul className="addons-list">
+                  <li>
+                    <strong>ClearPath</strong> - DAO governance platform with futarchy-based decision-making (RBAC managed)
+                  </li>
+                  <li>
+                    <strong>TokenMint</strong> - Token creation and management tools (RBAC managed)
+                  </li>
+                  <li>
+                    <strong>SpindleTop</strong> - Advanced treasury management (RBAC managed)
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="dev-warning-notice">
+                <p className="dev-warning-modal-message">
+                  ⚠️ <strong>Development Notice:</strong> This site is under active development. 
+                  Features and functionality may change.
+                </p>
+              </div>
+            </div>
+            
+            <div className="dev-warning-modal-footer">
+              <a 
+                href="https://docs.fairwins.app" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="dev-warning-modal-link"
+              >
+                📚 Visit docs.fairwins.app for more information
+              </a>
+              <button 
+                className="dev-warning-modal-button"
+                onClick={() => {
+                  sessionStorage.setItem(DEV_WARNING_SEEN_KEY, 'true')
+                  hideModal()
+                }}
+              >
+                Continue to FairWins
+              </button>
+            </div>
           </div>,
           {
             title: null,
