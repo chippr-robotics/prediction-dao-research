@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useWeb3, useWallet } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { useRoles } from '../../hooks/useRoles'
 import SwapPanel from '../fairwins/SwapPanel'
+import RolePurchaseModal from './RolePurchaseModal'
 import './UserManagementModal.css'
 
 function UserManagementModal({ onScanMarket }) {
@@ -12,6 +14,7 @@ function UserManagementModal({ onScanMarket }) {
   const { hideModal, showModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
   const { roles, hasRole, ROLES, ROLE_INFO } = useRoles()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -38,6 +41,24 @@ function UserManagementModal({ onScanMarket }) {
     // TODO: Implement launch market navigation
     hideModal()
     console.log('Navigate to launch market')
+  }
+
+  const handleOpenPurchaseModal = () => {
+    showModal(<RolePurchaseModal onClose={hideModal} />, {
+      title: '',
+      size: 'large',
+      closable: false
+    })
+  }
+
+  const handleNavigateToClearPath = () => {
+    hideModal()
+    navigate('/clearpath')
+  }
+
+  const handleNavigateToAdmin = () => {
+    hideModal()
+    navigate('/admin/roles')
   }
 
   const shortenAddress = (address) => {
@@ -191,11 +212,7 @@ function UserManagementModal({ onScanMarket }) {
                     <div className="no-roles-message">
                       <p>You don't have any special roles yet.</p>
                       <button 
-                        onClick={() => {
-                          hideModal()
-                          // Navigate to purchase - will be implemented in next phase
-                          console.log('Navigate to role purchase')
-                        }}
+                        onClick={handleOpenPurchaseModal}
                         className="get-roles-btn"
                       >
                         Get Premium Access
@@ -211,11 +228,7 @@ function UserManagementModal({ onScanMarket }) {
                       Access DAO governance and management features
                     </p>
                     <button 
-                      onClick={() => {
-                        hideModal()
-                        // Navigate to ClearPath - implementation pending
-                        console.log('Navigate to ClearPath management')
-                      }}
+                      onClick={handleNavigateToClearPath}
                       className="manage-org-btn"
                     >
                       Manage Organizations
@@ -230,11 +243,7 @@ function UserManagementModal({ onScanMarket }) {
                       Manage roles and permissions for users
                     </p>
                     <button 
-                      onClick={() => {
-                        hideModal()
-                        // Navigate to admin panel - will be implemented next
-                        console.log('Navigate to admin panel')
-                      }}
+                      onClick={handleNavigateToAdmin}
                       className="admin-panel-btn"
                     >
                       Role Management
