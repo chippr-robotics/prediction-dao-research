@@ -155,12 +155,12 @@ See [FRONTEND_BUILD_BOOK.md](../FRONTEND_BUILD_BOOK.md) for comprehensive develo
 
 ## Testing
 
-The project includes comprehensive testing for UI components, Web3 integration, and accessibility compliance.
+The project includes comprehensive testing for UI components, Web3 integration, accessibility compliance, and end-to-end user flows.
 
 ### Running Tests
 
 ```bash
-# Run all tests once
+# Run unit tests once
 npm test
 
 # Run tests in watch mode (for development)
@@ -174,6 +174,12 @@ npm run test:ui
 
 # Run specific test file
 npm test Button.test
+
+# Run E2E tests with Cypress
+npm run test:e2e
+
+# Open Cypress interactive test runner
+npm run cypress:open
 ```
 
 ### Test Structure
@@ -185,15 +191,41 @@ src/test/
 ├── StatusIndicator.test.jsx    # Status indicator tests
 ├── accessibility.test.jsx      # WCAG compliance tests
 └── web3-integration.test.js    # Web3 wallet integration tests
+
+cypress/
+├── e2e/                        # End-to-end test suites
+│   ├── 01-onboarding.cy.js     # User onboarding flow
+│   ├── 02-fairwins-trading.cy.js  # Market trading flow
+│   ├── 03-clearpath-governance.cy.js  # DAO governance flow
+│   ├── 04-positions-results.cy.js  # Portfolio management
+│   └── 05-integration.cy.js    # Full integration tests
+├── support/                    # Custom commands and utilities
+│   ├── commands.js             # Reusable Cypress commands
+│   └── e2e.js                  # Global configuration
+└── fixtures/                   # Test data
 ```
 
 ### Test Coverage
 
 Current test coverage:
-- **UI Components**: 30 tests for buttons, status indicators, forms
+- **UI Components**: 30 unit tests for buttons, status indicators, forms
 - **Accessibility**: 24 tests for WCAG AA compliance with axe-core
 - **Web3 Integration**: 17 tests for wallet connection flows
-- **Total**: 67 tests, all passing ✅
+- **E2E Tests**: 82 tests covering major user flows and integrations
+- **Total**: 153+ tests ✅
+
+### End-to-End Testing
+
+Comprehensive Cypress E2E tests validate complete user journeys:
+
+- **User Onboarding**: Landing page, platform selection, wallet connection (15 tests)
+- **Market Trading**: Browsing, filtering, trading interface (18 tests)
+- **DAO Governance**: Dashboard, proposals, voting (18 tests)
+- **Position Management**: Portfolio, balances, results (17 tests)
+- **Integration**: Full cross-platform user journeys (14 tests)
+
+See [CYPRESS_E2E_TESTING.md](./CYPRESS_E2E_TESTING.md) for detailed documentation.  
+See [E2E_TEST_OUTCOMES.md](./E2E_TEST_OUTCOMES.md) for test results and coverage.
 
 ### Writing New Tests
 
