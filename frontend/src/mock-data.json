@@ -149,68 +149,68 @@
     },
     {
       "id": 4,
-      "proposalTitle": "2024 President: Candidate A wins",
-      "description": "Will Candidate A win the 2024 US Presidential Election?",
+      "proposalTitle": "Presidential Election: Candidate A wins",
+      "description": "Will this candidate win the US Presidential Election?",
       "category": "politics",
       "passTokenPrice": "0.32",
       "failTokenPrice": "0.68",
       "totalLiquidity": "45000",
       "tradingEndTime": "RELATIVE:30d",
       "status": "Active",
-      "correlationGroupId": "election-2024-president",
-      "correlationGroupName": "2024 Presidential Election"
+      "correlationGroupId": "presidential-election",
+      "correlationGroupName": "Presidential Election"
     },
     {
       "id": 40,
-      "proposalTitle": "2024 President: Candidate B wins",
-      "description": "Will Candidate B win the 2024 US Presidential Election?",
+      "proposalTitle": "Presidential Election: Candidate B wins",
+      "description": "Will this candidate win the US Presidential Election?",
       "category": "politics",
       "passTokenPrice": "0.28",
       "failTokenPrice": "0.72",
       "totalLiquidity": "38000",
       "tradingEndTime": "RELATIVE:30d",
       "status": "Active",
-      "correlationGroupId": "election-2024-president",
-      "correlationGroupName": "2024 Presidential Election"
+      "correlationGroupId": "presidential-election",
+      "correlationGroupName": "Presidential Election"
     },
     {
       "id": 41,
-      "proposalTitle": "2024 President: Candidate C wins",
-      "description": "Will Candidate C win the 2024 US Presidential Election?",
+      "proposalTitle": "Presidential Election: Candidate C wins",
+      "description": "Will this candidate win the US Presidential Election?",
       "category": "politics",
       "passTokenPrice": "0.15",
       "failTokenPrice": "0.85",
       "totalLiquidity": "22000",
       "tradingEndTime": "RELATIVE:30d",
       "status": "Active",
-      "correlationGroupId": "election-2024-president",
-      "correlationGroupName": "2024 Presidential Election"
+      "correlationGroupId": "presidential-election",
+      "correlationGroupName": "Presidential Election"
     },
     {
       "id": 42,
-      "proposalTitle": "2024 President: Candidate D wins",
-      "description": "Will Candidate D win the 2024 US Presidential Election?",
+      "proposalTitle": "Presidential Election: Candidate D wins",
+      "description": "Will this candidate win the US Presidential Election?",
       "category": "politics",
       "passTokenPrice": "0.18",
       "failTokenPrice": "0.82",
       "totalLiquidity": "28000",
       "tradingEndTime": "RELATIVE:30d",
       "status": "Active",
-      "correlationGroupId": "election-2024-president",
-      "correlationGroupName": "2024 Presidential Election"
+      "correlationGroupId": "presidential-election",
+      "correlationGroupName": "Presidential Election"
     },
     {
       "id": 43,
-      "proposalTitle": "2024 President: Candidate E wins",
-      "description": "Will Candidate E win the 2024 US Presidential Election?",
+      "proposalTitle": "Presidential Election: Candidate E wins",
+      "description": "Will this candidate win the US Presidential Election?",
       "category": "politics",
       "passTokenPrice": "0.07",
       "failTokenPrice": "0.93",
       "totalLiquidity": "15000",
       "tradingEndTime": "RELATIVE:30d",
       "status": "Active",
-      "correlationGroupId": "election-2024-president",
-      "correlationGroupName": "2024 Presidential Election"
+      "correlationGroupId": "presidential-election",
+      "correlationGroupName": "Presidential Election"
     },
     {
       "id": 5,

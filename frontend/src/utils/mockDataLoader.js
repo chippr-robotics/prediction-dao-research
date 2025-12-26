@@ -31,6 +31,16 @@ function processRelativeTime(timeStr) {
   }
   
   const days = parseInt(match[1], 10)
+  
+  // Validate days is within reasonable range to prevent extreme dates
+  if (days < -365 || days > 730) {
+    console.warn(`Relative time days value ${days} is outside reasonable range (-365 to 730). Using clamped value.`)
+    const clampedDays = Math.max(-365, Math.min(730, days))
+    const date = new Date()
+    date.setDate(date.getDate() + clampedDays)
+    return date.toISOString()
+  }
+  
   const date = new Date()
   date.setDate(date.getDate() + days)
   return date.toISOString()
