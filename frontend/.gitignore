@@ -35,3 +35,9 @@ coverage
 
 # Vitest
 .vitest
+
+# Cypress
+cypress/screenshots
+cypress/videos
+cypress/downloads
+.cypress-cache

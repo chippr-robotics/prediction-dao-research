@@ -1,0 +1,47 @@
+{
+  "testAccount": {
+    "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "privateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    "balance": "10000"
+  },
+  "networkConfig": {
+    "chainId": 1337,
+    "networkId": 1337,
+    "name": "Hardhat Local",
+    "rpcUrl": "http://localhost:8545"
+  },
+  "mockMarkets": [
+    {
+      "id": 0,
+      "title": "Test Market: Bitcoin reaches $100k",
+      "description": "Will Bitcoin reach $100,000 by end of 2025?",
+      "category": "crypto",
+      "yesPrice": "0.45",
+      "noPrice": "0.55",
+      "liquidity": "50000",
+      "status": "active"
+    },
+    {
+      "id": 1,
+      "title": "Test Market: NFL Super Bowl winner",
+      "description": "Will the Chiefs win Super Bowl 2025?",
+      "category": "sports",
+      "yesPrice": "0.35",
+      "noPrice": "0.65",
+      "liquidity": "25000",
+      "status": "active"
+    }
+  ],
+  "mockProposals": [
+    {
+      "id": 0,
+      "title": "Test Proposal: Increase treasury allocation",
+      "description": "Should we increase treasury allocation to 20%?",
+      "status": "active",
+      "votes": {
+        "for": "1000",
+        "against": "500"
+      }
+    }
+  ]
+}
