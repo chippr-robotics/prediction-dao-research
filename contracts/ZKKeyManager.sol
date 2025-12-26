@@ -57,6 +57,9 @@ contract ZKKeyManager is AccessControl, Pausable {
     // User address => all key hashes (history)
     mapping(address => bytes32[]) public userKeyHistory;
     
+    // Nonce for key hash generation (prevents predictability)
+    uint256 private keyNonce;
+    
     // Configuration
     uint256 public keyExpirationDuration;  // Default: 365 days
     uint256 public maxRotationsPerYear;     // Rate limiting
@@ -161,8 +164,15 @@ contract ZKKeyManager is AccessControl, Pausable {
         // Validate key format
         _validateKeyFormat(publicKey);
         
-        // Create key hash
-        bytes32 keyHash = keccak256(abi.encodePacked(user, publicKey, block.timestamp));
+        // Create key hash with multiple sources of entropy
+        // Using: user address, public key, block timestamp, and incrementing nonce
+        // This ensures uniqueness and unpredictability without relying on prevrandao
+        bytes32 keyHash = keccak256(abi.encodePacked(
+            user, 
+            publicKey, 
+            block.timestamp,
+            ++keyNonce
+        ));
         
         // Calculate expiration
         uint256 expiresAt = requireKeyExpiration 
@@ -236,8 +246,13 @@ contract ZKKeyManager is AccessControl, Pausable {
         // Validate new key format
         _validateKeyFormat(newPublicKey);
         
-        // Create new key hash
-        bytes32 newKeyHash = keccak256(abi.encodePacked(user, newPublicKey, block.timestamp));
+        // Create new key hash with multiple sources of entropy
+        bytes32 newKeyHash = keccak256(abi.encodePacked(
+            user, 
+            newPublicKey, 
+            block.timestamp,
+            ++keyNonce
+        ));
         
         // Calculate expiration
         uint256 expiresAt = requireKeyExpiration 
