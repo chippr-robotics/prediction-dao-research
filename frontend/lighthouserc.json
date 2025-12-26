@@ -1,9 +1,9 @@
 {
   "ci": {
     "collect": {
-      "startServerCommand": "npm run preview",
+      "startServerCommand": "npm run preview -- --host 0.0.0.0",
       "startServerReadyPattern": "Local:.*http://localhost:4173",
-      "startServerReadyTimeout": 30000,
+      "startServerReadyTimeout": 60000,
       "url": [
         "http://localhost:4173/",
         "http://localhost:4173/select",
@@ -14,7 +14,8 @@
       "settings": {
         "preset": "desktop",
         "onlyCategories": ["accessibility", "performance", "best-practices", "seo"],
-        "skipAudits": []
+        "skipAudits": [],
+        "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage"
       }
     },
     "assert": {
