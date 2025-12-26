@@ -9,6 +9,7 @@ import { UIProvider } from '../contexts/UIContext'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { ETCswapProvider } from '../contexts/ETCswapContext'
 import { RoleProvider } from '../contexts/RoleContext'
+import { PriceProvider } from '../contexts/PriceContext'
 
 // Create mockable functions for wagmi hooks
 const mockUseAccount = vi.fn()
@@ -59,7 +60,9 @@ const renderWithProviders = (ui, { isConnected = true } = {}) => {
             <RoleProvider>
               <ETCswapProvider>
                 <UIProvider>
-                  {ui}
+                  <PriceProvider>
+                    {ui}
+                  </PriceProvider>
                 </UIProvider>
               </ETCswapProvider>
             </RoleProvider>
