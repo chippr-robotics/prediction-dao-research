@@ -2,8 +2,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import './theme.css'
 import './App.css'
-import LandingPage from './components/LandingPage'
-import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
@@ -99,8 +97,15 @@ function AppContent() {
       )}
 
       <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/select" element={<PlatformSelector />} />
+        <Route 
+          path="/" 
+          element={
+            <FairWinsAppNew 
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+            />
+          } 
+        />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
         <Route 
