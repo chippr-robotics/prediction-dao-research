@@ -102,6 +102,8 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
                 src="/logo_fairwins.svg" 
                 alt="FairWins" 
                 className="logo-image"
+                width="48"
+                height="48"
               />
             </div>
             <h2 className="brand-name">FairWins</h2>

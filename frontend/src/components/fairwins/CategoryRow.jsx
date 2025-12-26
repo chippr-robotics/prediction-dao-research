@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef } from 'react'
 import MarketTile from './MarketTile'
 import './CategoryRow.css'
 
@@ -10,38 +10,10 @@ function CategoryRow({
   icon
 }) {
   const scrollerRef = useRef(null)
-  const [scrollPosition, setScrollPosition] = useState(0)
-  const [isHovering, setIsHovering] = useState(false)
-
-  // Duplicate markets for infinite loop effect
-  const duplicatedMarkets = [...markets, ...markets, ...markets]
-
-  useEffect(() => {
-    if (!scrollerRef.current || isHovering) return
-
-    const scroller = scrollerRef.current
-    const scrollWidth = scroller.scrollWidth / 3 // Since we tripled the content
-    
-    // Auto-scroll
-    const interval = setInterval(() => {
-      setScrollPosition((prev) => {
-        const newPos = prev + 1
-        // Reset to beginning when reaching the middle copy
-        if (newPos >= scrollWidth) {
-          scroller.scrollLeft = 0
-          return 0
-        }
-        scroller.scrollLeft = newPos
-        return newPos
-      })
-    }, 30)
-
-    return () => clearInterval(interval)
-  }, [isHovering])
 
   const scroll = (direction) => {
     if (scrollerRef.current) {
-      const scrollAmount = 350
+      const scrollAmount = 300
       const newPosition = direction === 'left' 
         ? scrollerRef.current.scrollLeft - scrollAmount
         : scrollerRef.current.scrollLeft + scrollAmount
@@ -86,14 +58,12 @@ function CategoryRow({
       <div 
         className="category-scroller"
         ref={scrollerRef}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
         role="region"
         aria-label={`${title} markets`}
       >
-        <div className="scroller-track-infinite">
-          {duplicatedMarkets.map((market, index) => (
-            <div key={`${market.id}-${index}`} className="scroller-item-small">
+        <div className="scroller-track">
+          {markets.map((market) => (
+            <div key={market.id} className="scroller-item-small">
               <MarketTile 
                 market={market}
                 onClick={onMarketClick}

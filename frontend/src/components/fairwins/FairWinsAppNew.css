@@ -121,11 +121,13 @@
 /* Category Rows Container - Primary view, not overlaid */
 .categories-rows-container {
   width: 100%;
+  max-width: 100%;
   height: 100%;
-  padding: 2rem;
+  padding: 0.75rem;
   background: var(--bg-primary);
-  overflow-y: auto; /* Enable vertical scrolling for the entire category rows view */
-  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-x: hidden !important; /* Prevent horizontal overflow - each row scrolls independently */
+  box-sizing: border-box;
 }
 
 /* Swap View Container */

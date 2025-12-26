@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getMockWelfareMetrics } from '../utils/mockDataLoader'
 
 function WelfareMetrics({ provider, signer }) {
   const [metrics, setMetrics] = useState([])
@@ -10,42 +11,9 @@ function WelfareMetrics({ provider, signer }) {
 
   const loadMetrics = async () => {
     try {
-      // Mock data for demonstration
+      // Load mock data from centralized source
       // In production, this would fetch from WelfareMetricRegistry contract
-      const mockMetrics = [
-        {
-          id: 0,
-          name: 'Treasury Value',
-          description: 'Time-weighted average price of total treasury holdings',
-          weight: 5000,
-          active: true,
-          currentValue: '$12,450,000'
-        },
-        {
-          id: 1,
-          name: 'Network Activity',
-          description: 'Composite index of transaction count and active addresses',
-          weight: 3000,
-          active: true,
-          currentValue: '87.5 (normalized)'
-        },
-        {
-          id: 2,
-          name: 'Hash Rate Security',
-          description: 'Network hash rate normalized against other PoW chains',
-          weight: 1500,
-          active: true,
-          currentValue: '0.042 (relative)'
-        },
-        {
-          id: 3,
-          name: 'Developer Activity',
-          description: 'Weighted measure of GitHub commits and contributors',
-          weight: 500,
-          active: true,
-          currentValue: '142 (score)'
-        }
-      ]
+      const mockMetrics = getMockWelfareMetrics()
 
       setMetrics(mockMetrics)
       setLoading(false)

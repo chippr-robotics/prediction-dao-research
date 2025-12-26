@@ -1,13 +1,17 @@
 .category-row {
-  margin-bottom: 1.5rem; /* Reduced from 2.5rem for more compact layout */
+  margin-bottom: 0.75rem; /* Compact spacing between rows */
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden !important; /* Prevent horizontal overflow from this row */
+  position: relative;
 }
 
 .category-row-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem; /* Reduced from 1rem */
-  padding: 0 0.5rem; /* Reduced from 1rem */
+  margin-bottom: 0.25rem; /* Minimal spacing between header and cards */
+  padding: 0 0.5rem;
 }
 
 .category-title-group {
@@ -71,14 +75,15 @@
 }
 
 .category-scroller {
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow-x: scroll !important;
+  overflow-y: hidden !important;
   scroll-behavior: smooth;
-  padding: 0.5rem 0 1rem;
-  margin: 0 -0.5rem;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
+  padding: 0.25rem 0 0.5rem;
   cursor: grab;
+  width: 100%;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
 }
 
 .category-scroller:active {
@@ -104,43 +109,58 @@
   background: rgba(59, 130, 246, 0.5);
 }
 
-.scroller-track-infinite {
-  display: flex;
-  gap: 1rem;
-  width: max-content;
+.scroller-track {
+  display: inline-flex;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
 }
 
 .scroller-item-small {
-  flex: 0 0 280px;
+  flex: 0 0 260px;
+  width: 260px;
+  min-width: 260px;
+  max-width: 260px;
   scroll-snap-align: start;
 }
 
 .scroller-item-small .market-tile {
-  width: 280px;
+  width: 100%;
   height: 100%;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .category-row-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
+    flex-direction: row; /* Keep horizontal on mobile too */
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.5rem;
   }
 
   .category-row-header h2 {
-    font-size: 1.25rem;
+    font-size: 1rem;
+  }
+
+  .market-count {
+    font-size: 0.7rem;
   }
 
   .scroll-controls {
-    align-self: flex-end;
+    display: none; /* Hide scroll buttons on mobile - use swipe instead */
   }
 
   .scroller-item-small {
-    flex: 0 0 240px;
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
   }
+}
 
-  .scroller-item-small .market-tile {
-    width: 240px;
+/* Large screens - cards span nicely */
+@media (min-width: 1200px) {
+  .scroller-item-small {
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
   }
 }
