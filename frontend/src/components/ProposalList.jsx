@@ -1,30 +1,14 @@
 import { useState, useEffect } from 'react'
+import { getMockProposals } from '../utils/mockDataLoader'
 
 function ProposalList() {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock data for demonstration
+    // Load mock data from centralized source
     // In production, this would fetch from ProposalRegistry contract
-    const mockProposals = [
-      {
-        id: 0,
-        title: 'Fund Core Protocol Development',
-        description: 'Funding for Q1 2025 core protocol development team',
-        fundingAmount: '10000',
-        status: 'Active',
-        proposer: '0x1234...5678'
-      },
-      {
-        id: 1,
-        title: 'Security Audit Funding',
-        description: 'Comprehensive security audit for new features',
-        fundingAmount: '5000',
-        status: 'Reviewing',
-        proposer: '0xabcd...efgh'
-      }
-    ]
+    const mockProposals = getMockProposals()
 
     // Initial data load - legitimate use case for setting state in effect
     // eslint-disable-next-line react-hooks/set-state-in-effect

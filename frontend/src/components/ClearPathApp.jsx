@@ -38,6 +38,8 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
                   src="/logo_clearpath.svg" 
                   alt="ClearPath Logo" 
                   className="logo-image"
+                  width="40"
+                  height="40"
                   onError={(e) => { e.target.style.display = 'none' }}
                 />
               </div>

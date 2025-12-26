@@ -74,6 +74,8 @@ function LandingPage() {
                           src="/logo_fairwins.svg" 
                           alt="FairWins" 
                           className="platform-logo-compact"
+                          width="48"
+                          height="48"
                           onError={() => handleLogoError('fairwins')}
                         />
                       ) : (
@@ -102,6 +104,8 @@ function LandingPage() {
                             src="/logo_clearpath.svg" 
                             alt="ClearPath" 
                             className="platform-logo-compact"
+                            width="48"
+                            height="48"
                             onError={() => handleLogoError('clearpath')}
                           />
                         ) : (
