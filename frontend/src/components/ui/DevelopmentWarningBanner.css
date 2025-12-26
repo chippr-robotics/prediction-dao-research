@@ -1,8 +1,4 @@
 .dev-warning-banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: white;
   padding: 0.75rem 1rem;
@@ -21,6 +17,7 @@
   gap: 0.75rem;
   max-width: 1200px;
   width: 100%;
+  position: relative;
 }
 
 .dev-warning-icon {
@@ -50,6 +47,37 @@
   border-radius: 2px;
 }
 
+.dev-warning-close {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.dev-warning-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dev-warning-close:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.dev-warning-close:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
 @media (max-width: 768px) {
   .dev-warning-banner {
     font-size: 0.875rem;
@@ -62,5 +90,11 @@
   
   .dev-warning-icon {
     font-size: 1rem;
+  }
+
+  .dev-warning-close {
+    font-size: 1.25rem;
+    width: 28px;
+    height: 28px;
   }
 }
