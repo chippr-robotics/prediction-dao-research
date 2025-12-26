@@ -52,17 +52,30 @@ async function main() {
   // Deploy RagequitModule
   console.log("\nDeploying RagequitModule...");
   const RagequitModule = await hre.ethers.getContractFactory("RagequitModule");
-  const ragequitModule = await RagequitModule.deploy(
+  const ragequitModule = await RagequitModule.deploy();
+  await ragequitModule.waitForDeployment();
+  console.log("RagequitModule deployed to:", await ragequitModule.getAddress());
+  
+  // Initialize RagequitModule
+  console.log("Initializing RagequitModule...");
+  await ragequitModule.initialize(
+    deployer.address, // initialOwner
     mockGovernanceToken,
     deployer.address // Using deployer as treasury vault placeholder
   );
-  await ragequitModule.waitForDeployment();
-  console.log("RagequitModule deployed to:", await ragequitModule.getAddress());
+  console.log("RagequitModule initialized");
 
   // Deploy FutarchyGovernor
   console.log("\nDeploying FutarchyGovernor...");
   const FutarchyGovernor = await hre.ethers.getContractFactory("FutarchyGovernor");
-  const futarchyGovernor = await FutarchyGovernor.deploy(
+  const futarchyGovernor = await FutarchyGovernor.deploy();
+  await futarchyGovernor.waitForDeployment();
+  console.log("FutarchyGovernor deployed to:", await futarchyGovernor.getAddress());
+  
+  // Initialize FutarchyGovernor
+  console.log("Initializing FutarchyGovernor...");
+  await futarchyGovernor.initialize(
+    deployer.address, // initialOwner
     await welfareRegistry.getAddress(),
     await proposalRegistry.getAddress(),
     await marketFactory.getAddress(),
@@ -71,8 +84,7 @@ async function main() {
     await ragequitModule.getAddress(),
     deployer.address // Using deployer as treasury vault placeholder
   );
-  await futarchyGovernor.waitForDeployment();
-  console.log("FutarchyGovernor deployed to:", await futarchyGovernor.getAddress());
+  console.log("FutarchyGovernor initialized");
 
   // Setup initial configuration
   console.log("\n\nSetting up initial configuration...");
