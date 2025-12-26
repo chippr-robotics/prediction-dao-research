@@ -1,6 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("Real Payments Processing - E2E Tests", function () {
   let roleManager, tieredRoleManager, paymentManager;
@@ -217,7 +216,8 @@ describe("Real Payments Processing - E2E Tests", function () {
         ethers.parseUnits("100", 6)
       );
       
-      const [, , , , , newUser] = await ethers.getSigners();
+      const signers = await ethers.getSigners();
+      const newUser = signers[5];
       await mockUSDC.mint(newUser.address, ethers.parseUnits("1000", 6));
       
       const price = ethers.parseUnits("100", 6);
@@ -252,7 +252,8 @@ describe("Real Payments Processing - E2E Tests", function () {
       );
       
       // New user purchases at new price
-      const [newUser2] = await ethers.getSigners();
+      const signers = await ethers.getSigners();
+      const newUser2 = signers[5];
       await mockUSDC.mint(newUser2.address, ethers.parseUnits("1000", 6));
       
       await mockUSDC.connect(newUser2).approve(await roleManager.getAddress(), newPrice);
@@ -299,7 +300,7 @@ describe("Real Payments Processing - E2E Tests", function () {
       
       // Verify payment marked as refunded
       const refundedPayment = await paymentManager.payments(paymentId);
-      expect(refundedPayment.amount).to.equal(0);
+      expect(refundedPayment.isRefunded).to.equal(true);
     });
   });
 

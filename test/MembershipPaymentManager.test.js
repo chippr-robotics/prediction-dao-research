@@ -1,6 +1,5 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
 describe("MembershipPaymentManager - Unit Tests", function () {
   let paymentManager;
@@ -541,7 +540,7 @@ describe("MembershipPaymentManager - Unit Tests", function () {
       await paymentManager.connect(paymentAdmin).refundPayment(paymentId);
       
       const payment = await paymentManager.payments(paymentId);
-      expect(payment.amount).to.equal(0); // Marked as refunded
+      expect(payment.isRefunded).to.equal(true); // Marked as refunded
     });
 
     it("Should reject refunding non-existent payment", async function () {

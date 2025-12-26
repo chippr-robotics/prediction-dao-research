@@ -69,6 +69,7 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount;
         uint256 timestamp;
         uint8 tier; // 0 for non-tiered, 1-4 for tiers
+        bool isRefunded; // explicit refund flag
     }
     
     // Payment tracking
@@ -133,7 +134,8 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
         uint8 decimals
     ) external onlyRole(PAYMENT_ADMIN_ROLE) {
         require(token != address(0), "Invalid token address");
-        require(!paymentTokens[token].isActive && paymentTokens[token].tokenAddress == address(0), "Token already exists");
+        require(bytes(symbol).length > 0, "Invalid token symbol");
+        require(paymentTokens[token].tokenAddress == address(0), "Token already exists");
         
         paymentTokens[token] = PaymentToken({
             tokenAddress: token,
@@ -208,18 +210,19 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
         uint256[] calldata prices
     ) external onlyRole(PRICING_ADMIN_ROLE) {
         require(tokens.length == prices.length, "Arrays length mismatch");
-        require(tokens.length > 0, "Empty arrays");
         
+        // Validate all tokens before making any state changes
         for (uint256 i = 0; i < tokens.length; i++) {
             require(paymentTokens[tokens[i]].isActive, "Token not active");
+        }
+        
+        // All validations passed, now set prices
+        for (uint256 i = 0; i < tokens.length; i++) {
             rolePricing[role].priceByToken[tokens[i]] = prices[i];
+            emit RolePriceUpdated(role, tokens[i], prices[i]);
         }
         
         rolePricing[role].isActive = true;
-        
-        for (uint256 i = 0; i < tokens.length; i++) {
-            emit RolePriceUpdated(role, tokens[i], prices[i]);
-        }
     }
     
     /**
@@ -251,7 +254,6 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
         uint256 totalBasisPoints = 0;
         for (uint256 i = 0; i < recipients.length; i++) {
             require(recipients[i] != address(0), "Invalid recipient");
-            require(basisPoints[i] > 0, "Basis points must be > 0");
             
             paymentRouting.push(PaymentRouting({
                 recipient: recipients[i],
@@ -305,7 +307,9 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
         uint256 amount,
         uint8 tier
     ) external nonReentrant whenNotPaused returns (bytes32) {
+        require(payer != address(0), "Invalid payer");
         require(buyer != address(0), "Invalid buyer");
+        require(amount > 0, "Amount must be greater than 0");
         require(paymentTokens[paymentToken].isActive, "Payment token not active");
         require(rolePricing[role].isActive, "Role pricing not configured");
         
@@ -328,7 +332,8 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
             paymentToken: paymentToken,
             amount: amount,
             timestamp: block.timestamp,
-            tier: tier
+            tier: tier,
+            isRefunded: false
         });
         
         userPayments[buyer].push(paymentId);
@@ -356,11 +361,20 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
             IERC20(token).safeTransfer(treasury, amount);
         } else {
             // Route according to configuration
+            uint256 totalDistributed = 0;
             for (uint256 i = 0; i < paymentRouting.length; i++) {
                 uint256 share = (amount * paymentRouting[i].basisPoints) / 10000;
                 if (share > 0) {
                     IERC20(token).safeTransfer(paymentRouting[i].recipient, share);
+                    totalDistributed += share;
                 }
+            }
+            
+            // Send any remainder due to rounding to the last recipient
+            uint256 remainder = amount - totalDistributed;
+            if (remainder > 0 && paymentRouting.length > 0) {
+                address lastRecipient = paymentRouting[paymentRouting.length - 1].recipient;
+                IERC20(token).safeTransfer(lastRecipient, remainder);
             }
         }
     }
@@ -374,19 +388,18 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
     function refundPayment(bytes32 paymentId) external onlyRole(PAYMENT_ADMIN_ROLE) nonReentrant {
         Payment storage payment = payments[paymentId];
         require(payment.buyer != address(0), "Payment not found");
-        require(payment.amount > 0, "Payment already refunded");
+        require(!payment.isRefunded, "Payment already refunded");
         
         address buyer = payment.buyer;
         address token = payment.paymentToken;
         uint256 amount = payment.amount;
         
         // Mark as refunded
-        payment.amount = 0;
+        payment.isRefunded = true;
         
-        // Reduce revenue tracking
-        if (revenueByToken[token] >= amount) {
-            revenueByToken[token] -= amount;
-        }
+        // Reduce revenue tracking - this must never underflow
+        require(revenueByToken[token] >= amount, "Revenue underflow on refund");
+        revenueByToken[token] -= amount;
         
         // Transfer funds back to buyer
         IERC20(token).safeTransfer(buyer, amount);
