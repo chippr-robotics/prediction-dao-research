@@ -321,7 +321,7 @@
 
   .header-content {
     padding: 0 1rem;
-    gap: 0.5rem;
+    justify-content: space-between;
   }
 
   .back-button {
@@ -347,11 +347,6 @@
 
   .header-center {
     display: none;
-  }
-
-  /* Ensure proper spacing on mobile even when center is hidden */
-  .header-content {
-    justify-content: space-between;
   }
 
   .header-left {
