@@ -195,36 +195,56 @@ async function main() {
   deployments.oracleResolver = oracleResolver.address;
 
   // 6. Deploy RagequitModule
-  // Note: Using deployer address as temporary placeholders for governance token and treasury
-  // These should be updated to actual governance token and treasury addresses in production
+  // Note: RagequitModule uses initialize pattern - deploy without constructor args
   console.log("\n⚠️  Using deployer address as temporary placeholder for governance token and treasury");
-  console.log("    In production, update RagequitModule with actual token and treasury addresses");
+  console.log("    In production, update RagequitModule initialization with actual token and treasury addresses");
   const PLACEHOLDER_ADDRESS = deployer.address;
   
   const ragequitModule = await deployDeterministic(
     "RagequitModule",
-    [PLACEHOLDER_ADDRESS, PLACEHOLDER_ADDRESS], // [governanceToken, treasuryVault]
+    [], // No constructor arguments - uses initialize pattern
     generateSalt(saltPrefix + "RagequitModule"),
     deployer
   );
   deployments.ragequitModule = ragequitModule.address;
+  
+  // Initialize RagequitModule if newly deployed
+  if (!ragequitModule.alreadyDeployed) {
+    console.log("Initializing RagequitModule...");
+    const tx = await ragequitModule.contract.initialize(
+      deployer.address, // initialOwner
+      PLACEHOLDER_ADDRESS, // governanceToken
+      PLACEHOLDER_ADDRESS  // treasuryVault
+    );
+    await tx.wait();
+    console.log("  ✓ RagequitModule initialized");
+  }
 
   // 7. Deploy FutarchyGovernor
   const futarchyGovernor = await deployDeterministic(
     "FutarchyGovernor",
-    [
+    [], // No constructor arguments - uses initialize pattern
+    generateSalt(saltPrefix + "FutarchyGovernor"),
+    deployer
+  );
+  deployments.futarchyGovernor = futarchyGovernor.address;
+  
+  // Initialize FutarchyGovernor if newly deployed
+  if (!futarchyGovernor.alreadyDeployed) {
+    console.log("Initializing FutarchyGovernor...");
+    const tx = await futarchyGovernor.contract.initialize(
+      deployer.address, // initialOwner
       welfareRegistry.address,
       proposalRegistry.address,
       marketFactory.address,
       privacyCoordinator.address,
       oracleResolver.address,
       ragequitModule.address,
-      PLACEHOLDER_ADDRESS // Treasury vault placeholder - should be updated in production
-    ],
-    generateSalt(saltPrefix + "FutarchyGovernor"),
-    deployer
-  );
-  deployments.futarchyGovernor = futarchyGovernor.address;
+      PLACEHOLDER_ADDRESS // Treasury vault placeholder
+    );
+    await tx.wait();
+    console.log("  ✓ FutarchyGovernor initialized");
+  }
 
   // Setup initial configuration (only if contracts are newly deployed)
   console.log("\n\nSetting up initial configuration...");
