@@ -321,7 +321,7 @@
 
   .header-content {
     padding: 0 1rem;
-    gap: 0.5rem;
+    justify-content: space-between;
   }
 
   .back-button {
@@ -347,6 +347,14 @@
 
   .header-center {
     display: none;
+  }
+
+  .header-left {
+    flex: 0 0 auto;
+  }
+
+  .header-right {
+    flex: 0 0 auto;
   }
 
   .wallet-info-compact {

@@ -148,12 +148,33 @@
 /* Grid View Container - replaces category rows for specific category */
 .grid-view-container {
   width: 100%;
-  padding: 2rem;
+  padding: 1.5rem;
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   height: 100%; /* Use full available height from parent */
-  overflow: hidden;
+  overflow-y: auto; /* Allow container to scroll */
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Custom scrollbar styling for grid container */
+.grid-view-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.grid-view-container::-webkit-scrollbar-track {
+  background: var(--bg-light, rgba(255, 255, 255, 0.05));
+  border-radius: 4px;
+}
+
+.grid-view-container::-webkit-scrollbar-thumb {
+  background: rgba(97, 218, 251, 0.3);
+  border-radius: 4px;
+}
+
+.grid-view-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(97, 218, 251, 0.5);
 }
 
 .grid-controls {
@@ -271,6 +292,15 @@
   .sidebar-nav.collapsed ~ .fairwins-app-new .fixed-bottom-carousel {
     left: 60px;
   }
+
+  /* Reduce padding on tablet for more grid space */
+  .grid-view-container {
+    padding: 1rem;
+  }
+
+  .grid-controls {
+    margin-bottom: 1.5rem;
+  }
 }
 
 @media (max-width: 768px) {
@@ -314,7 +344,7 @@
 
   /* Grid view container for mobile */
   .grid-view-container {
-    padding: 1rem;
+    padding: 0.75rem;
     height: 100%;
   }
 
@@ -323,6 +353,7 @@
     align-items: flex-start;
     gap: 1rem;
     padding: 0.75rem;
+    margin-bottom: 1rem;
   }
 
   .grid-header h2 {
