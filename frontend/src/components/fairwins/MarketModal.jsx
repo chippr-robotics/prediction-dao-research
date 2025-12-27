@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
+import { useTheme } from '../../hooks/useTheme'
 import './MarketModal.css'
 
 // Quick action button values for market orders
-const QUICK_ACTION_AMOUNTS = [1, 5, 20, 50, 100]
+const QUICK_ACTION_AMOUNTS = [5, 25, 100, 500]
 
 /**
  * MarketModal - Interactive modal for viewing and trading on prediction markets
@@ -22,6 +23,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [price, setPrice] = useState('')
   const modalRef = useRef(null)
   const { formatPrice } = usePrice()
+  const { isDark } = useTheme()
 
   // Reset state when modal opens and set default values
   useEffect(() => {
@@ -248,34 +250,39 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             {/* Market Order UI */}
             {orderType === 'market' && (
               <div className="order-form">
-                <div className="form-group">
-                  <label htmlFor="amount-input">Risk (USD)</label>
-                  <input
-                    id="amount-input"
-                    type="number"
-                    className="form-input"
-                    placeholder="$##.##"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    min="0"
-                    max={userBalance}
-                    step="0.01"
-                  />
-                  <div className="input-hint">Balance: ${userBalance.toFixed(2)}</div>
-                </div>
+                <div className="form-group-with-buttons">
+                  <div className="form-group">
+                    <label htmlFor="amount-input">Risk (USD)</label>
+                    <input
+                      id="amount-input"
+                      type="text"
+                      className="form-input form-input-money"
+                      placeholder="$0.00"
+                      value={amount}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, '')
+                        setAmount(val)
+                      }}
+                    />
+                    <div className="input-hint">Balance: ${userBalance.toFixed(2)}</div>
+                  </div>
 
-                {/* Quick action buttons */}
-                <div className="quick-actions">
-                  {QUICK_ACTION_AMOUNTS.map(value => (
-                    <button 
-                      key={value}
-                      className="quick-action-btn" 
-                      onClick={() => setAmount(String(value))}
-                      type="button"
-                    >
-                      ${value}
-                    </button>
-                  ))}
+                  {/* Quick action buttons */}
+                  <div className="quick-actions">
+                    {QUICK_ACTION_AMOUNTS.map(value => (
+                      <button 
+                        key={value}
+                        className="quick-action-btn" 
+                        onClick={() => {
+                          const currentVal = parseFloat(amount) || 0
+                          setAmount(String((currentVal + value).toFixed(2)))
+                        }}
+                        type="button"
+                      >
+                        ${value}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="calc-display">
@@ -284,12 +291,12 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                     <span className="calc-value">${averagePrice.toFixed(2)}</span>
                   </div>
                   <div className="calc-row">
-                    <span className="calc-label">Total Payout</span>
-                    <span className="calc-value">${totalPayout.toFixed(2)}</span>
-                  </div>
-                  <div className="calc-row">
                     <span className="calc-label">Reward</span>
                     <span className="calc-value reward-value">${reward.toFixed(2)}</span>
+                  </div>
+                  <div className="calc-row">
+                    <span className="calc-label">Total Payout</span>
+                    <span className="calc-value total-value">${totalPayout.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -298,7 +305,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             {/* Limit Order UI */}
             {orderType === 'limit' && (
               <div className="order-form">
-                <div className="form-row">
+                <div className="form-row form-row-top-align">
                   <div className="form-group">
                     <label htmlFor="shares-input">Shares</label>
                     <input
@@ -317,29 +324,36 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                     <label htmlFor="price-input">Price</label>
                     <input
                       id="price-input"
-                      type="number"
+                      type="text"
                       className="form-input"
-                      placeholder="$##.##"
+                      placeholder="$0.00"
                       value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      min="0"
-                      step="0.01"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, '')
+                        // Ensure price is below $1
+                        const numVal = parseFloat(val)
+                        if (!isNaN(numVal) && numVal >= 1) {
+                          setPrice('0.99')
+                        } else {
+                          setPrice(val)
+                        }
+                      }}
                     />
                   </div>
                 </div>
 
-                <div className="total-display">
-                  Total Price: ${totalAmount.toFixed(2)}
-                </div>
-
                 <div className="calc-display">
                   <div className="calc-row">
-                    <span className="calc-label">Total Payout</span>
-                    <span className="calc-value">${limitTotalPayout.toFixed(2)}</span>
+                    <span className="calc-label">Total Price</span>
+                    <span className="calc-value">${totalAmount.toFixed(2)}</span>
                   </div>
                   <div className="calc-row">
                     <span className="calc-label">Reward</span>
                     <span className="calc-value reward-value">${limitReward.toFixed(2)}</span>
+                  </div>
+                  <div className="calc-row">
+                    <span className="calc-label">Total Payout</span>
+                    <span className="calc-value total-value">${limitTotalPayout.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
