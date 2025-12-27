@@ -31,17 +31,27 @@ The documentation site provides comprehensive guides for both platforms:
 
 ### 🏛️ ClearPath — DAO Governance Platform
 
-ClearPath implements a futarchy-based governance system where:
+ClearPath offers **two governance modes** to suit different organizational needs:
+
+#### Futarchy Governance (Prediction Markets)
 - **Democratic voting** establishes welfare metrics (protocol success measures)
 - **Prediction markets** aggregate distributed knowledge about which proposals maximize those metrics
 - **Privacy mechanisms** prevent collusion and vote buying
 - **Conditional tokens** enable efficient market-based decision making
+
+#### Traditional Democracy Voting
+- **Token-weighted voting** where 1 token = 1 vote
+- **Direct voting** with For, Against, and Abstain options
+- **Configurable quorum** requirements (default 40% of supply)
+- **Simple majority** determines proposal approval
+- **Timelock period** for execution safety
 
 **Use Cases:**
 - DAO treasury management
 - Institutional governance
 - Protocol upgrades and parameter changes
 - Grant allocation and funding decisions
+- Enterprise-friendly traditional voting
 
 ### 🎯 FairWins — Prediction Markets for Friends
 
@@ -65,13 +75,20 @@ Both platforms are built on the same secure, privacy-preserving foundation:
 
 ### Smart Contracts (Shared Infrastructure)
 
-1. **FutarchyGovernor.sol** - Main governance coordinator
+1. **FutarchyGovernor.sol** - Main futarchy governance coordinator
    - Integrates all futarchy components
    - Manages proposal lifecycle from submission to execution
    - Implements timelock and emergency pause mechanisms
-   - Used by: ClearPath
+   - Used by: ClearPath (Futarchy mode)
 
-2. **WelfareMetricRegistry.sol** - Welfare metrics management
+2. **TraditionalGovernor.sol** - Traditional democracy governance
+   - Token-weighted voting with For/Against/Abstain options
+   - Configurable voting period and quorum requirements
+   - Timelock and daily spending limits
+   - Emergency pause and guardian controls
+   - Used by: ClearPath (Traditional mode)
+
+3. **WelfareMetricRegistry.sol** - Welfare metrics management
    - On-chain storage of democratically-selected protocol success measures
    - Versioning and weight update mechanisms
    - Primary, secondary, tertiary, and quaternary metrics
@@ -81,7 +98,7 @@ Both platforms are built on the same secure, privacy-preserving foundation:
    - Permissionless proposal submission with bond requirements
    - Standardized metadata schemas
    - Milestone tracking and completion criteria
-   - Used by: Both platforms
+   - Used by: Both governance modes
 
 4. **ConditionalMarketFactory.sol** - Market deployment
    - Automated deployment of PASS/FAIL market pairs
@@ -234,16 +251,52 @@ You will see a platform selector where you can choose between:
 
 ### Using ClearPath (DAO Governance)
 
-#### For Proposers
+ClearPath offers two governance modes:
+
+#### Choosing a Governance Mode
+
+1. **Futarchy Mode**: Prediction market-based decision making
+   - Best for: Complex decisions requiring distributed knowledge
+   - Features: Market trading, welfare metrics, privacy mechanisms
+   
+2. **Traditional Voting Mode**: Token-weighted democracy
+   - Best for: Straightforward decisions, enterprise governance
+   - Features: Direct voting, quorum requirements, simple majority
+
+You can switch between modes in the governance interface.
+
+#### For Proposers (Both Modes)
 
 1. **Connect Wallet**: Connect MetaMask or compatible wallet
 2. **Submit Proposal**: 
    - Provide title, description, funding amount
    - Specify recipient address
-   - Select welfare metric for evaluation
+   - Select welfare metric for evaluation (Futarchy only)
    - Pay 50 ETC bond (returned on good-faith resolution)
 3. **Add Milestones**: Define completion criteria and timelock periods
-4. **Monitor Status**: Track proposal through review → trading → resolution → execution
+4. **Monitor Status**: Track proposal through its lifecycle
+
+#### Traditional Voting Mode
+
+##### For Voters
+
+1. **Connect Wallet**: Ensure you hold governance tokens
+2. **View Proposals**: Browse active voting proposals
+3. **Cast Vote**: Choose one of three options:
+   - **For**: Support the proposal
+   - **Against**: Oppose the proposal
+   - **Abstain**: Participate in quorum without taking a side
+4. **Track Progress**: Monitor vote counts and quorum status
+5. **Execution**: Successful proposals are queued and executed after timelock
+
+**Voting Requirements:**
+- Must hold governance tokens to vote
+- Voting power = token balance (1 token = 1 vote)
+- Proposals need 40% quorum to pass (configurable)
+- Simple majority (For > Against) required
+- 2-day timelock before execution
+
+#### Futarchy Mode
 
 ### For Traders
 
@@ -284,17 +337,34 @@ You will see a platform selector where you can choose between:
 4. **Track Positions**: Monitor your positions and market developments
 5. **Settle**: Redeem winning tokens after market resolution
 
-## Platform Comparison
+## Platform & Governance Comparison
+
+### ClearPath Governance Modes
+
+| Feature | Futarchy Mode | Traditional Voting Mode |
+|---------|--------------|-------------------------|
+| **Decision Method** | Prediction markets | Token-weighted voting |
+| **Voting Options** | PASS/FAIL token trading | For/Against/Abstain |
+| **Approval Criteria** | Market price comparison | Simple majority + quorum |
+| **Complexity** | High (requires market understanding) | Low (straightforward voting) |
+| **Privacy** | High (encrypted positions) | Standard (on-chain votes) |
+| **Best For** | Complex decisions, knowledge aggregation | Simple decisions, traditional orgs |
+| **Quorum** | N/A (market-based) | 40% of token supply |
+| **Execution** | Based on welfare metrics | Based on vote outcome |
+| **Enterprise Appeal** | Innovative DAOs | Traditional foundations |
+
+### Platform Comparison
 
 | Feature | ClearPath (DAO) | FairWins (Markets) |
 |---------|----------------|-------------------|
 | **Primary Use** | Governance decisions | General predictions |
+| **Governance Mode** | Futarchy or Traditional | N/A |
 | **Market Creation** | Automated (per proposal) | Manual (user-created) |
-| **Resolution Criteria** | Welfare metrics | Flexible, creator-defined |
+| **Resolution Criteria** | Welfare metrics or votes | Flexible, creator-defined |
 | **Participation** | DAO members | Open to anyone |
 | **Treasury** | Shared DAO treasury | Individual market pools |
-| **Voting Integration** | Yes (welfare metrics) | No |
-| **Ragequit Protection** | Yes | No |
+| **Voting Integration** | Yes (both modes) | No |
+| **Ragequit Protection** | Yes (Futarchy mode) | No |
 
 ## Technical Details
 
