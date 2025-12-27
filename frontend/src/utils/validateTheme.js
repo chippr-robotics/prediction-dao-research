@@ -32,7 +32,7 @@ export function validateTheme() {
   if (missing.length > 0) {
     console.warn(
       `⚠️ Missing CSS variables: ${missing.join(', ')}\n` +
-      `Check that theme classes (platform-fairwins, theme-light) are applied to <html>`
+      `Check that theme classes (e.g., platform-clearpath or platform-fairwins, and theme-light or theme-dark) are applied to <html>`
     );
   }
 }

@@ -3,34 +3,30 @@ import { validateTheme } from '../utils/validateTheme'
 
 describe('validateTheme', () => {
   let consoleWarnSpy
-  let originalMode
   let mockGetComputedStyle
 
   beforeEach(() => {
     // Spy on console.warn
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    
-    // Store original import.meta.env.MODE
-    originalMode = import.meta.env.MODE
   })
 
   afterEach(() => {
     // Restore console.warn
     consoleWarnSpy.mockRestore()
     
-    // Restore original mode
-    import.meta.env.MODE = originalMode
-    
     // Restore getComputedStyle if it was mocked
     if (mockGetComputedStyle) {
       mockGetComputedStyle.mockRestore()
       mockGetComputedStyle = null
     }
+    
+    // Restore environment variables
+    vi.unstubAllEnvs()
   })
 
   describe('development mode', () => {
     beforeEach(() => {
-      import.meta.env.MODE = 'development'
+      vi.stubEnv('MODE', 'development')
     })
 
     it('should not warn when all required CSS variables are defined', () => {
@@ -72,7 +68,7 @@ describe('validateTheme', () => {
         expect.stringContaining('--brand-primary')
       )
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('platform-fairwins, theme-light')
+        expect.stringContaining('platform-clearpath or platform-fairwins')
       )
     })
 
@@ -125,7 +121,7 @@ describe('validateTheme', () => {
 
   describe('production mode', () => {
     beforeEach(() => {
-      import.meta.env.MODE = 'production'
+      vi.stubEnv('MODE', 'production')
     })
 
     it('should not check or warn in production mode', () => {
@@ -144,7 +140,7 @@ describe('validateTheme', () => {
 
   describe('test mode', () => {
     beforeEach(() => {
-      import.meta.env.MODE = 'test'
+      vi.stubEnv('MODE', 'test')
     })
 
     it('should not check or warn in test mode', () => {
