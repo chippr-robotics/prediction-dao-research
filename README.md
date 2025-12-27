@@ -1,13 +1,15 @@
-![](docs/assets/logo_fwcp.png)
+![](docs/assets/logo_fairwins.svg)
 
-# ClearPath & FairWins — Prediction Market Platform Suite
+# FairWins — Prediction Market Platform Suite
 
 **Clear signals for collective decisions** — A comprehensive platform suite offering two distinct applications built on shared, privacy-preserving infrastructure:
 
-- **ClearPath**: Futarchy-based DAO governance platform for institutional decision-making
 - **FairWins**: Open prediction markets for anyone to create, join, and resolve markets
 
-Both platforms integrate privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
+- **Clearpath**: Futarchy-based DAO governance platform for institutional decision-making
+- **Tokenmintprise token managementn- **Spindletop**: Liquidity pool management
+  
+The platforms integrate privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
 
 ## Build Status
 
@@ -41,7 +43,7 @@ ClearPath implements a futarchy-based governance system where:
 - Protocol upgrades and parameter changes
 - Grant allocation and funding decisions
 
-### 🎯 FairWins — Open Prediction Markets
+### 🎯 FairWins — Prediction Markets for Friends
 
 FairWins provides an open prediction market platform where:
 - **Anyone can create markets** on any topic with custom parameters
