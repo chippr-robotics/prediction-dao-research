@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
+import { useContractEvent, useAccountChange, useChainChange } from '../hooks/useBlockchainEvents'
 
 // Mock the useUI hooks directly
 const mockShowNotification = vi.fn()
@@ -22,9 +23,6 @@ vi.mock('../hooks/useWeb3', () => ({
     }
   }))
 }))
-
-// Import after mocks are set up
-const { useContractEvent, useAccountChange, useChainChange } = await import('../hooks/useBlockchainEvents')
 
 describe('useBlockchainEvents hooks', () => {
   let mockContract
