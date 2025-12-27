@@ -17,9 +17,35 @@ function UserManagementModal({ onScanMarket }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectionError, setConnectionError] = useState(null)
 
   const handleConnect = async () => {
-    await connectWallet()
+    setIsConnecting(true)
+    setConnectionError(null)
+    
+    try {
+      const success = await connectWallet()
+      if (!success) {
+        setConnectionError('Failed to connect wallet. Please try again.')
+      }
+      // On success, the modal will re-render with isConnected=true
+    } catch (error) {
+      console.error('Wallet connection error:', error)
+      
+      // Provide user-friendly error messages
+      if (error.message.includes('MetaMask')) {
+        setConnectionError('Please install MetaMask to connect your wallet.')
+      } else if (error.message.includes('rejected') || error.message.includes('approve')) {
+        setConnectionError('Connection request was rejected. Please try again.')
+      } else if (error.message.includes('connector')) {
+        setConnectionError('No wallet connector available. Please install MetaMask.')
+      } else {
+        setConnectionError(error.message || 'Failed to connect wallet. Please try again.')
+      }
+    } finally {
+      setIsConnecting(false)
+    }
   }
 
   const handleDisconnect = () => {
@@ -83,12 +109,43 @@ function UserManagementModal({ onScanMarket }) {
             <div className="connect-icon" aria-hidden="true">🔗</div>
             <h3>Connect Your Wallet</h3>
             <p>Connect your Web3 wallet to access all features, manage your preferences, and interact with markets.</p>
+            
+            {connectionError && (
+              <div className="connection-error" role="alert" aria-live="assertive">
+                <span className="error-icon" aria-hidden="true">⚠️</span>
+                <span className="error-message">{connectionError}</span>
+              </div>
+            )}
+            
             <button 
               onClick={handleConnect}
               className="connect-wallet-btn-large"
+              disabled={isConnecting}
+              aria-busy={isConnecting}
             >
-              Connect Wallet
+              {isConnecting ? (
+                <>
+                  <span className="spinner" aria-hidden="true"></span>
+                  Connecting...
+                </>
+              ) : (
+                'Connect Wallet'
+              )}
             </button>
+            
+            {!window.ethereum && (
+              <div className="wallet-help" role="note">
+                <p>Don't have a Web3 wallet?</p>
+                <a 
+                  href="https://metamask.io/download/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="install-metamask-link"
+                >
+                  Install MetaMask
+                </a>
+              </div>
+            )}
           </div>
         </div>
       ) : (

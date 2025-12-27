@@ -96,6 +96,39 @@ describe('UserManagementModal', () => {
       
       const connectButton = screen.getByText('Connect Wallet')
       expect(connectButton).toBeInTheDocument()
+      expect(connectButton).not.toBeDisabled()
+    })
+
+    it('should show loading state when connecting', async () => {
+      const mockConnect = vi.fn().mockImplementation(() => {
+        return new Promise(resolve => setTimeout(() => resolve({ accounts: ['0x123'] }), 100))
+      })
+      
+      mockUseConnect.mockReturnValue({
+        connect: mockConnect,
+        connectors: [{ id: 'injected', name: 'MetaMask' }]
+      })
+      
+      renderWithProviders(<UserManagementModal />, { isConnected: false })
+      
+      const connectButton = screen.getByText('Connect Wallet')
+      fireEvent.click(connectButton)
+      
+      await waitFor(() => {
+        expect(screen.getByText('Connecting...')).toBeInTheDocument()
+      })
+    })
+
+    it('should show help text for installing MetaMask when not available', () => {
+      const originalEthereum = window.ethereum
+      delete window.ethereum
+      
+      renderWithProviders(<UserManagementModal />, { isConnected: false })
+      
+      expect(screen.getByText(/Don't have a Web3 wallet?/i)).toBeInTheDocument()
+      expect(screen.getByText('Install MetaMask')).toBeInTheDocument()
+      
+      window.ethereum = originalEthereum
     })
   })
 
