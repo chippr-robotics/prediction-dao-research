@@ -3,7 +3,7 @@ import * as d3 from 'd3'
 import { usePrice } from '../../contexts/PriceContext'
 import './CorrelatedMarketsView.css'
 
-function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
+function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarket }) {
   const [selectedOption, setSelectedOption] = useState(market.id)
   const [visibleMarkets, setVisibleMarkets] = useState(
     correlatedMarkets.reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
@@ -45,8 +45,8 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     if (lastTap.marketId === marketId && (now - lastTap.timestamp) < DOUBLE_TAP_DELAY) {
       // Double tap detected - open market modal
       const selectedMarket = correlatedMarkets.find(m => m.id === marketId)
-      if (selectedMarket && onTrade) {
-        onTrade({ market: selectedMarket, type: 'view' })
+      if (selectedMarket && onOpenMarket) {
+        onOpenMarket(selectedMarket)
       }
       setLastTap({ marketId: null, timestamp: 0 })
     } else {
