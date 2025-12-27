@@ -183,12 +183,12 @@ This document provides a detailed comparison between devion.dev (third-party cha
 **Replication Strategy**:
 ```javascript
 // Custom semantic-release plugin
-const { Configuration, OpenAIApi } = require("openai");
+import OpenAI from 'openai';
 
 async function translateReleaseNotes(technicalNotes, options) {
-  const openai = new OpenAIApi(new Configuration({
+  const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
-  }));
+  });
   
   const prompt = `
     Convert these technical release notes into user-friendly language 
@@ -202,7 +202,7 @@ async function translateReleaseNotes(technicalNotes, options) {
     Audience: ${options.audience || 'end users'}
   `;
   
-  const response = await openai.createChatCompletion({
+  const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [
       {
@@ -218,7 +218,7 @@ async function translateReleaseNotes(technicalNotes, options) {
     max_tokens: 2000
   });
   
-  return response.data.choices[0].message.content;
+  return response.choices[0].message.content;
 }
 
 // Usage in semantic-release plugin

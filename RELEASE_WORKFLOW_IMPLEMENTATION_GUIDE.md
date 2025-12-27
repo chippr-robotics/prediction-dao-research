@@ -456,17 +456,17 @@ If user-friendly language is important, add custom plugin:
 
 ```javascript
 // custom-ai-translator-plugin.js
-const { Configuration, OpenAIApi } = require("openai");
-const fs = require('fs').promises;
+import OpenAI from 'openai';
+import { promises as fs } from 'fs';
 
 async function translateReleaseNotes(pluginConfig, context) {
   const { nextRelease } = context;
   
-  const openai = new OpenAIApi(new Configuration({
+  const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
-  }));
+  });
   
-  const response = await openai.createChatCompletion({
+  const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [
       {
@@ -481,7 +481,7 @@ async function translateReleaseNotes(pluginConfig, context) {
     temperature: 0.7
   });
   
-  const userFriendlyNotes = response.data.choices[0].message.content;
+  const userFriendlyNotes = response.choices[0].message.content;
   
   // Write to separate file
   await fs.writeFile(
@@ -492,7 +492,7 @@ async function translateReleaseNotes(pluginConfig, context) {
   return { userFriendlyNotes };
 }
 
-module.exports = { translateReleaseNotes };
+export { translateReleaseNotes };
 ```
 
 Add to `.releaserc.json`:

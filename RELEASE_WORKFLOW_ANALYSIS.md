@@ -441,14 +441,14 @@ If AI-powered translation is highly valued, consider:
 **Implementation**:
 ```javascript
 // Custom semantic-release plugin
-const { Configuration, OpenAIApi } = require("openai");
+import OpenAI from 'openai';
 
 async function generateUserFriendlyNotes(technicalNotes) {
-  const openai = new OpenAIApi(new Configuration({
+  const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
-  }));
+  });
   
-  const response = await openai.createChatCompletion({
+  const response = await openai.chat.completions.create({
     model: "gpt-4",
     messages: [{
       role: "system",
@@ -459,7 +459,7 @@ async function generateUserFriendlyNotes(technicalNotes) {
     }]
   });
   
-  return response.data.choices[0].message.content;
+  return response.choices[0].message.content;
 }
 ```
 
