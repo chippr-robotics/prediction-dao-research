@@ -34,8 +34,7 @@
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--brand-primary);
-  margin-bottom: 0.5rem;
-  max-width: 100%;
+  max-width: fit-content;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -175,6 +174,14 @@
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.tile-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
 }
 
 .probability-bar {

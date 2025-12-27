@@ -65,17 +65,18 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
         </div>
       </div>
 
-      {market.correlationGroupId && (
-        <div className="correlation-badge" title={market.correlationGroupName}>
-          <span className="correlation-text">{market.correlationGroupName}</span>
-        </div>
-      )}
-
       <h3 className="tile-title">{market.proposalTitle}</h3>
 
-      <p className="tile-secondary">
-        {formatTimeRemaining(market.tradingEndTime)} remaining
-      </p>
+      <div className="tile-footer">
+        <p className="tile-secondary">
+          {formatTimeRemaining(market.tradingEndTime)} remaining
+        </p>
+        {market.correlationGroupId && (
+          <div className="correlation-badge" title={market.correlationGroupName}>
+            <span className="correlation-text">{market.correlationGroupName}</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
