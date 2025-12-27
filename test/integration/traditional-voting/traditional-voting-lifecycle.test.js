@@ -16,6 +16,16 @@ describe("Integration: Traditional Voting Lifecycle", function () {
   beforeEach(async function () {
     [owner, proposer, voter1, voter2, voter3, recipient] = await ethers.getSigners();
     
+    // Ensure proposer has enough ETH for bond payments (50 ETH per proposal + gas)
+    // This is needed when running as part of full test suite where accounts may be depleted
+    const proposerBalance = await ethers.provider.getBalance(proposer.address);
+    if (proposerBalance < ethers.parseEther("500")) {
+      await owner.sendTransaction({
+        to: proposer.address,
+        value: ethers.parseEther("500")
+      });
+    }
+    
     // Deploy mock governance token
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     governanceToken = await MockERC20.deploy("Governance Token", "GOV", ethers.parseEther("1000000"));
