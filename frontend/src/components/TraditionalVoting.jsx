@@ -49,6 +49,7 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
   const [error, setError] = useState(null)
   const [castingVote, setCastingVote] = useState({})
   const [tokenSymbol, setTokenSymbol] = useState('VOTE')
+  const [tokenDecimals, setTokenDecimals] = useState(18)
   const [userVotingPower, setUserVotingPower] = useState('0')
   const [currentBlock, setCurrentBlock] = useState(0)
 
@@ -85,6 +86,7 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
       const decimals = await token.decimals()
       
       setTokenSymbol(symbol)
+      setTokenDecimals(decimals)
       setUserVotingPower(ethers.formatUnits(balance, decimals))
     } catch (error) {
       console.error('Error loading token info:', error)
@@ -126,10 +128,10 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
           recipient: proposal[4],
           startBlock: Number(voting.startBlock),
           endBlock: Number(voting.endBlock),
-          forVotes: ethers.formatEther(voting.forVotes),
-          againstVotes: ethers.formatEther(voting.againstVotes),
-          abstainVotes: ethers.formatEther(voting.abstainVotes),
-          quorum: ethers.formatEther(voting.quorum),
+          forVotes: ethers.formatUnits(voting.forVotes, tokenDecimals),
+          againstVotes: ethers.formatUnits(voting.againstVotes, tokenDecimals),
+          abstainVotes: ethers.formatUnits(voting.abstainVotes, tokenDecimals),
+          quorum: ethers.formatUnits(voting.quorum, tokenDecimals),
           executionTime: Number(voting.executionTime),
           executed: voting.executed,
           canceled: voting.canceled,

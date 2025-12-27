@@ -187,7 +187,7 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
             ,
             
         ) = proposalRegistry.getProposal(proposalId);
-        require(proposer != address(0), "Proposal does not exist");
+        require(proposer != address(0), "Invalid proposal ID");
         
         // Allocate voting proposal ID
         votingProposalId = votingProposalCount++;
