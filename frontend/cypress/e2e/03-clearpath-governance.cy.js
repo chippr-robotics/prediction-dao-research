@@ -30,9 +30,12 @@ describe('ClearPath DAO Governance Flow', () => {
   })
 
   it('should display DAO information after wallet connection', () => {
-    // Connect wallet
-    cy.contains('button', /connect wallet/i, { timeout: 10000 }).click()
-    cy.wait(1000)
+    // Connect wallet with stability checks
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(2000)
     
     // Dashboard content should be visible
     cy.get('body').should('be.visible')
