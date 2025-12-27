@@ -379,20 +379,23 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
         uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
         
         // Check if quorum is met (including abstain votes)
-        if (totalVotes < proposal.quorum) {
+        bool quorumReached = totalVotes >= proposal.quorum;
+        if (!quorumReached) {
             return ProposalState.Defeated;
         }
         
-        // Check if For votes exceed Against votes (abstain votes do not affect this comparison)
-        if (proposal.forVotes <= proposal.againstVotes) {
-            return ProposalState.Defeated;
-        }
-        
+        // Check if already queued for execution
         if (proposal.executionTime > 0) {
             return ProposalState.Queued;
         }
         
-        return ProposalState.Succeeded;
+        // Check outcome: For votes must exceed Against votes (abstain votes do not affect this comparison)
+        if (proposal.forVotes > proposal.againstVotes) {
+            return ProposalState.Succeeded;
+        }
+        
+        // If For <= Against (including ties), proposal is defeated
+        return ProposalState.Defeated;
     }
     
     /**
