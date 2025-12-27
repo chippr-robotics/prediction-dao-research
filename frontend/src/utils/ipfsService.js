@@ -260,7 +260,7 @@ export const checkGatewayHealth = async () => {
     
     clearTimeout(timeoutId)
     return response.ok || response.status === 404 // 404 is ok, means gateway is up
-  } catch (error) {
+  } catch {
     return false
   }
 }
