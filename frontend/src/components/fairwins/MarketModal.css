@@ -20,6 +20,7 @@
   width: 100%;
   max-width: 420px;
   margin: auto 0;
+  overflow: hidden;
 }
 
 /* New Modal Card - Now Theme-Aware */
@@ -32,11 +33,76 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  overflow: hidden;
 }
 
 .theme-dark .market-modal-new {
   background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%);
   color: white;
+}
+
+/* Carousel Container */
+.carousel-container {
+  display: flex;
+  transition: transform 0.3s ease-in-out;
+  width: 100%;
+}
+
+.carousel-panel {
+  min-width: 100%;
+  flex-shrink: 0;
+}
+
+/* Panel Indicators */
+.panel-indicators {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-color);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.indicator.active {
+  background: var(--brand-primary, #36B37E);
+  width: 24px;
+  border-radius: 4px;
+}
+
+.indicator:hover {
+  opacity: 0.7;
+}
+
+/* Navigation Buttons */
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  transition: opacity 0.2s;
+  font-weight: bold;
+}
+
+.nav-btn:hover {
+  opacity: 0.7;
+}
+
+.nav-btn-left {
+  margin-right: auto;
+}
+
+.nav-btn-right {
+  margin-left: auto;
 }
 
 /* Header */
@@ -451,4 +517,31 @@
   .orders-section {
     gap: 0.5rem;
   }
+}
+
+/* Share Panel Wrapper */
+.share-panel-wrapper {
+  /* Remove ShareModal's backdrop and adjust positioning */
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+}
+
+.share-panel-wrapper .share-modal-backdrop {
+  position: relative;
+  background: transparent;
+  backdrop-filter: none;
+  padding: 0;
+  overflow: visible;
+}
+
+.share-panel-wrapper .share-modal {
+  position: relative;
+  box-shadow: none;
+  max-width: 100%;
+}
+
+.share-panel-wrapper .share-modal-close {
+  display: none;
 }

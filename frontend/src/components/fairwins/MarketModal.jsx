@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
 import { useTheme } from '../../hooks/useTheme'
+import MarketDetailsPanel from './MarketDetailsPanel'
+import ShareModal from '../ui/ShareModal'
 import './MarketModal.css'
 
 // Quick action button values for market orders
@@ -9,11 +11,12 @@ const QUICK_ACTION_AMOUNTS = [5, 25, 100, 500]
 /**
  * MarketModal - Interactive modal for viewing and trading on prediction markets
  * Features:
+ * - 3-panel carousel: Trading, Details, Share
+ * - Swipe/tap navigation between panels
  * - Prediction gauge showing market value
  * - Binary outcome selection (YES/NO)
  * - Market and limit order types
  * - Dynamic price and reward calculations
- * - All elements visible without scrolling
  */
 function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [selectedOutcome, setSelectedOutcome] = useState('YES')
@@ -21,7 +24,11 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [amount, setAmount] = useState('1.00')
   const [shares, setShares] = useState('10')
   const [price, setPrice] = useState('')
+  const [currentPanel, setCurrentPanel] = useState(0) // 0: Trading, 1: Details, 2: Share
   const modalRef = useRef(null)
+  const carouselRef = useRef(null)
+  const touchStartX = useRef(0)
+  const touchEndX = useRef(0)
   const { formatPrice } = usePrice()
   const { isDark } = useTheme()
 
@@ -34,6 +41,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
       setOrderType('market')
       setAmount('1.00')
       setShares('10')
+      setCurrentPanel(0) // Always start at trading panel
       // Set price to current spot price with validation
       const passPrice = parseFloat(market.passTokenPrice)
       const currentSpotPrice = !isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5
@@ -61,6 +69,10 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose()
+      } else if (e.key === 'ArrowLeft') {
+        navigatePanel('prev')
+      } else if (e.key === 'ArrowRight') {
+        navigatePanel('next')
       }
     }
 
@@ -68,7 +80,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, currentPanel])
 
   // Focus management
   useEffect(() => {
@@ -80,9 +92,42 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
         focusableElements[0].focus()
       }
     }
-  }, [isOpen])
+  }, [isOpen, currentPanel])
 
   if (!isOpen || !market) return null
+
+  // Carousel navigation
+  const navigatePanel = (direction) => {
+    if (direction === 'next') {
+      setCurrentPanel((prev) => (prev + 1) % 3)
+    } else if (direction === 'prev') {
+      setCurrentPanel((prev) => (prev - 1 + 3) % 3)
+    }
+  }
+
+  // Touch handlers for swipe
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  const handleTouchMove = (e) => {
+    touchEndX.current = e.touches[0].clientX
+  }
+
+  const handleTouchEnd = () => {
+    const swipeThreshold = 50
+    const diff = touchStartX.current - touchEndX.current
+
+    if (Math.abs(diff) > swipeThreshold) {
+      if (diff > 0) {
+        // Swiped left - go to next panel
+        navigatePanel('next')
+      } else {
+        // Swiped right - go to previous panel
+        navigatePanel('prev')
+      }
+    }
+  }
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -153,10 +198,20 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
       <div 
         ref={modalRef}
         className="market-modal-container-new"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <div className="market-modal-new">
-          {/* Header */}
+          {/* Header with Navigation */}
           <div className="modal-header-new">
+            <button
+              className="nav-btn nav-btn-left"
+              onClick={() => navigatePanel('prev')}
+              aria-label="Previous panel"
+            >
+              ‹
+            </button>
             <img 
               src="/assets/fairwins_no-text_logo.svg" 
               alt="FairWins" 
@@ -165,6 +220,13 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             <h2 className="modal-title-new" id="market-modal-title">
               {market.proposalTitle}
             </h2>
+            <button
+              className="nav-btn nav-btn-right"
+              onClick={() => navigatePanel('next')}
+              aria-label="Next panel"
+            >
+              ›
+            </button>
             <button 
               className="modal-close-btn-new"
               onClick={onClose}
@@ -174,7 +236,21 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             </button>
           </div>
 
-          {/* Section 1: Prediction Gauge */}
+          {/* Panel Indicator */}
+          <div className="panel-indicators">
+            <div className={`indicator ${currentPanel === 0 ? 'active' : ''}`} onClick={() => setCurrentPanel(0)} />
+            <div className={`indicator ${currentPanel === 1 ? 'active' : ''}`} onClick={() => setCurrentPanel(1)} />
+            <div className={`indicator ${currentPanel === 2 ? 'active' : ''}`} onClick={() => setCurrentPanel(2)} />
+          </div>
+
+          {/* Carousel Container */}
+          <div 
+            ref={carouselRef}
+            className="carousel-container"
+            style={{ transform: `translateX(-${currentPanel * 100}%)` }}
+          >
+            {/* Panel 0: Trading */}
+            <div className="carousel-panel">
           <div className="prediction-gauge-section">
             {/* Gauge visualization */}
             <div className="gauge-container">
@@ -373,6 +449,25 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
           <div className="modal-footer-new">
             <span className="footer-label">Ends:</span>
             <span className="footer-value">{formatEndDate(market.tradingEndTime)}</span>
+          </div>
+            </div>
+
+            {/* Panel 1: Market Details */}
+            <div className="carousel-panel">
+              <MarketDetailsPanel market={market} />
+            </div>
+
+            {/* Panel 2: Share/QR */}
+            <div className="carousel-panel">
+              <div className="share-panel-wrapper">
+                <ShareModal 
+                  isOpen={true}
+                  onClose={() => {}} 
+                  market={market} 
+                  marketUrl={`${window.location.origin}/market/${market.id}`}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

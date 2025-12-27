@@ -1,0 +1,115 @@
+/* Market Details Panel */
+.market-details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.details-header {
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.details-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.details-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Detail Section */
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.05);
+  border-radius: 8px;
+  border-left: 3px solid var(--brand-primary, #36B37E);
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.detail-value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+/* Special styling for different detail types */
+.detail-question {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.detail-address {
+  font-family: 'Courier New', monospace;
+  font-size: 0.813rem;
+}
+
+.detail-highlight {
+  font-weight: 700;
+  color: var(--brand-primary, #36B37E);
+}
+
+.detail-description {
+  font-size: 0.813rem;
+  line-height: 1.6;
+}
+
+/* Price Grid */
+.detail-prices {
+  border-left-color: var(--brand-secondary, #4C9AFF);
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.price-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+  border-radius: 6px;
+}
+
+.price-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.price-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-primary, #36B37E);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .detail-section {
+    padding: 0.625rem;
+  }
+  
+  .details-title {
+    font-size: 1rem;
+  }
+}
