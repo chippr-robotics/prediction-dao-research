@@ -8,7 +8,6 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
   const [visibleMarkets, setVisibleMarkets] = useState(
     correlatedMarkets.reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
   )
-  const [pinnedMarkets, setPinnedMarkets] = useState(new Set())
   const [timeHorizon, setTimeHorizon] = useState('7d') // 7d, 30d, 90d, all
   const [lastTap, setLastTap] = useState({ marketId: null, timestamp: 0 })
   const { formatPrice } = usePrice()
@@ -22,19 +21,6 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
   // Toggle market visibility
   const toggleMarketVisibility = (marketId) => {
     setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
-  }
-
-  // Toggle pin status
-  const togglePin = (marketId) => {
-    setPinnedMarkets(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(marketId)) {
-        newSet.delete(marketId)
-      } else {
-        newSet.add(marketId)
-      }
-      return newSet
-    })
   }
 
   // Handle double tap to open market modal
@@ -64,10 +50,9 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
         id: m.id,
         label: m.proposalTitle.split(':')[1]?.trim() || m.proposalTitle,
         probability: parseFloat(m.passTokenPrice) * 100,
-        totalLiquidity: parseFloat(m.totalLiquidity),
-        isPinned: pinnedMarkets.has(m.id)
+        totalLiquidity: parseFloat(m.totalLiquidity)
       }))
-  }, [correlatedMarkets, visibleMarkets, pinnedMarkets])
+  }, [correlatedMarkets, visibleMarkets])
 
   // Generate mock historical data for timeline
   const generateTimelineData = (market, horizon) => {
@@ -289,8 +274,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
       data: generateTimelineData(
         correlatedMarkets.find(m => m.id === market.id),
         timeHorizon
-      ),
-      isPinned: market.isPinned
+      )
     }))
 
     // Create scales
