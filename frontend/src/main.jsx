@@ -14,6 +14,7 @@ import { ETCswapProvider } from './contexts/ETCswapContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
 import { RoleProvider } from './contexts/RoleContext'
 import ErrorBoundary from './components/ui/ErrorBoundary'
+import { validateTheme } from './utils/validateTheme'
 
 // Create query client for wagmi
 const queryClient = new QueryClient()
@@ -48,3 +49,9 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// Validate theme CSS variables after React mounts
+// Use requestAnimationFrame to ensure DOM is ready and styles are applied
+requestAnimationFrame(() => {
+  validateTheme()
+})
