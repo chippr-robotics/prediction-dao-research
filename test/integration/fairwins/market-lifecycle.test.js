@@ -10,6 +10,22 @@ const { BetType } = require("../../constants/BetType");
 async function deployFairWinsFixture() {
   const [owner, reporter, trader1, trader2] = await ethers.getSigners();
 
+  // Ensure reporter has enough ETH for bond/report payments (100 ETH per report + gas)
+  // This is needed when running as part of full test suite where accounts may be depleted
+  const reporterBalance = await ethers.provider.getBalance(reporter.address);
+  const requiredBalance = ethers.parseEther("500"); // Buffer for multiple reports
+  if (reporterBalance < requiredBalance) {
+    const amountNeeded = requiredBalance - reporterBalance;
+    const ownerBalance = await ethers.provider.getBalance(owner.address);
+    // Only send if owner has enough (leave some for gas)
+    if (ownerBalance > amountNeeded + ethers.parseEther("50")) {
+      await owner.sendTransaction({
+        to: reporter.address,
+        value: amountNeeded
+      });
+    }
+  }
+
   // Deploy only what's needed for standalone markets
   const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
   const marketFactory = await ConditionalMarketFactory.deploy();

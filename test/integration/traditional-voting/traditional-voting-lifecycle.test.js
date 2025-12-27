@@ -19,11 +19,17 @@ describe("Integration: Traditional Voting Lifecycle", function () {
     // Ensure proposer has enough ETH for bond payments (50 ETH per proposal + gas)
     // This is needed when running as part of full test suite where accounts may be depleted
     const proposerBalance = await ethers.provider.getBalance(proposer.address);
-    if (proposerBalance < ethers.parseEther("500")) {
-      await owner.sendTransaction({
-        to: proposer.address,
-        value: ethers.parseEther("500")
-      });
+    const requiredBalance = ethers.parseEther("300"); // 6 tests * 50 ETH each
+    if (proposerBalance < requiredBalance) {
+      const amountNeeded = requiredBalance - proposerBalance;
+      const ownerBalance = await ethers.provider.getBalance(owner.address);
+      // Only send if owner has enough (leave some for gas)
+      if (ownerBalance > amountNeeded + ethers.parseEther("10")) {
+        await owner.sendTransaction({
+          to: proposer.address,
+          value: amountNeeded
+        });
+      }
     }
     
     // Deploy mock governance token
