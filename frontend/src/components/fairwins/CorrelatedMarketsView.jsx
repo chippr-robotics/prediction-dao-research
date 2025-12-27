@@ -3,13 +3,13 @@ import * as d3 from 'd3'
 import { usePrice } from '../../contexts/PriceContext'
 import './CorrelatedMarketsView.css'
 
-function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
+function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarket }) {
   const [selectedOption, setSelectedOption] = useState(market.id)
   const [visibleMarkets, setVisibleMarkets] = useState(
     correlatedMarkets.reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
   )
-  const [pinnedMarkets, setPinnedMarkets] = useState(new Set())
   const [timeHorizon, setTimeHorizon] = useState('7d') // 7d, 30d, 90d, all
+  const [lastTap, setLastTap] = useState({ marketId: null, timestamp: 0 })
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
   const timelineRef = useRef(null)
@@ -23,17 +23,23 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
   }
 
-  // Toggle pin status
-  const togglePin = (marketId) => {
-    setPinnedMarkets(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(marketId)) {
-        newSet.delete(marketId)
-      } else {
-        newSet.add(marketId)
+  // Handle double tap to open market modal
+  const handleMarketCardClick = (marketId) => {
+    const now = Date.now()
+    const DOUBLE_TAP_DELAY = 300 // milliseconds
+    
+    if (lastTap.marketId === marketId && (now - lastTap.timestamp) < DOUBLE_TAP_DELAY) {
+      // Double tap detected - open market modal
+      const selectedMarket = correlatedMarkets.find(m => m.id === marketId)
+      if (selectedMarket && onOpenMarket) {
+        onOpenMarket(selectedMarket)
       }
-      return newSet
-    })
+      setLastTap({ marketId: null, timestamp: 0 })
+    } else {
+      // Single tap - select the option
+      setSelectedOption(marketId)
+      setLastTap({ marketId, timestamp: now })
+    }
   }
 
   // Prepare radar chart data (only visible markets)
@@ -44,10 +50,9 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         id: m.id,
         label: m.proposalTitle.split(':')[1]?.trim() || m.proposalTitle,
         probability: parseFloat(m.passTokenPrice) * 100,
-        totalLiquidity: parseFloat(m.totalLiquidity),
-        isPinned: pinnedMarkets.has(m.id)
+        totalLiquidity: parseFloat(m.totalLiquidity)
       }))
-  }, [correlatedMarkets, visibleMarkets, pinnedMarkets])
+  }, [correlatedMarkets, visibleMarkets])
 
   // Generate mock historical data for timeline
   const generateTimelineData = (market, horizon) => {
@@ -239,52 +244,6 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
         .text(d.label)
     })
 
-    // Embed SVG logo in center
-    fetch('/docs/assets/logo_fairwins.svg')
-      .then(response => response.text())
-      .then(svgText => {
-        const logoSize = 60
-        const logoGroup = g.append('g')
-          .attr('transform', `translate(${-logoSize/2}, ${-logoSize/2})`)
-        
-        logoGroup.html(svgText)
-          .select('svg')
-          .attr('width', logoSize)
-          .attr('height', logoSize)
-      })
-      .catch(() => {
-        // Fallback: Draw clover logo if SVG fetch fails
-        const cloverSize = 30
-        const cloverGroup = g.append('g')
-        
-        // Background circle
-        cloverGroup.append('circle')
-          .attr('r', cloverSize)
-          .attr('fill', 'white')
-          .attr('stroke', 'rgba(54, 179, 126, 1)')
-          .attr('stroke-width', 2)
-
-        // Four-leaf clover design
-        const leafPositions = [
-          { x: 0, y: -12 },
-          { x: 12, y: 0 },
-          { x: 0, y: 12 },
-          { x: -12, y: 0 }
-        ]
-
-        leafPositions.forEach(pos => {
-          cloverGroup.append('circle')
-            .attr('cx', pos.x)
-            .attr('cy', pos.y)
-            .attr('r', 10)
-            .attr('fill', 'rgba(54, 179, 126, 0.8)')
-        })
-
-        cloverGroup.append('circle')
-          .attr('r', 6)
-          .attr('fill', 'rgba(54, 179, 126, 1)')
-      })
-
   }, [radarData, selectedOption])
 
   // Create timeline chart using D3.js
@@ -315,8 +274,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
       data: generateTimelineData(
         correlatedMarkets.find(m => m.id === market.id),
         timeHorizon
-      ),
-      isPinned: market.isPinned
+      )
     }))
 
     // Create scales
@@ -325,8 +283,20 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
       .domain(d3.extent(allDates))
       .range([0, chartWidth])
 
+    // Auto-scale Y-axis based on actual probability ranges for better visualization
+    const allProbabilities = allTimelines.flatMap(t => t.data.map(d => d.probability))
+    const minProb = Math.min(...allProbabilities)
+    const maxProb = Math.max(...allProbabilities)
+    const probRange = maxProb - minProb
+    
+    // Add padding for better visualization (10% of range on each side)
+    // Use minimum of 5 percentage points to ensure visibility even for very close probabilities
+    const padding = Math.max(probRange * 0.1, 5)
+    const yMin = Math.max(0, minProb - padding)
+    const yMax = Math.min(100, maxProb + padding)
+    
     const yScale = d3.scaleLinear()
-      .domain([0, 100])
+      .domain([yMin, yMax])
       .range([chartHeight, 0])
 
     // Color scale
@@ -411,7 +381,6 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
     <div className="correlated-markets-view">
       <div className="correlation-header">
         <div className="correlation-group-info">
-          <span className="correlation-icon">🔗</span>
           <h2 className="correlation-group-title">{market.correlationGroupName}</h2>
         </div>
         <p className="correlation-description">
@@ -435,20 +404,10 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade }) {
                 <button
                   key={option.id}
                   className={`option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
-                  onClick={() => setSelectedOption(option.id)}
+                  onClick={() => handleMarketCardClick(option.id)}
                 >
                   <div className="option-header">
                     <div className="option-controls">
-                      <button
-                        className="pin-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          togglePin(option.id)
-                        }}
-                        title={pinnedMarkets.has(option.id) ? 'Unpin market' : 'Pin market'}
-                      >
-                        {pinnedMarkets.has(option.id) ? '📌' : '📍'}
-                      </button>
                       <button
                         className="visibility-btn"
                         onClick={(e) => {

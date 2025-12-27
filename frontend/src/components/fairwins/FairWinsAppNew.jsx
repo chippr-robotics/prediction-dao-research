@@ -148,6 +148,13 @@ Trade Details:
 This is a transparent market - all trades are publicly visible on the blockchain.`)
   }
 
+  const handleOpenIndividualMarket = (market) => {
+    // Create a copy of the market without the correlation group to show individual modal
+    const individualMarket = { ...market, correlationGroupId: null }
+    setSelectedMarket(individualMarket)
+    setShowHero(true)
+  }
+
   const handleScanMarket = (marketId) => {
     // Find the market by ID
     const market = markets.find(m => m.id === parseInt(marketId))
@@ -424,6 +431,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                   market={selectedMarket}
                   correlatedMarkets={markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId)}
                   onTrade={handleTrade}
+                  onOpenMarket={handleOpenIndividualMarket}
                 />
               </div>
             </div>
