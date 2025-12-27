@@ -24,6 +24,11 @@ Cypress.on('uncaught:exception', (err, runnable) => {
   // Log errors for debugging
   console.error('Uncaught exception:', err.message)
   
+  // Ignore ResizeObserver errors (harmless browser errors)
+  if (err.message.includes('ResizeObserver')) {
+    return false
+  }
+  
   // Ignore Web3 provider errors during testing
   if (err.message.includes('MetaMask') || 
       err.message.includes('ethereum') ||

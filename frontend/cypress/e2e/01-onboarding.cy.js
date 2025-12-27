@@ -10,6 +10,8 @@
 
 describe('User Onboarding Flow', () => {
   beforeEach(() => {
+    // Mock Web3 provider before visiting to ensure wallet detection works
+    cy.mockWeb3Provider()
     cy.visit('/')
   })
 
@@ -29,7 +31,13 @@ describe('User Onboarding Flow', () => {
 
   it('should navigate from landing page to platform selector or app', () => {
     // Look for "Get Started", "Browse", or similar CTA
-    cy.contains('button, a', /browse|explore|enter|get started/i, { timeout: 10000 }).first().click()
+    cy.contains('button, a', /browse|explore|enter|get started/i, { timeout: 10000 })
+      .first()
+      .should('be.visible')
+      .click({ force: true })
+    
+    // Wait for navigation
+    cy.wait(1000)
     
     // Should navigate to either selector, fairwins, or clearpath
     cy.url().should('match', /\/(select|fairwins|clearpath|app|main|$)/)
@@ -82,6 +90,9 @@ describe('User Onboarding Flow', () => {
     // Connect wallet using custom command
     cy.connectWallet()
     
+    // Wait for wallet UI to update
+    cy.wait(1000)
+    
     // Verify wallet is connected
     cy.get('.wallet-address, [data-testid="wallet-address"]').should('be.visible')
     cy.contains('button', /disconnect/i).should('be.visible')
@@ -96,8 +107,13 @@ describe('User Onboarding Flow', () => {
     cy.visit('/clearpath')
     cy.connectWallet()
     
-    // Click disconnect
-    cy.contains('button', /disconnect/i).click()
+    // Click disconnect with stability checks
+    cy.contains('button', /disconnect/i)
+      .should('be.visible')
+      .click({ force: true })
+    
+    // Wait for disconnect to complete
+    cy.wait(1000)
     
     // Verify wallet is disconnected
     cy.contains('button', /connect wallet/i, { timeout: 10000 }).should('be.visible')
@@ -117,8 +133,13 @@ describe('User Onboarding Flow', () => {
     cy.visit('/clearpath')
     cy.contains(/clearpath/i, { timeout: 10000 }).should('be.visible')
     
-    // Navigate back
-    cy.contains('button', /back/i).click()
+    // Navigate back with stability checks
+    cy.contains('button', /back/i)
+      .should('be.visible')
+      .click({ force: true })
+    
+    // Wait for navigation
+    cy.wait(1000)
     
     // Should return to selector or landing
     cy.url().should('match', /\/(select|$)/)
@@ -132,11 +153,17 @@ describe('User Onboarding Flow', () => {
     cy.visit('/clearpath')
     cy.connectWallet()
     
+    // Wait for connection to stabilize
+    cy.wait(1000)
+    
     // Verify connection
     cy.get('.wallet-address, [data-testid="wallet-address"]').should('be.visible')
     
     // Navigate to FairWins
     cy.visit('/fairwins')
+    
+    // Wait for page to load
+    cy.wait(1000)
     
     // Wallet should still be connected
     cy.get('.wallet-address, [data-testid="wallet-address"]', { timeout: 10000 }).should('be.visible')

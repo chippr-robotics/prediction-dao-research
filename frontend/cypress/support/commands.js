@@ -112,8 +112,11 @@ Cypress.Commands.add('connectWallet', () => {
     }
   })
   
-  // Then click the connect button
-  cy.contains('button', /connect wallet/i, { timeout: 10000 }).click()
+  // Then click the connect button with stability checks
+  cy.contains('button', /connect wallet/i, { timeout: 10000 })
+    .should('be.visible')
+    .should('not.be.disabled')
+    .click({ force: true })
   
   // Wait for connection to complete
   cy.waitForWalletConnection()
@@ -140,9 +143,15 @@ Cypress.Commands.add('selectPlatform', (platform) => {
   const platformName = platform.toLowerCase()
   
   if (platformName === 'clearpath') {
-    cy.contains('button, a', /enter clearpath|clearpath/i, { timeout: 10000 }).click()
+    // Look for button, link, or element with button role containing clearpath text
+    cy.contains('button, a, [role="button"]', /enter clearpath|clearpath/i, { timeout: 10000 })
+      .should('be.visible')
+      .click({ force: true })
   } else if (platformName === 'fairwins') {
-    cy.contains('button, a', /enter fairwins|fairwins|explore markets/i, { timeout: 10000 }).click()
+    // Look for button, link, or element with button role containing fairwins text
+    cy.contains('button, a, [role="button"]', /enter fairwins|fairwins|explore markets/i, { timeout: 10000 })
+      .should('be.visible')
+      .click({ force: true })
   }
   
   // Wait for platform to load

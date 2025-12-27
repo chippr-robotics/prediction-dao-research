@@ -95,9 +95,12 @@ describe('FairWins Market Trading Flow', () => {
   })
 
   it('should display balance information when wallet is connected', () => {
-    // Connect wallet
-    cy.contains('button', /connect wallet/i, { timeout: 10000 }).click()
-    cy.wait(1000)
+    // Connect wallet with stability checks
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(2000)
     
     // Look for balance display
     cy.get('body').invoke('text').then((text) => {

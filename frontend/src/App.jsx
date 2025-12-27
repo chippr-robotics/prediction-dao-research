@@ -1,7 +1,9 @@
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import './theme.css'
 import './App.css'
+import LandingPage from './components/LandingPage'
+import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
 import FairWinsApp from './components/FairWinsApp'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
@@ -27,6 +29,7 @@ function AppContent() {
   const { showNotification } = useNotification()
   const { setThemePlatform } = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
 
   // Auto-detect platform based on route
   useEffect(() => {
@@ -59,6 +62,10 @@ function AppContent() {
     await switchNetwork()
     announce('Attempting to switch network')
     showNotification('Switching network...', 'info')
+  }
+
+  const handleBack = () => {
+    navigate('/')
   }
 
   return (
@@ -99,12 +106,11 @@ function AppContent() {
       <Routes>
         <Route 
           path="/" 
-          element={
-            <FairWinsAppNew 
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          } 
+          element={<LandingPage />} 
+        />
+        <Route 
+          path="/select" 
+          element={<PlatformSelector />} 
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
@@ -114,6 +120,7 @@ function AppContent() {
             <ClearPathApp 
               onConnect={handleConnect}
               onDisconnect={handleDisconnect}
+              onBack={handleBack}
             />
           } 
         />
