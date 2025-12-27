@@ -138,20 +138,7 @@ function MarketHeroCard({ market, onTrade }) {
     return `${hours} hours`
   }
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      'politics': '🏛️',
-      'sports': '⚽',
-      'finance': '💰',
-      'tech': '💻',
-      'pop-culture': '🎬',
-      'crypto': '₿',
-      'new': '✨',
-      'daos': '🏢',
-      'other': '📊'
-    }
-    return icons[category] || '📊'
-  }
+
 
   const handleTradeSubmit = (e) => {
     e.preventDefault()
@@ -411,9 +398,6 @@ function MarketHeroCard({ market, onTrade }) {
     <div className="market-hero-card">
       <div className="hero-header">
         <div className="hero-category">
-          <span className="hero-category-icon" aria-hidden="true">
-            {getCategoryIcon(market.category)}
-          </span>
           <span className="hero-category-name">
             {market.category.replace('-', ' ').toUpperCase()}
           </span>
