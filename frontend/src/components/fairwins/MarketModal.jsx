@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
 import './MarketModal.css'
 
+// Quick action button values for market orders
+const QUICK_ACTION_AMOUNTS = [1, 5, 20, 50, 100]
+
 /**
  * MarketModal - Interactive modal for viewing and trading on prediction markets
  * Features:
@@ -29,8 +32,9 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
       setOrderType('market')
       setAmount('1.00')
       setShares('10')
-      // Set price to current spot price
-      const currentSpotPrice = parseFloat(market.passTokenPrice)
+      // Set price to current spot price with validation
+      const passPrice = parseFloat(market.passTokenPrice)
+      const currentSpotPrice = !isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5
       setPrice(currentSpotPrice.toFixed(2))
     }
   }, [isOpen, market])
@@ -38,9 +42,11 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   // Update limit price when outcome changes
   useEffect(() => {
     if (market && orderType === 'limit') {
+      const passPrice = parseFloat(market.passTokenPrice)
+      const failPrice = parseFloat(market.failTokenPrice)
       const currentSpotPrice = selectedOutcome === 'YES' 
-        ? parseFloat(market.passTokenPrice) 
-        : parseFloat(market.failTokenPrice)
+        ? (!isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5)
+        : (!isNaN(failPrice) && failPrice > 0 ? failPrice : 0.5)
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setPrice(currentSpotPrice.toFixed(2))
     }
@@ -260,41 +266,16 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
 
                 {/* Quick action buttons */}
                 <div className="quick-actions">
-                  <button 
-                    className="quick-action-btn" 
-                    onClick={() => setAmount('1')}
-                    type="button"
-                  >
-                    $1
-                  </button>
-                  <button 
-                    className="quick-action-btn" 
-                    onClick={() => setAmount('5')}
-                    type="button"
-                  >
-                    $5
-                  </button>
-                  <button 
-                    className="quick-action-btn" 
-                    onClick={() => setAmount('20')}
-                    type="button"
-                  >
-                    $20
-                  </button>
-                  <button 
-                    className="quick-action-btn" 
-                    onClick={() => setAmount('50')}
-                    type="button"
-                  >
-                    $50
-                  </button>
-                  <button 
-                    className="quick-action-btn" 
-                    onClick={() => setAmount('100')}
-                    type="button"
-                  >
-                    $100
-                  </button>
+                  {QUICK_ACTION_AMOUNTS.map(value => (
+                    <button 
+                      key={value}
+                      className="quick-action-btn" 
+                      onClick={() => setAmount(String(value))}
+                      type="button"
+                    >
+                      ${value}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="calc-display">
