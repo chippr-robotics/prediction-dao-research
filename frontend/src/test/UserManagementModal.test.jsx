@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { BrowserRouter } from 'react-router-dom'
 import UserManagementModal from '../components/ui/UserManagementModal'
+import { WalletProvider } from '../contexts/WalletContext'
 import { Web3Provider } from '../contexts/Web3Context'
 import { UserPreferencesProvider } from '../contexts/UserPreferencesContext'
 import { UIProvider } from '../contexts/UIContext'
@@ -55,19 +56,21 @@ const renderWithProviders = (ui, { isConnected = true } = {}) => {
   return render(
     <BrowserRouter>
       <ThemeProvider>
-        <Web3Provider>
-          <UserPreferencesProvider>
-            <RoleProvider>
-              <ETCswapProvider>
-                <UIProvider>
-                  <PriceProvider>
-                    {ui}
-                  </PriceProvider>
-                </UIProvider>
-              </ETCswapProvider>
-            </RoleProvider>
-          </UserPreferencesProvider>
-        </Web3Provider>
+        <WalletProvider>
+          <Web3Provider>
+            <UserPreferencesProvider>
+              <RoleProvider>
+                <ETCswapProvider>
+                  <UIProvider>
+                    <PriceProvider>
+                      {ui}
+                    </PriceProvider>
+                  </UIProvider>
+                </ETCswapProvider>
+              </RoleProvider>
+            </UserPreferencesProvider>
+          </Web3Provider>
+        </WalletProvider>
       </ThemeProvider>
     </BrowserRouter>
   )

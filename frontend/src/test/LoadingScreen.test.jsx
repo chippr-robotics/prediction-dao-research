@@ -139,10 +139,10 @@ describe('LoadingScreen Component', () => {
       expect(loadingElement).toHaveAttribute('aria-label', 'Loading...')
     })
 
-    it('marks SVG as decorative with aria-hidden', () => {
+    it('marks logo image as decorative with aria-hidden', () => {
       const { container } = render(<LoadingScreen visible={true} />)
-      const svg = container.querySelector('svg')
-      expect(svg).toHaveAttribute('aria-hidden', 'true')
+      const img = container.querySelector('img')
+      expect(img).toHaveAttribute('aria-hidden', 'true')
     })
 
     it('passes axe accessibility tests', async () => {

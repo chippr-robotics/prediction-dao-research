@@ -11,6 +11,27 @@ afterEach(() => {
   cleanup()
 })
 
+// Mock wagmi hooks for WalletProvider
+vi.mock('wagmi', () => ({
+  useAccount: vi.fn(() => ({
+    address: '0x1234567890123456789012345678901234567890',
+    isConnected: true
+  })),
+  useConnect: vi.fn(() => ({
+    connect: vi.fn(),
+    connectors: [{ id: 'injected', name: 'MetaMask' }]
+  })),
+  useDisconnect: vi.fn(() => ({
+    disconnect: vi.fn()
+  })),
+  useChainId: vi.fn(() => 61), // ETC mainnet
+  useSwitchChain: vi.fn(() => ({
+    switchChain: vi.fn()
+  })),
+  createConfig: vi.fn(),
+  http: vi.fn()
+}))
+
 // Mock window.ethereum for Web3 tests
 global.window = global.window || {}
 
