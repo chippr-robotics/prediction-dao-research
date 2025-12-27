@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './TokenMintHeroCard.css'
 
-function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onUpdateMetadata, onListOnETCSwap }) {
+function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListOnETCSwap }) {
   const [activeTab, setActiveTab] = useState('info') // 'info', 'allocation', 'activity'
   const [actionMode, setActionMode] = useState(null) // 'mint', 'burn', 'transfer', null
   const [actionData, setActionData] = useState({ address: '', amount: '', tokenURI: '' })

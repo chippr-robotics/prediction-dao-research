@@ -534,7 +534,6 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
               onMint={handleTokenMint}
               onBurn={handleTokenBurn}
               onTransfer={handleTokenTransfer}
-              onUpdateMetadata={handleUpdateTokenMetadata}
               onListOnETCSwap={handleListOnETCSwap}
             />
           )}
