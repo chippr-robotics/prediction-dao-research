@@ -19,7 +19,7 @@ export function ThemeProvider({ children }) {
   // Current platform (clearpath or fairwins)
   const [platform, setPlatform] = useState(() => {
     const savedPlatform = localStorage.getItem('themePlatform')
-    return savedPlatform || 'clearpath'
+    return savedPlatform || 'fairwins'
   })
 
   // Apply theme to document root
