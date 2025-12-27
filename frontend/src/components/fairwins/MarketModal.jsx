@@ -62,7 +62,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
     }
   }, [selectedOutcome, orderType, market])
 
-  // Handle Escape key press
+  // Handle Escape key press and arrow navigation
   useEffect(() => {
     if (!isOpen) return
 
@@ -70,9 +70,9 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
       if (e.key === 'Escape') {
         onClose()
       } else if (e.key === 'ArrowLeft') {
-        navigatePanel('prev')
+        setCurrentPanel((prev) => (prev - 1 + 3) % 3)
       } else if (e.key === 'ArrowRight') {
-        navigatePanel('next')
+        setCurrentPanel((prev) => (prev + 1) % 3)
       }
     }
 
@@ -80,11 +80,11 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose, currentPanel])
+  }, [isOpen, onClose])
 
-  // Focus management
+  // Focus management - only on initial open
   useEffect(() => {
-    if (isOpen && modalRef.current) {
+    if (isOpen && modalRef.current && currentPanel === 0) {
       const focusableElements = modalRef.current.querySelectorAll(
         'button, [tabindex]:not([tabindex="-1"])'
       )
@@ -92,7 +92,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
         focusableElements[0].focus()
       }
     }
-  }, [isOpen, currentPanel])
+  }, [isOpen])
 
   if (!isOpen || !market) return null
 
@@ -353,7 +353,11 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                         className="quick-action-btn" 
                         onClick={() => {
                           const currentVal = parseFloat(amount) || 0
-                          setAmount(String((currentVal + value).toFixed(2)))
+                          const newVal = currentVal + value
+                          // Ensure new value doesn't exceed balance
+                          if (newVal <= userBalance) {
+                            setAmount(String(newVal.toFixed(2)))
+                          }
                         }}
                         type="button"
                       >

@@ -59,7 +59,9 @@ function MarketDetailsPanel({ market }) {
         {/* Created Date */}
         <div className="detail-section">
           <div className="detail-label">Created</div>
-          <div className="detail-value">{formatDate(market.creationTime || Date.now())}</div>
+          <div className="detail-value">
+            {market.creationTime ? formatDate(market.creationTime) : 'Unknown'}
+          </div>
         </div>
 
         {/* Market Maker */}
@@ -100,11 +102,15 @@ function MarketDetailsPanel({ market }) {
           <div className="price-grid">
             <div className="price-item">
               <span className="price-label">YES</span>
-              <span className="price-value">${parseFloat(market.passTokenPrice).toFixed(2)}</span>
+              <span className="price-value">
+                ${market.passTokenPrice ? parseFloat(market.passTokenPrice).toFixed(2) : '0.00'}
+              </span>
             </div>
             <div className="price-item">
               <span className="price-label">NO</span>
-              <span className="price-value">${parseFloat(market.failTokenPrice).toFixed(2)}</span>
+              <span className="price-value">
+                ${market.failTokenPrice ? parseFloat(market.failTokenPrice).toFixed(2) : '0.00'}
+              </span>
             </div>
           </div>
         </div>
