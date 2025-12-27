@@ -21,11 +21,13 @@
           var savedPlatform = localStorage.getItem('themePlatform');
           
           // Determine theme mode
-          var mode = savedMode || 'light';
-          
-          // Respect user's prefers-color-scheme if no saved preference
-          if (!savedMode && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          // First check system preference, then override with saved preference if it exists
+          var mode = 'light';
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             mode = 'dark';
+          }
+          if (savedMode) {
+            mode = savedMode;
           }
           
           // Determine platform (default to fairwins)
@@ -35,7 +37,7 @@
           document.documentElement.classList.add('theme-' + mode);
           document.documentElement.classList.add('platform-' + platform);
         } catch (e) {
-          // Fallback to light mode if localStorage is not available
+          // Fallback to default theme if any error occurs
           document.documentElement.classList.add('theme-light');
           document.documentElement.classList.add('platform-fairwins');
         }
