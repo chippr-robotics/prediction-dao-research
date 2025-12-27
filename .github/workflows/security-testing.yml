@@ -128,7 +128,7 @@ jobs:
   manticore-analysis:
     name: Manticore Symbolic Execution
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     
     steps:
       - name: Checkout code
@@ -185,6 +185,104 @@ jobs:
           echo "Running Manticore on WelfareMetricRegistry..."
           timeout 300 python scripts/run-manticore.py contracts/WelfareMetricRegistry.sol \
             --contract WelfareMetricRegistry --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on ConditionalMarketFactory
+        run: |
+          echo "Running Manticore on ConditionalMarketFactory..."
+          timeout 300 python scripts/run-manticore.py contracts/ConditionalMarketFactory.sol \
+            --contract ConditionalMarketFactory --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on DAOFactory
+        run: |
+          echo "Running Manticore on DAOFactory..."
+          timeout 300 python scripts/run-manticore.py contracts/DAOFactory.sol \
+            --contract DAOFactory --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on ETCSwapV3Integration
+        run: |
+          echo "Running Manticore on ETCSwapV3Integration..."
+          timeout 300 python scripts/run-manticore.py contracts/ETCSwapV3Integration.sol \
+            --contract ETCSwapV3Integration --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on FutarchyGovernor
+        run: |
+          echo "Running Manticore on FutarchyGovernor..."
+          timeout 300 python scripts/run-manticore.py contracts/FutarchyGovernor.sol \
+            --contract FutarchyGovernor --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on MarketCorrelationRegistry
+        run: |
+          echo "Running Manticore on MarketCorrelationRegistry..."
+          timeout 300 python scripts/run-manticore.py contracts/MarketCorrelationRegistry.sol \
+            --contract MarketCorrelationRegistry --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on MembershipPaymentManager
+        run: |
+          echo "Running Manticore on MembershipPaymentManager..."
+          timeout 300 python scripts/run-manticore.py contracts/MembershipPaymentManager.sol \
+            --contract MembershipPaymentManager --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on OracleResolver
+        run: |
+          echo "Running Manticore on OracleResolver..."
+          timeout 300 python scripts/run-manticore.py contracts/OracleResolver.sol \
+            --contract OracleResolver --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on PrivacyCoordinator
+        run: |
+          echo "Running Manticore on PrivacyCoordinator..."
+          timeout 300 python scripts/run-manticore.py contracts/PrivacyCoordinator.sol \
+            --contract PrivacyCoordinator --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on RagequitModule
+        run: |
+          echo "Running Manticore on RagequitModule..."
+          timeout 300 python scripts/run-manticore.py contracts/RagequitModule.sol \
+            --contract RagequitModule --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on RoleManager
+        run: |
+          echo "Running Manticore on RoleManager..."
+          timeout 300 python scripts/run-manticore.py contracts/RoleManager.sol \
+            --contract RoleManager --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on TieredRoleManager
+        run: |
+          echo "Running Manticore on TieredRoleManager..."
+          timeout 300 python scripts/run-manticore.py contracts/TieredRoleManager.sol \
+            --contract TieredRoleManager --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on TokenMintFactory
+        run: |
+          echo "Running Manticore on TokenMintFactory..."
+          timeout 300 python scripts/run-manticore.py contracts/TokenMintFactory.sol \
+            --contract TokenMintFactory --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on ZKKeyManager
+        run: |
+          echo "Running Manticore on ZKKeyManager..."
+          timeout 300 python scripts/run-manticore.py contracts/ZKKeyManager.sol \
+            --contract ZKKeyManager --timeout 300 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on ZKVerifier
+        run: |
+          echo "Running Manticore on ZKVerifier..."
+          timeout 300 python scripts/run-manticore.py contracts/ZKVerifier.sol \
+            --contract ZKVerifier --timeout 300 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Collect Manticore results
