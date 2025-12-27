@@ -51,7 +51,7 @@ function LandingPage() {
                   )}
                     <div>
                       <h3>FairWins</h3>
-                      <p className="platform-tagline-compact">Create, Trade, and Win</p>
+                      <p className="platform-tagline-compact">Prediction Markets for Friends</p>
                     </div>
                   </div>
                   <p className="platform-description-compact">
@@ -120,8 +120,8 @@ function LandingPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Conditional Privacy</h3>
-              <p>ClearPath uses shielded transactions; FairWins is transparent</p>
+              <h3>Transparent Markets</h3>
+              <p>All trades and outcomes visible on-chain for complete transparency</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
