@@ -1,0 +1,128 @@
+.governance-mode-selector {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.mode-selector-header {
+  margin-bottom: 30px;
+}
+
+.mode-selector-header h2 {
+  margin: 0 0 20px 0;
+  color: var(--clearpath-primary, #2c3e50);
+  font-size: 28px;
+}
+
+.mode-toggle {
+  display: flex;
+  gap: 15px;
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.mode-button {
+  background: transparent;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.mode-button:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.mode-button.active {
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mode-icon {
+  font-size: 32px;
+}
+
+.mode-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--clearpath-primary, #2c3e50);
+}
+
+.mode-subtitle {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.mode-description {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+}
+
+.description-content h3 {
+  margin: 0 0 15px 0;
+  font-size: 24px;
+}
+
+.description-content p {
+  margin: 0 0 20px 0;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+.description-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.description-content li {
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  font-size: 14px;
+}
+
+.description-content li::before {
+  content: '✓';
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.mode-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .mode-toggle {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .mode-button {
+    width: 100%;
+  }
+
+  .description-content ul {
+    grid-template-columns: 1fr;
+  }
+}
