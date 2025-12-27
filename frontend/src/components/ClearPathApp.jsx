@@ -2,6 +2,7 @@ import './ClearPathApp.css'
 import Dashboard from './Dashboard'
 import RoleGate from './ui/RoleGate'
 import RolePurchaseModal from './ui/RolePurchaseModal'
+import BlockiesAvatar from './ui/BlockiesAvatar'
 import { useWeb3, useNetwork } from '../hooks/useWeb3'
 import { useRoles } from '../hooks/useRoles'
 import { useModal } from '../hooks/useUI'
@@ -69,7 +70,7 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
               <div className="connected-wallet">
                 <div className="wallet-info">
                   <span className="connection-status" aria-label="Wallet connected">
-                    <span className="status-indicator" aria-hidden="true">●</span>
+                    <BlockiesAvatar address={account} size={24} className="wallet-avatar-inline" />
                     <span className="wallet-address">{shortenAddress(account)}</span>
                   </span>
                 </div>
