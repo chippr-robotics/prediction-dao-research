@@ -3,6 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getMockMarkets } from '../../utils/mockDataLoader'
+import BlockiesAvatar from '../ui/BlockiesAvatar'
 import * as d3 from 'd3'
 import './Dashboard.css'
 
@@ -383,7 +384,7 @@ function Dashboard() {
           <h2 className="section-title">My Account</h2>
           <div className="user-info-card">
             <div className="user-header">
-              <div className="user-avatar">👤</div>
+              <BlockiesAvatar address={account} size={48} className="user-avatar" />
               <div className="user-details">
                 <div className="user-address">{account}</div>
                 <div className="user-status">Connected</div>

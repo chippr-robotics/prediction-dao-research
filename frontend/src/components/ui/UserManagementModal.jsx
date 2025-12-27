@@ -6,8 +6,10 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import RolePurchaseModal from './RolePurchaseModal'
+import BlockiesAvatar from './BlockiesAvatar'
 import './UserManagementModal.css'
 
+// eslint-disable-next-line no-unused-vars
 function UserManagementModal({ onScanMarket }) {
   const { address, isConnected } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
@@ -97,6 +99,7 @@ function UserManagementModal({ onScanMarket }) {
       {isConnected && (
         <div className="modal-header-section">
           <div className="wallet-info-header">
+            <BlockiesAvatar address={address} size={40} className="wallet-avatar" />
             <span className="wallet-address-display">{shortenAddress(address)}</span>
             <span className={`status-dot ${isConnected ? 'connected' : ''}`} aria-hidden="true"></span>
           </div>
