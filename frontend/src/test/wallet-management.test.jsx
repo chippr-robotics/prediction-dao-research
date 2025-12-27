@@ -28,7 +28,9 @@ vi.mock('wagmi', () => ({
   useChainId: () => 61,
   useSwitchChain: () => ({
     switchChain: vi.fn()
-  })
+  }),
+  createConfig: vi.fn(),
+  http: vi.fn()
 }))
 
 // Test component using wallet hooks
