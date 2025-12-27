@@ -290,7 +290,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
     const probRange = maxProb - minProb
     
     // Add padding for better visualization (10% on each side)
-    const padding = Math.max(probRange * 0.1, 5) // At least 5% padding
+    const padding = Math.max(probRange * 0.1, 5) // At least 5 percentage points
     const yMin = Math.max(0, minProb - padding)
     const yMax = Math.min(100, maxProb + padding)
     
