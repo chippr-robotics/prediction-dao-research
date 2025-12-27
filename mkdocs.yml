@@ -133,6 +133,8 @@ nav:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md
     - Configuration: reference/configuration.md
+    - Market Activity Badges: reference/market-activity-badges.md
+    - Badge Implementation Guide: reference/badge-implementation-guide.md
 
 extra:
   social:
