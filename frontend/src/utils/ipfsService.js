@@ -7,6 +7,7 @@
 
 import { 
   IPFS_CONFIG, 
+  IPFS_GATEWAY,
   getIpfsUrl, 
   buildIpfsPath,
   isValidCid 
@@ -253,7 +254,7 @@ export const checkGatewayHealth = async () => {
     const timeoutId = setTimeout(() => controller.abort(), 5000)
     
     // Try to fetch a known IPFS CID or health endpoint
-    const response = await fetch(`${import.meta.env.VITE_IPFS_GATEWAY || 'https://ipfs.fairwins.app'}/`, {
+    const response = await fetch(`${IPFS_GATEWAY}/`, {
       method: 'HEAD',
       signal: controller.signal,
     })
