@@ -26,11 +26,6 @@ function HeaderBar({ isConnected, onScanMarket }) {
   // Hide header on mobile when scrolling down
   const shouldHideHeader = isMobile && isScrollingDown && hasScrolled
 
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
-  }
-
   return (
     <header className={`header-bar ${shouldHideHeader ? 'header-hidden' : ''} ${hasScrolled ? 'header-scrolled' : ''}`}>
       <div className="header-content">

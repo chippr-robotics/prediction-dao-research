@@ -9,6 +9,7 @@ import RolePurchaseModal from './RolePurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
 import './UserManagementModal.css'
 
+// eslint-disable-next-line no-unused-vars
 function UserManagementModal({ onScanMarket }) {
   const { address, isConnected } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
