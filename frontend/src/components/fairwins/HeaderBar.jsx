@@ -2,7 +2,9 @@ import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirectio
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import { useModal } from '../../hooks/useUI'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { useWallet } from '../../hooks'
 import UserManagementModal from '../ui/UserManagementModal'
+import BlockiesAvatar from '../ui/BlockiesAvatar'
 import './HeaderBar.css'
 
 function HeaderBar({ isConnected, onScanMarket }) {
@@ -11,6 +13,7 @@ function HeaderBar({ isConnected, onScanMarket }) {
   const isMobile = useIsMobile()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
+  const { address } = useWallet()
 
   const handleOpenUserManagement = () => {
     showModal(<UserManagementModal onScanMarket={onScanMarket} />, {
@@ -69,7 +72,7 @@ function HeaderBar({ isConnected, onScanMarket }) {
             aria-label="Open user management"
             title="User Management"
           >
-            <span className="user-icon" aria-hidden="true">👤</span>
+            <BlockiesAvatar address={address} size={32} className="user-icon" />
             {isConnected && preferences.clearPathStatus.active && (
               <span className="clearpath-badge" aria-label="ClearPath Active">✓</span>
             )}

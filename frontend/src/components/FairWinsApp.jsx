@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './FairWinsApp.css'
 import { useWeb3, useNetwork } from '../hooks/useWeb3'
+import BlockiesAvatar from './ui/BlockiesAvatar'
 import MarketTrading from './MarketTrading'
 import MyPositions from './MyPositions'
 import MarketCreation from './MarketCreation'
@@ -82,7 +83,7 @@ function FairWinsApp({ onConnect, onDisconnect, onBack }) {
               <div className="connected-wallet">
                 <div className="wallet-info">
                   <span className="connection-status" aria-label="Wallet connected">
-                    <span className="status-indicator" aria-hidden="true">●</span>
+                    <BlockiesAvatar address={account} size={24} className="wallet-avatar-inline" />
                     <span className="wallet-address">{shortenAddress(account)}</span>
                   </span>
                 </div>
