@@ -13,6 +13,9 @@ import BalanceDisplay from './BalanceDisplay'
 import BalanceChart from './BalanceChart'
 import Dashboard from './Dashboard'
 import MarketsTable from './MarketsTable'
+import TokenMintTab from './TokenMintTab'
+import TokenMintBuilderModal from './TokenMintBuilderModal'
+import TokenMintHeroCard from './TokenMintHeroCard'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
@@ -25,6 +28,13 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [showHero, setShowHero] = useState(false) // Control hero visibility
   const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
+  
+  // TokenMint state
+  const [tokens, setTokens] = useState([])
+  const [selectedToken, setSelectedToken] = useState(null)
+  const [showTokenBuilder, setShowTokenBuilder] = useState(false)
+  const [tokenLoading, setTokenLoading] = useState(false)
+  const [userRoles, setUserRoles] = useState([]) // User's roles for conditional rendering
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -146,6 +156,125 @@ This is a transparent market - all trades are publicly visible on the blockchain
     }
   }
 
+  // TokenMint handlers
+  const loadUserTokens = useCallback(async () => {
+    if (!account || !isConnected) {
+      setTokens([])
+      return
+    }
+    
+    try {
+      setTokenLoading(true)
+      // Simulate loading tokens from contract
+      // In production, this would call TokenMintFactory.getOwnerTokens(account)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Mock tokens for demo
+      const mockTokens = [
+        {
+          tokenId: 1,
+          tokenType: 0, // ERC20
+          tokenAddress: '0x1234567890123456789012345678901234567890',
+          owner: account,
+          name: 'Demo Token',
+          symbol: 'DEMO',
+          metadataURI: 'ipfs://QmDemo123',
+          createdAt: Math.floor(Date.now() / 1000) - 86400 * 7,
+          listedOnETCSwap: true,
+          isBurnable: true,
+          isPausable: false
+        },
+        {
+          tokenId: 2,
+          tokenType: 1, // ERC721
+          tokenAddress: '0x0987654321098765432109876543210987654321',
+          owner: account,
+          name: 'Demo NFT Collection',
+          symbol: 'DNFT',
+          metadataURI: 'ipfs://QmNFTBase/',
+          createdAt: Math.floor(Date.now() / 1000) - 86400 * 3,
+          listedOnETCSwap: false,
+          isBurnable: false,
+          isPausable: false
+        }
+      ]
+      
+      setTokens(mockTokens)
+      setTokenLoading(false)
+    } catch (error) {
+      console.error('Error loading tokens:', error)
+      setTokenLoading(false)
+    }
+  }, [account, isConnected])
+
+  const handleCreateToken = async (tokenData) => {
+    console.log('Creating token:', tokenData)
+    alert(`Token creation requires deployed contracts.
+
+Token Details:
+- Type: ${tokenData.tokenType}
+- Name: ${tokenData.name}
+- Symbol: ${tokenData.symbol}
+${tokenData.tokenType === 'ERC20' ? `- Initial Supply: ${tokenData.initialSupply}` : ''}
+- Metadata URI: ${tokenData.metadataURI || 'None'}
+- Features: ${tokenData.isBurnable ? 'Burnable ' : ''}${tokenData.isPausable ? 'Pausable ' : ''}
+- List on ETCSwap: ${tokenData.listOnETCSwap ? 'Yes' : 'No'}
+
+This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchain.`)
+    
+    // In production, this would interact with the TokenMintFactory contract
+    // await tokenMintFactory.createERC20(...) or createERC721(...)
+    
+    // Reload tokens after creation
+    await loadUserTokens()
+  }
+
+  const handleTokenClick = (token) => {
+    setSelectedToken(token)
+    setShowHero(true)
+  }
+
+  const handleTokenMint = async (tokenId, data) => {
+    console.log('Minting tokens:', tokenId, data)
+    alert('Mint functionality requires deployed contracts.')
+  }
+
+  const handleTokenBurn = async (tokenId, data) => {
+    console.log('Burning tokens:', tokenId, data)
+    alert('Burn functionality requires deployed contracts.')
+  }
+
+  const handleTokenTransfer = async (tokenId, data) => {
+    console.log('Transferring tokens:', tokenId, data)
+    alert('Transfer functionality requires deployed contracts.')
+  }
+
+  const handleUpdateTokenMetadata = async (tokenId, newURI) => {
+    console.log('Updating metadata:', tokenId, newURI)
+    alert('Metadata update requires deployed contracts.')
+  }
+
+  const handleListOnETCSwap = async (tokenId) => {
+    console.log('Listing on ETCSwap:', tokenId)
+    alert('ETCSwap listing requires deployed contracts.')
+  }
+
+  // Load user tokens when account changes
+  useEffect(() => {
+    loadUserTokens()
+  }, [loadUserTokens])
+
+  // Check user roles (mock for now)
+  useEffect(() => {
+    if (isConnected && account) {
+      // In production, check user's roles from RoleManager contract
+      // For demo, assume user has TOKENMINT_ROLE
+      setUserRoles(['TOKENMINT_ROLE'])
+    } else {
+      setUserRoles([])
+    }
+  }, [isConnected, account])
+
   const marketsByCategory = getMarketsByCategory()
 
   // Memoize trending markets to avoid recalculation on every render
@@ -232,6 +361,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
         <SidebarNav 
           selectedCategory={selectedCategory}
           onCategoryChange={handleCategoryChange}
+          userRoles={userRoles}
         />
         <HeaderBar 
           onConnect={onConnect}
@@ -254,6 +384,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
       <SidebarNav 
         selectedCategory={selectedCategory}
         onCategoryChange={handleCategoryChange}
+        userRoles={userRoles}
       />
       
       <HeaderBar 
@@ -309,6 +440,14 @@ This is a transparent market - all trades are publicly visible on the blockchain
               {selectedCategory === 'dashboard' ? (
                 /* Dashboard View - Landing Page */
                 <Dashboard />
+              ) : selectedCategory === 'tokenmint' ? (
+                /* TokenMint View - Token Management */
+                <TokenMintTab 
+                  tokens={tokens}
+                  loading={tokenLoading}
+                  onTokenClick={handleTokenClick}
+                  onCreateToken={() => setShowTokenBuilder(true)}
+                />
               ) : selectedCategory === 'all-table' ? (
                 /* All Markets Table View - Power User Screen */
                 <MarketsTable 
@@ -375,6 +514,28 @@ This is a transparent market - all trades are publicly visible on the blockchain
                 </div>
               )}
             </>
+          )}
+          
+          {/* TokenMint Builder Modal */}
+          <TokenMintBuilderModal 
+            isOpen={showTokenBuilder}
+            onClose={() => setShowTokenBuilder(false)}
+            onCreate={handleCreateToken}
+          />
+          
+          {/* TokenMint Hero Card */}
+          {selectedToken && showHero && selectedCategory === 'tokenmint' && (
+            <TokenMintHeroCard 
+              token={selectedToken}
+              onClose={() => {
+                setSelectedToken(null)
+                setShowHero(false)
+              }}
+              onMint={handleTokenMint}
+              onBurn={handleTokenBurn}
+              onTransfer={handleTokenTransfer}
+              onListOnETCSwap={handleListOnETCSwap}
+            />
           )}
         </div>
       </main>

@@ -12,10 +12,11 @@ const CATEGORIES = [
   { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
   { id: 'crypto', name: 'Crypto', icon: '₿' },
   { id: 'other', name: 'Other Markets', icon: '🌐' },
+  { id: 'tokenmint', name: 'TokenMint', icon: '🪙', requiresRole: 'TOKENMINT_ROLE' },
   { id: 'all-table', name: 'All Markets Table', icon: '📋', powerUser: true }
 ]
 
-function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange }) {
+function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange, userRoles = [] }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const isMobile = useIsMobile()
 
@@ -43,6 +44,14 @@ function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange }) {
     }
   }
 
+  // Filter categories based on role requirements
+  const visibleCategories = CATEGORIES.filter(category => {
+    if (category.requiresRole) {
+      return userRoles.includes(category.requiresRole)
+    }
+    return true
+  })
+
   // On mobile, render as bottom navigation bar
   if (isMobile) {
     return (
@@ -52,7 +61,7 @@ function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange }) {
         aria-label="Market categories"
       >
         <div className="bottom-nav-scroll">
-          {CATEGORIES.map((category) => (
+          {visibleCategories.map((category) => (
             <button
               key={category.id}
               className={`bottom-nav-item ${selectedCategory === category.id ? 'active' : ''}`}
@@ -92,7 +101,7 @@ function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange }) {
       </div>
 
       <nav className="category-list">
-        {CATEGORIES.map((category) => (
+        {visibleCategories.map((category) => (
           <button
             key={category.id}
             className={`category-item ${selectedCategory === category.id ? 'active' : ''}`}
