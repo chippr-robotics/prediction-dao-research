@@ -145,7 +145,7 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
         address _proposalRegistry,
         address _governanceToken,
         address _treasuryVault
-    ) external {
+    ) external onlyOwner {
         require(!_initialized, "Already initialized");
         require(initialOwner != address(0), "Invalid owner");
         require(_proposalRegistry != address(0), "Invalid proposal registry");
@@ -185,7 +185,6 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
             ,
             ,
             ,
-            
         ) = proposalRegistry.getProposal(proposalId);
         require(proposer != address(0), "Invalid proposal ID");
         
@@ -266,7 +265,7 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
      */
     function executeProposal(
         uint256 votingProposalId
-    ) external onlyOwner whenNotPaused nonReentrant {
+    ) external whenNotPaused nonReentrant {
         require(
             state(votingProposalId) == ProposalState.Queued,
             "Proposal not queued"
@@ -286,11 +285,29 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
             uint256 amount,
             address recipient,
             ,
-            ,
-            ,
-            ,
-            
+            ProposalRegistry.ProposalStatus registryStatus,
+            address fundingToken,
+            uint256 startDate,
+            uint256 executionDeadline
         ) = proposalRegistry.getProposal(proposal.proposalId);
+        
+        // Validate proposal status and execution window
+        require(
+            registryStatus == ProposalRegistry.ProposalStatus.Active,
+            "Proposal not active in registry"
+        );
+        require(
+            block.timestamp >= startDate,
+            "Execution window not started"
+        );
+        require(
+            block.timestamp <= executionDeadline,
+            "Execution deadline passed"
+        );
+        require(
+            fundingToken == address(0),
+            "Only native token funding supported"
+        );
         
         // Check daily spending limit
         uint256 today = block.timestamp / 1 days;

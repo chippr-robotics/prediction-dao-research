@@ -54,8 +54,11 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
   const [currentBlock, setCurrentBlock] = useState(0)
 
   useEffect(() => {
-    loadVotingProposals()
-    loadTokenInfo()
+    const initializeData = async () => {
+      await loadTokenInfo()
+      await loadVotingProposals()
+    }
+    initializeData()
     loadCurrentBlock()
     
     // Update current block periodically
@@ -74,7 +77,7 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
   }
 
   const loadTokenInfo = async () => {
-    if (!governorAddress || !provider || !account) return
+    if (!governorAddress || !provider) return
     
     try {
       const governor = new ethers.Contract(governorAddress, TraditionalGovernorABI, provider)
@@ -82,12 +85,16 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
       const token = new ethers.Contract(tokenAddress, ERC20ABI, provider)
       
       const symbol = await token.symbol()
-      const balance = await token.balanceOf(account)
       const decimals = await token.decimals()
       
       setTokenSymbol(symbol)
       setTokenDecimals(decimals)
-      setUserVotingPower(ethers.formatUnits(balance, decimals))
+      
+      // Only load user voting power if account is connected
+      if (account) {
+        const balance = await token.balanceOf(account)
+        setUserVotingPower(ethers.formatUnits(balance, decimals))
+      }
     } catch (error) {
       console.error('Error loading token info:', error)
     }

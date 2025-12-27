@@ -81,7 +81,8 @@ describe("TraditionalGovernor", function () {
     beforeEach(async function () {
       // Create a proposal in the registry first
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30 days from now
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60; // 30 days from now
       await proposalRegistry.connect(addr1).submitProposal(
         "Test Proposal",
         "Description",
@@ -144,7 +145,8 @@ describe("TraditionalGovernor", function () {
     beforeEach(async function () {
       // Create a proposal in the registry
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       await proposalRegistry.connect(addr1).submitProposal(
         "Test Proposal",
         "Description",
@@ -244,7 +246,8 @@ describe("TraditionalGovernor", function () {
 
     beforeEach(async function () {
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       await proposalRegistry.connect(addr1).submitProposal(
         "Test Proposal",
         "Description",
@@ -257,6 +260,11 @@ describe("TraditionalGovernor", function () {
         { value: bondAmount }
       );
       proposalId = 0;
+      
+      // Fast forward past review period and activate proposal
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60 + 1]);
+      await mine(1);
+      await proposalRegistry.activateProposal(proposalId);
       
       await traditionalGovernor.connect(addr1).createVotingProposal(proposalId);
       votingProposalId = 0;
@@ -348,7 +356,8 @@ describe("TraditionalGovernor", function () {
 
     beforeEach(async function () {
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       await proposalRegistry.connect(addr1).submitProposal(
         "Test Proposal",
         "Description",
@@ -361,6 +370,11 @@ describe("TraditionalGovernor", function () {
         { value: bondAmount }
       );
       proposalId = 0;
+      
+      // Fast forward past review period and activate proposal
+      await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60 + 1]);
+      await mine(1);
+      await proposalRegistry.activateProposal(proposalId);
       
       await traditionalGovernor.connect(addr1).createVotingProposal(proposalId);
       votingProposalId = 0;
@@ -405,7 +419,8 @@ describe("TraditionalGovernor", function () {
     it("Should revert if proposal not queued", async function () {
       // Create another proposal without queueing
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       await proposalRegistry.connect(addr1).submitProposal(
         "Test Proposal 2",
         "Description",
@@ -428,7 +443,8 @@ describe("TraditionalGovernor", function () {
     it("Should enforce daily spending limit", async function () {
       // Create multiple proposals that exceed limit
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       
       for (let i = 0; i < 5; i++) {
         await proposalRegistry.connect(addr1).submitProposal(
@@ -511,7 +527,8 @@ describe("TraditionalGovernor", function () {
       await traditionalGovernor.togglePause();
       
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       await proposalRegistry.connect(addr1).submitProposal(
         "Test",
         "Desc",
@@ -545,7 +562,8 @@ describe("TraditionalGovernor", function () {
 
     beforeEach(async function () {
       const bondAmount = await proposalRegistry.bondAmount();
-      const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
       await proposalRegistry.connect(addr1).submitProposal(
         "Test Proposal",
         "Description",

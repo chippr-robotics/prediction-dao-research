@@ -51,7 +51,8 @@ describe("Integration: Traditional Voting Lifecycle", function () {
   it("Should complete full traditional voting lifecycle", async function () {
     // Step 1: Submit proposal to registry
     const bondAmount = await proposalRegistry.bondAmount();
-    const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
     
     await proposalRegistry.connect(proposer).submitProposal(
       "Community Grant Proposal",
@@ -72,9 +73,14 @@ describe("Integration: Traditional Voting Lifecycle", function () {
     expect(proposal[0]).to.equal(proposer.address); // proposer
     expect(proposal[3]).to.equal(ethers.parseEther("50")); // fundingAmount
     
+    // Fast forward past review period and activate proposal
+    await ethers.provider.send("evm_increaseTime", [7 * 24 * 60 * 60 + 1]);
+    await mine(1);
+    await proposalRegistry.activateProposal(proposalId);
+    
     // Step 2: Create voting proposal
     const tx = await traditionalGovernor.connect(proposer).createVotingProposal(proposalId);
-    const receipt = await tx.wait();
+    await tx.wait();
     
     const votingProposalId = 0;
     const votingProposal = await traditionalGovernor.votingProposals(votingProposalId);
@@ -145,7 +151,8 @@ describe("Integration: Traditional Voting Lifecycle", function () {
   it("Should reject proposal when quorum is not met", async function () {
     // Submit proposal
     const bondAmount = await proposalRegistry.bondAmount();
-    const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
     
     await proposalRegistry.connect(proposer).submitProposal(
       "Low Participation Proposal",
@@ -183,7 +190,8 @@ describe("Integration: Traditional Voting Lifecycle", function () {
   it("Should reject proposal when Against votes win", async function () {
     // Submit proposal
     const bondAmount = await proposalRegistry.bondAmount();
-    const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
     
     await proposalRegistry.connect(proposer).submitProposal(
       "Controversial Proposal",
@@ -217,7 +225,8 @@ describe("Integration: Traditional Voting Lifecycle", function () {
 
   it("Should handle multiple concurrent proposals", async function () {
     const bondAmount = await proposalRegistry.bondAmount();
-    const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
     
     // Submit multiple proposals
     for (let i = 0; i < 3; i++) {
@@ -260,7 +269,8 @@ describe("Integration: Traditional Voting Lifecycle", function () {
 
   it("Should handle abstain votes correctly", async function () {
     const bondAmount = await proposalRegistry.bondAmount();
-    const executionDeadline = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
     
     await proposalRegistry.connect(proposer).submitProposal(
       "Proposal with Abstentions",
