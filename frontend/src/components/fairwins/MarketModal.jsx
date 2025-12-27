@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
 import './MarketModal.css'
 
+// Quick action button values for market orders
+const QUICK_ACTION_AMOUNTS = [1, 5, 20, 50, 100]
+
 /**
  * MarketModal - Interactive modal for viewing and trading on prediction markets
  * Features:
@@ -14,24 +17,40 @@ import './MarketModal.css'
 function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [selectedOutcome, setSelectedOutcome] = useState('YES')
   const [orderType, setOrderType] = useState('market') // 'market' or 'limit'
-  const [amount, setAmount] = useState('')
-  const [shares, setShares] = useState('')
+  const [amount, setAmount] = useState('1.00')
+  const [shares, setShares] = useState('10')
   const [price, setPrice] = useState('')
   const modalRef = useRef(null)
   const { formatPrice } = usePrice()
 
-  // Reset state when modal closes
+  // Reset state when modal opens and set default values
   useEffect(() => {
-    if (!isOpen) {
-      // Reset to defaults when modal closes
+    if (isOpen && market) {
+      // Reset to defaults when modal opens
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedOutcome('YES')
       setOrderType('market')
-      setAmount('')
-      setShares('')
-      setPrice('')
+      setAmount('1.00')
+      setShares('10')
+      // Set price to current spot price with validation
+      const passPrice = parseFloat(market.passTokenPrice)
+      const currentSpotPrice = !isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5
+      setPrice(currentSpotPrice.toFixed(2))
     }
-  }, [isOpen])
+  }, [isOpen, market])
+
+  // Update limit price when outcome changes
+  useEffect(() => {
+    if (market && orderType === 'limit') {
+      const passPrice = parseFloat(market.passTokenPrice)
+      const failPrice = parseFloat(market.failTokenPrice)
+      const currentSpotPrice = selectedOutcome === 'YES' 
+        ? (!isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5)
+        : (!isNaN(failPrice) && failPrice > 0 ? failPrice : 0.5)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPrice(currentSpotPrice.toFixed(2))
+    }
+  }, [selectedOutcome, orderType, market])
 
   // Handle Escape key press
   useEffect(() => {
@@ -70,7 +89,6 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   }
 
   const yesProb = (parseFloat(market.passTokenPrice) * 100).toFixed(1)
-  const noProb = (parseFloat(market.failTokenPrice) * 100).toFixed(1)
   
   // Get user balance (TODO: Replace with actual balance from context/props)
   const userBalance = 1000.00 // USD
@@ -79,12 +97,14 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const currentPrice = selectedOutcome === 'YES' ? parseFloat(market.passTokenPrice) : parseFloat(market.failTokenPrice)
   const estimatedShares = amount && currentPrice > 0 ? parseFloat(amount) / currentPrice : 0
   const averagePrice = currentPrice
-  const reward = estimatedShares > 0 ? estimatedShares - parseFloat(amount || 0) : 0
+  const totalPayout = estimatedShares > 0 ? estimatedShares * 1.0 : 0 // Each winning share pays $1
+  const reward = totalPayout - parseFloat(amount || 0)
 
   // Calculate values for limit order
   const SHARES_PAYOUT_VALUE = 1.0 // Each winning share pays out $1
   const totalAmount = shares && price ? parseFloat(shares) * parseFloat(price) : 0
-  const limitReward = shares && price ? (parseFloat(shares) * SHARES_PAYOUT_VALUE) - totalAmount : 0
+  const limitTotalPayout = shares && price ? (parseFloat(shares) * SHARES_PAYOUT_VALUE) : 0
+  const limitReward = limitTotalPayout - totalAmount
 
   // Validation
   const isMarketOrderValid = amount && parseFloat(amount) > 0 && parseFloat(amount) <= userBalance
@@ -183,10 +203,6 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             {/* Price and Market Value Display */}
             <div className="market-info-display">
               <div className="info-item">
-                <span className="info-label">Current Price</span>
-                <span className="info-value">${currentPrice.toFixed(2)}</span>
-              </div>
-              <div className="info-item">
                 <span className="info-label">Market Value</span>
                 <span className="info-value">{formatPrice(market.totalLiquidity, { compact: true })}</span>
               </div>
@@ -199,14 +215,14 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                 onClick={() => setSelectedOutcome('YES')}
               >
                 <span className="outcome-label">YES</span>
-                <span className="outcome-prob">{yesProb}%</span>
+                <span className="outcome-prob">${parseFloat(market.passTokenPrice).toFixed(2)}</span>
               </button>
               <button
                 className={`outcome-btn ${selectedOutcome === 'NO' ? 'selected' : ''}`}
                 onClick={() => setSelectedOutcome('NO')}
               >
                 <span className="outcome-label">NO</span>
-                <span className="outcome-prob">{noProb}%</span>
+                <span className="outcome-prob">${parseFloat(market.failTokenPrice).toFixed(2)}</span>
               </button>
             </div>
           </div>
@@ -248,10 +264,28 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                   <div className="input-hint">Balance: ${userBalance.toFixed(2)}</div>
                 </div>
 
+                {/* Quick action buttons */}
+                <div className="quick-actions">
+                  {QUICK_ACTION_AMOUNTS.map(value => (
+                    <button 
+                      key={value}
+                      className="quick-action-btn" 
+                      onClick={() => setAmount(String(value))}
+                      type="button"
+                    >
+                      ${value}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="calc-display">
                   <div className="calc-row">
                     <span className="calc-label">Avg Price</span>
                     <span className="calc-value">${averagePrice.toFixed(2)}</span>
+                  </div>
+                  <div className="calc-row">
+                    <span className="calc-label">Total Payout</span>
+                    <span className="calc-value">${totalPayout.toFixed(2)}</span>
                   </div>
                   <div className="calc-row">
                     <span className="calc-label">Reward</span>
@@ -299,6 +333,10 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                 </div>
 
                 <div className="calc-display">
+                  <div className="calc-row">
+                    <span className="calc-label">Total Payout</span>
+                    <span className="calc-value">${limitTotalPayout.toFixed(2)}</span>
+                  </div>
                   <div className="calc-row">
                     <span className="calc-label">Reward</span>
                     <span className="calc-value reward-value">${limitReward.toFixed(2)}</span>

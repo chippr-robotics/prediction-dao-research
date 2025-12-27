@@ -226,11 +226,11 @@
 }
 
 .form-input {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   padding: 0.625rem;
-  color: white;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 0.875rem;
   font-family: inherit;
   width: 100%;
@@ -239,7 +239,8 @@
 .form-input:focus {
   outline: none;
   border-color: #36B37E;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
 }
 
 .form-input::placeholder {
@@ -249,6 +250,37 @@
 .input-hint {
   font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.5);
+}
+
+/* Quick Action Buttons */
+.quick-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.quick-action-btn {
+  flex: 1;
+  min-width: calc(20% - 0.4rem);
+  background: rgba(54, 179, 126, 0.1);
+  border: 1px solid rgba(54, 179, 126, 0.3);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  color: #36B37E;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: rgba(54, 179, 126, 0.2);
+  border-color: #36B37E;
+  transform: translateY(-1px);
+}
+
+.quick-action-btn:active {
+  transform: translateY(0);
 }
 
 /* Form Row (for limit order) */
