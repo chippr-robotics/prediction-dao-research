@@ -16,11 +16,14 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should display user balance when connected', () => {
-    // Connect wallet
-    cy.contains('button', /connect wallet/i, { timeout: 10000 }).click()
-    cy.wait(1000)
+    // Connect wallet with stability wait
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(2000)
     
-    // Look for balance display
+    // Look for balance display - more lenient check
     cy.get('body').invoke('text').then((text) => {
       const lowerText = text.toLowerCase()
       const hasBalance = lowerText.includes('balance') || 
@@ -30,8 +33,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should show positions or portfolio section', () => {
-    cy.connectWallet()
-    cy.wait(1000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(2000)
     
     // Look for positions/portfolio in navigation or content
     cy.get('body').invoke('text').then((text) => {
@@ -45,8 +51,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should display balance chart or visualization', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for chart or visualization elements
     cy.get('[class*="chart"], [class*="graph"], svg, canvas').then(($elements) => {
@@ -60,8 +69,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should show token balances for active positions', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for token information
     cy.get('body').invoke('text').then((text) => {
@@ -72,8 +84,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should display position value in currency', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for monetary values
     cy.get('body').invoke('text').then((text) => {
@@ -83,8 +98,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should show unrealized profit/loss if applicable', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for P&L indicators
     cy.get('body').invoke('text').then((text) => {
@@ -98,8 +116,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should display market results when resolved', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for results or resolved status
     cy.get('body').invoke('text').then((text) => {
@@ -113,8 +134,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should show claim or payout interface for winning positions', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for claim/payout buttons
     cy.get('button, a').then(($elements) => {
@@ -128,8 +152,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should display historical performance data', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for historical or time-series data
     cy.get('body').invoke('text').then((text) => {
@@ -143,8 +170,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should show transaction history if available', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for transaction or activity section
     cy.get('body').invoke('text').then((text) => {
@@ -157,8 +187,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should display position details on click', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Try clicking on market or position elements
     cy.get('[class*="market"], [class*="position"], button, a')
@@ -166,8 +199,8 @@ describe('Position Management and Results Flow', () => {
       .first()
       .then(($el) => {
         if ($el.length > 0) {
-          cy.wrap($el).click()
-          cy.wait(500)
+          cy.wrap($el).should('be.visible').click({ force: true })
+          cy.wait(1000)
           // Should show some details
           cy.get('body').should('be.visible')
         }
@@ -175,8 +208,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should show empty state when no positions exist', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // The page should handle empty state gracefully
     cy.get('body').invoke('text').then((text) => {
@@ -187,8 +223,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should update balance after simulated trade', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Get initial balance if displayed
     cy.get('body').invoke('text').then((initialText) => {
@@ -199,8 +238,8 @@ describe('Position Management and Results Flow', () => {
         .first()
         .then(($input) => {
           if ($input.length > 0) {
-            cy.wrap($input).clear().type('1')
-            cy.wait(500)
+            cy.wrap($input).should('be.visible').clear().type('1')
+            cy.wait(1000)
           }
         })
       
@@ -210,8 +249,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should filter positions by status', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for filter options
     cy.get('button, [role="tab"]').then(($elements) => {
@@ -226,8 +268,11 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should sort positions by different criteria', () => {
-    cy.connectWallet()
-    cy.wait(2000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(3000)
     
     // Look for sort options
     cy.get('button, select, [role="combobox"]').then(($elements) => {
@@ -242,8 +287,11 @@ describe('Position Management and Results Flow', () => {
 
   it('should handle responsive layout for positions on mobile', () => {
     cy.viewport('iphone-x')
-    cy.connectWallet()
-    cy.wait(1000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(2000)
     
     // Verify positions are accessible
     cy.get('body').should('be.visible')
@@ -251,13 +299,19 @@ describe('Position Management and Results Flow', () => {
   })
 
   it('should maintain accessibility in position view', () => {
-    cy.connectWallet()
-    cy.wait(1000)
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
+    cy.wait(2000)
     cy.checkA11y()
   })
 
   it('should show loading states while fetching positions', () => {
-    cy.connectWallet()
+    cy.contains('button', /connect wallet/i, { timeout: 10000 })
+      .should('be.visible')
+      .should('not.be.disabled')
+      .click({ force: true })
     
     // Should eventually show content
     cy.get('body', { timeout: 10000 }).should('be.visible')

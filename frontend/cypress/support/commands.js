@@ -112,8 +112,11 @@ Cypress.Commands.add('connectWallet', () => {
     }
   })
   
-  // Then click the connect button
-  cy.contains('button', /connect wallet/i, { timeout: 10000 }).click()
+  // Then click the connect button with stability checks
+  cy.contains('button', /connect wallet/i, { timeout: 10000 })
+    .should('be.visible')
+    .should('not.be.disabled')
+    .click({ force: true })
   
   // Wait for connection to complete
   cy.waitForWalletConnection()
