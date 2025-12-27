@@ -125,103 +125,10 @@ jobs:
             slither-report.md
           retention-days: 30
 
-  manticore-analysis:
-    name: Manticore Symbolic Execution
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Compile contracts
-        run: npm run compile
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3-dev
-
-      - name: Install Manticore
-        run: |
-          python -m pip install --upgrade pip
-          pip install 'protobuf<=3.20.3'
-          pip install manticore[native]
-          pip install solc-select
-          solc-select install 0.8.24
-          solc-select use 0.8.24
-
-      - name: Patch wasm package for Python 3.10+ compatibility
-        run: python scripts/patch-wasm-types.py
-
-      - name: Verify Manticore installation
-        run: |
-          manticore --version
-          solc --version
-
-      - name: Run Manticore on ProposalRegistry
-        run: |
-          echo "Running Manticore on ProposalRegistry..."
-          timeout 300 python scripts/run-manticore.py contracts/ProposalRegistry.sol \
-            --contract ProposalRegistry --timeout 300 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on WelfareMetricRegistry
-        run: |
-          echo "Running Manticore on WelfareMetricRegistry..."
-          timeout 300 python scripts/run-manticore.py contracts/WelfareMetricRegistry.sol \
-            --contract WelfareMetricRegistry --timeout 300 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Collect Manticore results
-        if: always()
-        run: |
-          mkdir -p manticore-results
-          echo "Searching for Manticore output directories..."
-          mcore_count=$(find . -maxdepth 1 -type d -name "mcore_*" | wc -l)
-          echo "Found $mcore_count mcore_* directories"
-          
-          if [ "$mcore_count" -gt 0 ]; then
-            echo "Copying Manticore results to manticore-results/..."
-            for dir in mcore_*; do
-              [ -d "$dir" ] && cp -r "$dir" manticore-results/
-            done
-            echo "Results collected successfully"
-            ls -la manticore-results/
-          else
-            echo "WARNING: No Manticore output directories found!"
-            echo "This indicates Manticore did not generate any results."
-            echo "Creating a status file to indicate no results..."
-            echo "No Manticore results generated during this run." > manticore-results/NO_RESULTS.txt
-            echo "Check the 'Run Manticore' step logs for errors or warnings." >> manticore-results/NO_RESULTS.txt
-          fi
-
-      - name: Upload Manticore results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: manticore-results
-          path: manticore-results/
-          retention-days: 30
-
   summary:
     name: Generate Test Summary
     runs-on: ubuntu-latest
-    needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis]
+    needs: [hardhat-tests, coverage-report, slither-analysis]
     if: always()
     
     steps:
@@ -256,79 +163,9 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Manticore Results
-          echo "### Manticore Symbolic Execution" >> $GITHUB_STEP_SUMMARY
-          if [ -d "artifacts/manticore-results" ]; then
-            # Check for NO_RESULTS indicator file
-            if [ -f "artifacts/manticore-results/NO_RESULTS.txt" ]; then
-              echo "⚠️ **No Manticore results found.** The analysis may have failed or produced no output." >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              cat artifacts/manticore-results/NO_RESULTS.txt >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**Possible causes:**" >> $GITHUB_STEP_SUMMARY
-              echo "- Analysis timed out before generating results" >> $GITHUB_STEP_SUMMARY
-              echo "- Manticore encountered an error during execution" >> $GITHUB_STEP_SUMMARY
-              echo "- Contracts could not be analyzed (compilation or dependency issues)" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Check the 'Manticore Symbolic Execution' job logs for details." >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            else
-              # Check if there are any mcore_* directories
-              mcore_dirs=$(find artifacts/manticore-results -type d -name "mcore_*" 2>/dev/null | wc -l)
-              
-              if [ "$mcore_dirs" -gt 0 ]; then
-                echo "✅ Manticore analysis completed successfully." >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                
-                # Process each mcore directory
-                for mcore_dir in artifacts/manticore-results/mcore_*; do
-                  if [ -d "$mcore_dir" ]; then
-                    contract_name=$(basename "$mcore_dir")
-                    echo "#### Results for $contract_name" >> $GITHUB_STEP_SUMMARY
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                    
-                    # Check for global.summary file
-                    if [ -f "$mcore_dir/global.summary" ]; then
-                      echo '```' >> $GITHUB_STEP_SUMMARY
-                      cat "$mcore_dir/global.summary" >> $GITHUB_STEP_SUMMARY
-                      echo '```' >> $GITHUB_STEP_SUMMARY
-                    else
-                      # Count test cases and other files
-                      test_count=$(find "$mcore_dir" -name "test_*.tx" 2>/dev/null | wc -l)
-                      echo "- Test cases generated: $test_count" >> $GITHUB_STEP_SUMMARY
-                      
-                      # Check for visited.txt
-                      if [ -f "$mcore_dir/visited.txt" ]; then
-                        visited_count=$(wc -l < "$mcore_dir/visited.txt")
-                        echo "- Instructions visited: $visited_count" >> $GITHUB_STEP_SUMMARY
-                      fi
-                      
-                      # List other files (up to 10 for brevity)
-                      echo "- Files generated:" >> $GITHUB_STEP_SUMMARY
-                      ls -1 "$mcore_dir" | head -10 | sed 's/^/  - /' >> $GITHUB_STEP_SUMMARY
-                    fi
-                    
-                    echo "" >> $GITHUB_STEP_SUMMARY
-                  fi
-                done
-              else
-                echo "⚠️ **No Manticore output directories found.** The analysis may have failed silently." >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "Check the 'Manticore Symbolic Execution' job logs for details." >> $GITHUB_STEP_SUMMARY
-                echo "" >> $GITHUB_STEP_SUMMARY
-              fi
-            fi
-          else
-            echo "⚠️ **Manticore results artifact not found.** The job may have failed completely." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
           echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Gas Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Coverage Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Slither Analysis: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Manticore Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** Medusa fuzz testing runs in the Weekly Torture Test workflow." >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Manticore symbolic execution and Medusa fuzz testing run in the Weekly Torture Test workflow." >> $GITHUB_STEP_SUMMARY
