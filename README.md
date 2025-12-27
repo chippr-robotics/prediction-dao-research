@@ -30,7 +30,7 @@ The documentation site provides comprehensive guides for both platforms:
 
 ## Platform Overview
 
-### 🎯 FairWins — Prediction Markets for Everyone (Primary Platform)
+### 🎯 FairWins — Prediction Markets for Friends (Primary Platform)
 
 FairWins is the main prediction market platform where:
 - **Anyone can create markets** on any topic with custom parameters
@@ -67,6 +67,34 @@ ClearPath is an optional add-on feature within FairWins for DAO governance, offe
 - Protocol upgrades and parameter changes
 - Grant allocation and funding decisions
 - Enterprise-friendly traditional voting
+
+### 🪙 TokenMint — Enterprise Token Management (Add-on Feature)
+
+TokenMint is an optional add-on feature for creating and managing custom tokens:
+- **Token creation** with configurable parameters
+- **Vesting schedules** for controlled distribution
+- **Access control** and role-based permissions
+- **Integration** with FairWins markets and ClearPath governance
+
+**Use Cases:**
+- DAO token issuance
+- Reward token creation
+- Governance token management
+- Community token distribution
+
+### 🌊 Spindletop — Liquidity Pool Management (Add-on Feature)
+
+Spindletop is an optional add-on feature for managing liquidity pools:
+- **Automated market making** for token pairs
+- **Liquidity provisioning** with dynamic fees
+- **Pool analytics** and performance tracking
+- **Integration** with FairWins prediction markets
+
+**Use Cases:**
+- Market liquidity provision
+- Token pair trading
+- Yield generation
+- Decentralized exchange functionality
 
 ## Shared Infrastructure
 

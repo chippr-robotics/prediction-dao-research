@@ -8,19 +8,7 @@ function LandingPage() {
   const navigate = useNavigate()
   const { isConnected } = useWeb3()
   const { connectWallet } = useWallet()
-  const [isClearPathMember, setIsClearPathMember] = useState(false)
-  const [logoErrors, setLogoErrors] = useState({ fairwins: false, clearpath: false })
-
-  const handleConnectForClearPath = async () => {
-    const success = await connectWallet()
-    if (success) {
-      // In the future, this will check the ClearPath DAO contract for membership
-      // For now, we use the toggle state
-      if (isClearPathMember) {
-        navigate('/clearpath')
-      }
-    }
-  }
+  const [logoErrors, setLogoErrors] = useState({ fairwins: false })
 
   const handleBrowseMarkets = () => {
     navigate('/fairwins')
@@ -30,172 +18,72 @@ function LandingPage() {
     setLogoErrors(prev => ({ ...prev, [platform]: true }))
   }
 
-  const showClearPathBranding = isConnected && isClearPathMember
   const isDevelopment = import.meta.env.DEV
 
   return (
     <div className="landing-page">
       {/* Sticky Header */}
-      <Header showClearPathBranding={showClearPathBranding} hideWalletButton={true} />
-
-      {/* Temporary ClearPath Membership Toggle (for development) */}
-      {isDevelopment && isConnected && (
-        <div className="dev-toggle-banner">
-          <label className="toggle-label">
-            <input 
-              type="checkbox" 
-              checked={isClearPathMember}
-              onChange={(e) => setIsClearPathMember(e.target.checked)}
-              className="toggle-checkbox"
-            />
-            <span className="toggle-text">
-              ClearPath Member (Dev Toggle)
-            </span>
-          </label>
-        </div>
-      )}
+      <Header hideWalletButton={true} />
 
       {/* Hero Split Section - 66% Left / 33% Right */}
       <section className="hero-split-section" id="hero">
         <div className="hero-container">
-          {/* Left Column (66%) - Platform Cards */}
+          {/* Left Column (66%) - FairWins Hero */}
           <div className="hero-left">
-            {!showClearPathBranding && (
-              <>
-                {/* Platform Cards */}
-                <div className="platforms-compact">
-                  <h2 className="section-title-compact">Two Complementary Platforms</h2>
-                  <div className="platform-cards-compact">
-                    {/* FairWins Card */}
-                    <div className="platform-card-compact fairwins">
-                      <div className="platform-card-header-compact">
-                     {!logoErrors.fairwins ? (
-                        <img 
-                          src="/logo_fairwins.svg" 
-                          alt="FairWins" 
-                          className="platform-logo-compact"
-                          width="48"
-                          height="48"
-                          onError={() => handleLogoError('fairwins')}
-                        />
-                      ) : (
-                        <div className="platform-logo-fallback" aria-label="FairWins">FW</div>
-                      )}
-                        <div>
-                          <h3>FairWins</h3>
-                          <p className="platform-tagline-compact">Prediction Markets for Friends</p>
-                        </div>
-                      </div>
-                      <p className="platform-description-compact">
-                        Create and trade on prediction markets about any topic. Open to everyone.
-                      </p>
-                      <ul className="platform-features-compact">
-                        <li>✓ No wallet required to browse</li>
-                        <li>✓ Open to all participants</li>
-                        <li>✓ Flexible market creation</li>
-                      </ul>
-                    </div>
-
-                    {/* ClearPath Card */}
-                    <div className="platform-card-compact clearpath">
-                      <div className="platform-card-header-compact">
-                        {!logoErrors.clearpath ? (
-                          <img 
-                            src="/logo_clearpath.svg" 
-                            alt="ClearPath" 
-                            className="platform-logo-compact"
-                            width="48"
-                            height="48"
-                            onError={() => handleLogoError('clearpath')}
-                          />
-                        ) : (
-                          <div className="platform-logo-fallback" aria-label="ClearPath">CP</div>
-                        )}
-                        <div>
-                          <h3>ClearPath</h3>
-                          <p className="platform-tagline-compact">DAO Governance Platform</p>
-                        </div>
-                      </div>
-                      <p className="platform-description-compact">
-                        Institutional-grade governance through futarchy for data-driven decisions.
-                      </p>
-                      <ul className="platform-features-compact">
-                        <li>✓ Member-only governance</li>
-                        <li>✓ Treasury management</li>
-                        <li>✓ Shielded transactions</li>
-                      </ul>
+            {/* FairWins Hero Content */}
+            <div className="platforms-compact">
+              <h2 className="section-title-compact">Prediction Markets for Friends</h2>
+              <div className="platform-cards-compact">
+                {/* FairWins Main Card */}
+                <div className="platform-card-compact fairwins">
+                  <div className="platform-card-header-compact">
+                 {!logoErrors.fairwins ? (
+                    <img 
+                      src="/logo_fairwins.svg" 
+                      alt="FairWins" 
+                      className="platform-logo-compact"
+                      width="48"
+                      height="48"
+                      onError={() => handleLogoError('fairwins')}
+                    />
+                  ) : (
+                    <div className="platform-logo-fallback" aria-label="FairWins">FW</div>
+                  )}
+                    <div>
+                      <h3>FairWins</h3>
+                      <p className="platform-tagline-compact">Create, Trade, and Win</p>
                     </div>
                   </div>
+                  <p className="platform-description-compact">
+                    Create and trade on prediction markets about any topic. Open to everyone.
+                  </p>
+                  <ul className="platform-features-compact">
+                    <li>✓ No wallet required to browse</li>
+                    <li>✓ Open to all participants</li>
+                    <li>✓ Flexible market creation</li>
+                    <li>✓ Transparent resolution</li>
+                  </ul>
                 </div>
-              </>
-            )}
-            
-            {showClearPathBranding && (
-              <div className="clearpath-welcome">
-                <h1>Welcome Back to ClearPath</h1>
-                <p>Access your DAO governance dashboard and participate in futarchy-based decision-making.</p>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Right Column (33%) - CTA Sidebar */}
           <div className="hero-right">
             <div className="cta-sidebar">
-              {!isConnected ? (
-                <>
-                  <button 
-                    onClick={handleConnectForClearPath} 
-                    className="cta-button-sidebar primary"
-                  >
-                    <span className="button-icon" aria-hidden="true">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                      </svg>
-                    </span>
-                    Connect Wallet for ClearPath
-                  </button>
-                  <button 
-                    onClick={handleBrowseMarkets} 
-                    className="cta-button-sidebar secondary"
-                  >
-                    <span className="button-icon" aria-hidden="true">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <line x1="3" y1="9" x2="21" y2="9" />
-                        <line x1="9" y1="21" x2="9" y2="9" />
-                      </svg>
-                    </span>
-                    Explore FairWins Markets
-                  </button>
-                </>
-              ) : showClearPathBranding ? (
-                <button 
-                  onClick={() => navigate('/clearpath')} 
-                  className="cta-button-sidebar primary"
-                >
-                  Enter ClearPath Dashboard
-                </button>
-              ) : (
-                <>
-                  <button 
-                    onClick={handleBrowseMarkets} 
-                    className="cta-button-sidebar primary"
-                  >
-                    <span className="button-icon" aria-hidden="true">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <line x1="3" y1="9" x2="21" y2="9" />
-                        <line x1="9" y1="21" x2="9" y2="9" />
-                      </svg>
-                    </span>
-                    Explore FairWins Markets
-                  </button>
-                  <p className="membership-note-sidebar">
-                    ClearPath membership required for governance access
-                  </p>
-                </>
-              )}
+              <button 
+                onClick={handleBrowseMarkets} 
+                className="cta-button-sidebar primary"
+              >
+                <span className="button-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="9" y1="21" x2="9" y2="9" />
+                  </svg>
+                </span>
+                Explore Markets
+              </button>
               
               {/* Social Media Placeholders */}
               <div className="social-links">
@@ -221,76 +109,74 @@ function LandingPage() {
       </section>
 
       {/* Enterprise-Grade Governance - Full Width Section */}
-      {!showClearPathBranding && (
-        <section className="enterprise-full-width" id="features">
-          <div className="container">
-            <h2 className="section-title">Enterprise-Grade Governance</h2>
-            <div className="features-grid">
-              <div className="feature-card">
-                <div className="feature-icon" aria-hidden="true">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </div>
-                <h3>Conditional Privacy</h3>
-                <p>ClearPath uses shielded transactions; FairWins is transparent</p>
+      <section className="enterprise-full-width" id="features">
+        <div className="container">
+          <h2 className="section-title">Enterprise-Grade Governance</h2>
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
               </div>
-              <div className="feature-card">
-                <div className="feature-icon" aria-hidden="true">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg>
-                </div>
-                <h3>Anti-Collusion</h3>
-                <p>MACI-style key-change mechanisms</p>
+              <h3>Conditional Privacy</h3>
+              <p>ClearPath uses shielded transactions; FairWins is transparent</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
               </div>
-              <div className="feature-card">
-                <div className="feature-icon" aria-hidden="true">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="12" y1="20" x2="12" y2="10" />
-                    <line x1="18" y1="20" x2="18" y2="4" />
-                    <line x1="6" y1="20" x2="6" y2="16" />
-                  </svg>
-                </div>
-                <h3>Market Mechanics</h3>
-                <p>Automated liquidity with bounded losses</p>
+              <h3>Anti-Collusion</h3>
+              <p>MACI-style key-change mechanisms</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="20" x2="12" y2="10" />
+                  <line x1="18" y1="20" x2="18" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="16" />
+                </svg>
               </div>
-              <div className="feature-card">
-                <div className="feature-icon" aria-hidden="true">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <h3>Minority Protection</h3>
-                <p>Ragequit functionality for stakeholders</p>
+              <h3>Market Mechanics</h3>
+              <p>Automated liquidity with bounded losses</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
               </div>
-              <div className="feature-card">
-                <div className="feature-icon" aria-hidden="true">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </div>
-                <h3>Multi-Stage Oracle</h3>
-                <p>Challenge period with dispute resolution</p>
+              <h3>Minority Protection</h3>
+              <p>Ragequit functionality for stakeholders</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
               </div>
-              <div className="feature-card">
-                <div className="feature-icon" aria-hidden="true">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                </div>
-                <h3>Timelock Security</h3>
-                <p>Delay periods and spending limits</p>
+              <h3>Multi-Stage Oracle</h3>
+              <p>Challenge period with dispute resolution</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
               </div>
+              <h3>Timelock Security</h3>
+              <p>Delay periods and spending limits</p>
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* How It Works Section */}
       <section className="how-it-works-section" id="how-it-works">
