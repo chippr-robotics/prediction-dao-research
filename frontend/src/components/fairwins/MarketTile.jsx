@@ -67,7 +67,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
 
       {market.correlationGroupId && (
         <div className="correlation-badge" title={market.correlationGroupName}>
-          <span className="correlation-icon" aria-hidden="true">🔗</span>
           <span className="correlation-text">{market.correlationGroupName}</span>
         </div>
       )}
