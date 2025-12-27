@@ -583,6 +583,20 @@ Before mainnet deployment:
 4. 30-day community review period
 5. Formal verification of critical invariants
 
+## Release Management
+
+This project uses automated release management to maintain clear documentation of changes:
+
+- **Automated Release Notes**: GitHub Actions automatically drafts release notes from merged PRs
+- **Semantic Versioning**: Follows [SemVer](https://semver.org/) for version numbering
+- **Release Process**: See [RELEASE_PROCESS.md](./RELEASE_PROCESS.md) for complete workflow
+- **Changelog**: View releases at [GitHub Releases](https://github.com/chippr-robotics/prediction-dao-research/releases)
+
+For detailed information:
+- **Release workflow**: [RELEASE_PROCESS.md](./RELEASE_PROCESS.md)
+- **CI/CD pipelines**: [CI_CD_PIPELINE.md](./CI_CD_PIPELINE.md)
+- **Solution analysis**: [RELEASE_WORKFLOW_ANALYSIS.md](./RELEASE_WORKFLOW_ANALYSIS.md)
+
 ## References
 
 - [Futarchy Specification](https://gist.github.com/realcodywburns/8c89419db5c7797b678afe5ee66cc02b)
@@ -601,7 +615,10 @@ Contributions welcome! Please:
 1. Fork the repository
 2. Create a feature branch
 3. Add tests for new functionality
-4. Submit a pull request
+4. Label your PRs appropriately (see [RELEASE_PROCESS.md](./RELEASE_PROCESS.md))
+5. Submit a pull request
+
+**Note**: PR labels help generate release notes automatically. Use labels like `feature`, `fix`, `documentation`, etc.
 
 ## Security
 

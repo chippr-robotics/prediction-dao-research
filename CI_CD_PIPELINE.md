@@ -1,11 +1,34 @@
 # CI/CD Pipeline Documentation
 
 ## Overview
-This repository includes comprehensive CI/CD pipelines for automated testing, accessibility auditing, and deployment to Google Cloud Run.
+This repository includes comprehensive CI/CD pipelines for automated testing, accessibility auditing, release management, and deployment to Google Cloud Run.
 
 ## Pipeline Structure
 
-### 1. Frontend Testing and Accessibility Audits
+### 1. Release Management
+**File**: `.github/workflows/release-drafter.yml`
+
+Runs on:
+- Pull requests (opened, reopened, synchronize)
+- Pushes to `main` branch
+
+**Purpose**: Automatically drafts release notes based on merged pull requests.
+
+**Jobs**:
+
+#### Update Release Draft
+- Parses merged PRs and their labels
+- Categorizes changes (Features, Bug Fixes, Documentation, etc.)
+- Suggests version bump based on labels
+- Generates draft release with formatted notes
+- Auto-labels PRs based on files changed and branch names
+- Acknowledges contributors
+
+**Configuration**: `.github/release-drafter.yml`
+
+**Documentation**: See [RELEASE_PROCESS.md](./RELEASE_PROCESS.md) for complete release workflow.
+
+### 2. Frontend Testing and Accessibility Audits
 **File**: `.github/workflows/frontend-testing.yml`
 
 Runs on:
@@ -32,7 +55,7 @@ Runs on:
 - Validates WCAG 2.1 AA compliance
 - **Requirement**: Zero WCAG AA violations
 
-### 2. Cloud Run Deployment
+### 3. Cloud Run Deployment
 **File**: `.github/workflows/deploy-cloud-run.yml`
 
 Runs on:
@@ -63,6 +86,25 @@ Runs on:
 ---
 
 ## Setup Instructions
+
+### Release Management Setup
+
+1. **Release Drafter Configuration**
+   - Configuration file: `.github/release-drafter.yml`
+   - Workflow file: `.github/workflows/release-drafter.yml`
+   - No additional secrets required (uses `GITHUB_TOKEN`)
+
+2. **PR Labeling Guidelines**
+   - Add appropriate labels to PRs (feature, fix, documentation, etc.)
+   - Labels determine version bump and categorization
+   - Auto-labeling configured based on file paths and branch names
+   - See [RELEASE_PROCESS.md](./RELEASE_PROCESS.md) for label guide
+
+3. **Creating Releases**
+   - Merge PRs to `main` with proper labels
+   - Review draft release at: `https://github.com/chippr-robotics/prediction-dao-research/releases`
+   - Edit and publish when ready
+   - See [RELEASE_PROCESS.md](./RELEASE_PROCESS.md) for complete workflow
 
 ### Prerequisites
 
