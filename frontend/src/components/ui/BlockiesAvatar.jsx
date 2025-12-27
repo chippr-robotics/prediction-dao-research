@@ -30,7 +30,7 @@ function BlockiesAvatar({ address, size = 40, className = '', alt }) {
         role="img"
         aria-label="Default wallet avatar"
       >
-        👤
+        👛
       </div>
     )
   }

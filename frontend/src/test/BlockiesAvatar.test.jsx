@@ -19,7 +19,7 @@ describe('BlockiesAvatar', () => {
     
     const fallback = screen.getByRole('img', { name: /default wallet avatar/i })
     expect(fallback).toBeInTheDocument()
-    expect(fallback).toHaveTextContent('👤')
+    expect(fallback).toHaveTextContent('👛')
   })
 
   it('applies custom size', () => {
