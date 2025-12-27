@@ -41,6 +41,13 @@
   color: white;
 }
 
+/* Carousel Wrapper - Contains and hides overflow */
+.carousel-wrapper {
+  overflow: hidden;
+  width: 100%;
+  position: relative;
+}
+
 /* Carousel Container */
 .carousel-container {
   display: flex;

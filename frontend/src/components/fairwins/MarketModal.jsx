@@ -243,6 +243,8 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             <div className={`indicator ${currentPanel === 2 ? 'active' : ''}`} onClick={() => setCurrentPanel(2)} />
           </div>
 
+          {/* Carousel Wrapper */}
+          <div className="carousel-wrapper">
           {/* Carousel Container */}
           <div 
             ref={carouselRef}
@@ -468,6 +470,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                 />
               </div>
             </div>
+          </div>
           </div>
         </div>
       </div>
