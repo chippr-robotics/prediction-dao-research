@@ -71,7 +71,7 @@ function UserManagementModal({ onScanMarket }) {
       {isConnected && (
         <div className="modal-header-section">
           <div className="wallet-info-header">
-            <span className="wallet-address-display">{shortenAddress(account)}</span>
+            <span className="wallet-address-display">{shortenAddress(address)}</span>
             <span className={`status-dot ${isConnected ? 'connected' : ''}`} aria-hidden="true"></span>
           </div>
         </div>
