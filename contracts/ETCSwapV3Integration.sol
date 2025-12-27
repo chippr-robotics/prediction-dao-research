@@ -500,6 +500,9 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
 
         // Simplified estimation based on current price
+        // Note: sqrtPriceX96 is in Q64.96 format, so we need to square it and divide by 2^96
+        // to get the actual price. This appears as divide-before-multiply to static analyzers
+        // but is the correct implementation for Uniswap v3's fixed-point arithmetic.
         uint256 priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) / (1 << 96);
         estimatedCollateralAmount = (tokenAmount * priceX96) / (1 << 96);
     }
