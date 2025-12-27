@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWeb3 } from '../hooks/useWeb3'
+import { useWallet } from '../hooks/useWalletManagement'
 import { ETCSWAP_ADDRESSES, TOKENS, FEE_TIERS, DEFAULT_SLIPPAGE } from '../constants/etcswap'
 import { ERC20_ABI } from '../abis/ERC20'
 import { WETC_ABI } from '../abis/WETC'
@@ -10,7 +10,8 @@ import { QUOTER_V2_ABI } from '../abis/QuoterV2'
 export const ETCswapContext = createContext(null)
 
 export function ETCswapProvider({ children }) {
-  const { provider, signer, account, isConnected } = useWeb3()
+  // Use unified wallet management
+  const { provider, signer, address, isConnected } = useWallet()
   
   // Balances
   const [balances, setBalances] = useState({
@@ -43,19 +44,19 @@ export function ETCswapProvider({ children }) {
   
   // Fetch balances
   const fetchBalances = useCallback(async () => {
-    if (!provider || !account || !contracts) return
+    if (!provider || !address || !contracts) return
     
     try {
       setLoading(true)
       
       // Get native ETC balance
-      const etcBalance = await provider.getBalance(account)
+      const etcBalance = await provider.getBalance(address)
       
       // Get WETC balance
-      const wetcBalance = await contracts.wetc.balanceOf(account)
+      const wetcBalance = await contracts.wetc.balanceOf(address)
       
       // Get USC balance
-      const uscBalance = await contracts.usc.balanceOf(account)
+      const uscBalance = await contracts.usc.balanceOf(address)
       
       const newBalances = {
         etc: ethers.formatEther(etcBalance),
@@ -79,7 +80,7 @@ export function ETCswapProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [provider, account, contracts])
+  }, [provider, address, contracts])
   
   // Fetch balances on connect and periodically
   useEffect(() => {
@@ -168,7 +169,7 @@ export function ETCswapProvider({ children }) {
   
   // Perform swap
   const swap = useCallback(async (tokenIn, tokenOut, amountIn) => {
-    if (!signer || !contracts || !account) {
+    if (!signer || !contracts || !address) {
       throw new Error('Wallet not connected')
     }
     
@@ -186,7 +187,7 @@ export function ETCswapProvider({ children }) {
       
       // Approve token if needed
       const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, signer)
-      const allowance = await tokenInContract.allowance(account, ETCSWAP_ADDRESSES.SWAP_ROUTER_02)
+      const allowance = await tokenInContract.allowance(address, ETCSWAP_ADDRESSES.SWAP_ROUTER_02)
       
       if (allowance < amountInWei) {
         const approveTx = await tokenInContract.approve(
@@ -202,7 +203,7 @@ export function ETCswapProvider({ children }) {
         tokenIn,
         tokenOut,
         fee: FEE_TIERS.MEDIUM,
-        recipient: account,
+        recipient: address,
         amountIn: amountInWei,
         amountOutMinimum: minAmountOutWei,
         sqrtPriceLimitX96: 0
@@ -219,7 +220,7 @@ export function ETCswapProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, account, slippage, getQuote, fetchBalances])
+  }, [signer, contracts, address, slippage, getQuote, fetchBalances])
   
   const value = {
     // State

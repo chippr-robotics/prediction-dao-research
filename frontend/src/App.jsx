@@ -9,7 +9,7 @@ import StateManagementDemo from './components/StateManagementDemo'
 import RoleManagementAdmin from './components/RoleManagementAdmin'
 import RolePurchaseScreen from './components/RolePurchaseScreen'
 import { ComponentExamples } from './components/ui'
-import { useWeb3, useWallet, useNetwork } from './hooks/useWeb3'
+import { useWallet, useWalletConnection, useWalletNetwork } from './hooks'
 import { useAnnouncement, useNotification } from './hooks/useUI'
 import { useTheme } from './hooks/useTheme'
 import { useEffect } from 'react'
@@ -20,9 +20,9 @@ import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
 
 function AppContent() {
-  const { isConnected } = useWeb3()
-  const { connectWallet, disconnectWallet } = useWallet()
-  const { networkError, switchNetwork } = useNetwork()
+  const { isConnected } = useWallet()
+  const { connectWallet, disconnectWallet } = useWalletConnection()
+  const { networkError, switchNetwork } = useWalletNetwork()
   const { announce } = useAnnouncement()
   const { showNotification } = useNotification()
   const { setThemePlatform } = useTheme()

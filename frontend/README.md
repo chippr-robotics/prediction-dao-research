@@ -2,6 +2,30 @@
 
 A unified React application serving two distinct platforms: **ClearPath** (DAO Governance) and **FairWins** (Open Prediction Markets). Both applications share core infrastructure while providing specialized user experiences.
 
+## 🔗 Unified Wallet Management
+
+This application features a comprehensive, site-wide wallet management system that provides a single, cohesive interface for all wallet operations. See [WALLET_MANAGEMENT.md](./WALLET_MANAGEMENT.md) for complete documentation.
+
+**Key Features:**
+- Single source of truth for wallet state across the entire app
+- Integrated RVAC (Role-Based Access Control) tied to wallet address
+- Transaction helpers for signing and sending
+- Balance tracking and caching (ETC, WETC, tokens)
+- Network validation and switching
+- Specialized hooks for different use cases
+
+**Quick Start:**
+```jsx
+import { useWallet, useWalletRoles } from './hooks'
+
+function MyComponent() {
+  const { address, isConnected, balances, sendTransaction } = useWallet()
+  const { hasRole, grantRole } = useWalletRoles()
+  
+  // Use wallet functionality...
+}
+```
+
 ## Architecture Overview
 
 This frontend implements a **dual-application architecture** with shared components and infrastructure:

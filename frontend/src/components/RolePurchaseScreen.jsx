@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
-import { useRoles } from '../hooks/useRoles'
-import { useWeb3 } from '../hooks/useWeb3'
+import { useWallet, useWalletRoles } from '../hooks'
 import { useNotification } from '../hooks/useUI'
 import { recordRolePurchase } from '../utils/roleStorage'
+import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import './RolePurchaseScreen.css'
 
 // Payment configuration
@@ -12,9 +12,9 @@ const PAYMENT_TOKEN = 'ETC' // ETC for payments
 // Individual role prices in ETC - Bronze tier (entry level from RBAC_SMART_CONTRACTS.md)
 // Higher tiers (Silver, Gold, Platinum) available with increased limits
 const ROLE_PRICES = {
-  MARKET_MAKER: 100,      // Bronze: 100 ETC (Silver: 150, Gold: 250, Platinum: 500)
-  CLEARPATH_USER: 250,    // Bronze: 250 ETC (Silver: 200, Gold: 350, Platinum: 750)  
-  TOKENMINT: 150,         // Bronze: 150 ETC (Silver: 200, Gold: 350, Platinum: 600)
+  [ROLES.MARKET_MAKER]: 100,      // Bronze: 100 ETC (Silver: 150, Gold: 250, Platinum: 500)
+  [ROLES.CLEARPATH_USER]: 250,    // Bronze: 250 ETC (Silver: 200, Gold: 350, Platinum: 750)  
+  [ROLES.TOKENMINT]: 150,         // Bronze: 150 ETC (Silver: 200, Gold: 350, Platinum: 600)
 }
 
 // Bundle discount percentage
@@ -22,8 +22,9 @@ const BUNDLE_DISCOUNT_TWO = 0.15 // 15% discount for 2 roles
 const BUNDLE_DISCOUNT_ALL = 0.25 // 25% discount for all 3 roles
 
 function RolePurchaseScreen() {
-  const { ROLES, ROLE_INFO, grantRole, hasRole } = useRoles()
-  const { account, isConnected } = useWeb3()
+  // Use unified wallet management
+  const { address, isConnected } = useWallet()
+  const { hasRole, grantRole } = useWalletRoles()
   const { showNotification } = useNotification()
   
   const [selectedProducts, setSelectedProducts] = useState(new Set())
@@ -40,7 +41,7 @@ function RolePurchaseScreen() {
         price: ROLE_PRICES[roleKey],
         owned: hasRole(roleKey)
       }))
-  }, [hasRole, ROLE_INFO])
+  }, [hasRole])
 
   // Calculate bundle options
   const bundleOptions = useMemo(() => {
@@ -85,7 +86,7 @@ function RolePurchaseScreen() {
     })
 
     return bundles
-  }, [availableRoles, ROLE_INFO])
+  }, [availableRoles])
 
   // Calculate total price
   const calculateTotal = useMemo(() => {
@@ -139,7 +140,7 @@ function RolePurchaseScreen() {
   }
 
   const handlePurchase = async () => {
-    if (!isConnected || !account) {
+    if (!isConnected || !address) {
       showNotification('Please connect your wallet first', 'error')
       return
     }
@@ -169,7 +170,7 @@ function RolePurchaseScreen() {
       const { total } = calculateTotal
       
       // Mock transaction - in production, use ethers/wagmi to send transaction
-      await simulatePaymentTransaction(account, total)
+      await simulatePaymentTransaction(address, total)
 
       // Grant roles
       for (const role of rolesToGrant) {
@@ -188,7 +189,7 @@ function RolePurchaseScreen() {
       }
 
       for (const role of rolesToGrant) {
-        recordRolePurchase(account, role, {
+        recordRolePurchase(address, role, {
           price: ROLE_PRICES[role],
           currency: PAYMENT_TOKEN,
           txHash: txHash,

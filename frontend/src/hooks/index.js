@@ -1,11 +1,21 @@
-// Web3 hooks
+// Web3 hooks (legacy)
 export { 
   useWeb3, 
   useAccount, 
   useNetwork, 
-  useEthers, 
-  useWallet 
+  useEthers 
 } from './useWeb3'
+
+// Unified Wallet Management hooks (primary)
+export {
+  useWallet,
+  useWalletAddress,
+  useWalletBalances,
+  useWalletTransactions,
+  useWalletRoles,
+  useWalletNetwork,
+  useWalletConnection
+} from './useWalletManagement'
 
 // ETCswap hooks
 export { useETCswap } from './useETCswap'

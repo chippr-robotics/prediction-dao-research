@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useWeb3 } from '../hooks/useWeb3'
+import { useWallet } from '../hooks'
 import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import UserManagementModal from './ui/UserManagementModal'
@@ -9,7 +9,7 @@ import './Header.css'
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isConnected } = useWeb3()
+  const { isConnected } = useWallet()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
   const [isMenuOpen, setIsMenuOpen] = useState(false)

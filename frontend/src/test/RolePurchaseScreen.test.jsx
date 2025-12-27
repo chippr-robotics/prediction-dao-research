@@ -1,18 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import RolePurchaseScreen from '../components/RolePurchaseScreen'
-import { RoleProvider } from '../contexts/RoleContext'
-import { Web3Context } from '../contexts/Web3Context'
+import { WalletProvider } from '../contexts/WalletContext'
 import { UIContext } from '../contexts/UIContext'
 
 // Mock contexts
-const mockWeb3Context = {
-  account: '0x1234567890123456789012345678901234567890',
-  isConnected: true,
-  chainId: 1,
-  balance: '100',
-}
-
 const mockUIContext = {
   showNotification: vi.fn(),
   showModal: vi.fn(),
@@ -23,13 +15,11 @@ const mockUIContext = {
 
 function renderWithProviders(component) {
   return render(
-    <Web3Context.Provider value={mockWeb3Context}>
+    <WalletProvider>
       <UIContext.Provider value={mockUIContext}>
-        <RoleProvider>
-          {component}
-        </RoleProvider>
+        {component}
       </UIContext.Provider>
-    </Web3Context.Provider>
+    </WalletProvider>
   )
 }
 
@@ -86,17 +76,14 @@ describe('RolePurchaseScreen', () => {
   })
 
   it('displays connect wallet prompt when not connected', () => {
-    const disconnectedContext = { ...mockWeb3Context, isConnected: false, account: null }
+    // Mock wagmi hooks to return disconnected state for this test
+    const { useAccount } = await import('wagmi')
+    vi.mocked(useAccount).mockReturnValueOnce({
+      address: undefined,
+      isConnected: false
+    })
     
-    render(
-      <Web3Context.Provider value={disconnectedContext}>
-        <UIContext.Provider value={mockUIContext}>
-          <RoleProvider>
-            <RolePurchaseScreen />
-          </RoleProvider>
-        </UIContext.Provider>
-      </Web3Context.Provider>
-    )
+    renderWithProviders(<RolePurchaseScreen />)
     
     // Should still show the products but with a warning
     expect(screen.getByText('Unlock Premium Access')).toBeInTheDocument()

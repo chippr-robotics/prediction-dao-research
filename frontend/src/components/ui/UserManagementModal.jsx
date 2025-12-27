@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWeb3, useWallet } from '../../hooks/useWeb3'
+import { useWallet, useWalletConnection, useWalletRoles } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
-import { useRoles } from '../../hooks/useRoles'
+import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import RolePurchaseModal from './RolePurchaseModal'
 import './UserManagementModal.css'
 
 function UserManagementModal({ onScanMarket }) {
-  const { account, isConnected } = useWeb3()
-  const { connectWallet, disconnectWallet } = useWallet()
+  const { address, isConnected } = useWallet()
+  const { connectWallet, disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
-  const { roles, hasRole, ROLES, ROLE_INFO } = useRoles()
+  const { roles, hasRole } = useWalletRoles()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
@@ -71,7 +71,7 @@ function UserManagementModal({ onScanMarket }) {
       {isConnected && (
         <div className="modal-header-section">
           <div className="wallet-info-header">
-            <span className="wallet-address-display">{shortenAddress(account)}</span>
+            <span className="wallet-address-display">{shortenAddress(address)}</span>
             <span className={`status-dot ${isConnected ? 'connected' : ''}`} aria-hidden="true"></span>
           </div>
         </div>
@@ -138,7 +138,7 @@ function UserManagementModal({ onScanMarket }) {
                   <div className="wallet-details">
                     <div className="detail-row">
                       <span className="label">Address:</span>
-                      <span className="value">{account}</span>
+                      <span className="value">{address}</span>
                     </div>
                     <button 
                       onClick={handleDisconnect}
