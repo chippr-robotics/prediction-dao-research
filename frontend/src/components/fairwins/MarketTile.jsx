@@ -76,19 +76,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
       <p className="tile-secondary">
         {formatTimeRemaining(market.tradingEndTime)} remaining
       </p>
-
-      {!compact && (
-        <button 
-          className="tile-action-btn"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleClick()
-          }}
-          aria-label={`Trade on ${market.proposalTitle}`}
-        >
-          View Market
-        </button>
-      )}
     </div>
   )
 }

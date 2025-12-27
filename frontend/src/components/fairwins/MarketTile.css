@@ -196,31 +196,6 @@
   transition: width 0.3s ease;
 }
 
-
-
-.tile-action-btn {
-  width: 100%;
-  padding: 0.75rem;
-  background: linear-gradient(135deg, var(--brand-primary), var(--primary-button-hover));
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  margin-top: 0.5rem;
-}
-
-.tile-action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
-
-.tile-action-btn:active {
-  transform: translateY(0);
-}
-
 /* Compact mode for horizontal scrolling */
 .market-tile.compact {
   padding: 0.875rem;
