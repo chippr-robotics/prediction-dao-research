@@ -60,11 +60,9 @@ IERC20(fundingToken).safeTransfer(recipient, fundingAmount);
 
 **Files Modified:**
 - `contracts/ConditionalMarketFactory.sol`
-  - Line 469: `transferFrom` → `safeTransferFrom`
-  - Line 494: `transfer` → `safeTransfer`
-  - Line 511: `transfer` → `safeTransfer`
-  - Line 558: `transferFrom` → `safeTransferFrom`
-  - Line 597: `transfer` → `safeTransfer`
+  - Multiple locations: `transferFrom` → `safeTransferFrom`
+  - Multiple locations: `transfer` → `safeTransfer`
+  - Specific changes at lines 472, 497, 514, 561, and 600 in the modified code
 
 - `contracts/RagequitModule.sol`
   - Line 163: Already uses `safeTransferFrom` ✓
@@ -183,9 +181,10 @@ All tests pass after fixes:
 ## Summary
 
 ### Issues Fixed ✅
-- **5/5 HIGH severity issues** from original scope: FIXED or VALIDATED AS SAFE
-- **3/3 MEDIUM reentrancy issues**: FIXED with CEI pattern
-- **5 unchecked-transfer issues**: FIXED with SafeERC20
+- **5/5 HIGH severity issues from original scope**: FIXED or VALIDATED AS SAFE
+  - Note: New Slither run found additional issues in other contracts (MembershipPaymentManager) that were NOT in the original scope
+- **3/3 MEDIUM reentrancy issues from original scope**: FIXED with CEI pattern
+- **5 unchecked-transfer issues from original scope**: FIXED with SafeERC20
 
 ### False Positives Documented ⚠️
 - **uninitialized-state**: Mappings auto-initialize in Solidity
@@ -209,10 +208,14 @@ All tests pass after fixes:
 
 ## Conclusion
 
-All security vulnerabilities identified in the original Slither report have been successfully addressed. The codebase now follows best practices for:
+All security vulnerabilities identified in the **original Slither report** (slither-output.txt) within our scope have been successfully addressed. The codebase now follows best practices for:
 - ✅ Safe ERC20 token transfers
 - ✅ Reentrancy protection using CEI pattern
 - ✅ Proper variable initialization
 - ✅ Clear documentation of complex operations
 
-The remaining Slither warnings are false positives related to idiomatic Solidity patterns and correct implementations of external protocols (Uniswap v3).
+The remaining Slither warnings are either:
+1. False positives related to idiomatic Solidity patterns and correct implementations of external protocols (Uniswap v3)
+2. Issues in contracts outside the original scope (e.g., MembershipPaymentManager, RoleManager, etc.)
+
+**Note:** A fresh Slither run may identify additional issues in other contracts that were not part of the original reported findings. This PR specifically addresses the issues mentioned in the problem statement.
