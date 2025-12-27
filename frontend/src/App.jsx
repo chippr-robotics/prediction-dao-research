@@ -35,7 +35,8 @@ function AppContent() {
   useEffect(() => {
     if (location.pathname.includes('/clearpath')) {
       setThemePlatform('clearpath')
-    } else if (location.pathname.includes('/fairwins')) {
+    } else {
+      // All other routes use FairWins theme (this is fairwins.app)
       setThemePlatform('fairwins')
     }
   }, [location.pathname, setThemePlatform])
