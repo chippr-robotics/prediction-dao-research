@@ -57,7 +57,7 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
         <div className="header-logo" onClick={() => navigate('/')}>
           {!logoError ? (
             <img 
-              src={showClearPathBranding ? "/logo_clearpath.svg" : "/logo_fairwins.svg"} 
+              src={showClearPathBranding ? "/logo_clearpath.svg" : "/fairwins_no-text_logo.svg"} 
               alt={showClearPathBranding ? "ClearPath" : "FairWins"} 
               className="header-logo-image"
               width="48"
