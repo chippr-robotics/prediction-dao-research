@@ -310,4 +310,48 @@ describe("Integration: Traditional Voting Lifecycle", function () {
     const state = await traditionalGovernor.state(votingProposalId);
     expect(state).to.equal(3); // Succeeded
   });
+
+  it("Should defeat proposal when abstain helps reach quorum but Against > For", async function () {
+    const bondAmount = await proposalRegistry.bondAmount();
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
+    
+    await proposalRegistry.connect(proposer).submitProposal(
+      "Proposal with Abstain but More Against",
+      "Testing abstain with losing outcome",
+      ethers.parseEther("18"),
+      recipient.address,
+      0,
+      ethers.ZeroAddress,
+      0,
+      executionDeadline,
+      { value: bondAmount }
+    );
+    
+    await traditionalGovernor.connect(proposer).createVotingProposal(0);
+    const votingProposalId = 0;
+    
+    // voter1 votes Against (25%)
+    await traditionalGovernor.connect(voter1).castVote(votingProposalId, 0);
+    
+    // voter2 abstains (20%)
+    await traditionalGovernor.connect(voter2).castVote(votingProposalId, 2);
+    
+    // voter3 votes For (15%)
+    await traditionalGovernor.connect(voter3).castVote(votingProposalId, 1);
+    
+    // Verify votes
+    const proposal = await traditionalGovernor.votingProposals(votingProposalId);
+    expect(proposal.forVotes).to.equal(ethers.parseEther("150000"));
+    expect(proposal.againstVotes).to.equal(ethers.parseEther("250000"));
+    expect(proposal.abstainVotes).to.equal(ethers.parseEther("200000"));
+    
+    // Wait for voting to end
+    const votingPeriod = await traditionalGovernor.votingPeriod();
+    await mine(Number(votingPeriod) + 1);
+    
+    // Proposal should be defeated (quorum met with 60%, but Against > For)
+    const state = await traditionalGovernor.state(votingProposalId);
+    expect(state).to.equal(2); // Defeated
+  });
 });
