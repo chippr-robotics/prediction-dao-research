@@ -20,7 +20,9 @@ export default defineConfig({
         'node_modules/',
         'src/test/',
         '*.config.js',
-        'dist/'
+        'dist/',
+        'cypress/',
+        'cypress.config.js'
       ]
     }
   }
