@@ -11,6 +11,36 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    
+    <!-- Pre-hydration theme script to prevent FOUC -->
+    <script>
+      (function() {
+        try {
+          // Read theme preferences from localStorage
+          var savedMode = localStorage.getItem('themeMode');
+          var savedPlatform = localStorage.getItem('themePlatform');
+          
+          // Determine theme mode
+          var mode = savedMode || 'light';
+          
+          // Respect user's prefers-color-scheme if no saved preference
+          if (!savedMode && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            mode = 'dark';
+          }
+          
+          // Determine platform (default to fairwins)
+          var platform = savedPlatform || 'fairwins';
+          
+          // Apply theme classes immediately to prevent FOUC
+          document.documentElement.classList.add('theme-' + mode);
+          document.documentElement.classList.add('platform-' + platform);
+        } catch (e) {
+          // Fallback to light mode if localStorage is not available
+          document.documentElement.classList.add('theme-light');
+          document.documentElement.classList.add('platform-fairwins');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
