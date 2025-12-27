@@ -137,6 +137,7 @@ function TokenMintTab({ tokens, loading, onTokenClick, onCreateToken }) {
                         onClick={(e) => {
                           e.stopPropagation()
                           navigator.clipboard.writeText(token.tokenAddress)
+                            .catch(err => console.error('Failed to copy:', err))
                         }}
                         aria-label={`Copy address for ${token.name}`}
                       >
@@ -144,7 +145,9 @@ function TokenMintTab({ tokens, loading, onTokenClick, onCreateToken }) {
                       </button>
                     </td>
                     <td className="token-created">
-                      {new Date(token.createdAt * 1000).toLocaleDateString()}
+                      {token.createdAt 
+                        ? new Date(token.createdAt * 1000).toLocaleDateString()
+                        : 'Unknown'}
                     </td>
                     <td className="token-features">
                       <div className="feature-badges">

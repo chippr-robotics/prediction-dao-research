@@ -53,7 +53,8 @@ function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListO
               <div className="info-value address">
                 <code>{token.tokenAddress.slice(0, 10)}...{token.tokenAddress.slice(-8)}</code>
                 <button 
-                  onClick={() => navigator.clipboard.writeText(token.tokenAddress)}
+                  onClick={() => navigator.clipboard.writeText(token.tokenAddress)
+                    .catch(err => console.error('Failed to copy:', err))}
                   className="copy-btn"
                   aria-label="Copy address"
                 >
@@ -191,16 +192,30 @@ function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListO
                   </>
                 )}
 
-                {actionMode === 'burn' && token.tokenType === 0 && (
-                  <div className="form-group">
-                    <label>Amount to Burn</label>
-                    <input 
-                      type="number"
-                      placeholder="100"
-                      value={actionData.amount}
-                      onChange={(e) => setActionData({...actionData, amount: e.target.value})}
-                    />
-                  </div>
+                {actionMode === 'burn' && (
+                  <>
+                    {token.tokenType === 0 ? (
+                      <div className="form-group">
+                        <label>Amount to Burn</label>
+                        <input 
+                          type="number"
+                          placeholder="100"
+                          value={actionData.amount}
+                          onChange={(e) => setActionData({...actionData, amount: e.target.value})}
+                        />
+                      </div>
+                    ) : (
+                      <div className="form-group">
+                        <label>Token ID to Burn</label>
+                        <input 
+                          type="number"
+                          placeholder="1"
+                          value={actionData.amount}
+                          onChange={(e) => setActionData({...actionData, amount: e.target.value})}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {actionMode === 'transfer' && (
