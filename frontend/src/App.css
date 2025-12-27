@@ -470,7 +470,7 @@ select[aria-invalid="true"] {
 }
 
 .metrics-info {
-  background: rgba(var(--brand-primary-rgb, 47, 164, 169), 0.1);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
   padding: 1.5rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--brand-primary);
@@ -616,7 +616,7 @@ select[aria-invalid="true"] {
 
 .token-button.active {
   border-color: var(--brand-primary);
-  background: rgba(var(--brand-primary-rgb, 47, 164, 169), 0.2);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
   color: var(--brand-primary);
 }
 
@@ -626,7 +626,7 @@ select[aria-invalid="true"] {
 
 .privacy-notice {
   padding: 1rem;
-  background: rgba(var(--brand-secondary-rgb, 107, 207, 156), 0.1);
+  background: rgba(var(--brand-secondary-rgb, 76, 154, 255), 0.1);
   border: 1px solid var(--brand-secondary);
   border-radius: var(--radius-md);
   color: var(--brand-secondary);
