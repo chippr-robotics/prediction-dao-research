@@ -77,8 +77,8 @@
   padding: 12px 32px;
   font-size: 16px;
   font-weight: 600;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text, white);
+  background: var(--primary-button, #36B37E);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -91,7 +91,7 @@
 }
 
 .connect-wallet-btn-large:hover:not(:disabled) {
-  background: var(--color-primary-dark);
+  background: var(--primary-button-hover, #2F9E6E);
   transform: translateY(-1px);
 }
 
@@ -111,10 +111,11 @@
   gap: 10px;
   padding: 12px 16px;
   margin: 16px 0;
-  background: var(--color-error-bg, rgba(245, 101, 101, 0.1));
-  border: 1px solid var(--color-error, #f56565);
+  background: var(--semantic-loss, #E5533D);
+  background: rgba(229, 83, 61, 0.1);
+  border: 1px solid var(--semantic-loss, #E5533D);
   border-radius: 8px;
-  color: var(--color-error, #f56565);
+  color: var(--semantic-loss, #E5533D);
 }
 
 .connection-error .error-icon {
@@ -126,14 +127,15 @@
   font-size: 14px;
   line-height: 1.5;
   flex: 1;
+  color: var(--text-primary, #1F2933);
 }
 
 /* Wallet Help */
 .wallet-help {
   margin-top: 24px;
   padding: 16px;
-  background: var(--color-info-bg, rgba(66, 153, 225, 0.1));
-  border-left: 3px solid var(--color-info, #4299e1);
+  background: rgba(76, 154, 255, 0.1);
+  border-left: 3px solid var(--semantic-active, #4C9AFF);
   border-radius: 6px;
   text-align: left;
 }
@@ -141,7 +143,7 @@
 .wallet-help p {
   margin: 0 0 8px;
   font-size: 14px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary, #5A6772);
 }
 
 .install-metamask-link {
@@ -150,13 +152,13 @@
   gap: 4px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--primary-button, #36B37E);
   text-decoration: none;
   transition: all 0.2s ease;
 }
 
 .install-metamask-link:hover {
-  color: var(--color-primary-dark);
+  color: var(--primary-button-hover, #2F9E6E);
   text-decoration: underline;
 }
 
