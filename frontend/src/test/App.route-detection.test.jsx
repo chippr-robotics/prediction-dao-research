@@ -42,66 +42,52 @@ describe('App Route Detection', () => {
     )
   }
 
-  it('should set FairWins theme for root path /', async () => {
-    renderWithRoute('/')
-
+  const expectFairWinsTheme = async () => {
     await waitFor(() => {
       expect(document.documentElement.classList.contains('platform-fairwins')).toBe(true)
       expect(document.documentElement.classList.contains('platform-clearpath')).toBe(false)
     }, { timeout: 3000 })
-  })
+  }
 
-  it('should set FairWins theme for /app route', async () => {
-    renderWithRoute('/app')
-
-    await waitFor(() => {
-      expect(document.documentElement.classList.contains('platform-fairwins')).toBe(true)
-      expect(document.documentElement.classList.contains('platform-clearpath')).toBe(false)
-    }, { timeout: 3000 })
-  })
-
-  it('should set FairWins theme for /main route', async () => {
-    renderWithRoute('/main')
-
-    await waitFor(() => {
-      expect(document.documentElement.classList.contains('platform-fairwins')).toBe(true)
-      expect(document.documentElement.classList.contains('platform-clearpath')).toBe(false)
-    }, { timeout: 3000 })
-  })
-
-  it('should set FairWins theme for /fairwins route', async () => {
-    renderWithRoute('/fairwins')
-
-    await waitFor(() => {
-      expect(document.documentElement.classList.contains('platform-fairwins')).toBe(true)
-      expect(document.documentElement.classList.contains('platform-clearpath')).toBe(false)
-    }, { timeout: 3000 })
-  })
-
-  it('should set ClearPath theme for /clearpath route', async () => {
-    renderWithRoute('/clearpath')
-
+  const expectClearPathTheme = async () => {
     await waitFor(() => {
       expect(document.documentElement.classList.contains('platform-clearpath')).toBe(true)
       expect(document.documentElement.classList.contains('platform-fairwins')).toBe(false)
     }, { timeout: 3000 })
+  }
+
+  it('should set FairWins theme for root path /', async () => {
+    renderWithRoute('/')
+    await expectFairWinsTheme()
+  })
+
+  it('should set FairWins theme for /app route', async () => {
+    renderWithRoute('/app')
+    await expectFairWinsTheme()
+  })
+
+  it('should set FairWins theme for /main route', async () => {
+    renderWithRoute('/main')
+    await expectFairWinsTheme()
+  })
+
+  it('should set FairWins theme for /fairwins route', async () => {
+    renderWithRoute('/fairwins')
+    await expectFairWinsTheme()
+  })
+
+  it('should set ClearPath theme for /clearpath route', async () => {
+    renderWithRoute('/clearpath')
+    await expectClearPathTheme()
   })
 
   it('should set FairWins theme for unknown routes', async () => {
     renderWithRoute('/unknown-route')
-
-    await waitFor(() => {
-      expect(document.documentElement.classList.contains('platform-fairwins')).toBe(true)
-      expect(document.documentElement.classList.contains('platform-clearpath')).toBe(false)
-    }, { timeout: 3000 })
+    await expectFairWinsTheme()
   })
 
   it('should set FairWins theme for /select route', async () => {
     renderWithRoute('/select')
-
-    await waitFor(() => {
-      expect(document.documentElement.classList.contains('platform-fairwins')).toBe(true)
-      expect(document.documentElement.classList.contains('platform-clearpath')).toBe(false)
-    }, { timeout: 3000 })
+    await expectFairWinsTheme()
   })
 })
