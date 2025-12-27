@@ -2,14 +2,15 @@
 
 # FairWins — Prediction Market Platform Suite
 
-**Clear signals for collective decisions** — A comprehensive platform suite offering two distinct applications built on shared, privacy-preserving infrastructure:
+**Clear signals for collective decisions** — A comprehensive prediction market platform with optional DAO governance capabilities:
 
-- **FairWins**: Open prediction markets for anyone to create, join, and resolve markets
+- **FairWins** (Primary): Open prediction markets for anyone to create, join, and resolve markets
 
-- **Clearpath**: Futarchy-based DAO governance platform for institutional decision-making
-- **Tokenmintprise token managementn- **Spindletop**: Liquidity pool management
+- **ClearPath** (Add-on): Futarchy-based DAO governance feature for institutional decision-making
+- **TokenMint** (Add-on): Enterprise token management
+- **Spindletop** (Add-on): Liquidity pool management
   
-The platforms integrate privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
+The platform integrates privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
 
 ## Build Status
 
@@ -29,9 +30,23 @@ The documentation site provides comprehensive guides for both platforms:
 
 ## Platform Overview
 
-### 🏛️ ClearPath — DAO Governance Platform
+### 🎯 FairWins — Prediction Markets for Friends (Primary Platform)
 
-ClearPath offers **two governance modes** to suit different organizational needs:
+FairWins is the main prediction market platform where:
+- **Anyone can create markets** on any topic with custom parameters
+- **Flexible controls** allow market creators to set resolution criteria
+- **Fair participation** enables anyone to trade based on their knowledge
+- **Transparent resolution** ensures trust and accountability
+
+**Use Cases:**
+- Event outcome predictions
+- Financial market forecasting
+- Sports and entertainment betting
+- Community sentiment tracking
+
+### 🏛️ ClearPath — DAO Governance (Add-on Feature)
+
+ClearPath is an optional add-on feature within FairWins for DAO governance, offering **two governance modes**:
 
 #### Futarchy Governance (Prediction Markets)
 - **Democratic voting** establishes welfare metrics (protocol success measures)
@@ -53,19 +68,33 @@ ClearPath offers **two governance modes** to suit different organizational needs
 - Grant allocation and funding decisions
 - Enterprise-friendly traditional voting
 
-### 🎯 FairWins — Prediction Markets for Friends
+### 🪙 TokenMint — Enterprise Token Management (Add-on Feature)
 
-FairWins provides an open prediction market platform where:
-- **Anyone can create markets** on any topic with custom parameters
-- **Flexible controls** allow market creators to set resolution criteria
-- **Fair participation** enables anyone to trade based on their knowledge
-- **Transparent resolution** ensures trust and accountability
+TokenMint is an optional add-on feature for creating and managing custom tokens:
+- **Token creation** with configurable parameters
+- **Vesting schedules** for controlled distribution
+- **Access control** and role-based permissions
+- **Integration** with FairWins markets and ClearPath governance
 
 **Use Cases:**
-- Event outcome predictions
-- Financial market forecasting
-- Sports and entertainment betting
-- Community sentiment tracking
+- DAO token issuance
+- Reward token creation
+- Governance token management
+- Community token distribution
+
+### 🌊 Spindletop — Liquidity Pool Management (Add-on Feature)
+
+Spindletop is an optional add-on feature for managing liquidity pools:
+- **Automated market making** for token pairs
+- **Liquidity provisioning** with dynamic fees
+- **Pool analytics** and performance tracking
+- **Integration** with FairWins prediction markets
+
+**Use Cases:**
+- Market liquidity provision
+- Token pair trading
+- Yield generation
+- Decentralized exchange functionality
 
 ## Shared Infrastructure
 
@@ -243,15 +272,38 @@ You will see a platform selector where you can choose between:
 
 ## Usage
 
-### Platform Selection
+### Getting Started
 
 1. **Open Application**: Navigate to the frontend at `http://localhost:5173`
-2. **Choose Platform**: Select either ClearPath or FairWins based on your use case
-3. **Connect Wallet**: Click to connect your MetaMask or compatible wallet
+2. **Start with FairWins**: The platform opens with FairWins prediction markets
+3. **Connect Wallet**: Click to connect your MetaMask or compatible wallet (optional for browsing)
 
-### Using ClearPath (DAO Governance)
+### Using FairWins (Prediction Markets - Primary Platform)
 
-ClearPath offers two governance modes:
+#### For Market Creators
+
+1. **Connect Wallet**: Connect to FairWins platform
+2. **Create Market**: 
+   - Define clear prediction question
+   - Set resolution criteria and dates
+   - Provide initial liquidity (minimum 100 USDC)
+   - Stake creator bond (returned after proper resolution)
+3. **Monitor Market**: Track participation and trading activity
+4. **Resolve Market**: Submit outcome evidence when resolution date arrives
+
+#### For Traders
+
+1. **Browse Markets**: View active prediction markets across all topics
+2. **Research**: Review market details, resolution criteria, and current odds
+3. **Trade Positions**:
+   - Buy YES tokens if you believe the outcome will occur
+   - Buy NO tokens if you believe it won't
+4. **Track Positions**: Monitor your positions and market developments
+5. **Settle**: Redeem winning tokens after market resolution
+
+### Using ClearPath (DAO Governance - Add-on Feature)
+
+ClearPath is an optional add-on feature accessible from the sidebar. It offers two governance modes:
 
 #### Choosing a Governance Mode
 
@@ -314,29 +366,6 @@ You can switch between modes in the governance interface.
 2. **Challenge Oracle Reports**: Submit counter-evidence during challenge period
 3. **Ragequit**: Exit with proportional treasury share if you disagree with proposal
 
-### Using FairWins (Prediction Markets)
-
-#### For Market Creators
-
-1. **Connect Wallet**: Connect to FairWins platform
-2. **Create Market**: 
-   - Define clear prediction question
-   - Set resolution criteria and dates
-   - Provide initial liquidity (minimum 100 USDC)
-   - Stake creator bond (returned after proper resolution)
-3. **Monitor Market**: Track participation and trading activity
-4. **Resolve Market**: Submit outcome evidence when resolution date arrives
-
-#### For Traders
-
-1. **Browse Markets**: View active prediction markets across all topics
-2. **Research**: Review market details, resolution criteria, and current odds
-3. **Trade Positions**:
-   - Buy YES tokens if you believe the outcome will occur
-   - Buy NO tokens if you believe it won't
-4. **Track Positions**: Monitor your positions and market developments
-5. **Settle**: Redeem winning tokens after market resolution
-
 ## Platform & Governance Comparison
 
 ### ClearPath Governance Modes
@@ -353,18 +382,19 @@ You can switch between modes in the governance interface.
 | **Execution** | Based on welfare metrics | Based on vote outcome |
 | **Enterprise Appeal** | Innovative DAOs | Traditional foundations |
 
-### Platform Comparison
+### Feature Comparison
 
-| Feature | ClearPath (DAO) | FairWins (Markets) |
-|---------|----------------|-------------------|
-| **Primary Use** | Governance decisions | General predictions |
-| **Governance Mode** | Futarchy or Traditional | N/A |
-| **Market Creation** | Automated (per proposal) | Manual (user-created) |
-| **Resolution Criteria** | Welfare metrics or votes | Flexible, creator-defined |
-| **Participation** | DAO members | Open to anyone |
-| **Treasury** | Shared DAO treasury | Individual market pools |
-| **Voting Integration** | Yes (both modes) | No |
-| **Ragequit Protection** | Yes (Futarchy mode) | No |
+| Feature | FairWins (Primary Platform) | ClearPath (Add-on) |
+|---------|----------------------------|-------------------|
+| **Primary Use** | General predictions | Governance decisions |
+| **Access** | Default, open to anyone | Optional sidebar tab, requires role |
+| **Market Creation** | Manual (user-created) | Automated (per proposal) |
+| **Resolution Criteria** | Flexible, creator-defined | Welfare metrics or votes |
+| **Participation** | Open to anyone | DAO members only |
+| **Treasury** | Individual market pools | Shared DAO treasury |
+| **Governance Mode** | N/A | Futarchy or Traditional |
+| **Voting Integration** | No | Yes (both modes) |
+| **Ragequit Protection** | No | Yes (Futarchy mode) |
 
 ## Technical Details
 

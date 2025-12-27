@@ -57,8 +57,8 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
         <div className="header-logo" onClick={() => navigate('/')}>
           {!logoError ? (
             <img 
-              src={showClearPathBranding ? "/logo_clearpath.svg" : "/logo_fwcp.svg"} 
-              alt={showClearPathBranding ? "ClearPath" : "FairWins & ClearPath"} 
+              src={showClearPathBranding ? "/logo_clearpath.svg" : "/assets/fairwins_no-text_logo.svg"} 
+              alt={showClearPathBranding ? "ClearPath" : "FairWins"} 
               className="header-logo-image"
               width="48"
               height="48"
@@ -66,7 +66,7 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
             />
           ) : (
             <span className="header-logo-text">
-              {showClearPathBranding ? 'ClearPath' : 'Prediction DAO'}
+              {showClearPathBranding ? 'ClearPath' : 'FairWins'}
             </span>
           )}
         </div>
