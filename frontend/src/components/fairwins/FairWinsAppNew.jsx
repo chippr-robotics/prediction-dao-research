@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
+import { useRoles } from '../../hooks/useRoles'
 import { getMockMarkets } from '../../utils/mockDataLoader'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
@@ -16,10 +17,12 @@ import MarketsTable from './MarketsTable'
 import TokenMintTab from './TokenMintTab'
 import TokenMintBuilderModal from './TokenMintBuilderModal'
 import TokenMintHeroCard from './TokenMintHeroCard'
+import ClearPathTab from './ClearPathTab'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
+  const { roles, ROLES } = useRoles()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
@@ -34,7 +37,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [selectedToken, setSelectedToken] = useState(null)
   const [showTokenBuilder, setShowTokenBuilder] = useState(false)
   const [tokenLoading, setTokenLoading] = useState(false)
-  const [userRoles, setUserRoles] = useState([]) // User's roles for conditional rendering
 
   const loadMarkets = useCallback(async () => {
     try {
@@ -264,16 +266,17 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
     loadUserTokens()
   }, [loadUserTokens])
 
-  // Check user roles (mock for now)
-  useEffect(() => {
-    if (isConnected && account) {
-      // In production, check user's roles from RoleManager contract
-      // For demo, assume user has TOKENMINT_ROLE
-      setUserRoles(['TOKENMINT_ROLE'])
-    } else {
-      setUserRoles([])
-    }
-  }, [isConnected, account])
+  // Convert roles array to role names for sidebar compatibility
+  const userRoleNames = useMemo(() => {
+    return roles.map(role => {
+      // Map ROLES.CLEARPATH_USER to 'CLEARPATH_USER' string, etc.
+      if (role === ROLES.CLEARPATH_USER) return 'CLEARPATH_USER'
+      if (role === ROLES.TOKENMINT) return 'TOKENMINT_ROLE'
+      if (role === ROLES.MARKET_MAKER) return 'MARKET_MAKER'
+      if (role === ROLES.ADMIN) return 'ADMIN'
+      return role
+    })
+  }, [roles, ROLES])
 
   const marketsByCategory = getMarketsByCategory()
 
@@ -361,7 +364,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
         <SidebarNav 
           selectedCategory={selectedCategory}
           onCategoryChange={handleCategoryChange}
-          userRoles={userRoles}
+          userRoles={userRoleNames}
         />
         <HeaderBar 
           onConnect={onConnect}
@@ -384,7 +387,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
       <SidebarNav 
         selectedCategory={selectedCategory}
         onCategoryChange={handleCategoryChange}
-        userRoles={userRoles}
+        userRoles={userRoleNames}
       />
       
       <HeaderBar 
@@ -440,6 +443,9 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
               {selectedCategory === 'dashboard' ? (
                 /* Dashboard View - Landing Page */
                 <Dashboard />
+              ) : selectedCategory === 'clearpath' ? (
+                /* ClearPath View - DAO Governance */
+                <ClearPathTab />
               ) : selectedCategory === 'tokenmint' ? (
                 /* TokenMint View - Token Management */
                 <TokenMintTab 
