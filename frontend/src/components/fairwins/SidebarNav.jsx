@@ -12,6 +12,7 @@ const CATEGORIES = [
   { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
   { id: 'crypto', name: 'Crypto', icon: '₿' },
   { id: 'other', name: 'Other Markets', icon: '🌐' },
+  { id: 'clearpath', name: 'ClearPath', icon: '🏛️', requiresRole: 'CLEARPATH_USER' },
   { id: 'tokenmint', name: 'TokenMint', icon: '🪙', requiresRole: 'TOKENMINT_ROLE' },
   { id: 'all-table', name: 'All Markets Table', icon: '📋', powerUser: true }
 ]

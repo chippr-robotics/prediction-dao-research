@@ -1,0 +1,66 @@
+/* ClearPath Tab - Integration styling for ClearPath within FairWins */
+
+.clearpath-tab {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 2rem;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.clearpath-tab-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.clearpath-tab-header h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.clearpath-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  font-weight: 400;
+}
+
+.clearpath-content {
+  /* Allow the Dashboard component to handle its own layout */
+  width: 100%;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .clearpath-tab {
+    padding: 1rem;
+  }
+
+  .clearpath-tab-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .clearpath-subtitle {
+    font-size: 0.875rem;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .clearpath-tab {
+    animation: none;
+  }
+}
