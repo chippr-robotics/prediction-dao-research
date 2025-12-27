@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -37,6 +38,8 @@ import "./TieredRoleManager.sol";
  * - Tier limits enforced on market creation and trading
  */
 contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+    
     /**
      * @notice Enum defining different types of binary outcomes for prediction markets
      * @dev Each bet type represents a different way to frame binary predictions
@@ -466,7 +469,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             require(msg.value == 0, "Send collateral tokens, not ETH");
             
             // Transfer collateral from buyer to this contract
-            IERC20(market.collateralToken).transferFrom(msg.sender, address(this), amount);
+            IERC20(market.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
             
             // Approve ETCSwap integration to spend collateral
             IERC20(market.collateralToken).approve(address(etcSwapIntegration), amount);
@@ -491,7 +494,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 
                 // Transfer purchased tokens from this contract to the buyer
                 // (ETCSwap sends tokens to this contract, we forward to buyer)
-                IERC20(outcomeToken).transfer(msg.sender, tokenAmount);
+                IERC20(outcomeToken).safeTransfer(msg.sender, tokenAmount);
             } catch {
                 // If quote fails, use conservative minimum (allow up to 20% slippage for edge cases)
                 uint256 minTokenAmount = (amount * 80) / 100;
@@ -508,7 +511,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 tokenAmount = result.amountOut;
                 
                 // Transfer purchased tokens from this contract to the buyer
-                IERC20(outcomeToken).transfer(msg.sender, tokenAmount);
+                IERC20(outcomeToken).safeTransfer(msg.sender, tokenAmount);
             }
         } else {
             // Fallback: Simplified LMSR implementation for testing
@@ -555,7 +558,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             require(market.collateralToken != address(0), "ETCSwap requires ERC20 collateral");
             
             // Transfer tokens from seller to this contract
-            IERC20(outcomeToken).transferFrom(msg.sender, address(this), tokenAmount);
+            IERC20(outcomeToken).safeTransferFrom(msg.sender, address(this), tokenAmount);
             
             // Approve ETCSwap integration to spend outcome tokens
             IERC20(outcomeToken).approve(address(etcSwapIntegration), tokenAmount);
@@ -594,7 +597,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             }
             
             // Transfer collateral to seller
-            IERC20(market.collateralToken).transfer(msg.sender, collateralAmount);
+            IERC20(market.collateralToken).safeTransfer(msg.sender, collateralAmount);
         } else {
             // Fallback: Simplified LMSR implementation for testing
             collateralAmount = (tokenAmount * 1e15) / 1e18; // Inverse of buy pricing

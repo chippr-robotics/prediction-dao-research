@@ -1,0 +1,195 @@
+'npx hardhat clean' running (wd: /home/runner/work/prediction-dao-research/prediction-dao-research)
+'npx hardhat clean --global' running (wd: /home/runner/work/prediction-dao-research/prediction-dao-research)
+'npx hardhat compile --force' running (wd: /home/runner/work/prediction-dao-research/prediction-dao-research)
+
+MembershipPaymentManager.processPayment(address,address,bytes32,address,uint256,uint8) (contracts/MembershipPaymentManager.sol#302-351) uses arbitrary from in transferFrom: IERC20(paymentToken).safeTransferFrom(payer,address(this),amount) (contracts/MembershipPaymentManager.sol#321)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#arbitrary-from-in-transferfrom
+
+ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#542-619) sends eth to arbitrary user
+	Dangerous calls:
+	- (success,None) = address(msg.sender).call{value: collateralAmount}() (contracts/ConditionalMarketFactory.sol#614)
+RoleManager.withdraw() (contracts/RoleManager.sol#567-571) sends eth to arbitrary user
+	Dangerous calls:
+	- address(msg.sender).transfer(balance) (contracts/RoleManager.sol#570)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#functions-that-send-ether-to-arbitrary-destinations
+
+DAOFactory.userDAOs (contracts/DAOFactory.sol#46) is never initialized. It is used in:
+	- DAOFactory.getUserDAOs(address) (contracts/DAOFactory.sol#312-314)
+	- DAOFactory._grantDAORole(uint256,address,bytes32) (contracts/DAOFactory.sol#368-385)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-state-variables
+
+ETCSwapV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#491-505) performs a multiplication on the result of a division:
+	- priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) / (1 << 96) (contracts/ETCSwapV3Integration.sol#503)
+	- estimatedCollateralAmount = (tokenAmount * priceX96) / (1 << 96) (contracts/ETCSwapV3Integration.sol#504)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
+
+TokenMintFactory._listOnETCSwap(uint256) (contracts/TokenMintFactory.sol#252-261) uses a dangerous strict equality:
+	- require(bool,string)(tokens[tokenId].tokenType == TokenType.ERC20,Only ERC20 can be listed on swap) (contracts/TokenMintFactory.sol#253)
+ZKKeyManager._rotateKeyFor(address,string) (contracts/ZKKeyManager.sol#232-286) uses a dangerous strict equality:
+	- oldKeyHash == bytes32(0) (contracts/ZKKeyManager.sol#234)
+ZKKeyManager.getPublicKey(address) (contracts/ZKKeyManager.sol#339-346) uses a dangerous strict equality:
+	- keyHash == bytes32(0) (contracts/ZKKeyManager.sol#341)
+ZKKeyManager.hasValidKey(address) (contracts/ZKKeyManager.sol#324-332) uses a dangerous strict equality:
+	- keyHash == bytes32(0) (contracts/ZKKeyManager.sol#326)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+
+Reentrancy in ETCSwapV3Integration.createMarketPools(uint256,address,address,address,uint24,uint160) (contracts/ETCSwapV3Integration.sol#207-240):
+	External calls:
+	- passPool = _getOrCreatePool(passToken,collateralToken,fee) (contracts/ETCSwapV3Integration.sol#224)
+		- pool = factory.createPool(tokenA,tokenB,fee) (contracts/ETCSwapV3Integration.sol#618)
+	- _initializePoolIfNeeded(passPool,initialSqrtPriceX96) (contracts/ETCSwapV3Integration.sol#225)
+		- IUniswapV3Pool(pool).initialize(sqrtPriceX96) (contracts/ETCSwapV3Integration.sol#632)
+	- failPool = _getOrCreatePool(failToken,collateralToken,fee) (contracts/ETCSwapV3Integration.sol#228)
+		- pool = factory.createPool(tokenA,tokenB,fee) (contracts/ETCSwapV3Integration.sol#618)
+	- _initializePoolIfNeeded(failPool,initialSqrtPriceX96) (contracts/ETCSwapV3Integration.sol#229)
+		- IUniswapV3Pool(pool).initialize(sqrtPriceX96) (contracts/ETCSwapV3Integration.sol#632)
+	State variables written after the call(s):
+	- marketPools[marketId] = PoolConfig({passPool:passPool,failPool:failPool,fee:fee,initialized:true}) (contracts/ETCSwapV3Integration.sol#232-237)
+	ETCSwapV3Integration.marketPools (contracts/ETCSwapV3Integration.sol#69) can be used in cross function reentrancies:
+	- ETCSwapV3Integration.createMarketPools(uint256,address,address,address,uint24,uint160) (contracts/ETCSwapV3Integration.sol#207-240)
+	- ETCSwapV3Integration.getMarketPools(uint256) (contracts/ETCSwapV3Integration.sol#566-569)
+	- ETCSwapV3Integration.getPoolPrice(uint256,bool) (contracts/ETCSwapV3Integration.sol#578-588)
+	- ETCSwapV3Integration.marketPools (contracts/ETCSwapV3Integration.sol#69)
+	- ETCSwapV3Integration.quoteBuyTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#466-481)
+	- ETCSwapV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#491-505)
+Reentrancy in TieredRoleManager.purchaseRoleWithTierToken(bytes32,TieredRoleManager.MembershipTier,address,uint256) (contracts/TieredRoleManager.sol#382-425):
+	External calls:
+	- paymentId = paymentManager.processPayment(address(this),msg.sender,role,paymentToken,amount,uint8(tier)) (contracts/TieredRoleManager.sol#406-413)
+	State variables written after the call(s):
+	- roleMeta.currentMembers ++ (contracts/TieredRoleManager.sol#419)
+	RoleManager.roleMetadata (contracts/RoleManager.sol#65) can be used in cross function reentrancies:
+	- RoleManager._initializeRoleMetadata() (contracts/RoleManager.sol#134-225)
+	- RoleManager.getRoleMetadata(bytes32) (contracts/RoleManager.sol#651-653)
+	- RoleManager.grantRole(bytes32,address) (contracts/RoleManager.sol#579-607)
+	- RoleManager.proposeRoleAction(bytes32,address,bool) (contracts/RoleManager.sol#380-420)
+	- RoleManager.roleMetadata (contracts/RoleManager.sol#65)
+	- RoleManager.setRoleActive(bytes32,bool) (contracts/RoleManager.sol#560-562)
+	- RoleManager.setRolePrice(bytes32,uint256) (contracts/RoleManager.sol#552-555)
+	- RoleManager.updateRoleMetadata(bytes32,string,string,uint256,uint256,uint256) (contracts/RoleManager.sol#530-547)
+	- userTiers[msg.sender][role] = tier (contracts/TieredRoleManager.sol#417)
+	TieredRoleManager.userTiers (contracts/TieredRoleManager.sol#52) can be used in cross function reentrancies:
+	- TieredRoleManager.canCreatePrivateMarkets(address,bytes32) (contracts/TieredRoleManager.sol#668-672)
+	- TieredRoleManager.canUseAdvancedFeatures(address,bytes32) (contracts/TieredRoleManager.sol#677-681)
+	- TieredRoleManager.checkBetLimit(bytes32) (contracts/TieredRoleManager.sol#518-537)
+	- TieredRoleManager.checkMarketCreationLimitFor(address,bytes32) (contracts/TieredRoleManager.sol#554-574)
+	- TieredRoleManager.checkWithdrawalLimit(bytes32,uint256) (contracts/TieredRoleManager.sol#592-610)
+	- TieredRoleManager.getFeeDiscount(address,bytes32) (contracts/TieredRoleManager.sol#686-690)
+	- TieredRoleManager.getUserTier(address,bytes32) (contracts/TieredRoleManager.sol#640-642)
+	- TieredRoleManager.userTiers (contracts/TieredRoleManager.sol#52)
+Reentrancy in TieredRoleManager.upgradeTierWithToken(bytes32,TieredRoleManager.MembershipTier,address,uint256) (contracts/TieredRoleManager.sol#460-496):
+	External calls:
+	- paymentId = paymentManager.processPayment(address(this),msg.sender,role,paymentToken,amount,uint8(newTier)) (contracts/TieredRoleManager.sol#482-489)
+	State variables written after the call(s):
+	- userTiers[msg.sender][role] = newTier (contracts/TieredRoleManager.sol#492)
+	TieredRoleManager.userTiers (contracts/TieredRoleManager.sol#52) can be used in cross function reentrancies:
+	- TieredRoleManager.canCreatePrivateMarkets(address,bytes32) (contracts/TieredRoleManager.sol#668-672)
+	- TieredRoleManager.canUseAdvancedFeatures(address,bytes32) (contracts/TieredRoleManager.sol#677-681)
+	- TieredRoleManager.checkBetLimit(bytes32) (contracts/TieredRoleManager.sol#518-537)
+	- TieredRoleManager.checkMarketCreationLimitFor(address,bytes32) (contracts/TieredRoleManager.sol#554-574)
+	- TieredRoleManager.checkWithdrawalLimit(bytes32,uint256) (contracts/TieredRoleManager.sol#592-610)
+	- TieredRoleManager.getFeeDiscount(address,bytes32) (contracts/TieredRoleManager.sol#686-690)
+	- TieredRoleManager.getUserTier(address,bytes32) (contracts/TieredRoleManager.sol#640-642)
+	- TieredRoleManager.userTiers (contracts/TieredRoleManager.sol#52)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+
+ZKVerifier._decodeProof(bytes).proof (contracts/ZKVerifier.sol#230) is a local variable never initialized
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
+
+ConditionalMarketFactory.buyTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#452-532) ignores return value by IERC20(market.collateralToken).approve(address(etcSwapIntegration),amount) (contracts/ConditionalMarketFactory.sol#475)
+ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#542-619) ignores return value by IERC20(outcomeToken).approve(address(etcSwapIntegration),tokenAmount) (contracts/ConditionalMarketFactory.sol#564)
+ETCSwapV3Integration.quoteBuyTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#466-481) ignores return value by (sqrtPriceX96,None,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#475)
+ETCSwapV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#491-505) ignores return value by (sqrtPriceX96,None,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#500)
+ETCSwapV3Integration.getPoolPrice(uint256,bool) (contracts/ETCSwapV3Integration.sol#578-588) ignores return value by (sqrtPriceX96,tick,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#587)
+ETCSwapV3Integration._initializePoolIfNeeded(address,uint160) (contracts/ETCSwapV3Integration.sol#627-634) ignores return value by (currentPrice,None,None,None,None,None,unlocked) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#628)
+FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#208-244) ignores return value by (None,passValue,failValue,finalized) = oracleResolver.getResolution(govProposal.proposalId) (contracts/FutarchyGovernor.sol#213-218)
+FutarchyGovernor.executeProposal(uint256) (contracts/FutarchyGovernor.sol#250-305) ignores return value by (None,None,None,fundingAmount,recipient,None,status,fundingToken,startDate,executionDeadline) = proposalRegistry.getProposal(govProposal.proposalId) (contracts/FutarchyGovernor.sol#257-268)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
+
+TokenMintFactory.createERC20(string,string,uint256,string,bool,bool,bool).listOnETCSwap (contracts/TokenMintFactory.sol#130) shadows:
+	- TokenMintFactory.listOnETCSwap(uint256) (contracts/TokenMintFactory.sol#245-250) (function)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#local-variable-shadowing
+
+WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) has external calls inside a loop: metric = registry.getMetric(i) (contracts/WelfareMetricRegistryFuzzTest.sol#40)
+WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) has external calls inside a loop: metric.weight > registry.TOTAL_WEIGHT() (contracts/WelfareMetricRegistryFuzzTest.sol#41)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
+
+Reentrancy in ETCSwapV3Integration.addLiquidity(uint256,address,address,address,uint256,uint256,uint256,uint256,int24,int24,uint256) (contracts/ETCSwapV3Integration.sol#259-318):
+	External calls:
+	- (tokenId,liquidity,amount0,amount1) = positionManager.mint(params) (contracts/ETCSwapV3Integration.sol#312)
+	State variables written after the call(s):
+	- marketPositions[marketId] = tokenId (contracts/ETCSwapV3Integration.sol#315)
+Reentrancy in ConditionalMarketFactory.batchDeployMarkets(ConditionalMarketFactory.MarketCreationParams[]) (contracts/ConditionalMarketFactory.sol#373-442):
+	External calls:
+	- checkMarketCreationLimit() (contracts/ConditionalMarketFactory.sol#375)
+		- require(bool,string)(roleManager.checkMarketCreationLimitFor(msg.sender,roleManager.MARKET_MAKER_ROLE()),Market creation limit exceeded) (contracts/ConditionalMarketFactory.sol#211)
+	State variables written after the call(s):
+	- _proposalToMarketPlusOne[params[i].proposalId] = marketId + 1 (contracts/ConditionalMarketFactory.sol#420)
+	- marketId = marketCount ++ (contracts/ConditionalMarketFactory.sol#395)
+	- markets[marketId] = Market({proposalId:params[i].proposalId,passToken:passToken,failToken:failToken,collateralToken:params[i].collateralToken,tradingEndTime:block.timestamp + params[i].tradingPeriod,liquidityParameter:params[i].liquidityParameter,totalLiquidity:params[i].liquidityAmount,resolved:false,passValue:0,failValue:0,status:MarketStatus.Active,betType:params[i].betType}) (contracts/ConditionalMarketFactory.sol#405-418)
+	- _updateMarketIndex(marketId,MarketStatus.Active) (contracts/ConditionalMarketFactory.sol#423)
+		- marketsByDay[day].push(marketId) (contracts/ConditionalMarketFactory.sol#924)
+	- _updateMarketIndex(marketId,MarketStatus.Active) (contracts/ConditionalMarketFactory.sol#423)
+		- marketsByStatus[newStatus].push(marketId) (contracts/ConditionalMarketFactory.sol#920)
+Reentrancy in DAOFactory.createDAO(string,string,address,address[]) (contracts/DAOFactory.sol#116-159):
+	External calls:
+	- (futarchyGovernor,welfareRegistry,proposalRegistry,marketFactory,privacyCoordinator,oracleResolver,ragequitModule) = _deployDAOComponents(treasuryVault) (contracts/DAOFactory.sol#128-136)
+		- WelfareMetricRegistry(welfareRegistry).initialize(address(this)) (contracts/DAOFactory.sol#188)
+		- ProposalRegistry(proposalRegistry).initialize(address(this)) (contracts/DAOFactory.sol#189)
+		- ConditionalMarketFactory(marketFactory).initialize(address(this)) (contracts/DAOFactory.sol#190)
+		- PrivacyCoordinator(privacyCoordinator).initialize(address(this)) (contracts/DAOFactory.sol#191)
+		- OracleResolver(oracleResolver).initialize(address(this)) (contracts/DAOFactory.sol#192)
+		- RagequitModule(ragequitModule).initialize(address(this),address(this),treasuryVault) (contracts/DAOFactory.sol#193-197)
+		- FutarchyGovernor(futarchyGovernor).initialize(address(this),welfareRegistry,proposalRegistry,marketFactory,privacyCoordinator,oracleResolver,ragequitModule,treasuryVault) (contracts/DAOFactory.sol#200-209)
+		- WelfareMetricRegistry(welfareRegistry).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#212)
+		- ProposalRegistry(proposalRegistry).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#213)
+		- ConditionalMarketFactory(marketFactory).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#214)
+		- OracleResolver(oracleResolver).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#215)
+		- RagequitModule(ragequitModule).transferOwnership(futarchyGovernor) (contracts/DAOFactory.sol#216)
+	State variables written after the call(s):
+	- _setupDAORoles(daoId,admins) (contracts/DAOFactory.sol#156)
+		- daoRoles[daoId][user][role] = true (contracts/DAOFactory.sol#369)
+	- daos[daoId] = DAOInstance({name:name,description:description,futarchyGovernor:futarchyGovernor,welfareRegistry:welfareRegistry,proposalRegistry:proposalRegistry,marketFactory:marketFactory,privacyCoordinator:privacyCoordinator,oracleResolver:oracleResolver,ragequitModule:ragequitModule,treasuryVault:treasuryVault,creator:msg.sender,createdAt:block.timestamp,active:true}) (contracts/DAOFactory.sol#139-153)
+Reentrancy in FutarchyGovernor.createGovernanceProposal(uint256,uint256,uint256,uint256) (contracts/FutarchyGovernor.sol#154-185):
+	External calls:
+	- marketId = marketFactory.deployMarketPair(proposalId,address(0),liquidityAmount,liquidityParameter,tradingPeriod,ConditionalMarketFactory.BetType.PassFail) (contracts/FutarchyGovernor.sol#164-171)
+	State variables written after the call(s):
+	- governanceProposals[governanceProposalId] = GovernanceProposal({proposalId:proposalId,marketId:marketId,phase:ProposalPhase.MarketTrading,createdAt:block.timestamp,executionTime:0,executed:false}) (contracts/FutarchyGovernor.sol#174-181)
+Reentrancy in ConditionalMarketFactory.deployMarketPair(uint256,address,uint256,uint256,uint256,ConditionalMarketFactory.BetType) (contracts/ConditionalMarketFactory.sol#308-366):
+	External calls:
+	- checkMarketCreationLimit() (contracts/ConditionalMarketFactory.sol#315)
+		- require(bool,string)(roleManager.checkMarketCreationLimitFor(msg.sender,roleManager.MARKET_MAKER_ROLE()),Market creation limit exceeded) (contracts/ConditionalMarketFactory.sol#211)
+	State variables written after the call(s):
+	- _proposalToMarketPlusOne[proposalId] = marketId + 1 (contracts/ConditionalMarketFactory.sol#349)
+	- marketId = marketCount ++ (contracts/ConditionalMarketFactory.sol#325)
+	- markets[marketId] = Market({proposalId:proposalId,passToken:passToken,failToken:failToken,collateralToken:collateralToken,tradingEndTime:block.timestamp + tradingPeriod,liquidityParameter:liquidityParameter,totalLiquidity:liquidityAmount,resolved:false,passValue:0,failValue:0,status:MarketStatus.Active,betType:betType}) (contracts/ConditionalMarketFactory.sol#334-347)
+	- _updateMarketIndex(marketId,MarketStatus.Active) (contracts/ConditionalMarketFactory.sol#352)
+		- marketsByDay[day].push(marketId) (contracts/ConditionalMarketFactory.sol#924)
+	- _updateMarketIndex(marketId,MarketStatus.Active) (contracts/ConditionalMarketFactory.sol#352)
+		- marketsByStatus[newStatus].push(marketId) (contracts/ConditionalMarketFactory.sol#920)
+Reentrancy in RoleManager.purchaseRoleWithToken(bytes32,address,uint256) (contracts/RoleManager.sol#271-317):
+	External calls:
+	- paymentId = paymentManager.processPayment(address(this),msg.sender,role,paymentToken,amount,0) (contracts/RoleManager.sol#292-299)
+	State variables written after the call(s):
+	- purchases[msg.sender][role] = RolePurchase({buyer:msg.sender,role:role,timestamp:block.timestamp,price:amount,zkPublicKey:}) (contracts/RoleManager.sol#302-308)
+	- userPurchasedRoles[msg.sender].push(role) (contracts/RoleManager.sol#310)
+Reentrancy in RoleManager.registerZKKey(string) (contracts/RoleManager.sol#323-337):
+	External calls:
+	- zkKeyManager.registerKeyFor(msg.sender,zkPublicKey) (contracts/RoleManager.sol#330)
+	State variables written after the call(s):
+	- purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey = zkPublicKey (contracts/RoleManager.sol#334)
+Reentrancy in RoleManager.revokeZKKey() (contracts/RoleManager.sol#360-370):
+	External calls:
+	- zkKeyManager.revokeKey(msg.sender) (contracts/RoleManager.sol#366)
+	State variables written after the call(s):
+	- purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey =  (contracts/RoleManager.sol#369)
+Reentrancy in RoleManager.rotateZKKey(string) (contracts/RoleManager.sol#343-355):
+	External calls:
+	- zkKeyManager.rotateKeyFor(msg.sender,newZKPublicKey) (contracts/RoleManager.sol#349)
+	State variables written after the call(s):
+	- purchases[msg.sender][CLEARPATH_USER_ROLE].zkPublicKey = newZKPublicKey (contracts/RoleManager.sol#352)
+Reentrancy in TieredRoleManager.upgradeTierWithToken(bytes32,TieredRoleManager.MembershipTier,address,uint256) (contracts/TieredRoleManager.sol#460-496):
+	External calls:
+	- paymentId = paymentManager.processPayment(address(this),msg.sender,role,paymentToken,amount,uint8(newTier)) (contracts/TieredRoleManager.sol#482-489)
+	State variables written after the call(s):
+	- tierPurchases[msg.sender][role][newTier] = block.timestamp (contracts/TieredRoleManager.sol#493)
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
