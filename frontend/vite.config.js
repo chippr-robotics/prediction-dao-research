@@ -15,11 +15,9 @@ export default defineConfig({
     setupFiles: './src/test/setup.js',
     testTimeout: 30000,
     exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/cypress/**',
-      '**/.{idea,git,cache,output,temp}/**',
-      '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
+      'node_modules/**',
+      'dist/**',
+      'cypress/**',
       '**/useIpfs.test.js'
     ],
     coverage: {
