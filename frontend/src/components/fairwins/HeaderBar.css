@@ -22,10 +22,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-.header-content {
+.header-bar-content {
   width: 100%;
   padding: 0 2rem;
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 2rem;
@@ -301,7 +302,7 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .header-content {
+  .header-bar-content {
     gap: 1rem;
   }
 
@@ -319,7 +320,7 @@
     height: var(--mobile-header-compact-height, 48px);
   }
 
-  .header-content {
+  .header-bar-content {
     padding: 0 1rem;
     justify-content: space-between;
   }
