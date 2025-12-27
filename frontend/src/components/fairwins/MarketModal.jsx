@@ -26,11 +26,9 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [price, setPrice] = useState('')
   const [currentPanel, setCurrentPanel] = useState(0) // 0: Trading, 1: Details, 2: Share
   const modalRef = useRef(null)
-  const carouselRef = useRef(null)
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const { formatPrice } = usePrice()
-  const { isDark } = useTheme()
 
   // Reset state when modal opens and set default values
   useEffect(() => {
@@ -238,16 +236,40 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
 
           {/* Panel Indicator */}
           <div className="panel-indicators">
-            <div className={`indicator ${currentPanel === 0 ? 'active' : ''}`} onClick={() => setCurrentPanel(0)} />
-            <div className={`indicator ${currentPanel === 1 ? 'active' : ''}`} onClick={() => setCurrentPanel(1)} />
-            <div className={`indicator ${currentPanel === 2 ? 'active' : ''}`} onClick={() => setCurrentPanel(2)} />
+            <button
+              type="button"
+              className={`indicator ${currentPanel === 0 ? 'active' : ''}`}
+              onClick={() => setCurrentPanel(0)}
+              aria-label="Go to Trading panel"
+              aria-current={currentPanel === 0 ? 'true' : undefined}
+            />
+            <button
+              type="button"
+              className={`indicator ${currentPanel === 1 ? 'active' : ''}`}
+              onClick={() => setCurrentPanel(1)}
+              aria-label="Go to Details panel"
+              aria-current={currentPanel === 1 ? 'true' : undefined}
+            />
+            <button
+              type="button"
+              className={`indicator ${currentPanel === 2 ? 'active' : ''}`}
+              onClick={() => setCurrentPanel(2)}
+              aria-label="Go to Share panel"
+              aria-current={currentPanel === 2 ? 'true' : undefined}
+            />
+          </div>
+
+          {/* Screen reader announcement for panel changes */}
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {currentPanel === 0 && 'Trading panel'}
+            {currentPanel === 1 && 'Market Details panel'}
+            {currentPanel === 2 && 'Share panel'}
           </div>
 
           {/* Carousel Wrapper */}
           <div className="carousel-wrapper">
           {/* Carousel Container */}
           <div 
-            ref={carouselRef}
             className="carousel-container"
             style={{ transform: `translateX(-${currentPanel * 100}%)` }}
           >
@@ -338,8 +360,12 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                       placeholder="$0.00"
                       value={amount}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9.]/g, '')
-                        setAmount(val)
+                        const raw = e.target.value
+                        const sanitized = raw.replace(/[^0-9.]/g, '')
+                        // Allow empty string so the user can clear the input
+                        if (sanitized === '' || /^\d*\.?\d{0,2}$/.test(sanitized)) {
+                          setAmount(sanitized)
+                        }
                       }}
                     />
                     <div className="input-hint">Balance: ${userBalance.toFixed(2)}</div>
@@ -411,13 +437,34 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                       placeholder="$0.00"
                       value={price}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9.]/g, '')
+                        // Remove anything that's not a digit or decimal point
+                        const raw = e.target.value
+                        const cleaned = raw.replace(/[^0-9.]/g, '')
+
+                        // Enforce at most one decimal point by collapsing extras
+                        const parts = cleaned.split('.')
+                        let normalized = cleaned
+                        if (parts.length > 2) {
+                          const integerPart = parts.shift() || ''
+                          const decimalPart = parts.join('')
+                          normalized = integerPart + (decimalPart ? '.' + decimalPart : '')
+                        }
+
+                        // Allow empty string or lone "." as intermediate states while typing
+                        if (normalized === '' || normalized === '.') {
+                          setPrice(normalized)
+                          return
+                        }
+
                         // Ensure price is below $1
-                        const numVal = parseFloat(val)
+                        const numVal = parseFloat(normalized)
                         if (!isNaN(numVal) && numVal >= 1) {
                           setPrice('0.99')
+                        } else if (!isNaN(numVal)) {
+                          setPrice(normalized)
                         } else {
-                          setPrice(val)
+                          // If parsing fails, clear the value
+                          setPrice('')
                         }
                       }}
                     />
@@ -466,12 +513,14 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             {/* Panel 2: Share/QR */}
             <div className="carousel-panel">
               <div className="share-panel-wrapper">
-                <ShareModal 
-                  isOpen={true}
-                  onClose={() => {}} 
-                  market={market} 
-                  marketUrl={`${window.location.origin}/market/${market.id}`}
-                />
+                {currentPanel === 2 && (
+                  <ShareModal 
+                    isOpen={true}
+                    onClose={() => setCurrentPanel(0)} 
+                    market={market} 
+                    marketUrl={`${window.location.origin}/market/${market.id}`}
+                  />
+                )}
               </div>
             </div>
           </div>

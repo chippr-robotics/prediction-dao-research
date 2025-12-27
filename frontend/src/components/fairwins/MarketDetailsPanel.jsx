@@ -34,7 +34,8 @@ function MarketDetailsPanel({ market }) {
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
     
     if (days > 0) return `${days}d ${hours}h`
-    return `${hours}h`
+    if (hours > 0) return `${hours}h`
+    return 'Less than 1h'
   }
 
   return (
@@ -75,13 +76,17 @@ function MarketDetailsPanel({ market }) {
         {/* Trading End Time */}
         <div className="detail-section">
           <div className="detail-label">Trading Ends</div>
-          <div className="detail-value">{formatDate(market.tradingEndTime)}</div>
+          <div className="detail-value">
+            {market.tradingEndTime ? formatDate(market.tradingEndTime) : 'Unknown'}
+          </div>
         </div>
 
         {/* Time Until Settlement */}
         <div className="detail-section">
           <div className="detail-label">Time Until Settlement</div>
-          <div className="detail-value detail-highlight">{getTimeUntilSettlement(market.tradingEndTime)}</div>
+          <div className="detail-value detail-highlight">
+            {market.tradingEndTime ? getTimeUntilSettlement(market.tradingEndTime) : 'Unknown'}
+          </div>
         </div>
 
         {/* Resolution Source */}

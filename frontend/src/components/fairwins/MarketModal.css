@@ -36,11 +36,6 @@
   overflow: hidden;
 }
 
-.theme-dark .market-modal-new {
-  background: linear-gradient(135deg, #1a2332 0%, #2d3e50 100%);
-  color: white;
-}
-
 /* Carousel Wrapper - Contains and hides overflow */
 .carousel-wrapper {
   overflow: hidden;
@@ -60,6 +55,19 @@
   flex-shrink: 0;
 }
 
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 /* Panel Indicators */
 .panel-indicators {
   display: flex;
@@ -73,6 +81,8 @@
   height: 8px;
   border-radius: 50%;
   background: var(--border-color);
+  border: none;
+  padding: 0;
   cursor: pointer;
   transition: all 0.3s ease;
 }
