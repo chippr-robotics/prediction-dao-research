@@ -41,11 +41,6 @@
   white-space: nowrap;
 }
 
-.correlation-icon {
-  font-size: 0.85rem;
-  display: inline-block;
-}
-
 .correlation-text {
   overflow: hidden;
   text-overflow: ellipsis;
