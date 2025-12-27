@@ -21,20 +21,7 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
     return `${hours}h`
   }
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      'politics': '🏛️',
-      'sports': '⚽',
-      'finance': '💰',
-      'tech': '💻',
-      'pop-culture': '🎬',
-      'crypto': '₿',
-      'new': '✨',
-      'daos': '🏢',
-      'other': '📊'
-    }
-    return icons[category] || '📊'
-  }
+
 
   const handleClick = () => {
     if (onClick) {
@@ -61,9 +48,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
     >
       <div className="tile-header">
         <div className="header-left">
-          <span className="category-badge" aria-hidden="true">
-            {getCategoryIcon(market.category)}
-          </span>
           <div className="market-value">
             <span className="market-value-label">Market Value</span>
             <span className="market-value-amount">{formatPrice(market.totalLiquidity, { compact: true })}</span>
@@ -83,7 +67,6 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
 
       {market.correlationGroupId && (
         <div className="correlation-badge" title={market.correlationGroupName}>
-          <span className="correlation-icon" aria-hidden="true">🔗</span>
           <span className="correlation-text">{market.correlationGroupName}</span>
         </div>
       )}
