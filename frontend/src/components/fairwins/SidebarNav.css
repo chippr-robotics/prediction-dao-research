@@ -145,6 +145,12 @@
   min-width: 24px;
 }
 
+.category-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .category-name {
   white-space: nowrap;
 }
@@ -267,6 +273,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.bottom-nav-icon .category-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .bottom-nav-label {

@@ -2,19 +2,29 @@ import { useState } from 'react'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import './SidebarNav.css'
 
+// Import SVG icons
+import dashboardIcon from '../../assets/dashboard_no_text.svg'
+import trendingIcon from '../../assets/trending_no_text.svg'
+import politicsIcon from '../../assets/politics_no_text.svg'
+import financeIcon from '../../assets/finance_no_text.svg'
+import techIcon from '../../assets/tech_no_text.svg'
+import cryptoIcon from '../../assets/crypto_no_text.svg'
+import otherMarketsIcon from '../../assets/other_markets_no_text.svg'
+import allMarketsIcon from '../../assets/all_markets_no_text.svg'
+
 const CATEGORIES = [
-  { id: 'dashboard', name: 'Dashboard', icon: '📊' },
-  { id: 'trending', name: 'Trending', icon: '🔥' },
-  { id: 'politics', name: 'Politics', icon: '🏛️' },
+  { id: 'dashboard', name: 'Dashboard', icon: dashboardIcon },
+  { id: 'trending', name: 'Trending', icon: trendingIcon },
+  { id: 'politics', name: 'Politics', icon: politicsIcon },
   { id: 'sports', name: 'Sports', icon: '⚽' },
-  { id: 'finance', name: 'Finance', icon: '💰' },
-  { id: 'tech', name: 'Tech', icon: '💻' },
+  { id: 'finance', name: 'Finance', icon: financeIcon },
+  { id: 'tech', name: 'Tech', icon: techIcon },
   { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
-  { id: 'crypto', name: 'Crypto', icon: '₿' },
-  { id: 'other', name: 'Other Markets', icon: '🌐' },
-  { id: 'clearpath', name: 'ClearPath', icon: '🏛️', requiresRole: 'CLEARPATH_USER' },
-  { id: 'tokenmint', name: 'TokenMint', icon: '🪙', requiresRole: 'TOKENMINT_ROLE' },
-  { id: 'all-table', name: 'All Markets Table', icon: '📋', powerUser: true }
+  { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
+  { id: 'other', name: 'Other Markets', icon: otherMarketsIcon },
+  { id: 'clearpath', name: 'ClearPath', icon: politicsIcon, requiresRole: 'CLEARPATH_USER' },
+  { id: 'tokenmint', name: 'TokenMint', icon: cryptoIcon, requiresRole: 'TOKENMINT_ROLE' },
+  { id: 'all-table', name: 'All Markets Table', icon: allMarketsIcon, powerUser: true }
 ]
 
 function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange, userRoles = [] }) {
@@ -71,7 +81,13 @@ function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange, userRole
               aria-current={selectedCategory === category.id ? 'page' : undefined}
               aria-label={`View ${category.name}`}
             >
-              <span className="bottom-nav-icon" aria-hidden="true">{category.icon}</span>
+              <span className="bottom-nav-icon" aria-hidden="true">
+                {typeof category.icon === 'string' && category.icon.endsWith('.svg') ? (
+                  <img src={category.icon} alt="" className="category-icon-img" />
+                ) : (
+                  category.icon
+                )}
+              </span>
               <span className="bottom-nav-label">{category.name}</span>
             </button>
           ))}
@@ -112,7 +128,13 @@ function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange, userRole
             aria-label={`View ${category.name}`}
             title={!isExpanded ? category.name : ''}
           >
-            <span className="category-icon" aria-hidden="true">{category.icon}</span>
+            <span className="category-icon" aria-hidden="true">
+              {typeof category.icon === 'string' && category.icon.endsWith('.svg') ? (
+                <img src={category.icon} alt="" className="category-icon-img" />
+              ) : (
+                category.icon
+              )}
+            </span>
             {isExpanded && <span className="category-name">{category.name}</span>}
           </button>
         ))}

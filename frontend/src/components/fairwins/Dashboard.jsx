@@ -4,6 +4,12 @@ import { getMockMarkets } from '../../utils/mockDataLoader'
 import * as d3 from 'd3'
 import './Dashboard.css'
 
+// Import SVG icons
+import politicsIcon from '../../assets/politics_no_text.svg'
+import financeIcon from '../../assets/finance_no_text.svg'
+import techIcon from '../../assets/tech_no_text.svg'
+import cryptoIcon from '../../assets/crypto_no_text.svg'
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -937,10 +943,10 @@ function Dashboard() {
 
   const categories = useMemo(() => [
     { id: 'sports', name: 'Sports', icon: '⚽' },
-    { id: 'politics', name: 'Politics', icon: '🏛️' },
-    { id: 'finance', name: 'Finance', icon: '💰' },
-    { id: 'tech', name: 'Tech', icon: '💻' },
-    { id: 'crypto', name: 'Crypto', icon: '₿' },
+    { id: 'politics', name: 'Politics', icon: politicsIcon },
+    { id: 'finance', name: 'Finance', icon: financeIcon },
+    { id: 'tech', name: 'Tech', icon: techIcon },
+    { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
     { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' }
   ], [])
 
