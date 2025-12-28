@@ -3,6 +3,19 @@ import * as d3 from 'd3'
 import { usePrice } from '../../contexts/PriceContext'
 import './CorrelatedMarketsModal.css'
 
+// Time horizon configurations
+const TIME_HORIZONS = {
+  '7d': { label: '7 Days', dataPoints: 7 },
+  '30d': { label: '30 Days', dataPoints: 30 },
+  '90d': { label: '90 Days', dataPoints: 90 },
+  'all': { label: 'All Time', dataPoints: 365 }
+}
+
+// Utility function to parse proposal title
+const parseProposalTitle = (title) => {
+  return title.split(':')[1]?.trim() || title
+}
+
 function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, onTrade, onOpenMarket }) {
   const [selectedOption, setSelectedOption] = useState(market?.id)
   const [visibleMarkets, setVisibleMarkets] = useState(
@@ -95,7 +108,7 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
       .filter(m => visibleMarkets[m.id])
       .map(m => ({
         id: m.id,
-        label: m.proposalTitle.split(':')[1]?.trim() || m.proposalTitle,
+        label: parseProposalTitle(m.proposalTitle),
         probability: parseFloat(m.passTokenPrice) * 100,
         totalLiquidity: parseFloat(m.totalLiquidity)
       }))
@@ -104,7 +117,7 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
   // Generate mock historical data for timeline
   const generateTimelineData = (market, horizon) => {
     const now = Date.now()
-    const dataPoints = horizon === '7d' ? 7 : horizon === '30d' ? 30 : horizon === '90d' ? 90 : 365
+    const dataPoints = TIME_HORIZONS[horizon]?.dataPoints || 7
     const dayMs = 24 * 60 * 60 * 1000
     const baseProb = parseFloat(market.passTokenPrice) * 100
     
@@ -200,13 +213,13 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
       enhancedData.push({
         angle: angleSlice * i,
         radius: radius,
-        name: d.name
+        label: d.label  // Fixed: use label instead of name
       })
       
       enhancedData.push({
         angle: angleSlice * i + angleSlice / 2,
         radius: innerCircleRadius,
-        name: null
+        label: null  // Anchor point, not a real market
       })
     })
     
@@ -479,13 +492,14 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
                               e.stopPropagation()
                               toggleMarketVisibility(option.id)
                             }}
+                            aria-label={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
                             title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
                           >
-                            {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
+                            <span aria-hidden="true">{visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}</span>
                           </button>
                         </div>
                         <span className="correlated-option-name">
-                          {option.proposalTitle.split(':')[1]?.trim() || option.proposalTitle}
+                          {parseProposalTitle(option.proposalTitle)}
                         </span>
                         {selectedOption === option.id && (
                           <span className="correlated-selected-indicator">✓</span>
@@ -528,30 +542,15 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
               <div className="correlated-timeline-header">
                 <h3 className="correlated-timeline-title">Market Sentiment Over Time</h3>
                 <div className="correlated-time-horizon-controls">
-                  <button 
-                    className={`correlated-horizon-btn ${timeHorizon === '7d' ? 'active' : ''}`}
-                    onClick={() => setTimeHorizon('7d')}
-                  >
-                    7 Days
-                  </button>
-                  <button 
-                    className={`correlated-horizon-btn ${timeHorizon === '30d' ? 'active' : ''}`}
-                    onClick={() => setTimeHorizon('30d')}
-                  >
-                    30 Days
-                  </button>
-                  <button 
-                    className={`correlated-horizon-btn ${timeHorizon === '90d' ? 'active' : ''}`}
-                    onClick={() => setTimeHorizon('90d')}
-                  >
-                    90 Days
-                  </button>
-                  <button 
-                    className={`correlated-horizon-btn ${timeHorizon === 'all' ? 'active' : ''}`}
-                    onClick={() => setTimeHorizon('all')}
-                  >
-                    All Time
-                  </button>
+                  {Object.entries(TIME_HORIZONS).map(([key, { label }]) => (
+                    <button 
+                      key={key}
+                      className={`correlated-horizon-btn ${timeHorizon === key ? 'active' : ''}`}
+                      onClick={() => setTimeHorizon(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="correlated-timeline-chart-container">
