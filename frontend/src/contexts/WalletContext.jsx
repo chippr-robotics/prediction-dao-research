@@ -204,6 +204,25 @@ export function WalletProvider({ children }) {
     disconnect()
     setRoles([])
     setBalances({ etc: '0', wetc: '0', tokens: {} })
+    
+    // Clear wagmi persistence from storage
+    try {
+      // Clear wagmi's connection cache
+      const wagmiKeys = ['wagmi.store', 'wagmi.cache', 'wagmi.wallet', 'wagmi.connected']
+      wagmiKeys.forEach(key => {
+        localStorage.removeItem(key)
+        sessionStorage.removeItem(key)
+      })
+      
+      // Clear any wallet-specific storage that might persist connection
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('wagmi.') || key.startsWith('wallet')) {
+          localStorage.removeItem(key)
+        }
+      })
+    } catch (error) {
+      console.error('Error clearing wallet persistence:', error)
+    }
   }, [disconnect])
 
   // Switch to correct network
