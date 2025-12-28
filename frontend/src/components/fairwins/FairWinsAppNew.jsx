@@ -308,6 +308,29 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
   // Apply Fuse.js search to category-filtered markets
   const searchFilteredMarkets = useFuseSearch(categoryFilteredMarkets, searchQuery)
 
+  // Comparison function for sorting markets
+  const compareMarkets = useCallback((a, b, useDefaultSort = false) => {
+    switch (sortBy) {
+      case 'endTime':
+        return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
+      case 'marketValue':
+        return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+      case 'volume24h':
+        return parseFloat(b.volume24h || 0) - parseFloat(a.volume24h || 0)
+      case 'activity':
+        return parseFloat(b.tradesCount || 0) - parseFloat(a.tradesCount || 0)
+      case 'popularity':
+        return parseFloat(b.uniqueTraders || 0) - parseFloat(a.uniqueTraders || 0)
+      case 'probability':
+        return parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0)
+      case 'category':
+        return a.category.localeCompare(b.category)
+      default:
+        // For grouped markets, default to sorting by probability to show most likely outcomes first
+        return useDefaultSort ? parseFloat(b.passTokenPrice) - parseFloat(a.passTokenPrice) : 0
+    }
+  }, [sortBy])
+
   // Get markets for current category with sorting and grouping
   const getFilteredAndSortedMarkets = useCallback(() => {
     // Use searchFilteredMarkets for specific categories
@@ -337,54 +360,16 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
       // mutually exclusive outcomes, so displaying them by probability by default
       // helps users understand the market sentiment while still respecting explicit
       // sort choices.
-      const sortedGroup = [...grouped[groupId]].sort((a, b) => {
-        switch (sortBy) {
-          case 'endTime':
-            return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
-          case 'marketValue':
-            return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
-          case 'volume24h':
-            return parseFloat(b.volume24h || 0) - parseFloat(a.volume24h || 0)
-          case 'activity':
-            return parseFloat(b.tradesCount || 0) - parseFloat(a.tradesCount || 0)
-          case 'popularity':
-            return parseFloat(b.uniqueTraders || 0) - parseFloat(a.uniqueTraders || 0)
-          case 'probability':
-            return parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0)
-          case 'category':
-            return a.category.localeCompare(b.category)
-          default:
-            return parseFloat(b.passTokenPrice) - parseFloat(a.passTokenPrice)
-        }
-      })
+      const sortedGroup = [...grouped[groupId]].sort((a, b) => compareMarkets(a, b, true))
       groupedMarkets.push(...sortedGroup)
     })
     
     // Sort ungrouped markets based on selected sort option
-    const sortedUngrouped = [...ungrouped].sort((a, b) => {
-      switch (sortBy) {
-        case 'endTime':
-          return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
-        case 'marketValue':
-          return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
-        case 'volume24h':
-          return parseFloat(b.volume24h || 0) - parseFloat(a.volume24h || 0)
-        case 'activity':
-          return parseFloat(b.tradesCount || 0) - parseFloat(a.tradesCount || 0)
-        case 'popularity':
-          return parseFloat(b.uniqueTraders || 0) - parseFloat(a.uniqueTraders || 0)
-        case 'probability':
-          return parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0)
-        case 'category':
-          return a.category.localeCompare(b.category)
-        default:
-          return 0
-      }
-    })
+    const sortedUngrouped = [...ungrouped].sort((a, b) => compareMarkets(a, b, false))
     
     // Return grouped markets first, then ungrouped markets
     return [...groupedMarkets, ...sortedUngrouped]
-  }, [searchFilteredMarkets, sortBy])
+  }, [searchFilteredMarkets, compareMarkets])
 
   if (loading) {
     return (
