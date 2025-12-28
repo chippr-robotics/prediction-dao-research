@@ -275,7 +275,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
         
         // Check and record usage limit
-        require(tieredRoleManager.checkMarketCreationLimit(role), "Monthly market limit reached");
+        require(tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role), "Monthly market limit reached");
         
         require(opponent != address(0), "Invalid opponent");
         require(opponent != msg.sender, "Cannot bet against yourself");
@@ -370,7 +370,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address arbitrator,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        require(msg.value >= friendMarketFee, "Insufficient creation fee");
+        // Check FRIEND_MARKET_ROLE membership
+        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
+        require(tieredRoleManager.hasRole(role, msg.sender), "Requires FRIEND_MARKET_ROLE membership");
+        require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
+        
+        // Check and record usage limit
+        require(tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role), "Monthly market limit reached");
+        
         require(bytes(description).length > 0, "Description required");
         require(memberLimit > 2 && memberLimit <= maxSmallGroupMembers, "Invalid member limit");
         require(initialMembers.length > 0 && initialMembers.length <= memberLimit, "Invalid initial members");
@@ -388,8 +395,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
         }
         
-        // Calculate liquidity amount
-        uint256 liquidityAmount = msg.value > friendMarketFee ? msg.value - friendMarketFee : 0;
+        // For members, creation fee is waived (gas only), but accept any payment for liquidity
+        uint256 liquidityAmount = msg.value;
         
         // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
@@ -465,7 +472,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingPeriod,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        require(msg.value >= friendMarketFee, "Insufficient creation fee");
+        // Check FRIEND_MARKET_ROLE membership
+        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
+        require(tieredRoleManager.hasRole(role, msg.sender), "Requires FRIEND_MARKET_ROLE membership");
+        require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
+        
+        // Check and record usage limit
+        require(tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role), "Monthly market limit reached");
+        
         require(bytes(description).length > 0, "Description required");
         require(
             players.length >= minEventTrackingMembers && 
@@ -486,8 +500,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
         }
         
-        // Calculate liquidity amount
-        uint256 liquidityAmount = msg.value > friendMarketFee ? msg.value - friendMarketFee : 0;
+        // For members, creation fee is waived (gas only), but accept any payment for liquidity
+        uint256 liquidityAmount = msg.value;
         
         // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;

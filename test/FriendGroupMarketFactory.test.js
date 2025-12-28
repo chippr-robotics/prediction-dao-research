@@ -45,25 +45,64 @@ describe("FriendGroupMarketFactory", function () {
       await paymentManager.getAddress()
     );
     
-    // Grant FRIEND_MARKET_ROLE to test users directly (for testing, avoids draining ETH balance)
+    // Purchase FRIEND_MARKET_ROLE with ENTERPRISE duration (never expires) to avoid expiration issues
     const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();
-    const OPERATIONS_ADMIN_ROLE = await tieredRoleManager.OPERATIONS_ADMIN_ROLE();
-    const CORE_SYSTEM_ADMIN_ROLE = await tieredRoleManager.CORE_SYSTEM_ADMIN_ROLE();
+    // Match Solidity enum: NONE = 0, BRONZE = 1, SILVER = 2, GOLD = 3, PLATINUM = 4
+    const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
+    const MembershipDuration = { ONE_MONTH: 0, THREE_MONTHS: 1, SIX_MONTHS: 2, TWELVE_MONTHS: 3, ENTERPRISE: 4 };
     
-    // Role hierarchy: DEFAULT_ADMIN -> CORE_SYSTEM_ADMIN -> OPERATIONS_ADMIN -> FRIEND_MARKET_ROLE
-    // Owner (who has DEFAULT_ADMIN_ROLE) grants themselves CORE_SYSTEM_ADMIN_ROLE first
-    await tieredRoleManager.connect(owner).grantRole(CORE_SYSTEM_ADMIN_ROLE, owner.address);
+    // Get Bronze tier price (cheapest option)
+    const tierMeta = await tieredRoleManager.tierMetadata(FRIEND_MARKET_ROLE, MembershipTier.BRONZE);
+    const price = tierMeta.price;
     
-    // Now owner (with CORE_SYSTEM_ADMIN_ROLE) can grant OPERATIONS_ADMIN_ROLE
-    await tieredRoleManager.connect(owner).grantRole(OPERATIONS_ADMIN_ROLE, owner.address);
+    // Purchase ENTERPRISE memberships for test users (never expires, avoids test failures)
+    // ENTERPRISE duration = 100 years, so membership won't expire during tests
+    await tieredRoleManager.connect(owner).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr1).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr2).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr3).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr4).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
     
-    // Now owner (with OPERATIONS_ADMIN_ROLE) can grant FRIEND_MARKET_ROLE to test users
-    // This avoids purchasing expensive memberships which drains test account balances
-    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, owner.address);
-    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr1.address);
-    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr2.address);
-    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr3.address);
-    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr4.address);
+    // Verify memberships were purchased successfully (for debugging if tests fail)
+    const ownerTier = await tieredRoleManager.userTiers(owner.address, FRIEND_MARKET_ROLE);
+    const addr1Tier = await tieredRoleManager.userTiers(addr1.address, FRIEND_MARKET_ROLE);
+    const ownerHasRole = await tieredRoleManager.hasRole(FRIEND_MARKET_ROLE, owner.address);
+    const addr1HasRole = await tieredRoleManager.hasRole(FRIEND_MARKET_ROLE, addr1.address);
+    const ownerActive = await tieredRoleManager.isMembershipActive(owner.address, FRIEND_MARKET_ROLE);
+    const addr1Active = await tieredRoleManager.isMembershipActive(addr1.address, FRIEND_MARKET_ROLE);
+    
+    // Debug output
+    console.log(`Owner: tier=${ownerTier}, hasRole=${ownerHasRole}, active=${ownerActive}`);
+    console.log(`Addr1: tier=${addr1Tier}, hasRole=${addr1HasRole}, active=${addr1Active}`);
+    
+    if (ownerTier == 0 || addr1Tier == 0) {
+      throw new Error(`Membership purchase failed: owner tier=${ownerTier}, addr1 tier=${addr1Tier}`);
+    }
     
     // Transfer ownership of marketFactory to friendGroupFactory for testing
     await marketFactory.transferOwnership(await friendGroupFactory.getAddress());
