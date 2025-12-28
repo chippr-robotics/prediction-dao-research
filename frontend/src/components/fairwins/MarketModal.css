@@ -443,13 +443,24 @@
 }
 
 .reward-value {
+  color: #90EE90; /* Light green for reward */
+  font-weight: 600;
+}
+
+/* Total value - big, bold and green */
+.total-value {
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--brand-primary, #36B37E);
 }
 
-/* Total value - bold and green */
-.total-value {
-  font-weight: 700;
-  color: var(--brand-primary, #36B37E);
+/* Disclaimer text */
+.calc-disclaimer {
+  font-size: 0.75rem;
+  color: #999; /* Light grey */
+  text-align: center;
+  margin-top: 0.25rem;
+  font-style: italic;
 }
 
 /* Send Button */

@@ -72,7 +72,12 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
     }
   }, [isOpen])
 
-  if (!isOpen || !market || !correlatedMarkets) return null
+  if (!isOpen || !market) return null
+  
+  // Handle case where correlatedMarkets is not provided or empty
+  if (!correlatedMarkets || correlatedMarkets.length === 0) {
+    return null
+  }
 
   const selectedMarket = useMemo(() => {
     return correlatedMarkets.find(m => m.id === selectedOption) || market
@@ -104,13 +109,15 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
 
   // Prepare radar chart data (only visible markets)
   const radarData = useMemo(() => {
+    if (!correlatedMarkets || correlatedMarkets.length === 0) return []
+    
     return correlatedMarkets
-      .filter(m => visibleMarkets[m.id])
+      .filter(m => m && m.id && visibleMarkets[m.id])
       .map(m => ({
         id: m.id,
-        label: parseProposalTitle(m.proposalTitle),
-        probability: parseFloat(m.passTokenPrice) * 100,
-        totalLiquidity: parseFloat(m.totalLiquidity)
+        label: parseProposalTitle(m.proposalTitle || ''),
+        probability: parseFloat(m.passTokenPrice || 0) * 100,
+        totalLiquidity: parseFloat(m.totalLiquidity || 0)
       }))
   }, [correlatedMarkets, visibleMarkets])
 
@@ -478,7 +485,10 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
               <div className="correlated-options-section">
                 <h3 className="correlated-options-title">Options</h3>
                 <div className="correlated-options-list">
-                  {correlatedMarkets.map((option) => (
+                  {correlatedMarkets && correlatedMarkets.length > 0 && correlatedMarkets.map((option) => {
+                    if (!option || !option.id) return null
+                    
+                    return (
                     <button
                       key={option.id}
                       className={`correlated-option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
@@ -499,7 +509,7 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
                           </button>
                         </div>
                         <span className="correlated-option-name">
-                          {parseProposalTitle(option.proposalTitle)}
+                          {parseProposalTitle(option.proposalTitle || '')}
                         </span>
                         {selectedOption === option.id && (
                           <span className="correlated-selected-indicator">✓</span>
@@ -509,11 +519,11 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
                       <div className="correlated-option-stats">
                         <div className="correlated-option-stat">
                           <span className="correlated-stat-label">Probability</span>
-                          <span className="correlated-stat-value">{(parseFloat(option.passTokenPrice) * 100).toFixed(1)}%</span>
+                          <span className="correlated-stat-value">{(parseFloat(option.passTokenPrice || 0) * 100).toFixed(1)}%</span>
                         </div>
                         <div className="correlated-option-stat">
                           <span className="correlated-stat-label">Volume</span>
-                          <span className="correlated-stat-value">{formatPrice(option.totalLiquidity, { compact: true })}</span>
+                          <span className="correlated-stat-value">{formatPrice(option.totalLiquidity || 0, { compact: true })}</span>
                         </div>
                       </div>
 
@@ -522,7 +532,7 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
                         <div className="correlated-histogram-bar-container">
                           <div 
                             className="correlated-histogram-bar"
-                            style={{ width: `${parseFloat(option.passTokenPrice) * 100}%` }}
+                            style={{ width: `${parseFloat(option.passTokenPrice || 0) * 100}%` }}
                           />
                         </div>
                         <div className="correlated-histogram-labels">
@@ -532,7 +542,8 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
                         </div>
                       </div>
                     </button>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </div>

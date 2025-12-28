@@ -25,9 +25,11 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
   const [shares, setShares] = useState('10')
   const [price, setPrice] = useState('')
   const [currentPanel, setCurrentPanel] = useState(0) // 0: Trading, 1: Details, 2: Share
+  const [hasUserEditedAmount, setHasUserEditedAmount] = useState(false) // Track if user has edited the amount
   const modalRef = useRef(null)
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
+  const isTouchOnButton = useRef(false)
   const { formatPrice } = usePrice()
 
   // Reset state when modal opens and set default values
@@ -37,7 +39,8 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedOutcome('YES')
       setOrderType('market')
-      setAmount('1.00')
+      setAmount('1')
+      setHasUserEditedAmount(false)
       setShares('10')
       setCurrentPanel(0) // Always start at trading panel
       // Set price to current spot price with validation
@@ -105,14 +108,27 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
 
   // Touch handlers for swipe
   const handleTouchStart = (e) => {
-    touchStartX.current = e.touches[0].clientX
+    // Check if touch started on a button or input element
+    const target = e.target
+    isTouchOnButton.current = target.tagName === 'BUTTON' || target.tagName === 'INPUT' || target.closest('button') !== null
+    
+    if (!isTouchOnButton.current) {
+      touchStartX.current = e.touches[0].clientX
+    }
   }
 
   const handleTouchMove = (e) => {
-    touchEndX.current = e.touches[0].clientX
+    if (!isTouchOnButton.current) {
+      touchEndX.current = e.touches[0].clientX
+    }
   }
 
   const handleTouchEnd = () => {
+    if (isTouchOnButton.current) {
+      isTouchOnButton.current = false
+      return
+    }
+    
     const swipeThreshold = 50
     const diff = touchStartX.current - touchEndX.current
 
@@ -365,6 +381,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                         // Allow empty string so the user can clear the input
                         if (sanitized === '' || /^\d*\.?\d{0,2}$/.test(sanitized)) {
                           setAmount(sanitized)
+                          setHasUserEditedAmount(true)
                         }
                       }}
                     />
@@ -378,11 +395,17 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                         key={value}
                         className="quick-action-btn" 
                         onClick={() => {
-                          const currentVal = parseFloat(amount) || 0
-                          const newVal = currentVal + value
-                          // Ensure new value doesn't exceed balance
-                          if (newVal <= userBalance) {
-                            setAmount(String(newVal.toFixed(2)))
+                          // First press replaces the initial $1, subsequent presses add
+                          if (!hasUserEditedAmount && amount === '1') {
+                            setAmount(String(value))
+                            setHasUserEditedAmount(true)
+                          } else {
+                            const currentVal = parseFloat(amount) || 0
+                            const newVal = currentVal + value
+                            // Ensure new value doesn't exceed balance
+                            if (newVal <= userBalance) {
+                              setAmount(String(newVal.toFixed(2)))
+                            }
                           }
                         }}
                         type="button"
@@ -405,6 +428,9 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                   <div className="calc-row">
                     <span className="calc-label">Total Payout</span>
                     <span className="calc-value total-value">${totalPayout.toFixed(2)}</span>
+                  </div>
+                  <div className="calc-disclaimer">
+                    Amount does not include processing fees
                   </div>
                 </div>
               </div>
@@ -483,6 +509,9 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                   <div className="calc-row">
                     <span className="calc-label">Total Payout</span>
                     <span className="calc-value total-value">${limitTotalPayout.toFixed(2)}</span>
+                  </div>
+                  <div className="calc-disclaimer">
+                    Amount does not include processing fees
                   </div>
                 </div>
               </div>
