@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
 import { useUserPreferences } from '../hooks/useUserPreferences'

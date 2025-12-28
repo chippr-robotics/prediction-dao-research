@@ -19,7 +19,6 @@ const parseProposalTitle = (title) => {
 function CorrelatedMarketsPage() {
   const { groupId } = useParams()
   const navigate = useNavigate()
-  const [markets, setMarkets] = useState([])
   const [correlatedMarkets, setCorrelatedMarkets] = useState([])
   const [selectedOption, setSelectedOption] = useState(null)
   const [visibleMarkets, setVisibleMarkets] = useState({})
@@ -35,7 +34,6 @@ function CorrelatedMarketsPage() {
       try {
         setLoading(true)
         const allMarkets = getMockMarkets()
-        setMarkets(allMarkets)
         
         const correlated = allMarkets.filter(m => m.correlationGroupId === groupId)
         
@@ -67,16 +65,18 @@ function CorrelatedMarketsPage() {
   }
 
   const handleMarketCardClick = (marketId) => {
-    const now = Date.now()
     const DOUBLE_TAP_DELAY = 300
+    const now = Date.now()
     
-    if (lastTap.marketId === marketId && (now - lastTap.timestamp) < DOUBLE_TAP_DELAY) {
-      navigate(`/market/${marketId}`)
-      setLastTap({ marketId: null, timestamp: 0 })
-    } else {
-      setSelectedOption(marketId)
-      setLastTap({ marketId, timestamp: now })
-    }
+    setLastTap(prev => {
+      if (prev.marketId === marketId && (now - prev.timestamp) < DOUBLE_TAP_DELAY) {
+        navigate(`/market/${marketId}`)
+        return { marketId: null, timestamp: 0 }
+      } else {
+        setSelectedOption(marketId)
+        return { marketId, timestamp: now }
+      }
+    })
   }
 
   const radarData = useMemo(() => {

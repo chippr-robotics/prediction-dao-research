@@ -100,11 +100,6 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
     alert('Transfer functionality requires deployed contracts.')
   }
 
-  const handleUpdateTokenMetadata = async (tokenId, newURI) => {
-    console.log('Updating metadata:', tokenId, newURI)
-    alert('Metadata update requires deployed contracts.')
-  }
-
   const handleListOnETCSwap = async (tokenId) => {
     console.log('Listing on ETCSwap:', tokenId)
     alert('ETCSwap listing requires deployed contracts.')
