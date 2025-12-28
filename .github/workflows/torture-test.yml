@@ -341,10 +341,72 @@ jobs:
           path: medusa-results/
           retention-days: 90
 
+  cypress-e2e:
+    name: Cypress E2E Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Start Hardhat node
+        run: |
+          npm run node > /tmp/hardhat-node.log 2>&1 &
+          echo "HARDHAT_PID=$!" >> $GITHUB_ENV
+        
+      - name: Wait for Hardhat to start
+        run: |
+          echo "Waiting for Hardhat node to be ready..."
+          sleep 15
+          # Check if Hardhat node is responding
+          curl -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+            http://localhost:8545 || echo "Hardhat node may not be ready yet"
+
+      - name: Deploy contracts to local network
+        run: |
+          echo "Deploying contracts to local Hardhat network..."
+          npm run deploy:local
+          echo "Contract deployment completed"
+        continue-on-error: false
+
+      - name: Run Cypress E2E tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Cypress screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: frontend/cypress/screenshots
+          retention-days: 90
+
+      - name: Upload Cypress videos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cypress-videos
+          path: frontend/cypress/videos
+          retention-days: 90
+
   summary:
     name: Generate Test Summary
     runs-on: ubuntu-latest
-    needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis, medusa-fuzzing]
+    needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis, medusa-fuzzing, cypress-e2e]
     if: always()
     
     steps:
@@ -385,3 +447,4 @@ jobs:
           echo "- Slither Analysis: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Manticore Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Medusa Fuzzing (Extended): Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Cypress E2E Test Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
