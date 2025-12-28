@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import './DevelopmentWarningBanner.css'
 
 const DEV_WARNING_DISMISSED_KEY = 'dev_warning_banner_dismissed'
-const DEV_BANNER_HEIGHT = '45px' // Approximate height including padding
+// Height calculated from: padding (0.75rem * 2 = 1.5rem ≈ 24px) + content height (≈ 20px) ≈ 44-48px
+const DEV_BANNER_HEIGHT = '45px'
 
 /**
  * Dismissible warning banner displayed at the top of the site
@@ -19,6 +20,11 @@ function DevelopmentWarningBanner() {
     if (!isDismissed) {
       document.documentElement.style.setProperty('--dev-banner-height', DEV_BANNER_HEIGHT)
     } else {
+      document.documentElement.style.setProperty('--dev-banner-height', '0px')
+    }
+
+    // Cleanup: Reset to 0px when component unmounts
+    return () => {
       document.documentElement.style.setProperty('--dev-banner-height', '0px')
     }
   }, [isDismissed])
