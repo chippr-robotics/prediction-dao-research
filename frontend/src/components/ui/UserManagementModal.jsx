@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -43,6 +43,21 @@ function UserManagementModal({ onScanMarket }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
+  const [wasDisconnected, setWasDisconnected] = useState(!isConnected)
+
+  // Auto-close modal when connection is successful
+  useEffect(() => {
+    if (wasDisconnected && isConnected) {
+      // Connection successful - close the modal after a brief delay for feedback
+      const timer = setTimeout(() => {
+        hideModal()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+    if (!isConnected) {
+      setWasDisconnected(true)
+    }
+  }, [isConnected, wasDisconnected, hideModal])
 
   const handleConnect = async (connectorId) => {
     setConnectingConnectorId(connectorId)

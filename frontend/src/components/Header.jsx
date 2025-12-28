@@ -5,12 +5,13 @@ import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import UserManagementModal from './ui/UserManagementModal'
 import TokenMintButton from './TokenMintButton'
+import walletIcon from '../assets/wallet_icon.svg'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isConnected } = useWallet()
+  const { isConnected, address } = useWallet()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -49,6 +50,12 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
       size: 'large',
       closable: true
     })
+  }
+
+  // Shorten wallet address for display
+  const shortenAddress = (address) => {
+    if (!address) return ''
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
   return (
@@ -97,12 +104,22 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
             <>
               <TokenMintButton />
               <button
-                className="user-panel-btn"
+                className={`wallet-btn ${isConnected ? 'connected' : ''}`}
                 onClick={handleOpenUserManagement}
-                aria-label="Open user management"
-                title="User Management"
+                aria-label={isConnected ? `Wallet connected: ${shortenAddress(address)}` : "Connect wallet"}
+                title={isConnected ? `Wallet: ${shortenAddress(address)}` : "Connect Wallet"}
               >
-                <span className="user-icon" aria-hidden="true">👤</span>
+                <img 
+                  src={walletIcon} 
+                  alt="Wallet" 
+                  className="wallet-icon-img"
+                  aria-hidden="true"
+                />
+                {isConnected && (
+                  <span className="wallet-address-badge">
+                    {shortenAddress(address)}
+                  </span>
+                )}
                 {isConnected && preferences.clearPathStatus.active && (
                   <span className="clearpath-indicator" aria-label="ClearPath Active">✓</span>
                 )}
