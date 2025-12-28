@@ -93,7 +93,7 @@ function TokenMintButton() {
 
   const handlePurchaseMembership = () => {
     setIsOpen(false)
-    showModal(<RolePurchaseModal onClose={() => {}} />, {
+    showModal(<RolePurchaseModal onClose={() => showModal(null)} />, {
       title: 'Purchase Premium Access',
       size: 'large',
       closable: true
@@ -104,6 +104,8 @@ function TokenMintButton() {
     console.log('Creating token:', tokenData)
     
     // Show transaction dialog
+    // Note: In production, this would call the TokenMintFactory contract methods
+    // (tokenMintFactory.createERC20() or createERC721()) to initiate blockchain transaction
     showModal(
       <div className="transaction-modal">
         <h3>Token Creation Transaction</h3>
@@ -145,9 +147,6 @@ function TokenMintButton() {
         closable: true
       }
     )
-    
-    // In production, this would trigger the wallet transaction
-    // await tokenMintFactory.createERC20(...) or createERC721(...)
   }
 
   // Determine available options based on roles and membership
@@ -179,28 +178,24 @@ function TokenMintButton() {
       })
     }
 
+    // Helper function to create membership purchase option
+    const createMembershipOption = (description) => ({
+      id: 'purchase-membership',
+      label: 'Purchase Membership',
+      icon: '🎫',
+      description,
+      action: handlePurchaseMembership,
+      highlight: true
+    })
+
     // If no membership, show purchase option
     if (!hasMembership) {
-      options.push({
-        id: 'purchase-membership',
-        label: 'Purchase Membership',
-        icon: '🎫',
-        description: 'Get access to premium features',
-        action: handlePurchaseMembership,
-        highlight: true
-      })
+      options.push(createMembershipOption('Get access to premium features'))
     }
 
     // If user has no roles and no membership, just show purchase option
     if (options.length === 0) {
-      options.push({
-        id: 'purchase-membership',
-        label: 'Purchase Membership',
-        icon: '🎫',
-        description: 'Get access to token minting and market creation',
-        action: handlePurchaseMembership,
-        highlight: true
-      })
+      return [createMembershipOption('Get access to token minting and market creation')]
     }
 
     return options
