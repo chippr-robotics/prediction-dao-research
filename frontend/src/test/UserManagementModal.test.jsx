@@ -36,7 +36,7 @@ vi.mock('wagmi/connectors', () => ({
   walletConnect: vi.fn(() => ({})),
 }))
 
-const renderWithProviders = (ui, { isConnected = true } = {}) => {
+const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
   // Set up mocks based on connection state
   mockUseAccount.mockReturnValue({
     address: isConnected ? '0x1234567890123456789012345678901234567890' : null,
@@ -44,7 +44,7 @@ const renderWithProviders = (ui, { isConnected = true } = {}) => {
   })
   mockUseConnect.mockReturnValue({
     connect: vi.fn(),
-    connectors: [{ id: 'injected', name: 'MetaMask' }]
+    connectors: connectors || [{ id: 'injected', name: 'MetaMask' }]
   })
   mockUseDisconnect.mockReturnValue({
     disconnect: vi.fn()
@@ -96,7 +96,7 @@ describe('UserManagementModal', () => {
       renderWithProviders(<UserManagementModal />, { isConnected: false })
       
       // Check for connector buttons instead of single connect button
-      const metaMaskButton = screen.getByText(/MetaMask \/ Browser Wallet/i)
+      const metaMaskButton = screen.getByText(/MetaMask/i)
       expect(metaMaskButton).toBeInTheDocument()
       expect(metaMaskButton).not.toBeDisabled()
     })
@@ -113,7 +113,7 @@ describe('UserManagementModal', () => {
       
       renderWithProviders(<UserManagementModal />, { isConnected: false })
       
-      const connectButton = screen.getByText(/MetaMask \/ Browser Wallet/i)
+      const connectButton = screen.getByText(/MetaMask/i)
       fireEvent.click(connectButton)
       
       await waitFor(() => {
@@ -121,16 +121,57 @@ describe('UserManagementModal', () => {
       })
     })
 
-    it('should show help text for installing MetaMask when not available', () => {
-      const originalEthereum = window.ethereum
-      delete window.ethereum
-      
+    it('should show help text for Web3 wallets', () => {
       renderWithProviders(<UserManagementModal />, { isConnected: false })
       
-      expect(screen.getByText(/Don't have a Web3 wallet?/i)).toBeInTheDocument()
-      expect(screen.getByText('Install MetaMask')).toBeInTheDocument()
+      expect(screen.getByText(/New to Web3 wallets?/i)).toBeInTheDocument()
+      expect(screen.getByText('Learn about Web3 wallets')).toBeInTheDocument()
+    })
+
+    it('should render multiple connector options when available', () => {
+      renderWithProviders(<UserManagementModal />, { 
+        isConnected: false,
+        connectors: [
+          { id: 'injected', name: 'MetaMask' },
+          { id: 'walletConnect', name: 'WalletConnect' }
+        ]
+      })
       
-      window.ethereum = originalEthereum
+      expect(screen.getByText(/🦊 MetaMask/i)).toBeInTheDocument()
+      expect(screen.getByText(/🔗 WalletConnect/i)).toBeInTheDocument()
+    })
+
+    it('should only disable the clicked connector during connection', async () => {
+      const mockConnect = vi.fn().mockImplementation(() => {
+        return new Promise(resolve => setTimeout(() => resolve({ accounts: ['0x123'] }), 100))
+      })
+      
+      mockUseConnect.mockReturnValueOnce({
+        connect: mockConnect,
+        connectors: [
+          { id: 'injected', name: 'MetaMask' },
+          { id: 'walletConnect', name: 'WalletConnect' }
+        ]
+      })
+      
+      renderWithProviders(<UserManagementModal />, { 
+        isConnected: false,
+        connectors: [
+          { id: 'injected', name: 'MetaMask' },
+          { id: 'walletConnect', name: 'WalletConnect' }
+        ]
+      })
+      
+      const metaMaskButton = screen.getByText(/🦊 MetaMask/i)
+      const walletConnectButton = screen.getByText(/🔗 WalletConnect/i)
+      
+      fireEvent.click(metaMaskButton)
+      
+      await waitFor(() => {
+        // Both buttons should be disabled during connection
+        expect(metaMaskButton).toBeDisabled()
+        expect(walletConnectButton).toBeDisabled()
+      })
     })
   })
 

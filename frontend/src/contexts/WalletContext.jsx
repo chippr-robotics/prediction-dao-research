@@ -126,7 +126,8 @@ export function WalletProvider({ children }) {
       setRoles([])
       setBalances({ etc: '0', wetc: '0', tokens: {} })
     }
-  }, [address, isConnected, loadRoles, fetchBalances])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected])
 
   // Refresh balances manually
   const refreshBalances = useCallback(() => {
@@ -169,16 +170,16 @@ export function WalletProvider({ children }) {
   // Connect wallet
   const connectWallet = useCallback(async (connectorId) => {
     try {
-      // If no specific connector is requested, try WalletConnect first, then injected
+      // If no specific connector is requested, try injected first, then WalletConnect
       let connector
       
       if (connectorId) {
         // Use specific connector if requested
         connector = connectors.find(c => c.id === connectorId)
       } else {
-        // Try WalletConnect first if available, otherwise use injected
-        connector = connectors.find(c => c.id === 'walletConnect') || 
-                   connectors.find(c => c.id === 'injected')
+        // Try injected first if available, otherwise use WalletConnect
+        connector = connectors.find(c => c.id === 'injected') || 
+                   connectors.find(c => c.id === 'walletConnect')
       }
       
       if (!connector) {

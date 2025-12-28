@@ -67,7 +67,28 @@ const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperativ
 const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
 
 // Get app URL for WalletConnect metadata
-const appUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://fairwins.app')
+const resolveAppUrl = () => {
+  const envUrl = import.meta.env.VITE_APP_URL
+
+  if (envUrl) {
+    return envUrl
+  }
+
+  // In production, require VITE_APP_URL to be set to avoid metadata mismatches
+  if (import.meta.env.PROD && walletConnectProjectId) {
+    console.warn('VITE_APP_URL should be set in production for correct WalletConnect metadata. Falling back to window.location.origin.')
+  }
+
+  // In development, fall back to the current origin when available
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    return window.location.origin
+  }
+
+  // As a last resort, return a fallback domain
+  return 'https://fairwins.app'
+}
+
+const appUrl = resolveAppUrl()
 
 // Define supported chains
 const chains = [ethereumClassic, mordor, hardhat]

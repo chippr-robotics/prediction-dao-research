@@ -7,6 +7,7 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import RolePurchaseModal from './RolePurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
+import LoadingScreen from './LoadingScreen'
 import './UserManagementModal.css'
 
 // Connector display configuration
@@ -17,7 +18,7 @@ const CONNECTOR_CONFIG = {
   },
   injected: {
     icon: '🦊',
-    label: 'MetaMask / Browser Wallet'
+    label: 'MetaMask'
   }
 }
 
@@ -40,11 +41,11 @@ function UserManagementModal({ onScanMarket }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
-  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
 
   const handleConnect = async (connectorId) => {
-    setIsConnecting(true)
+    setConnectingConnectorId(connectorId)
     setConnectionError(null)
     
     try {
@@ -60,12 +61,12 @@ function UserManagementModal({ onScanMarket }) {
       if (error.message.includes('rejected') || error.message.includes('approve')) {
         setConnectionError('Connection request was rejected. Please try again.')
       } else if (error.message.includes('connector')) {
-        setConnectionError('No wallet connector available.')
+        setConnectionError('No wallet connector available. Please install a Web3 wallet.')
       } else {
         setConnectionError(error.message || 'Failed to connect wallet. Please try again.')
       }
     } finally {
-      setIsConnecting(false)
+      setConnectingConnectorId(null)
     }
   }
 
@@ -140,35 +141,43 @@ function UserManagementModal({ onScanMarket }) {
             )}
             
             <div className="connector-options">
-              {connectors.map((connector) => (
-                <button
-                  key={connector.id}
-                  onClick={() => handleConnect(connector.id)}
-                  className="connector-btn"
-                  disabled={isConnecting}
-                  aria-busy={isConnecting}
-                >
-                  {isConnecting ? (
-                    <>
-                      <span className="spinner" aria-hidden="true"></span>
-                      Connecting...
-                    </>
-                  ) : (
-                    getConnectorInfo(connector)
-                  )}
-                </button>
-              ))}
+              {connectors.map((connector) => {
+                const isThisConnecting = connectingConnectorId === connector.id
+                return (
+                  <button
+                    key={connector.id}
+                    onClick={() => handleConnect(connector.id)}
+                    className="connector-btn"
+                    disabled={connectingConnectorId !== null}
+                    aria-busy={isThisConnecting}
+                  >
+                    {isThisConnecting ? (
+                      <>
+                        <LoadingScreen 
+                          visible={true} 
+                          inline 
+                          size="small" 
+                          text="" 
+                        />
+                        <span style={{ marginLeft: '8px' }}>Connecting...</span>
+                      </>
+                    ) : (
+                      getConnectorInfo(connector)
+                    )}
+                  </button>
+                )
+              })}
             </div>
             
             <div className="wallet-help" role="note">
-              <p>Don't have a Web3 wallet?</p>
+              <p>New to Web3 wallets?</p>
               <a 
-                href="https://metamask.io/download/" 
+                href="https://ethereum.org/en/wallets/" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="install-metamask-link"
               >
-                Install MetaMask
+                Learn about Web3 wallets
               </a>
             </div>
           </div>
