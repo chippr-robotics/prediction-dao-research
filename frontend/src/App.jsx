@@ -5,7 +5,6 @@ import './App.css'
 import LandingPage from './components/LandingPage'
 import PlatformSelector from './components/PlatformSelector'
 import ClearPathApp from './components/ClearPathApp'
-import FairWinsApp from './components/FairWinsApp'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
 import StateManagementDemo from './components/StateManagementDemo'
 import RoleManagementAdmin from './components/RoleManagementAdmin'
@@ -152,15 +151,7 @@ function AppContent() {
             />
           } 
         />
-        <Route 
-          path="/fairwins-old" 
-          element={
-            <FairWinsApp 
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          } 
-        />
+
         <Route path="/admin/roles" element={<RoleManagementAdmin />} />
         <Route path="/purchase-roles" element={<RolePurchaseScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
