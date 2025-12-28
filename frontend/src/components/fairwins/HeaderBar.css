@@ -1,6 +1,6 @@
 .header-bar {
   position: fixed;
-  top: 0;
+  top: var(--dev-banner-height, 0px);
   left: 0;
   right: 0;
   height: 70px;
@@ -9,7 +9,7 @@
   z-index: 200;
   display: flex;
   align-items: center;
-  transition: transform 0.3s ease, height 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, height 0.3s ease, box-shadow 0.3s ease, top 0.3s ease;
 }
 
 /* Header hidden state (mobile scrolling down) */
