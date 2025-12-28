@@ -6,6 +6,9 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
   const [copied, setCopied] = useState(false)
   const qrRef = useRef(null)
 
+  // Only compute url when we have data
+  const url = (isOpen && market) ? (marketUrl || `${window.location.origin}/market/${market.id}`) : ''
+
   // Focus management
   useEffect(() => {
     if (isOpen) {
@@ -35,9 +38,9 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
     }
   }, [isOpen, onClose])
 
+  // Don't render anything if modal is closed or no market data
   if (!isOpen || !market) return null
 
-  const url = marketUrl || `${window.location.origin}/market/${market.id}`
   const shareText = `Check out this market: ${market.proposalTitle}`
 
   const handleCopyLink = async () => {
