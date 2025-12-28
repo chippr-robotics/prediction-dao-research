@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fairwins.app/schemas/token-metadata-v1.json",
+  "title": "Token Metadata Schema",
+  "description": "Schema for ERC20/ERC721 token metadata following OpenSea standards",
+  "type": "object",
+  "required": ["name", "symbol", "description", "image", "attributes"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Token name",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Token symbol",
+      "minLength": 1,
+      "maxLength": 10
+    },
+    "description": {
+      "type": "string",
+      "description": "Token description",
+      "minLength": 10
+    },
+    "external_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Project website"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Token logo URI (IPFS preferred)"
+    },
+    "background_color": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{6}$"
+    },
+    "attributes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trait_type", "value"],
+        "properties": {
+          "trait_type": { "type": "string" },
+          "value": { "type": ["string", "number"] },
+          "display_type": {
+            "enum": ["string", "number", "date", "boost_number", "boost_percentage"]
+          }
+        }
+      }
+    },
+    "properties": {
+      "type": "object",
+      "properties": {
+        "token_address": { "type": "string" },
+        "decimals": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "creator": { "type": "string" },
+        "listed_on_etcswap": { "type": "boolean" },
+        "contract_verified": { "type": "boolean" },
+        "tokenomics": { "type": "object" },
+        "utility": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "links": { "type": "object" }
+      }
+    }
+  }
+}
