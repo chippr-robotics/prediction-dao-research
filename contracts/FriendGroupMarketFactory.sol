@@ -127,23 +127,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     event ManagerUpdated(address indexed oldManager, address indexed newManager);
     event PaymentTokenAdded(address indexed token);
     event PaymentTokenRemoved(address indexed token);
-    );
-    
-    event FeesUpdated(uint256 publicFee, uint256 friendFee, uint256 oneVsOneFee);
-    event MemberLimitsUpdated(uint256 maxSmallGroup, uint256 maxOneVsOne, uint256 minEventTracking, uint256 maxEventTracking);
-    event ManagerUpdated(address indexed oldManager, address indexed newManager);
-    
-    event MemberAdded(
-        uint256 indexed friendMarketId,
-        address indexed member,
-        uint256 timestamp
-    );
-    
-    event MemberRemoved(
-        uint256 indexed friendMarketId,
-        address indexed member,
-        uint256 timestamp
-    );
     
     event ArbitratorSet(
         uint256 indexed friendMarketId,
@@ -336,7 +319,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             active: true,
             description: description,
             peggedPublicMarketId: peggedPublicMarketId,
-            autoPegged: peggedPublicMarketId > 0
+            autoPegged: peggedPublicMarketId > 0,
+            paymentToken: address(0),  // Native ETC by default
+            liquidityAmount: liquidityAmount
         });
         
         memberCount[friendMarketId] = 2;
@@ -355,7 +340,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             MarketType.OneVsOne,
             msg.sender,
             maxOneVsOneMembers,
-            0 // No creation fee for members
+            0, // No creation fee for members
+            address(0)  // Native ETC
         );
         
         emit MemberAdded(friendMarketId, msg.sender, block.timestamp);
@@ -428,7 +414,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             active: true,
             description: description,
             peggedPublicMarketId: peggedPublicMarketId,
-            autoPegged: peggedPublicMarketId > 0
+            autoPegged: peggedPublicMarketId > 0,
+            paymentToken: address(0),  // Native ETC by default
+            liquidityAmount: liquidityAmount
         });
         
         memberCount[friendMarketId] = initialMembers.length;
@@ -451,7 +439,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             MarketType.SmallGroup,
             msg.sender,
             memberLimit,
-            friendMarketFee
+            friendMarketFee,
+            address(0)  // Native ETC
         );
         
         if (arbitrator != address(0)) {
@@ -520,7 +509,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             active: true,
             description: description,
             peggedPublicMarketId: peggedPublicMarketId,
-            autoPegged: peggedPublicMarketId > 0
+            autoPegged: peggedPublicMarketId > 0,
+            paymentToken: address(0),  // Native ETC by default
+            liquidityAmount: liquidityAmount
         });
         
         memberCount[friendMarketId] = players.length;
@@ -542,7 +533,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             MarketType.EventTracking,
             msg.sender,
             maxEventTrackingMembers,
-            friendMarketFee
+            friendMarketFee,
+            address(0)  // Native ETC
         );
     }
     
