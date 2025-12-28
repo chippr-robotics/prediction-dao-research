@@ -3,6 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
 import useFuseSearch from '../../hooks/useFuseSearch'
 import { getMockMarkets } from '../../utils/mockDataLoader'
+import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -10,6 +11,8 @@ import CorrelatedMarketsModal from './CorrelatedMarketsModal'
 import MarketModal from './MarketModal'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
+import CompactMarketView from './CompactMarketView'
+import ViewToggle from './ViewToggle'
 import SwapPanel from './SwapPanel'
 import BalanceDisplay from './BalanceDisplay'
 import BalanceChart from './BalanceChart'
@@ -32,6 +35,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'volume24h', 'activity', 'popularity', 'probability', 'category'
   const [showHero, setShowHero] = useState(false) // Control hero visibility
   const [searchQuery, setSearchQuery] = useState('') // Search query state
+  const [viewMode, setViewMode] = useState(() => getViewPreference()) // View mode: grid or compact
   const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
@@ -128,6 +132,11 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
   const handleSearchChange = (query) => {
     setSearchQuery(query)
+  }
+
+  const handleViewChange = (newViewMode) => {
+    setViewMode(newViewMode)
+    setViewPreference(newViewMode)
   }
 
   const handleMarketClick = (market) => {
@@ -471,13 +480,25 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                         ({trendingMarkets.length} markets)
                       </span>
                     </div>
+                    <ViewToggle 
+                      currentView={viewMode}
+                      onViewChange={handleViewChange}
+                    />
                   </div>
-                  <MarketGrid 
-                    markets={trendingMarkets}
-                    onMarketClick={handleMarketClick}
-                    selectedMarketId={selectedMarket?.id}
-                    loading={loading}
-                  />
+                  {viewMode === VIEW_MODES.GRID ? (
+                    <MarketGrid 
+                      markets={trendingMarkets}
+                      onMarketClick={handleMarketClick}
+                      selectedMarketId={selectedMarket?.id}
+                      loading={loading}
+                    />
+                  ) : (
+                    <CompactMarketView 
+                      markets={trendingMarkets}
+                      onMarketClick={handleMarketClick}
+                      loading={loading}
+                    />
+                  )}
                 </div>
               ) : (
                 /* Full Grid View for specific category */
@@ -515,14 +536,26 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                           <option value="probability">Probability (YES%)</option>
                         </select>
                       </div>
+                      <ViewToggle 
+                        currentView={viewMode}
+                        onViewChange={handleViewChange}
+                      />
                     </div>
                   </div>
-                  <MarketGrid 
-                    markets={getFilteredAndSortedMarkets()}
-                    onMarketClick={handleMarketClick}
-                    selectedMarketId={selectedMarket?.id}
-                    loading={loading}
-                  />
+                  {viewMode === VIEW_MODES.GRID ? (
+                    <MarketGrid 
+                      markets={getFilteredAndSortedMarkets()}
+                      onMarketClick={handleMarketClick}
+                      selectedMarketId={selectedMarket?.id}
+                      loading={loading}
+                    />
+                  ) : (
+                    <CompactMarketView 
+                      markets={getFilteredAndSortedMarkets()}
+                      onMarketClick={handleMarketClick}
+                      loading={loading}
+                    />
+                  )}
                 </div>
               )}
             </>
