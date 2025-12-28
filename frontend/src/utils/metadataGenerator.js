@@ -413,12 +413,13 @@ export function generateDAOMetadata(params) {
 }
 
 /**
- * Validate metadata against schema
+ * Validate metadata against basic requirements
  * @param {Object} metadata - Metadata object to validate
- * @param {string} schemaType - Schema type (market, token, proposal, dao)
  * @returns {Object} Validation result with valid flag and errors array
+ * @description Performs basic validation of metadata structure and format.
+ * For full schema validation, use a JSON schema validator with the schema files.
  */
-export function validateMetadata(metadata, schemaType) {
+export function validateMetadata(metadata) {
   const errors = []
 
   // Basic validation
@@ -463,12 +464,18 @@ export function validateMetadata(metadata, schemaType) {
  * @returns {boolean} True if valid URL
  */
 function isValidUrl(url) {
+  // Check for IPFS URL format first (not parseable by URL constructor)
+  if (url.startsWith('ipfs://')) {
+    // Basic IPFS CID validation - should have something after ipfs://
+    return url.length > 7
+  }
+  
+  // Check for standard HTTP/HTTPS URLs
   try {
-    new URL(url)
-    return true
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
   } catch (e) {
-    // Check for IPFS URL
-    return url.startsWith('ipfs://')
+    return false
   }
 }
 

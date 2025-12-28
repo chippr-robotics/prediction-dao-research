@@ -311,7 +311,7 @@ describe('validateMetadata', () => {
       ]
     }
 
-    const result = validateMetadata(metadata, 'market')
+    const result = validateMetadata(metadata)
     expect(result.valid).toBe(true)
     expect(result.errors).toHaveLength(0)
   })
@@ -319,10 +319,10 @@ describe('validateMetadata', () => {
   it('should detect missing required fields', () => {
     const metadata = {
       name: 'Test'
-      // missing description, image, attributes
+      // Has name, but missing: description, image, attributes
     }
 
-    const result = validateMetadata(metadata, 'market')
+    const result = validateMetadata(metadata)
     expect(result.valid).toBe(false)
     expect(result.errors).toContain('Missing required field: description')
     expect(result.errors).toContain('Missing required field: image')
@@ -338,7 +338,7 @@ describe('validateMetadata', () => {
       background_color: 'invalid'
     }
 
-    const result = validateMetadata(metadata, 'market')
+    const result = validateMetadata(metadata)
     expect(result.valid).toBe(false)
     expect(result.errors).toContain('Invalid background_color format (should be 6-character hex without #)')
   })
@@ -352,7 +352,7 @@ describe('validateMetadata', () => {
       external_url: 'also-not-a-url'
     }
 
-    const result = validateMetadata(metadata, 'market')
+    const result = validateMetadata(metadata)
     expect(result.valid).toBe(false)
     expect(result.errors.some(e => e.includes('Invalid URL format'))).toBe(true)
   })
@@ -365,7 +365,7 @@ describe('validateMetadata', () => {
       attributes: []
     }
 
-    const result = validateMetadata(metadata, 'market')
+    const result = validateMetadata(metadata)
     expect(result.valid).toBe(true)
   })
 
@@ -378,7 +378,7 @@ describe('validateMetadata', () => {
       background_color: 'FF6B35'
     }
 
-    const result = validateMetadata(metadata, 'market')
+    const result = validateMetadata(metadata)
     expect(result.valid).toBe(true)
   })
 })
