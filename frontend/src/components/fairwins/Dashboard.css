@@ -210,7 +210,7 @@
 
 .chart-subtitle {
   font-size: 0.75rem;
-  color: var(--text-muted, var(--text-secondary));
+  color: var(--text-muted);
 }
 
 .chart-container {
@@ -405,7 +405,7 @@
 .trending-rank {
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--text-muted, var(--text-secondary));
+  color: var(--text-muted);
   width: 28px;
   text-align: center;
 }
@@ -523,7 +523,7 @@
 
 .activity-feed-time {
   font-size: 0.65rem;
-  color: var(--text-muted, var(--text-secondary));
+  color: var(--text-muted);
 }
 
 .activity-feed-market {
@@ -709,15 +709,15 @@
 /* Ensure proper contrast in dark mode */
 @media (prefers-color-scheme: dark) {
   .metric-card {
-    background: var(--surface-color, #1a1a2e);
+    background: var(--surface-color);
   }
   
   .chart-card {
-    background: var(--surface-color, #1a1a2e);
+    background: var(--surface-color);
   }
   
   .bottom-card {
-    background: var(--surface-color, #1a1a2e);
+    background: var(--surface-color);
   }
 }
 
