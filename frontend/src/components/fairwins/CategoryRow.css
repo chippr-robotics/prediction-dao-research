@@ -31,6 +31,12 @@
   border-radius: 8px; /* Reduced from 10px */
 }
 
+.category-icon-large .category-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
 .category-row-header h2 {
   font-size: 1.1rem; /* Reduced from 1.5rem */
   font-weight: 700;
