@@ -23,9 +23,9 @@ function DevelopmentWarningBanner() {
       document.documentElement.style.setProperty('--dev-banner-height', '0px')
     }
 
-    // Cleanup: Reset to 0px when component unmounts
+    // Cleanup: Remove the CSS property when component unmounts
     return () => {
-      document.documentElement.style.setProperty('--dev-banner-height', '0px')
+      document.documentElement.style.removeProperty('--dev-banner-height')
     }
   }, [isDismissed])
 
