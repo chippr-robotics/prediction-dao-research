@@ -38,17 +38,17 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
       </a>
       
       <header className="clearpath-header">
-        <div className="header-content">
-          <div className="header-left">
+        <div className="clearpath-header-content">
+          <div className="clearpath-header-left">
             <button 
               onClick={onBack} 
-              className="back-button" 
+              className="clearpath-back-button" 
               aria-label="Back to platform selection"
             >
               ← Back
             </button>
-            <div className="branding">
-              <div className="brand-logo">
+            <div className="clearpath-branding">
+              <div className="clearpath-brand-logo">
                 <img 
                   src="/logo_clearpath.svg" 
                   alt="ClearPath Logo" 
@@ -58,25 +58,25 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
                   onError={(e) => { e.target.style.display = 'none' }}
                 />
               </div>
-              <div className="brand-text">
+              <div className="clearpath-brand-text">
                 <h1>ClearPath</h1>
                 <p className="subtitle">DAO Governance Platform</p>
               </div>
             </div>
           </div>
           
-          <div className="wallet-section">
+          <div className="clearpath-wallet-section">
             {isConnected ? (
-              <div className="connected-wallet">
-                <div className="wallet-info">
-                  <span className="connection-status" aria-label="Wallet connected">
+              <div className="clearpath-connected-wallet">
+                <div className="clearpath-wallet-info">
+                  <span className="clearpath-connection-status" aria-label="Wallet connected">
                     <BlockiesAvatar address={account} size={24} className="wallet-avatar-inline" />
-                    <span className="wallet-address">{shortenAddress(account)}</span>
+                    <span className="clearpath-wallet-address">{shortenAddress(account)}</span>
                   </span>
                 </div>
                 <button 
                   onClick={onDisconnect} 
-                  className="disconnect-button"
+                  className="clearpath-disconnect-button"
                   aria-label="Disconnect wallet"
                 >
                   Disconnect
@@ -85,7 +85,7 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
             ) : (
               <button 
                 onClick={handleConnectClick} 
-                className="connect-button"
+                className="clearpath-connect-button"
                 aria-label="Connect wallet"
               >
                 Connect Wallet

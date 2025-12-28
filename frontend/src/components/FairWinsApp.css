@@ -32,7 +32,7 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
-.header-content {
+.fairwins-header-content {
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
@@ -40,13 +40,13 @@
   align-items: center;
 }
 
-.header-left {
+.fairwins-header-left {
   display: flex;
   align-items: center;
   gap: 1.5rem;
 }
 
-.back-button {
+.fairwins-back-button {
   background: rgba(255, 255, 255, 0.1);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -58,46 +58,46 @@
   transition: all 0.3s;
 }
 
-.back-button:hover {
+.fairwins-back-button:hover {
   background: rgba(255, 255, 255, 0.2);
   transform: translateX(-2px);
 }
 
-.branding {
+.fairwins-branding {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.brand-logo {
+.fairwins-brand-logo {
   height: 50px;
   display: flex;
   align-items: center;
 }
 
-.brand-logo .logo-image {
+.fairwins-brand-logo .logo-image {
   max-height: 50px;
   width: auto;
 }
 
-.brand-text h1 {
+.fairwins-brand-text h1 {
   font-size: 2rem;
   margin-bottom: 0.25rem;
   color: white;
 }
 
-.brand-text .subtitle {
+.fairwins-brand-text .subtitle {
   font-size: 0.95rem;
   opacity: 0.9;
   color: white;
 }
 
-.wallet-section {
+.fairwins-wallet-section {
   display: flex;
   align-items: center;
 }
 
-.connected-wallet {
+.fairwins-connected-wallet {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -106,12 +106,12 @@
   border-radius: 8px;
 }
 
-.wallet-info {
+.fairwins-wallet-info {
   display: flex;
   align-items: center;
 }
 
-.connection-status {
+.fairwins-connection-status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -132,12 +132,12 @@
   }
 }
 
-.wallet-address {
+.fairwins-wallet-address {
   font-weight: 600;
   color: white;
 }
 
-.disconnect-button {
+.fairwins-disconnect-button {
   background-color: rgba(239, 68, 68, 0.2);
   color: white;
   padding: 0.5rem 1rem;
@@ -149,11 +149,11 @@
   transition: all 0.3s;
 }
 
-.disconnect-button:hover {
+.fairwins-disconnect-button:hover {
   background-color: rgba(239, 68, 68, 0.4);
 }
 
-.connect-button {
+.fairwins-connect-button {
   background-color: rgba(34, 197, 94, 0.2);
   color: white;
   padding: 0.75rem 1.5rem;
@@ -165,7 +165,7 @@
   transition: all 0.3s;
 }
 
-.connect-button:hover {
+.fairwins-connect-button:hover {
   background-color: rgba(34, 197, 94, 0.4);
   border-color: rgba(34, 197, 94, 0.5);
   transform: translateY(-1px);
@@ -404,18 +404,18 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .header-content {
+  .fairwins-header-content {
     flex-direction: column;
     gap: 1rem;
   }
 
-  .header-left {
+  .fairwins-header-left {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
 
-  .branding h1 {
+  .fairwins-branding h1 {
     font-size: 1.5rem;
   }
 
