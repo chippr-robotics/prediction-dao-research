@@ -327,7 +327,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
         return a.category.localeCompare(b.category)
       default:
         // For grouped markets, default to sorting by probability to show most likely outcomes first
-        return useDefaultSort ? parseFloat(b.passTokenPrice) - parseFloat(a.passTokenPrice) : 0
+        return useDefaultSort ? parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0) : 0
     }
   }, [sortBy])
 
