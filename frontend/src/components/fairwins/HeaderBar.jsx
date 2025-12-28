@@ -1,9 +1,8 @@
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
-import { useModal } from '../../hooks/useUI'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWallet } from '../../hooks'
-import UserManagementModal from '../ui/UserManagementModal'
+import { useNavigate } from 'react-router-dom'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import './HeaderBar.css'
 
@@ -11,16 +10,12 @@ function HeaderBar({ isConnected, onScanMarket }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
-  const { showModal } = useModal()
   const { preferences } = useUserPreferences()
   const { address } = useWallet()
+  const navigate = useNavigate()
 
   const handleOpenUserManagement = () => {
-    showModal(<UserManagementModal onScanMarket={onScanMarket} />, {
-      title: 'User Management',
-      size: 'large',
-      closable: true
-    })
+    navigate('/wallet')
   }
 
   // Hide header on mobile when scrolling down
