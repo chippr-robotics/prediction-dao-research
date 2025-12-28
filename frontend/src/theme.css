@@ -14,8 +14,10 @@
   /* Light Mode Neutrals (Default) */
   --bg-primary: #F7F9FA;        /* Porcelain - Background */
   --bg-secondary: #FFFFFF;      /* White Sand - Surface/Card */
+  --surface-color: #FFFFFF;     /* Surface/Card - Same as bg-secondary */
   --text-primary: #1F2933;      /* Deep Slate - Primary text */
   --text-secondary: #5A6772;    /* Steel Gray - Secondary text */
+  --text-muted: #8A959E;        /* Muted text - lighter than secondary */
   --border-color: #E3E7EB;      /* Soft Gray - Borders/Dividers */
 }
 
@@ -23,8 +25,10 @@
   /* Dark Mode Neutrals */
   --bg-primary: #0E141B;        /* Midnight Slate - Background */
   --bg-secondary: #141C24;      /* Charcoal - Surface/Card */
+  --surface-color: #1F2933;     /* Surface/Card - Slightly lighter than bg-secondary */
   --text-primary: #E6EDF3;      /* Cloud White - Primary text */
   --text-secondary: #AAB6C2;    /* Cool Gray - Secondary text */
+  --text-muted: #7A8590;        /* Muted text - darker than secondary */
   --border-color: #23303D;      /* Graphite - Borders/Dividers */
 }
 
