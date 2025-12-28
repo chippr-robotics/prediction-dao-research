@@ -826,12 +826,4 @@ select[aria-invalid="true"] {
 }
 
 /* Adjust body padding to account for fixed development warning banner */
-body {
-  padding-top: 45px; /* Approximate height of the dev warning banner */
-}
-
-@media (max-width: 768px) {
-  body {
-    padding-top: 42px; /* Adjusted for mobile banner height */
-  }
-}
+/* Removed: body padding is no longer needed as banner and header are both fixed positioned */
