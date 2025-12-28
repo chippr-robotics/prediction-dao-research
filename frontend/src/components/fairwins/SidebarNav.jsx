@@ -6,8 +6,10 @@ import './SidebarNav.css'
 import dashboardIcon from '../../assets/dashboard_no_text.svg'
 import trendingIcon from '../../assets/trending_no_text.svg'
 import politicsIcon from '../../assets/politics_no_text.svg'
+import sportsIcon from '../../assets/sports_no_text.svg'
 import financeIcon from '../../assets/finance_no_text.svg'
 import techIcon from '../../assets/tech_no_text.svg'
+import popCultureIcon from '../../assets/pop-culture_no_text.svg'
 import cryptoIcon from '../../assets/crypto_no_text.svg'
 import otherMarketsIcon from '../../assets/other_markets_no_text.svg'
 import allMarketsIcon from '../../assets/all_markets_no_text.svg'
@@ -16,10 +18,10 @@ const CATEGORIES = [
   { id: 'dashboard', name: 'Dashboard', icon: dashboardIcon },
   { id: 'trending', name: 'Trending', icon: trendingIcon },
   { id: 'politics', name: 'Politics', icon: politicsIcon },
-  { id: 'sports', name: 'Sports', icon: '⚽' },
+  { id: 'sports', name: 'Sports', icon: sportsIcon },
   { id: 'finance', name: 'Finance', icon: financeIcon },
   { id: 'tech', name: 'Tech', icon: techIcon },
-  { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
+  { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon },
   { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
   { id: 'other', name: 'Other Markets', icon: otherMarketsIcon },
   { id: 'clearpath', name: 'ClearPath', icon: politicsIcon, requiresRole: 'CLEARPATH_USER' },

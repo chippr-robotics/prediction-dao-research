@@ -5,10 +5,12 @@ import * as d3 from 'd3'
 import './Dashboard.css'
 
 // Import SVG icons
+import sportsIcon from '../../assets/sports_no_text.svg'
 import politicsIcon from '../../assets/politics_no_text.svg'
 import financeIcon from '../../assets/finance_no_text.svg'
 import techIcon from '../../assets/tech_no_text.svg'
 import cryptoIcon from '../../assets/crypto_no_text.svg'
+import popCultureIcon from '../../assets/pop-culture_no_text.svg'
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -942,12 +944,12 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   const categories = useMemo(() => [
-    { id: 'sports', name: 'Sports', icon: '⚽' },
+    { id: 'sports', name: 'Sports', icon: sportsIcon },
     { id: 'politics', name: 'Politics', icon: politicsIcon },
     { id: 'finance', name: 'Finance', icon: financeIcon },
     { id: 'tech', name: 'Tech', icon: techIcon },
     { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
-    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' }
+    { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon }
   ], [])
 
   useEffect(() => {
