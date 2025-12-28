@@ -4,6 +4,13 @@ import Dashboard from '../components/fairwins/Dashboard'
 import { useWeb3 } from '../hooks/useWeb3'
 import { getMockMarkets } from '../utils/mockDataLoader'
 
+// Mock ResizeObserver
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn()
+}))
+
 // Mock the hooks and utilities
 vi.mock('../hooks/useWeb3')
 vi.mock('../utils/mockDataLoader')
@@ -44,13 +51,15 @@ vi.mock('d3', () => {
     return fn
   }
 
-  const mockScale = () => ({
-    domain: vi.fn(function() { return this }),
-    range: vi.fn(function() { return this }),
-    padding: vi.fn(function() { return this }),
-    bandwidth: vi.fn(() => 20),
-    call: vi.fn(function() { return this })
-  })
+  const mockScale = () => {
+    const scale = vi.fn((x) => x)  // Make it callable
+    scale.domain = vi.fn(() => scale)
+    scale.range = vi.fn(() => scale)
+    scale.padding = vi.fn(() => scale)
+    scale.bandwidth = vi.fn(() => 20)
+    scale.call = vi.fn(() => scale)
+    return scale
+  }
 
   return {
     select: vi.fn(() => createChainableMock()),

@@ -414,6 +414,13 @@ function LiquidityStreamChart({ markets, categories }) {
 // MARKET HEALTH GAUGE
 // ============================================================================
 
+// Health score calculation constants
+const LIQUIDITY_NORMALIZATION_FACTOR = 200 // ETC - used to normalize liquidity to 100 scale
+const EXPECTED_CATEGORY_COUNT = 6 // Number of market categories
+const HEALTH_WEIGHT_ACTIVE = 40 // Weight for active markets percentage (out of 100)
+const HEALTH_WEIGHT_LIQUIDITY = 0.35 // Weight for liquidity score
+const HEALTH_WEIGHT_DIVERSITY = 0.25 // Weight for category diversity
+
 function MarketHealthGauge({ markets }) {
   const svgRef = useRef()
   const containerRef = useRef()
@@ -424,10 +431,14 @@ function MarketHealthGauge({ markets }) {
     // Calculate health based on various factors
     const activeMarkets = markets.filter(m => m.status === 'Active').length
     const avgLiquidity = markets.reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0) / markets.length
-    const liquidityScore = Math.min(100, avgLiquidity / 200) // Normalize to 100
-    const diversityScore = new Set(markets.map(m => m.category)).size / 6 * 100
+    const liquidityScore = Math.min(100, avgLiquidity / LIQUIDITY_NORMALIZATION_FACTOR)
+    const diversityScore = new Set(markets.map(m => m.category)).size / EXPECTED_CATEGORY_COUNT * 100
     
-    return Math.round((activeMarkets / markets.length * 40) + (liquidityScore * 0.35) + (diversityScore * 0.25))
+    return Math.round(
+      (activeMarkets / markets.length * HEALTH_WEIGHT_ACTIVE) + 
+      (liquidityScore * HEALTH_WEIGHT_LIQUIDITY) + 
+      (diversityScore * HEALTH_WEIGHT_DIVERSITY)
+    )
   }, [markets])
 
   useEffect(() => {
