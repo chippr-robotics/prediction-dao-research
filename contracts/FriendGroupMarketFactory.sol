@@ -344,8 +344,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             address(0)  // Native ETC
         );
         
-        emit MemberAdded(friendMarketId, msg.sender, block.timestamp);
-        emit MemberAdded(friendMarketId, opponent, block.timestamp);
+        emit MemberAdded(friendMarketId, msg.sender);
+        emit MemberAdded(friendMarketId, opponent);
         
         if (arbitrator != address(0)) {
             emit ArbitratorSet(friendMarketId, arbitrator);
@@ -388,12 +388,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
         }
         
+        // Calculate liquidity amount
+        uint256 liquidityAmount = msg.value > friendMarketFee ? msg.value - friendMarketFee : 0;
+        
         // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
-            msg.value - friendMarketFee,
+            liquidityAmount,
             0.1 ether, // Medium liquidity parameter
             tradingPeriod,
             ConditionalMarketFactory.BetType.YesNo
@@ -424,7 +427,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         // Add members to user markets mapping
         for (uint256 i = 0; i < initialMembers.length; i++) {
             userMarkets[initialMembers[i]].push(friendMarketId);
-            emit MemberAdded(friendMarketId, initialMembers[i], block.timestamp);
+            emit MemberAdded(friendMarketId, initialMembers[i]);
         }
         
         // Track pegging relationship
@@ -483,12 +486,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
         }
         
+        // Calculate liquidity amount
+        uint256 liquidityAmount = msg.value > friendMarketFee ? msg.value - friendMarketFee : 0;
+        
         // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
-            msg.value - friendMarketFee,
+            liquidityAmount,
             0.1 ether,
             tradingPeriod,
             ConditionalMarketFactory.BetType.WinLose
@@ -518,7 +524,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         
         for (uint256 i = 0; i < players.length; i++) {
             userMarkets[players[i]].push(friendMarketId);
-            emit MemberAdded(friendMarketId, players[i], block.timestamp);
+            emit MemberAdded(friendMarketId, players[i]);
         }
         
         // Track pegging relationship
@@ -560,7 +566,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         memberCount[friendMarketId]++;
         userMarkets[newMember].push(friendMarketId);
         
-        emit MemberAdded(friendMarketId, newMember, block.timestamp);
+        emit MemberAdded(friendMarketId, newMember);
     }
     
     /**
@@ -587,7 +593,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         
         require(found, "Not a member");
         
-        emit MemberRemoved(friendMarketId, msg.sender, block.timestamp);
+        emit MemberRemoved(friendMarketId, msg.sender);
     }
     
     /**
