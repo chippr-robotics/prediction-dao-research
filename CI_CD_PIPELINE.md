@@ -83,6 +83,50 @@ Runs on:
 - Verifies service responds with HTTP 200
 - Confirms deployment success
 
+### 4. Weekly Torture Test
+**File**: `.github/workflows/torture-test.yml`
+
+Runs on:
+- Scheduled: Weekly on Monday at 00:00 UTC
+- Manual workflow dispatch
+
+**Purpose**: Comprehensive weekly testing including long-running tests, security analysis, and end-to-end testing.
+
+**Jobs**:
+
+#### Hardhat Tests & Gas Report
+- Runs full smart contract test suite
+- Generates detailed gas usage reports
+- Provides insights for optimization
+
+#### Coverage Analysis
+- Generates comprehensive coverage reports
+- Identifies untested code paths
+- Provides metrics for code quality
+
+#### Slither Static Analysis
+- Performs static analysis on smart contracts
+- Identifies potential vulnerabilities
+- Generates detailed security reports
+
+#### Manticore Symbolic Execution
+- Runs symbolic execution on all contracts
+- Deep analysis for edge cases and vulnerabilities
+- Long-running tests (up to 10 minutes per contract)
+
+#### Medusa Fuzz Testing
+- Extended fuzzing session (1 hour)
+- Tests for unexpected behavior
+- Generates test corpus
+
+#### Cypress E2E Tests
+- Full end-to-end testing of frontend workflows
+- Tests integration with smart contracts
+- Validates complete user journeys
+- **Note**: Moved from daily CI to weekly testing to optimize development build times
+
+**Rationale**: E2E tests are comprehensive but time-consuming. Running them weekly ensures thorough testing without slowing down daily development cycles.
+
 ---
 
 ## Setup Instructions

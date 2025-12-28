@@ -150,74 +150,10 @@ jobs:
               body: '⚠️ Accessibility tests failed. Please review the axe audit results and fix any WCAG AA violations.'
             })
 
-  cypress-e2e:
-    name: Cypress E2E Tests
-    runs-on: ubuntu-latest
-    needs: unit-tests
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
-
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Start Hardhat node
-        run: |
-          npm run node > /tmp/hardhat-node.log 2>&1 &
-          echo "HARDHAT_PID=$!" >> $GITHUB_ENV
-        
-      - name: Wait for Hardhat to start
-        run: |
-          echo "Waiting for Hardhat node to be ready..."
-          sleep 15
-          # Check if Hardhat node is responding
-          curl -X POST -H "Content-Type: application/json" \
-            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-            http://localhost:8545 || echo "Hardhat node may not be ready yet"
-
-      - name: Deploy contracts to local network
-        run: |
-          echo "Deploying contracts to local Hardhat network..."
-          npm run deploy:local
-          echo "Contract deployment completed"
-        continue-on-error: false
-
-      - name: Run Cypress E2E tests
-        working-directory: frontend
-        run: npm run test:e2e
-
-      - name: Upload Cypress screenshots
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: cypress-screenshots
-          path: frontend/cypress/screenshots
-          retention-days: 30
-
-      - name: Upload Cypress videos
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cypress-videos
-          path: frontend/cypress/videos
-          retention-days: 30
-
   deployment-ready:
     name: Deployment Readiness Check
     runs-on: ubuntu-latest
-    needs: [unit-tests, lighthouse-audit, axe-audit, cypress-e2e]
+    needs: [unit-tests, lighthouse-audit, axe-audit]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     
     steps:
@@ -229,5 +165,4 @@ jobs:
           echo "✅ Unit and integration tests passed"
           echo "✅ Lighthouse accessibility audit completed"
           echo "✅ axe accessibility audit passed"
-          echo "✅ Cypress E2E tests passed"
           echo "🚀 Application is ready for deployment"
