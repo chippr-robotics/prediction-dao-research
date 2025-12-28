@@ -147,9 +147,12 @@
   overflow-y: auto;
   max-height: 400px;
   padding-right: 0.5rem;
+  /* Standard scrollbar styling for Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3) rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
 }
 
-/* Scrollbar styling for options list */
+/* Scrollbar styling for Webkit browsers (Chrome, Safari, Edge) */
 .correlated-options-list::-webkit-scrollbar {
   width: 8px;
 }
