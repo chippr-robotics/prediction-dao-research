@@ -181,7 +181,25 @@ contract MetadataRegistry is Ownable {
         uint256 resourceId,
         string calldata ipfsCid
     ) external onlyAuthorized {
-        this.setMetadata(resourceType, _uint2str(resourceId), ipfsCid);
+        string memory key = _buildKey(resourceType, _uint2str(resourceId));
+        
+        bool isUpdate = isRegistered[key];
+        string memory oldCid = metadata[key].cid;
+        
+        metadata[key] = MetadataEntry({
+            cid: ipfsCid,
+            updatedAt: block.timestamp,
+            updatedBy: msg.sender,
+            version: currentSchemaVersion
+        });
+        
+        if (!isUpdate) {
+            isRegistered[key] = true;
+            resourceKeys.push(key);
+            emit MetadataSet(resourceType, _uint2str(resourceId), ipfsCid, currentSchemaVersion, msg.sender);
+        } else {
+            emit MetadataUpdated(resourceType, _uint2str(resourceId), oldCid, ipfsCid, currentSchemaVersion);
+        }
     }
     
     /**
@@ -209,7 +227,9 @@ contract MetadataRegistry is Ownable {
         string calldata resourceType,
         uint256 resourceId
     ) external view returns (string memory) {
-        return this.getMetadata(resourceType, _uint2str(resourceId));
+        string memory key = _buildKey(resourceType, _uint2str(resourceId));
+        require(isRegistered[key], "Metadata not found");
+        return metadata[key].cid;
     }
     
     /**
