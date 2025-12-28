@@ -25,11 +25,11 @@
 /* Main canvas area (content area) */
 .main-canvas {
   margin-left: 70px; /* Default sidebar width (collapsed/icon-only) */
-  margin-top: 115px; /* Dev warning banner (45px) + Header (70px) */
+  margin-top: 70px;
   flex: 1;
   padding: 0; /* Remove padding for full viewport hero */
-  min-height: calc(100vh - 115px);
-  height: calc(100vh - 115px);
+  min-height: calc(100vh - 70px);
+  height: calc(100vh - 70px);
   transition: margin-left 0.3s ease, margin-top 0.3s ease;
   position: relative;
   overflow: hidden; /* Prevent main canvas from scrolling - individual sections scroll instead */
@@ -57,7 +57,7 @@
 /* Hero Overlay - Covers entire screen when open */
 .hero-overlay {
   position: fixed;
-  top: 115px; /* Below banner (45px) + header (70px) */
+  top: 70px; /* Below header */
   left: 70px; /* From sidenav edge */
   right: 0;
   bottom: 0;
@@ -99,7 +99,7 @@
 
 /* Hero Section - Full screen height */
 .hero-section {
-  max-height: calc(100vh - 115px); /* Screen height minus banner (45px) and header (70px) */
+  max-height: calc(100vh - 70px); /* Screen height minus header */
   width: 100%;
   padding: 0; /* Remove padding, let hero card handle it */
   box-sizing: border-box;
@@ -307,10 +307,10 @@
   /* Adjust main canvas for mobile with bottom nav */
   .main-canvas {
     margin-left: 0;
-    margin-top: calc(var(--mobile-header-height) + 42px); /* Mobile header + mobile banner */
+    margin-top: var(--mobile-header-height);
     padding: 0;
-    height: calc(100vh - var(--mobile-header-height) - 42px - var(--bottom-nav-height));
-    min-height: calc(100vh - var(--mobile-header-height) - 42px - var(--bottom-nav-height));
+    height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
+    min-height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
     padding-bottom: var(--bottom-nav-height);
     overflow: hidden;
   }
@@ -321,14 +321,14 @@
 
   /* Hero overlay adjustments for mobile */
   .hero-overlay {
-    top: calc(var(--mobile-header-height) + 42px);
+    top: var(--mobile-header-height);
     left: 0;
     bottom: var(--bottom-nav-height);
   }
 
   /* Hero section adjustments for mobile */
   .hero-section {
-    max-height: calc(100vh - var(--mobile-header-height) - 42px - var(--bottom-nav-height));
+    max-height: calc(100vh - var(--mobile-header-height) - var(--bottom-nav-height));
     padding: 0;
   }
 

@@ -1,6 +1,6 @@
 .header-bar {
   position: fixed;
-  top: 45px; /* Position below dev warning banner */
+  top: 0;
   left: 0;
   right: 0;
   height: 70px;
@@ -313,7 +313,6 @@
 
 @media (max-width: 768px) {
   .header-bar {
-    top: 42px; /* Position below mobile dev warning banner */
     height: var(--mobile-header-height, 56px);
   }
 

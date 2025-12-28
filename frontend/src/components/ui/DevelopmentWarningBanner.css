@@ -9,10 +9,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 9999; /* Higher than header (z-index: 200) to overlay it */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   font-size: 0.95rem;
   font-weight: 500;
+  /* Note: This banner overlays the top portion of the header when present.
+     When dismissed, the header appears at top: 0 normally. */
 }
 
 .dev-warning-content {
