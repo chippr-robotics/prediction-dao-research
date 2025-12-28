@@ -27,38 +27,6 @@ describe('SearchBar', () => {
     expect(handleChange).toHaveBeenCalledWith('new search')
   })
 
-  it('should show clear button when value is not empty', () => {
-    render(<SearchBar value="test" />)
-    
-    const clearButton = screen.getByLabelText('Clear search')
-    expect(clearButton).toBeInTheDocument()
-  })
-
-  it('should not show clear button when value is empty', () => {
-    render(<SearchBar value="" />)
-    
-    const clearButton = screen.queryByLabelText('Clear search')
-    expect(clearButton).not.toBeInTheDocument()
-  })
-
-  it('should call onClear and onChange when clear button is clicked', () => {
-    const handleChange = vi.fn()
-    const handleClear = vi.fn()
-    render(
-      <SearchBar 
-        value="test" 
-        onChange={handleChange}
-        onClear={handleClear}
-      />
-    )
-    
-    const clearButton = screen.getByLabelText('Clear search')
-    fireEvent.click(clearButton)
-    
-    expect(handleClear).toHaveBeenCalled()
-    expect(handleChange).toHaveBeenCalledWith('')
-  })
-
   it('should have correct aria-label', () => {
     render(<SearchBar ariaLabel="Search for markets" />)
     

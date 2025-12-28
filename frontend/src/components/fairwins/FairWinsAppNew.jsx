@@ -130,10 +130,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     setSearchQuery(query)
   }
 
-  const handleSearchClear = () => {
-    setSearchQuery('')
-  }
-
   const handleMarketClick = (market) => {
     // Store the currently focused element
     lastFocusedElementRef.current = document.activeElement
@@ -499,7 +495,6 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                       <SearchBar 
                         value={searchQuery}
                         onChange={handleSearchChange}
-                        onClear={handleSearchClear}
                         placeholder="Search markets..."
                         ariaLabel={`Search ${categories.find(c => c.id === selectedCategory)?.name} markets`}
                       />

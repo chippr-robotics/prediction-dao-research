@@ -48,18 +48,6 @@ function HeaderBar({ isConnected, onScanMarket }) {
           </div>
         </div>
 
-        <div className="header-center">
-          <div className="search-box">
-            <input 
-              type="search" 
-              placeholder="Search markets..." 
-              className="search-input"
-              aria-label="Search markets"
-            />
-            <span className="search-icon" aria-hidden="true">🔍</span>
-          </div>
-        </div>
-
         <div className="header-right">
           <button
             className="user-management-btn"

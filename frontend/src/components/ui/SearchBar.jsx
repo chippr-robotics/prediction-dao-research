@@ -4,7 +4,6 @@ import './SearchBar.css'
 function SearchBar({ 
   value = '', 
   onChange, 
-  onClear,
   placeholder = 'Search...', 
   ariaLabel = 'Search',
   className = ''
@@ -23,16 +22,6 @@ function SearchBar({
     }
   }
 
-  const handleClear = () => {
-    setLocalValue('')
-    if (onChange) {
-      onChange('')
-    }
-    if (onClear) {
-      onClear()
-    }
-  }
-
   return (
     <div className={`search-bar ${className}`}>
       <span className="search-icon" aria-hidden="true">🔍</span>
@@ -44,16 +33,6 @@ function SearchBar({
         className="search-input"
         aria-label={ariaLabel}
       />
-      {localValue && (
-        <button 
-          className="clear-btn"
-          onClick={handleClear}
-          aria-label="Clear search"
-          type="button"
-        >
-          ✕
-        </button>
-      )}
     </div>
   )
 }
