@@ -29,7 +29,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'category'
   const [showHero, setShowHero] = useState(false) // Control hero visibility
-  const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
   // TokenMint state
@@ -79,18 +78,11 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     }
   }, [showHero, handleCloseHero])
 
-  // Manage body scroll lock and focus when hero opens/closes
+  // Manage body scroll lock when hero opens/closes
   useEffect(() => {
     if (showHero) {
       // Prevent body scroll when hero is open
       document.body.style.overflow = 'hidden'
-      
-      // Move focus to the back button after a short delay to ensure it's rendered
-      setTimeout(() => {
-        if (heroBackButtonRef.current) {
-          heroBackButtonRef.current.focus()
-        }
-      }, 100)
     } else {
       // Restore body scroll
       document.body.style.overflow = ''
