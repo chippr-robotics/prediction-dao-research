@@ -331,7 +331,7 @@ describe("FriendGroupMarketFactory", function () {
 
     it("Should enforce maximum players for poker", async function () {
       const description = "Poker night";
-      const players = new Array(11).fill(addr1.address).map((addr, i) => 
+      const players = new Array(11).fill(0).map(() => 
         ethers.Wallet.createRandom().address
       ); // 11 players, max is 10
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days

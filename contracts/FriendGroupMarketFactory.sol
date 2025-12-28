@@ -74,6 +74,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     uint256 public constant FRIEND_MARKET_FEE = 0.1 ether;    // Reduced fee for friend markets
     uint256 public constant ONE_V_ONE_FEE = 0.05 ether;       // Even lower for 1v1
     
+    // Proposal ID offset to avoid collision with public markets
+    uint256 public constant PROPOSAL_ID_OFFSET = 1000000;
+    
     // Member limits
     uint256 public constant MAX_SMALL_GROUP_MEMBERS = 10;
     uint256 public constant MAX_ONE_V_ONE_MEMBERS = 2;
@@ -159,7 +162,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         }
         
         // Create underlying market in ConditionalMarketFactory
-        uint256 proposalId = friendMarketCount + 1000000; // Offset to avoid collision
+        uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
@@ -255,7 +258,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         }
         
         // Create underlying market
-        uint256 proposalId = friendMarketCount + 1000000;
+        uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
@@ -347,7 +350,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         }
         
         // Create underlying market
-        uint256 proposalId = friendMarketCount + 1000000;
+        uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
@@ -610,6 +613,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @notice Resolve a friend market (by arbitrator or creator)
      * @param friendMarketId ID of the friend market
      * @param outcome True for positive outcome, false for negative
+     * @dev NOTE: This simplified implementation emits events only.
+     * In production, this would integrate with OracleResolver to properly
+     * resolve the underlying ConditionalMarketFactory market and enable
+     * token redemption based on the outcome.
      */
     function resolveFriendMarket(uint256 friendMarketId, bool outcome) external {
         require(friendMarketId < friendMarketCount, "Invalid market ID");
@@ -625,8 +632,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         market.active = false;
         
         // Resolve underlying market
-        // Note: In production, this would need proper oracle integration
-        // For now, we emit an event for tracking
+        // NOTE: In production, this would call marketFactory.resolveMarket()
+        // or OracleResolver to properly resolve the underlying market and
+        // enable participants to redeem their tokens based on the outcome.
+        // Current implementation emits events for tracking purposes only.
         emit MarketResolved(friendMarketId, msg.sender, outcome);
     }
     
