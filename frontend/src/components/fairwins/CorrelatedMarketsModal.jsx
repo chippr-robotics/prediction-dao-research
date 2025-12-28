@@ -1,18 +1,78 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import * as d3 from 'd3'
 import { usePrice } from '../../contexts/PriceContext'
-import './CorrelatedMarketsView.css'
+import './CorrelatedMarketsModal.css'
 
-function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarket }) {
-  const [selectedOption, setSelectedOption] = useState(market.id)
+// Time horizon configurations
+const TIME_HORIZONS = {
+  '7d': { label: '7 Days', dataPoints: 7 },
+  '30d': { label: '30 Days', dataPoints: 30 },
+  '90d': { label: '90 Days', dataPoints: 90 },
+  'all': { label: 'All Time', dataPoints: 365 }
+}
+
+// Utility function to parse proposal title
+const parseProposalTitle = (title) => {
+  return title.split(':')[1]?.trim() || title
+}
+
+function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, onTrade, onOpenMarket }) {
+  const [selectedOption, setSelectedOption] = useState(market?.id)
   const [visibleMarkets, setVisibleMarkets] = useState(
-    correlatedMarkets.reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
+    correlatedMarkets?.reduce((acc, m) => ({ ...acc, [m.id]: true }), {}) || {}
   )
   const [timeHorizon, setTimeHorizon] = useState('7d') // 7d, 30d, 90d, all
   const [lastTap, setLastTap] = useState({ marketId: null, timestamp: 0 })
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
   const timelineRef = useRef(null)
+  const modalRef = useRef(null)
+
+  // Update selected option when market changes
+  useEffect(() => {
+    if (market) {
+      setSelectedOption(market.id)
+    }
+  }, [market])
+
+  // Update visible markets when correlatedMarkets changes
+  useEffect(() => {
+    if (correlatedMarkets) {
+      setVisibleMarkets(
+        correlatedMarkets.reduce((acc, m) => ({ ...acc, [m.id]: true }), {})
+      )
+    }
+  }, [correlatedMarkets])
+
+  // Handle Escape key press
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
+  // Focus management
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      const focusableElements = modalRef.current.querySelectorAll(
+        'button, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus()
+      }
+    }
+  }, [isOpen])
+
+  if (!isOpen || !market || !correlatedMarkets) return null
 
   const selectedMarket = useMemo(() => {
     return correlatedMarkets.find(m => m.id === selectedOption) || market
@@ -48,7 +108,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
       .filter(m => visibleMarkets[m.id])
       .map(m => ({
         id: m.id,
-        label: m.proposalTitle.split(':')[1]?.trim() || m.proposalTitle,
+        label: parseProposalTitle(m.proposalTitle),
         probability: parseFloat(m.passTokenPrice) * 100,
         totalLiquidity: parseFloat(m.totalLiquidity)
       }))
@@ -57,7 +117,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
   // Generate mock historical data for timeline
   const generateTimelineData = (market, horizon) => {
     const now = Date.now()
-    const dataPoints = horizon === '7d' ? 7 : horizon === '30d' ? 30 : horizon === '90d' ? 90 : 365
+    const dataPoints = TIME_HORIZONS[horizon]?.dataPoints || 7
     const dayMs = 24 * 60 * 60 * 1000
     const baseProb = parseFloat(market.passTokenPrice) * 100
     
@@ -75,26 +135,22 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
     const height = 350
     const centerX = width / 2
     const centerY = height / 2
-    const maxRadius = 120 // Smaller exterior radius
-    const levels = 5 // Number of concentric circles
+    const maxRadius = 120
+    const levels = 5
     const angleSlice = (Math.PI * 2) / radarData.length
 
     // Calculate dynamic scale based on market probabilities
-    // Use average as baseline, with padding for visual distinction
     const probabilities = radarData.map(d => d.probability)
     const avgProb = probabilities.reduce((a, b) => a + b, 0) / probabilities.length
     const maxProb = Math.max(...probabilities)
     const minProb = Math.min(...probabilities)
     const range = maxProb - minProb
     
-    // Dynamic scale: if markets are close (range < 20%), zoom in for better comparison
-    // Otherwise use full 0-100 scale
     let scaleMin = 0
     let scaleMax = 100
     
     if (range < 20 && range > 0) {
-      // Close match: center scale around average with padding
-      const padding = Math.max(range * 0.5, 5) // At least 5% padding
+      const padding = Math.max(range * 0.5, 5)
       scaleMin = Math.max(0, avgProb - padding - range / 2)
       scaleMax = Math.min(100, avgProb + padding + range / 2)
     }
@@ -109,11 +165,10 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
       .attr('height', height)
       .attr('viewBox', `0 0 ${width} ${height}`)
 
-    // Create main group
     const g = svg.append('g')
       .attr('transform', `translate(${centerX},${centerY})`)
 
-    // Draw concentric circles (grid) with dynamic scale labels
+    // Draw concentric circles (grid)
     const gridLevels = d3.range(1, levels + 1).reverse()
     gridLevels.forEach((level) => {
       g.append('circle')
@@ -122,7 +177,6 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
         .attr('stroke', 'rgba(54, 179, 126, 0.15)')
         .attr('stroke-width', 1)
       
-      // Add percentage labels with dynamic scale
       const labelValue = scaleMin + (scaleRange / levels) * level
       g.append('text')
         .attr('x', 5)
@@ -149,31 +203,27 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
         .attr('stroke-width', 1)
     })
 
-    // Create enhanced data with artificial anchor points between options for petal effect
-    // This makes the petals arch outward toward each option and curve back inward between them
+    // Create enhanced data with anchor points for petal effect
     const enhancedData = []
-    const innerCircleRadius = 0.15 // 15% inner circle where petals meet
+    const innerCircleRadius = 0.15
     
     radarData.forEach((d, i) => {
-      // Add the main data point (arches outward to this option)
-      // Prevent division by zero when all probabilities are identical
       const radius = scaleRange > 0 ? (d.probability - scaleMin) / scaleRange : 0.5
       
       enhancedData.push({
         angle: angleSlice * i,
         radius: radius,
-        name: d.name
+        label: d.label  // Fixed: use label instead of name
       })
       
-      // Add anchor point between this option and the next (curves back to inner circle)
       enhancedData.push({
         angle: angleSlice * i + angleSlice / 2,
-        radius: innerCircleRadius, // Pull back to inner circle between options
-        name: null // Anchor point, not a real market
+        radius: innerCircleRadius,
+        label: null  // Anchor point, not a real market
       })
     })
     
-    // Create data polygon with smooth curves for flower petal effect
+    // Create data polygon with smooth curves
     const radarLine = d3.lineRadial()
       .angle(d => d.angle)
       .radius(d => d.radius * maxRadius)
@@ -186,10 +236,9 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
       .attr('stroke', 'rgba(54, 179, 126, 1)')
       .attr('stroke-width', 2)
 
-    // Draw data points (only for actual markets, not anchor points)
+    // Draw data points
     radarData.forEach((d, i) => {
       const angle = angleSlice * i - Math.PI / 2
-      // Prevent division by zero when all probabilities are identical
       const normalizedRadius = scaleRange > 0 ? (d.probability - scaleMin) / scaleRange : 0.5
       const radius = normalizedRadius * maxRadius
       const x = radius * Math.cos(angle)
@@ -218,10 +267,10 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
         })
     })
 
-    // Draw labels around the perimeter with high z-order
+    // Draw labels
     const labelsGroup = g.append('g')
       .attr('class', 'radar-labels-group')
-      .style('pointer-events', 'none') // Ensure labels don't interfere with interactions
+      .style('pointer-events', 'none')
     
     radarData.forEach((d, i) => {
       const angle = angleSlice * i - Math.PI / 2
@@ -237,7 +286,7 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
         .attr('font-size', '12px')
         .attr('font-weight', '600')
         .attr('fill', 'var(--text-primary)')
-        .style('paint-order', 'stroke fill') // Ensure text renders on top
+        .style('paint-order', 'stroke fill')
         .style('stroke', 'white')
         .style('stroke-width', '3px')
         .style('stroke-linejoin', 'round')
@@ -283,14 +332,11 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
       .domain(d3.extent(allDates))
       .range([0, chartWidth])
 
-    // Auto-scale Y-axis based on actual probability ranges for better visualization
     const allProbabilities = allTimelines.flatMap(t => t.data.map(d => d.probability))
     const minProb = Math.min(...allProbabilities)
     const maxProb = Math.max(...allProbabilities)
     const probRange = maxProb - minProb
     
-    // Add padding for better visualization (10% of range on each side)
-    // Use minimum of 5 percentage points to ensure visibility even for very close probabilities
     const padding = Math.max(probRange * 0.1, 5)
     const yMin = Math.max(0, minProb - padding)
     const yMax = Math.min(100, maxProb + padding)
@@ -377,125 +423,145 @@ function CorrelatedMarketsView({ market, correlatedMarkets, onTrade, onOpenMarke
 
   }, [radarData, timeHorizon, selectedOption, correlatedMarkets])
 
-  return (
-    <div className="correlated-markets-view">
-      <div className="correlation-header">
-        <div className="correlation-group-info">
-          <h2 className="correlation-group-title">{market.correlationGroupName}</h2>
-        </div>
-        <p className="correlation-description">
-          Compare all options in this linked market group
-        </p>
-      </div>
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }
 
-      {/* Single card containing both radar and options */}
-      <div className="correlation-card">
-        <div className="correlation-content">
-          {/* Radar Chart - Smaller size */}
-          <div className="radar-section">
-            <svg ref={svgRef} className="radar-chart"></svg>
+  return (
+    <div 
+      className="correlated-markets-modal-backdrop" 
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="correlated-markets-modal-title"
+    >
+      <div 
+        ref={modalRef}
+        className="correlated-markets-modal-container"
+      >
+        <div className="correlated-markets-modal">
+          {/* Header */}
+          <div className="correlated-modal-header">
+            <img 
+              src="/assets/fairwins_no-text_logo.svg" 
+              alt="FairWins" 
+              className="correlated-modal-logo"
+            />
+            <h2 className="correlated-modal-title" id="correlated-markets-modal-title">
+              {market.correlationGroupName || 'Correlated Markets'}
+            </h2>
+            <button 
+              className="correlated-modal-close-btn"
+              onClick={onClose}
+              aria-label="Close modal"
+            >
+              ×
+            </button>
           </div>
 
-          {/* Options Cards */}
-          <div className="options-section">
-            <h3 className="options-title">Options</h3>
-            <div className="options-list">
-              {correlatedMarkets.map((option) => (
-                <button
-                  key={option.id}
-                  className={`option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
-                  onClick={() => handleMarketCardClick(option.id)}
-                >
-                  <div className="option-header">
-                    <div className="option-controls">
-                      <button
-                        className="visibility-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleMarketVisibility(option.id)
-                        }}
-                        title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
-                      >
-                        {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
-                      </button>
-                    </div>
-                    <span className="option-name">
-                      {option.proposalTitle.split(':')[1]?.trim() || option.proposalTitle}
-                    </span>
-                    {selectedOption === option.id && (
-                      <span className="selected-indicator">✓</span>
-                    )}
-                  </div>
-                  
-                  <div className="option-stats">
-                    <div className="option-stat">
-                      <span className="stat-label">Probability</span>
-                      <span className="stat-value">{(parseFloat(option.passTokenPrice) * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="option-stat">
-                      <span className="stat-label">Volume</span>
-                      <span className="stat-value">{formatPrice(option.totalLiquidity, { compact: true })}</span>
-                    </div>
-                  </div>
+          <p className="correlated-modal-description">
+            Compare all options in this linked market group
+          </p>
 
-                  {/* Histogram bar showing current price */}
-                  <div className="price-histogram">
-                    <div className="histogram-bar-container">
-                      <div 
-                        className="histogram-bar"
-                        style={{ width: `${parseFloat(option.passTokenPrice) * 100}%` }}
-                      />
-                    </div>
-                    <div className="histogram-labels">
-                      <span className="histogram-label">0%</span>
-                      <span className="histogram-label">50%</span>
-                      <span className="histogram-label">100%</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
+          {/* Main Content Area with Scrolling */}
+          <div className="correlated-modal-content">
+            {/* Radar and Options Side by Side */}
+            <div className="correlated-content-row">
+              {/* Radar Chart Section */}
+              <div className="correlated-radar-section">
+                <svg ref={svgRef} className="correlated-radar-chart"></svg>
+              </div>
+
+              {/* Options Section */}
+              <div className="correlated-options-section">
+                <h3 className="correlated-options-title">Options</h3>
+                <div className="correlated-options-list">
+                  {correlatedMarkets.map((option) => (
+                    <button
+                      key={option.id}
+                      className={`correlated-option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
+                      onClick={() => handleMarketCardClick(option.id)}
+                    >
+                      <div className="correlated-option-header">
+                        <div className="correlated-option-controls">
+                          <button
+                            className="correlated-visibility-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleMarketVisibility(option.id)
+                            }}
+                            aria-label={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
+                            title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
+                          >
+                            <span aria-hidden="true">{visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}</span>
+                          </button>
+                        </div>
+                        <span className="correlated-option-name">
+                          {parseProposalTitle(option.proposalTitle)}
+                        </span>
+                        {selectedOption === option.id && (
+                          <span className="correlated-selected-indicator">✓</span>
+                        )}
+                      </div>
+                      
+                      <div className="correlated-option-stats">
+                        <div className="correlated-option-stat">
+                          <span className="correlated-stat-label">Probability</span>
+                          <span className="correlated-stat-value">{(parseFloat(option.passTokenPrice) * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="correlated-option-stat">
+                          <span className="correlated-stat-label">Volume</span>
+                          <span className="correlated-stat-value">{formatPrice(option.totalLiquidity, { compact: true })}</span>
+                        </div>
+                      </div>
+
+                      {/* Histogram bar */}
+                      <div className="correlated-price-histogram">
+                        <div className="correlated-histogram-bar-container">
+                          <div 
+                            className="correlated-histogram-bar"
+                            style={{ width: `${parseFloat(option.passTokenPrice) * 100}%` }}
+                          />
+                        </div>
+                        <div className="correlated-histogram-labels">
+                          <span className="correlated-histogram-label">0%</span>
+                          <span className="correlated-histogram-label">50%</span>
+                          <span className="correlated-histogram-label">100%</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Timeline Section */}
+            <div className="correlated-timeline-section">
+              <div className="correlated-timeline-header">
+                <h3 className="correlated-timeline-title">Market Sentiment Over Time</h3>
+                <div className="correlated-time-horizon-controls">
+                  {Object.entries(TIME_HORIZONS).map(([key, { label }]) => (
+                    <button 
+                      key={key}
+                      className={`correlated-horizon-btn ${timeHorizon === key ? 'active' : ''}`}
+                      onClick={() => setTimeHorizon(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="correlated-timeline-chart-container">
+                <svg ref={timelineRef} className="correlated-timeline-chart"></svg>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Timeline View */}
-      <div className="timeline-section">
-        <div className="timeline-header">
-          <h3 className="timeline-title">Market Sentiment Over Time</h3>
-          <div className="time-horizon-controls">
-            <button 
-              className={`horizon-btn ${timeHorizon === '7d' ? 'active' : ''}`}
-              onClick={() => setTimeHorizon('7d')}
-            >
-              7 Days
-            </button>
-            <button 
-              className={`horizon-btn ${timeHorizon === '30d' ? 'active' : ''}`}
-              onClick={() => setTimeHorizon('30d')}
-            >
-              30 Days
-            </button>
-            <button 
-              className={`horizon-btn ${timeHorizon === '90d' ? 'active' : ''}`}
-              onClick={() => setTimeHorizon('90d')}
-            >
-              90 Days
-            </button>
-            <button 
-              className={`horizon-btn ${timeHorizon === 'all' ? 'active' : ''}`}
-              onClick={() => setTimeHorizon('all')}
-            >
-              All Time
-            </button>
-          </div>
-        </div>
-        <div className="timeline-chart-container">
-          <svg ref={timelineRef} className="timeline-chart"></svg>
         </div>
       </div>
     </div>
   )
 }
 
-export default CorrelatedMarketsView
+export default CorrelatedMarketsModal

@@ -6,7 +6,7 @@ import { getMockMarkets } from '../../utils/mockDataLoader'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
-import CorrelatedMarketsView from './CorrelatedMarketsView'
+import CorrelatedMarketsModal from './CorrelatedMarketsModal'
 import MarketModal from './MarketModal'
 import CategoryRow from './CategoryRow'
 import MarketGrid from './MarketGrid'
@@ -82,18 +82,11 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     }
   }, [showHero, handleCloseHero])
 
-  // Manage body scroll lock and focus when hero opens/closes
+  // Manage body scroll lock when hero opens/closes
   useEffect(() => {
     if (showHero) {
       // Prevent body scroll when hero is open
       document.body.style.overflow = 'hidden'
-      
-      // Move focus to the back button after a short delay to ensure it's rendered
-      setTimeout(() => {
-        if (heroBackButtonRef.current) {
-          heroBackButtonRef.current.focus()
-        }
-      }, 100)
     } else {
       // Restore body scroll
       document.body.style.overflow = ''
@@ -423,35 +416,15 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
 
       <main className="main-canvas">
         <div className="unified-view">
-          {/* Correlated Markets View - Full page for correlation groups */}
-          {showHero && selectedMarket && selectedMarket.correlationGroupId && (
-            <div 
-              className="hero-overlay"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="hero-dialog-title"
-            >
-              <div className="hero-section">
-                <button 
-                  ref={heroBackButtonRef}
-                  className="hero-back-btn"
-                  onClick={handleCloseHero}
-                  aria-label="Close and return to grid"
-                >
-                  ← Back to Grid
-                </button>
-                <h2 id="hero-dialog-title" className="visually-hidden">
-                  Correlated markets view
-                </h2>
-                <CorrelatedMarketsView 
-                  market={selectedMarket}
-                  correlatedMarkets={markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId)}
-                  onTrade={handleTrade}
-                  onOpenMarket={handleOpenIndividualMarket}
-                />
-              </div>
-            </div>
-          )}
+          {/* Correlated Markets Modal - For correlation groups */}
+          <CorrelatedMarketsModal
+            isOpen={showHero && selectedMarket && selectedMarket.correlationGroupId}
+            onClose={handleCloseHero}
+            market={selectedMarket}
+            correlatedMarkets={selectedMarket?.correlationGroupId ? markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId) : []}
+            onTrade={handleTrade}
+            onOpenMarket={handleOpenIndividualMarket}
+          />
 
           {/* Market Modal - For individual markets (non-correlated) */}
           <MarketModal
