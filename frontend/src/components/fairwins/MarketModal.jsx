@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
-import { useTheme } from '../../hooks/useTheme'
 import MarketDetailsPanel from './MarketDetailsPanel'
 import ShareModal from '../ui/ShareModal'
 import './MarketModal.css'
