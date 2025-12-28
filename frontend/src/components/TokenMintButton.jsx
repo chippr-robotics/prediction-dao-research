@@ -25,7 +25,7 @@ function TokenMintButton() {
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   
-  const { hasRole, ROLES, ROLE_INFO } = useRoles()
+  const { hasRole, ROLES } = useRoles()
   const { showModal } = useModal()
   const { preferences } = useUserPreferences()
   const { isConnected } = useWallet()
@@ -153,7 +153,7 @@ function TokenMintButton() {
   const getMenuOptions = () => {
     const options = []
     
-    // Check if user has active Fairwinds membership (ClearPath User role)
+    // Check if user has active FairWins membership (ClearPath User role)
     const hasMembership = hasRole(ROLES.CLEARPATH_USER) && preferences.clearPathStatus?.active
 
     // Token creation options - requires TOKENMINT role
@@ -178,24 +178,18 @@ function TokenMintButton() {
       })
     }
 
-    // Helper function to create membership purchase option
-    const createMembershipOption = (description) => ({
-      id: 'purchase-membership',
-      label: 'Purchase Membership',
-      icon: '🎫',
-      description,
-      action: handlePurchaseMembership,
-      highlight: true
-    })
-
     // If no membership, show purchase option
     if (!hasMembership) {
-      options.push(createMembershipOption('Get access to premium features'))
-    }
-
-    // If user has no roles and no membership, just show purchase option
-    if (options.length === 0) {
-      return [createMembershipOption('Get access to token minting and market creation')]
+      options.push({
+        id: 'purchase-membership',
+        label: 'Purchase Membership',
+        icon: '🎫',
+        description: options.length === 0 
+          ? 'Get access to token minting and market creation'
+          : 'Get access to premium features',
+        action: handlePurchaseMembership,
+        highlight: true
+      })
     }
 
     return options
