@@ -94,6 +94,10 @@ contract TieredRoleManager is RoleManager {
     event UsageRecorded(address indexed user, bytes32 indexed role, string actionType);
     event MembershipExtended(address indexed user, bytes32 indexed role, uint256 newExpiration, MembershipDuration duration);
     event MembershipExpired(address indexed user, bytes32 indexed role);
+    event TierPriceUpdated(bytes32 indexed role, MembershipTier tier, uint256 newPrice);
+    event TierLimitsUpdated(bytes32 indexed role, MembershipTier tier);
+    event TierMetadataUpdated(bytes32 indexed role, MembershipTier tier, string name, string description);
+    event TierActiveStatusChanged(bytes32 indexed role, MembershipTier tier, bool active);
     
     // ========== Constructor ==========
     
@@ -906,32 +910,5 @@ contract TieredRoleManager is RoleManager {
         MembershipTier tier = userTiers[user][role];
         if (tier == MembershipTier.NONE) return 0;
         return tierMetadata[role][tier].limits.feeDiscount;
-    }
-    
-    // ========== Admin Functions ==========
-    
-    /**
-     * @notice Update tier pricing (Operations Admin only)
-     */
-    function setTierPrice(bytes32 role, MembershipTier tier, uint256 newPrice) external onlyRole(OPERATIONS_ADMIN_ROLE) {
-        tierMetadata[role][tier].price = newPrice;
-    }
-    
-    /**
-     * @notice Update tier limits (Core System Admin only)
-     */
-    function updateTierLimits(
-        bytes32 role,
-        MembershipTier tier,
-        TierLimits memory newLimits
-    ) external onlyRole(CORE_SYSTEM_ADMIN_ROLE) {
-        tierMetadata[role][tier].limits = newLimits;
-    }
-    
-    /**
-     * @notice Toggle tier active status (Operations Admin only)
-     */
-    function setTierActive(bytes32 role, MembershipTier tier, bool isActive) external onlyRole(OPERATIONS_ADMIN_ROLE) {
-        tierMetadata[role][tier].isActive = isActive;
     }
 }

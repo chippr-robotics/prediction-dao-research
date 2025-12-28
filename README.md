@@ -41,11 +41,14 @@ FairWins is the main prediction market platform where:
 **Market Types:**
 1. **Public Markets** - Open to all users with full oracle support
 2. **Friend Group Markets** (P2P Betting) - Private markets between friends with:
-   - Reduced creation costs (0.05-0.1 ETH vs 1 ETH)
+   - **Gas-only markets**: Members pay only gas fees (creation fees waived)
+   - **Monthly allocations**: Bronze (15), Silver (30), Gold (100), Platinum (Unlimited)
+   - **Membership durations**: 1, 3, 6, 12 months, or enterprise
    - Member limits (2-10 participants)
    - Optional third-party arbitration
    - Market pegging to public markets for automatic settlement
    - Support for 1v1 bets, group prop bets, and event tracking
+   - **Updateable pricing**: Managers can adjust fees and limits
 
 **Use Cases:**
 - Event outcome predictions

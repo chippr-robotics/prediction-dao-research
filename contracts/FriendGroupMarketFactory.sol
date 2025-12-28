@@ -73,19 +73,22 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Reference to tiered role manager for membership checks
     TieredRoleManager public tieredRoleManager;
     
-    // Pricing tiers (for non-members, legacy support)
-    uint256 public constant PUBLIC_MARKET_FEE = 1 ether;      // Standard market fee
-    uint256 public constant FRIEND_MARKET_FEE = 0.1 ether;    // Reduced fee for friend markets
-    uint256 public constant ONE_V_ONE_FEE = 0.05 ether;       // Even lower for 1v1
+    // Pricing tiers (updateable by managers)
+    uint256 public publicMarketFee = 1 ether;      // Standard market fee
+    uint256 public friendMarketFee = 0.1 ether;    // Reduced fee for friend markets
+    uint256 public oneVsOneFee = 0.05 ether;       // Even lower for 1v1
     
     // Proposal ID offset to avoid collision with public markets
     uint256 public constant PROPOSAL_ID_OFFSET = 1000000;
     
-    // Member limits
-    uint256 public constant MAX_SMALL_GROUP_MEMBERS = 10;
-    uint256 public constant MAX_ONE_V_ONE_MEMBERS = 2;
-    uint256 public constant MIN_EVENT_TRACKING_MEMBERS = 3;
-    uint256 public constant MAX_EVENT_TRACKING_MEMBERS = 10;
+    // Member limits (updateable by managers)
+    uint256 public maxSmallGroupMembers = 10;
+    uint256 public maxOneVsOneMembers = 2;
+    uint256 public minEventTrackingMembers = 3;
+    uint256 public maxEventTrackingMembers = 10;
+    
+    // Manager role for updating configuration
+    address public manager;
     
     // Events
     event FriendMarketCreated(
@@ -96,6 +99,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 memberLimit,
         uint256 creationFee
     );
+    
+    event FeesUpdated(uint256 publicFee, uint256 friendFee, uint256 oneVsOneFee);
+    event MemberLimitsUpdated(uint256 maxSmallGroup, uint256 maxOneVsOne, uint256 minEventTracking, uint256 maxEventTracking);
+    event ManagerUpdated(address indexed oldManager, address indexed newManager);
     
     event MemberAdded(
         uint256 indexed friendMarketId,
@@ -139,6 +146,57 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         marketFactory = ConditionalMarketFactory(_marketFactory);
         ragequitModule = RagequitModule(_ragequitModule);
         tieredRoleManager = TieredRoleManager(_tieredRoleManager);
+        manager = msg.sender; // Initial manager is deployer
+    }
+    
+    // ========== Manager Functions ==========
+    
+    /**
+     * @notice Update manager address (only owner)
+     * @param newManager New manager address
+     */
+    function updateManager(address newManager) external onlyOwner {
+        require(newManager != address(0), "Invalid manager address");
+        address oldManager = manager;
+        manager = newManager;
+        emit ManagerUpdated(oldManager, newManager);
+    }
+    
+    /**
+     * @notice Update fee structure (only manager)
+     * @param _publicFee New public market fee
+     * @param _friendFee New friend market fee
+     * @param _oneVsOneFee New 1v1 market fee
+     */
+    function updateFees(uint256 _publicFee, uint256 _friendFee, uint256 _oneVsOneFee) external {
+        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
+        publicMarketFee = _publicFee;
+        friendMarketFee = _friendFee;
+        oneVsOneFee = _oneVsOneFee;
+        emit FeesUpdated(_publicFee, _friendFee, _oneVsOneFee);
+    }
+    
+    /**
+     * @notice Update member limits (only manager)
+     * @param _maxSmallGroup Max members for small group markets
+     * @param _maxOneVsOne Max members for 1v1 markets (should be 2)
+     * @param _minEventTracking Min members for event tracking
+     * @param _maxEventTracking Max members for event tracking
+     */
+    function updateMemberLimits(
+        uint256 _maxSmallGroup,
+        uint256 _maxOneVsOne,
+        uint256 _minEventTracking,
+        uint256 _maxEventTracking
+    ) external {
+        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
+        require(_maxOneVsOne == 2, "1v1 must have exactly 2 members");
+        require(_minEventTracking <= _maxEventTracking, "Invalid event tracking limits");
+        maxSmallGroupMembers = _maxSmallGroup;
+        maxOneVsOneMembers = _maxOneVsOne;
+        minEventTrackingMembers = _minEventTracking;
+        maxEventTrackingMembers = _maxEventTracking;
+        emit MemberLimitsUpdated(_maxSmallGroup, _maxOneVsOne, _minEventTracking, _maxEventTracking);
     }
     
     /**
@@ -201,7 +259,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             creator: msg.sender,
             members: members,
             arbitrator: arbitrator,
-            memberLimit: MAX_ONE_V_ONE_MEMBERS,
+            memberLimit: maxOneVsOneMembers,
             creationFee: 0, // Fee waived for members (gas only)
             createdAt: block.timestamp,
             active: true,
@@ -225,7 +283,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             underlyingMarketId,
             MarketType.OneVsOne,
             msg.sender,
-            MAX_ONE_V_ONE_MEMBERS,
+            maxOneVsOneMembers,
             0 // No creation fee for members
         );
         
@@ -255,9 +313,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address arbitrator,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        require(msg.value >= FRIEND_MARKET_FEE, "Insufficient creation fee");
+        require(msg.value >= friendMarketFee, "Insufficient creation fee");
         require(bytes(description).length > 0, "Description required");
-        require(memberLimit > 2 && memberLimit <= MAX_SMALL_GROUP_MEMBERS, "Invalid member limit");
+        require(memberLimit > 2 && memberLimit <= maxSmallGroupMembers, "Invalid member limit");
         require(initialMembers.length > 0 && initialMembers.length <= memberLimit, "Invalid initial members");
         
         // Validate no duplicate members
@@ -278,7 +336,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
-            msg.value - FRIEND_MARKET_FEE,
+            msg.value - friendMarketFee,
             0.1 ether, // Medium liquidity parameter
             tradingPeriod,
             ConditionalMarketFactory.BetType.YesNo
@@ -294,7 +352,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             members: initialMembers,
             arbitrator: arbitrator,
             memberLimit: memberLimit,
-            creationFee: FRIEND_MARKET_FEE,
+            creationFee: friendMarketFee,
             createdAt: block.timestamp,
             active: true,
             description: description,
@@ -322,7 +380,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             MarketType.SmallGroup,
             msg.sender,
             memberLimit,
-            FRIEND_MARKET_FEE
+            friendMarketFee
         );
         
         if (arbitrator != address(0)) {
@@ -344,11 +402,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingPeriod,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        require(msg.value >= FRIEND_MARKET_FEE, "Insufficient creation fee");
+        require(msg.value >= friendMarketFee, "Insufficient creation fee");
         require(bytes(description).length > 0, "Description required");
         require(
-            players.length >= MIN_EVENT_TRACKING_MEMBERS && 
-            players.length <= MAX_EVENT_TRACKING_MEMBERS,
+            players.length >= minEventTrackingMembers && 
+            players.length <= maxEventTrackingMembers,
             "Invalid number of players"
         );
         
@@ -370,7 +428,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
-            msg.value - FRIEND_MARKET_FEE,
+            msg.value - friendMarketFee,
             0.1 ether,
             tradingPeriod,
             ConditionalMarketFactory.BetType.WinLose
@@ -385,8 +443,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             creator: msg.sender,
             members: players,
             arbitrator: address(0), // No arbitrator for event tracking
-            memberLimit: MAX_EVENT_TRACKING_MEMBERS,
-            creationFee: FRIEND_MARKET_FEE,
+            memberLimit: maxEventTrackingMembers,
+            creationFee: friendMarketFee,
             createdAt: block.timestamp,
             active: true,
             description: description,
@@ -412,8 +470,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             underlyingMarketId,
             MarketType.EventTracking,
             msg.sender,
-            MAX_EVENT_TRACKING_MEMBERS,
-            FRIEND_MARKET_FEE
+            maxEventTrackingMembers,
+            friendMarketFee
         );
     }
     
