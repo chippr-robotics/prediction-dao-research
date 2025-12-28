@@ -66,6 +66,9 @@ const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperativ
 // Get WalletConnect project ID from environment
 const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
 
+// Get app URL for WalletConnect metadata
+const appUrl = import.meta.env.VITE_APP_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://fairwins.app')
+
 // Define supported chains
 const chains = [ethereumClassic, mordor, hardhat]
 
@@ -80,8 +83,8 @@ export const config = createConfig({
       metadata: {
         name: 'Prediction DAO',
         description: 'Decentralized prediction markets on Ethereum Classic',
-        url: typeof window !== 'undefined' ? window.location.origin : 'https://fairwins.app',
-        icons: ['https://fairwins.app/assets/fairwins_no-text_logo.svg']
+        url: appUrl,
+        icons: [`${appUrl}/assets/fairwins_no-text_logo.svg`]
       },
       showQrModal: true,
     })] : []),

@@ -9,6 +9,27 @@ import RolePurchaseModal from './RolePurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
 import './UserManagementModal.css'
 
+// Connector display configuration
+const CONNECTOR_CONFIG = {
+  walletConnect: {
+    icon: '🔗',
+    label: 'WalletConnect'
+  },
+  injected: {
+    icon: '🦊',
+    label: 'MetaMask / Browser Wallet'
+  }
+}
+
+// Get connector display info
+const getConnectorInfo = (connector) => {
+  const config = CONNECTOR_CONFIG[connector.id]
+  if (config) {
+    return `${config.icon} ${config.label}`
+  }
+  return connector.name || connector.id
+}
+
 // eslint-disable-next-line no-unused-vars
 function UserManagementModal({ onScanMarket }) {
   const { address, isConnected, connectors } = useWallet()
@@ -133,11 +154,7 @@ function UserManagementModal({ onScanMarket }) {
                       Connecting...
                     </>
                   ) : (
-                    <>
-                      {connector.id === 'walletConnect' && '🔗 WalletConnect'}
-                      {connector.id === 'injected' && '🦊 MetaMask / Browser Wallet'}
-                      {!['walletConnect', 'injected'].includes(connector.id) && connector.name}
-                    </>
+                    getConnectorInfo(connector)
                   )}
                 </button>
               ))}
