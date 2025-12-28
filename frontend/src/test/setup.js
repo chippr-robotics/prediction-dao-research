@@ -32,6 +32,12 @@ vi.mock('wagmi', () => ({
   http: vi.fn()
 }))
 
+// Mock wagmi connectors
+vi.mock('wagmi/connectors', () => ({
+  injected: vi.fn(() => ({ id: 'injected', name: 'MetaMask' })),
+  walletConnect: vi.fn(() => ({ id: 'walletConnect', name: 'WalletConnect' }))
+}))
+
 // Mock window.ethereum for Web3 tests
 global.window = global.window || {}
 

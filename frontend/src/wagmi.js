@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi'
-import { injected } from 'wagmi/connectors'
+import { injected, walletConnect } from 'wagmi/connectors'
 
 // Define Ethereum Classic mainnet
 const ethereumClassic = {
@@ -63,6 +63,33 @@ const networkId = import.meta.env.VITE_NETWORK_ID
 // Get RPC URL from environment
 const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
 
+// Get WalletConnect project ID from environment
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
+
+// Get app URL for WalletConnect metadata
+const resolveAppUrl = () => {
+  const envUrl = import.meta.env.VITE_APP_URL
+
+  if (envUrl) {
+    return envUrl
+  }
+
+  // In production, require VITE_APP_URL to be set to avoid metadata mismatches
+  if (import.meta.env.PROD && walletConnectProjectId) {
+    console.warn('VITE_APP_URL should be set in production for correct WalletConnect metadata. Falling back to window.location.origin.')
+  }
+
+  // In development, fall back to the current origin when available
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    return window.location.origin
+  }
+
+  // As a last resort, return a fallback domain
+  return 'https://fairwins.app'
+}
+
+const appUrl = resolveAppUrl()
+
 // Define supported chains
 const chains = [ethereumClassic, mordor, hardhat]
 
@@ -71,6 +98,17 @@ export const config = createConfig({
   chains,
   connectors: [
     injected({ target: 'metaMask' }),
+    // Add WalletConnect connector if project ID is provided
+    ...(walletConnectProjectId ? [walletConnect({
+      projectId: walletConnectProjectId,
+      metadata: {
+        name: 'Prediction DAO',
+        description: 'Decentralized prediction markets on Ethereum Classic',
+        url: appUrl,
+        icons: [`${appUrl}/assets/fairwins_no-text_logo.svg`]
+      },
+      showQrModal: true,
+    })] : []),
   ],
   transports: {
     [ethereumClassic.id]: http(),

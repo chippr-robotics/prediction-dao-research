@@ -83,17 +83,6 @@ export function WalletProvider({ children }) {
     }
   }, [chainId, isConnected])
 
-  // Load RVAC roles when wallet connects
-  useEffect(() => {
-    if (isConnected && address) {
-      loadRoles(address)
-      fetchBalances(address)
-    } else {
-      setRoles([])
-      setBalances({ etc: '0', wetc: '0', tokens: {} })
-    }
-  }, [address, isConnected])
-
   // Load user roles from storage
   const loadRoles = useCallback((walletAddress) => {
     setRolesLoading(true)
@@ -127,6 +116,18 @@ export function WalletProvider({ children }) {
       setBalancesLoading(false)
     }
   }, [provider])
+
+  // Load RVAC roles when wallet connects
+  useEffect(() => {
+    if (isConnected && address) {
+      loadRoles(address)
+      fetchBalances(address)
+    } else {
+      setRoles([])
+      setBalances({ etc: '0', wetc: '0', tokens: {} })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, isConnected])
 
   // Refresh balances manually
   const refreshBalances = useCallback(() => {
@@ -167,13 +168,20 @@ export function WalletProvider({ children }) {
   }, [provider, address])
 
   // Connect wallet
-  const connectWallet = useCallback(async () => {
+  const connectWallet = useCallback(async (connectorId) => {
     try {
-      if (!window.ethereum) {
-        throw new Error('Please install MetaMask to use this application')
+      // If no specific connector is requested, try injected first, then WalletConnect
+      let connector
+      
+      if (connectorId) {
+        // Use specific connector if requested
+        connector = connectors.find(c => c.id === connectorId)
+      } else {
+        // Try injected first if available, otherwise use WalletConnect
+        connector = connectors.find(c => c.id === 'injected') || 
+                   connectors.find(c => c.id === 'walletConnect')
       }
-
-      const connector = connectors.find(c => c.id === 'injected')
+      
       if (!connector) {
         throw new Error('No wallet connector available')
       }
@@ -299,6 +307,9 @@ export function WalletProvider({ children }) {
     account: address, // Alias for backwards compatibility
     isConnected,
     chainId,
+    
+    // Available connectors
+    connectors,
     
     // Provider and signer for transactions
     provider,

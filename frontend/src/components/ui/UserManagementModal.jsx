@@ -7,11 +7,33 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import RolePurchaseModal from './RolePurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
+import LoadingScreen from './LoadingScreen'
 import './UserManagementModal.css'
+
+// Connector display configuration
+const CONNECTOR_CONFIG = {
+  walletConnect: {
+    icon: '🔗',
+    label: 'WalletConnect'
+  },
+  injected: {
+    icon: '🦊',
+    label: 'MetaMask'
+  }
+}
+
+// Get connector display info
+const getConnectorInfo = (connector) => {
+  const config = CONNECTOR_CONFIG[connector.id]
+  if (config) {
+    return `${config.icon} ${config.label}`
+  }
+  return connector.name || connector.id
+}
 
 // eslint-disable-next-line no-unused-vars
 function UserManagementModal({ onScanMarket }) {
-  const { address, isConnected } = useWallet()
+  const { address, isConnected, connectors } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
@@ -19,15 +41,15 @@ function UserManagementModal({ onScanMarket }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
-  const [isConnecting, setIsConnecting] = useState(false)
+  const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
 
-  const handleConnect = async () => {
-    setIsConnecting(true)
+  const handleConnect = async (connectorId) => {
+    setConnectingConnectorId(connectorId)
     setConnectionError(null)
     
     try {
-      const success = await connectWallet()
+      const success = await connectWallet(connectorId)
       if (!success) {
         setConnectionError('Failed to connect wallet. Please try again.')
       }
@@ -36,17 +58,15 @@ function UserManagementModal({ onScanMarket }) {
       console.error('Wallet connection error:', error)
       
       // Provide user-friendly error messages
-      if (error.message.includes('MetaMask')) {
-        setConnectionError('Please install MetaMask to connect your wallet.')
-      } else if (error.message.includes('rejected') || error.message.includes('approve')) {
+      if (error.message.includes('rejected') || error.message.includes('approve')) {
         setConnectionError('Connection request was rejected. Please try again.')
       } else if (error.message.includes('connector')) {
-        setConnectionError('No wallet connector available. Please install MetaMask.')
+        setConnectionError('No wallet connector available. Please install a Web3 wallet.')
       } else {
         setConnectionError(error.message || 'Failed to connect wallet. Please try again.')
       }
     } finally {
-      setIsConnecting(false)
+      setConnectingConnectorId(null)
     }
   }
 
@@ -120,35 +140,46 @@ function UserManagementModal({ onScanMarket }) {
               </div>
             )}
             
-            <button 
-              onClick={handleConnect}
-              className="connect-wallet-btn-large"
-              disabled={isConnecting}
-              aria-busy={isConnecting}
-            >
-              {isConnecting ? (
-                <>
-                  <span className="spinner" aria-hidden="true"></span>
-                  Connecting...
-                </>
-              ) : (
-                'Connect Wallet'
-              )}
-            </button>
+            <div className="connector-options">
+              {connectors.map((connector) => {
+                const isThisConnecting = connectingConnectorId === connector.id
+                return (
+                  <button
+                    key={connector.id}
+                    onClick={() => handleConnect(connector.id)}
+                    className="connector-btn"
+                    disabled={connectingConnectorId !== null}
+                    aria-busy={isThisConnecting}
+                  >
+                    {isThisConnecting ? (
+                      <>
+                        <LoadingScreen 
+                          visible={true} 
+                          inline 
+                          size="small" 
+                          text="" 
+                        />
+                        <span style={{ marginLeft: '8px' }}>Connecting...</span>
+                      </>
+                    ) : (
+                      getConnectorInfo(connector)
+                    )}
+                  </button>
+                )
+              })}
+            </div>
             
-            {!window.ethereum && (
-              <div className="wallet-help" role="note">
-                <p>Don't have a Web3 wallet?</p>
-                <a 
-                  href="https://metamask.io/download/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="install-metamask-link"
-                >
-                  Install MetaMask
-                </a>
-              </div>
-            )}
+            <div className="wallet-help" role="note">
+              <p>New to Web3 wallets?</p>
+              <a 
+                href="https://ethereum.org/en/wallets/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="install-metamask-link"
+              >
+                Learn about Web3 wallets
+              </a>
+            </div>
           </div>
         </div>
       ) : (

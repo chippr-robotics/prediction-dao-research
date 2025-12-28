@@ -4,6 +4,41 @@
 
 The Prediction DAO frontend now features a harmonized wallet management system that provides a single, cohesive interface for all wallet-related operations throughout the application. This system consolidates wallet connection, transaction signing, balance management, and RVAC (Role-Based Access Control) into a unified context.
 
+## Wallet Connection Options
+
+The application supports multiple wallet connection methods:
+
+1. **MetaMask / Browser Wallet** - Using injected provider (MetaMask, Brave, etc.)
+2. **WalletConnect** - Mobile wallets and other WalletConnect-compatible wallets
+
+### WalletConnect Setup
+
+To enable WalletConnect functionality:
+
+1. **Get a Project ID**:
+   - Visit [WalletConnect Cloud](https://cloud.walletconnect.com)
+   - Create a new project
+   - Copy your Project ID
+
+2. **Configure Environment**:
+   Add the Project ID to your `.env` file:
+   ```bash
+   VITE_WALLETCONNECT_PROJECT_ID=your_project_id_here
+   ```
+
+3. **Whitelist Your Domain**:
+   - In WalletConnect Cloud dashboard
+   - Add your domain(s) to the allowed origins
+   - Include both production and development URLs
+
+4. **Test Connection**:
+   - Click the profile icon (👤) when not connected
+   - Select "WalletConnect" from the connector options
+   - Scan QR code with your mobile wallet
+   - Approve the connection request
+
+**Note**: If `VITE_WALLETCONNECT_PROJECT_ID` is not set, the WalletConnect option will not appear, and only the injected wallet option (MetaMask) will be available.
+
 ## Architecture
 
 ### WalletContext (`src/contexts/WalletContext.jsx`)
@@ -11,6 +46,7 @@ The Prediction DAO frontend now features a harmonized wallet management system t
 The `WalletContext` is the central hub for all wallet-related state and operations. It provides:
 
 - **Wallet Connection**: Connect/disconnect wallet with automatic provider setup
+- **Multiple Connectors**: Support for injected wallets and WalletConnect
 - **Address Management**: Current wallet address and connection state
 - **Provider & Signer**: Ethers.js provider and signer instances for transactions
 - **Balance Tracking**: ETC, WETC, and other token balances
@@ -21,10 +57,11 @@ The `WalletContext` is the central hub for all wallet-related state and operatio
 ### Key Features
 
 1. **Single Source of Truth**: All wallet state is managed in one place
-2. **RVAC Integration**: User roles are automatically loaded and managed based on wallet address
-3. **Balance Caching**: Token balances are cached to reduce RPC calls
-4. **Network Validation**: Automatic detection of wrong network with switch capability
-5. **Transaction Support**: Helper methods for common transaction operations
+2. **Multiple Wallet Support**: Injected wallets (MetaMask) and WalletConnect
+3. **RVAC Integration**: User roles are automatically loaded and managed based on wallet address
+4. **Balance Caching**: Token balances are cached to reduce RPC calls
+5. **Network Validation**: Automatic detection of wrong network with switch capability
+6. **Transaction Support**: Helper methods for common transaction operations
 
 ## Usage
 
