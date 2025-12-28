@@ -28,7 +28,7 @@ function HeaderBar({ isConnected, onScanMarket }) {
 
   return (
     <header className={`header-bar ${shouldHideHeader ? 'header-hidden' : ''} ${hasScrolled ? 'header-scrolled' : ''}`}>
-      <div className="header-content">
+      <div className="header-bar-content">
         <div className="header-left">
           <div className="header-branding">
             <div className="brand-logo">
