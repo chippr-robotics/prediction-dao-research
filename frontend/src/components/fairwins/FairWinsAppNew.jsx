@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
+import useFuseSearch from '../../hooks/useFuseSearch'
 import { getMockMarkets } from '../../utils/mockDataLoader'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
@@ -18,6 +19,7 @@ import TokenMintTab from './TokenMintTab'
 import TokenMintBuilderModal from './TokenMintBuilderModal'
 import TokenMintHeroCard from './TokenMintHeroCard'
 import ClearPathTab from './ClearPathTab'
+import SearchBar from '../ui/SearchBar'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
@@ -29,6 +31,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'category'
   const [showHero, setShowHero] = useState(false) // Control hero visibility
+  const [searchQuery, setSearchQuery] = useState('') // Search query state
+  const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
   // TokenMint state
@@ -113,11 +117,17 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
   const handleCategoryChange = (categoryId) => {
     setSelectedCategory(categoryId)
+    // Clear search when changing category
+    setSearchQuery('')
     // Close hero when changing category
     setShowHero(false)
     setSelectedMarket(null)
     // Scroll to top when changing category
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleSearchChange = (query) => {
+    setSearchQuery(query)
   }
 
   const handleMarketClick = (market) => {
@@ -295,10 +305,13 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
     return markets.filter(m => m.category === selectedCategory)
   }, [markets, selectedCategory])
 
+  // Apply Fuse.js search to category-filtered markets
+  const searchFilteredMarkets = useFuseSearch(categoryFilteredMarkets, searchQuery)
+
   // Get markets for current category with sorting and grouping
   const getFilteredAndSortedMarkets = useCallback(() => {
-    // Use categoryFilteredMarkets for specific categories
-    const filteredMarkets = categoryFilteredMarkets
+    // Use searchFilteredMarkets for specific categories
+    const filteredMarkets = searchFilteredMarkets
     
     // Group markets by correlation
     const grouped = {}
@@ -355,7 +368,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
     
     // Return grouped markets first, then ungrouped markets
     return [...groupedMarkets, ...sortedUngrouped]
-  }, [categoryFilteredMarkets, sortBy])
+  }, [searchFilteredMarkets, sortBy])
 
   if (loading) {
     return (
@@ -475,20 +488,28 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                         {categories.find(c => c.id === selectedCategory)?.name} Markets
                       </h2>
                       <span className="market-count">
-                        ({categoryFilteredMarkets.length} active markets)
+                        ({searchFilteredMarkets.length} {searchQuery ? 'matching' : 'active'} markets)
                       </span>
                     </div>
-                    <div className="sort-controls">
-                      <label htmlFor="sort-select">Sort by:</label>
-                      <select 
-                        id="sort-select"
-                        value={sortBy} 
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="sort-select"
-                      >
-                        <option value="endTime">Ending Time</option>
-                        <option value="marketValue">Market Value</option>
-                      </select>
+                    <div className="search-and-sort-controls">
+                      <SearchBar 
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        placeholder="Search markets..."
+                        ariaLabel={`Search ${categories.find(c => c.id === selectedCategory)?.name} markets`}
+                      />
+                      <div className="sort-controls">
+                        <label htmlFor="sort-select">Sort by:</label>
+                        <select 
+                          id="sort-select"
+                          value={sortBy} 
+                          onChange={(e) => setSortBy(e.target.value)}
+                          className="sort-select"
+                        >
+                          <option value="endTime">Ending Time</option>
+                          <option value="marketValue">Market Value</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <MarketGrid 
