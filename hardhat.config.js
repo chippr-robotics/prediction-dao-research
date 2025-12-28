@@ -18,7 +18,7 @@ module.exports = {
       allowUnlimitedContractSize: true,
       accounts: {
         count: 20, // More accounts for integration tests
-        accountsBalance: "10000000000000000000000", // 10,000 ETH each
+        accountsBalance: "100000000000000000000000", // 100,000 ETH each - increased to handle bond-heavy tests
       },
       mining: {
         auto: true,

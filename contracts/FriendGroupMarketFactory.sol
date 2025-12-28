@@ -119,7 +119,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     );
     event MemberAdded(uint256 indexed friendMarketId, address indexed member);
     event MemberRemoved(uint256 indexed friendMarketId, address indexed member);
-    event MarketResolved(uint256 indexed friendMarketId, uint256 outcome);
     event MarketPegged(uint256 indexed friendMarketId, uint256 indexed publicMarketId);
     event BatchResolution(uint256 indexed publicMarketId, uint256[] friendMarketIds, uint256 outcome);
     event FeesUpdated(uint256 publicFee, uint256 friendFee, uint256 oneVsOneFee);
@@ -626,7 +625,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         bool active,
         string memory description,
         uint256 peggedPublicMarketId,
-        bool autoPegged
+        bool autoPegged,
+        address paymentToken,
+        uint256 liquidityAmount
     ) {
         require(friendMarketId < friendMarketCount, "Invalid market ID");
         FriendMarket storage market = friendMarkets[friendMarketId];
@@ -643,7 +644,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             market.active,
             market.description,
             market.peggedPublicMarketId,
-            market.autoPegged
+            market.autoPegged,
+            market.paymentToken,
+            market.liquidityAmount
         );
     }
     

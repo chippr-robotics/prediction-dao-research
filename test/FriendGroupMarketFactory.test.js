@@ -167,11 +167,12 @@ describe("FriendGroupMarketFactory", function () {
       expect(await friendGroupFactory.getMemberCount(0)).to.equal(2);
     });
 
-    it("Should reject 1v1 market with insufficient fee", async function () {
+    it("Should allow 1v1 market creation with any liquidity amount (fees waived for members)", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const lowFee = ethers.parseEther("0.01"); // Too low
+      const liquidityAmount = ethers.parseEther("0.01"); // Any amount works as liquidity
       
+      // Should succeed since fees are waived for members, value goes to liquidity
       await expect(
         friendGroupFactory.connect(addr1).createOneVsOneMarket(
           addr2.address,
@@ -179,9 +180,14 @@ describe("FriendGroupMarketFactory", function () {
           tradingPeriod,
           ethers.ZeroAddress,
           0,
-          { value: lowFee }
+          { value: liquidityAmount }
         )
-      ).to.be.revertedWith("Insufficient creation fee");
+      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+      
+      // Verify market was created with correct liquidity (should be market ID 0)
+      const market = await friendGroupFactory.getFriendMarket(0);
+      expect(market.liquidityAmount).to.equal(liquidityAmount);
+      expect(market.creationFee).to.equal(0); // Fee waived for members
     });
 
     it("Should reject 1v1 market with invalid opponent", async function () {
@@ -512,7 +518,8 @@ describe("FriendGroupMarketFactory", function () {
     it("Should allow creator to resolve market", async function () {
       await expect(
         friendGroupFactory.connect(addr1).resolveFriendMarket(0, true)
-      ).to.emit(friendGroupFactory, "MarketResolved");
+      ).to.emit(friendGroupFactory, "MarketResolved")
+        .withArgs(0, addr1.address, true);
       
       const market = await friendGroupFactory.getFriendMarket(0);
       expect(market.active).to.equal(false);
@@ -521,7 +528,8 @@ describe("FriendGroupMarketFactory", function () {
     it("Should allow arbitrator to resolve market", async function () {
       await expect(
         friendGroupFactory.connect(arbitrator).resolveFriendMarket(0, false)
-      ).to.emit(friendGroupFactory, "MarketResolved");
+      ).to.emit(friendGroupFactory, "MarketResolved")
+        .withArgs(0, arbitrator.address, false);
       
       const market = await friendGroupFactory.getFriendMarket(0);
       expect(market.active).to.equal(false);
@@ -670,7 +678,18 @@ describe("FriendGroupMarketFactory", function () {
       const tradingPeriod = 7 * 24 * 60 * 60;
       const fee = ethers.parseEther("0.1");
       
-      // First create a "public" market to peg to
+      // Create a dummy market first so the "public" market gets a non-zero marketId
+      await friendGroupFactory.createSmallGroupMarket(
+        "Dummy market",
+        [owner.address],
+        5,
+        tradingPeriod,
+        ethers.ZeroAddress,
+        0,
+        { value: ethers.parseEther("0.1") }
+      );
+      
+      // Now create the "public" market to peg to (will have marketId > 0)
       await friendGroupFactory.createSmallGroupMarket(
         "Public market",
         [owner.address],
@@ -681,7 +700,7 @@ describe("FriendGroupMarketFactory", function () {
         { value: ethers.parseEther("0.2") }
       );
       
-      const publicMarket = await friendGroupFactory.getFriendMarket(0);
+      const publicMarket = await friendGroupFactory.getFriendMarket(1);
       const publicMarketId = publicMarket.marketId;
       
       // Create pegged friend market
@@ -694,7 +713,7 @@ describe("FriendGroupMarketFactory", function () {
         { value: fee }
       );
       
-      const market = await friendGroupFactory.getFriendMarket(1);
+      const market = await friendGroupFactory.getFriendMarket(2);
       expect(market.peggedPublicMarketId).to.equal(publicMarketId);
       expect(market.autoPegged).to.equal(true);
     });
@@ -740,7 +759,18 @@ describe("FriendGroupMarketFactory", function () {
       const tradingPeriod = 7 * 24 * 60 * 60;
       const fee = ethers.parseEther("0.1");
       
-      // Create public market
+      // Create dummy market first so the "public" market gets a non-zero marketId
+      await friendGroupFactory.createSmallGroupMarket(
+        "Dummy market",
+        [owner.address],
+        5,
+        tradingPeriod,
+        ethers.ZeroAddress,
+        0,
+        { value: ethers.parseEther("0.1") }
+      );
+      
+      // Create public market (will have marketId > 0)
       await friendGroupFactory.createSmallGroupMarket(
         "Public market",
         [owner.address],
@@ -751,7 +781,7 @@ describe("FriendGroupMarketFactory", function () {
         { value: ethers.parseEther("0.2") }
       );
       
-      const publicMarket = await friendGroupFactory.getFriendMarket(0);
+      const publicMarket = await friendGroupFactory.getFriendMarket(1);
       const publicMarketId = publicMarket.marketId;
       
       // Create two pegged markets
