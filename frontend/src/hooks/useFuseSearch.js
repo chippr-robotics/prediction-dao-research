@@ -5,10 +5,13 @@ import Fuse from 'fuse.js'
  * Custom hook for implementing fuzzy search using Fuse.js
  * @param {Array} items - Array of items to search through
  * @param {string} searchQuery - The search query string
- * @param {Object} options - Fuse.js configuration options
+ * @param {Object} optionsOverride - Optional Fuse.js configuration overrides
  * @returns {Array} Filtered array of items based on search query
  */
-function useFuseSearch(items, searchQuery, options = {}) {
+function useFuseSearch(items, searchQuery, optionsOverride = {}) {
+  // Create a stable stringified version of options for dependency tracking
+  const optionsKey = useMemo(() => JSON.stringify(optionsOverride), [JSON.stringify(optionsOverride)])
+
   // Create Fuse instance - memoized to avoid recreation on every render
   const fuse = useMemo(() => {
     if (!items || items.length === 0) {
@@ -25,12 +28,11 @@ function useFuseSearch(items, searchQuery, options = {}) {
       includeScore: true,
       useExtendedSearch: false,
       ignoreLocation: true,
-      ...options
+      ...optionsOverride
     }
 
     return new Fuse(items, fuseOptions)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items])
+  }, [items, optionsKey])
 
   // Perform search - memoized to avoid re-searching with same query
   const searchResults = useMemo(() => {
