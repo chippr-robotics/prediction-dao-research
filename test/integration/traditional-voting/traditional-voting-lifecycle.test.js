@@ -16,6 +16,22 @@ describe("Integration: Traditional Voting Lifecycle", function () {
   beforeEach(async function () {
     [owner, proposer, voter1, voter2, voter3, recipient] = await ethers.getSigners();
     
+    // Ensure proposer has enough ETH for bond payments (50 ETH per proposal + gas)
+    // This is needed when running as part of full test suite where accounts may be depleted
+    const proposerBalance = await ethers.provider.getBalance(proposer.address);
+    const requiredBalance = ethers.parseEther("300"); // 6 tests * 50 ETH each
+    if (proposerBalance < requiredBalance) {
+      const amountNeeded = requiredBalance - proposerBalance;
+      const ownerBalance = await ethers.provider.getBalance(owner.address);
+      // Only send if owner has enough (leave some for gas)
+      if (ownerBalance > amountNeeded + ethers.parseEther("10")) {
+        await owner.sendTransaction({
+          to: proposer.address,
+          value: amountNeeded
+        });
+      }
+    }
+    
     // Deploy mock governance token
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     governanceToken = await MockERC20.deploy("Governance Token", "GOV", ethers.parseEther("1000000"));
@@ -309,5 +325,49 @@ describe("Integration: Traditional Voting Lifecycle", function () {
     // Proposal should succeed (quorum met with 60%, For > Against)
     const state = await traditionalGovernor.state(votingProposalId);
     expect(state).to.equal(3); // Succeeded
+  });
+
+  it("Should defeat proposal when abstain helps reach quorum but Against > For", async function () {
+    const bondAmount = await proposalRegistry.bondAmount();
+    const latestBlock = await ethers.provider.getBlock('latest');
+    const executionDeadline = latestBlock.timestamp + 30 * 24 * 60 * 60;
+    
+    await proposalRegistry.connect(proposer).submitProposal(
+      "Proposal with Abstain but More Against",
+      "Testing abstain with losing outcome",
+      ethers.parseEther("18"),
+      recipient.address,
+      0,
+      ethers.ZeroAddress,
+      0,
+      executionDeadline,
+      { value: bondAmount }
+    );
+    
+    await traditionalGovernor.connect(proposer).createVotingProposal(0);
+    const votingProposalId = 0;
+    
+    // voter1 votes Against (25%)
+    await traditionalGovernor.connect(voter1).castVote(votingProposalId, 0);
+    
+    // voter2 abstains (20%)
+    await traditionalGovernor.connect(voter2).castVote(votingProposalId, 2);
+    
+    // voter3 votes For (15%)
+    await traditionalGovernor.connect(voter3).castVote(votingProposalId, 1);
+    
+    // Verify votes
+    const proposal = await traditionalGovernor.votingProposals(votingProposalId);
+    expect(proposal.forVotes).to.equal(ethers.parseEther("150000"));
+    expect(proposal.againstVotes).to.equal(ethers.parseEther("250000"));
+    expect(proposal.abstainVotes).to.equal(ethers.parseEther("200000"));
+    
+    // Wait for voting to end
+    const votingPeriod = await traditionalGovernor.votingPeriod();
+    await mine(Number(votingPeriod) + 1);
+    
+    // Proposal should be defeated (quorum met with 60%, but Against > For)
+    const state = await traditionalGovernor.state(votingProposalId);
+    expect(state).to.equal(2); // Defeated
   });
 });

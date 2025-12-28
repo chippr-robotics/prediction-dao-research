@@ -348,6 +348,12 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
      * @notice Get the state of a proposal
      * @param votingProposalId ID of the voting proposal
      * @return Current state of the proposal
+     * 
+     * @dev Abstain vote handling:
+     * - Abstain votes COUNT toward meeting quorum requirements
+     * - Abstain votes DO NOT affect the For vs Against outcome comparison
+     * - A proposal succeeds if: (For + Against + Abstain) >= quorum AND For > Against
+     * - A proposal is defeated if: quorum not met OR For <= Against
      */
     function state(uint256 votingProposalId) public view returns (ProposalState) {
         VotingProposal storage proposal = votingProposals[votingProposalId];
@@ -369,21 +375,27 @@ contract TraditionalGovernor is Ownable, ReentrancyGuard {
         }
         
         // Voting ended, check if succeeded
+        // Note: Abstain votes are included in quorum calculation
         uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
         
-        if (totalVotes < proposal.quorum) {
+        // Check if quorum is met (including abstain votes)
+        bool quorumReached = totalVotes >= proposal.quorum;
+        if (!quorumReached) {
             return ProposalState.Defeated;
         }
         
-        if (proposal.forVotes <= proposal.againstVotes) {
-            return ProposalState.Defeated;
-        }
-        
+        // Check if already queued for execution
         if (proposal.executionTime > 0) {
             return ProposalState.Queued;
         }
         
-        return ProposalState.Succeeded;
+        // Check outcome: For votes must exceed Against votes (abstain votes do not affect this comparison)
+        if (proposal.forVotes > proposal.againstVotes) {
+            return ProposalState.Succeeded;
+        }
+        
+        // If For <= Against (including ties), proposal is defeated
+        return ProposalState.Defeated;
     }
     
     /**
