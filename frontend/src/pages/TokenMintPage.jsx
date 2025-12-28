@@ -13,7 +13,7 @@ function TokenMintPage() {
   const [selectedToken, setSelectedToken] = useState(null)
   const [showTokenBuilder, setShowTokenBuilder] = useState(false)
   const [tokenLoading, setTokenLoading] = useState(false)
-  const [showHero, setShowHero] = useState(false)
+  const [showTokenDetails, setShowTokenDetails] = useState(false)
 
   const loadUserTokens = useCallback(async () => {
     if (!account || !isConnected) {
@@ -82,7 +82,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
 
   const handleTokenClick = (token) => {
     setSelectedToken(token)
-    setShowHero(true)
+    setShowTokenDetails(true)
   }
 
   const handleTokenMint = async (tokenId, data) => {
@@ -126,7 +126,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
         <h1>🪙 Token Management</h1>
       </div>
 
-      {!showHero ? (
+      {!showTokenDetails ? (
         <TokenMintTab 
           tokens={tokens}
           loading={tokenLoading}
@@ -138,7 +138,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
           token={selectedToken}
           onClose={() => {
             setSelectedToken(null)
-            setShowHero(false)
+            setShowTokenDetails(false)
           }}
           onMint={handleTokenMint}
           onBurn={handleTokenBurn}

@@ -4,7 +4,7 @@ import { getMockMarkets } from '../utils/mockDataLoader'
 import MarketDetailsPanel from '../components/fairwins/MarketDetailsPanel'
 import ShareModal from '../components/ui/ShareModal'
 import { usePrice } from '../contexts/PriceContext'
-import '../components/fairwins/MarketModal.css'
+import './MarketPage.css'
 
 // Quick action button values for market orders
 const QUICK_ACTION_AMOUNTS = [5, 25, 100, 500]
@@ -148,10 +148,10 @@ This is a transparent market - all trades are publicly visible on the blockchain
   }
 
   return (
-    <div className="market-modal-backdrop">
-      <div className="market-modal-container-new">
-        <div className="market-modal-new">
-          <div className="modal-header-new">
+    <div className="market-page-backdrop">
+      <div className="market-page-container-new">
+        <div className="market-page-new">
+          <div className="page-header-new">
             <button
               className="nav-btn nav-btn-left"
               onClick={() => setCurrentPanel((prev) => (prev - 1 + 3) % 3)}
@@ -162,9 +162,9 @@ This is a transparent market - all trades are publicly visible on the blockchain
             <img 
               src="/assets/fairwins_no-text_logo.svg" 
               alt="FairWins" 
-              className="modal-logo-new"
+              className="page-logo-new"
             />
-            <h2 className="modal-title-new">{market.proposalTitle}</h2>
+            <h2 className="page-title-new">{market.proposalTitle}</h2>
             <button
               className="nav-btn nav-btn-right"
               onClick={() => setCurrentPanel((prev) => (prev + 1) % 3)}
@@ -173,7 +173,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
               ›
             </button>
             <button 
-              className="modal-close-btn-new"
+              className="page-close-btn-new"
               onClick={handleClose}
               aria-label="Close"
             >
@@ -332,7 +332,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
                   <button className="send-btn" onClick={handleSend} disabled={orderType === 'market' ? !isMarketOrderValid : !isLimitOrderValid}>Send</button>
                 </div>
 
-                <div className="modal-footer-new">
+                <div className="page-footer-new">
                   <span className="footer-label">Ends:</span>
                   <span className="footer-value">{formatEndDate(market.tradingEndTime)}</span>
                 </div>

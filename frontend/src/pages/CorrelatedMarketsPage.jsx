@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
 import { getMockMarkets } from '../utils/mockDataLoader'
 import { usePrice } from '../contexts/PriceContext'
-import '../components/fairwins/CorrelatedMarketsModal.css'
+import './CorrelatedMarketsPage.css'
 
 const TIME_HORIZONS = {
   '7d': { label: '7 Days', dataPoints: 7 },
@@ -22,8 +22,9 @@ function CorrelatedMarketsPage() {
   const [correlatedMarkets, setCorrelatedMarkets] = useState([])
   const [selectedOption, setSelectedOption] = useState(null)
   const [visibleMarkets, setVisibleMarkets] = useState({})
+  const [pinnedMarkets, setPinnedMarkets] = useState(new Set())
+  const [favoriteMarkets, setFavoriteMarkets] = useState(new Set())
   const [timeHorizon, setTimeHorizon] = useState('7d')
-  const [lastTap, setLastTap] = useState({ marketId: null, timestamp: 0 })
   const [loading, setLoading] = useState(true)
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
@@ -64,19 +65,39 @@ function CorrelatedMarketsPage() {
     setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
   }
 
-  const handleMarketCardClick = (marketId) => {
-    const DOUBLE_TAP_DELAY = 300
-    const now = Date.now()
-    
-    setLastTap(prev => {
-      if (prev.marketId === marketId && (now - prev.timestamp) < DOUBLE_TAP_DELAY) {
-        navigate(`/market/${marketId}`)
-        return { marketId: null, timestamp: 0 }
+  const togglePinMarket = (marketId, e) => {
+    e.stopPropagation()
+    setPinnedMarkets(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(marketId)) {
+        newSet.delete(marketId)
       } else {
-        setSelectedOption(marketId)
-        return { marketId, timestamp: now }
+        newSet.add(marketId)
       }
+      return newSet
     })
+  }
+
+  const toggleFavoriteMarket = (marketId, e) => {
+    e.stopPropagation()
+    setFavoriteMarkets(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(marketId)) {
+        newSet.delete(marketId)
+      } else {
+        newSet.add(marketId)
+      }
+      return newSet
+    })
+  }
+
+  const handleViewDetails = (marketId, e) => {
+    e.stopPropagation()
+    navigate(`/market/${marketId}`)
+  }
+
+  const handleRowClick = (marketId) => {
+    setSelectedOption(marketId)
   }
 
   const radarData = useMemo(() => {
@@ -350,8 +371,8 @@ function CorrelatedMarketsPage() {
 
   if (loading) {
     return (
-      <div className="correlated-markets-modal-backdrop">
-        <div className="correlated-markets-modal-container">
+      <div className="correlated-markets-page-backdrop">
+        <div className="correlated-markets-page-container">
           <div className="loading-spinner"></div>
           <p>Loading markets...</p>
         </div>
@@ -362,77 +383,135 @@ function CorrelatedMarketsPage() {
   const market = correlatedMarkets[0]
   if (!market) return null
 
+  // Helper to format countdown timer
+  const formatCountdown = (endTime) => {
+    const now = new Date()
+    const end = new Date(endTime)
+    const diff = end - now
+    
+    if (diff <= 0) return 'Ended'
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+  }
+
+  // Sort markets: pinned first, then others
+  const sortedMarkets = useMemo(() => {
+    const pinned = correlatedMarkets.filter(m => pinnedMarkets.has(m.id))
+    const unpinned = correlatedMarkets.filter(m => !pinnedMarkets.has(m.id))
+    return [...pinned, ...unpinned]
+  }, [correlatedMarkets, pinnedMarkets])
+
   return (
-    <div className="correlated-markets-modal-backdrop">
-      <div className="correlated-markets-modal-container">
-        <div className="correlated-markets-modal">
-          <div className="correlated-modal-header">
-            <img src="/assets/fairwins_no-text_logo.svg" alt="FairWins" className="correlated-modal-logo" />
-            <h2 className="correlated-modal-title">{market.correlationGroupName || 'Correlated Markets'}</h2>
-            <button className="correlated-modal-close-btn" onClick={handleClose} aria-label="Close">×</button>
+    <div className="correlated-markets-page-backdrop">
+      <div className="correlated-markets-page-container">
+        <div className="correlated-markets-page">
+          <div className="correlated-page-header">
+            <img src="/assets/fairwins_no-text_logo.svg" alt="FairWins" className="correlated-page-logo" />
+            <h2 className="correlated-page-title">{market.correlationGroupName || 'Correlated Markets'}</h2>
+            <button className="correlated-page-close-btn" onClick={handleClose} aria-label="Close">×</button>
           </div>
 
-          <p className="correlated-modal-description">Compare all options in this linked market group</p>
+          <p className="correlated-page-description">Compare all options in this linked market group</p>
 
-          <div className="correlated-modal-content">
+          <div className="correlated-page-content">
             <div className="correlated-content-row">
               <div className="correlated-radar-section">
                 <svg ref={svgRef} className="correlated-radar-chart"></svg>
               </div>
 
-              <div className="correlated-options-section">
-                <h3 className="correlated-options-title">Options</h3>
-                <div className="correlated-options-list">
-                  {correlatedMarkets && correlatedMarkets.length > 0 && correlatedMarkets.map((option) => {
-                    if (!option || !option.id) return null
-                    
-                    return (
-                      <button
-                        key={option.id}
-                        className={`correlated-option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
-                        onClick={() => handleMarketCardClick(option.id)}
-                      >
-                        <div className="correlated-option-header">
-                          <div className="correlated-option-controls">
-                            <button
-                              className="correlated-visibility-btn"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleMarketVisibility(option.id)
-                              }}
-                              aria-label={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
-                            >
-                              <span aria-hidden="true">{visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}</span>
-                            </button>
-                          </div>
-                          <span className="correlated-option-name">{parseProposalTitle(option.proposalTitle || '')}</span>
-                          {selectedOption === option.id && (<span className="correlated-selected-indicator">✓</span>)}
-                        </div>
+              <div className="correlated-table-section">
+                <h3 className="correlated-table-title">Linked Markets</h3>
+                <div className="correlated-table-container">
+                  <table className="correlated-markets-table">
+                    <thead>
+                      <tr>
+                        <th className="col-pin"></th>
+                        <th className="col-market">Market</th>
+                        <th className="col-countdown">Time Left</th>
+                        <th className="col-type">Type</th>
+                        <th className="col-yes-price">YES Price</th>
+                        <th className="col-no-price">NO Price</th>
+                        <th className="col-actions">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedMarkets && sortedMarkets.length > 0 && sortedMarkets.map((option) => {
+                        if (!option || !option.id) return null
                         
-                        <div className="correlated-option-stats">
-                          <div className="correlated-option-stat">
-                            <span className="correlated-stat-label">Probability</span>
-                            <span className="correlated-stat-value">{(parseFloat(option.passTokenPrice || 0) * 100).toFixed(1)}%</span>
-                          </div>
-                          <div className="correlated-option-stat">
-                            <span className="correlated-stat-label">Volume</span>
-                            <span className="correlated-stat-value">{formatPrice(option.totalLiquidity || 0, { compact: true })}</span>
-                          </div>
-                        </div>
-
-                        <div className="correlated-price-histogram">
-                          <div className="correlated-histogram-bar-container">
-                            <div className="correlated-histogram-bar" style={{ width: `${parseFloat(option.passTokenPrice || 0) * 100}%` }} />
-                          </div>
-                          <div className="correlated-histogram-labels">
-                            <span className="correlated-histogram-label">0%</span>
-                            <span className="correlated-histogram-label">50%</span>
-                            <span className="correlated-histogram-label">100%</span>
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
+                        return (
+                          <tr
+                            key={option.id}
+                            className={`market-row ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
+                            onClick={() => handleRowClick(option.id)}
+                          >
+                            <td className="col-pin">
+                              <button
+                                className={`pin-btn ${pinnedMarkets.has(option.id) ? 'pinned' : ''}`}
+                                onClick={(e) => togglePinMarket(option.id, e)}
+                                aria-label={pinnedMarkets.has(option.id) ? 'Unpin market' : 'Pin market'}
+                                title={pinnedMarkets.has(option.id) ? 'Unpin' : 'Pin to top'}
+                              >
+                                📌
+                              </button>
+                            </td>
+                            <td className="col-market">
+                              <div className="market-name-container">
+                                <button
+                                  className={`favorite-btn ${favoriteMarkets.has(option.id) ? 'favorited' : ''}`}
+                                  onClick={(e) => toggleFavoriteMarket(option.id, e)}
+                                  aria-label={favoriteMarkets.has(option.id) ? 'Unfavorite' : 'Favorite'}
+                                  title={favoriteMarkets.has(option.id) ? 'Remove from favorites' : 'Add to favorites'}
+                                >
+                                  {favoriteMarkets.has(option.id) ? '⭐' : '☆'}
+                                </button>
+                                <span className="market-name">{parseProposalTitle(option.proposalTitle || '')}</span>
+                              </div>
+                            </td>
+                            <td className="col-countdown">
+                              <span className="countdown">{formatCountdown(option.tradingEndTime)}</span>
+                            </td>
+                            <td className="col-type">
+                              <span className="market-type">Binary</span>
+                            </td>
+                            <td className="col-yes-price">
+                              <span className="price yes-price">${parseFloat(option.passTokenPrice || 0).toFixed(2)}</span>
+                              <span className="probability">({(parseFloat(option.passTokenPrice || 0) * 100).toFixed(1)}%)</span>
+                            </td>
+                            <td className="col-no-price">
+                              <span className="price no-price">${parseFloat(option.failTokenPrice || 0).toFixed(2)}</span>
+                              <span className="probability">({(parseFloat(option.failTokenPrice || 0) * 100).toFixed(1)}%)</span>
+                            </td>
+                            <td className="col-actions">
+                              <button
+                                className="view-details-btn"
+                                onClick={(e) => handleViewDetails(option.id, e)}
+                                aria-label="View market details"
+                              >
+                                View Details
+                              </button>
+                              <button
+                                className="visibility-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleMarketVisibility(option.id)
+                                }}
+                                aria-label={visibleMarkets[option.id] ? 'Hide from chart' : 'Show in chart'}
+                                title={visibleMarkets[option.id] ? 'Hide from chart' : 'Show in chart'}
+                              >
+                                {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

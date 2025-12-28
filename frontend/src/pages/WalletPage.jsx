@@ -8,7 +8,7 @@ import SwapPanel from '../components/fairwins/SwapPanel'
 import RolePurchaseModal from '../components/ui/RolePurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
-import '../components/ui/UserManagementModal.css'
+import './WalletPage.css'
 
 const CONNECTOR_CONFIG = {
   walletConnect: {
@@ -109,11 +109,11 @@ function WalletPage() {
   }
 
   return (
-    <div className="user-management-modal-backdrop">
-      <div className="user-management-modal-container">
-        <div className="user-management-modal">
+    <div className="wallet-page-backdrop">
+      <div className="wallet-page-container">
+        <div className="wallet-page">
           <button 
-            className="modal-close-btn"
+            className="page-close-btn"
             onClick={handleClose}
             aria-label="Close"
           >
@@ -121,11 +121,11 @@ function WalletPage() {
           </button>
 
           {isConnected && (
-            <div className="modal-header-section">
+            <div className="page-header-section">
               <div className="wallet-info-header">
                 <BlockiesAvatar address={address} size={40} className="wallet-avatar" />
                 <span className="wallet-address-display">{shortenAddress(address)}</span>
-                <span className={`status-dot ${isConnected ? 'connected' : ''}`} aria-hidden="true"></span>
+                <span className="status-dot connected" aria-hidden="true"></span>
               </div>
             </div>
           )}
