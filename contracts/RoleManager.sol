@@ -36,6 +36,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
     bytes32 public constant CLEARPATH_USER_ROLE = keccak256("CLEARPATH_USER_ROLE");
     bytes32 public constant TOKENMINT_ROLE = keccak256("TOKENMINT_ROLE");
+    bytes32 public constant FRIEND_MARKET_ROLE = keccak256("FRIEND_MARKET_ROLE");
     
     // Oversight & Verification
     bytes32 public constant OVERSIGHT_COMMITTEE_ROLE = keccak256("OVERSIGHT_COMMITTEE_ROLE");
@@ -123,6 +124,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         _setRoleAdmin(MARKET_MAKER_ROLE, OPERATIONS_ADMIN_ROLE);
         _setRoleAdmin(CLEARPATH_USER_ROLE, OPERATIONS_ADMIN_ROLE);
         _setRoleAdmin(TOKENMINT_ROLE, OPERATIONS_ADMIN_ROLE);
+        _setRoleAdmin(FRIEND_MARKET_ROLE, OPERATIONS_ADMIN_ROLE);
         _setRoleAdmin(OVERSIGHT_COMMITTEE_ROLE, DEFAULT_ADMIN_ROLE);
         
         // Initialize role metadata
@@ -205,6 +207,19 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
             timelockDelay: 0,
             isPremium: true,
             price: 150 ether, // 150 tokens
+            isActive: true,
+            maxMembers: 0, // Unlimited
+            currentMembers: 0
+        });
+        
+        // Friend Market: Premium, function-specific
+        roleMetadata[FRIEND_MARKET_ROLE] = RoleMetadata({
+            name: "Friend Market Creator",
+            description: "Create small-scale friend group prediction markets",
+            minApprovals: 1,
+            timelockDelay: 0,
+            isPremium: true,
+            price: 50 ether, // 50 tokens (base price, tiers managed by TieredRoleManager)
             isActive: true,
             maxMembers: 0, // Unlimited
             currentMembers: 0
