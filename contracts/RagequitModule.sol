@@ -185,8 +185,9 @@ contract RagequitModule is Ownable, ReentrancyGuard {
         uint256 totalSupply = IERC20(governanceToken).totalSupply();
         require(totalSupply > 0, "No total supply");
 
-        // Get treasury balance (simplified - in production, aggregate all treasury assets)
-        uint256 treasuryBalance = address(treasuryVault).balance;
+        // Get treasury balance (simplified - uses RagequitModule balance for payouts)
+        // In production, this would interact with the treasury vault
+        uint256 treasuryBalance = address(this).balance;
 
         // Calculate proportional share
         return (treasuryBalance * tokenAmount) / totalSupply;
