@@ -513,7 +513,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             {/* Panel 2: Share/QR */}
             <div className="carousel-panel">
               <div className="share-panel-wrapper">
-                {currentPanel === 2 && (
+                {currentPanel === 2 && market && (
                   <ShareModal 
                     isOpen={true}
                     onClose={() => setCurrentPanel(0)} 
