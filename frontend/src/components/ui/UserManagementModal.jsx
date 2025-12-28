@@ -11,7 +11,7 @@ import './UserManagementModal.css'
 
 // eslint-disable-next-line no-unused-vars
 function UserManagementModal({ onScanMarket }) {
-  const { address, isConnected } = useWallet()
+  const { address, isConnected, connectors } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
@@ -22,12 +22,12 @@ function UserManagementModal({ onScanMarket }) {
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionError, setConnectionError] = useState(null)
 
-  const handleConnect = async () => {
+  const handleConnect = async (connectorId) => {
     setIsConnecting(true)
     setConnectionError(null)
     
     try {
-      const success = await connectWallet()
+      const success = await connectWallet(connectorId)
       if (!success) {
         setConnectionError('Failed to connect wallet. Please try again.')
       }
@@ -36,12 +36,10 @@ function UserManagementModal({ onScanMarket }) {
       console.error('Wallet connection error:', error)
       
       // Provide user-friendly error messages
-      if (error.message.includes('MetaMask')) {
-        setConnectionError('Please install MetaMask to connect your wallet.')
-      } else if (error.message.includes('rejected') || error.message.includes('approve')) {
+      if (error.message.includes('rejected') || error.message.includes('approve')) {
         setConnectionError('Connection request was rejected. Please try again.')
       } else if (error.message.includes('connector')) {
-        setConnectionError('No wallet connector available. Please install MetaMask.')
+        setConnectionError('No wallet connector available.')
       } else {
         setConnectionError(error.message || 'Failed to connect wallet. Please try again.')
       }
@@ -120,35 +118,42 @@ function UserManagementModal({ onScanMarket }) {
               </div>
             )}
             
-            <button 
-              onClick={handleConnect}
-              className="connect-wallet-btn-large"
-              disabled={isConnecting}
-              aria-busy={isConnecting}
-            >
-              {isConnecting ? (
-                <>
-                  <span className="spinner" aria-hidden="true"></span>
-                  Connecting...
-                </>
-              ) : (
-                'Connect Wallet'
-              )}
-            </button>
-            
-            {!window.ethereum && (
-              <div className="wallet-help" role="note">
-                <p>Don't have a Web3 wallet?</p>
-                <a 
-                  href="https://metamask.io/download/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="install-metamask-link"
+            <div className="connector-options">
+              {connectors.map((connector) => (
+                <button
+                  key={connector.id}
+                  onClick={() => handleConnect(connector.id)}
+                  className="connector-btn"
+                  disabled={isConnecting}
+                  aria-busy={isConnecting}
                 >
-                  Install MetaMask
-                </a>
-              </div>
-            )}
+                  {isConnecting ? (
+                    <>
+                      <span className="spinner" aria-hidden="true"></span>
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      {connector.id === 'walletConnect' && '🔗 WalletConnect'}
+                      {connector.id === 'injected' && '🦊 MetaMask / Browser Wallet'}
+                      {!['walletConnect', 'injected'].includes(connector.id) && connector.name}
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+            
+            <div className="wallet-help" role="note">
+              <p>Don't have a Web3 wallet?</p>
+              <a 
+                href="https://metamask.io/download/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="install-metamask-link"
+              >
+                Install MetaMask
+              </a>
+            </div>
           </div>
         </div>
       ) : (

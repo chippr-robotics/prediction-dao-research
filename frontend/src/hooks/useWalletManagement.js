@@ -197,7 +197,7 @@ export function useWalletNetwork() {
  * @example
  * ```jsx
  * function ConnectButton() {
- *   const { isConnected, connectWallet, disconnectWallet } = useWalletConnection()
+ *   const { isConnected, connectWallet, disconnectWallet, connectors } = useWalletConnection()
  *   
  *   return (
  *     <button onClick={isConnected ? disconnectWallet : connectWallet}>
@@ -208,6 +208,6 @@ export function useWalletNetwork() {
  * ```
  */
 export function useWalletConnection() {
-  const { isConnected, connectWallet, disconnectWallet } = useWallet()
-  return { isConnected, connectWallet, disconnectWallet }
+  const { isConnected, connectWallet, disconnectWallet, connectors } = useWallet()
+  return { isConnected, connectWallet, disconnectWallet, connectors }
 }

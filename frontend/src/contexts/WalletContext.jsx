@@ -92,7 +92,7 @@ export function WalletProvider({ children }) {
       setRoles([])
       setBalances({ etc: '0', wetc: '0', tokens: {} })
     }
-  }, [address, isConnected])
+  }, [address, isConnected, loadRoles, fetchBalances])
 
   // Load user roles from storage
   const loadRoles = useCallback((walletAddress) => {
@@ -167,13 +167,20 @@ export function WalletProvider({ children }) {
   }, [provider, address])
 
   // Connect wallet
-  const connectWallet = useCallback(async () => {
+  const connectWallet = useCallback(async (connectorId) => {
     try {
-      if (!window.ethereum) {
-        throw new Error('Please install MetaMask to use this application')
+      // If no specific connector is requested, try WalletConnect first, then injected
+      let connector
+      
+      if (connectorId) {
+        // Use specific connector if requested
+        connector = connectors.find(c => c.id === connectorId)
+      } else {
+        // Try WalletConnect first if available, otherwise use injected
+        connector = connectors.find(c => c.id === 'walletConnect') || 
+                   connectors.find(c => c.id === 'injected')
       }
-
-      const connector = connectors.find(c => c.id === 'injected')
+      
       if (!connector) {
         throw new Error('No wallet connector available')
       }
@@ -299,6 +306,9 @@ export function WalletProvider({ children }) {
     account: address, // Alias for backwards compatibility
     isConnected,
     chainId,
+    
+    // Available connectors
+    connectors,
     
     // Provider and signer for transactions
     provider,

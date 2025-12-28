@@ -118,6 +118,61 @@
   color: var(--semantic-loss, #E5533D);
 }
 
+/* Connector Options */
+.connector-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.connector-btn {
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.connector-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover, rgba(54, 179, 126, 0.05));
+  border-color: var(--primary-button, #36B37E);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.connector-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.connector-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Connection Error */
+.connection-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: var(--semantic-loss, #E5533D);
+  background: rgba(229, 83, 61, 0.1);
+  border: 1px solid var(--semantic-loss, #E5533D);
+  border-radius: 8px;
+  color: var(--semantic-loss, #E5533D);
+}
+
 .connection-error .error-icon {
   font-size: 20px;
   flex-shrink: 0;
