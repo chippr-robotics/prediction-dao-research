@@ -33,6 +33,7 @@ vi.mock('wagmi', () => ({
 // Mock wagmi/connectors
 vi.mock('wagmi/connectors', () => ({
   injected: vi.fn(() => ({})),
+  walletConnect: vi.fn(() => ({})),
 }))
 
 const renderWithProviders = (ui, { isConnected = true } = {}) => {
@@ -94,9 +95,10 @@ describe('UserManagementModal', () => {
     it('should show connect wallet button', () => {
       renderWithProviders(<UserManagementModal />, { isConnected: false })
       
-      const connectButton = screen.getByText('Connect Wallet')
-      expect(connectButton).toBeInTheDocument()
-      expect(connectButton).not.toBeDisabled()
+      // Check for connector buttons instead of single connect button
+      const metaMaskButton = screen.getByText(/MetaMask \/ Browser Wallet/i)
+      expect(metaMaskButton).toBeInTheDocument()
+      expect(metaMaskButton).not.toBeDisabled()
     })
 
     it('should show loading state when connecting', async () => {
@@ -111,7 +113,7 @@ describe('UserManagementModal', () => {
       
       renderWithProviders(<UserManagementModal />, { isConnected: false })
       
-      const connectButton = screen.getByText('Connect Wallet')
+      const connectButton = screen.getByText(/MetaMask \/ Browser Wallet/i)
       fireEvent.click(connectButton)
       
       await waitFor(() => {

@@ -83,17 +83,6 @@ export function WalletProvider({ children }) {
     }
   }, [chainId, isConnected])
 
-  // Load RVAC roles when wallet connects
-  useEffect(() => {
-    if (isConnected && address) {
-      loadRoles(address)
-      fetchBalances(address)
-    } else {
-      setRoles([])
-      setBalances({ etc: '0', wetc: '0', tokens: {} })
-    }
-  }, [address, isConnected, loadRoles, fetchBalances])
-
   // Load user roles from storage
   const loadRoles = useCallback((walletAddress) => {
     setRolesLoading(true)
@@ -127,6 +116,17 @@ export function WalletProvider({ children }) {
       setBalancesLoading(false)
     }
   }, [provider])
+
+  // Load RVAC roles when wallet connects
+  useEffect(() => {
+    if (isConnected && address) {
+      loadRoles(address)
+      fetchBalances(address)
+    } else {
+      setRoles([])
+      setBalances({ etc: '0', wetc: '0', tokens: {} })
+    }
+  }, [address, isConnected, loadRoles, fetchBalances])
 
   // Refresh balances manually
   const refreshBalances = useCallback(() => {
