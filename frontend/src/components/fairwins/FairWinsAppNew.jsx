@@ -318,9 +318,9 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
       case 'volume24h':
         return parseFloat(b.volume24h || 0) - parseFloat(a.volume24h || 0)
       case 'activity':
-        return parseFloat(b.tradesCount || 0) - parseFloat(a.tradesCount || 0)
+        return (b.tradesCount ?? 0) - (a.tradesCount ?? 0)
       case 'popularity':
-        return parseFloat(b.uniqueTraders || 0) - parseFloat(a.uniqueTraders || 0)
+        return (b.uniqueTraders ?? 0) - (a.uniqueTraders ?? 0)
       case 'probability':
         return parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0)
       case 'category':
