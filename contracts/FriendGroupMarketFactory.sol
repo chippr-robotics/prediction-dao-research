@@ -3,21 +3,26 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ConditionalMarketFactory.sol";
 import "./RagequitModule.sol";
 import "./TieredRoleManager.sol";
+import "./MembershipPaymentManager.sol";
 
 /**
  * @title FriendGroupMarketFactory
  * @notice Factory for creating small-scale prediction markets between friends
- * @dev Supports P2P betting with tiered membership and member limits
+ * @dev Supports P2P betting with tiered membership, member limits, and ERC20 payments
  * 
  * KEY FEATURES:
  * - Tiered membership system (gas-only markets for members)
+ * - ERC20 token support (USDC, USDT, stablecoins)
  * - Member limit enforcement to prevent bypassing public markets
  * - Support for 1v1 bets, group prop bets, and event tracking scenarios
  * - Optional third-party arbitration
  * - Integration with RagequitModule for fair exits
+ * - USD-based pricing display
  * 
  * USE CASES:
  * 1. Competitive event tracking (poker, board games, etc.)
@@ -26,6 +31,7 @@ import "./TieredRoleManager.sol";
  * 4. Friend group contests and competitions
  */
 contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     
     // Market type to distinguish friend markets from public markets
     enum MarketType {
@@ -48,6 +54,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         string description;
         uint256 peggedPublicMarketId;  // Public market ID to peg resolution to (0 = none)
         bool autoPegged;               // Whether resolution is pegged to public market
+        address paymentToken;          // ERC20 token used (address(0) = native ETC)
+        uint256 liquidityAmount;       // Initial liquidity in payment token
     }
     
     // Friend market ID => FriendMarket
@@ -90,6 +98,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Manager role for updating configuration
     address public manager;
     
+    // Reference to membership payment manager for ERC20 handling
+    MembershipPaymentManager public paymentManager;
+    
+    // Accepted payment tokens for market creation and liquidity (address => isAccepted)
+    mapping(address => bool) public acceptedPaymentTokens;
+    
+    // Track accepted token list
+    address[] public acceptedTokenList;
+    
     // Events
     event FriendMarketCreated(
         uint256 indexed friendMarketId,
@@ -97,7 +114,19 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         MarketType marketType,
         address indexed creator,
         uint256 memberLimit,
-        uint256 creationFee
+        uint256 creationFee,
+        address paymentToken
+    );
+    event MemberAdded(uint256 indexed friendMarketId, address indexed member);
+    event MemberRemoved(uint256 indexed friendMarketId, address indexed member);
+    event MarketResolved(uint256 indexed friendMarketId, uint256 outcome);
+    event MarketPegged(uint256 indexed friendMarketId, uint256 indexed publicMarketId);
+    event BatchResolution(uint256 indexed publicMarketId, uint256[] friendMarketIds, uint256 outcome);
+    event FeesUpdated(uint256 publicFee, uint256 friendFee, uint256 oneVsOneFee);
+    event MemberLimitsUpdated(uint256 maxSmallGroup, uint256 maxOneVsOne, uint256 minEventTracking, uint256 maxEventTracking);
+    event ManagerUpdated(address indexed oldManager, address indexed newManager);
+    event PaymentTokenAdded(address indexed token);
+    event PaymentTokenRemoved(address indexed token);
     );
     
     event FeesUpdated(uint256 publicFee, uint256 friendFee, uint256 oneVsOneFee);
@@ -139,14 +168,25 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 failValue
     );
     
-    constructor(address _marketFactory, address payable _ragequitModule, address _tieredRoleManager) Ownable(msg.sender) {
+    constructor(
+        address _marketFactory, 
+        address payable _ragequitModule, 
+        address _tieredRoleManager,
+        address _paymentManager
+    ) Ownable(msg.sender) {
         require(_marketFactory != address(0), "Invalid market factory");
         require(_ragequitModule != address(0), "Invalid ragequit module");
         require(_tieredRoleManager != address(0), "Invalid tiered role manager");
+        require(_paymentManager != address(0), "Invalid payment manager");
+        
         marketFactory = ConditionalMarketFactory(_marketFactory);
         ragequitModule = RagequitModule(_ragequitModule);
         tieredRoleManager = TieredRoleManager(_tieredRoleManager);
-        manager = msg.sender; // Initial manager is deployer
+        paymentManager = MembershipPaymentManager(_paymentManager);
+        manager = msg.sender; // Initially deployer, transferable
+        
+        // Accept native ETC by default
+        acceptedPaymentTokens[address(0)] = true;
     }
     
     // ========== Manager Functions ==========
@@ -160,6 +200,37 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address oldManager = manager;
         manager = newManager;
         emit ManagerUpdated(oldManager, newManager);
+    }
+    
+    /**
+     * @notice Add or update accepted payment token
+     * @param token Token address (address(0) for native ETC)
+     * @param active Whether the token is accepted
+     */
+    function addAcceptedPaymentToken(address token, bool active) external {
+        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
+        
+        bool wasAccepted = acceptedPaymentTokens[token];
+        acceptedPaymentTokens[token] = active;
+        
+        if (active && !wasAccepted && token != address(0)) {
+            acceptedTokenList.push(token);
+            emit PaymentTokenAdded(token);
+        } else if (!active && wasAccepted) {
+            emit PaymentTokenRemoved(token);
+        }
+    }
+    
+    /**
+     * @notice Remove accepted payment token
+     * @param token Token address to remove
+     */
+    function removeAcceptedPaymentToken(address token) external {
+        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
+        require(token != address(0), "Cannot remove native ETC");
+        
+        acceptedPaymentTokens[token] = false;
+        emit PaymentTokenRemoved(token);
     }
     
     /**
@@ -750,6 +821,57 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     function getPeggedFriendMarkets(uint256 publicMarketId) external view returns (uint256[] memory) {
         require(publicMarketId < marketFactory.marketCount(), "Invalid public market ID");
         return publicMarketToPeggedFriendMarkets[publicMarketId];
+    }
+    
+    // ========== ERC20 Payment Helper Functions ==========
+    
+    /**
+     * @notice Handle ERC20 payment for market creation/liquidity
+     * @param paymentToken Token address (address(0) for native ETC)
+     * @param amount Amount to transfer
+     * @param purpose Description of payment purpose
+     */
+    function _handlePayment(address paymentToken, uint256 amount, string memory purpose) internal {
+        require(acceptedPaymentTokens[paymentToken], "Payment token not accepted");
+        
+        if (paymentToken == address(0)) {
+            // Native ETC payment
+            require(msg.value >= amount, "Insufficient native payment");
+        } else {
+            // ERC20 payment
+            require(amount > 0, "Amount must be greater than 0");
+            IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
+        }
+    }
+    
+    /**
+     * @notice Get list of accepted payment tokens
+     * @return Array of accepted token addresses
+     */
+    function getAcceptedTokens() external view returns (address[] memory) {
+        // Count active tokens
+        uint256 activeCount = acceptedPaymentTokens[address(0)] ? 1 : 0;
+        for (uint256 i = 0; i < acceptedTokenList.length; i++) {
+            if (acceptedPaymentTokens[acceptedTokenList[i]]) {
+                activeCount++;
+            }
+        }
+        
+        // Build return array
+        address[] memory tokens = new address[](activeCount);
+        uint256 index = 0;
+        
+        if (acceptedPaymentTokens[address(0)]) {
+            tokens[index++] = address(0);
+        }
+        
+        for (uint256 i = 0; i < acceptedTokenList.length; i++) {
+            if (acceptedPaymentTokens[acceptedTokenList[i]]) {
+                tokens[index++] = acceptedTokenList[i];
+            }
+        }
+        
+        return tokens;
     }
     
     receive() external payable {}
