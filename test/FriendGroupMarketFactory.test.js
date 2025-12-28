@@ -5,6 +5,8 @@ describe("FriendGroupMarketFactory", function () {
   let friendGroupFactory;
   let marketFactory;
   let ragequitModule;
+  let tieredRoleManager;
+  let paymentManager;
   let owner;
   let addr1;
   let addr2;
@@ -24,11 +26,64 @@ describe("FriendGroupMarketFactory", function () {
     const RagequitModule = await ethers.getContractFactory("RagequitModule");
     ragequitModule = await RagequitModule.deploy();
     
+    // Deploy TieredRoleManager
+    const TieredRoleManager = await ethers.getContractFactory("TieredRoleManager");
+    tieredRoleManager = await TieredRoleManager.deploy();
+    await tieredRoleManager.waitForDeployment();
+    
+    // Deploy MembershipPaymentManager
+    const MembershipPaymentManager = await ethers.getContractFactory("MembershipPaymentManager");
+    paymentManager = await MembershipPaymentManager.deploy(owner.address); // owner as treasury
+    await paymentManager.waitForDeployment();
+    
     // Deploy FriendGroupMarketFactory
     const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
-      await ragequitModule.getAddress()
+      await ragequitModule.getAddress(),
+      await tieredRoleManager.getAddress(),
+      await paymentManager.getAddress()
+    );
+    
+    // Purchase FRIEND_MARKET_ROLE memberships for test users (ENTERPRISE tier for no expiration)
+    const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();
+    const MembershipTier = { BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
+    const MembershipDuration = { ONE_MONTH: 0, THREE_MONTHS: 1, SIX_MONTHS: 2, TWELVE_MONTHS: 3, ENTERPRISE: 4 };
+    
+    // Get tier price for Bronze
+    const tierMeta = await tieredRoleManager.tierMetadata(FRIEND_MARKET_ROLE, MembershipTier.BRONZE);
+    const price = tierMeta.price;
+    
+    // Purchase memberships for all test users with ENTERPRISE duration (no expiration)
+    await tieredRoleManager.connect(owner).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr1).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr2).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr3).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
+    );
+    await tieredRoleManager.connect(addr4).purchaseRoleWithTierAndDuration(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      MembershipDuration.ENTERPRISE,
+      { value: price }
     );
     
     // Transfer ownership of marketFactory to friendGroupFactory for testing
@@ -44,14 +99,14 @@ describe("FriendGroupMarketFactory", function () {
       expect(await friendGroupFactory.friendMarketCount()).to.equal(0);
     });
 
-    it("Should set correct fee constants", async function () {
-      expect(await friendGroupFactory.FRIEND_MARKET_FEE()).to.equal(ethers.parseEther("0.1"));
-      expect(await friendGroupFactory.ONE_V_ONE_FEE()).to.equal(ethers.parseEther("0.05"));
+    it("Should set correct fee values", async function () {
+      expect(await friendGroupFactory.friendMarketFee()).to.equal(ethers.parseEther("0.1"));
+      expect(await friendGroupFactory.oneVsOneFee()).to.equal(ethers.parseEther("0.05"));
     });
 
-    it("Should set correct member limit constants", async function () {
-      expect(await friendGroupFactory.MAX_SMALL_GROUP_MEMBERS()).to.equal(10);
-      expect(await friendGroupFactory.MAX_ONE_V_ONE_MEMBERS()).to.equal(2);
+    it("Should set correct member limit values", async function () {
+      expect(await friendGroupFactory.maxSmallGroupMembers()).to.equal(10);
+      expect(await friendGroupFactory.maxOneVsOneMembers()).to.equal(2);
     });
   });
 
