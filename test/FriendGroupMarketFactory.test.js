@@ -48,9 +48,13 @@ describe("FriendGroupMarketFactory", function () {
     // Grant FRIEND_MARKET_ROLE to test users directly (for testing, avoids draining ETH balance)
     const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();
     const OPERATIONS_ADMIN_ROLE = await tieredRoleManager.OPERATIONS_ADMIN_ROLE();
+    const CORE_SYSTEM_ADMIN_ROLE = await tieredRoleManager.CORE_SYSTEM_ADMIN_ROLE();
     
-    // First, owner (who has DEFAULT_ADMIN_ROLE) grants themselves OPERATIONS_ADMIN_ROLE
-    // OPERATIONS_ADMIN_ROLE is required to grant FRIEND_MARKET_ROLE
+    // Role hierarchy: DEFAULT_ADMIN -> CORE_SYSTEM_ADMIN -> OPERATIONS_ADMIN -> FRIEND_MARKET_ROLE
+    // Owner (who has DEFAULT_ADMIN_ROLE) grants themselves CORE_SYSTEM_ADMIN_ROLE first
+    await tieredRoleManager.connect(owner).grantRole(CORE_SYSTEM_ADMIN_ROLE, owner.address);
+    
+    // Now owner (with CORE_SYSTEM_ADMIN_ROLE) can grant OPERATIONS_ADMIN_ROLE
     await tieredRoleManager.connect(owner).grantRole(OPERATIONS_ADMIN_ROLE, owner.address);
     
     // Now owner (with OPERATIONS_ADMIN_ROLE) can grant FRIEND_MARKET_ROLE to test users
