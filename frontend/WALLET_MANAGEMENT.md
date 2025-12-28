@@ -13,7 +13,9 @@ The application supports multiple wallet connection methods:
 
 ### WalletConnect Setup
 
-To enable WalletConnect functionality:
+WalletConnect is always available in the wallet connection modal, enabling hardware wallet support out of the box. The application uses a fallback project ID for development and testing purposes.
+
+**For Production Use:**
 
 1. **Get a Project ID**:
    - Visit [WalletConnect Cloud](https://cloud.walletconnect.com)
@@ -37,7 +39,7 @@ To enable WalletConnect functionality:
    - Scan QR code with your mobile wallet
    - Approve the connection request
 
-**Note**: If `VITE_WALLETCONNECT_PROJECT_ID` is not set, the WalletConnect option will not appear, and only the injected wallet option (MetaMask) will be available.
+**Note**: If `VITE_WALLETCONNECT_PROJECT_ID` is not set, a fallback demo project ID will be used. This is suitable for development and testing, but for production deployments, you should configure your own project ID for better reliability and to avoid rate limiting.
 
 ## Architecture
 

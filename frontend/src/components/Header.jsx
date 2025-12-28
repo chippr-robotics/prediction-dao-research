@@ -5,7 +5,7 @@ import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import UserManagementModal from './ui/UserManagementModal'
 import TokenMintButton from './TokenMintButton'
-import walletIcon from '../assets/wallet_icon.svg'
+import walletIcon from '../assets/wallet_no_text.svg'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
