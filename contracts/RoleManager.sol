@@ -36,6 +36,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant MARKET_MAKER_ROLE = keccak256("MARKET_MAKER_ROLE");
     bytes32 public constant CLEARPATH_USER_ROLE = keccak256("CLEARPATH_USER_ROLE");
     bytes32 public constant TOKENMINT_ROLE = keccak256("TOKENMINT_ROLE");
+    bytes32 public constant FRIEND_MARKET_ROLE = keccak256("FRIEND_MARKET_ROLE");
     
     // Oversight & Verification
     bytes32 public constant OVERSIGHT_COMMITTEE_ROLE = keccak256("OVERSIGHT_COMMITTEE_ROLE");

@@ -54,6 +54,22 @@ contract TieredRoleManager is RoleManager {
     // user => role => tier => purchase timestamp
     mapping(address => mapping(bytes32 => mapping(MembershipTier => uint256))) public tierPurchases;
     
+    // ========== Membership Duration Tracking ==========
+    
+    enum MembershipDuration {
+        ONE_MONTH,      // 30 days
+        THREE_MONTHS,   // 90 days
+        SIX_MONTHS,     // 180 days
+        TWELVE_MONTHS,  // 365 days
+        ENTERPRISE      // Custom/unlimited duration
+    }
+    
+    // user => role => membership expiration timestamp
+    mapping(address => mapping(bytes32 => uint256)) public membershipExpiration;
+    
+    // user => role => membership duration type
+    mapping(address => mapping(bytes32 => MembershipDuration)) public membershipDurationType;
+    
     // ========== Usage Tracking ==========
     
     struct UsageStats {
@@ -76,6 +92,8 @@ contract TieredRoleManager is RoleManager {
     event TierUpgraded(address indexed user, bytes32 indexed role, MembershipTier fromTier, MembershipTier toTier);
     event UsageLimitExceeded(address indexed user, bytes32 indexed role, string limitType);
     event UsageRecorded(address indexed user, bytes32 indexed role, string actionType);
+    event MembershipExtended(address indexed user, bytes32 indexed role, uint256 newExpiration, MembershipDuration duration);
+    event MembershipExpired(address indexed user, bytes32 indexed role);
     
     // ========== Constructor ==========
     
@@ -94,6 +112,9 @@ contract TieredRoleManager is RoleManager {
         
         // TOKENMINT Role Tiers
         _initializeTokenMintTiers();
+        
+        // FRIEND_MARKET Role Tiers
+        _initializeFriendMarketTiers();
     }
     
     function _initializeMarketMakerTiers() internal {
@@ -336,10 +357,132 @@ contract TieredRoleManager is RoleManager {
         });
     }
     
+    function _initializeFriendMarketTiers() internal {
+        bytes32 role = FRIEND_MARKET_ROLE;
+        
+        // Bronze Tier - Basic friend market access (15 markets/month)
+        tierMetadata[role][MembershipTier.BRONZE] = TierMetadata({
+            name: "Friend Market Bronze",
+            description: "Basic friend market creation - 15 markets/month",
+            price: 50 ether,
+            limits: TierLimits({
+                dailyBetLimit: 5,
+                weeklyBetLimit: 20,
+                monthlyMarketCreation: 15, // 15 friend markets per month
+                maxPositionSize: 5 ether,
+                maxConcurrentMarkets: 5,
+                withdrawalLimit: 25 ether,
+                canCreatePrivateMarkets: true, // Friend markets are inherently private
+                canUseAdvancedFeatures: false,
+                feeDiscount: 10000 // 100% discount on creation fees (gas only)
+            }),
+            isActive: true
+        });
+        
+        // Silver Tier - Enhanced friend market access (30 markets/month)
+        tierMetadata[role][MembershipTier.SILVER] = TierMetadata({
+            name: "Friend Market Silver",
+            description: "Enhanced friend market creation - 30 markets/month",
+            price: 100 ether, // Upgrade cost from Bronze
+            limits: TierLimits({
+                dailyBetLimit: 10,
+                weeklyBetLimit: 50,
+                monthlyMarketCreation: 30, // 30 friend markets per month
+                maxPositionSize: 15 ether,
+                maxConcurrentMarkets: 10,
+                withdrawalLimit: 100 ether,
+                canCreatePrivateMarkets: true,
+                canUseAdvancedFeatures: true,
+                feeDiscount: 10000 // 100% discount on creation fees (gas only)
+            }),
+            isActive: true
+        });
+        
+        // Gold Tier - Advanced friend market access (100 markets/month)
+        tierMetadata[role][MembershipTier.GOLD] = TierMetadata({
+            name: "Friend Market Gold",
+            description: "Advanced friend market creation - 100 markets/month",
+            price: 200 ether,
+            limits: TierLimits({
+                dailyBetLimit: 35,
+                weeklyBetLimit: 200,
+                monthlyMarketCreation: 100, // 100 friend markets per month
+                maxPositionSize: 50 ether,
+                maxConcurrentMarkets: 30,
+                withdrawalLimit: 500 ether,
+                canCreatePrivateMarkets: true,
+                canUseAdvancedFeatures: true,
+                feeDiscount: 10000 // 100% discount on creation fees (gas only)
+            }),
+            isActive: true
+        });
+        
+        // Platinum Tier - Unlimited friend market access
+        tierMetadata[role][MembershipTier.PLATINUM] = TierMetadata({
+            name: "Friend Market Platinum",
+            description: "Unlimited friend market creation",
+            price: 400 ether,
+            limits: TierLimits({
+                dailyBetLimit: type(uint256).max,
+                weeklyBetLimit: type(uint256).max,
+                monthlyMarketCreation: type(uint256).max, // Unlimited friend markets
+                maxPositionSize: type(uint256).max,
+                maxConcurrentMarkets: type(uint256).max,
+                withdrawalLimit: type(uint256).max,
+                canCreatePrivateMarkets: true,
+                canUseAdvancedFeatures: true,
+                feeDiscount: 10000 // 100% discount on creation fees (gas only)
+            }),
+            isActive: true
+        });
+    }
+    
     // ========== Tier Purchase & Upgrade Functions ==========
     
     /**
-     * @notice Purchase a role at specific tier with ETH (legacy method)
+     * @notice Purchase a role at specific tier with ETH and duration
+     * @param role The role to purchase
+     * @param tier The membership tier
+     * @param duration The membership duration
+     */
+    function purchaseRoleWithTierAndDuration(
+        bytes32 role, 
+        MembershipTier tier, 
+        MembershipDuration duration
+    ) external payable nonReentrant whenNotPaused {
+        require(tier != MembershipTier.NONE, "Invalid tier");
+        require(userTiers[msg.sender][role] == MembershipTier.NONE, "Already has role, use upgradeTier");
+        
+        TierMetadata storage tierMeta = tierMetadata[role][tier];
+        require(tierMeta.isActive, "Tier not active");
+        require(msg.value >= tierMeta.price, "Insufficient payment");
+        
+        RoleMetadata storage roleMeta = roleMetadata[role];
+        require(roleMeta.isPremium, "Role is not purchasable");
+        require(roleMeta.maxMembers == 0 || roleMeta.currentMembers < roleMeta.maxMembers, "Role at max capacity");
+        
+        // Grant role and set tier
+        _grantRole(role, msg.sender);
+        userTiers[msg.sender][role] = tier;
+        tierPurchases[msg.sender][role][tier] = block.timestamp;
+        roleMeta.currentMembers++;
+        
+        // Set membership duration
+        _setMembershipDuration(msg.sender, role, duration);
+        
+        // Initialize usage stats
+        _initializeUsageStats(msg.sender, role);
+        
+        emit TierPurchased(msg.sender, role, tier, msg.value);
+        
+        // Refund excess
+        if (msg.value > tierMeta.price) {
+            payable(msg.sender).transfer(msg.value - tierMeta.price);
+        }
+    }
+    
+    /**
+     * @notice Purchase a role at specific tier with ETH (legacy method - defaults to 1 month)
      * @param role The role to purchase
      * @param tier The membership tier
      */
@@ -360,6 +503,9 @@ contract TieredRoleManager is RoleManager {
         userTiers[msg.sender][role] = tier;
         tierPurchases[msg.sender][role][tier] = block.timestamp;
         roleMeta.currentMembers++;
+        
+        // Set membership duration (default to 1 month for legacy)
+        _setMembershipDuration(msg.sender, role, MembershipDuration.ONE_MONTH);
         
         // Initialize usage stats
         _initializeUsageStats(msg.sender, role);
@@ -496,6 +642,79 @@ contract TieredRoleManager is RoleManager {
     }
     
     // ========== Usage Tracking & Enforcement ==========
+    
+    /**
+     * @notice Set membership duration for a user's role
+     * @param user The user address
+     * @param role The role
+     * @param duration The membership duration type
+     */
+    function _setMembershipDuration(address user, bytes32 role, MembershipDuration duration) internal {
+        uint256 durationInSeconds;
+        
+        if (duration == MembershipDuration.ONE_MONTH) {
+            durationInSeconds = 30 days;
+        } else if (duration == MembershipDuration.THREE_MONTHS) {
+            durationInSeconds = 90 days;
+        } else if (duration == MembershipDuration.SIX_MONTHS) {
+            durationInSeconds = 180 days;
+        } else if (duration == MembershipDuration.TWELVE_MONTHS) {
+            durationInSeconds = 365 days;
+        } else if (duration == MembershipDuration.ENTERPRISE) {
+            // Enterprise memberships don't expire (set to far future)
+            durationInSeconds = 100 * 365 days;
+        }
+        
+        membershipDurationType[user][role] = duration;
+        membershipExpiration[user][role] = block.timestamp + durationInSeconds;
+        
+        emit MembershipExtended(user, role, membershipExpiration[user][role], duration);
+    }
+    
+    /**
+     * @notice Check if membership is still active
+     * @param user The user address
+     * @param role The role
+     * @return bool Whether membership is active
+     */
+    function isMembershipActive(address user, bytes32 role) public view returns (bool) {
+        return block.timestamp < membershipExpiration[user][role];
+    }
+    
+    /**
+     * @notice Extend membership by purchasing additional duration
+     * @param role The role to extend
+     * @param duration The additional duration to add
+     */
+    function extendMembership(bytes32 role, MembershipDuration duration) external payable nonReentrant whenNotPaused {
+        require(userTiers[msg.sender][role] != MembershipTier.NONE, "No existing membership");
+        require(isMembershipActive(msg.sender, role), "Membership expired, must repurchase");
+        
+        // For simplicity, charge same as tier upgrade price
+        MembershipTier tier = userTiers[msg.sender][role];
+        TierMetadata storage tierMeta = tierMetadata[role][tier];
+        require(msg.value >= tierMeta.price / 2, "Insufficient payment for extension"); // 50% of original price
+        
+        uint256 durationInSeconds;
+        if (duration == MembershipDuration.ONE_MONTH) {
+            durationInSeconds = 30 days;
+        } else if (duration == MembershipDuration.THREE_MONTHS) {
+            durationInSeconds = 90 days;
+        } else if (duration == MembershipDuration.SIX_MONTHS) {
+            durationInSeconds = 180 days;
+        } else if (duration == MembershipDuration.TWELVE_MONTHS) {
+            durationInSeconds = 365 days;
+        }
+        
+        membershipExpiration[msg.sender][role] += durationInSeconds;
+        emit MembershipExtended(msg.sender, role, membershipExpiration[msg.sender][role], duration);
+        
+        // Refund excess
+        uint256 extensionCost = tierMeta.price / 2;
+        if (msg.value > extensionCost) {
+            payable(msg.sender).transfer(msg.value - extensionCost);
+        }
+    }
     
     function _initializeUsageStats(address user, bytes32 role) internal {
         usageStats[user][role] = UsageStats({

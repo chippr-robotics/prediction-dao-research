@@ -5,14 +5,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./ConditionalMarketFactory.sol";
 import "./RagequitModule.sol";
+import "./TieredRoleManager.sol";
 
 /**
  * @title FriendGroupMarketFactory
  * @notice Factory for creating small-scale prediction markets between friends
- * @dev Supports P2P betting with reduced costs and member limits
+ * @dev Supports P2P betting with tiered membership and member limits
  * 
  * KEY FEATURES:
- * - Reduced creation costs for friend group markets
+ * - Tiered membership system (gas-only markets for members)
  * - Member limit enforcement to prevent bypassing public markets
  * - Support for 1v1 bets, group prop bets, and event tracking scenarios
  * - Optional third-party arbitration
@@ -69,7 +70,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Reference to ragequit module
     RagequitModule public ragequitModule;
     
-    // Pricing tiers
+    // Reference to tiered role manager for membership checks
+    TieredRoleManager public tieredRoleManager;
+    
+    // Pricing tiers (for non-members, legacy support)
     uint256 public constant PUBLIC_MARKET_FEE = 1 ether;      // Standard market fee
     uint256 public constant FRIEND_MARKET_FEE = 0.1 ether;    // Reduced fee for friend markets
     uint256 public constant ONE_V_ONE_FEE = 0.05 ether;       // Even lower for 1v1
@@ -128,11 +132,13 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 failValue
     );
     
-    constructor(address _marketFactory, address payable _ragequitModule) Ownable(msg.sender) {
+    constructor(address _marketFactory, address payable _ragequitModule, address _tieredRoleManager) Ownable(msg.sender) {
         require(_marketFactory != address(0), "Invalid market factory");
         require(_ragequitModule != address(0), "Invalid ragequit module");
+        require(_tieredRoleManager != address(0), "Invalid tiered role manager");
         marketFactory = ConditionalMarketFactory(_marketFactory);
         ragequitModule = RagequitModule(_ragequitModule);
+        tieredRoleManager = TieredRoleManager(_tieredRoleManager);
     }
     
     /**
@@ -151,7 +157,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address arbitrator,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        require(msg.value >= ONE_V_ONE_FEE, "Insufficient creation fee");
+        // Check FRIEND_MARKET_ROLE membership
+        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
+        require(tieredRoleManager.hasRole(role, msg.sender), "Requires FRIEND_MARKET_ROLE membership");
+        require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
+        
+        // Check and record usage limit
+        require(tieredRoleManager.checkMarketCreationLimit(role), "Monthly market limit reached");
+        
         require(opponent != address(0), "Invalid opponent");
         require(opponent != msg.sender, "Cannot bet against yourself");
         require(bytes(description).length > 0, "Description required");
@@ -161,12 +174,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
         }
         
+        // For members, creation fee is waived (gas only), but accept any payment for liquidity
+        uint256 liquidityAmount = msg.value;
+        
         // Create underlying market in ConditionalMarketFactory
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
             address(0), // ETH collateral
-            msg.value - ONE_V_ONE_FEE, // Remaining value as liquidity
+            liquidityAmount, // All value goes to liquidity (no creation fee)
             0.01 ether, // Small liquidity parameter
             tradingPeriod,
             ConditionalMarketFactory.BetType.YesNo
@@ -186,7 +202,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             members: members,
             arbitrator: arbitrator,
             memberLimit: MAX_ONE_V_ONE_MEMBERS,
-            creationFee: ONE_V_ONE_FEE,
+            creationFee: 0, // Fee waived for members (gas only)
             createdAt: block.timestamp,
             active: true,
             description: description,
@@ -210,7 +226,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             MarketType.OneVsOne,
             msg.sender,
             MAX_ONE_V_ONE_MEMBERS,
-            ONE_V_ONE_FEE
+            0 // No creation fee for members
         );
         
         emit MemberAdded(friendMarketId, msg.sender, block.timestamp);
