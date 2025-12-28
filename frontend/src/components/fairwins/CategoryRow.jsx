@@ -33,7 +33,15 @@ function CategoryRow({
     <div className="category-row">
       <div className="category-row-header">
         <div className="category-title-group">
-          {icon && <span className="category-icon-large" aria-hidden="true">{icon}</span>}
+          {icon && (
+            <span className="category-icon-large" aria-hidden="true">
+              {typeof icon === 'string' && icon.endsWith('.svg') ? (
+                <img src={icon} alt="" className="category-icon-img" />
+              ) : (
+                icon
+              )}
+            </span>
+          )}
           <h2>{title}</h2>
           <span className="market-count">({markets.length} markets)</span>
         </div>
