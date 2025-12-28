@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import MarketTile from './MarketTile'
+import SubcategoryFilter from './SubcategoryFilter'
 import './CategoryRow.css'
 
 function CategoryRow({ 
@@ -7,7 +8,11 @@ function CategoryRow({
   markets = [], 
   onMarketClick,
   selectedMarketId,
-  icon
+  icon,
+  subcategories = [],
+  selectedSubcategories = [],
+  onSubcategoryToggle,
+  categoryId
 }) {
   const scrollerRef = useRef(null)
 
@@ -62,6 +67,16 @@ function CategoryRow({
           </button>
         </div>
       </div>
+
+      {/* Subcategory Filter Section */}
+      {subcategories && subcategories.length > 0 && (
+        <SubcategoryFilter
+          subcategories={subcategories}
+          selectedSubcategories={selectedSubcategories}
+          onSubcategoryToggle={onSubcategoryToggle}
+          categoryName={title}
+        />
+      )}
       
       <div 
         className="category-scroller"
