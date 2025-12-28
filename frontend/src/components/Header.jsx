@@ -4,6 +4,7 @@ import { useWallet } from '../hooks'
 import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import UserManagementModal from './ui/UserManagementModal'
+import TokenMintButton from './TokenMintButton'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
@@ -94,6 +95,7 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
         <div className="header-actions">
           {!hideWalletButton && (
             <>
+              <TokenMintButton />
               <button
                 className="user-panel-btn"
                 onClick={handleOpenUserManagement}
