@@ -19,6 +19,10 @@ import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
+import MarketPage from './pages/MarketPage'
+import CorrelatedMarketsPage from './pages/CorrelatedMarketsPage'
+import WalletPage from './pages/WalletPage'
+import TokenMintPage from './pages/TokenMintPage'
 
 function AppContent() {
   const { isConnected } = useWallet()
@@ -151,6 +155,12 @@ function AppContent() {
             />
           } 
         />
+        
+        {/* New page routes for modals converted to pages */}
+        <Route path="/market/:id" element={<MarketPage />} />
+        <Route path="/markets/correlated/:groupId" element={<CorrelatedMarketsPage />} />
+        <Route path="/wallet" element={<WalletPage />} />
+        <Route path="/tokenmint" element={<TokenMintPage />} />
 
         <Route path="/admin/roles" element={<RoleManagementAdmin />} />
         <Route path="/purchase-roles" element={<RolePurchaseScreen />} />
