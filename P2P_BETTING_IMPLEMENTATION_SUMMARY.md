@@ -13,7 +13,7 @@ A new factory contract that enables creation and management of friend group pred
 **Market Types:**
 - **1v1 Markets**: Direct betting between two parties (0.05 ETH fee)
 - **Small Group Markets**: 3-10 participants (0.1 ETH fee)
-- **Poker Night Markets**: Game tracking for 3-10 players (0.1 ETH fee)
+- **Event Tracking Markets**: Competitive event tracking for 3-10 players (0.1 ETH fee)
 - **Prop Bet Markets**: General proposition betting with flexible limits
 
 **Key Features:**
@@ -36,7 +36,7 @@ A new factory contract that enables creation and management of friend group pred
 
 Coverage includes:
 - ✅ Contract deployment and initialization
-- ✅ All market creation types (1v1, small group, poker night)
+- ✅ All market creation types (1v1, small group, event tracking)
 - ✅ Fee enforcement and pricing tiers
 - ✅ Member limit enforcement
 - ✅ Member management (add/remove)
@@ -87,10 +87,11 @@ Coverage includes:
 
 ## Use Cases Supported
 
-### 1. Home Poker Night
+### 1. Competitive Event Tracking
 ```solidity
-createPokerNightMarket(
-  "Friday Night Poker",
+// Track a competitive event or tournament
+createEventTrackingMarket(
+  "Friday Night Game Tournament",
   [player1, player2, player3, player4],
   7 days,
   0  // No pegging needed
@@ -230,7 +231,7 @@ The following are ready for implementation but not yet built:
 - All deployment tests ✅
 - All 1v1 market tests ✅
 - All small group market tests ✅
-- All poker night market tests ✅
+- All event tracking market tests ✅
 - All member management tests ✅
 - All resolution tests ✅
 - All fee management tests ✅
@@ -335,7 +336,7 @@ This implementation successfully delivers on all requirements from the original 
 ✅ **DAOs between friends** - FriendGroupMarketFactory enables this
 ✅ **Prop bets support** - Multiple market types supported
 ✅ **Use cases covered**:
-  - ✅ Home poker night
+  - ✅ Competitive event tracking
   - ✅ Third-party arbitration
   - ✅ 1v1 bets
 ✅ **Reduced cost** - 90% cheaper (0.05-0.1 vs 1 ETH)

@@ -14,12 +14,12 @@ import "./RagequitModule.sol";
  * KEY FEATURES:
  * - Reduced creation costs for friend group markets
  * - Member limit enforcement to prevent bypassing public markets
- * - Support for 1v1 bets, group prop bets, and poker night scenarios
+ * - Support for 1v1 bets, group prop bets, and event tracking scenarios
  * - Optional third-party arbitration
  * - Integration with RagequitModule for fair exits
  * 
  * USE CASES:
- * 1. Home poker night tracking
+ * 1. Competitive event tracking (poker, board games, etc.)
  * 2. 1v1 prop bets between friends
  * 3. Small group predictions with arbitrator
  * 4. Friend group contests and competitions
@@ -30,7 +30,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     enum MarketType {
         OneVsOne,           // 1v1 direct bet between two parties
         SmallGroup,         // 3-10 participants
-        PokerNight,         // Tracking for poker games
+        EventTracking,      // Tracking for competitive events/games
         PropBet             // General proposition bet
     }
     
@@ -80,8 +80,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Member limits
     uint256 public constant MAX_SMALL_GROUP_MEMBERS = 10;
     uint256 public constant MAX_ONE_V_ONE_MEMBERS = 2;
-    uint256 public constant MIN_POKER_NIGHT_MEMBERS = 3;
-    uint256 public constant MAX_POKER_NIGHT_MEMBERS = 10;
+    uint256 public constant MIN_EVENT_TRACKING_MEMBERS = 3;
+    uint256 public constant MAX_EVENT_TRACKING_MEMBERS = 10;
     
     // Events
     event FriendMarketCreated(
@@ -315,14 +315,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @notice Create a poker night market for tracking games
-     * @param description Description of the poker night
+     * @notice Create an event tracking market for competitive events/games
+     * @param description Description of the event
      * @param players Array of player addresses
-     * @param tradingPeriod Duration of the poker night
+     * @param tradingPeriod Duration of the event
      * @param peggedPublicMarketId Optional public market ID to peg resolution to (0 = none)
      * @return friendMarketId ID of created friend market
      */
-    function createPokerNightMarket(
+    function createEventTrackingMarket(
         string memory description,
         address[] memory players,
         uint256 tradingPeriod,
@@ -331,8 +331,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         require(msg.value >= FRIEND_MARKET_FEE, "Insufficient creation fee");
         require(bytes(description).length > 0, "Description required");
         require(
-            players.length >= MIN_POKER_NIGHT_MEMBERS && 
-            players.length <= MAX_POKER_NIGHT_MEMBERS,
+            players.length >= MIN_EVENT_TRACKING_MEMBERS && 
+            players.length <= MAX_EVENT_TRACKING_MEMBERS,
             "Invalid number of players"
         );
         
@@ -365,11 +365,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         
         friendMarkets[friendMarketId] = FriendMarket({
             marketId: underlyingMarketId,
-            marketType: MarketType.PokerNight,
+            marketType: MarketType.EventTracking,
             creator: msg.sender,
             members: players,
-            arbitrator: address(0), // No arbitrator for poker
-            memberLimit: MAX_POKER_NIGHT_MEMBERS,
+            arbitrator: address(0), // No arbitrator for event tracking
+            memberLimit: MAX_EVENT_TRACKING_MEMBERS,
             creationFee: FRIEND_MARKET_FEE,
             createdAt: block.timestamp,
             active: true,
@@ -394,9 +394,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         emit FriendMarketCreated(
             friendMarketId,
             underlyingMarketId,
-            MarketType.PokerNight,
+            MarketType.EventTracking,
             msg.sender,
-            MAX_POKER_NIGHT_MEMBERS,
+            MAX_EVENT_TRACKING_MEMBERS,
             FRIEND_MARKET_FEE
         );
     }

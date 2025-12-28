@@ -30,7 +30,7 @@ The documentation site provides comprehensive guides for both platforms:
 
 ## Platform Overview
 
-### 🎯 FairWins — Prediction Markets for Everyone (Primary Platform)
+### 🎯 FairWins — Prediction Markets for Friends (Primary Platform)
 
 FairWins is the main prediction market platform where:
 - **Anyone can create markets** on any topic with custom parameters
@@ -45,14 +45,14 @@ FairWins is the main prediction market platform where:
    - Member limits (2-10 participants)
    - Optional third-party arbitration
    - Market pegging to public markets for automatic settlement
-   - Support for 1v1 bets, group prop bets, and poker night tracking
+   - Support for 1v1 bets, group prop bets, and event tracking
 
 **Use Cases:**
 - Event outcome predictions
 - Financial market forecasting
 - Sports and entertainment betting
 - Community sentiment tracking
-- **Friend group betting** (home poker nights, prop bets, office pools)
+- **Friend group betting** (competitive events, prop bets, office pools)
 
 ### 🏛️ ClearPath — DAO Governance (Add-on Feature)
 
@@ -208,8 +208,8 @@ Friend Group Markets enable prediction markets between trusted groups with reduc
    - Collaborative betting environment
    - Moderate creation fee (0.1 ETH)
 
-3. **Poker Night Markets**
-   - Track poker games and tournaments
+3. **Event Tracking Markets**
+   - Track competitive events and tournaments
    - 3-10 players
    - Transparent accounting
    - Automatic settlement
@@ -223,7 +223,7 @@ Friend Group Markets enable prediction markets between trusted groups with reduc
 - Prevents friend markets from bypassing public markets
 - 1v1: Exactly 2 participants
 - Small Groups: Maximum 10 concurrent members
-- Poker Nights: 3-10 players
+- Event Tracking: 3-10 players
 
 #### Market Pegging for Easy Settlement
 - **Peg to public markets** for automatic resolution
@@ -235,7 +235,7 @@ Friend Group Markets enable prediction markets between trusted groups with reduc
 - **No arbitrator**: For simple, objective outcomes
 - **Third-party arbitrator**: Neutral friend for disputes
 - **Market pegging**: Automatic based on public market
-- **Creator resolution**: For poker nights and tracking
+- **Creator resolution**: For event tracking and monitoring
 
 #### Ragequit Protection
 - Integrated with existing RagequitModule
@@ -267,11 +267,11 @@ Friend markets create irreversible smart contracts. Before participating:
 
 ### Example Use Cases
 
-#### 1. Home Poker Night
+#### 1. Competitive Event Tracking
 ```solidity
-// Track a Friday night poker game
-createPokerNightMarket(
-  "Friday Night Poker",
+// Track a competitive event or tournament
+createEventTrackingMarket(
+  "Friday Night Game Tournament",
   [player1, player2, player3, player4],
   7 days,
   0  // No pegging

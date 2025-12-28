@@ -294,15 +294,15 @@ describe("FriendGroupMarketFactory", function () {
     });
   });
 
-  describe("Poker Night Markets", function () {
-    it("Should create a poker night market", async function () {
-      const description = "Friday night poker";
+  describe("Event Tracking Markets", function () {
+    it("Should create an event tracking market", async function () {
+      const description = "Friday night game tournament";
       const players = [addr1.address, addr2.address, addr3.address, addr4.address];
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days minimum
       const fee = ethers.parseEther("0.2");
       
       await expect(
-        friendGroupFactory.createPokerNightMarket(
+        friendGroupFactory.createEventTrackingMarket(
           description,
           players,
           tradingPeriod,
@@ -312,14 +312,14 @@ describe("FriendGroupMarketFactory", function () {
       ).to.emit(friendGroupFactory, "FriendMarketCreated");
     });
 
-    it("Should require minimum players for poker", async function () {
-      const description = "Poker night";
+    it("Should require minimum players for event tracking", async function () {
+      const description = "Game tournament";
       const players = [addr1.address, addr2.address]; // Only 2, minimum is 3
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days
       const fee = ethers.parseEther("0.2");
       
       await expect(
-        friendGroupFactory.createPokerNightMarket(
+        friendGroupFactory.createEventTrackingMarket(
           description,
           players,
           tradingPeriod,
@@ -329,8 +329,8 @@ describe("FriendGroupMarketFactory", function () {
       ).to.be.revertedWith("Invalid number of players");
     });
 
-    it("Should enforce maximum players for poker", async function () {
-      const description = "Poker night";
+    it("Should enforce maximum players for event tracking", async function () {
+      const description = "Game tournament";
       const players = new Array(11).fill(0).map(() => 
         ethers.Wallet.createRandom().address
       ); // 11 players, max is 10
@@ -338,7 +338,7 @@ describe("FriendGroupMarketFactory", function () {
       const fee = ethers.parseEther("0.2");
       
       await expect(
-        friendGroupFactory.createPokerNightMarket(
+        friendGroupFactory.createEventTrackingMarket(
           description,
           players,
           tradingPeriod,

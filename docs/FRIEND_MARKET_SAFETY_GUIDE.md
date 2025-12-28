@@ -173,7 +173,7 @@ Friend markets include several protections:
 ### Member Limits
 - **1v1 markets**: Exactly 2 participants (prevents group manipulation)
 - **Small groups**: Maximum 10 members (prevents becoming unofficial public market)
-- **Poker nights**: 3-10 players (appropriate for game tracking)
+- **Event tracking**: 3-10 players (appropriate for competitive events)
 
 ### Reduced Costs
 - **1v1**: 0.05 ETH creation fee (vs 1 ETH for public)
@@ -232,7 +232,7 @@ Friend markets include several protections:
    - "Will it snow on Christmas in our hometown?"
    - "Who scores more points in tonight's game?"
 
-2. **Poker Night Tracking**
+2. **Event Tracking**
    - Track buy-ins and payouts
    - Transparent accounting
    - Automatic settlement
