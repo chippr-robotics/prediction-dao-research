@@ -1,12 +1,16 @@
+
+/* Container */
 .swap-panel {
   max-width: 500px;
   margin: 2rem auto;
   padding: 1.5rem;
-  background: var(--card-bg, #ffffff);
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
+/* Header */
 .swap-header {
   text-align: center;
   margin-bottom: 1.5rem;
@@ -15,29 +19,32 @@
 .swap-header h2 {
   margin: 0 0 0.5rem 0;
   font-size: 1.75rem;
-  color: var(--text-primary, #1a1a1a);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .swap-header .subtitle {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
 }
 
+/* Connect message */
 .connect-message {
   padding: 2rem;
   text-align: center;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
 }
 
-/* Mode Selector */
+/* Mode selector */
 .mode-selector {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  background: var(--bg-secondary, #f5f5f5);
+  background: var(--color-surface-secondary);
   padding: 0.25rem;
   border-radius: 12px;
+  border: 1px solid var(--color-border);
 }
 
 .mode-btn {
@@ -45,25 +52,26 @@
   padding: 0.75rem;
   background: transparent;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 500;
-  color: var(--text-secondary, #666);
-  transition: all 0.2s;
+  color: var(--color-text-secondary);
+  transition: background 0.2s, color 0.2s;
 }
 
 .mode-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .mode-btn.active {
-  background: var(--primary-color, #4CAF50);
-  color: white;
-  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Swap Form */
+/* Swap form */
 .swap-form {
   display: flex;
   flex-direction: column;
@@ -79,7 +87,7 @@
 .token-input-group label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
 }
 
 .token-input {
@@ -87,25 +95,27 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: var(--bg-secondary, #f5f5f5);
-  border-radius: 12px;
-  border: 2px solid transparent;
+  background: var(--color-surface-secondary);
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
   transition: border-color 0.2s;
 }
 
 .token-input:focus-within {
-  border-color: var(--primary-color, #4CAF50);
+  border-color: var(--color-primary);
 }
 
+/* Token select / display */
 .token-select,
 .token-display {
   min-width: 80px;
   padding: 0.5rem;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   font-weight: 600;
   font-size: 1rem;
+  color: var(--color-text);
 }
 
 .token-select {
@@ -114,9 +124,9 @@
 
 .token-display {
   text-align: center;
-  color: var(--text-primary, #1a1a1a);
 }
 
+/* Amount input / display */
 .amount-input,
 .amount-display {
   flex: 1;
@@ -125,7 +135,7 @@
   font-weight: 600;
   border: none;
   background: transparent;
-  color: var(--text-primary, #1a1a1a);
+  color: var(--color-text);
 }
 
 .amount-input:focus {
@@ -133,17 +143,18 @@
 }
 
 .amount-input::placeholder {
-  color: #ccc;
+  color: var(--color-text-tertiary);
 }
 
 .amount-display {
   text-align: right;
 }
 
+/* Max button */
 .max-btn {
   padding: 0.5rem 1rem;
-  background: var(--primary-color, #4CAF50);
-  color: white;
+  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
   border: none;
   border-radius: 8px;
   font-size: 0.75rem;
@@ -152,17 +163,24 @@
   transition: background-color 0.2s;
 }
 
-.max-btn:hover {
-  background: var(--primary-hover, #45a049);
+.max-btn:hover:not(:disabled) {
+  background: var(--color-primary-dark);
 }
 
+.max-btn:disabled {
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+/* Balance info */
 .balance-info {
   font-size: 0.875rem;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
   text-align: right;
 }
 
-/* Swap Direction */
+/* Swap direction */
 .swap-direction {
   display: flex;
   justify-content: center;
@@ -172,78 +190,83 @@
 .flip-btn {
   width: 40px;
   height: 40px;
-  background: var(--card-bg, #ffffff);
-  border: 2px solid var(--border-color, #e0e0e0);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 50%;
   font-size: 1.5rem;
+  color: var(--color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, border-color 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .flip-btn:hover {
   transform: rotate(180deg);
-  border-color: var(--primary-color, #4CAF50);
+  border-color: var(--color-primary);
 }
 
+/* Optional arrow for non‑interactive states */
 .swap-arrow {
   text-align: center;
   font-size: 1.5rem;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
   margin: -0.5rem 0;
 }
 
-/* Slippage Settings */
+/* Slippage settings */
 .slippage-settings {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem;
-  background: var(--bg-secondary, #f5f5f5);
+  background: var(--color-surface-secondary);
   border-radius: 8px;
+  border: 1px solid var(--color-border);
 }
 
 .slippage-settings label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
 }
 
 .slippage-select {
   padding: 0.5rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
-  background: white;
+  background: var(--color-surface);
   cursor: pointer;
   font-size: 0.875rem;
+  color: var(--color-text);
 }
 
-/* Execute Button */
+/* Execute button */
 .execute-btn {
   width: 100%;
   padding: 1rem;
-  background: var(--primary-color, #4CAF50);
-  color: white;
+  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
   border: none;
   border-radius: 12px;
   font-size: 1.125rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
   margin-top: 0.5rem;
 }
 
 .execute-btn:hover:not(:disabled) {
-  background: var(--primary-hover, #45a049);
+  background: var(--color-primary-dark);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .execute-btn:disabled {
-  background: #ccc;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -254,32 +277,33 @@
   border-radius: 8px;
   font-size: 0.875rem;
   margin-top: 0.5rem;
+  border: 1px solid transparent;
 }
 
 .error-message {
-  background: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef5350;
+  background: var(--color-error-bg, rgba(229, 83, 61, 0.1));
+  color: var(--color-error, #e5533d);
+  border-color: var(--color-error, #e5533d);
 }
 
 .success-message {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #66bb6a;
+  background: var(--color-success-bg, rgba(72, 187, 120, 0.1));
+  color: var(--color-success, #48bb78);
+  border-color: var(--color-success, #48bb78);
 }
 
-/* Contract Links */
+/* Contract links */
 .contract-links {
   margin-top: 2rem;
   padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color, #e0e0e0);
+  border-top: 1px solid var(--color-border);
 }
 
 .contract-links h3 {
   margin: 0 0 1rem 0;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -292,79 +316,27 @@
 
 .contract-link {
   padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary, #f5f5f5);
-  border: 1px solid var(--border-color, #e0e0e0);
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   text-decoration: none;
-  color: var(--primary-color, #4CAF50);
+  color: var(--color-primary);
   font-size: 0.875rem;
   font-weight: 500;
   text-align: center;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
   display: block;
 }
 
 .contract-link:hover {
-  background: var(--primary-color, #4CAF50);
-  color: white;
-  border-color: var(--primary-color, #4CAF50);
+  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
+  border-color: var(--color-primary);
   transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .swap-panel {
-    background: var(--card-bg, #2a2a2a);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .swap-header h2 {
-    color: var(--text-primary, #ffffff);
-  }
-
-  .mode-selector {
-    background: var(--bg-secondary, #1a1a1a);
-  }
-
-  .token-input {
-    background: var(--bg-secondary, #1a1a1a);
-  }
-
-  .token-select,
-  .token-display {
-    background: #333;
-    border-color: #444;
-    color: white;
-  }
-
-  .amount-input,
-  .amount-display {
-    color: white;
-  }
-
-  .slippage-settings {
-    background: var(--bg-secondary, #1a1a1a);
-  }
-
-  .slippage-select {
-    background: #333;
-    border-color: #444;
-    color: white;
-  }
-
-  .flip-btn {
-    background: var(--card-bg, #2a2a2a);
-    border-color: #444;
-  }
-
-  .contract-link {
-    background: var(--bg-secondary, #1a1a1a);
-    border-color: #444;
-  }
-}
-
-/* Responsive Design */
+/* Responsive design */
 @media (max-width: 768px) {
   .swap-panel {
     margin: 1rem;
