@@ -30,7 +30,7 @@ The documentation site provides comprehensive guides for both platforms:
 
 ## Platform Overview
 
-### 🎯 FairWins — Prediction Markets for Friends (Primary Platform)
+### 🎯 FairWins — Prediction Markets for Everyone (Primary Platform)
 
 FairWins is the main prediction market platform where:
 - **Anyone can create markets** on any topic with custom parameters
@@ -38,11 +38,21 @@ FairWins is the main prediction market platform where:
 - **Fair participation** enables anyone to trade based on their knowledge
 - **Transparent resolution** ensures trust and accountability
 
+**Market Types:**
+1. **Public Markets** - Open to all users with full oracle support
+2. **Friend Group Markets** (P2P Betting) - Private markets between friends with:
+   - Reduced creation costs (0.05-0.1 ETH vs 1 ETH)
+   - Member limits (2-10 participants)
+   - Optional third-party arbitration
+   - Market pegging to public markets for automatic settlement
+   - Support for 1v1 bets, group prop bets, and poker night tracking
+
 **Use Cases:**
 - Event outcome predictions
 - Financial market forecasting
 - Sports and entertainment betting
 - Community sentiment tracking
+- **Friend group betting** (home poker nights, prop bets, office pools)
 
 ### 🏛️ ClearPath — DAO Governance (Add-on Feature)
 
@@ -173,21 +183,147 @@ Both platforms are built on the same secure, privacy-preserving foundation:
 - **Multiple Trading Periods**: 7-21 day configurable trading windows
 - **Time-Weighted Pricing**: Reduces manipulation through TWAP oracles
 
+## Friend Group Markets (P2P Betting)
+
+Friend Group Markets enable prediction markets between trusted groups with reduced costs and simplified operations.
+
+### Key Features
+
+#### Reduced Creation Costs
+- **1v1 Markets**: 0.05 ETH (90% cheaper than public markets)
+- **Small Group Markets**: 0.1 ETH (10-90% cheaper)
+- **Public Markets**: 1 ETH (standard fee)
+
+#### Market Types
+
+1. **One-vs-One (1v1)**
+   - Direct betting between two parties
+   - Optional third-party arbitrator
+   - Lowest creation fee (0.05 ETH)
+   - Perfect for friendly wagers
+
+2. **Small Group Markets**
+   - 3-10 participants
+   - Ideal for office pools and friend groups
+   - Collaborative betting environment
+   - Moderate creation fee (0.1 ETH)
+
+3. **Poker Night Markets**
+   - Track poker games and tournaments
+   - 3-10 players
+   - Transparent accounting
+   - Automatic settlement
+
+4. **Prop Bet Markets**
+   - General proposition betting
+   - Flexible member limits
+   - Custom resolution criteria
+
+#### Member Limits (Anti-Bypass Protection)
+- Prevents friend markets from bypassing public markets
+- 1v1: Exactly 2 participants
+- Small Groups: Maximum 10 concurrent members
+- Poker Nights: 3-10 players
+
+#### Market Pegging for Easy Settlement
+- **Peg to public markets** for automatic resolution
+- No manual arbitration needed
+- Transparent, verifiable outcomes
+- Batch resolution supported
+
+#### Arbitration Options
+- **No arbitrator**: For simple, objective outcomes
+- **Third-party arbitrator**: Neutral friend for disputes
+- **Market pegging**: Automatic based on public market
+- **Creator resolution**: For poker nights and tracking
+
+#### Ragequit Protection
+- Integrated with existing RagequitModule
+- Exit with proportional treasury share
+- Protection for dissenting participants
+- Fair exit mechanism
+
+### Safety and Risk Warnings
+
+⚠️ **CRITICAL: Smart Contract Risks** ⚠️
+
+Friend markets create irreversible smart contracts. Before participating:
+- **No one controls outcomes** - Not you, your friends, or FairWins
+- **Use at your own risk** - You are solely responsible
+- **Only bet with trusted friends** you know in real life
+- **Read the safety guide** - Required before creating markets
+
+**📚 [Complete Safety Guide](docs/FRIEND_MARKET_SAFETY_GUIDE.md)** - **REQUIRED READING**
+
+**🚨 [Scam Prevention Guide](docs/FRIEND_MARKET_SAFETY_GUIDE.md#how-to-spot-scams)** - Learn red flags
+
+### Smart Contracts
+
+**FriendGroupMarketFactory.sol** - Factory for creating friend markets
+- Manages market creation and lifecycle
+- Enforces member limits
+- Handles market pegging
+- Integrates with ConditionalMarketFactory and RagequitModule
+
+### Example Use Cases
+
+#### 1. Home Poker Night
+```solidity
+// Track a Friday night poker game
+createPokerNightMarket(
+  "Friday Night Poker",
+  [player1, player2, player3, player4],
+  7 days,
+  0  // No pegging
+);
+```
+
+#### 2. 1v1 Sports Bet
+```solidity
+// Bet on tonight's game with a friend
+createOneVsOneMarket(
+  friend,
+  "Lakers beat Warriors tonight?",
+  1 days,
+  mutualFriend,  // Arbitrator
+  0  // No pegging
+);
+```
+
+#### 3. Office Pool Pegged to Public Market
+```solidity
+// Office pool that settles based on public election market
+createSmallGroupMarket(
+  "Office 2024 Election Pool",
+  [alice, bob, carol, dave],
+  10,  // Max 10 members
+  90 days,
+  address(0),  // No arbitrator needed
+  publicElectionMarketId  // Auto-settle based on public market
+);
+```
+
 ## Project Structure
 
 ```
 prediction-dao-research/
 ├── contracts/              # Solidity smart contracts
 │   ├── FutarchyGovernor.sol
+│   ├── TraditionalGovernor.sol
 │   ├── WelfareMetricRegistry.sol
 │   ├── ProposalRegistry.sol
 │   ├── ConditionalMarketFactory.sol
+│   ├── FriendGroupMarketFactory.sol  # NEW: P2P betting markets
 │   ├── PrivacyCoordinator.sol
 │   ├── OracleResolver.sol
 │   └── RagequitModule.sol
 ├── test/                   # Contract tests
 │   ├── WelfareMetricRegistry.test.js
-│   └── ProposalRegistry.test.js
+│   ├── ProposalRegistry.test.js
+│   └── FriendGroupMarketFactory.test.js  # NEW: Friend market tests
+├── docs/                   # Documentation
+│   ├── FRIEND_MARKET_SAFETY_GUIDE.md     # NEW: Safety warnings & scam prevention
+│   └── FRIEND_MARKET_WARNING_UI.md        # NEW: UI warning components
 ├── frontend/              # React frontend application
 │   ├── src/
 │   │   ├── components/   # React components
