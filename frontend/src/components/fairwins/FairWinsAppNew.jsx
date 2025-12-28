@@ -4,6 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
 import useFuseSearch from '../../hooks/useFuseSearch'
 import { getMockMarkets } from '../../utils/mockDataLoader'
+import { getSubcategoriesForCategory } from '../../config/subcategories'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -17,6 +18,7 @@ import MarketsTable from './MarketsTable'
 import TokenMintTab from './TokenMintTab'
 import ClearPathTab from './ClearPathTab'
 import SearchBar from '../ui/SearchBar'
+import SubcategoryFilter from './SubcategoryFilter'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
@@ -29,6 +31,9 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'volume24h', 'activity', 'popularity', 'probability', 'category'
   const [searchQuery, setSearchQuery] = useState('') // Search query state
+  const [selectedSubcategories, setSelectedSubcategories] = useState([]) // Subcategory filter state
+  const heroBackButtonRef = useRef(null)
+  const lastFocusedElementRef = useRef(null)
   
   // TokenMint state - kept for TokenMintTab display
   const [tokens, setTokens] = useState([])
@@ -82,6 +87,11 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     setSelectedCategory(categoryId)
     // Clear search when changing category
     setSearchQuery('')
+    // Clear subcategory filters when changing category
+    setSelectedSubcategories([])
+    // Close hero when changing category
+    setShowHero(false)
+    setSelectedMarket(null)
     // Scroll to top when changing category
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -89,6 +99,19 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const handleSearchChange = (query) => {
     setSearchQuery(query)
   }
+
+  // Handle subcategory toggle
+  const handleSubcategoryToggle = useCallback((subcategoryId) => {
+    setSelectedSubcategories(prev => {
+      if (prev.includes(subcategoryId)) {
+        // Remove subcategory
+        return prev.filter(id => id !== subcategoryId)
+      } else {
+        // Add subcategory
+        return [...prev, subcategoryId]
+      }
+    })
+  }, [])
 
   const handleMarketClick = (market) => {
     // Navigate to market page based on whether it's correlated or individual
@@ -202,8 +225,20 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     return markets.filter(m => m.category === selectedCategory)
   }, [markets, selectedCategory])
 
-  // Apply Fuse.js search to category-filtered markets
-  const searchFilteredMarkets = useFuseSearch(categoryFilteredMarkets, searchQuery)
+  // Apply subcategory filtering
+  const subcategoryFilteredMarkets = useMemo(() => {
+    // If no subcategories selected, return all category markets
+    if (selectedSubcategories.length === 0) {
+      return categoryFilteredMarkets
+    }
+    // Filter by selected subcategories
+    return categoryFilteredMarkets.filter(m => 
+      selectedSubcategories.includes(m.subcategory)
+    )
+  }, [categoryFilteredMarkets, selectedSubcategories])
+
+  // Apply Fuse.js search to subcategory-filtered markets
+  const searchFilteredMarkets = useFuseSearch(subcategoryFilteredMarkets, searchQuery)
 
   // Comparison function for sorting markets
   const compareMarkets = useCallback((a, b, useDefaultSort = false) => {
@@ -393,6 +428,15 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Subcategory Filter Section */}
+                  <SubcategoryFilter
+                    subcategories={getSubcategoriesForCategory(selectedCategory)}
+                    selectedSubcategories={selectedSubcategories}
+                    onSubcategoryToggle={handleSubcategoryToggle}
+                    categoryName={categories.find(c => c.id === selectedCategory)?.name}
+                  />
+
                   <MarketGrid 
                     markets={getFilteredAndSortedMarkets()}
                     onMarketClick={handleMarketClick}

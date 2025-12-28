@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import MarketTile from './MarketTile'
+import SubcategoryFilter from './SubcategoryFilter'
 import './CategoryRow.css'
 
 function CategoryRow({ 
@@ -7,7 +8,11 @@ function CategoryRow({
   markets = [], 
   onMarketClick,
   selectedMarketId,
-  icon
+  icon,
+  subcategories = [],
+  selectedSubcategories = [],
+  onSubcategoryToggle,
+  categoryId
 }) {
   const scrollerRef = useRef(null)
 
@@ -33,7 +38,15 @@ function CategoryRow({
     <div className="category-row">
       <div className="category-row-header">
         <div className="category-title-group">
-          {icon && <span className="category-icon-large" aria-hidden="true">{icon}</span>}
+          {icon && (
+            <span className="category-icon-large" aria-hidden="true">
+              {typeof icon === 'string' && icon.endsWith('.svg') ? (
+                <img src={icon} alt="" className="category-icon-img" />
+              ) : (
+                icon
+              )}
+            </span>
+          )}
           <h2>{title}</h2>
           <span className="market-count">({markets.length} markets)</span>
         </div>
@@ -54,6 +67,16 @@ function CategoryRow({
           </button>
         </div>
       </div>
+
+      {/* Subcategory Filter Section */}
+      {subcategories && subcategories.length > 0 && (
+        <SubcategoryFilter
+          subcategories={subcategories}
+          selectedSubcategories={selectedSubcategories}
+          onSubcategoryToggle={onSubcategoryToggle}
+          categoryName={title}
+        />
+      )}
       
       <div 
         className="category-scroller"

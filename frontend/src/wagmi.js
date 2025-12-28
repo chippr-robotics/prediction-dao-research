@@ -64,7 +64,16 @@ const networkId = import.meta.env.VITE_NETWORK_ID
 const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
 
 // Get WalletConnect project ID from environment
-const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
+// Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'a01e2fef66f2abc4ca480cb13a6d8db7'
+
+// Warn if using fallback project ID
+if (!import.meta.env.VITE_WALLETCONNECT_PROJECT_ID) {
+  console.warn(
+    'WalletConnect: Using fallback project ID. For production, please set VITE_WALLETCONNECT_PROJECT_ID in your .env file. ' +
+    'Get your project ID at https://cloud.walletconnect.com'
+  )
+}
 
 // Get app URL for WalletConnect metadata
 const resolveAppUrl = () => {
@@ -75,7 +84,7 @@ const resolveAppUrl = () => {
   }
 
   // In production, require VITE_APP_URL to be set to avoid metadata mismatches
-  if (import.meta.env.PROD && walletConnectProjectId) {
+  if (import.meta.env.PROD) {
     console.warn('VITE_APP_URL should be set in production for correct WalletConnect metadata. Falling back to window.location.origin.')
   }
 
@@ -98,8 +107,8 @@ export const config = createConfig({
   chains,
   connectors: [
     injected({ target: 'metaMask' }),
-    // Add WalletConnect connector if project ID is provided
-    ...(walletConnectProjectId ? [walletConnect({
+    // WalletConnect is always available for hardware wallet support
+    walletConnect({
       projectId: walletConnectProjectId,
       metadata: {
         name: 'Prediction DAO',
@@ -108,7 +117,7 @@ export const config = createConfig({
         icons: [`${appUrl}/assets/fairwins_no-text_logo.svg`]
       },
       showQrModal: true,
-    })] : []),
+    }),
   ],
   transports: {
     [ethereumClassic.id]: http(),
