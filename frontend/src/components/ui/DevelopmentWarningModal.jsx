@@ -71,17 +71,6 @@ function DevelopmentWarningModal() {
                       <strong>TokenMint</strong> - Token creation and management tools
                     </div>
                   </li>
-                  <li>
-                    <img 
-                      src="/assets/spindletop_no-text_logo.svg" 
-                      alt="SpindleTop" 
-                      className="addon-logo"
-                      onError={(e) => { e.target.style.display = 'none' }}
-                    />
-                    <div className="addon-content">
-                      <strong>SpindleTop</strong> - Liquidity and poll management system where users can manage their payouts and mining related activities
-                    </div>
-                  </li>
                 </ul>
               </div>
               
