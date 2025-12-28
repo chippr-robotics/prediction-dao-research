@@ -45,46 +45,16 @@ describe("FriendGroupMarketFactory", function () {
       await paymentManager.getAddress()
     );
     
-    // Purchase FRIEND_MARKET_ROLE memberships for test users (ENTERPRISE tier for no expiration)
+    // Grant FRIEND_MARKET_ROLE to test users directly (for testing, avoids draining ETH balance)
     const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();
-    const MembershipTier = { BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
-    const MembershipDuration = { ONE_MONTH: 0, THREE_MONTHS: 1, SIX_MONTHS: 2, TWELVE_MONTHS: 3, ENTERPRISE: 4 };
     
-    // Get tier price for Bronze
-    const tierMeta = await tieredRoleManager.tierMetadata(FRIEND_MARKET_ROLE, MembershipTier.BRONZE);
-    const price = tierMeta.price;
-    
-    // Purchase memberships for all test users with ENTERPRISE duration (no expiration)
-    await tieredRoleManager.connect(owner).purchaseRoleWithTierAndDuration(
-      FRIEND_MARKET_ROLE,
-      MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
-      { value: price }
-    );
-    await tieredRoleManager.connect(addr1).purchaseRoleWithTierAndDuration(
-      FRIEND_MARKET_ROLE,
-      MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
-      { value: price }
-    );
-    await tieredRoleManager.connect(addr2).purchaseRoleWithTierAndDuration(
-      FRIEND_MARKET_ROLE,
-      MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
-      { value: price }
-    );
-    await tieredRoleManager.connect(addr3).purchaseRoleWithTierAndDuration(
-      FRIEND_MARKET_ROLE,
-      MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
-      { value: price }
-    );
-    await tieredRoleManager.connect(addr4).purchaseRoleWithTierAndDuration(
-      FRIEND_MARKET_ROLE,
-      MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
-      { value: price }
-    );
+    // Grant role directly to test users (owner is admin and can grant roles)
+    // This avoids purchasing expensive memberships which drains test account balances
+    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, owner.address);
+    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr1.address);
+    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr2.address);
+    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr3.address);
+    await tieredRoleManager.connect(owner).grantRole(FRIEND_MARKET_ROLE, addr4.address);
     
     // Transfer ownership of marketFactory to friendGroupFactory for testing
     await marketFactory.transferOwnership(await friendGroupFactory.getAddress());
