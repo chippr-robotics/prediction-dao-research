@@ -29,7 +29,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'category'
+  const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'volume24h', 'activity', 'popularity', 'probability', 'category'
   const [showHero, setShowHero] = useState(false) // Control hero visibility
   const [searchQuery, setSearchQuery] = useState('') // Search query state
   const heroBackButtonRef = useRef(null)
@@ -343,6 +343,14 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
             return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
           case 'marketValue':
             return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+          case 'volume24h':
+            return parseFloat(b.volume24h || 0) - parseFloat(a.volume24h || 0)
+          case 'activity':
+            return parseFloat(b.tradesCount || 0) - parseFloat(a.tradesCount || 0)
+          case 'popularity':
+            return parseFloat(b.uniqueTraders || 0) - parseFloat(a.uniqueTraders || 0)
+          case 'probability':
+            return parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0)
           case 'category':
             return a.category.localeCompare(b.category)
           default:
@@ -359,6 +367,14 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
           return new Date(a.tradingEndTime) - new Date(b.tradingEndTime)
         case 'marketValue':
           return parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity)
+        case 'volume24h':
+          return parseFloat(b.volume24h || 0) - parseFloat(a.volume24h || 0)
+        case 'activity':
+          return parseFloat(b.tradesCount || 0) - parseFloat(a.tradesCount || 0)
+        case 'popularity':
+          return parseFloat(b.uniqueTraders || 0) - parseFloat(a.uniqueTraders || 0)
+        case 'probability':
+          return parseFloat(b.passTokenPrice || 0) - parseFloat(a.passTokenPrice || 0)
         case 'category':
           return a.category.localeCompare(b.category)
         default:
@@ -508,6 +524,10 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                         >
                           <option value="endTime">Ending Time</option>
                           <option value="marketValue">Market Value</option>
+                          <option value="volume24h">Volume (24h)</option>
+                          <option value="activity">Activity (Trades)</option>
+                          <option value="popularity">Popularity (Traders)</option>
+                          <option value="probability">Probability (YES%)</option>
                         </select>
                       </div>
                     </div>
