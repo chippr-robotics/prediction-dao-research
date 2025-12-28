@@ -14,24 +14,36 @@ Created four new page components in `/frontend/src/pages/`:
    - Replaced: `MarketModal`
    - Displays individual market details with trading interface
    - Features: Trading panel, market details, and share QR code
+   - CSS: Dedicated `MarketPage.css` with renamed classes (`market-page-*`)
    - Navigation: Click on any individual market tile navigates to this page
 
 2. **CorrelatedMarketsPage** (`/markets/correlated/:groupId`)
-   - Replaced: `CorrelatedMarketsModal`
+   - Replaced: `CorrelatedMarketsModal` 
    - Shows all correlated markets in a group with comparison tools
-   - Features: Radar chart visualization, timeline analysis, market comparison
+   - Features: Radar chart visualization, timeline analysis, **compact table view**
+   - CSS: Dedicated `CorrelatedMarketsPage.css` with renamed classes (`correlated-markets-page-*`)
+   - **New Table View**: Replaced card-based UI with table including:
+     - Pin to top functionality
+     - Favorite/unfavorite toggle
+     - Countdown timer display
+     - Market type (Binary)
+     - YES/NO prices with probabilities
+     - Explicit "View Details" button
+     - Chart visibility toggle
    - Navigation: Click on any correlated market tile navigates to this page
 
 3. **WalletPage** (`/wallet`)
    - Replaced: `UserManagementModal`
    - User profile, wallet connection, and preferences management
    - Features: Wallet management, ClearPath status, role management, market search, token swap
+   - CSS: Dedicated `WalletPage.css` with renamed classes (`wallet-page-*`)
    - Navigation: Click on wallet icon in header navigates to this page
 
 4. **TokenMintPage** (`/tokenmint`)
    - Replaced: TokenMint modal flows
    - Token creation and management interface
    - Features: View user tokens, create new tokens, manage token settings
+   - State: Renamed `showHero` to `showTokenDetails` for clarity
    - Navigation: Click on TokenMint sidebar category or any token navigates to this page
 
 ### Updated Components
@@ -44,7 +56,7 @@ Created four new page components in `/frontend/src/pages/`:
 - Updated `handleMarketClick` to use `navigate()` instead of opening modals
 - Updated `handleCategoryChange` to navigate to `/tokenmint` and `/clearpath` pages
 - Updated `handleTokenClick` to navigate to `/tokenmint` page
-- Removed modal state management (`showHero`, `showTokenBuilder`, etc.)
+- Removed modal state management
 - Removed modal rendering code
 - Simplified component by removing modal-related handlers
 
@@ -117,10 +129,24 @@ App → Market Grid → Click → Navigate to Market Page
 - `frontend/src/App.jsx` - Added new routes
 - `frontend/src/components/fairwins/FairWinsAppNew.jsx` - Updated navigation logic
 - `frontend/src/components/fairwins/HeaderBar.jsx` - Updated wallet navigation
-- `frontend/src/pages/MarketPage.jsx` - New file
-- `frontend/src/pages/CorrelatedMarketsPage.jsx` - New file
-- `frontend/src/pages/WalletPage.jsx` - New file
+- `frontend/src/pages/MarketPage.jsx` - New file (with `MarketPage.css`)
+- `frontend/src/pages/CorrelatedMarketsPage.jsx` - New file (with `CorrelatedMarketsPage.css`)
+- `frontend/src/pages/WalletPage.jsx` - New file (with `WalletPage.css`)
 - `frontend/src/pages/TokenMintPage.jsx` - New file
+
+## CSS Refactoring
+
+All page components now have dedicated CSS files with updated class naming:
+- Modal-related class names (`*-modal-*`) renamed to page-based (`*-page-*`)
+- Improves code clarity and maintainability
+- Prevents confusion between modal and page contexts
+
+## Code Quality Improvements
+
+- Fixed always-true condition in WalletPage status indicator
+- Removed unused variables (e.g., `lastTap` in CorrelatedMarketsPage)
+- Renamed ambiguous state variables (`showHero` → `showTokenDetails`)
+- Improved accessibility with explicit action buttons
 
 ## Future Considerations
 
