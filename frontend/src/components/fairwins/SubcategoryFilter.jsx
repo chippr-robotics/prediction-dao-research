@@ -83,6 +83,14 @@ function SubcategoryFilter({
   return (
     <div className="subcategory-filter">
       <div className="subcategory-filter-header">
+        <input
+          type="text"
+          className="subcategory-search-input"
+          placeholder="Search subcategories..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          aria-label={`Search ${categoryName} subcategories`}
+        />
         {hasActiveFilters && (
           <button
             className="clear-filters-btn"
