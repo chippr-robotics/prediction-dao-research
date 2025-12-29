@@ -20,6 +20,8 @@ import Dashboard from './Dashboard'
 import MarketsTable from './MarketsTable'
 import TokenMintTab from './TokenMintTab'
 import ClearPathTab from './ClearPathTab'
+import CorrelatedMarketsModal from './CorrelatedMarketsModal'
+import MarketModal from './MarketModal'
 import SearchBar from '../ui/SearchBar'
 import SubcategoryFilter from './SubcategoryFilter'
 import './FairWinsAppNew.css'
@@ -36,6 +38,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [searchQuery, setSearchQuery] = useState('') // Search query state
   const [viewMode, setViewMode] = useState(() => getViewPreference()) // View mode: grid or compact
   const [selectedSubcategories, setSelectedSubcategories] = useState([]) // Subcategory filter state
+  const [showHero, setShowHero] = useState(false) // Hero view state
+  const [showTokenBuilder, setShowTokenBuilder] = useState(false) // Token builder state
   const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
@@ -124,7 +128,27 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 Trade Details:
 - Market: ${tradeData.market.proposalTitle}
 - Type: ${tradeData.type}
-- Amount: ${tradeData.amount} ETC
+- Amount: ${tradeData.amount} ETC`)
+  }
+
+  const handleCloseHero = () => {
+    setShowHero(false)
+    setSelectedMarket(null)
+    // Return focus to the last focused element
+    if (lastFocusedElementRef.current) {
+      lastFocusedElementRef.current.focus()
+    }
+  }
+
+  const handleOpenIndividualMarket = (market) => {
+    setSelectedMarket(market)
+  }
+
+  const handleTokenClick = (token) => {
+    // Handle token click - could open a detail modal or navigate
+    console.log('Token clicked:', token)
+  }
+
   // Handle subcategory toggle
   const handleSubcategoryToggle = useCallback((subcategoryId) => {
     setSelectedSubcategories(prev => {
@@ -550,22 +574,10 @@ Trade Details:
                       selectedCategory={selectedCategory}
                     />
                   )}
-                  
-                  {/* Subcategory Filter Section */}
-                  <SubcategoryFilter
-                    subcategories={getSubcategoriesForCategory(selectedCategory)}
-                    selectedSubcategories={selectedSubcategories}
-                    onSubcategoryToggle={handleSubcategoryToggle}
-                    categoryName={categories.find(c => c.id === selectedCategory)?.name}
-                  />
-
-                  <MarketGrid 
-                    markets={getFilteredAndSortedMarkets()}
-                    onMarketClick={handleMarketClick}
-                    loading={loading}
-                  />
                 </div>
               )}
+            </>
+          )}
         </div>
       </main>
     </div>
