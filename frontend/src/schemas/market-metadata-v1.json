@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fairwins.app/schemas/market-metadata-v1.json",
+  "title": "Market Metadata Schema",
+  "description": "Schema for prediction market metadata following OpenSea standards",
+  "type": "object",
+  "required": ["name", "description", "image", "attributes"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Market title",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed market description with resolution criteria (markdown supported)",
+      "minLength": 10
+    },
+    "external_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Link to market page on FairWins"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Market image URI (IPFS preferred)",
+      "pattern": "^(ipfs://|https://)"
+    },
+    "animation_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional video or animation URI"
+    },
+    "background_color": {
+      "type": "string",
+      "pattern": "^[0-9A-Fa-f]{6}$",
+      "description": "6-character hex color (without #)"
+    },
+    "attributes": {
+      "type": "array",
+      "description": "Array of market attributes for filtering and sorting",
+      "items": {
+        "type": "object",
+        "required": ["trait_type", "value"],
+        "properties": {
+          "trait_type": {
+            "type": "string",
+            "description": "Attribute name"
+          },
+          "value": {
+            "type": ["string", "number"],
+            "description": "Attribute value"
+          },
+          "display_type": {
+            "enum": ["string", "number", "date", "boost_number", "boost_percentage"],
+            "description": "How to display the value"
+          },
+          "max_value": {
+            "type": "number",
+            "description": "Maximum value for progress bars"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "properties": {
+      "type": "object",
+      "description": "Additional market-specific properties",
+      "properties": {
+        "market_id": { "type": "number" },
+        "proposal_id": { "type": "number" },
+        "pass_token": { "type": "string" },
+        "fail_token": { "type": "string" },
+        "collateral_token": { "type": "string" },
+        "creator": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "correlation_group_id": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "oracle_sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "resolution_bond": { "type": "string" },
+        "challenge_period_hours": { "type": "number" }
+      }
+    }
+  }
+}
