@@ -153,12 +153,38 @@
   white-space: nowrap;
 }
 
-.page-close-btn-new,
+.page-close-btn-new {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: var(--text-primary);
+  font-size: 2rem;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.page-close-btn-new:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
 .page-share-btn-new {
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
   padding: 0.5rem;
@@ -170,7 +196,6 @@
   border-radius: 8px;
 }
 
-.page-close-btn-new:hover,
 .page-share-btn-new:hover {
   opacity: 0.7;
   background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
@@ -532,10 +557,16 @@
     font-size: 0.85rem;
   }
 
-  .page-share-btn-new,
-  .page-close-btn-new {
+  .page-share-btn-new {
     font-size: 1.25rem;
     padding: 0.25rem;
+  }
+
+  .page-close-btn-new {
+    font-size: 1.75rem;
+    padding: 0.25rem;
+    width: 36px;
+    height: 36px;
   }
 
   .nav-btn {
