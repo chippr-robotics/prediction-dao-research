@@ -1,0 +1,63 @@
+.view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  background: var(--bg-dark);
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toggle-button:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--text-primary);
+}
+
+.toggle-button:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.toggle-button.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.toggle-button.active:hover {
+  background: var(--primary-color);
+  opacity: 0.9;
+}
+
+.toggle-button svg {
+  flex-shrink: 0;
+}
+
+.toggle-label {
+  display: inline;
+}
+
+/* Responsive: hide labels on small screens */
+@media (max-width: 768px) {
+  .toggle-label {
+    display: none;
+  }
+
+  .toggle-button {
+    padding: 0.5rem;
+  }
+}
