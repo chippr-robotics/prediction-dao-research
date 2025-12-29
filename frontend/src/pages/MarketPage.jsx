@@ -86,8 +86,25 @@ This is a transparent market - all trades are publicly visible on the blockchain
   }, [])
 
   const handleClose = useCallback(() => {
-    navigate(-1)
-  }, [navigate])
+    // Check if there's browser history to go back to
+    if (window.history.state && window.history.state.idx > 0) {
+      // There's history, use browser back
+      navigate(-1)
+    } else {
+      // No history (direct URL entry or QR code scan)
+      // Navigate intelligently based on market data
+      if (market?.correlationGroupId) {
+        // Market has linked markets, go to correlated markets page
+        navigate(`/markets/correlated/${market.correlationGroupId}`)
+      } else if (market?.category) {
+        // Go to parent category page
+        navigate(`/app?category=${market.category}`)
+      } else {
+        // Fallback to main app page
+        navigate('/app')
+      }
+    }
+  }, [navigate, market])
 
   if (loading) {
     return (
