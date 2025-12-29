@@ -26,6 +26,7 @@ function CorrelatedMarketsPage() {
   const [favoriteMarkets, setFavoriteMarkets] = useState(new Set())
   const [timeHorizon, setTimeHorizon] = useState('7d')
   const [loading, setLoading] = useState(true)
+  const [openKebabMenu, setOpenKebabMenu] = useState(null)
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
   const timelineRef = useRef(null)
@@ -98,6 +99,11 @@ function CorrelatedMarketsPage() {
 
   const handleRowClick = (marketId) => {
     setSelectedOption(marketId)
+  }
+
+  const toggleKebabMenu = (marketId, e) => {
+    e.stopPropagation()
+    setOpenKebabMenu(openKebabMenu === marketId ? null : marketId)
   }
 
   const radarData = useMemo(() => {
@@ -506,6 +512,29 @@ function CorrelatedMarketsPage() {
                               >
                                 {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
                               </button>
+                              <div className="kebab-menu-container">
+                                <button
+                                  className="kebab-btn"
+                                  onClick={(e) => toggleKebabMenu(option.id, e)}
+                                  aria-label="More actions"
+                                >
+                                  ⋮
+                                </button>
+                                {openKebabMenu === option.id && (
+                                  <div className="kebab-menu">
+                                    <button onClick={(e) => handleViewDetails(option.id, e)}>
+                                      View Details
+                                    </button>
+                                    <button onClick={(e) => {
+                                      e.stopPropagation()
+                                      toggleMarketVisibility(option.id)
+                                      setOpenKebabMenu(null)
+                                    }}>
+                                      {visibleMarkets[option.id] ? 'Hide Chart' : 'Show Chart'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )

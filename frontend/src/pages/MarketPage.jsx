@@ -166,6 +166,14 @@ This is a transparent market - all trades are publicly visible on the blockchain
             />
             <h2 className="page-title-new">{market.proposalTitle}</h2>
             <button
+              className="page-share-btn-new"
+              onClick={() => setCurrentPanel(2)}
+              aria-label="Share market"
+              title="Share market"
+            >
+              🔗
+            </button>
+            <button
               className="nav-btn nav-btn-right"
               onClick={() => setCurrentPanel((prev) => (prev + 1) % 3)}
               aria-label="Next panel"
