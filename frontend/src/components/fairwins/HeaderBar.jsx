@@ -4,6 +4,7 @@ import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWallet } from '../../hooks'
 import { useNavigate } from 'react-router-dom'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
+import TokenMintButton from '../TokenMintButton'
 import './HeaderBar.css'
 
 function HeaderBar({ isConnected, onScanMarket }) {
@@ -44,6 +45,7 @@ function HeaderBar({ isConnected, onScanMarket }) {
         </div>
 
         <div className="header-right">
+          <TokenMintButton />
           <button
             className="user-management-btn"
             onClick={handleOpenUserManagement}
