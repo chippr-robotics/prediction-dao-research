@@ -91,8 +91,8 @@ This is a transparent market - all trades are publicly visible on the blockchain
 
   if (loading) {
     return (
-      <div className="market-modal-backdrop">
-        <div className="market-modal-container-new">
+      <div className="market-page-backdrop">
+        <div className="market-page-container-new">
           <div className="loading-spinner"></div>
           <p>Loading market...</p>
         </div>
