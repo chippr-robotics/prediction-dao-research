@@ -453,53 +453,9 @@ Trade Details:
                       selectedCategory={selectedCategory}
                     />
                   )}
-          {/* Primary Grid View - Always visible */}
-          {selectedCategory === 'dashboard' ? (
-            /* Dashboard View - Landing Page */
-            <Dashboard />
-          ) : selectedCategory === 'clearpath' ? (
-            /* ClearPath View - DAO Governance */
-            <ClearPathTab />
-          ) : selectedCategory === 'tokenmint' ? (
-            /* TokenMint View - Token Management */
-            <TokenMintTab 
-              tokens={tokens}
-              loading={tokenLoading}
-              onTokenClick={handleTokenClick}
-              onCreateToken={() => navigate('/tokenmint')}
-            />
-          ) : selectedCategory === 'all-table' ? (
-            /* All Markets Table View - Power User Screen */
-            <MarketsTable 
-              markets={markets}
-              onMarketClick={handleMarketClick}
-            />
-          ) : selectedCategory === 'swap' ? (
-            /* Swap Panel View */
-            <div className="swap-view-container">
-              <BalanceDisplay />
-              <SwapPanel />
-              <BalanceChart />
-            </div>
-          ) : selectedCategory === 'trending' ? (
-            /* Trending View - Show all markets sorted by activity */
-            <div className="grid-view-container">
-              <div className="grid-controls">
-                <div className="grid-header">
-                  <h2>🔥 Trending Markets</h2>
-                  <span className="market-count">
-                    ({trendingMarkets.length} markets)
-                  </span>
                 </div>
-              </div>
-              <MarketGrid 
-                markets={trendingMarkets}
-                onMarketClick={handleMarketClick}
-                loading={loading}
-              />
-            </div>
-          ) : (
-            /* Full Grid View for specific category */
+              ) : (
+                /* Full Grid View for specific category */
             <div className="grid-view-container">
               <div className="grid-controls">
                 <div className="grid-header">
