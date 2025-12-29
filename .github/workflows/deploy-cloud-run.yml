@@ -92,11 +92,11 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            --build-arg VITE_WALLETCONNECT_PROJECT_ID="c30d7d7a8d575fe3dcc72ed55e5b287e" \
-            --build-arg VITE_APP_URL="https://fairwins.app" \
-            --build-arg VITE_NETWORK_ID="63" \
-            --build-arg VITE_RPC_URL="https://rpc.mordor.etccooperative.org" \
-            --build-arg VITE_IPFS_GATEWAY="https://ipfs.fairwins.app" \
+            --build-arg VITE_WALLETCONNECT_PROJECT_ID="${{ secrets.VITE_WALLETCONNECT_PROJECT_ID || 'c30d7d7a8d575fe3dcc72ed55e5b287e' }}" \
+            --build-arg VITE_APP_URL="${{ vars.VITE_APP_URL || 'https://fairwins.app' }}" \
+            --build-arg VITE_NETWORK_ID="${{ vars.VITE_NETWORK_ID || '63' }}" \
+            --build-arg VITE_RPC_URL="${{ vars.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org' }}" \
+            --build-arg VITE_IPFS_GATEWAY="${{ vars.VITE_IPFS_GATEWAY || 'https://ipfs.fairwins.app' }}" \
             -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
             -t ${{ env.IMAGE_NAME }}:latest \
             ./frontend
