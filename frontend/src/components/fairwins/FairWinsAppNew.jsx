@@ -162,20 +162,6 @@ Trade Details:
     })
   }, [])
 
-  const handleMarketClick = (market) => {
-    // Navigate to market page based on whether it's correlated or individual
-    if (market.correlationGroupId) {
-      navigate(`/markets/correlated/${market.correlationGroupId}`)
-    } else {
-      navigate(`/market/${market.id}`)
-    }
-  }
-
-  const handleOpenIndividualMarket = (market) => {
-    // Navigate directly to individual market page
-    navigate(`/market/${market.id}`)
-  }
-
   const handleScanMarket = (marketId) => {
     // Navigate directly to market page
     const market = markets.find(m => m.id === parseInt(marketId))
@@ -233,11 +219,6 @@ Trade Details:
       setTokenLoading(false)
     }
   }, [account, isConnected])
-
-  const handleTokenClick = (token) => {
-    // Navigate to TokenMint page
-    navigate('/tokenmint')
-  }
 
   // Load user tokens when account changes
   useEffect(() => {
