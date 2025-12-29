@@ -1,28 +1,43 @@
+//core
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import './theme.css'
 import './App.css'
-import LandingPage from './components/LandingPage'
-import PlatformSelector from './components/PlatformSelector'
-import ClearPathApp from './components/ClearPathApp'
-import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
-import StateManagementDemo from './components/StateManagementDemo'
-import RoleManagementAdmin from './components/RoleManagementAdmin'
-import RolePurchaseScreen from './components/RolePurchaseScreen'
-import { ComponentExamples } from './components/ui'
+import { useEffect } from 'react'
+
+//system hooks & effects
 import { useWallet, useWalletConnection, useWalletNetwork } from './hooks'
 import { useAnnouncement, useNotification } from './hooks/useUI'
 import { useTheme } from './hooks/useTheme'
-import { useEffect } from 'react'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
-import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
-import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
+
+// Main flow
+import LandingPage from './components/LandingPage'
+import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
+
+// add-ons
+import RolePurchaseScreen from './components/RolePurchaseScreen'
+import TokenMintPage from './pages/TokenMintPage'
 import MarketPage from './pages/MarketPage'
 import CorrelatedMarketsPage from './pages/CorrelatedMarketsPage'
 import WalletPage from './pages/WalletPage'
-import TokenMintPage from './pages/TokenMintPage'
+
+
+//admin 
+import RoleManagementAdmin from './components/RoleManagementAdmin'
+
+// dev
+import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
+import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
+import StateManagementDemo from './components/StateManagementDemo'
+import { ComponentExamples } from './components/ui'
+
+//potential removal
+import PlatformSelector from './components/PlatformSelector'
+import ClearPathApp from './components/ClearPathApp'
+
 
 function AppContent() {
   const { isConnected } = useWallet()
