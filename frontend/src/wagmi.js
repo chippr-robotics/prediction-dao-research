@@ -67,8 +67,8 @@ const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperativ
 // Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
 const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'a01e2fef66f2abc4ca480cb13a6d8db7'
 
-// Warn if using fallback project ID
-if (!import.meta.env.VITE_WALLETCONNECT_PROJECT_ID) {
+// Warn if using fallback project ID (only in development)
+if (!import.meta.env.VITE_WALLETCONNECT_PROJECT_ID && import.meta.env.DEV) {
   console.warn(
     'WalletConnect: Using fallback project ID. For production, please set VITE_WALLETCONNECT_PROJECT_ID in your .env file. ' +
     'Get your project ID at https://cloud.walletconnect.com'
@@ -83,9 +83,10 @@ const resolveAppUrl = () => {
     return envUrl
   }
 
-  // In production, require VITE_APP_URL to be set to avoid metadata mismatches
-  if (import.meta.env.PROD) {
-    console.warn('VITE_APP_URL should be set in production for correct WalletConnect metadata. Falling back to window.location.origin.')
+  // Silently use window.location.origin in production if VITE_APP_URL is not set
+  // Only warn in development mode
+  if (import.meta.env.DEV) {
+    console.warn('VITE_APP_URL is not set. Using window.location.origin as fallback. Set VITE_APP_URL in .env for production deployments.')
   }
 
   // In development, fall back to the current origin when available
