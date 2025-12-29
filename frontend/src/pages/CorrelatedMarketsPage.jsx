@@ -26,6 +26,7 @@ function CorrelatedMarketsPage() {
   const [favoriteMarkets, setFavoriteMarkets] = useState(new Set())
   const [timeHorizon, setTimeHorizon] = useState('7d')
   const [loading, setLoading] = useState(true)
+  const [openKebabMenu, setOpenKebabMenu] = useState(null)
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
   const timelineRef = useRef(null)
@@ -98,6 +99,11 @@ function CorrelatedMarketsPage() {
 
   const handleRowClick = (marketId) => {
     setSelectedOption(marketId)
+  }
+
+  const toggleKebabMenu = (marketId, e) => {
+    e.stopPropagation()
+    setOpenKebabMenu(openKebabMenu === marketId ? null : marketId)
   }
 
   const radarData = useMemo(() => {
@@ -369,6 +375,13 @@ function CorrelatedMarketsPage() {
       .call(d3.axisLeft(yScale).ticks(5).tickSize(-chartWidth).tickFormat(''))
   }, [radarData, timeHorizon, selectedOption, correlatedMarkets])
 
+  // Sort markets: pinned first, then others
+  const sortedMarkets = useMemo(() => {
+    const pinned = correlatedMarkets.filter(m => pinnedMarkets.has(m.id))
+    const unpinned = correlatedMarkets.filter(m => !pinnedMarkets.has(m.id))
+    return [...pinned, ...unpinned]
+  }, [correlatedMarkets, pinnedMarkets])
+
   if (loading) {
     return (
       <div className="correlated-markets-page-backdrop">
@@ -399,13 +412,6 @@ function CorrelatedMarketsPage() {
     if (hours > 0) return `${hours}h ${minutes}m`
     return `${minutes}m`
   }
-
-  // Sort markets: pinned first, then others
-  const sortedMarkets = useMemo(() => {
-    const pinned = correlatedMarkets.filter(m => pinnedMarkets.has(m.id))
-    const unpinned = correlatedMarkets.filter(m => !pinnedMarkets.has(m.id))
-    return [...pinned, ...unpinned]
-  }, [correlatedMarkets, pinnedMarkets])
 
   return (
     <div className="correlated-markets-page-backdrop">
@@ -506,6 +512,29 @@ function CorrelatedMarketsPage() {
                               >
                                 {visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}
                               </button>
+                              <div className="kebab-menu-container">
+                                <button
+                                  className="kebab-btn"
+                                  onClick={(e) => toggleKebabMenu(option.id, e)}
+                                  aria-label="More actions"
+                                >
+                                  ⋮
+                                </button>
+                                {openKebabMenu === option.id && (
+                                  <div className="kebab-menu">
+                                    <button onClick={(e) => handleViewDetails(option.id, e)}>
+                                      View Details
+                                    </button>
+                                    <button onClick={(e) => {
+                                      e.stopPropagation()
+                                      toggleMarketVisibility(option.id)
+                                      setOpenKebabMenu(null)
+                                    }}>
+                                      {visibleMarkets[option.id] ? 'Hide Chart' : 'Show Chart'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         )

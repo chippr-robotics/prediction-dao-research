@@ -91,8 +91,8 @@ This is a transparent market - all trades are publicly visible on the blockchain
 
   if (loading) {
     return (
-      <div className="market-modal-backdrop">
-        <div className="market-modal-container-new">
+      <div className="market-page-backdrop">
+        <div className="market-page-container-new">
           <div className="loading-spinner"></div>
           <p>Loading market...</p>
         </div>
@@ -165,6 +165,14 @@ This is a transparent market - all trades are publicly visible on the blockchain
               className="page-logo-new"
             />
             <h2 className="page-title-new">{market.proposalTitle}</h2>
+            <button
+              className="page-share-btn-new"
+              onClick={() => setCurrentPanel(2)}
+              aria-label="Share market"
+              title="Share market"
+            >
+              🔗
+            </button>
             <button
               className="nav-btn nav-btn-right"
               onClick={() => setCurrentPanel((prev) => (prev + 1) % 3)}
