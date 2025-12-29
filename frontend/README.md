@@ -109,6 +109,9 @@ Create a `.env` file based on `.env.example`:
 VITE_NETWORK_ID=63                              # 63 for Mordor testnet, 61 for ETC mainnet, 1337 for Hardhat
 VITE_RPC_URL=https://rpc.mordor.etccooperative.org  # RPC endpoint
 
+# Application URL (required for production, optional for development)
+VITE_APP_URL=http://localhost:5173            # Used for WalletConnect metadata and external integrations
+
 # WalletConnect Configuration (optional, enables mobile wallet support)
 VITE_WALLETCONNECT_PROJECT_ID=your_project_id_here  # Get from https://cloud.walletconnect.com
 ```
@@ -116,8 +119,9 @@ VITE_WALLETCONNECT_PROJECT_ID=your_project_id_here  # Get from https://cloud.wal
 **WalletConnect Setup** (Optional):
 1. Visit [WalletConnect Cloud](https://cloud.walletconnect.com) and create a project
 2. Copy your Project ID to `VITE_WALLETCONNECT_PROJECT_ID`
-3. Whitelist your domain(s) in the WalletConnect dashboard
-4. Without this, only browser wallets (MetaMask) will be available
+3. Set `VITE_APP_URL` to your application URL (e.g., `http://localhost:5173` for dev, `https://your-domain.com` for production)
+4. Whitelist your domain(s) in the WalletConnect dashboard
+5. Without these settings, fallback values will be used and warning messages may appear
 
 See [WALLET_MANAGEMENT.md](./WALLET_MANAGEMENT.md) for complete wallet integration documentation.
 
