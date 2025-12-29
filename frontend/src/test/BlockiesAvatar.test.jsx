@@ -19,7 +19,8 @@ describe('BlockiesAvatar', () => {
     
     const fallback = screen.getByRole('img', { name: /default wallet avatar/i })
     expect(fallback).toBeInTheDocument()
-    expect(fallback).toHaveTextContent('👛')
+    expect(fallback).toHaveAttribute('src')
+    expect(fallback.src).toContain('wallet_no_text.svg')
   })
 
   it('applies custom size', () => {
