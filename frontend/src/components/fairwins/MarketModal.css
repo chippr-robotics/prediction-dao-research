@@ -18,7 +18,6 @@
 /* New Modal Container */
 .market-modal-container-new {
   width: 100%;
-  max-width: 420px;
   margin: auto 0;
   overflow: hidden;
 }

@@ -24,14 +24,12 @@ function BlockiesAvatar({ address, size = 40, className = '', alt }) {
   if (!blockiesDataUrl) {
     // Fallback to a default avatar if no address is provided
     return (
-      <div 
+      <img 
+        src={new URL('../../assets/wallet_no_text.svg', import.meta.url).href}
+        alt="Default wallet avatar"
         className={`blockies-avatar blockies-avatar-fallback ${className}`}
         style={{ width: size, height: size }}
-        role="img"
-        aria-label="Default wallet avatar"
-      >
-        👛
-      </div>
+      />
     )
   }
 
