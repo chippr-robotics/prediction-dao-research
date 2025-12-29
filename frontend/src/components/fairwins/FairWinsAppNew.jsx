@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
 import useFuseSearch from '../../hooks/useFuseSearch'
@@ -30,6 +30,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
   const { roles, ROLES } = useRoles()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
@@ -46,6 +47,14 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   // TokenMint state - kept for TokenMintTab display
   const [tokens, setTokens] = useState([])
   const [tokenLoading, setTokenLoading] = useState(false)
+
+  // Handle URL query parameters for category
+  useEffect(() => {
+    const categoryParam = searchParams.get('category')
+    if (categoryParam && categoryParam !== selectedCategory) {
+      setSelectedCategory(categoryParam)
+    }
+  }, [searchParams, selectedCategory])
 
   const loadMarkets = useCallback(async () => {
     try {

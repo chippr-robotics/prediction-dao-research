@@ -59,7 +59,22 @@ function CorrelatedMarketsPage() {
   }, [groupId, navigate])
 
   const handleClose = () => {
-    navigate(-1)
+    // Check if there's browser history to go back to
+    if (window.history.state && window.history.state.idx > 0) {
+      // There's history, use browser back
+      navigate(-1)
+    } else {
+      // No history (direct URL entry or QR code scan)
+      // Get the category from the first market in the group
+      const category = correlatedMarkets[0]?.category
+      if (category) {
+        // Navigate to the parent category page
+        navigate(`/app?category=${category}`)
+      } else {
+        // Fallback to main app page
+        navigate('/app')
+      }
+    }
   }
 
   const toggleMarketVisibility = (marketId) => {
