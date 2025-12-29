@@ -184,6 +184,35 @@
   text-transform: capitalize;
 }
 
+/* Tags column */
+.tags-cell {
+  max-width: 200px;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.tag-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--primary-color);
+  white-space: nowrap;
+}
+
+.no-tags {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Loading state */
 .compact-view-loading {
   display: flex;

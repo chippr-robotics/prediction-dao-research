@@ -2,10 +2,14 @@ import { useState, useMemo } from 'react'
 import { usePrice } from '../../contexts/PriceContext'
 import './CompactMarketView.css'
 
-function CompactMarketView({ markets = [], onMarketClick, loading = false }) {
+function CompactMarketView({ markets = [], onMarketClick, loading = false, selectedCategory = null }) {
   const { formatPrice } = usePrice()
   const [sortField, setSortField] = useState('tradingEndTime')
   const [sortDirection, setSortDirection] = useState('asc')
+  
+  // Determine if we're in a single category view (not dashboard, trending, or all-table)
+  const isSingleCategoryView = selectedCategory && 
+    !['dashboard', 'trending', 'all-table'].includes(selectedCategory)
 
   const calculateTimeRemaining = (endTime) => {
     const now = new Date()
@@ -192,19 +196,25 @@ function CompactMarketView({ markets = [], onMarketClick, loading = false }) {
                 </span>
               )}
             </th>
-            <th 
-              onClick={() => handleSort('category')}
-              className={`sortable ${sortField === 'category' ? 'sorted' : ''}`}
-              role="columnheader"
-              aria-sort={sortField === 'category' ? sortDirection : 'none'}
-            >
-              Category
-              {sortField === 'category' && (
-                <span className="sort-indicator" aria-hidden="true">
-                  {sortDirection === 'asc' ? '↑' : '↓'}
-                </span>
-              )}
-            </th>
+            {isSingleCategoryView ? (
+              <th role="columnheader">
+                Tags
+              </th>
+            ) : (
+              <th 
+                onClick={() => handleSort('category')}
+                className={`sortable ${sortField === 'category' ? 'sorted' : ''}`}
+                role="columnheader"
+                aria-sort={sortField === 'category' ? sortDirection : 'none'}
+              >
+                Category
+                {sortField === 'category' && (
+                  <span className="sort-indicator" aria-hidden="true">
+                    {sortDirection === 'asc' ? '↑' : '↓'}
+                  </span>
+                )}
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -254,12 +264,28 @@ function CompactMarketView({ markets = [], onMarketClick, loading = false }) {
               <td className="liquidity-cell">
                 {formatPrice(market.totalLiquidity, { compact: true })}
               </td>
-              <td className="category-cell">
-                <span className="category-badge">
-                  <span className="category-icon" aria-hidden="true">{getCategoryIcon(market.category)}</span>
-                  <span className="category-name">{market.category}</span>
-                </span>
-              </td>
+              {isSingleCategoryView ? (
+                <td className="tags-cell">
+                  {market.tags && market.tags.length > 0 ? (
+                    <div className="tags-container">
+                      {market.tags.map((tag, index) => (
+                        <span key={index} className="tag-badge">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="no-tags">—</span>
+                  )}
+                </td>
+              ) : (
+                <td className="category-cell">
+                  <span className="category-badge">
+                    <span className="category-icon" aria-hidden="true">{getCategoryIcon(market.category)}</span>
+                    <span className="category-name">{market.category}</span>
+                  </span>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

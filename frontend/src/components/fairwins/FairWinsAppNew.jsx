@@ -497,6 +497,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                       markets={trendingMarkets}
                       onMarketClick={handleMarketClick}
                       loading={loading}
+                      selectedCategory={selectedCategory}
                     />
                   )}
                 </div>
@@ -554,6 +555,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
                       markets={getFilteredAndSortedMarkets()}
                       onMarketClick={handleMarketClick}
                       loading={loading}
+                      selectedCategory={selectedCategory}
                     />
                   )}
                 </div>
