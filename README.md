@@ -8,7 +8,6 @@
 
 - **ClearPath** (Add-on): Futarchy-based DAO governance feature for institutional decision-making
 - **TokenMint** (Add-on): Enterprise token management
-- **Spindletop** (Add-on): Liquidity pool management
   
 The platform integrates privacy-preserving mechanisms from Nightmarket (zero-knowledge position encryption), anti-collusion infrastructure from MACI (encrypted key-change voting), and Gnosis Conditional Token Framework standards for market mechanics.
 
@@ -96,20 +95,6 @@ TokenMint is an optional add-on feature for creating and managing custom tokens:
 - Reward token creation
 - Governance token management
 - Community token distribution
-
-### 🌊 Spindletop — Liquidity Pool Management (Add-on Feature)
-
-Spindletop is an optional add-on feature for managing liquidity pools:
-- **Automated market making** for token pairs
-- **Liquidity provisioning** with dynamic fees
-- **Pool analytics** and performance tracking
-- **Integration** with FairWins prediction markets
-
-**Use Cases:**
-- Market liquidity provision
-- Token pair trading
-- Yield generation
-- Decentralized exchange functionality
 
 ## Shared Infrastructure
 
