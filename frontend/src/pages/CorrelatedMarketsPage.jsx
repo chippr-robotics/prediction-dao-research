@@ -369,6 +369,13 @@ function CorrelatedMarketsPage() {
       .call(d3.axisLeft(yScale).ticks(5).tickSize(-chartWidth).tickFormat(''))
   }, [radarData, timeHorizon, selectedOption, correlatedMarkets])
 
+  // Sort markets: pinned first, then others
+  const sortedMarkets = useMemo(() => {
+    const pinned = correlatedMarkets.filter(m => pinnedMarkets.has(m.id))
+    const unpinned = correlatedMarkets.filter(m => !pinnedMarkets.has(m.id))
+    return [...pinned, ...unpinned]
+  }, [correlatedMarkets, pinnedMarkets])
+
   if (loading) {
     return (
       <div className="correlated-markets-page-backdrop">
@@ -399,13 +406,6 @@ function CorrelatedMarketsPage() {
     if (hours > 0) return `${hours}h ${minutes}m`
     return `${minutes}m`
   }
-
-  // Sort markets: pinned first, then others
-  const sortedMarkets = useMemo(() => {
-    const pinned = correlatedMarkets.filter(m => pinnedMarkets.has(m.id))
-    const unpinned = correlatedMarkets.filter(m => !pinnedMarkets.has(m.id))
-    return [...pinned, ...unpinned]
-  }, [correlatedMarkets, pinnedMarkets])
 
   return (
     <div className="correlated-markets-page-backdrop">
