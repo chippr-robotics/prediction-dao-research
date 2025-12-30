@@ -16,9 +16,13 @@ describe("FutarchyGovernor", function () {
   beforeEach(async function () {
     [owner, addr1] = await ethers.getSigners();
     
-    // Deploy mock governance token
+    // Deploy mock tokens
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     governanceToken = await MockERC20.deploy("Governance Token", "GOV", ethers.parseEther("1000000"));
+    
+    // Deploy mock collateral token for markets (required for CTF1155)
+    const collateralToken = await MockERC20.deploy("Market Collateral", "MCOL", ethers.parseEther("10000000"));
+    await collateralToken.waitForDeployment();
     
     // Deploy dependencies
     const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
@@ -70,6 +74,9 @@ describe("FutarchyGovernor", function () {
       await ragequitModule.getAddress(),
       addr1.address
     );
+    
+    // Set collateral token for markets (required for CTF1155)
+    await futarchyGovernor.setMarketCollateralToken(await collateralToken.getAddress());
 
     // Transfer ownership of marketFactory to futarchyGovernor so it can deploy markets
     await marketFactory.transferOwnership(await futarchyGovernor.getAddress());

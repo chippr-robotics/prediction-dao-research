@@ -22,6 +22,11 @@ describe("FriendGroupMarketFactory", function () {
     const ctf1155 = await CTF1155.deploy();
     await ctf1155.waitForDeployment();
     
+    // Deploy mock collateral token for markets (required for CTF1155)
+    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const collateralToken = await MockERC20.deploy("Market Collateral", "MCOL", ethers.parseEther("10000000"));
+    await collateralToken.waitForDeployment();
+    
     // Deploy ConditionalMarketFactory
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
@@ -52,6 +57,9 @@ describe("FriendGroupMarketFactory", function () {
       await tieredRoleManager.getAddress(),
       await paymentManager.getAddress()
     );
+    
+    // Set collateral token for markets (required for CTF1155)
+    await friendGroupFactory.setDefaultCollateralToken(await collateralToken.getAddress());
     
     // Purchase FRIEND_MARKET_ROLE with ENTERPRISE duration (never expires) to avoid expiration issues
     const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();
