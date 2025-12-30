@@ -150,7 +150,16 @@ Trade Details:
   }
 
   const handleOpenIndividualMarket = (market) => {
-    setSelectedMarket(market)
+    // When opening an individual market from a correlated group,
+    // we want to show the MarketModal instead of CorrelatedMarketsModal
+    // To do this, we create a copy of the market without the correlationGroupId
+    const individualMarket = { ...market, correlationGroupId: null }
+    setShowHero(false) // Close current modal
+    // Use setTimeout to ensure state updates before reopening
+    setTimeout(() => {
+      setSelectedMarket(individualMarket)
+      setShowHero(true)
+    }, 0)
   }
 
   const handleTokenClick = (token) => {
