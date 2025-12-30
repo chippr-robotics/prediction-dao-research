@@ -110,13 +110,13 @@ function CategoryDonutChart({ markets, categories }) {
         .attr('stroke', 'var(--bg-primary)')
         .attr('stroke-width', 2)
         .style('cursor', 'pointer')
-        .on('mouseenter', function(event, d) {
+        .on('mouseenter', function() {
           d3.select(this)
             .transition()
             .duration(200)
             .attr('d', hoverArc)
         })
-        .on('mouseleave', function(event, d) {
+        .on('mouseleave', function() {
           d3.select(this)
             .transition()
             .duration(200)
