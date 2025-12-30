@@ -232,16 +232,19 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
         uint256 totalFees = 0;
 
         for (uint256 i = 0; i < orders.length; i++) {
-            try this.fillOrderInternal(orders[i], signatures[i], takerAmounts[i]) 
-                returns (uint256, uint256, uint256 fee) 
-            {
+            // Attempt to fill each order independently
+            (bool success, uint256 fee, string memory errorReason) = _fillOrderSafe(
+                orders[i],
+                signatures[i],
+                takerAmounts[i]
+            );
+            
+            if (success) {
                 results[i] = FillResult(true, takerAmounts[i], "");
                 successCount++;
                 totalFees += fee;
-            } catch Error(string memory reason) {
-                results[i] = FillResult(false, 0, reason);
-            } catch {
-                results[i] = FillResult(false, 0, "Unknown error");
+            } else {
+                results[i] = FillResult(false, 0, errorReason);
             }
         }
 
@@ -249,31 +252,40 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Internal function for batch fills (called via try/catch)
+     * @notice Internal safe fill function that catches errors
      * @param order Order to fill
      * @param signature EIP-712 signature
      * @param takerAmount Amount to fill
-     * @return makerAmount Amount from maker
-     * @return actualTakerAmount Amount from taker
-     * @return fee Fee amount
+     * @return success Whether fill succeeded
+     * @return fee Fee amount collected
+     * @return errorReason Error message if failed
      */
-    function fillOrderInternal(
+    function _fillOrderSafe(
         Order calldata order,
         bytes calldata signature,
         uint256 takerAmount
-    ) external returns (uint256 makerAmount, uint256 actualTakerAmount, uint256 fee) {
-        require(msg.sender == address(this), "Internal only");
-        
+    ) internal returns (bool success, uint256 fee, string memory errorReason) {
         // Verify order
         bytes32 orderHash = _hashOrder(order);
-        require(_verifySignature(orderHash, order.maker, signature), "Invalid signature");
-        require(block.timestamp <= order.expiration, "Order expired");
-        require(!cancelledNonces[order.maker][order.nonce], "Order cancelled");
-        require(takerAmount > 0, "Invalid taker amount");
+        
+        if (!_verifySignature(orderHash, order.maker, signature)) {
+            return (false, 0, "Invalid signature");
+        }
+        if (block.timestamp > order.expiration) {
+            return (false, 0, "Order expired");
+        }
+        if (cancelledNonces[order.maker][order.nonce]) {
+            return (false, 0, "Order cancelled");
+        }
+        if (takerAmount == 0) {
+            return (false, 0, "Invalid taker amount");
+        }
 
         // Calculate fill amounts
         uint256 remainingMaker = order.makerAmount - filled[orderHash];
-        require(remainingMaker > 0, "Order fully filled");
+        if (remainingMaker == 0) {
+            return (false, 0, "Order fully filled");
+        }
 
         uint256 takerFillAmount = takerAmount;
         if (takerFillAmount > order.takerAmount - (filled[orderHash] * order.takerAmount / order.makerAmount)) {
@@ -281,7 +293,9 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
         }
 
         uint256 makerFillAmount = (takerFillAmount * order.makerAmount) / order.takerAmount;
-        require(makerFillAmount <= remainingMaker, "Exceeds remaining");
+        if (makerFillAmount > remainingMaker) {
+            return (false, 0, "Exceeds remaining");
+        }
 
         // Calculate fee
         fee = (takerFillAmount * feeBps) / 10000;
@@ -290,11 +304,11 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
         // Update filled amount
         filled[orderHash] += makerFillAmount;
 
-        // Execute transfers
+        // Execute transfers - using msg.sender as taker
         if (order.isMakerERC1155) {
             IERC1155(order.makerAsset).safeTransferFrom(
                 order.maker,
-                tx.origin,
+                msg.sender,
                 order.makerTokenId,
                 makerFillAmount,
                 ""
@@ -302,14 +316,14 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
         } else {
             IERC20(order.makerAsset).safeTransferFrom(
                 order.maker,
-                tx.origin,
+                msg.sender,
                 makerFillAmount
             );
         }
 
         if (order.isTakerERC1155) {
             IERC1155(order.takerAsset).safeTransferFrom(
-                tx.origin,
+                msg.sender,
                 order.maker,
                 order.takerTokenId,
                 takerAmountAfterFee,
@@ -317,7 +331,7 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
             );
             if (fee > 0) {
                 IERC1155(order.takerAsset).safeTransferFrom(
-                    tx.origin,
+                    msg.sender,
                     feeRecipient,
                     order.takerTokenId,
                     fee,
@@ -326,13 +340,13 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
             }
         } else {
             IERC20(order.takerAsset).safeTransferFrom(
-                tx.origin,
+                msg.sender,
                 order.maker,
                 takerAmountAfterFee
             );
             if (fee > 0) {
                 IERC20(order.takerAsset).safeTransferFrom(
-                    tx.origin,
+                    msg.sender,
                     feeRecipient,
                     fee
                 );
@@ -342,7 +356,7 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
         emit OrderFilled(
             orderHash,
             order.maker,
-            tx.origin,
+            msg.sender,
             order.makerAsset,
             order.takerAsset,
             order.makerAmount,
@@ -352,7 +366,7 @@ contract PredictionMarketExchange is EIP712, Ownable, ReentrancyGuard {
             fee
         );
 
-        return (makerFillAmount, takerFillAmount, fee);
+        return (true, fee, "");
     }
 
     /**
