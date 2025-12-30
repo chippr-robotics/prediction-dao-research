@@ -28,6 +28,26 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
   const timelineRef = useRef(null)
   const modalRef = useRef(null)
 
+  // useMemo hooks must be called unconditionally before any early returns
+  const selectedMarket = useMemo(() => {
+    if (!correlatedMarkets || !market) return null
+    return correlatedMarkets.find(m => m.id === selectedOption) || market
+  }, [selectedOption, correlatedMarkets, market])
+
+  // Prepare radar chart data (only visible markets)
+  const radarData = useMemo(() => {
+    if (!correlatedMarkets || correlatedMarkets.length === 0) return []
+    
+    return correlatedMarkets
+      .filter(m => m && m.id && visibleMarkets[m.id])
+      .map(m => ({
+        id: m.id,
+        label: parseProposalTitle(m.proposalTitle || ''),
+        probability: parseFloat(m.passTokenPrice || 0) * 100,
+        totalLiquidity: parseFloat(m.totalLiquidity || 0)
+      }))
+  }, [correlatedMarkets, visibleMarkets])
+
   // Update selected option when market changes
   useEffect(() => {
     if (market) {
@@ -71,68 +91,6 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
       }
     }
   }, [isOpen])
-
-  if (!isOpen || !market) return null
-  
-  // Handle case where correlatedMarkets is not provided or empty
-  if (!correlatedMarkets || correlatedMarkets.length === 0) {
-    return null
-  }
-
-  const selectedMarket = useMemo(() => {
-    return correlatedMarkets.find(m => m.id === selectedOption) || market
-  }, [selectedOption, correlatedMarkets, market])
-
-  // Toggle market visibility
-  const toggleMarketVisibility = (marketId) => {
-    setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
-  }
-
-  // Handle double tap to open market modal
-  const handleMarketCardClick = (marketId) => {
-    const now = Date.now()
-    const DOUBLE_TAP_DELAY = 300 // milliseconds
-    
-    if (lastTap.marketId === marketId && (now - lastTap.timestamp) < DOUBLE_TAP_DELAY) {
-      // Double tap detected - open market modal
-      const selectedMarket = correlatedMarkets.find(m => m.id === marketId)
-      if (selectedMarket && onOpenMarket) {
-        onOpenMarket(selectedMarket)
-      }
-      setLastTap({ marketId: null, timestamp: 0 })
-    } else {
-      // Single tap - select the option
-      setSelectedOption(marketId)
-      setLastTap({ marketId, timestamp: now })
-    }
-  }
-
-  // Prepare radar chart data (only visible markets)
-  const radarData = useMemo(() => {
-    if (!correlatedMarkets || correlatedMarkets.length === 0) return []
-    
-    return correlatedMarkets
-      .filter(m => m && m.id && visibleMarkets[m.id])
-      .map(m => ({
-        id: m.id,
-        label: parseProposalTitle(m.proposalTitle || ''),
-        probability: parseFloat(m.passTokenPrice || 0) * 100,
-        totalLiquidity: parseFloat(m.totalLiquidity || 0)
-      }))
-  }, [correlatedMarkets, visibleMarkets])
-
-  // Generate mock historical data for timeline
-  const generateTimelineData = (market, horizon) => {
-    const now = Date.now()
-    const dataPoints = TIME_HORIZONS[horizon]?.dataPoints || 7
-    const dayMs = 24 * 60 * 60 * 1000
-    const baseProb = parseFloat(market.passTokenPrice) * 100
-    
-    return Array.from({ length: dataPoints }, (_, i) => ({
-      date: new Date(now - (dataPoints - i - 1) * dayMs),
-      probability: baseProb + (Math.random() - 0.5) * 15 // Mock variance
-    }))
-  }
 
   // Create radar chart using D3.js
   useEffect(() => {
@@ -429,6 +387,52 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
       )
 
   }, [radarData, timeHorizon, selectedOption, correlatedMarkets])
+
+  // All hooks must be called before any conditional returns
+  // Now we can safely return null if conditions aren't met
+  if (!isOpen || !market) return null
+  
+  // Handle case where correlatedMarkets is not provided or empty
+  if (!correlatedMarkets || correlatedMarkets.length === 0) {
+    return null
+  }
+
+  // Toggle market visibility
+  const toggleMarketVisibility = (marketId) => {
+    setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
+  }
+
+  // Handle double tap to open market modal
+  const handleMarketCardClick = (marketId) => {
+    const now = Date.now()
+    const DOUBLE_TAP_DELAY = 300 // milliseconds
+    
+    if (lastTap.marketId === marketId && (now - lastTap.timestamp) < DOUBLE_TAP_DELAY) {
+      // Double tap detected - open market modal
+      const selectedMarket = correlatedMarkets.find(m => m.id === marketId)
+      if (selectedMarket && onOpenMarket) {
+        onOpenMarket(selectedMarket)
+      }
+      setLastTap({ marketId: null, timestamp: 0 })
+    } else {
+      // Single tap - select the option
+      setSelectedOption(marketId)
+      setLastTap({ marketId, timestamp: now })
+    }
+  }
+
+  // Generate mock historical data for timeline
+  const generateTimelineData = (market, horizon) => {
+    const now = Date.now()
+    const dataPoints = TIME_HORIZONS[horizon]?.dataPoints || 7
+    const dayMs = 24 * 60 * 60 * 1000
+    const baseProb = parseFloat(market.passTokenPrice) * 100
+    
+    return Array.from({ length: dataPoints }, (_, i) => ({
+      date: new Date(now - (dataPoints - i - 1) * dayMs),
+      probability: baseProb + (Math.random() - 0.5) * 15 // Mock variance
+    }))
+  }
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
