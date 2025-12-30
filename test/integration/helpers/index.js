@@ -60,16 +60,19 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
 /**
  * Execute trades from multiple traders on a market
  * @param {Object} marketFactory - Market factory contract
+ * @param {Object} collateralToken - Collateral ERC20 token contract
  * @param {Array} trades - Array of trade objects {signer, buyPass, amount}
  * @param {BigInt} marketId - Market identifier
  */
-async function executeTrades(marketFactory, trades, marketId) {
+async function executeTrades(marketFactory, collateralToken, trades, marketId) {
   for (const trade of trades) {
+    // Approve collateral token transfer
+    await collateralToken.connect(trade.signer).approve(await marketFactory.getAddress(), trade.amount);
+    
+    // Execute buy with ERC20 collateral (no ETH value)
     await marketFactory
       .connect(trade.signer)
-      .buyTokens(marketId, trade.buyPass, trade.amount, {
-        value: trade.amount
-      });
+      .buyTokens(marketId, trade.buyPass, trade.amount);
   }
 }
 

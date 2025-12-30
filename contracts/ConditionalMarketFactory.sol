@@ -578,18 +578,46 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 IERC20(outcomeToken).safeTransfer(msg.sender, tokenAmount);
             }
         } else {
-            // Fallback: Simplified LMSR implementation for testing
-            // Requires ETH collateral
-            require(msg.value == amount, "Incorrect ETH amount");
+            // Fallback: Use CTF1155 to split collateral into position tokens
+            // With CTF1155, all markets require ERC20 collateral
+            require(market.collateralToken != address(0), "CTF requires ERC20 collateral");
+            require(msg.value == 0, "Send collateral tokens, not ETH");
             
-            tokenAmount = (amount * 1e18) / 1e15; // Simplified: 1000 tokens per ETH
+            // Transfer collateral from buyer to this contract
+            IERC20(market.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
             
-            // Update market liquidity BEFORE external call (CEI pattern)
+            // Approve CTF1155 to spend collateral
+            IERC20(market.collateralToken).approve(address(ctf1155), amount);
+            
+            // Split collateral into both position tokens (1:1 ratio)
+            uint256[] memory partition = new uint256[](1);
+            partition[0] = buyPass ? market.passPositionId : market.failPositionId;
+            
+            ctf1155.splitPosition(
+                IERC20(market.collateralToken),
+                bytes32(0), // parentCollectionId (root level)
+                market.conditionId,
+                partition,
+                amount
+            );
+            
+            // Calculate output tokens (1:1 with collateral for split)
+            tokenAmount = amount;
+            
+            // Transfer the requested position tokens to buyer
+            ctf1155.safeTransferFrom(
+                address(this),
+                msg.sender,
+                buyPass ? market.passPositionId : market.failPositionId,
+                tokenAmount,
+                ""
+            );
+            
+            // Store the other position tokens in this contract for later merging/redemption
+            // (They stay in this contract's balance)
+            
+            // Update market liquidity
             market.totalLiquidity += amount;
-            
-            // Mint tokens to buyer
-            ConditionalToken token = ConditionalToken(buyPass ? market.passToken : market.failToken);
-            token.mint(msg.sender, tokenAmount);
         }
         
         emit TokensPurchased(marketId, msg.sender, buyPass, amount, tokenAmount);
@@ -663,20 +691,49 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             // Transfer collateral to seller
             IERC20(market.collateralToken).safeTransfer(msg.sender, collateralAmount);
         } else {
-            // Fallback: Simplified LMSR implementation for testing
-            collateralAmount = (tokenAmount * 1e15) / 1e18; // Inverse of buy pricing
+            // Fallback: Use CTF1155 to merge position tokens back to collateral
+            // With CTF1155, all markets require ERC20 collateral
+            require(market.collateralToken != address(0), "CTF requires ERC20 collateral");
+            
+            // For selling, user must have BOTH position tokens to merge back to collateral
+            // This is a simplified version - in production, you'd implement a proper AMM
+            // For now, we require the contract to hold the opposite position
+            uint256 oppositePositionId = sellPass ? market.failPositionId : market.passPositionId;
+            uint256 oppositeBalance = ctf1155.balanceOf(address(this), oppositePositionId);
+            
+            require(oppositeBalance >= tokenAmount, "Insufficient opposite position for merge");
+            
+            // Transfer the position tokens being sold from user to this contract
+            ctf1155.safeTransferFrom(
+                msg.sender,
+                address(this),
+                sellPass ? market.passPositionId : market.failPositionId,
+                tokenAmount,
+                ""
+            );
+            
+            // Merge both positions back to collateral
+            uint256[] memory partition = new uint256[](2);
+            partition[0] = market.passPositionId;
+            partition[1] = market.failPositionId;
+            
+            ctf1155.mergePositions(
+                IERC20(market.collateralToken),
+                bytes32(0), // parentCollectionId (root level)
+                market.conditionId,
+                partition,
+                tokenAmount
+            );
+            
+            // Calculate collateral amount (1:1 for merge)
+            collateralAmount = tokenAmount;
+            
+            // Transfer collateral back to seller
+            IERC20(market.collateralToken).safeTransfer(msg.sender, collateralAmount);
+            
+            // Update market liquidity
             require(collateralAmount <= market.totalLiquidity, "Insufficient liquidity");
-            
-            // Update market liquidity BEFORE external calls (CEI pattern)
             market.totalLiquidity -= collateralAmount;
-            
-            // Burn tokens from seller
-            ConditionalToken token = ConditionalToken(sellPass ? market.passToken : market.failToken);
-            token.burn(msg.sender, tokenAmount);
-            
-            // Transfer collateral to seller (msg.sender is not arbitrary - it's the caller)
-            (bool success, ) = payable(msg.sender).call{value: collateralAmount}("");
-            require(success, "Transfer failed");
         }
         
         emit TokensSold(marketId, msg.sender, sellPass, tokenAmount, collateralAmount);

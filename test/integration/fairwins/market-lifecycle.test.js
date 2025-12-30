@@ -32,6 +32,16 @@ async function deployFairWinsFixture() {
   const ctf1155 = await CTF1155.deploy();
   await ctf1155.waitForDeployment();
   
+  // Deploy mock collateral token for markets (required for CTF1155)
+  const MockERC20 = await ethers.getContractFactory("MockERC20");
+  const collateralToken = await MockERC20.deploy("Market Collateral", "MCOL", ethers.parseEther("10000000"));
+  await collateralToken.waitForDeployment();
+  
+  // Distribute collateral tokens to test accounts
+  await collateralToken.transfer(reporter.address, ethers.parseEther("50000"));
+  await collateralToken.transfer(trader1.address, ethers.parseEther("50000"));
+  await collateralToken.transfer(trader2.address, ethers.parseEther("50000"));
+  
   const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
   const marketFactory = await ConditionalMarketFactory.deploy();
   await marketFactory.waitForDeployment();
@@ -47,7 +57,7 @@ async function deployFairWinsFixture() {
   await oracleResolver.connect(owner).addDesignatedReporter(reporter.address);
 
   return {
-    contracts: { marketFactory, oracleResolver },
+    contracts: { marketFactory, oracleResolver, collateralToken, ctf1155 },
     accounts: { owner, reporter, trader1, trader2 }
   };
 }
@@ -79,7 +89,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
     it("Should complete full market creation, resolution, and settlement flow", async function () {
       // Setup: Load the FairWins-specific fixture
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver } = contracts;
+      const { marketFactory, oracleResolver, collateralToken } = contracts;
       const { owner, reporter } = accounts;
 
       console.log("\n=== FairWins Market Lifecycle Test ===\n");
@@ -97,7 +107,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
       // proposalId = 0 indicates this is a FairWins market, not a governance proposal
       const createTx = await marketFactory.connect(owner).deployMarketPair(
         0, // proposalId = 0 for standalone FairWins markets
-        ethers.ZeroAddress, // collateral token (ETH)
+        await collateralToken.getAddress(), // ERC20 collateral token
         initialLiquidity,
         1000, // liquidity parameter for LMSR
         tradingPeriod,
@@ -224,7 +234,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
     it("Should handle NO outcome correctly", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver } = contracts;
+      const { marketFactory, oracleResolver, collateralToken } = contracts;
       const { owner, reporter } = accounts;
 
       console.log("\n=== FairWins Market: NO Outcome Test ===\n");
@@ -234,7 +244,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
       
       const createTx = await marketFactory.connect(owner).deployMarketPair(
         1, // different proposal ID to avoid collision
-        ethers.ZeroAddress,
+        await collateralToken.getAddress(),
         ethers.parseEther("50"),
         1000,
         tradingPeriod,
@@ -312,7 +322,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
       const tx = await marketFactory.connect(owner).deployMarketPair(
         2, // proposalId
-        ethers.ZeroAddress,
+        await collateralToken.getAddress(),
         initialLiquidity,
         liquidityParam,
         tradingPeriod,
@@ -347,7 +357,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
       await expect(
         marketFactory.connect(owner).deployMarketPair(
           3,
-          ethers.ZeroAddress,
+          await collateralToken.getAddress(),
           ethers.parseEther("50"),
           1000,
           tooShort,
@@ -360,13 +370,13 @@ describe("Integration: FairWins Market Lifecycle", function () {
   describe("Resolution Phase", function () {
     it("Should only allow resolution after trading ends", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver } = contracts;
+      const { marketFactory, oracleResolver, collateralToken } = contracts;
       const { owner, reporter } = accounts;
 
       const tradingPeriod = 7 * 24 * 3600;
       const createTx = await marketFactory.connect(owner).deployMarketPair(
         4,
-        ethers.ZeroAddress,
+        await collateralToken.getAddress(),
         ethers.parseEther("50"),
         1000,
         tradingPeriod,
@@ -422,12 +432,12 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
     it("Should update market status to Resolved after resolution", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver } = contracts;
+      const { marketFactory, oracleResolver, collateralToken } = contracts;
       const { owner, reporter } = accounts;
 
       const createTx = await marketFactory.connect(owner).deployMarketPair(
         5,
-        ethers.ZeroAddress,
+        await collateralToken.getAddress(),
         ethers.parseEther("50"),
         1000,
         7 * 24 * 3600,
@@ -476,12 +486,12 @@ describe("Integration: FairWins Market Lifecycle", function () {
   describe("Market Status Tracking", function () {
     it("Should properly track market status transitions", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver } = contracts;
+      const { marketFactory, oracleResolver, collateralToken } = contracts;
       const { owner, reporter } = accounts;
 
       const createTx = await marketFactory.connect(owner).deployMarketPair(
         6,
-        ethers.ZeroAddress,
+        await collateralToken.getAddress(),
         ethers.parseEther("100"),
         1000,
         7 * 24 * 3600,
