@@ -48,11 +48,19 @@ async function deploySystemFixture() {
   await proposalRegistry.waitForDeployment();
   await proposalRegistry.initialize(owner.address);
 
+  // Deploy CTF1155 (required for ConditionalMarketFactory)
+  const CTF1155 = await ethers.getContractFactory("CTF1155");
+  const ctf1155 = await CTF1155.deploy();
+  await ctf1155.waitForDeployment();
+
   // Deploy ConditionalMarketFactory
   const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
   const marketFactory = await ConditionalMarketFactory.deploy();
   await marketFactory.waitForDeployment();
   await marketFactory.initialize(owner.address);
+  
+  // Set CTF1155 in market factory (required for market creation)
+  await marketFactory.setCTF1155(await ctf1155.getAddress());
 
   // Deploy PrivacyCoordinator
   const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
@@ -139,6 +147,7 @@ async function deploySystemFixture() {
       welfareRegistry,
       proposalRegistry,
       marketFactory,
+      ctf1155,
       privacyCoordinator,
       oracleResolver,
       ragequitModule,

@@ -37,10 +37,18 @@ describe("Integration: ETCSwap V3 Trading", function () {
             await positionManager.getAddress()
         );
 
+        // Deploy CTF1155 (required for ConditionalMarketFactory)
+        const CTF1155 = await ethers.getContractFactory("CTF1155");
+        const ctf1155 = await CTF1155.deploy();
+        await ctf1155.waitForDeployment();
+
         // Deploy ConditionalMarketFactory
         const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
         const marketFactory = await ConditionalMarketFactory.deploy();
         await marketFactory.initialize(owner.address);
+        
+        // Set CTF1155 in market factory (required for market creation)
+        await marketFactory.setCTF1155(await ctf1155.getAddress());
 
         // Deploy mock collateral token (USDC)
         const MockERC20 = await ethers.getContractFactory("MockERC20");

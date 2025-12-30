@@ -27,10 +27,18 @@ async function deployFairWinsFixture() {
   }
 
   // Deploy only what's needed for standalone markets
+  // Deploy CTF1155 (required for ConditionalMarketFactory)
+  const CTF1155 = await ethers.getContractFactory("CTF1155");
+  const ctf1155 = await CTF1155.deploy();
+  await ctf1155.waitForDeployment();
+  
   const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
   const marketFactory = await ConditionalMarketFactory.deploy();
   await marketFactory.waitForDeployment();
   await marketFactory.initialize(owner.address);
+  
+  // Set CTF1155 in market factory (required for market creation)
+  await marketFactory.setCTF1155(await ctf1155.getAddress());
 
   const OracleResolver = await ethers.getContractFactory("OracleResolver");
   const oracleResolver = await OracleResolver.deploy();

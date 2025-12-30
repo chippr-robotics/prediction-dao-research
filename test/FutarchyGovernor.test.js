@@ -29,9 +29,17 @@ describe("FutarchyGovernor", function () {
     proposalRegistry = await ProposalRegistry.deploy();
     await proposalRegistry.initialize(owner.address);
     
+    // Deploy CTF1155 (required for ConditionalMarketFactory)
+    const CTF1155 = await ethers.getContractFactory("CTF1155");
+    const ctf1155 = await CTF1155.deploy();
+    await ctf1155.waitForDeployment();
+    
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
+    
+    // Set CTF1155 in market factory (required for market creation)
+    await marketFactory.setCTF1155(await ctf1155.getAddress());
     
     const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
     privacyCoordinator = await PrivacyCoordinator.deploy();
