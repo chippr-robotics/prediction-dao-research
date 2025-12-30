@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ThirdwebProvider } from 'thirdweb/react'
 import UserManagementModal from '../components/ui/UserManagementModal'
 import { WalletProvider } from '../contexts/WalletContext'
 import { Web3Provider } from '../contexts/Web3Context'
@@ -54,25 +56,37 @@ const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
     switchChain: vi.fn()
   })
   
+  // Create a new QueryClient for each test
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+  
   return render(
     <BrowserRouter>
-      <ThemeProvider>
-        <WalletProvider>
-          <Web3Provider>
-            <UserPreferencesProvider>
-              <RoleProvider>
-                <ETCswapProvider>
-                  <UIProvider>
-                    <PriceProvider>
-                      {ui}
-                    </PriceProvider>
-                  </UIProvider>
-                </ETCswapProvider>
-              </RoleProvider>
-            </UserPreferencesProvider>
-          </Web3Provider>
-        </WalletProvider>
-      </ThemeProvider>
+      <ThirdwebProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <WalletProvider>
+              <Web3Provider>
+                <UserPreferencesProvider>
+                  <RoleProvider>
+                    <ETCswapProvider>
+                      <UIProvider>
+                        <PriceProvider>
+                          {ui}
+                        </PriceProvider>
+                      </UIProvider>
+                    </ETCswapProvider>
+                  </RoleProvider>
+                </UserPreferencesProvider>
+              </Web3Provider>
+            </WalletProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </ThirdwebProvider>
     </BrowserRouter>
   )
 }
