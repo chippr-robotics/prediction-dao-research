@@ -6,8 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThirdwebProvider } from 'thirdweb/react'
 import UserManagementModal from '../components/ui/UserManagementModal'
 import { WalletProvider } from '../contexts/WalletContext'
-import { Web3Provider } from '../contexts/Web3Context'
-import { UserPreferencesProvider } from '../contexts/UserPreferencesContext'
+import { UserPreferencesProvider } from '../contexts/UserPreferencesProvider'
 import { UIProvider } from '../contexts/UIContext'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { ETCswapProvider } from '../contexts/ETCswapContext'
@@ -70,19 +69,17 @@ const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <WalletProvider>
-              <Web3Provider>
-                <UserPreferencesProvider>
-                  <RoleProvider>
-                    <ETCswapProvider>
-                      <UIProvider>
-                        <PriceProvider>
-                          {ui}
-                        </PriceProvider>
-                      </UIProvider>
-                    </ETCswapProvider>
-                  </RoleProvider>
-                </UserPreferencesProvider>
-              </Web3Provider>
+              <UserPreferencesProvider>
+                <RoleProvider>
+                  <ETCswapProvider>
+                    <UIProvider>
+                      <PriceProvider>
+                        {ui}
+                      </PriceProvider>
+                    </UIProvider>
+                  </ETCswapProvider>
+                </RoleProvider>
+              </UserPreferencesProvider>
             </WalletProvider>
           </ThemeProvider>
         </QueryClientProvider>
@@ -106,33 +103,12 @@ describe('UserManagementModal', () => {
       expect(screen.getByText(/Connect your Web3 wallet to access all features/i)).toBeInTheDocument()
     })
 
-    it('should show connect wallet button', () => {
+    it('should show ThirdWeb connect wallet button', () => {
       renderWithProviders(<UserManagementModal />, { isConnected: false })
       
-      // Check for connector buttons instead of single connect button
-      const metaMaskButton = screen.getByText(/MetaMask/i)
-      expect(metaMaskButton).toBeInTheDocument()
-      expect(metaMaskButton).not.toBeDisabled()
-    })
-
-    it('should show loading state when connecting', async () => {
-      const mockConnect = vi.fn().mockImplementation(() => {
-        return new Promise(resolve => setTimeout(() => resolve({ accounts: ['0x123'] }), 100))
-      })
-      
-      mockUseConnect.mockReturnValue({
-        connect: mockConnect,
-        connectors: [{ id: 'injected', name: 'MetaMask' }]
-      })
-      
-      renderWithProviders(<UserManagementModal />, { isConnected: false })
-      
-      const connectButton = screen.getByText(/MetaMask/i)
-      fireEvent.click(connectButton)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Connecting...')).toBeInTheDocument()
-      })
+      // ThirdWeb ConnectButton renders a button with "Connect Wallet" text
+      const connectButton = screen.getByRole('button', { name: /Connect Wallet/i })
+      expect(connectButton).toBeInTheDocument()
     })
 
     it('should show help text for Web3 wallets', () => {
@@ -142,7 +118,7 @@ describe('UserManagementModal', () => {
       expect(screen.getByText('Learn about Web3 wallets')).toBeInTheDocument()
     })
 
-    it('should render multiple connector options when available', () => {
+    it('should render ThirdWeb wallet connection UI', () => {
       renderWithProviders(<UserManagementModal />, { 
         isConnected: false,
         connectors: [
@@ -151,41 +127,11 @@ describe('UserManagementModal', () => {
         ]
       })
       
-      expect(screen.getByText(/🦊 MetaMask/i)).toBeInTheDocument()
-      expect(screen.getByText(/🔗 WalletConnect/i)).toBeInTheDocument()
-    })
-
-    it('should only disable the clicked connector during connection', async () => {
-      const mockConnect = vi.fn().mockImplementation(() => {
-        return new Promise(resolve => setTimeout(() => resolve({ accounts: ['0x123'] }), 100))
-      })
-      
-      mockUseConnect.mockReturnValueOnce({
-        connect: mockConnect,
-        connectors: [
-          { id: 'injected', name: 'MetaMask' },
-          { id: 'walletConnect', name: 'WalletConnect' }
-        ]
-      })
-      
-      renderWithProviders(<UserManagementModal />, { 
-        isConnected: false,
-        connectors: [
-          { id: 'injected', name: 'MetaMask' },
-          { id: 'walletConnect', name: 'WalletConnect' }
-        ]
-      })
-      
-      const metaMaskButton = screen.getByText(/🦊 MetaMask/i)
-      const walletConnectButton = screen.getByText(/🔗 WalletConnect/i)
-      
-      fireEvent.click(metaMaskButton)
-      
-      await waitFor(() => {
-        // Both buttons should be disabled during connection
-        expect(metaMaskButton).toBeDisabled()
-        expect(walletConnectButton).toBeDisabled()
-      })
+      // ThirdWeb handles wallet selection in its own modal
+      // Just verify the connect button is present
+      const connectButton = screen.getByRole('button', { name: /Connect Wallet/i })
+      expect(connectButton).toBeInTheDocument()
+      expect(connectButton).not.toBeDisabled()
     })
   })
 
