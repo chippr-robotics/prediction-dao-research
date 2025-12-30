@@ -32,6 +32,9 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
     PrivacyCoordinator public privacyCoordinator;
     OracleResolver public oracleResolver;
     RagequitModule public ragequitModule;
+    
+    // Collateral token for prediction markets (ERC20, required for CTF)
+    address public marketCollateralToken;
 
     enum ProposalPhase {
         Submission,
@@ -99,6 +102,15 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         require(address(roleManager) == address(0), "Role manager already set");
         roleManager = TieredRoleManager(_roleManager);
     }
+    
+    /**
+     * @notice Set the market collateral token (ERC20 required for CTF)
+     * @param _collateralToken Address of ERC20 token to use as collateral
+     */
+    function setMarketCollateralToken(address _collateralToken) external onlyOwner {
+        require(_collateralToken != address(0), "Invalid collateral token");
+        marketCollateralToken = _collateralToken;
+    }
 
     /**
      * @notice Initialize the contract (used for clones)
@@ -161,9 +173,11 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
         governanceProposalId = governanceProposalCount++;
 
         // Deploy conditional market with PassFail bet type (appropriate for governance)
+        // Use configured collateral token (required for CTF1155)
+        address collateral = marketCollateralToken != address(0) ? marketCollateralToken : address(0);
         uint256 marketId = marketFactory.deployMarketPair(
             proposalId,
-            address(0), // ETH as collateral
+            collateral, // ERC20 collateral token for CTF
             liquidityAmount,
             liquidityParameter,
             tradingPeriod,

@@ -4,15 +4,31 @@ const { BetType } = require("./constants/BetType");
 
 describe("ConditionalMarketFactory - Bet Types", function () {
   let marketFactory;
+  let ctf1155;
+  let collateralToken;
   let owner;
   let addr1;
 
   beforeEach(async function () {
     [owner, addr1] = await ethers.getSigners();
     
+    // Deploy CTF1155
+    const CTF1155 = await ethers.getContractFactory("CTF1155");
+    ctf1155 = await CTF1155.deploy();
+    await ctf1155.waitForDeployment();
+    
+    // Deploy ConditionalMarketFactory
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
+    
+    // Set CTF1155
+    await marketFactory.setCTF1155(await ctf1155.getAddress());
+    
+    // Deploy mock ERC20 collateral token
+    const MockERC20 = await ethers.getContractFactory("ConditionalToken");
+    collateralToken = await MockERC20.deploy("Collateral", "COL");
+    await collateralToken.waitForDeployment();
   });
 
   describe("Bet Type Labels", function () {
@@ -80,14 +96,14 @@ describe("ConditionalMarketFactory - Bet Types", function () {
   describe("Market Creation with Bet Types", function () {
     it("Should create market with YesNo bet type", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days
 
       const tx = await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -110,7 +126,7 @@ describe("ConditionalMarketFactory - Bet Types", function () {
 
     it("Should create market with AboveBelow bet type", async function () {
       const proposalId = 2;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
@@ -118,7 +134,7 @@ describe("ConditionalMarketFactory - Bet Types", function () {
       await expect(
         marketFactory.deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -132,14 +148,14 @@ describe("ConditionalMarketFactory - Bet Types", function () {
 
     it("Should create market with OverUnder bet type", async function () {
       const proposalId = 3;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -150,16 +166,16 @@ describe("ConditionalMarketFactory - Bet Types", function () {
       expect(market.betType).to.equal(BetType.OverUnder);
     });
 
-    it("Should create tokens with correct names based on bet type", async function () {
+    it("Should store bet type correctly in market", async function () {
       const proposalId = 4;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -168,26 +184,23 @@ describe("ConditionalMarketFactory - Bet Types", function () {
 
       const market = await marketFactory.getMarket(0);
       
-      // Get the token contracts
-      const ConditionalToken = await ethers.getContractFactory("ConditionalToken");
-      const passToken = ConditionalToken.attach(market.passToken);
-      const failToken = ConditionalToken.attach(market.failToken);
-
-      // Check token names
-      const passName = await passToken.name();
-      const failName = await failToken.name();
+      // Verify bet type is stored correctly
+      expect(market.betType).to.equal(BetType.HigherLower);
       
-      expect(passName).to.equal("HIGHER");
-      expect(failName).to.equal("LOWER");
+      // Verify CTF is being used
+      expect(market.useCTF).to.be.true;
+      expect(market.passToken).to.equal(await ctf1155.getAddress());
+      expect(market.failToken).to.equal(await ctf1155.getAddress());
     });
   });
 
   describe("Batch Market Creation with Bet Types", function () {
     it("Should create multiple markets with different bet types", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [
         {
           proposalId: 10,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -195,7 +208,7 @@ describe("ConditionalMarketFactory - Bet Types", function () {
         },
         {
           proposalId: 11,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -203,7 +216,7 @@ describe("ConditionalMarketFactory - Bet Types", function () {
         },
         {
           proposalId: 12,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -224,10 +237,11 @@ describe("ConditionalMarketFactory - Bet Types", function () {
     });
 
     it("Should emit MarketCreated events with correct bet types", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [
         {
           proposalId: 20,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -235,7 +249,7 @@ describe("ConditionalMarketFactory - Bet Types", function () {
         },
         {
           proposalId: 21,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -254,14 +268,14 @@ describe("ConditionalMarketFactory - Bet Types", function () {
   describe("Market Storage and Retrieval", function () {
     it("Should store and retrieve bet type correctly", async function () {
       const proposalId = 30;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -275,14 +289,14 @@ describe("ConditionalMarketFactory - Bet Types", function () {
 
     it("Should maintain bet type after market operations", async function () {
       const proposalId = 31;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,

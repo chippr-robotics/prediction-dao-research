@@ -28,7 +28,8 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         futarchyGovernor,
         proposalRegistry, 
         marketFactory,
-        oracleResolver 
+        oracleResolver,
+        collateralToken
       } = contracts;
       const { proposer1, trader1, trader2, trader3, reporter, owner } = accounts;
 
@@ -68,7 +69,7 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         [constants.TRADE_AMOUNT, constants.TRADE_AMOUNT, constants.TRADE_AMOUNT]
       );
 
-      await executeTrades(marketFactory, trades, marketId);
+      await executeTrades(marketFactory, collateralToken, trades, marketId);
       console.log("  ✓ Trades executed: 2 PASS, 1 FAIL");
 
       // Step 5: Advance through governance phases to execution
@@ -177,7 +178,7 @@ describe("Integration: Complete Proposal Lifecycle", function () {
         [constants.TRADE_AMOUNT, constants.TRADE_AMOUNT]
       );
 
-      await executeTrades(contracts.marketFactory, trades, marketId);
+      await executeTrades(contracts.marketFactory, contracts.collateralToken, trades, marketId);
 
       // Advance through governance - oracle shows negative outcome (fail better than pass)
       const passValue = ethers.parseEther("0.8"); // 20% decrease with proposal

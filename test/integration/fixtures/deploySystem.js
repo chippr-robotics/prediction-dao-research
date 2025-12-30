@@ -29,12 +29,27 @@ async function deploySystemFixture() {
   );
   await governanceToken.waitForDeployment();
 
+  // Deploy mock collateral token for markets (required for CTF1155)
+  const collateralToken = await MockERC20.deploy(
+    "Market Collateral",
+    "MCOL",
+    ethers.parseEther("10000000")
+  );
+  await collateralToken.waitForDeployment();
+
   // Distribute tokens to test accounts
   await governanceToken.transfer(proposer1.address, ethers.parseEther("10000"));
   await governanceToken.transfer(proposer2.address, ethers.parseEther("10000"));
   await governanceToken.transfer(trader1.address, ethers.parseEther("5000"));
   await governanceToken.transfer(trader2.address, ethers.parseEther("5000"));
   await governanceToken.transfer(trader3.address, ethers.parseEther("5000"));
+  
+  // Distribute collateral tokens for trading
+  await collateralToken.transfer(proposer1.address, ethers.parseEther("50000"));
+  await collateralToken.transfer(proposer2.address, ethers.parseEther("50000"));
+  await collateralToken.transfer(trader1.address, ethers.parseEther("50000"));
+  await collateralToken.transfer(trader2.address, ethers.parseEther("50000"));
+  await collateralToken.transfer(trader3.address, ethers.parseEther("50000"));
 
   // Deploy WelfareMetricRegistry
   const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
@@ -48,11 +63,19 @@ async function deploySystemFixture() {
   await proposalRegistry.waitForDeployment();
   await proposalRegistry.initialize(owner.address);
 
+  // Deploy CTF1155 (required for ConditionalMarketFactory)
+  const CTF1155 = await ethers.getContractFactory("CTF1155");
+  const ctf1155 = await CTF1155.deploy();
+  await ctf1155.waitForDeployment();
+
   // Deploy ConditionalMarketFactory
   const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
   const marketFactory = await ConditionalMarketFactory.deploy();
   await marketFactory.waitForDeployment();
   await marketFactory.initialize(owner.address);
+  
+  // Set CTF1155 in market factory (required for market creation)
+  await marketFactory.setCTF1155(await ctf1155.getAddress());
 
   // Deploy PrivacyCoordinator
   const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
@@ -93,6 +116,9 @@ async function deploySystemFixture() {
     await ragequitModule.getAddress(),
     owner.address // Treasury vault (using owner as placeholder)
   );
+  
+  // Set collateral token for markets (required for CTF1155)
+  await futarchyGovernor.setMarketCollateralToken(await collateralToken.getAddress());
 
   // Setup initial welfare metrics before transferring ownership
   
@@ -136,9 +162,11 @@ async function deploySystemFixture() {
   return {
     contracts: {
       governanceToken,
+      collateralToken,
       welfareRegistry,
       proposalRegistry,
       marketFactory,
+      ctf1155,
       privacyCoordinator,
       oracleResolver,
       ragequitModule,

@@ -6,6 +6,8 @@ const { BetType } = require("./constants/BetType");
 describe("Batch Operations", function () {
   let marketFactory;
   let privacyCoordinator;
+  let ctf1155;
+  let collateralToken;
   let owner;
   let addr1;
   let addr2;
@@ -13,10 +15,23 @@ describe("Batch Operations", function () {
   beforeEach(async function () {
     [owner, addr1, addr2] = await ethers.getSigners();
     
+    // Deploy CTF1155
+    const CTF1155 = await ethers.getContractFactory("CTF1155");
+    ctf1155 = await CTF1155.deploy();
+    await ctf1155.waitForDeployment();
+    
     // Deploy ConditionalMarketFactory
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
+    
+    // Set CTF1155
+    await marketFactory.setCTF1155(await ctf1155.getAddress());
+    
+    // Deploy mock ERC20 collateral token
+    const MockERC20 = await ethers.getContractFactory("ConditionalToken");
+    collateralToken = await MockERC20.deploy("Collateral", "COL");
+    await collateralToken.waitForDeployment();
     
     // Deploy PrivacyCoordinator
     const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
@@ -26,10 +41,11 @@ describe("Batch Operations", function () {
 
   describe("Batch Market Creation", function () {
     it("Should create multiple markets in a single transaction", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [
         {
           proposalId: 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -37,7 +53,7 @@ describe("Batch Operations", function () {
         },
         {
           proposalId: 2,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 10 * 24 * 60 * 60,
@@ -45,7 +61,7 @@ describe("Batch Operations", function () {
         },
         {
           proposalId: 3,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1500"),
           liquidityParameter: ethers.parseEther("150"),
           tradingPeriod: 14 * 24 * 60 * 60,
@@ -81,10 +97,11 @@ describe("Batch Operations", function () {
     });
 
     it("Should emit individual MarketCreated events for each market", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [
         {
           proposalId: 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -92,7 +109,7 @@ describe("Batch Operations", function () {
         },
         {
           proposalId: 2,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 10 * 24 * 60 * 60,
@@ -123,13 +140,14 @@ describe("Batch Operations", function () {
     });
 
     it("Should reject batch that is too large", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [];
       const maxBatchSize = await marketFactory.MAX_BATCH_SIZE();
       
       for (let i = 0; i < Number(maxBatchSize) + 1; i++) {
         params.push({
           proposalId: i + 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -143,10 +161,11 @@ describe("Batch Operations", function () {
     });
 
     it("Should reject if market already exists for proposal", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [
         {
           proposalId: 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -154,7 +173,7 @@ describe("Batch Operations", function () {
         },
         {
           proposalId: 1, // Duplicate proposal ID
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 10 * 24 * 60 * 60,
@@ -171,10 +190,11 @@ describe("Batch Operations", function () {
   describe("Batch Market Resolution", function () {
     beforeEach(async function () {
       // Create multiple markets
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [
         {
           proposalId: 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -182,7 +202,7 @@ describe("Batch Operations", function () {
         },
         {
           proposalId: 2,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("2000"),
           liquidityParameter: ethers.parseEther("200"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -190,7 +210,7 @@ describe("Batch Operations", function () {
         },
         {
           proposalId: 3,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1500"),
           liquidityParameter: ethers.parseEther("150"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -531,11 +551,12 @@ describe("Batch Operations", function () {
   describe("Market Query Functions", function () {
     beforeEach(async function () {
       // Create 10 markets
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [];
       for (let i = 0; i < 10; i++) {
         params.push({
           proposalId: i + 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -647,11 +668,12 @@ describe("Batch Operations", function () {
 
   describe("Gas Optimization Validation", function () {
     it("Batch market creation should be more efficient than individual", async function () {
+      const collateralTokenAddr = await collateralToken.getAddress();
       const params = [];
       for (let i = 0; i < 5; i++) {
         params.push({
           proposalId: i + 1,
-          collateralToken: ethers.ZeroAddress,
+          collateralToken: collateralTokenAddr,
           liquidityAmount: ethers.parseEther("1000"),
           liquidityParameter: ethers.parseEther("100"),
           tradingPeriod: 7 * 24 * 60 * 60,
@@ -668,13 +690,14 @@ describe("Batch Operations", function () {
       const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
       const marketFactory2 = await ConditionalMarketFactory.deploy();
       await marketFactory2.initialize(owner.address);
+      await marketFactory2.setCTF1155(await ctf1155.getAddress());
       
       // Individual deployments
       let totalIndividualGas = 0n;
       for (let i = 0; i < 5; i++) {
         const tx = await marketFactory2.deployMarketPair(
           i + 10,
-          ethers.ZeroAddress,
+          collateralTokenAddr,
           ethers.parseEther("1000"),
           ethers.parseEther("100"),
           7 * 24 * 60 * 60,

@@ -17,10 +17,23 @@ describe("FriendGroupMarketFactory", function () {
   beforeEach(async function () {
     [owner, addr1, addr2, addr3, addr4, arbitrator] = await ethers.getSigners();
     
+    // Deploy CTF1155 (required for ConditionalMarketFactory)
+    const CTF1155 = await ethers.getContractFactory("CTF1155");
+    const ctf1155 = await CTF1155.deploy();
+    await ctf1155.waitForDeployment();
+    
+    // Deploy mock collateral token for markets (required for CTF1155)
+    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const collateralToken = await MockERC20.deploy("Market Collateral", "MCOL", ethers.parseEther("10000000"));
+    await collateralToken.waitForDeployment();
+    
     // Deploy ConditionalMarketFactory
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
+    
+    // Set CTF1155 in market factory (required for market creation)
+    await marketFactory.setCTF1155(await ctf1155.getAddress());
     
     // Deploy RagequitModule (with mock token and treasury)
     const RagequitModule = await ethers.getContractFactory("RagequitModule");
@@ -44,6 +57,9 @@ describe("FriendGroupMarketFactory", function () {
       await tieredRoleManager.getAddress(),
       await paymentManager.getAddress()
     );
+    
+    // Set collateral token for markets (required for CTF1155)
+    await friendGroupFactory.setDefaultCollateralToken(await collateralToken.getAddress());
     
     // Purchase FRIEND_MARKET_ROLE with ENTERPRISE duration (never expires) to avoid expiration issues
     const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();

@@ -81,6 +81,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Reference to tiered role manager for membership checks
     TieredRoleManager public tieredRoleManager;
     
+    // Default collateral token for markets (ERC20, required for CTF)
+    address public defaultCollateralToken;
+    
     // Pricing tiers (updateable by managers)
     uint256 public publicMarketFee = 1 ether;      // Standard market fee
     uint256 public friendMarketFee = 0.1 ether;    // Reduced fee for friend markets
@@ -182,6 +185,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address oldManager = manager;
         manager = newManager;
         emit ManagerUpdated(oldManager, newManager);
+    }
+    
+    /**
+     * @notice Set default collateral token for markets (ERC20, required for CTF)
+     * @param _collateralToken Address of ERC20 token to use as collateral
+     */
+    function setDefaultCollateralToken(address _collateralToken) external onlyOwner {
+        require(_collateralToken != address(0), "Invalid collateral token");
+        defaultCollateralToken = _collateralToken;
     }
     
     /**
@@ -290,9 +302,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         
         // Create underlying market in ConditionalMarketFactory
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
+        // Use default collateral token (required for CTF1155)
+        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
-            address(0), // ETH collateral
+            collateral, // ERC20 collateral for CTF
             liquidityAmount, // All value goes to liquidity (no creation fee)
             0.01 ether, // Small liquidity parameter
             tradingPeriod,
@@ -399,9 +413,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         
         // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
+        // Use default collateral token (required for CTF1155)
+        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
-            address(0), // ETH collateral
+            collateral, // ERC20 collateral for CTF
             liquidityAmount,
             0.1 ether, // Medium liquidity parameter
             tradingPeriod,
@@ -504,9 +520,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         
         // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
+        // Use default collateral token (required for CTF1155)
+        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
-            address(0), // ETH collateral
+            collateral, // ERC20 collateral for CTF
             liquidityAmount,
             0.1 ether,
             tradingPeriod,

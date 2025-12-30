@@ -16,9 +16,13 @@ describe("FutarchyGovernor", function () {
   beforeEach(async function () {
     [owner, addr1] = await ethers.getSigners();
     
-    // Deploy mock governance token
+    // Deploy mock tokens
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     governanceToken = await MockERC20.deploy("Governance Token", "GOV", ethers.parseEther("1000000"));
+    
+    // Deploy mock collateral token for markets (required for CTF1155)
+    const collateralToken = await MockERC20.deploy("Market Collateral", "MCOL", ethers.parseEther("10000000"));
+    await collateralToken.waitForDeployment();
     
     // Deploy dependencies
     const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
@@ -29,9 +33,17 @@ describe("FutarchyGovernor", function () {
     proposalRegistry = await ProposalRegistry.deploy();
     await proposalRegistry.initialize(owner.address);
     
+    // Deploy CTF1155 (required for ConditionalMarketFactory)
+    const CTF1155 = await ethers.getContractFactory("CTF1155");
+    const ctf1155 = await CTF1155.deploy();
+    await ctf1155.waitForDeployment();
+    
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
+    
+    // Set CTF1155 in market factory (required for market creation)
+    await marketFactory.setCTF1155(await ctf1155.getAddress());
     
     const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
     privacyCoordinator = await PrivacyCoordinator.deploy();
@@ -62,6 +74,9 @@ describe("FutarchyGovernor", function () {
       await ragequitModule.getAddress(),
       addr1.address
     );
+    
+    // Set collateral token for markets (required for CTF1155)
+    await futarchyGovernor.setMarketCollateralToken(await collateralToken.getAddress());
 
     // Transfer ownership of marketFactory to futarchyGovernor so it can deploy markets
     await marketFactory.transferOwnership(await futarchyGovernor.getAddress());
