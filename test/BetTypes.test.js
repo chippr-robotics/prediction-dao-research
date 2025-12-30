@@ -166,7 +166,7 @@ describe("ConditionalMarketFactory - Bet Types", function () {
       expect(market.betType).to.equal(BetType.OverUnder);
     });
 
-    it("Should create tokens with correct names based on bet type", async function () {
+    it("Should store bet type correctly in market", async function () {
       const proposalId = 4;
       const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
@@ -184,17 +184,13 @@ describe("ConditionalMarketFactory - Bet Types", function () {
 
       const market = await marketFactory.getMarket(0);
       
-      // Get the token contracts
-      const ConditionalToken = await ethers.getContractFactory("ConditionalToken");
-      const passToken = ConditionalToken.attach(market.passToken);
-      const failToken = ConditionalToken.attach(market.failToken);
-
-      // Check token names
-      const passName = await passToken.name();
-      const failName = await failToken.name();
+      // Verify bet type is stored correctly
+      expect(market.betType).to.equal(BetType.HigherLower);
       
-      expect(passName).to.equal("HIGHER");
-      expect(failName).to.equal("LOWER");
+      // Verify CTF is being used
+      expect(market.useCTF).to.be.true;
+      expect(market.passToken).to.equal(await ctf1155.getAddress());
+      expect(market.failToken).to.equal(await ctf1155.getAddress());
     });
   });
 
