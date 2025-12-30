@@ -217,6 +217,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .crawler-track {
+    animation: none;
+  }
+}
+
 .crawler-item {
   display: flex;
   align-items: center;

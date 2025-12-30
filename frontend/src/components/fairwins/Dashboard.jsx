@@ -41,6 +41,19 @@ const stableRandom = (seed) => {
   return x - Math.floor(x)
 }
 
+// Get category icon emoji
+const getCategoryIcon = (category) => {
+  const icons = {
+    sports: '⚽',
+    politics: '🏛️',
+    finance: '💰',
+    tech: '💻',
+    crypto: '₿',
+    'pop-culture': '🎬'
+  }
+  return icons[category] || '📊'
+}
+
 // ============================================================================
 // CATEGORY DISTRIBUTION CHART (Donut with labels)
 // ============================================================================
@@ -798,53 +811,53 @@ function SparklineCard({ category }) {
 // ============================================================================
 
 function MarketCrawler({ markets }) {
-  const scrollerRef = useRef()
   const [isPaused, setIsPaused] = useState(false)
 
   const latestMarkets = useMemo(() => {
     if (!markets?.length) return []
     
-    // Get latest active markets sorted by creation date
+    // Get latest active markets sorted by trading end time (latest ending first)
     return [...markets]
       .filter(m => m.status === 'Active')
       .sort((a, b) => new Date(b.tradingEndTime) - new Date(a.tradingEndTime))
       .slice(0, 12)
   }, [markets])
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      sports: '⚽',
-      politics: '🏛️',
-      finance: '💰',
-      tech: '💻',
-      crypto: '₿',
-      'pop-culture': '🎬'
-    }
-    return icons[category] || '📊'
-  }
-
   // Duplicate markets for seamless infinite scroll
   const allMarkets = [...latestMarkets, ...latestMarkets]
+
+  const handleFocus = () => setIsPaused(true)
+  const handleBlur = () => setIsPaused(false)
 
   return (
     <div 
       className="market-crawler"
+      role="region"
+      aria-label="Latest markets ticker"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <div className={`crawler-track ${isPaused ? 'paused' : ''}`} ref={scrollerRef}>
+      <div className={`crawler-track ${isPaused ? 'paused' : ''}`}>
         {allMarkets.map((market, index) => {
-          const passPrice = parseFloat(market.passTokenPrice)
+          const passPrice = parseFloat(market.passTokenPrice) || 0
           const isHighConfidence = passPrice > 0.7 || passPrice < 0.3
           
           return (
-            <div key={`${market.id}-${index}`} className="crawler-item">
-              <span className="crawler-icon">{getCategoryIcon(market.category)}</span>
+            <div 
+              key={`${market.id}-${index}`} 
+              className="crawler-item"
+              tabIndex={0}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              role="article"
+              aria-label={`${market.proposalTitle}, ${Math.round(passPrice * 100)}% YES probability`}
+            >
+              <span className="crawler-icon" aria-hidden="true">{getCategoryIcon(market.category)}</span>
               <span className="crawler-title">{market.proposalTitle}</span>
               <span className={`crawler-price ${isHighConfidence ? 'high-confidence' : ''}`}>
                 {Math.round(passPrice * 100)}% YES
               </span>
-              <span className="crawler-separator">•</span>
+              <span className="crawler-separator" aria-hidden="true">•</span>
             </div>
           )
         })}
@@ -867,22 +880,10 @@ function TrendingMarketsList({ markets, onMarketClick }) {
       .slice(0, 5)
   }, [markets])
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      sports: '⚽',
-      politics: '🏛️',
-      finance: '💰',
-      tech: '💻',
-      crypto: '₿',
-      'pop-culture': '🎬'
-    }
-    return icons[category] || '📊'
-  }
-
   return (
     <div className="trending-list">
       {trendingMarkets.map((market, index) => {
-        const passPrice = parseFloat(market.passTokenPrice)
+        const passPrice = parseFloat(market.passTokenPrice) || 0
         const isHighConfidence = passPrice > 0.7 || passPrice < 0.3
         
         return (
