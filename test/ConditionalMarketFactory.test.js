@@ -4,15 +4,31 @@ const { BetType } = require("./constants/BetType");
 
 describe("ConditionalMarketFactory", function () {
   let marketFactory;
+  let ctf1155;
+  let collateralToken;
   let owner;
   let addr1;
 
   beforeEach(async function () {
     [owner, addr1] = await ethers.getSigners();
     
+    // Deploy CTF1155
+    const CTF1155 = await ethers.getContractFactory("CTF1155");
+    ctf1155 = await CTF1155.deploy();
+    await ctf1155.waitForDeployment();
+    
+    // Deploy ConditionalMarketFactory
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
+    
+    // Set CTF1155
+    await marketFactory.setCTF1155(await ctf1155.getAddress());
+    
+    // Deploy mock ERC20 collateral token
+    const MockERC20 = await ethers.getContractFactory("ConditionalToken");
+    collateralToken = await MockERC20.deploy("Collateral", "COL");
+    await collateralToken.waitForDeployment();
   });
 
   describe("Deployment", function () {
@@ -32,7 +48,7 @@ describe("ConditionalMarketFactory", function () {
   describe("Market Deployment", function () {
     it("Should allow owner to deploy market pair", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days
@@ -40,7 +56,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -51,7 +67,7 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should reject market deployment with invalid trading period", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 1 * 24 * 60 * 60; // 1 day (too short)
@@ -59,7 +75,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -70,14 +86,14 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should increment market count", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -89,7 +105,7 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should only allow owner or market maker to deploy market", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
@@ -97,7 +113,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.connect(addr1).deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -108,14 +124,14 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should reject duplicate market for same proposal", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -127,7 +143,7 @@ describe("ConditionalMarketFactory", function () {
       // Deploy another market with proposalId 0 first to avoid the collision
       await marketFactory.deployMarketPair(
         0,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -137,7 +153,7 @@ describe("ConditionalMarketFactory", function () {
       // Now test with proposalId 2 to check duplicate detection works when marketId != 0
       await marketFactory.deployMarketPair(
         2,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -147,7 +163,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.deployMarketPair(
           2,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -158,7 +174,7 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should reject trading period too long", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 30 * 24 * 60 * 60; // 30 days (too long)
@@ -166,7 +182,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -177,14 +193,14 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should store market details correctly", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -204,14 +220,14 @@ describe("ConditionalMarketFactory", function () {
   describe("Market Trading", function () {
     beforeEach(async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -267,14 +283,14 @@ describe("ConditionalMarketFactory", function () {
   describe("Market Resolution", function () {
     beforeEach(async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -306,14 +322,14 @@ describe("ConditionalMarketFactory", function () {
     it("Should reject resolving market if trading not ended", async function () {
       // Deploy a new market that hasn't ended trading
       const proposalId = 2;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -362,14 +378,14 @@ describe("ConditionalMarketFactory", function () {
   describe("Market Cancellation", function () {
     beforeEach(async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -414,14 +430,14 @@ describe("ConditionalMarketFactory", function () {
   describe("Market Queries", function () {
     it("Should get market for proposal", async function () {
       const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
 
       await marketFactory.deployMarketPair(
         proposalId,
-        collateralToken,
+        collateralTokenAddr,
         liquidityAmount,
         liquidityParameter,
         tradingPeriod,
@@ -445,221 +461,10 @@ describe("ConditionalMarketFactory", function () {
     });
   });
 
-  describe("ConditionalToken Tests", function () {
-    let passToken, failToken;
+  // ConditionalToken Tests are no longer relevant as we use CTF1155 exclusively
+  // CTF1155 tokens use ERC1155 standard, not ERC20
+  // See ConditionalMarketFactory.CTF.test.js for CTF-specific tests
 
-    beforeEach(async function () {
-      const proposalId = 1;
-      const collateralToken = ethers.ZeroAddress;
-      const liquidityAmount = ethers.parseEther("1000");
-      const liquidityParameter = ethers.parseEther("100");
-      const tradingPeriod = 7 * 24 * 60 * 60;
-
-      await marketFactory.deployMarketPair(
-        proposalId,
-        collateralToken,
-        liquidityAmount,
-        liquidityParameter,
-        tradingPeriod,
-          BetType.PassFail
-      );
-
-      const market = await marketFactory.getMarket(0);
-      const ConditionalToken = await ethers.getContractFactory("ConditionalToken");
-      passToken = ConditionalToken.attach(market.passToken);
-      failToken = ConditionalToken.attach(market.failToken);
-    });
-
-    describe("Token Properties", function () {
-      it("Should have correct name and symbol", async function () {
-        expect(await passToken.name()).to.equal("PASS");
-        expect(await passToken.symbol()).to.equal("PASS-0");
-        expect(await failToken.name()).to.equal("FAIL");
-        expect(await failToken.symbol()).to.equal("FAIL-0");
-      });
-
-      it("Should have 18 decimals", async function () {
-        expect(await passToken.decimals()).to.equal(18);
-      });
-
-      it("Should start with zero total supply", async function () {
-        expect(await passToken.totalSupply()).to.equal(0);
-      });
-    });
-
-    describe("Minting", function () {
-      it("Should allow minting tokens", async function () {
-        const amount = ethers.parseEther("100");
-        
-        await passToken.mint(owner.address, amount);
-        
-        expect(await passToken.totalSupply()).to.equal(amount);
-        expect(await passToken.balanceOf(owner.address)).to.equal(amount);
-      });
-
-      it("Should emit Transfer event on mint", async function () {
-        const amount = ethers.parseEther("100");
-        
-        await expect(passToken.mint(owner.address, amount))
-          .to.emit(passToken, "Transfer")
-          .withArgs(ethers.ZeroAddress, owner.address, amount);
-      });
-    });
-
-    describe("Burning", function () {
-      beforeEach(async function () {
-        const amount = ethers.parseEther("100");
-        await passToken.mint(owner.address, amount);
-      });
-
-      it("Should allow burning tokens", async function () {
-        const burnAmount = ethers.parseEther("50");
-        
-        await passToken.burn(owner.address, burnAmount);
-        
-        expect(await passToken.totalSupply()).to.equal(ethers.parseEther("50"));
-        expect(await passToken.balanceOf(owner.address)).to.equal(ethers.parseEther("50"));
-      });
-
-      it("Should emit Transfer event on burn", async function () {
-        const burnAmount = ethers.parseEther("50");
-        
-        await expect(passToken.burn(owner.address, burnAmount))
-          .to.emit(passToken, "Transfer")
-          .withArgs(owner.address, ethers.ZeroAddress, burnAmount);
-      });
-
-      it("Should reject burning more than balance", async function () {
-        const burnAmount = ethers.parseEther("200");
-        
-        await expect(
-          passToken.burn(owner.address, burnAmount)
-        ).to.be.revertedWith("Insufficient balance");
-      });
-    });
-
-    describe("Transfer", function () {
-      beforeEach(async function () {
-        const amount = ethers.parseEther("100");
-        await passToken.mint(owner.address, amount);
-      });
-
-      it("Should allow token transfer", async function () {
-        const transferAmount = ethers.parseEther("30");
-        
-        await passToken.transfer(addr1.address, transferAmount);
-        
-        expect(await passToken.balanceOf(owner.address)).to.equal(ethers.parseEther("70"));
-        expect(await passToken.balanceOf(addr1.address)).to.equal(transferAmount);
-      });
-
-      it("Should emit Transfer event", async function () {
-        const transferAmount = ethers.parseEther("30");
-        
-        await expect(passToken.transfer(addr1.address, transferAmount))
-          .to.emit(passToken, "Transfer")
-          .withArgs(owner.address, addr1.address, transferAmount);
-      });
-
-      it("Should reject transfer to zero address", async function () {
-        const transferAmount = ethers.parseEther("30");
-        
-        await expect(
-          passToken.transfer(ethers.ZeroAddress, transferAmount)
-        ).to.be.revertedWith("Transfer to zero address");
-      });
-
-      it("Should reject transfer with insufficient balance", async function () {
-        const transferAmount = ethers.parseEther("200");
-        
-        await expect(
-          passToken.transfer(addr1.address, transferAmount)
-        ).to.be.revertedWith("Insufficient balance");
-      });
-    });
-
-    describe("Approval and Allowance", function () {
-      it("Should allow setting allowance", async function () {
-        const approvalAmount = ethers.parseEther("50");
-        
-        await passToken.approve(addr1.address, approvalAmount);
-        
-        expect(await passToken.allowance(owner.address, addr1.address)).to.equal(approvalAmount);
-      });
-
-      it("Should emit Approval event", async function () {
-        const approvalAmount = ethers.parseEther("50");
-        
-        await expect(passToken.approve(addr1.address, approvalAmount))
-          .to.emit(passToken, "Approval")
-          .withArgs(owner.address, addr1.address, approvalAmount);
-      });
-
-      it("Should allow updating allowance", async function () {
-        await passToken.approve(addr1.address, ethers.parseEther("50"));
-        await passToken.approve(addr1.address, ethers.parseEther("100"));
-        
-        expect(await passToken.allowance(owner.address, addr1.address)).to.equal(ethers.parseEther("100"));
-      });
-    });
-
-    describe("TransferFrom", function () {
-      beforeEach(async function () {
-        const amount = ethers.parseEther("100");
-        await passToken.mint(owner.address, amount);
-        await passToken.approve(addr1.address, ethers.parseEther("50"));
-      });
-
-      it("Should allow transferFrom with approval", async function () {
-        const transferAmount = ethers.parseEther("30");
-        
-        await passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount);
-        
-        expect(await passToken.balanceOf(owner.address)).to.equal(ethers.parseEther("70"));
-        expect(await passToken.balanceOf(addr1.address)).to.equal(transferAmount);
-      });
-
-      it("Should decrease allowance after transferFrom", async function () {
-        const transferAmount = ethers.parseEther("30");
-        
-        await passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount);
-        
-        expect(await passToken.allowance(owner.address, addr1.address)).to.equal(ethers.parseEther("20"));
-      });
-
-      it("Should reject transferFrom without sufficient allowance", async function () {
-        const transferAmount = ethers.parseEther("60");
-        
-        await expect(
-          passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount)
-        ).to.be.revertedWith("Insufficient allowance");
-      });
-
-      it("Should emit Transfer event on transferFrom", async function () {
-        const transferAmount = ethers.parseEther("30");
-        
-        await expect(passToken.connect(addr1).transferFrom(owner.address, addr1.address, transferAmount))
-          .to.emit(passToken, "Transfer")
-          .withArgs(owner.address, addr1.address, transferAmount);
-      });
-    });
-
-    describe("Multiple Token Interactions", function () {
-      it("Should handle both pass and fail tokens independently", async function () {
-        await passToken.mint(owner.address, ethers.parseEther("100"));
-        await failToken.mint(owner.address, ethers.parseEther("200"));
-        
-        expect(await passToken.totalSupply()).to.equal(ethers.parseEther("100"));
-        expect(await failToken.totalSupply()).to.equal(ethers.parseEther("200"));
-        
-        await passToken.transfer(addr1.address, ethers.parseEther("50"));
-        
-        expect(await passToken.balanceOf(addr1.address)).to.equal(ethers.parseEther("50"));
-        expect(await failToken.balanceOf(addr1.address)).to.equal(0);
-      });
-    });
-  });
-  
   describe("RBAC Integration", function () {
     let roleManager;
     let marketMaker;
@@ -685,7 +490,7 @@ describe("ConditionalMarketFactory", function () {
 
     it("Should allow market maker with role to deploy market", async function () {
       const proposalId = 100;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
@@ -693,7 +498,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.connect(marketMaker).deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -703,13 +508,16 @@ describe("ConditionalMarketFactory", function () {
     });
 
     it("Should reject market deployment when role manager not set", async function () {
-      // Deploy new market factory without role manager
+      // Deploy new market factory without role manager but with CTF1155
       const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
       const newMarketFactory = await ConditionalMarketFactory.deploy();
       await newMarketFactory.initialize(owner.address);
+      
+      // Set CTF1155
+      await newMarketFactory.setCTF1155(await ctf1155.getAddress());
 
       const proposalId = 101;
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
@@ -718,7 +526,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         newMarketFactory.deployMarketPair(
           proposalId,
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -730,7 +538,7 @@ describe("ConditionalMarketFactory", function () {
     it("Should enforce tier limits on market creation", async function () {
       // Bronze tier allows 5 markets per month but only 3 concurrent
       const proposalIds = [200, 201, 202, 203];
-      const collateralToken = ethers.ZeroAddress;
+      const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
       const tradingPeriod = 7 * 24 * 60 * 60;
@@ -739,7 +547,7 @@ describe("ConditionalMarketFactory", function () {
       for (let i = 0; i < 3; i++) {
         await marketFactory.connect(marketMaker).deployMarketPair(
           proposalIds[i],
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
@@ -751,7 +559,7 @@ describe("ConditionalMarketFactory", function () {
       await expect(
         marketFactory.connect(marketMaker).deployMarketPair(
           proposalIds[3],
-          collateralToken,
+          collateralTokenAddr,
           liquidityAmount,
           liquidityParameter,
           tradingPeriod,
