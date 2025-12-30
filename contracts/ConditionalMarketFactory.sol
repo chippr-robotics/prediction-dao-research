@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./ETCSwapV3Integration.sol";
 import "./TieredRoleManager.sol";
+import "./CTF1155.sol";
 
 /**
  * @title ConditionalMarketFactory
@@ -70,6 +71,11 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 failValue;
         MarketStatus status;
         BetType betType;
+        bool useCTF;               // Whether this market uses CTF1155
+        bytes32 conditionId;       // CTF condition ID (if using CTF)
+        bytes32 questionId;        // CTF question ID (if using CTF)
+        uint256 passPositionId;    // CTF position ID for pass outcome
+        uint256 failPositionId;    // CTF position ID for fail outcome
     }
 
     enum MarketStatus {
@@ -105,6 +111,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     
     // Role-based access control
     TieredRoleManager public roleManager;
+    
+    // CTF1155 integration - now required for all markets
+    CTF1155 public ctf1155;
     
     // Default initial price for pools (0.5 = equal probability)
     uint160 public constant DEFAULT_INITIAL_SQRT_PRICE = 79228162514264337593543950336; // sqrt(0.5) in Q64.96
@@ -180,6 +189,15 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 indexed marketId,
         address indexed passPool,
         address indexed failPool
+    );
+    
+    event CTF1155Updated(address indexed ctf1155);
+    
+    event CTFMarketCreated(
+        uint256 indexed marketId,
+        bytes32 indexed conditionId,
+        uint256 passPositionId,
+        uint256 failPositionId
     );
 
     constructor() Ownable(msg.sender) {}
@@ -268,6 +286,16 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     }
     
     /**
+     * @notice Set CTF1155 contract (required for market creation)
+     * @param _ctf1155 Address of CTF1155 contract
+     */
+    function setCTF1155(address _ctf1155) external onlyOwner {
+        require(_ctf1155 != address(0), "Invalid CTF1155 address");
+        ctf1155 = CTF1155(_ctf1155);
+        emit CTF1155Updated(_ctf1155);
+    }
+    
+    /**
      * @notice Create ETCSwap pools for an existing market
      * @param marketId ID of the market
      * @param initialSqrtPriceX96 Initial price for pools (Q64.96 format)
@@ -296,9 +324,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Deploy a market pair for a proposal
+     * @notice Deploy a market pair for a proposal using CTF1155
      * @param proposalId ID of the proposal
-     * @param collateralToken Address of collateral token (use address(0) for ETH)
+     * @param collateralToken Address of collateral token (must be ERC20, not address(0))
      * @param liquidityAmount Initial liquidity amount
      * @param liquidityParameter Beta parameter for LMSR (higher = more liquidity)
      * @param tradingPeriod Trading period in seconds
@@ -321,20 +349,31 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         );
         require(_proposalToMarketPlusOne[proposalId] == 0, "Market already exists");
         require(tradingPeriod >= MIN_TRADING_PERIOD && tradingPeriod <= MAX_TRADING_PERIOD, "Invalid trading period");
+        require(address(ctf1155) != address(0), "CTF1155 not set");
+        require(collateralToken != address(0), "CTF requires ERC20 collateral");
 
         marketId = marketCount++;
 
-        // Get outcome labels based on bet type
-        (string memory positiveLabel, string memory negativeLabel) = getOutcomeLabels(betType);
-
-        // Create conditional tokens with bet-type-specific names
-        address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", Strings.toString(marketId)))));
-        address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", Strings.toString(marketId)))));
+        // Generate unique question ID for this market
+        bytes32 questionId = keccak256(abi.encodePacked("market", marketId, proposalId, block.timestamp));
+        
+        // Prepare condition with 2 outcomes (binary)
+        bytes32 conditionId = ctf1155.prepareCondition(address(this), questionId, 2);
+        
+        // Calculate position IDs for pass (index 1) and fail (index 2) outcomes
+        bytes32 passCollectionId = ctf1155.getCollectionId(bytes32(0), conditionId, 1);
+        bytes32 failCollectionId = ctf1155.getCollectionId(bytes32(0), conditionId, 2);
+        
+        uint256 passPositionId = ctf1155.getPositionId(IERC20(collateralToken), passCollectionId);
+        uint256 failPositionId = ctf1155.getPositionId(IERC20(collateralToken), failCollectionId);
+        
+        // Store CTF1155 address in passToken and failToken for compatibility
+        address ctfAddress = address(ctf1155);
 
         markets[marketId] = Market({
             proposalId: proposalId,
-            passToken: passToken,
-            failToken: failToken,
+            passToken: ctfAddress,
+            failToken: ctfAddress,
             collateralToken: collateralToken,
             tradingEndTime: block.timestamp + tradingPeriod,
             liquidityParameter: liquidityParameter,
@@ -343,7 +382,12 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             passValue: 0,
             failValue: 0,
             status: MarketStatus.Active,
-            betType: betType
+            betType: betType,
+            useCTF: true,
+            conditionId: conditionId,
+            questionId: questionId,
+            passPositionId: passPositionId,
+            failPositionId: failPositionId
         });
 
         _proposalToMarketPlusOne[proposalId] = marketId + 1;
@@ -355,14 +399,16 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             marketId,
             proposalId,
             collateralToken,
-            passToken,
-            failToken,
+            ctfAddress,
+            ctfAddress,
             markets[marketId].tradingEndTime,
             liquidityParameter,
             block.timestamp,
             msg.sender,
             betType
         );
+        
+        emit CTFMarketCreated(marketId, conditionId, passPositionId, failPositionId);
     }
     
     /**
@@ -391,21 +437,32 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 params[i].tradingPeriod <= MAX_TRADING_PERIOD,
                 "Invalid trading period"
             );
+            require(address(ctf1155) != address(0), "CTF1155 not set");
+            require(params[i].collateralToken != address(0), "CTF requires ERC20 collateral");
             
             uint256 marketId = marketCount++;
             marketIds[i] = marketId;
             
-            // Get outcome labels based on bet type
-            (string memory positiveLabel, string memory negativeLabel) = getOutcomeLabels(params[i].betType);
+            // Generate unique question ID for this market
+            bytes32 questionId = keccak256(abi.encodePacked("market", marketId, params[i].proposalId, block.timestamp, i));
             
-            // Create conditional tokens with bet-type-specific names
-            address passToken = address(new ConditionalToken(positiveLabel, string(abi.encodePacked(positiveLabel, "-", Strings.toString(marketId)))));
-            address failToken = address(new ConditionalToken(negativeLabel, string(abi.encodePacked(negativeLabel, "-", Strings.toString(marketId)))));
+            // Prepare condition with 2 outcomes (binary)
+            bytes32 conditionId = ctf1155.prepareCondition(address(this), questionId, 2);
+            
+            // Calculate position IDs for pass (index 1) and fail (index 2) outcomes
+            bytes32 passCollectionId = ctf1155.getCollectionId(bytes32(0), conditionId, 1);
+            bytes32 failCollectionId = ctf1155.getCollectionId(bytes32(0), conditionId, 2);
+            
+            uint256 passPositionId = ctf1155.getPositionId(IERC20(params[i].collateralToken), passCollectionId);
+            uint256 failPositionId = ctf1155.getPositionId(IERC20(params[i].collateralToken), failCollectionId);
+            
+            // Store CTF1155 address in passToken and failToken for compatibility
+            address ctfAddress = address(ctf1155);
             
             markets[marketId] = Market({
                 proposalId: params[i].proposalId,
-                passToken: passToken,
-                failToken: failToken,
+                passToken: ctfAddress,
+                failToken: ctfAddress,
                 collateralToken: params[i].collateralToken,
                 tradingEndTime: block.timestamp + params[i].tradingPeriod,
                 liquidityParameter: params[i].liquidityParameter,
@@ -414,7 +471,12 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 passValue: 0,
                 failValue: 0,
                 status: MarketStatus.Active,
-                betType: params[i].betType
+                betType: params[i].betType,
+                useCTF: true,
+                conditionId: conditionId,
+                questionId: questionId,
+                passPositionId: passPositionId,
+                failPositionId: failPositionId
             });
             
             _proposalToMarketPlusOne[params[i].proposalId] = marketId + 1;
@@ -426,14 +488,16 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
                 marketId,
                 params[i].proposalId,
                 params[i].collateralToken,
-                passToken,
-                failToken,
+                ctfAddress,
+                ctfAddress,
                 markets[marketId].tradingEndTime,
                 params[i].liquidityParameter,
                 block.timestamp,
                 msg.sender,
                 params[i].betType
             );
+            
+            emit CTFMarketCreated(marketId, conditionId, passPositionId, failPositionId);
             
             unchecked { ++i; }
         }
@@ -636,7 +700,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Resolve a market with welfare metric values
+     * @notice Resolve a market with welfare metric values and report to CTF1155
      * @param marketId ID of the market
      * @param passValue Welfare metric value if proposal passes
      * @param failValue Welfare metric value if proposal fails
@@ -657,6 +721,30 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         MarketStatus oldStatus = market.status;
         market.status = MarketStatus.Resolved;
         _updateMarketIndex(marketId, MarketStatus.Resolved);
+        
+        // Report payouts to CTF1155
+        if (market.useCTF) {
+            // Calculate payout numerators based on welfare metric values
+            uint256[] memory payouts = new uint256[](2);
+            
+            // Determine winner and set payouts
+            if (passValue > failValue) {
+                // Pass wins - full payout to pass (index 0), zero to fail (index 1)
+                payouts[0] = 1;
+                payouts[1] = 0;
+            } else if (failValue > passValue) {
+                // Fail wins - zero to pass (index 0), full payout to fail (index 1)
+                payouts[0] = 0;
+                payouts[1] = 1;
+            } else {
+                // Tie - equal payout to both
+                payouts[0] = 1;
+                payouts[1] = 1;
+            }
+            
+            // Report payouts to CTF1155 as the oracle (this contract)
+            ctf1155.reportPayouts(market.questionId, payouts);
+        }
 
         emit MarketResolved(
             marketId,
@@ -709,6 +797,24 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             MarketStatus oldStatus = market.status;
             market.status = MarketStatus.Resolved;
             _updateMarketIndex(marketId, MarketStatus.Resolved);
+            
+            // Report payouts to CTF1155
+            if (market.useCTF) {
+                uint256[] memory payouts = new uint256[](2);
+                
+                if (params[i].passValue > params[i].failValue) {
+                    payouts[0] = 1;
+                    payouts[1] = 0;
+                } else if (params[i].failValue > params[i].passValue) {
+                    payouts[0] = 0;
+                    payouts[1] = 1;
+                } else {
+                    payouts[0] = 1;
+                    payouts[1] = 1;
+                }
+                
+                ctf1155.reportPayouts(market.questionId, payouts);
+            }
             
             emit MarketResolved(
                 marketId,
