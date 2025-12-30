@@ -313,7 +313,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
   describe("Market Creation", function () {
     it("Should create market with custom parameters", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory } = contracts;
+      const { marketFactory, collateralToken } = contracts;
       const { owner } = accounts;
 
       const tradingPeriod = 21 * 24 * 3600; // 21 days (max)
@@ -349,7 +349,7 @@ describe("Integration: FairWins Market Lifecycle", function () {
 
     it("Should reject invalid trading period", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory } = contracts;
+      const { marketFactory, collateralToken } = contracts;
       const { owner } = accounts;
 
       const tooShort = 5 * 24 * 3600; // 5 days (< 7 day minimum)

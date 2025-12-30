@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
@@ -38,7 +40,7 @@ import "./CTF1155.sol";
  * - Admin functions require OPERATIONS_ADMIN_ROLE
  * - Tier limits enforced on market creation and trading
  */
-contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
+contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver {
     using SafeERC20 for IERC20;
     
     /**
@@ -589,9 +591,12 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             // Approve CTF1155 to spend collateral
             IERC20(market.collateralToken).approve(address(ctf1155), amount);
             
-            // Split collateral into both position tokens (1:1 ratio)
-            uint256[] memory partition = new uint256[](1);
-            partition[0] = buyPass ? market.passPositionId : market.failPositionId;
+            // Split collateral into BOTH position tokens (binary market)
+            // CTF1155 requires partition with at least 2 elements
+            // For binary conditions: index set 1 = outcome 0, index set 2 = outcome 1
+            uint256[] memory partition = new uint256[](2);
+            partition[0] = 1; // PASS outcome index set
+            partition[1] = 2; // FAIL outcome index set
             
             ctf1155.splitPosition(
                 IERC20(market.collateralToken),
@@ -605,6 +610,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             tokenAmount = amount;
             
             // Transfer the requested position tokens to buyer
+            // CTF splits to this contract, so we transfer the desired position to buyer
             ctf1155.safeTransferFrom(
                 address(this),
                 msg.sender,
@@ -713,9 +719,11 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
             );
             
             // Merge both positions back to collateral
+            // CTF1155 requires partition with at least 2 elements
+            // For binary conditions: index set 1 = outcome 0, index set 2 = outcome 1
             uint256[] memory partition = new uint256[](2);
-            partition[0] = market.passPositionId;
-            partition[1] = market.failPositionId;
+            partition[0] = 1; // PASS outcome index set
+            partition[1] = 2; // FAIL outcome index set
             
             ctf1155.mergePositions(
                 IERC20(market.collateralToken),
@@ -1106,6 +1114,43 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard {
         uint256 marketId;
         uint256 passValue;
         uint256 failValue;
+    }
+
+    /**
+     * @notice Handle the receipt of a single ERC1155 token type
+     * @dev Required by IERC1155Receiver to accept ERC1155 tokens
+     */
+    function onERC1155Received(
+        address /* operator */,
+        address /* from */,
+        uint256 /* id */,
+        uint256 /* value */,
+        bytes calldata /* data */
+    ) external pure returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    /**
+     * @notice Handle the receipt of multiple ERC1155 token types
+     * @dev Required by IERC1155Receiver to accept batch ERC1155 token transfers
+     */
+    function onERC1155BatchReceived(
+        address /* operator */,
+        address /* from */,
+        uint256[] calldata /* ids */,
+        uint256[] calldata /* values */,
+        bytes calldata /* data */
+    ) external pure returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
+    }
+
+    /**
+     * @notice Check if contract supports an interface
+     * @dev Required by IERC165 (inherited by IERC1155Receiver)
+     */
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(IERC1155Receiver).interfaceId ||
+               interfaceId == type(IERC165).interfaceId;
     }
 }
 
