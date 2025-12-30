@@ -2,15 +2,24 @@ import { createThirdwebClient } from 'thirdweb'
 import { defineChain } from 'thirdweb/chains'
 
 // Get client ID from environment
-const clientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID || 'demo-client-id'
+const envClientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID
 
-// Warn if using demo client ID (only in development)
-if (!import.meta.env.VITE_THIRDWEB_CLIENT_ID && import.meta.env.DEV) {
-  console.warn(
-    'ThirdWeb: Using demo client ID. For production, please set VITE_THIRDWEB_CLIENT_ID in your .env file. ' +
-    'Get your client ID at https://thirdweb.com/dashboard'
-  )
+// Validate client ID: allow demo ID only in development, fail fast in production
+if (!envClientId) {
+  if (import.meta.env.DEV) {
+    console.warn(
+      'ThirdWeb: Using demo client ID. For production, please set VITE_THIRDWEB_CLIENT_ID in your .env file. ' +
+      'Get your client ID at https://thirdweb.com/dashboard'
+    )
+  } else {
+    throw new Error(
+      'ThirdWeb: VITE_THIRDWEB_CLIENT_ID must be set in production builds. ' +
+      'Get your client ID at https://thirdweb.com/dashboard'
+    )
+  }
 }
+
+const clientId = envClientId || 'demo-client-id'
 
 // Create ThirdWeb client
 export const thirdwebClient = createThirdwebClient({
@@ -34,7 +43,7 @@ export const ethereumClassic = defineChain({
     name: 'Ether',
     symbol: 'ETC',
   },
-  rpc: 'https://etc.rivet.link',
+  rpc: networkId === 61 ? rpcUrl : 'https://etc.rivet.link',
   blockExplorers: [
     {
       name: 'BlockScout',
@@ -72,12 +81,12 @@ export const hardhat = defineChain({
     name: 'Ether',
     symbol: 'ETH',
   },
-  rpc: 'http://127.0.0.1:8545',
+  rpc: networkId === 1337 ? rpcUrl : 'http://127.0.0.1:8545',
   testnet: true,
 })
 
 // Helper to get expected chain info
-export const getThirdWebChain = () => {
+export const getThirdwebChain = () => {
   switch (networkId) {
     case 61:
       return ethereumClassic

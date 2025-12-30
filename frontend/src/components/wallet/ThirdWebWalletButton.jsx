@@ -1,5 +1,6 @@
+import { useMemo } from 'react'
 import { ConnectButton } from 'thirdweb/react'
-import { thirdwebClient, getThirdWebChain } from '../../thirdweb'
+import { thirdwebClient, getThirdwebChain } from '../../thirdweb'
 import './ThirdWebWalletButton.css'
 
 /**
@@ -15,7 +16,8 @@ function ThirdWebWalletButton({
   welcomeScreen,
   showAllWallets = true
 }) {
-  const chain = getThirdWebChain()
+  // Memoize chain to avoid recalculation on every render
+  const chain = useMemo(() => getThirdwebChain(), [])
 
   return (
     <div className={`thirdweb-wallet-button ${className}`}>
