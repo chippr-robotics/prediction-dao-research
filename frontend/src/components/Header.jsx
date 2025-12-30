@@ -1,19 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useWallet } from '../hooks'
-import { useModal } from '../hooks/useUI'
-import { useUserPreferences } from '../hooks/useUserPreferences'
-import UserManagementModal from './ui/UserManagementModal'
 import TokenMintButton from './TokenMintButton'
-import walletIcon from '../assets/wallet_no_text.svg'
+import ThirdWebWalletButton from './wallet/ThirdWebWalletButton'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isConnected, address } = useWallet()
-  const { showModal } = useModal()
-  const { preferences } = useUserPreferences()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [logoError, setLogoError] = useState(false)
 
@@ -42,20 +35,6 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
 
   const handleLogoError = () => {
     setLogoError(true)
-  }
-
-  const handleOpenUserManagement = () => {
-    showModal(<UserManagementModal />, {
-      title: 'User Management',
-      size: 'large',
-      closable: true
-    })
-  }
-
-  // Shorten wallet address for display
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
   return (
@@ -103,27 +82,12 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
           {!hideWalletButton && (
             <>
               <TokenMintButton />
-              <button
-                className={`wallet-btn ${isConnected ? 'connected' : ''}`}
-                onClick={handleOpenUserManagement}
-                aria-label={isConnected ? `Wallet connected: ${shortenAddress(address)}` : "Connect wallet"}
-                title={isConnected ? `Wallet: ${shortenAddress(address)}` : "Connect Wallet"}
-              >
-                <img 
-                  src={walletIcon} 
-                  alt="Wallet" 
-                  className="wallet-icon-img"
-                  aria-hidden="true"
-                />
-                {isConnected && (
-                  <span className="wallet-address-badge">
-                    {shortenAddress(address)}
-                  </span>
-                )}
-                {isConnected && preferences.clearPathStatus.active && (
-                  <span className="clearpath-indicator" aria-label="ClearPath Active">✓</span>
-                )}
-              </button>
+              <ThirdWebWalletButton 
+                theme="dark"
+                btnTitle="Connect Wallet"
+                modalTitle="Connect Your Wallet"
+                modalSize="wide"
+              />
             </>
           )}
 

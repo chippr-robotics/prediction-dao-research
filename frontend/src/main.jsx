@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ThirdwebProvider } from 'thirdweb/react'
 import './index.css'
 import App from './App.jsx'
 import { config } from './wagmi'
@@ -22,30 +23,32 @@ const queryClient = new QueryClient()
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <WagmiProvider config={config}>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            {/* WalletProvider is the primary wallet management - wraps everything */}
-            <WalletProvider>
-              {/* Web3Provider kept for backwards compatibility */}
-              <Web3Provider>
-                <UserPreferencesProvider>
-                  {/* RoleProvider kept for backwards compatibility, roles now in WalletProvider */}
-                  <RoleProvider>
-                    <ETCswapProvider>
-                      <UIProvider>
-                        <PriceProvider>
-                          <App />
-                        </PriceProvider>
-                      </UIProvider>
-                    </ETCswapProvider>
-                  </RoleProvider>
-                </UserPreferencesProvider>
-              </Web3Provider>
-            </WalletProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
+      <ThirdwebProvider>
+        <WagmiProvider config={config}>
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider>
+              {/* WalletProvider is the primary wallet management - wraps everything */}
+              <WalletProvider>
+                {/* Web3Provider kept for backwards compatibility */}
+                <Web3Provider>
+                  <UserPreferencesProvider>
+                    {/* RoleProvider kept for backwards compatibility, roles now in WalletProvider */}
+                    <RoleProvider>
+                      <ETCswapProvider>
+                        <UIProvider>
+                          <PriceProvider>
+                            <App />
+                          </PriceProvider>
+                        </UIProvider>
+                      </ETCswapProvider>
+                    </RoleProvider>
+                  </UserPreferencesProvider>
+                </Web3Provider>
+              </WalletProvider>
+            </ThemeProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
+      </ThirdwebProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

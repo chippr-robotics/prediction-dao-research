@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -7,83 +7,33 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import RolePurchaseModal from './RolePurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
-import LoadingScreen from './LoadingScreen'
+import ThirdWebWalletButton from '../wallet/ThirdWebWalletButton'
 import './UserManagementModal.css'
-
-// Connector display configuration
-const CONNECTOR_CONFIG = {
-  walletConnect: {
-    icon: '🔗',
-    label: 'WalletConnect'
-  },
-  injected: {
-    icon: '🦊',
-    label: 'MetaMask'
-  }
-}
-
-// Get connector display info
-const getConnectorInfo = (connector) => {
-  const config = CONNECTOR_CONFIG[connector.id]
-  if (config) {
-    return `${config.icon} ${config.label}`
-  }
-  return connector.name || connector.id
-}
 
 // eslint-disable-next-line no-unused-vars
 function UserManagementModal({ onScanMarket }) {
-  const { address, isConnected, connectors } = useWallet()
-  const { connectWallet, disconnectWallet } = useWalletConnection()
+  const { address, isConnected } = useWallet()
+  const { disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
   const { preferences, setClearPathStatus } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
-  const [connectingConnectorId, setConnectingConnectorId] = useState(null)
-  const [connectionError, setConnectionError] = useState(null)
-  const [wasDisconnected, setWasDisconnected] = useState(!isConnected)
+  const wasDisconnectedRef = useRef(!isConnected)
 
   // Auto-close modal when connection is successful
   useEffect(() => {
-    if (wasDisconnected && isConnected) {
+    if (wasDisconnectedRef.current && isConnected) {
       // Connection successful - close the modal after a brief delay for feedback
       const timer = setTimeout(() => {
         hideModal()
       }, 500)
       return () => clearTimeout(timer)
     }
-    if (!isConnected) {
-      setWasDisconnected(true)
-    }
-  }, [isConnected, wasDisconnected, hideModal])
-
-  const handleConnect = async (connectorId) => {
-    setConnectingConnectorId(connectorId)
-    setConnectionError(null)
-    
-    try {
-      const success = await connectWallet(connectorId)
-      if (!success) {
-        setConnectionError('Failed to connect wallet. Please try again.')
-      }
-      // On success, the modal will re-render with isConnected=true
-    } catch (error) {
-      console.error('Wallet connection error:', error)
-      
-      // Provide user-friendly error messages
-      if (error.message.includes('rejected') || error.message.includes('approve')) {
-        setConnectionError('Connection request was rejected. Please try again.')
-      } else if (error.message.includes('connector')) {
-        setConnectionError('No wallet connector available. Please install a Web3 wallet.')
-      } else {
-        setConnectionError(error.message || 'Failed to connect wallet. Please try again.')
-      }
-    } finally {
-      setConnectingConnectorId(null)
-    }
-  }
+    // Update ref when connection status changes
+    wasDisconnectedRef.current = !isConnected
+  }, [isConnected, hideModal])
 
   const handleDisconnect = () => {
     disconnectWallet()
@@ -148,40 +98,14 @@ function UserManagementModal({ onScanMarket }) {
             <h3>Connect Your Wallet</h3>
             <p>Connect your Web3 wallet to access all features, manage your preferences, and interact with markets.</p>
             
-            {connectionError && (
-              <div className="connection-error" role="alert" aria-live="assertive">
-                <span className="error-icon" aria-hidden="true">⚠️</span>
-                <span className="error-message">{connectionError}</span>
-              </div>
-            )}
-            
             <div className="connector-options">
-              {connectors.map((connector) => {
-                const isThisConnecting = connectingConnectorId === connector.id
-                return (
-                  <button
-                    key={connector.id}
-                    onClick={() => handleConnect(connector.id)}
-                    className="connector-btn"
-                    disabled={connectingConnectorId !== null}
-                    aria-busy={isThisConnecting}
-                  >
-                    {isThisConnecting ? (
-                      <>
-                        <LoadingScreen 
-                          visible={true} 
-                          inline 
-                          size="small" 
-                          text="" 
-                        />
-                        <span style={{ marginLeft: '8px' }}>Connecting...</span>
-                      </>
-                    ) : (
-                      getConnectorInfo(connector)
-                    )}
-                  </button>
-                )
-              })}
+              <ThirdWebWalletButton 
+                theme="dark"
+                btnTitle="Connect Wallet"
+                modalTitle="Connect Your Wallet"
+                modalSize="wide"
+                showAllWallets={true}
+              />
             </div>
             
             <div className="wallet-help" role="note">
