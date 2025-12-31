@@ -1,0 +1,660 @@
+/* ============================================================================
+   MODERN MARKET CARD - Fairwins Dashboard Style
+   Inspired by advanced fintech trading apps with 4K-ready design
+   Theme-aware: Supports both light and dark modes
+   ============================================================================ */
+
+/* CSS Custom Properties for theme-aware cards */
+.modern-market-card {
+  /* Dark mode defaults (will be overridden by light mode) */
+  --card-bg: linear-gradient(135deg, #1a1f2e 0%, #151922 100%);
+  --card-bg-solid: #1a1f2e;
+  --card-border: rgba(255, 255, 255, 0.06);
+  --card-border-hover: rgba(54, 179, 126, 0.3);
+  --card-shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.35), 0 0 30px rgba(54, 179, 126, 0.15);
+  --card-text-primary: #ffffff;
+  --card-text-secondary: rgba(255, 255, 255, 0.7);
+  --card-text-muted: rgba(255, 255, 255, 0.55);
+  --card-stats-bg: rgba(0, 0, 0, 0.2);
+  --card-action-bg: rgba(0, 0, 0, 0.15);
+  --card-expanded-bg: rgba(0, 0, 0, 0.25);
+  --card-tag-bg: rgba(255, 255, 255, 0.08);
+  --card-tag-text: rgba(255, 255, 255, 0.65);
+  --ring-bg: rgba(255, 255, 255, 0.1);
+  --resolution-bg: rgba(0, 0, 0, 0.3);
+  --yes-color: #36B37E;
+  --no-color: #e17055;
+}
+
+/* Light mode overrides */
+.theme-light .modern-market-card {
+  --card-bg: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  --card-bg-solid: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.08);
+  --card-border-hover: rgba(54, 179, 126, 0.4);
+  --card-shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.12), 0 0 30px rgba(54, 179, 126, 0.1);
+  --card-text-primary: #1F2933;
+  --card-text-secondary: rgba(31, 41, 51, 0.7);
+  --card-text-muted: rgba(31, 41, 51, 0.55);
+  --card-stats-bg: rgba(0, 0, 0, 0.04);
+  --card-action-bg: rgba(0, 0, 0, 0.03);
+  --card-expanded-bg: rgba(0, 0, 0, 0.03);
+  --card-tag-bg: rgba(0, 0, 0, 0.06);
+  --card-tag-text: rgba(31, 41, 51, 0.65);
+  --ring-bg: rgba(0, 0, 0, 0.08);
+  --resolution-bg: rgba(0, 0, 0, 0.06);
+}
+
+.modern-market-card {
+  position: relative;
+  background: var(--card-bg);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.modern-market-card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--card-shadow-hover);
+  border-color: var(--card-border-hover);
+}
+
+.modern-market-card:focus {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 2px;
+}
+
+/* Background thumbnail with overlay */
+.card-thumbnail {
+  position: relative;
+  height: 160px;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.card-thumbnail .thumbnail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Dark overlay gradient for text readability - stronger for clear visibility */
+.thumbnail-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.65) 50%,
+    rgba(0, 0, 0, 0.85) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0;
+}
+
+/* Light mode overlay adjustment - even stronger */
+.theme-light .thumbnail-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.7) 50%,
+    rgba(0, 0, 0, 0.9) 100%
+  );
+}
+
+/* Category pill badges */
+.card-header {
+  position: relative;
+  z-index: 1;
+  padding: 12px 14px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* Card title - Primary text over background - BOLD and VISIBLE */
+.card-title {
+  position: relative;
+  z-index: 1;
+  padding: 8px 14px 14px;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* Light mode title - still white over dark overlay */
+.theme-light .card-title {
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
+}
+
+.card-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.category-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.category-pill.politics {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: #fff;
+}
+
+.category-pill.crypto {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color: #fff;
+}
+
+.category-pill.sports {
+  background: linear-gradient(135deg, #27ae60 0%, #1e8449 100%);
+  color: #fff;
+}
+
+.category-pill.finance {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: #fff;
+}
+
+.category-pill.tech {
+  background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+  color: #fff;
+}
+
+.category-pill.pop-culture {
+  background: linear-gradient(135deg, #e91e63 0%, #c2185b 100%);
+  color: #fff;
+}
+
+/* Correlation group pill - distinct styling */
+.correlation-group-pill {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  background: rgba(76, 154, 255, 0.25);
+  color: #fff;
+  border: 1px solid rgba(76, 154, 255, 0.4);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resolution-date {
+  font-size: 0.7rem;
+  color: #fff;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+/* Gauge and Trend Section - Horizontal layout */
+.gauge-trend-section {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 8px 14px 12px;
+  gap: 16px;
+}
+
+/* Full Ring Probability Gauge */
+.probability-ring {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+}
+
+.probability-ring svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ring-bg {
+  stroke: var(--ring-bg);
+  stroke-width: 8;
+}
+
+.ring-fill {
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease-out;
+}
+
+.ring-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ring-percentage {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--card-text-primary);
+  line-height: 1;
+}
+
+.ring-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--yes-color);
+}
+
+/* Trend Section */
+.trend-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-label {
+  font-size: 0.6rem;
+  color: var(--card-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sparkline-container-v2 {
+  width: 100%;
+  height: 40px;
+}
+
+.sparkline-container-v2 svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sparkline-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-area {
+  opacity: 0.15;
+}
+
+.trend-indicator-v2 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.trend-indicator-v2.up {
+  color: var(--yes-color);
+}
+
+.trend-indicator-v2.down {
+  color: var(--no-color);
+}
+
+.trend-arrow {
+  font-size: 0.9rem;
+}
+
+.trend-change {
+  font-weight: 500;
+}
+
+/* Stats row */
+.stats-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 14px;
+  background: var(--card-stats-bg);
+  border-top: 1px solid var(--card-border);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.stat-icon {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+.stat-label {
+  font-size: 0.55rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--card-text-muted);
+  margin-bottom: 1px;
+}
+
+.stat-value {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--card-text-primary);
+}
+
+/* Tags row */
+.tags-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-top: 1px solid var(--card-border);
+}
+
+.market-tag {
+  padding: 3px 8px;
+  background: var(--card-tag-bg);
+  border-radius: 6px;
+  font-size: 0.6rem;
+  color: var(--card-tag-text);
+  font-weight: 500;
+}
+
+/* Action buttons - Yes/No binary - ALWAYS horizontal */
+.action-buttons {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: row !important;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--card-action-bg);
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.action-btn .btn-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.action-btn .btn-price {
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+/* Yes button - faint green background */
+.action-btn.yes-btn {
+  background: rgba(54, 179, 126, 0.15);
+  color: var(--yes-color);
+  border: 1px solid rgba(54, 179, 126, 0.4);
+}
+
+.action-btn.yes-btn:hover {
+  background: rgba(54, 179, 126, 0.25);
+  border-color: var(--yes-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.2);
+}
+
+/* No button - faint red background */
+.action-btn.no-btn {
+  background: rgba(225, 112, 85, 0.15);
+  color: var(--no-color);
+  border: 1px solid rgba(225, 112, 85, 0.4);
+}
+
+.action-btn.no-btn:hover {
+  background: rgba(225, 112, 85, 0.25);
+  border-color: var(--no-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(225, 112, 85, 0.2);
+}
+
+/* Light mode button adjustments */
+.theme-light .action-btn.yes-btn {
+  background: rgba(54, 179, 126, 0.12);
+  color: #2d9968;
+  border: 1px solid rgba(54, 179, 126, 0.35);
+}
+
+.theme-light .action-btn.yes-btn:hover {
+  background: rgba(54, 179, 126, 0.2);
+}
+
+.theme-light .action-btn.no-btn {
+  background: rgba(225, 112, 85, 0.12);
+  color: #c0392b;
+  border: 1px solid rgba(225, 112, 85, 0.35);
+}
+
+.theme-light .action-btn.no-btn:hover {
+  background: rgba(225, 112, 85, 0.2);
+}
+
+/* Card expanded state */
+.modern-market-card.expanded .card-expanded-content {
+  max-height: 80px;
+  opacity: 1;
+  padding: 10px 14px;
+}
+
+.card-expanded-content {
+  position: relative;
+  z-index: 1;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: all 0.35s ease;
+  background: var(--card-expanded-bg);
+  border-top: 1px solid var(--card-border);
+}
+
+.expanded-description {
+  font-size: 0.7rem;
+  color: var(--card-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modern-market-card {
+    min-height: 380px;
+  }
+
+  .card-title {
+    font-size: 0.9rem;
+  }
+
+  .ring-percentage {
+    font-size: 1.2rem;
+  }
+
+  .probability-ring {
+    width: 75px;
+    height: 75px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modern-market-card {
+    min-height: 340px;
+  }
+
+  /* Keep gauge and trend on same horizontal row on mobile */
+  .gauge-trend-section {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .probability-ring {
+    width: 70px;
+    height: 70px;
+    flex-shrink: 0;
+  }
+
+  .ring-percentage {
+    font-size: 1rem;
+  }
+
+  .trend-section {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .stats-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    justify-content: space-around;
+    padding: 10px 12px;
+  }
+
+  .stat-item {
+    flex: 1;
+    align-items: center;
+  }
+
+  .stat-label {
+    font-size: 0.5rem;
+  }
+
+  .stat-value {
+    font-size: 0.85rem;
+  }
+
+  /* Keep binary options on same horizontal row on mobile - ALWAYS */
+  .action-buttons {
+    flex-direction: row !important;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 10px 8px;
+    flex-direction: row !important;
+  }
+
+  .action-btn .btn-label {
+    font-size: 0.8rem;
+  }
+
+  .action-btn .btn-price {
+    font-size: 0.65rem;
+  }
+}
+
+/* Animation for ring on mount */
+/* Note: 251 ≈ 2π × 40 (full circumference of ring with radius 40) */
+@keyframes ringLoad {
+  from {
+    stroke-dasharray: 0 251;
+  }
+}
+
+.ring-fill {
+  animation: ringLoad 0.8s ease-out forwards;
+}
+
+/* Shine effect on hover */
+.modern-market-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.03),
+    transparent
+  );
+  transition: left 0.5s ease;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Light mode shine effect */
+.theme-light .modern-market-card::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 0, 0, 0.02),
+    transparent
+  );
+}
+
+.modern-market-card:hover::before {
+  left: 100%;
+}
+
+/* Correlation group indicator */
+.correlation-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--brand-primary, #36B37E), var(--brand-secondary, #4C9AFF));
+  z-index: 3;
+}

@@ -7,14 +7,14 @@ import './index.css'
 import App from './App.jsx'
 import { config } from './wagmi'
 import {
+  Web3Provider,
   WalletProvider,
   UIProvider,
   ThemeProvider,
   PriceProvider,
   ETCswapProvider,
   UserPreferencesProvider,
-  RoleProvider,
-  Web3Provider
+  RoleProvider
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'

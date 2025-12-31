@@ -1,4 +1,4 @@
-import MarketTile from './MarketTile'
+import ModernMarketCard from './ModernMarketCard'
 import './MarketGrid.css'
 
 function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = false }) {
@@ -26,18 +26,23 @@ function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = f
     )
   }
 
+  // Determine how many cards are in the first row based on grid layout (typically 3 on desktop)
+  const firstRowCount = 3
+
   return (
     <div 
       className="market-grid"
       role="grid"
       aria-label="Market grid"
     >
-      {markets.map((market) => (
+      {markets.map((market, index) => (
         <div key={market.id} role="gridcell">
-          <MarketTile 
+          <ModernMarketCard 
             market={market}
             onClick={onMarketClick}
+            onTrade={onMarketClick}
             isActive={selectedMarketId === market.id}
+            isFirstRow={index < firstRowCount}
           />
         </div>
       ))}
