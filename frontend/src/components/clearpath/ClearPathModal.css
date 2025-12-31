@@ -1,0 +1,97 @@
+/* ClearPath Modal Content */
+.clearpath-modal-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: #f9fafb;
+}
+
+/* Modal Header */
+.clearpath-modal-header {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #4A5568 0%, #2D3748 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.clearpath-branding {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.clearpath-modal-logo {
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+}
+
+.clearpath-text h2 {
+  margin: 0;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.clearpath-text .subtitle {
+  margin: 0.25rem 0 0 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Modal Body */
+.clearpath-modal-body {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  min-height: 400px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .clearpath-modal-header {
+    padding: 1rem;
+  }
+
+  .clearpath-branding {
+    gap: 0.75rem;
+  }
+
+  .clearpath-modal-logo {
+    width: 32px;
+    height: 32px;
+  }
+
+  .clearpath-text h2 {
+    font-size: 1.25rem;
+  }
+
+  .clearpath-text .subtitle {
+    font-size: 0.8rem;
+  }
+
+  .clearpath-modal-body {
+    padding: 1rem;
+    min-height: 300px;
+  }
+}
+
+/* Scrollbar styling */
+.clearpath-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.clearpath-modal-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.clearpath-modal-body::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.clearpath-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

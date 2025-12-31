@@ -27,23 +27,25 @@ createRoot(document.getElementById('root')).render(
       <ThirdwebProvider>
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
-            <ThemeProvider>
-              {/* WalletProvider is the primary wallet management - wraps everything */}
-              <WalletProvider>
-                <UserPreferencesProvider>
-                  {/* RoleProvider kept for backwards compatibility, roles now in WalletProvider */}
-                  <RoleProvider>
-                    <ETCswapProvider>
-                      <UIProvider>
-                        <PriceProvider>
-                          <App />
-                        </PriceProvider>
-                      </UIProvider>
-                    </ETCswapProvider>
-                  </RoleProvider>
-                </UserPreferencesProvider>
-              </WalletProvider>
-            </ThemeProvider>
+            <Web3Provider>
+              <ThemeProvider>
+                {/* WalletProvider is the primary wallet management - wraps everything */}
+                <WalletProvider>
+                  <UserPreferencesProvider>
+                    {/* RoleProvider kept for backwards compatibility, roles now in WalletProvider */}
+                    <RoleProvider>
+                      <ETCswapProvider>
+                        <UIProvider>
+                          <PriceProvider>
+                            <App />
+                          </PriceProvider>
+                        </UIProvider>
+                      </ETCswapProvider>
+                    </RoleProvider>
+                  </UserPreferencesProvider>
+                </WalletProvider>
+              </ThemeProvider>
+            </Web3Provider>
           </QueryClientProvider>
         </WagmiProvider>
       </ThirdwebProvider>

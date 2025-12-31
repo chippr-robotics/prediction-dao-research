@@ -1,20 +1,20 @@
-/* TokenMint Button Container */
-.tokenmint-button-container {
+/* ClearPath Button Container */
+.clearpath-button-container {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-/* TokenMint Button */
-.tokenmint-button {
+/* ClearPath Button */
+.clearpath-button {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 44px;
   height: 44px;
-  background: var(--color-primary, #2D7A4F);
-  border: 2px solid var(--color-primary-dark, #1e5a37);
+  background: var(--color-secondary, #4A5568);
+  border: 2px solid var(--color-secondary-dark, #2D3748);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -22,39 +22,39 @@
   padding: 6px;
 }
 
-.tokenmint-button.inactive {
+.clearpath-button.inactive {
   opacity: 0.4;
   cursor: not-allowed;
-  background: var(--color-primary-light, #48bb78);
-  border-color: var(--color-primary-light, #48bb78);
+  background: var(--color-secondary-light, #718096);
+  border-color: var(--color-secondary-light, #718096);
 }
 
-.tokenmint-button.inactive:hover {
+.clearpath-button.inactive:hover {
   opacity: 0.4;
   transform: none;
   box-shadow: none;
 }
 
-.tokenmint-button:not(.inactive):hover {
-  background: var(--color-primary-dark, #1e5a37);
+.clearpath-button:not(.inactive):hover {
+  background: var(--color-secondary-dark, #2D3748);
   transform: scale(1.05);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.tokenmint-button:active {
+.clearpath-button:active {
   transform: scale(0.98);
 }
 
-.tokenmint-button.inactive:active {
+.clearpath-button.inactive:active {
   transform: none;
 }
 
-.tokenmint-button:focus-visible {
-  outline: 3px solid var(--color-primary, #2D7A4F);
+.clearpath-button:focus-visible {
+  outline: 3px solid var(--color-secondary, #4A5568);
   outline-offset: 2px;
 }
 
-.tokenmint-icon {
+.clearpath-icon {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -62,7 +62,7 @@
 }
 
 /* Dropdown Menu */
-.tokenmint-dropdown {
+.clearpath-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
@@ -87,13 +87,13 @@
 }
 
 /* Dropdown Header */
-.dropdown-header {
+.clearpath-dropdown .dropdown-header {
   padding: 1rem;
   border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #2D7A4F 0%, #1e5a37 100%);
+  background: linear-gradient(135deg, #4A5568 0%, #2D3748 100%);
 }
 
-.dropdown-title {
+.clearpath-dropdown .dropdown-title {
   font-size: 1rem;
   font-weight: 600;
   color: white;
@@ -103,13 +103,13 @@
 }
 
 /* Dropdown Options */
-.dropdown-options {
+.clearpath-dropdown .dropdown-options {
   padding: 0.5rem;
   max-height: 400px;
   overflow-y: auto;
 }
 
-.dropdown-option {
+.clearpath-dropdown .dropdown-option {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
@@ -123,27 +123,27 @@
   transition: all 0.2s ease;
 }
 
-.dropdown-option:hover {
+.clearpath-dropdown .dropdown-option:hover {
   background: #f9fafb;
 }
 
-.dropdown-option:focus-visible {
-  outline: 2px solid var(--color-primary, #2D7A4F);
+.clearpath-dropdown .dropdown-option:focus-visible {
+  outline: 2px solid var(--color-secondary, #4A5568);
   outline-offset: -2px;
   background: #f9fafb;
 }
 
-.dropdown-option.highlight {
-  background: linear-gradient(135deg, rgba(45, 122, 79, 0.1) 0%, rgba(30, 90, 55, 0.1) 100%);
-  border: 1px solid rgba(45, 122, 79, 0.3);
+.clearpath-dropdown .dropdown-option.highlight {
+  background: linear-gradient(135deg, rgba(74, 85, 104, 0.1) 0%, rgba(45, 55, 72, 0.1) 100%);
+  border: 1px solid rgba(74, 85, 104, 0.3);
 }
 
-.dropdown-option.highlight:hover {
-  background: linear-gradient(135deg, rgba(45, 122, 79, 0.15) 0%, rgba(30, 90, 55, 0.15) 100%);
+.clearpath-dropdown .dropdown-option.highlight:hover {
+  background: linear-gradient(135deg, rgba(74, 85, 104, 0.15) 0%, rgba(45, 55, 72, 0.15) 100%);
 }
 
 /* Option Icon */
-.option-icon {
+.clearpath-dropdown .option-icon {
   font-size: 1.5rem;
   flex-shrink: 0;
   display: flex;
@@ -154,87 +154,29 @@
 }
 
 /* Option Content */
-.option-content {
+.clearpath-dropdown .option-content {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   flex: 1;
 }
 
-.option-label {
+.clearpath-dropdown .option-label {
   font-size: 0.95rem;
   font-weight: 600;
   color: #1a1a1a;
   line-height: 1.3;
 }
 
-.option-description {
+.clearpath-dropdown .option-description {
   font-size: 0.8rem;
   color: #6b7280;
   line-height: 1.4;
 }
 
-/* Transaction Modal Styles */
-.transaction-modal,
-.info-modal {
-  padding: 1rem;
-}
-
-.transaction-modal h3,
-.info-modal h3 {
-  margin: 0 0 1rem 0;
-  color: #1a1a1a;
-  font-size: 1.25rem;
-}
-
-.transaction-modal p,
-.info-modal p {
-  margin: 0.5rem 0;
-  color: #4b5563;
-  line-height: 1.6;
-}
-
-.token-details {
-  background: #f9fafb;
-  border-radius: 8px;
-  padding: 1rem;
-  margin: 1rem 0;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.detail-row:last-child {
-  border-bottom: none;
-}
-
-.detail-label {
-  font-weight: 600;
-  color: #374151;
-}
-
-.detail-value {
-  color: #1a1a1a;
-  font-family: 'Courier New', monospace;
-}
-
-.transaction-note {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: #fef3c7;
-  border-left: 4px solid #f59e0b;
-  border-radius: 4px;
-  color: #92400e;
-  font-size: 0.9rem;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
-  .tokenmint-dropdown {
+  .clearpath-dropdown {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
@@ -242,48 +184,48 @@
     max-width: calc(100vw - 2rem);
   }
 
-  .dropdown-option {
+  .clearpath-dropdown .dropdown-option {
     padding: 0.75rem;
   }
 
-  .option-icon {
+  .clearpath-dropdown .option-icon {
     font-size: 1.25rem;
     width: 28px;
     height: 28px;
   }
 
-  .option-label {
+  .clearpath-dropdown .option-label {
     font-size: 0.9rem;
   }
 
-  .option-description {
+  .clearpath-dropdown .option-description {
     font-size: 0.75rem;
   }
 }
 
 /* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
-  .tokenmint-button,
-  .dropdown-option {
+  .clearpath-button,
+  .clearpath-dropdown .dropdown-option {
     transition: none;
   }
 
-  .tokenmint-dropdown {
+  .clearpath-dropdown {
     animation: none;
   }
 }
 
 /* High Contrast Mode */
 @media (prefers-contrast: high) {
-  .tokenmint-button {
+  .clearpath-button {
     border-width: 3px;
   }
 
-  .dropdown-option {
+  .clearpath-dropdown .dropdown-option {
     border: 1px solid transparent;
   }
 
-  .dropdown-option:focus-visible {
+  .clearpath-dropdown .dropdown-option:focus-visible {
     border-color: #000;
   }
 }
