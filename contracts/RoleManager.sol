@@ -577,9 +577,9 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     }
     
     /**
-     * @notice Withdraw contract balance (Default Admin only)
+     * @notice Withdraw contract balance (Operations Admin only)
      */
-    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
+    function withdraw() external onlyRole(OPERATIONS_ADMIN_ROLE) nonReentrant {
         uint256 balance = address(this).balance;
         require(balance > 0, "No balance to withdraw");
         payable(msg.sender).transfer(balance);
