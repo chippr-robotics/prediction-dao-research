@@ -761,11 +761,54 @@
   margin-bottom: 1.5rem;
 }
 
+.understanding-text h4 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1a5a37;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
 .understanding-text p {
   color: #4a5568;
   line-height: 1.8;
   font-size: 1.125rem;
   margin-bottom: 1.25rem;
+}
+
+.clearpath-features {
+  margin-top: 3rem;
+  padding-top: 3rem;
+  border-top: 2px solid #e8f5e9;
+}
+
+.clearpath-features h3 {
+  font-size: 1.875rem;
+  font-weight: 600;
+  color: #2D7A4F;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.clearpath-features .features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.clearpath-features .feature-item {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border-left: 3px solid #2D7A4F;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.clearpath-features .feature-item strong {
+  color: #2D7A4F;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
 .understanding-visual {
@@ -830,6 +873,107 @@
   font-size: 3rem;
   color: #2D7A4F;
   font-weight: 300;
+}
+
+/* TokenMint Section */
+.tokenmint-section {
+  padding: 6rem 2rem;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
+}
+
+.tokenmint-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tokenmint-description p {
+  color: #4a5568;
+  font-size: 1.125rem;
+  line-height: 1.8;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tokenmint-features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.tokenmint-feature {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border-top: 3px solid #34A853;
+}
+
+.tokenmint-feature:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(45, 122, 79, 0.15);
+}
+
+.tokenmint-feature h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2D7A4F;
+  margin-bottom: 0.75rem;
+}
+
+.tokenmint-feature p {
+  color: #4a5568;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.tokenmint-use-cases {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-top: 2rem;
+}
+
+.tokenmint-use-cases h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2D7A4F;
+  margin-bottom: 1.5rem;
+}
+
+.tokenmint-use-cases ul {
+  list-style: none;
+  padding: 0;
+}
+
+.tokenmint-use-cases li {
+  color: #4a5568;
+  padding: 0.75rem 0;
+  padding-left: 2rem;
+  position: relative;
+  line-height: 1.7;
+  border-bottom: 1px solid #e8f5e9;
+}
+
+.tokenmint-use-cases li:last-child {
+  border-bottom: none;
+}
+
+.tokenmint-use-cases li::before {
+  content: '🪙';
+  position: absolute;
+  left: 0;
+  font-size: 1.25rem;
+}
+
+.tokenmint-use-cases strong {
+  color: #2D7A4F;
+  font-weight: 600;
 }
 
 /* CTA Section */
@@ -952,6 +1096,14 @@
 
   .visual-arrow {
     transform: rotate(90deg);
+  }
+
+  .clearpath-features .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tokenmint-features-grid {
+    grid-template-columns: 1fr;
   }
 }
 

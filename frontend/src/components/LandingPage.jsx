@@ -32,7 +32,7 @@ function LandingPage() {
           <div className="hero-left">
             {/* FairWins Hero Content */}
             <div className="platforms-compact">
-              <h2 className="section-title-compact">Prediction Markets for Friends</h2>
+              <h2 className="section-title-compact">Harness the Wisdom of the Crowd</h2>
               <div className="platform-cards-compact">
                 {/* FairWins Main Card */}
                 <div className="platform-card-compact fairwins">
@@ -51,17 +51,17 @@ function LandingPage() {
                   )}
                     <div>
                       <h3>FairWins</h3>
-                      <p className="platform-tagline-compact">Prediction Markets for Friends</p>
+                      <p className="platform-tagline-compact">Prediction Markets for Everyone</p>
                     </div>
                   </div>
                   <p className="platform-description-compact">
-                    Create and trade on prediction markets about any topic. Open to everyone.
+                    Tap into collective intelligence through prediction markets. When people put money behind their predictions, the crowd becomes remarkably accurate.
                   </p>
                   <ul className="platform-features-compact">
-                    <li>✓ No wallet required to browse</li>
-                    <li>✓ Open to all participants</li>
-                    <li>✓ Flexible market creation</li>
-                    <li>✓ Transparent resolution</li>
+                    <li>✓ Create markets on any topic</li>
+                    <li>✓ Trade on collective predictions</li>
+                    <li>✓ Earn from accurate forecasts</li>
+                    <li>✓ Transparent on-chain resolution</li>
                   </ul>
                 </div>
               </div>
@@ -108,11 +108,33 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Enterprise-Grade Governance - Full Width Section */}
+      {/* Why Prediction Markets Work - Full Width Section */}
       <section className="enterprise-full-width" id="features">
         <div className="container">
-          <h2 className="section-title">Enterprise-Grade Governance</h2>
+          <h2 className="section-title">Why Prediction Markets Work</h2>
           <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <h3>Aggregated Knowledge</h3>
+              <p>Markets collect information from diverse participants with different perspectives and expertise</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <h3>Financial Incentives</h3>
+              <p>Real money rewards accurate predictions, ensuring informed participants have stronger influence</p>
+            </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -120,8 +142,17 @@ function LandingPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Transparent Markets</h3>
-              <p>All trades and outcomes visible on-chain for complete transparency</p>
+              <h3>Transparent Outcomes</h3>
+              <p>All trades and resolutions are visible on-chain for complete accountability</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+              </div>
+              <h3>Price Discovery</h3>
+              <p>Market prices continuously reflect the collective probability assessment of outcomes</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
@@ -129,50 +160,19 @@ function LandingPage() {
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <h3>Anti-Collusion</h3>
-              <p>MACI-style key-change mechanisms</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon" aria-hidden="true">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="12" y1="20" x2="12" y2="10" />
-                  <line x1="18" y1="20" x2="18" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="16" />
-                </svg>
-              </div>
-              <h3>Market Mechanics</h3>
-              <p>Automated liquidity with bounded losses</p>
+              <h3>Anti-Manipulation</h3>
+              <p>MACI-style privacy mechanisms protect against collusion and vote buying</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                 </svg>
               </div>
-              <h3>Minority Protection</h3>
-              <p>Ragequit functionality for stakeholders</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon" aria-hidden="true">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </div>
-              <h3>Multi-Stage Oracle</h3>
-              <p>Challenge period with dispute resolution</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon" aria-hidden="true">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              </div>
-              <h3>Timelock Security</h3>
-              <p>Delay periods and spending limits</p>
+              <h3>Global Participation</h3>
+              <p>Anyone can contribute their knowledge, democratizing expertise and predictions</p>
             </div>
           </div>
         </div>
@@ -181,57 +181,57 @@ function LandingPage() {
       {/* How It Works Section */}
       <section className="how-it-works-section" id="how-it-works">
         <div className="container">
-          <h2 className="section-title">How Prediction DAO Works</h2>
+          <h2 className="section-title">How the Wisdom of the Crowd Works</h2>
           <p className="section-intro">
-            A simple, transparent process that combines the best of democracy with market wisdom
+            Prediction markets harness collective intelligence by aggregating diverse knowledge and rewarding accuracy
           </p>
           <div className="steps-grid">
             <div className="step-card">
               <div className="step-number">1</div>
-              <h3>Pool Funds Together</h3>
+              <h3>Market Creation</h3>
               <p>
-                Participants contribute stablecoins to a shared treasury. These funds become the 
-                basis for collective decision-making, giving everyone a stake in the outcomes.
+                Anyone can create a prediction market about future outcomes—from elections and sports 
+                to company performance and scientific discoveries. Clear resolution criteria ensure fair settlement.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">2</div>
-              <h3>Create Proposals</h3>
+              <h3>Information Aggregation</h3>
               <p>
-                Anyone can propose how to use the treasury or predict future outcomes. Proposals 
-                are clear and specific—like "fund this project" or "this metric will increase."
+                Participants with knowledge, research, or insights trade based on their predictions. 
+                The market price naturally gravitates toward the collective probability assessment.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">3</div>
-              <h3>Purchase Votes</h3>
+              <h3>Financial Incentives</h3>
               <p>
-                Instead of each person getting one vote, participants use their stablecoins to buy 
-                votes. You put more behind ideas you truly believe in—aligning your money with your conviction.
+                Traders buy outcome tokens at current market prices. Those who predict correctly 
+                earn profits, while incorrect predictions result in losses. This aligns incentives with accuracy.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">4</div>
-              <h3>Vote on Outcomes</h3>
+              <h3>Price Discovery</h3>
               <p>
-                Voting happens through prediction markets. Buy "PASS" tokens if you think a proposal 
-                will succeed, or "FAIL" tokens if you think it won't. Market prices reveal collective wisdom.
+                As new information emerges, prices update in real-time. The market price represents 
+                the crowd's best estimate of the probability that an outcome will occur.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">5</div>
-              <h3>Decision Time</h3>
+              <h3>Market Resolution</h3>
               <p>
-                The proposal either passes or fails based on vote count and market confidence. 
-                Proposals with strong support move forward automatically, while weak ones are rejected.
+                When the outcome is determined, an oracle reports the result. There's a challenge 
+                period for disputes, ensuring accurate resolution before markets settle.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">6</div>
-              <h3>Token Settlement</h3>
+              <h3>Settlement & Rewards</h3>
               <p>
-                After the outcome is verified, winners redeem their tokens for their share of the pool 
-                plus rewards. Accurate predictions are rewarded, incentivizing honest participation and expertise.
+                Winners redeem their tokens for their share of the pool plus earnings from those 
+                who predicted incorrectly. Accurate forecasters are rewarded, incentivizing expertise.
               </p>
             </div>
           </div>
@@ -241,38 +241,38 @@ function LandingPage() {
       {/* Why Different Section */}
       <section className="comparison-section">
         <div className="container">
-          <h2 className="section-title">How Is This Different from Regular Democracy?</h2>
+          <h2 className="section-title">Why Prediction Markets Beat Traditional Polling</h2>
           <div className="comparison-grid">
             <div className="comparison-card">
-              <h3>💰 Market Incentives</h3>
+              <h3>💰 Skin in the Game</h3>
               <p>
-                Unlike traditional voting where everyone's vote counts the same regardless of expertise, 
-                Prediction DAO rewards accurate predictions with real returns. This attracts informed 
-                participants and ensures those with genuine knowledge have stronger influence.
+                Unlike surveys where responses have no consequences, prediction markets require 
+                real financial commitment. This filters out noise and rewards those with genuine 
+                knowledge and conviction.
               </p>
             </div>
             <div className="comparison-card">
-              <h3>🎯 Prediction Accuracy</h3>
+              <h3>🎯 Incentivized Accuracy</h3>
               <p>
-                Regular democracy asks "what do you prefer?" Prediction DAO asks "what do you think 
-                will actually happen?" This shifts focus from personal preference to factual prediction, 
-                aggregating collective intelligence more effectively.
+                Polls ask "what do you think?" with no reward for being right. Prediction markets 
+                reward accurate forecasts with real profits, ensuring participants research thoroughly 
+                and predict honestly.
               </p>
             </div>
             <div className="comparison-card">
-              <h3>🌐 Public Participation</h3>
+              <h3>📊 Continuous Updates</h3>
               <p>
-                Anyone with stablecoins can participate—not just pre-selected members or token holders. 
-                The market is open to everyone, democratizing access while maintaining quality through 
-                financial skin in the game.
+                Traditional polls are snapshots in time. Prediction markets update continuously as 
+                new information emerges, providing real-time probability assessments that evolve 
+                with events.
               </p>
             </div>
             <div className="comparison-card">
-              <h3>🏦 Treasury Mechanisms</h3>
+              <h3>🌐 Self-Weighted Expertise</h3>
               <p>
-                Instead of tax-funded or membership-fee treasuries, funds are actively deployed in 
-                prediction markets. This creates a self-sustaining system where the treasury grows 
-                through successful decisions rather than constant fundraising.
+                Polls give everyone equal weight. Markets naturally weight expertise—informed 
+                participants trade more and with higher stakes, while casual observers contribute 
+                less to price formation.
               </p>
             </div>
           </div>
@@ -284,108 +284,183 @@ function LandingPage() {
         <div className="container">
           <h2 className="section-title">Real-World Applications</h2>
           <p className="section-intro">
-            See how Prediction DAO works in different scenarios
+            See how FairWins prediction markets work in different scenarios
           </p>
           <div className="use-cases-grid">
             <div className="use-case-card">
-              <div className="use-case-icon">📊</div>
-              <h3>Simple Prediction Market</h3>
+              <div className="use-case-icon">🗳️</div>
+              <h3>Election Forecasting</h3>
               <p className="use-case-description">
-                <strong>The Scenario:</strong> A community wants to track group welfare using a single 
-                metric, like average happiness score or health index.
+                <strong>The Scenario:</strong> A presidential election is approaching and people want 
+                to track the probability of different outcomes more accurately than traditional polls.
               </p>
               <p className="use-case-description">
-                <strong>How It Works:</strong> Members propose different predictions for what the metric 
-                will be in 6 months. Participants buy votes on their predicted values. When the time comes, 
-                the actual value is measured and those who predicted accurately earn rewards from the pool.
+                <strong>How It Works:</strong> Traders buy tokens representing different candidates. 
+                As new polls, debates, and events occur, prices update in real-time to reflect the 
+                collective probability assessment. The market price becomes the best predictor.
               </p>
               <p className="use-case-outcome">
-                <strong>The Result:</strong> The community continuously improves its forecasting ability 
-                and can make informed decisions based on collective predictions.
+                <strong>The Result:</strong> More accurate forecasts than polls alone, as participants 
+                with insider knowledge or superior analysis are rewarded for their contributions.
               </p>
             </div>
             <div className="use-case-card">
-              <div className="use-case-icon">🏛️</div>
-              <h3>DAO-Style Treasury</h3>
+              <div className="use-case-icon">🏈</div>
+              <h3>Sports Predictions</h3>
               <p className="use-case-description">
-                <strong>The Scenario:</strong> A group of investors pools their stablecoins and wants 
-                to collectively decide how to invest or spend the funds.
+                <strong>The Scenario:</strong> A group of friends wants to predict championship outcomes, 
+                player performance, or season records with skin in the game.
               </p>
               <p className="use-case-description">
-                <strong>How It Works:</strong> Members submit proposals like "invest in Project X" or 
-                "fund this marketing campaign." Only members who contributed to the treasury can buy 
-                votes. After voting, winning proposals get funded from the shared treasury.
+                <strong>How It Works:</strong> Create private or public markets for specific outcomes. 
+                Participants trade based on their knowledge of teams, players, and statistics. Accurate 
+                predictions earn rewards from those who predicted incorrectly.
               </p>
               <p className="use-case-outcome">
-                <strong>The Result:</strong> Members with the most expertise and conviction lead 
-                investment decisions, while everyone maintains proportional control over treasury use.
+                <strong>The Result:</strong> Engaging competition that rewards sports knowledge and 
+                analytical skills, with transparent on-chain settlement.
               </p>
             </div>
             <div className="use-case-card">
-              <div className="use-case-icon">🌍</div>
-              <h3>Futarchy-Style Public Market</h3>
+              <div className="use-case-icon">📈</div>
+              <h3>Financial Forecasting</h3>
               <p className="use-case-description">
-                <strong>The Scenario:</strong> A DAO proposes policy changes or capital allocations 
-                and wants to know which actions will best achieve their goals.
+                <strong>The Scenario:</strong> Investors want to predict economic indicators, company 
+                performance, or market movements through crowdsourced analysis.
               </p>
               <p className="use-case-description">
-                <strong>How It Works:</strong> The DAO sets clear success metrics (e.g., "increase 
-                treasury value by 20%"). Anyone—not just members—can buy votes with stablecoins on 
-                whether each proposal will achieve those metrics. Proposals with market confidence pass.
+                <strong>How It Works:</strong> Markets are created for specific predictions like "Will 
+                unemployment drop below 4%?" or "Will Company X beat earnings estimates?" Traders 
+                aggregate diverse financial expertise through their trading activity.
               </p>
               <p className="use-case-outcome">
-                <strong>The Result:</strong> The DAO taps into global expertise by allowing anyone 
-                to participate, making better decisions through market-aggregated intelligence.
+                <strong>The Result:</strong> Sophisticated forecasts that incorporate signals from 
+                many analysts, often outperforming individual expert predictions.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Understanding Futarchy Section */}
+      {/* ClearPath Add-on Section */}
       <section className="understanding-section">
         <div className="container">
-          <h2 className="section-title">The Power of "Vote on Values, Bet on Beliefs"</h2>
+          <h2 className="section-title">ClearPath: DAO Governance Add-on</h2>
+          <p className="section-intro">
+            Optional enterprise-grade governance features for institutional decision-making
+          </p>
           <div className="understanding-content">
             <div className="understanding-text">
-              <h3>Separating What We Want from How to Get It</h3>
+              <h3>Two Governance Modes for Your Organization</h3>
               <p>
-                Traditional democracy asks people to vote on both their goals AND the best way to 
-                achieve them. But what if we're not experts? Prediction DAO separates these questions.
+                ClearPath is an optional add-on that transforms FairWins into a complete DAO governance 
+                platform. Choose between traditional democratic voting or futarchy-based prediction markets, 
+                depending on your organization's needs.
               </p>
+              <h4>Traditional Voting Mode</h4>
               <p>
-                First, the group democratically decides what success looks like (treasury growth, 
-                project adoption, community satisfaction). Then, anyone can participate in prediction 
-                markets about which proposals will actually achieve those goals.
+                Familiar democratic governance where token holders vote directly on proposals. Each token 
+                equals one vote, with configurable quorum requirements and simple majority approval. 
+                Proposals pass based on For/Against votes with a default 40% quorum threshold. Includes 
+                timelock periods for execution safety and transparent on-chain tracking of all votes.
               </p>
+              <h4>Futarchy Mode: "Vote on Values, Bet on Beliefs"</h4>
               <p>
-                This approach harnesses the wisdom of crowds—those with real expertise and information 
-                are incentivized to participate because accurate predictions earn real rewards. Your 
-                financial stake aligns with your knowledge, creating better decisions for everyone.
+                An innovative approach that separates values from predictions. The DAO democratically 
+                decides what success metrics matter (treasury growth, user adoption, project milestones). 
+                Then, anyone can trade on prediction markets about which proposals will achieve those goals. 
+                This harnesses global expertise while letting the organization maintain control over its values.
               </p>
             </div>
             <div className="understanding-visual">
               <div className="visual-box vote">
-                <h4>Step 1: Define Success</h4>
-                <p>Everyone votes on what matters</p>
+                <h4>Traditional Voting</h4>
                 <ul>
-                  <li>Treasury growth</li>
-                  <li>Network security</li>
-                  <li>User satisfaction</li>
-                  <li>Project milestones</li>
+                  <li>1 token = 1 vote</li>
+                  <li>For/Against/Abstain options</li>
+                  <li>Quorum requirements</li>
+                  <li>Timelock execution</li>
+                  <li>Simple majority wins</li>
                 </ul>
               </div>
-              <div className="visual-arrow">→</div>
+              <div className="visual-arrow">OR</div>
               <div className="visual-box bet">
-                <h4>Step 2: Predict Outcomes</h4>
-                <p>Markets decide which proposals work</p>
+                <h4>Futarchy Markets</h4>
                 <ul>
-                  <li>Buy PASS if it'll succeed</li>
-                  <li>Buy FAIL if it'll fail</li>
-                  <li>Market prices show confidence</li>
-                  <li>Winners earn from the pool</li>
+                  <li>Define success metrics</li>
+                  <li>Open prediction markets</li>
+                  <li>Trade on proposal outcomes</li>
+                  <li>Market confidence determines approval</li>
+                  <li>Rewards accurate predictions</li>
                 </ul>
               </div>
+            </div>
+          </div>
+          <div className="clearpath-features">
+            <h3>Enterprise Features</h3>
+            <div className="features-grid">
+              <div className="feature-item">
+                <strong>Treasury Management:</strong> Shared pool governance with proposal-based spending
+              </div>
+              <div className="feature-item">
+                <strong>Role-Based Access:</strong> Control who can submit proposals and vote
+              </div>
+              <div className="feature-item">
+                <strong>Minority Protection:</strong> Ragequit functionality lets members exit with their share
+              </div>
+              <div className="feature-item">
+                <strong>Privacy Mechanisms:</strong> MACI-style anti-collusion for sensitive decisions
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* TokenMint Add-on Section */}
+      <section className="tokenmint-section">
+        <div className="container">
+          <h2 className="section-title">TokenMint: Enterprise Tokenization Add-on</h2>
+          <p className="section-intro">
+            Define, generate, and deploy digital assets with clarity and confidence
+          </p>
+          <div className="tokenmint-content">
+            <div className="tokenmint-description">
+              <p>
+                TokenMint is a tokenization add-on that streamlines how organizations design, configure, and launch 
+                digital assets at scale. Built around the Token Taxonomy Framework, TokenMint allows institutions to 
+                model token standards that reflect real-world assets and intellectual property, then automatically 
+                assembles secure, production-ready smart contracts using modular components. The platform simplifies 
+                the path from asset definition to on-chain deployment, making it easier for enterprises to tokenize 
+                traditional assets and intangible rights while maintaining consistency, compliance awareness, and 
+                technical rigor.
+              </p>
+              <div className="tokenmint-features-grid">
+                <div className="tokenmint-feature">
+                  <h4>🏗️ Token Taxonomy Framework</h4>
+                  <p>Model token standards that reflect real-world assets and intellectual property with structured definitions</p>
+                </div>
+                <div className="tokenmint-feature">
+                  <h4>🔧 Modular Components</h4>
+                  <p>Automatically assemble secure, production-ready smart contracts using tested modular building blocks</p>
+                </div>
+                <div className="tokenmint-feature">
+                  <h4>📜 Compliance Awareness</h4>
+                  <p>Maintain consistency and compliance awareness throughout the tokenization lifecycle</p>
+                </div>
+                <div className="tokenmint-feature">
+                  <h4>🚀 Simplified Deployment</h4>
+                  <p>Streamlined path from asset definition to on-chain deployment with technical rigor</p>
+                </div>
+              </div>
+            </div>
+            <div className="tokenmint-use-cases">
+              <h3>Common Use Cases</h3>
+              <ul>
+                <li><strong>Real-World Asset Tokenization:</strong> Model and deploy tokens representing physical assets like real estate, commodities, or equipment</li>
+                <li><strong>Intellectual Property Rights:</strong> Tokenize patents, copyrights, trademarks, and other intangible assets</li>
+                <li><strong>Enterprise Digital Assets:</strong> Create custom tokens for loyalty programs, carbon credits, or supply chain tracking</li>
+                <li><strong>Governance & Utility Tokens:</strong> Deploy voting tokens for ClearPath governance or utility tokens for platform access</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -407,8 +482,8 @@ function LandingPage() {
         <div className="container">
           <div className="footer-content">
             <div className="footer-section">
-              <h3>Clear Path</h3>
-              <p>Institutional-grade governance through prediction markets</p>
+              <h3>FairWins</h3>
+              <p>Prediction markets platform with optional DAO governance</p>
             </div>
             <div className="footer-section">
               <h3>Technology</h3>
