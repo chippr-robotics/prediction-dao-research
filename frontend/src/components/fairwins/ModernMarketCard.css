@@ -326,8 +326,8 @@
   position: relative;
   z-index: 1;
   display: flex;
-  justify-content: space-around;
-  padding: 10px 14px;
+  justify-content: space-between;
+  padding: 12px 14px;
   background: var(--card-stats-bg);
   border-top: 1px solid var(--card-border);
 }
@@ -335,19 +335,19 @@
 .stat-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  font-size: 0.55rem;
-  color: var(--card-text-secondary);
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
 }
 
 .stat-icon {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   opacity: 0.8;
 }
 
 .stat-label {
-  font-size: 0.5rem;
+  font-size: 0.6rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--card-text-muted);
@@ -355,7 +355,7 @@
 
 .stat-value {
   font-weight: 600;
-  font-size: 0.65rem;
+  font-size: 0.95rem;
   color: var(--card-text-primary);
 }
 
@@ -492,31 +492,51 @@
     min-height: 340px;
   }
 
+  /* Keep gauge and trend on same horizontal row on mobile */
   .gauge-trend-section {
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .probability-ring {
-    width: 80px;
-    height: 80px;
+    width: 70px;
+    height: 70px;
+    flex-shrink: 0;
+  }
+
+  .ring-percentage {
+    font-size: 1rem;
   }
 
   .trend-section {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
   }
 
   .stats-row {
-    flex-wrap: wrap;
-    gap: 6px;
-    justify-content: center;
-    padding: 8px 10px;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 10px 12px;
   }
 
   .stat-item {
-    width: calc(33% - 6px);
+    width: auto;
+    flex: 1;
+    align-items: flex-start;
   }
 
+  .stat-label {
+    font-size: 0.55rem;
+  }
+
+  .stat-value {
+    font-size: 0.85rem;
+  }
+
+  /* Keep binary options on same horizontal row on mobile */
   .action-buttons {
     flex-direction: row;
     gap: 6px;
@@ -524,6 +544,7 @@
   }
 
   .action-btn {
+    flex: 1;
     padding: 8px 10px;
   }
 

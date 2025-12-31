@@ -48,6 +48,27 @@ const SPARKLINE_PADDING = 2
 const RING_RADIUS = 40
 const RING_START_OFFSET = 0.25 // Start from top (quarter turn)
 
+// Ring color thresholds
+const RING_LOW_THRESHOLD = 33
+const RING_MID_THRESHOLD = 66
+
+// Get ring color based on probability and market status
+const getRingColor = (probability, marketStatus) => {
+  // Grey for paused or closed markets
+  if (marketStatus === 'paused' || marketStatus === 'closed' || marketStatus === 'resolved') {
+    return '#9ca3af' // grey
+  }
+  
+  const prob = parseFloat(probability)
+  if (prob <= RING_LOW_THRESHOLD) {
+    return '#ef4444' // red (0-33%)
+  } else if (prob <= RING_MID_THRESHOLD) {
+    return '#3b82f6' // blue (33-66%)
+  } else {
+    return '#22c55e' // green (66-100%)
+  }
+}
+
 // Generate sparkline data points
 const generateSparklineData = (market) => {
   // Use market ID as seed for consistent pseudo-random data
@@ -115,6 +136,9 @@ function ModernMarketCard({
 
   const yesProb = useMemo(() => (parseFloat(market.passTokenPrice) * 100).toFixed(0), [market.passTokenPrice])
   const noProb = useMemo(() => (100 - parseFloat(yesProb)).toFixed(0), [yesProb])
+  
+  // Get ring color based on probability and market status
+  const ringColor = useMemo(() => getRingColor(yesProb, market.status), [yesProb, market.status])
   
   const sparklineData = useMemo(() => generateSparklineData(market), [market])
   const trend = useMemo(() => calculateTrend(sparklineData), [sparklineData])
@@ -267,13 +291,6 @@ function ModernMarketCard({
         {/* Full Ring Probability Gauge */}
         <div className="probability-ring">
           <svg viewBox="0 0 100 100">
-            <defs>
-              <linearGradient id={`ringGradient-${market.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#36B37E" />
-                <stop offset="60%" stopColor="#f1c40f" />
-                <stop offset="100%" stopColor="#e17055" />
-              </linearGradient>
-            </defs>
             {/* Background ring */}
             <circle
               className="ring-bg"
@@ -282,7 +299,7 @@ function ModernMarketCard({
               r="40"
               fill="none"
             />
-            {/* Filled ring based on YES probability */}
+            {/* Filled ring based on YES probability with color based on threshold */}
             <circle
               className="ring-fill"
               cx="50"
@@ -290,7 +307,7 @@ function ModernMarketCard({
               r="40"
               fill="none"
               style={{
-                stroke: `url(#ringGradient-${market.id})`,
+                stroke: ringColor,
                 strokeDasharray: gaugeArc.dashArray,
                 strokeDashoffset: gaugeArc.circumference * RING_START_OFFSET,
                 transform: 'rotate(-90deg)',
@@ -301,8 +318,8 @@ function ModernMarketCard({
           
           {/* Center content */}
           <div className="ring-center">
-            <span className="ring-percentage">{yesProb}%</span>
-            <span className="ring-label">Yes</span>
+            <span className="ring-percentage" style={{ color: ringColor }}>{yesProb}%</span>
+            <span className="ring-label" style={{ color: ringColor }}>Yes</span>
           </div>
         </div>
 
