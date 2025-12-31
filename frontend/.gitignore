@@ -41,3 +41,6 @@ cypress/screenshots
 cypress/videos
 cypress/downloads
 .cypress-cache
+
+# Auto-generated reports
+UNUSED_FILES_REPORT.md
