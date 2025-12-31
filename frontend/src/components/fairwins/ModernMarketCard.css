@@ -326,7 +326,7 @@
   position: relative;
   z-index: 1;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-around;
   padding: 12px 14px;
   background: var(--card-stats-bg);
   border-top: 1px solid var(--card-border);
@@ -335,27 +335,29 @@
 .stat-item {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px;
-  flex: 1;
+  text-align: center;
 }
 
 .stat-icon {
-  font-size: 0.75rem;
-  opacity: 0.8;
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-bottom: 2px;
 }
 
 .stat-label {
-  font-size: 0.6rem;
-  font-weight: 700;
+  font-size: 0.55rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
   color: var(--card-text-muted);
+  margin-bottom: 1px;
 }
 
 .stat-value {
-  font-weight: 600;
-  font-size: 0.95rem;
+  font-weight: 700;
+  font-size: 1rem;
   color: var(--card-text-primary);
 }
 
@@ -379,12 +381,12 @@
   font-weight: 500;
 }
 
-/* Action buttons - Yes/No binary */
+/* Action buttons - Yes/No binary - ALWAYS horizontal */
 .action-buttons {
   position: relative;
   z-index: 1;
   display: flex;
-  flex-direction: row;
+  flex-direction: row !important;
   gap: 8px;
   padding: 12px 14px;
   background: var(--card-action-bg);
@@ -400,7 +402,7 @@
   transition: all 0.2s ease;
   border: none;
   display: flex;
-  flex-direction: row;
+  flex-direction: row !important;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -518,42 +520,42 @@
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 8px;
-    justify-content: space-between;
+    justify-content: space-around;
     padding: 10px 12px;
   }
 
   .stat-item {
-    width: auto;
     flex: 1;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .stat-label {
-    font-size: 0.55rem;
+    font-size: 0.5rem;
   }
 
   .stat-value {
     font-size: 0.85rem;
   }
 
-  /* Keep binary options on same horizontal row on mobile */
+  /* Keep binary options on same horizontal row on mobile - ALWAYS */
   .action-buttons {
-    flex-direction: row;
+    flex-direction: row !important;
     gap: 6px;
     padding: 10px 12px;
   }
 
   .action-btn {
     flex: 1;
-    padding: 8px 10px;
+    padding: 10px 8px;
+    flex-direction: row !important;
   }
 
   .action-btn .btn-label {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
   }
 
   .action-btn .btn-price {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
   }
 }
 
