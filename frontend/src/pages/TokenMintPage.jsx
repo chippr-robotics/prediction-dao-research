@@ -110,6 +110,7 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadUserTokens()
   }, [loadUserTokens])
 

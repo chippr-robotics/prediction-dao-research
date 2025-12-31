@@ -21,9 +21,6 @@ export function useMediaQuery(query) {
     }
 
     const mediaQuery = window.matchMedia(query)
-    
-    // Set initial value
-    setMatches(mediaQuery.matches)
 
     // Define handler
     const handler = (event) => {

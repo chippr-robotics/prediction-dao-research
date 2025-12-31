@@ -27,7 +27,6 @@ function CorrelatedMarketsPage() {
   const [timeHorizon, setTimeHorizon] = useState('7d')
   const [loading, setLoading] = useState(true)
   const [openKebabMenu, setOpenKebabMenu] = useState(null)
-  const { formatPrice } = usePrice()
   const svgRef = useRef(null)
   const timelineRef = useRef(null)
 

@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react'
 import RolePurchaseScreen from '../components/RolePurchaseScreen'
 import { WalletProvider } from '../contexts/WalletContext'
 import { UIContext } from '../contexts/UIContext'
-import { useAccount } from 'wagmi'
 
 // Mock contexts
 const mockUIContext = {

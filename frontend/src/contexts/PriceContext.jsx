@@ -1,7 +1,5 @@
-import { createContext, useContext } from 'react'
 import usePriceConversion from '../hooks/usePriceConversion'
-
-const PriceContext = createContext(null)
+import PriceContext from './PriceContext'
 
 export function PriceProvider({ children }) {
   const priceData = usePriceConversion()
@@ -12,13 +10,3 @@ export function PriceProvider({ children }) {
     </PriceContext.Provider>
   )
 }
-
-export function usePrice() {
-  const context = useContext(PriceContext)
-  if (!context) {
-    throw new Error('usePrice must be used within a PriceProvider')
-  }
-  return context
-}
-
-export default PriceContext

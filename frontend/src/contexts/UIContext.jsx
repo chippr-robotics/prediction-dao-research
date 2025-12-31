@@ -1,6 +1,5 @@
-import { createContext, useState, useCallback } from 'react'
-
-export const UIContext = createContext(null)
+import { useState, useCallback } from 'react'
+import { UIContext } from './UIContext'
 
 export function UIProvider({ children }) {
   const [notification, setNotification] = useState(null)

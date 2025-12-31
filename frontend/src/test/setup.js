@@ -39,7 +39,7 @@ vi.mock('wagmi/connectors', () => ({
 }))
 
 // Mock window.ethereum for Web3 tests
-global.window = global.window || {}
+window.ethereum = window.ethereum || {}
 
 // Create a mock that returns proper responses for ethers.js
 const mockEthereumProvider = {
@@ -59,7 +59,7 @@ const mockEthereumProvider = {
   isMetaMask: true,
   selectedAddress: '0x1234567890123456789012345678901234567890',
   // Mock methods needed by ethers BrowserProvider
-  send: vi.fn().mockImplementation(async (method, params) => {
+  send: vi.fn().mockImplementation(async (method) => {
     if (method === 'eth_accounts') {
       return ['0x1234567890123456789012345678901234567890']
     }
@@ -67,7 +67,7 @@ const mockEthereumProvider = {
   })
 }
 
-global.window.ethereum = mockEthereumProvider
+window.ethereum = mockEthereumProvider
 
 // Mock matchMedia for responsive design tests
 Object.defineProperty(window, 'matchMedia', {
