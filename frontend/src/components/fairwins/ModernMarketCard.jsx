@@ -35,7 +35,7 @@ const getSubcategoryName = (subcategoryId) => {
 // Format number for display
 const formatNumber = (num) => {
   const n = parseFloat(num)
-  if (Number.isNaN(n) || n === null) return '0'
+  if (Number.isNaN(n)) return '0'
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
   return parseFloat(n.toFixed(0)).toString()
@@ -109,10 +109,20 @@ const calculateTrend = (data) => {
   if (!data || data.length < 2) return { direction: 'up', change: 0 }
   const first = data[0]
   const last = data[data.length - 1]
-  const change = ((last - first) / first * 100).toFixed(0)
+  
+  // Avoid division by zero or near-zero values
+  if (!Number.isFinite(first) || Math.abs(first) < 1e-8) {
+    return {
+      direction: last >= first ? 'up' : 'down',
+      change: 0
+    }
+  }
+  
+  const rawChange = ((last - first) / first) * 100
+  const change = Math.abs(rawChange.toFixed(0))
   return {
     direction: last >= first ? 'up' : 'down',
-    change: Math.abs(change)
+    change
   }
 }
 
@@ -139,7 +149,6 @@ function ModernMarketCard({
   market, 
   onClick, 
   onTrade, 
-  onSimulate,
   isActive = false,
   isFirstRow = false 
 }) {
@@ -151,7 +160,7 @@ function ModernMarketCard({
   // Get ring color based on probability and market status
   const ringColor = useMemo(() => getRingColor(yesProb, market.status), [yesProb, market.status])
   
-  const sparklineData = useMemo(() => generateSparklineData(market), [market])
+  const sparklineData = useMemo(() => generateSparklineData(market), [market.id, market.passTokenPrice])
   const trend = useMemo(() => calculateTrend(sparklineData), [sparklineData])
   
   // Get subcategory display name
@@ -160,38 +169,40 @@ function ModernMarketCard({
     [market.subcategory]
   )
 
-  // Create SVG path for sparkline
-  const sparklinePath = useMemo(() => {
+  // Precompute sparkline points (shared by path and area)
+  const sparklinePoints = useMemo(() => {
     const min = Math.min(...sparklineData)
     const max = Math.max(...sparklineData)
     const range = max - min || 0.1
-    
-    const points = sparklineData.map((val, i) => {
-      const x = SPARKLINE_PADDING + (i / (sparklineData.length - 1)) * (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
-      const y = SPARKLINE_PADDING + (1 - (val - min) / range) * (SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING)
+
+    return sparklineData.map((val, i) => {
+      const x =
+        SPARKLINE_PADDING +
+        (i / (sparklineData.length - 1)) *
+          (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
+      const y =
+        SPARKLINE_PADDING +
+        (1 - (val - min) / range) *
+          (SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING)
       return `${x},${y}`
     })
-    
-    return `M ${points.join(' L ')}`
   }, [sparklineData])
+
+  // Create SVG path for sparkline
+  const sparklinePath = useMemo(() => {
+    return `M ${sparklinePoints.join(' L ')}`
+  }, [sparklinePoints])
 
   // Create area path for sparkline
   const sparklineArea = useMemo(() => {
-    const min = Math.min(...sparklineData)
-    const max = Math.max(...sparklineData)
-    const range = max - min || 0.1
-    
-    const points = sparklineData.map((val, i) => {
-      const x = SPARKLINE_PADDING + (i / (sparklineData.length - 1)) * (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
-      const y = SPARKLINE_PADDING + (1 - (val - min) / range) * (SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING)
-      return `${x},${y}`
-    })
-    
     const firstX = SPARKLINE_PADDING
-    const lastX = SPARKLINE_PADDING + (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
-    
-    return `M ${firstX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} L ${points.join(' L ')} L ${lastX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} Z`
-  }, [sparklineData])
+    const lastX =
+      SPARKLINE_PADDING + (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
+
+    return `M ${firstX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} L ${sparklinePoints.join(
+      ' L '
+    )} L ${lastX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} Z`
+  }, [sparklinePoints])
 
   // Calculate gauge arc for full circle
   const gaugeArc = useMemo(() => {
@@ -233,13 +244,6 @@ function ModernMarketCard({
       onTrade(market, 'no')
     } else if (onClick) {
       onClick(market)
-    }
-  }
-
-  const handleSimulateClick = (e) => {
-    e.stopPropagation()
-    if (onSimulate) {
-      onSimulate(market)
     }
   }
 
@@ -356,8 +360,8 @@ function ModernMarketCard({
             </svg>
           </div>
           <div className={`trend-indicator-v2 ${trend.direction}`}>
-            <span className="trend-arrow">{trend.direction === 'up' ? '↗' : '↘'}</span>
-            <span className="trend-change">{trend.direction === 'up' ? '+' : '-'}{trend.change}% today</span>
+            <span className="trend-arrow" aria-hidden="true">{trend.direction === 'up' ? '↗' : '↘'}</span>
+            <span className="trend-change">{trend.direction === 'up' ? '+' : '-'}{trend.change}% trend</span>
           </div>
         </div>
       </div>
@@ -365,27 +369,37 @@ function ModernMarketCard({
       {/* Stats row */}
       <div className="stats-row">
         <div className="stat-item">
-          <span className="stat-icon">📊</span>
+          <span className="stat-icon" aria-hidden="true">📊</span>
           <span className="stat-label">Volume</span>
-          <span className="stat-value">${formatNumber(market.volume24h || market.totalLiquidity * 0.08)}</span>
+          <span className="stat-value">
+            {market.volume24h != null
+              ? `$${formatNumber(market.volume24h)}`
+              : 'N/A'}
+          </span>
         </div>
         <div className="stat-item">
-          <span className="stat-icon">💧</span>
+          <span className="stat-icon" aria-hidden="true">💧</span>
           <span className="stat-label">Liquidity</span>
           <span className="stat-value">${formatNumber(market.totalLiquidity)}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-icon">👥</span>
+          <span className="stat-icon" aria-hidden="true">👥</span>
           <span className="stat-label">Traders</span>
-          <span className="stat-value">{market.uniqueTraders || formatNumber(market.tradesCount || 45)}</span>
+          <span className="stat-value">
+            {market.uniqueTraders != null
+              ? formatNumber(market.uniqueTraders)
+              : market.tradesCount != null
+                ? formatNumber(market.tradesCount)
+                : 'N/A'}
+          </span>
         </div>
       </div>
 
       {/* Tags row - use existing market tags */}
       {market.tags && market.tags.length > 0 && (
         <div className="tags-row">
-          {market.tags.slice(0, 4).map((tag, index) => (
-            <span key={index} className="market-tag">{tag}</span>
+          {market.tags.slice(0, 4).map((tag) => (
+            <span key={tag} className="market-tag">{tag}</span>
           ))}
         </div>
       )}
