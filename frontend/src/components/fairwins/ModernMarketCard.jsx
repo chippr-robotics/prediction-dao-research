@@ -39,6 +39,15 @@ const SPARKLINE_SEED_MULTIPLIER = 7
 const SPARKLINE_VARIATION_RANGE = 0.15
 const SPARKLINE_DEFAULT_PRICE = 0.5
 
+// Sparkline SVG dimensions
+const SPARKLINE_WIDTH = 80
+const SPARKLINE_HEIGHT = 28
+const SPARKLINE_PADDING = 2
+
+// Ring gauge constants  
+const RING_RADIUS = 40
+const RING_START_OFFSET = 0.25 // Start from top (quarter turn)
+
 // Generate sparkline data points
 const generateSparklineData = (market) => {
   // Use market ID as seed for consistent pseudo-random data
@@ -118,17 +127,13 @@ function ModernMarketCard({
 
   // Create SVG path for sparkline
   const sparklinePath = useMemo(() => {
-    const width = 80
-    const height = 28
-    const padding = 2
-    
     const min = Math.min(...sparklineData)
     const max = Math.max(...sparklineData)
     const range = max - min || 0.1
     
     const points = sparklineData.map((val, i) => {
-      const x = padding + (i / (sparklineData.length - 1)) * (width - 2 * padding)
-      const y = padding + (1 - (val - min) / range) * (height - 2 * padding)
+      const x = SPARKLINE_PADDING + (i / (sparklineData.length - 1)) * (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
+      const y = SPARKLINE_PADDING + (1 - (val - min) / range) * (SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING)
       return `${x},${y}`
     })
     
@@ -137,30 +142,26 @@ function ModernMarketCard({
 
   // Create area path for sparkline
   const sparklineArea = useMemo(() => {
-    const width = 80
-    const height = 28
-    const padding = 2
-    
     const min = Math.min(...sparklineData)
     const max = Math.max(...sparklineData)
     const range = max - min || 0.1
     
     const points = sparklineData.map((val, i) => {
-      const x = padding + (i / (sparklineData.length - 1)) * (width - 2 * padding)
-      const y = padding + (1 - (val - min) / range) * (height - 2 * padding)
+      const x = SPARKLINE_PADDING + (i / (sparklineData.length - 1)) * (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
+      const y = SPARKLINE_PADDING + (1 - (val - min) / range) * (SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING)
       return `${x},${y}`
     })
     
-    const firstX = padding
-    const lastX = padding + (width - 2 * padding)
+    const firstX = SPARKLINE_PADDING
+    const lastX = SPARKLINE_PADDING + (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
     
-    return `M ${firstX},${height - padding} L ${points.join(' L ')} L ${lastX},${height - padding} Z`
+    return `M ${firstX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} L ${points.join(' L ')} L ${lastX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} Z`
   }, [sparklineData])
 
   // Calculate gauge arc for full circle
   const gaugeArc = useMemo(() => {
     const percent = parseFloat(yesProb)
-    const circumference = Math.PI * 2 * 40 // Full circle with radius 40
+    const circumference = Math.PI * 2 * RING_RADIUS
     const offset = (percent / 100) * circumference
     return { dashArray: `${offset} ${circumference}`, circumference }
   }, [yesProb])
@@ -291,7 +292,7 @@ function ModernMarketCard({
               style={{
                 stroke: `url(#ringGradient-${market.id})`,
                 strokeDasharray: gaugeArc.dashArray,
-                strokeDashoffset: gaugeArc.circumference * 0.25, // Start from top
+                strokeDashoffset: gaugeArc.circumference * RING_START_OFFSET,
                 transform: 'rotate(-90deg)',
                 transformOrigin: 'center'
               }}
@@ -309,15 +310,15 @@ function ModernMarketCard({
         <div className="trend-section">
           <div className="trend-label">Price History</div>
           <div className="sparkline-container-v2">
-            <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+            <svg viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} preserveAspectRatio="none">
               <path
                 className="sparkline-area"
-                d={sparklineArea.replace(/80/g, '100').replace(/28/g, '40')}
+                d={sparklineArea}
                 fill={trend.direction === 'up' ? '#36B37E' : '#e17055'}
               />
               <path
                 className="sparkline-line"
-                d={sparklinePath.replace(/80/g, '100').replace(/28/g, '40')}
+                d={sparklinePath}
                 stroke={trend.direction === 'up' ? '#36B37E' : '#e17055'}
               />
             </svg>

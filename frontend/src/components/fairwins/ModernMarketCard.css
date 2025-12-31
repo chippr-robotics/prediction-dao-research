@@ -516,6 +516,7 @@
 }
 
 /* Animation for ring on mount */
+/* Note: 251 ≈ 2π × 40 (full circumference of ring with radius 40) */
 @keyframes ringLoad {
   from {
     stroke-dasharray: 0 251;
