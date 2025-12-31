@@ -8,7 +8,7 @@ const { BetType } = require("../../constants/BetType");
  * Unlike governance proposals, FairWins markets are standalone predictions
  */
 async function deployFairWinsFixture() {
-  const [owner, reporter, trader1, trader2] = await ethers.getSigners();
+  const [owner, reporter, trader1, trader2, feeRecipient] = await ethers.getSigners();
 
   // Ensure reporter has enough ETH for bond/report payments (100 ETH per report + gas)
   // This is needed when running as part of full test suite where accounts may be depleted
@@ -56,10 +56,62 @@ async function deployFairWinsFixture() {
   await oracleResolver.initialize(owner.address);
   await oracleResolver.connect(owner).addDesignatedReporter(reporter.address);
 
+  // Deploy PredictionMarketExchange for trading
+  const PredictionMarketExchange = await ethers.getContractFactory("PredictionMarketExchange");
+  const exchange = await PredictionMarketExchange.deploy(feeRecipient.address);
+  await exchange.waitForDeployment();
+
   return {
-    contracts: { marketFactory, oracleResolver, collateralToken, ctf1155 },
-    accounts: { owner, reporter, trader1, trader2 }
+    contracts: { marketFactory, oracleResolver, collateralToken, ctf1155, exchange },
+    accounts: { owner, reporter, trader1, trader2, feeRecipient }
   };
+}
+
+/**
+ * Helper to create and sign an order for the exchange
+ */
+async function createSignedOrder(signer, exchange, orderParams) {
+  const domain = {
+    name: "PredictionMarketExchange",
+    version: "1",
+    chainId: (await ethers.provider.getNetwork()).chainId,
+    verifyingContract: await exchange.getAddress()
+  };
+
+  const types = {
+    Order: [
+      { name: "maker", type: "address" },
+      { name: "makerAsset", type: "address" },
+      { name: "takerAsset", type: "address" },
+      { name: "makerAmount", type: "uint256" },
+      { name: "takerAmount", type: "uint256" },
+      { name: "nonce", type: "uint256" },
+      { name: "expiration", type: "uint256" },
+      { name: "salt", type: "bytes32" },
+      { name: "isMakerERC1155", type: "bool" },
+      { name: "isTakerERC1155", type: "bool" },
+      { name: "makerTokenId", type: "uint256" },
+      { name: "takerTokenId", type: "uint256" }
+    ]
+  };
+
+  const order = {
+    maker: signer.address,
+    makerAsset: orderParams.makerAsset,
+    takerAsset: orderParams.takerAsset,
+    makerAmount: orderParams.makerAmount,
+    takerAmount: orderParams.takerAmount,
+    nonce: orderParams.nonce,
+    expiration: orderParams.expiration,
+    salt: orderParams.salt || ethers.randomBytes(32),
+    isMakerERC1155: orderParams.isMakerERC1155,
+    isTakerERC1155: orderParams.isTakerERC1155,
+    makerTokenId: orderParams.makerTokenId,
+    takerTokenId: orderParams.takerTokenId
+  };
+
+  const signature = await signer.signTypedData(domain, types, order);
+  return { order, signature };
 }
 
 /**
@@ -89,8 +141,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
     it("Should complete full market creation, resolution, and settlement flow", async function () {
       // Setup: Load the FairWins-specific fixture
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver, collateralToken } = contracts;
-      const { owner, reporter } = accounts;
+      const { marketFactory, oracleResolver, collateralToken, ctf1155, exchange } = contracts;
+      const { owner, reporter, trader1, trader2, feeRecipient } = accounts;
 
       console.log("\n=== FairWins Market Lifecycle Test ===\n");
 
@@ -145,9 +197,171 @@ describe("Integration: FairWins Market Lifecycle", function () {
       // PHASE 2: TRADING PERIOD
       // ========================================
       console.log("Phase 2: Trading Period");
-      console.log("  ℹ Market open for trading");
-      console.log("  ℹ Trading occurs via conditional tokens (YES/NO tokens)");
-      console.log("  ℹ Trading implementation handled by token contracts\n");
+      console.log("  ℹ Market open for trading via PredictionMarketExchange");
+      
+      // Get position IDs for YES/NO tokens from market
+      const yesTokenId = market.passPositionId;
+      const noTokenId = market.failPositionId;
+      console.log(`  ✓ YES token ID: ${yesTokenId}`);
+      console.log(`  ✓ NO token ID: ${noTokenId}`);
+
+      // Traders need to split collateral into conditional tokens first
+      const splitAmount1 = ethers.parseEther("1000");
+      const splitAmount2 = ethers.parseEther("800");
+      
+      await collateralToken.connect(trader1).approve(await ctf1155.getAddress(), splitAmount1);
+      await collateralToken.connect(trader2).approve(await ctf1155.getAddress(), splitAmount2);
+      
+      await ctf1155.connect(trader1).splitPosition(
+        await collateralToken.getAddress(),
+        ethers.ZeroHash,
+        market.conditionId,
+        [1, 2],
+        splitAmount1
+      );
+      
+      await ctf1155.connect(trader2).splitPosition(
+        await collateralToken.getAddress(),
+        ethers.ZeroHash,
+        market.conditionId,
+        [1, 2],
+        splitAmount2
+      );
+      
+      console.log(`  ✓ Trader1 split ${ethers.formatEther(splitAmount1)} collateral into YES/NO tokens`);
+      console.log(`  ✓ Trader2 split ${ethers.formatEther(splitAmount2)} collateral into YES/NO tokens`);
+
+      // Approve exchange to transfer tokens
+      await ctf1155.connect(trader1).setApprovalForAll(await exchange.getAddress(), true);
+      await ctf1155.connect(trader2).setApprovalForAll(await exchange.getAddress(), true);
+
+      // Scenario 1: Single Fill - Trader1 sells YES tokens for NO tokens
+      console.log("\n  Scenario 1: Single Fill Order");
+      const currentTime = await time.latest();
+      const { order: order1, signature: sig1 } = await createSignedOrder(trader1, exchange, {
+        makerAsset: await ctf1155.getAddress(),
+        takerAsset: await ctf1155.getAddress(),
+        makerAmount: ethers.parseEther("100"), // Selling 100 YES
+        takerAmount: ethers.parseEther("100"), // For 100 NO
+        nonce: 1,
+        expiration: currentTime + 3600,
+        isMakerERC1155: true,
+        isTakerERC1155: true,
+        makerTokenId: yesTokenId,
+        takerTokenId: noTokenId
+      });
+
+      const trader1YesBefore = await ctf1155.balanceOf(trader1.address, yesTokenId);
+      const trader1NoBefore = await ctf1155.balanceOf(trader1.address, noTokenId);
+      const trader2YesBefore = await ctf1155.balanceOf(trader2.address, yesTokenId);
+      const trader2NoBefore = await ctf1155.balanceOf(trader2.address, noTokenId);
+
+      await exchange.connect(trader2).fillOrder(order1, sig1, ethers.parseEther("100"));
+      
+      const trader1YesAfter = await ctf1155.balanceOf(trader1.address, yesTokenId);
+      const trader1NoAfter = await ctf1155.balanceOf(trader1.address, noTokenId);
+      const trader2YesAfter = await ctf1155.balanceOf(trader2.address, yesTokenId);
+      const trader2NoAfter = await ctf1155.balanceOf(trader2.address, noTokenId);
+      const feeBalance1 = await ctf1155.balanceOf(feeRecipient.address, noTokenId);
+
+      console.log(`    ✓ Trader1 sold 100 YES tokens`);
+      console.log(`    ✓ Trader2 bought 100 YES tokens`);
+      console.log(`    ✓ Fee collected: ${ethers.formatEther(feeBalance1)} NO tokens`);
+
+      // Verify balances
+      expect(trader1YesBefore - trader1YesAfter).to.equal(ethers.parseEther("100"));
+      const expectedFee = ethers.parseEther("100") * 10n / 10000n; // 0.1% fee
+      expect(trader1NoAfter - trader1NoBefore).to.equal(ethers.parseEther("100") - expectedFee);
+      expect(trader2YesAfter - trader2YesBefore).to.equal(ethers.parseEther("100"));
+      expect(trader2NoBefore - trader2NoAfter).to.equal(ethers.parseEther("100"));
+      expect(feeBalance1).to.equal(expectedFee);
+
+      // Scenario 2: Batch Fill - Multiple orders filled in one transaction
+      console.log("\n  Scenario 2: Batch Fill Orders");
+      const { order: order2, signature: sig2 } = await createSignedOrder(trader1, exchange, {
+        makerAsset: await ctf1155.getAddress(),
+        takerAsset: await ctf1155.getAddress(),
+        makerAmount: ethers.parseEther("50"),
+        takerAmount: ethers.parseEther("50"),
+        nonce: 2,
+        expiration: currentTime + 3600,
+        isMakerERC1155: true,
+        isTakerERC1155: true,
+        makerTokenId: yesTokenId,
+        takerTokenId: noTokenId
+      });
+
+      const { order: order3, signature: sig3 } = await createSignedOrder(trader1, exchange, {
+        makerAsset: await ctf1155.getAddress(),
+        takerAsset: await ctf1155.getAddress(),
+        makerAmount: ethers.parseEther("30"),
+        takerAmount: ethers.parseEther("30"),
+        nonce: 3,
+        expiration: currentTime + 3600,
+        isMakerERC1155: true,
+        isTakerERC1155: true,
+        makerTokenId: yesTokenId,
+        takerTokenId: noTokenId
+      });
+
+      const results = await exchange.connect(trader2).batchFillOrders(
+        [order2, order3],
+        [sig2, sig3],
+        [ethers.parseEther("50"), ethers.parseEther("30")]
+      );
+
+      console.log(`    ✓ Batch filled 2 orders (50 + 30 YES tokens)`);
+      
+      // Scenario 3: Maker-to-Maker matching
+      console.log("\n  Scenario 3: Maker-to-Maker Order Matching");
+      
+      // Trader1 wants to sell YES for NO
+      const { order: orderA, signature: sigA } = await createSignedOrder(trader1, exchange, {
+        makerAsset: await ctf1155.getAddress(),
+        takerAsset: await ctf1155.getAddress(),
+        makerAmount: ethers.parseEther("40"),
+        takerAmount: ethers.parseEther("40"),
+        nonce: 4,
+        expiration: currentTime + 3600,
+        isMakerERC1155: true,
+        isTakerERC1155: true,
+        makerTokenId: yesTokenId,
+        takerTokenId: noTokenId
+      });
+
+      // Trader2 wants to sell NO for YES (inverse)
+      const { order: orderB, signature: sigB } = await createSignedOrder(trader2, exchange, {
+        makerAsset: await ctf1155.getAddress(),
+        takerAsset: await ctf1155.getAddress(),
+        makerAmount: ethers.parseEther("40"),
+        takerAmount: ethers.parseEther("40"),
+        nonce: 5,
+        expiration: currentTime + 3600,
+        isMakerERC1155: true,
+        isTakerERC1155: true,
+        makerTokenId: noTokenId,
+        takerTokenId: yesTokenId
+      });
+
+      await exchange.connect(owner).matchOrders(
+        orderA, sigA,
+        orderB, sigB,
+        ethers.parseEther("40")
+      );
+
+      console.log(`    ✓ Matched 40 YES/NO tokens between traders (maker-to-maker)`);
+      
+      // Verify final balances
+      const trader1YesFinal = await ctf1155.balanceOf(trader1.address, yesTokenId);
+      const trader1NoFinal = await ctf1155.balanceOf(trader1.address, noTokenId);
+      const trader2YesFinal = await ctf1155.balanceOf(trader2.address, yesTokenId);
+      const trader2NoFinal = await ctf1155.balanceOf(trader2.address, noTokenId);
+      
+      console.log(`\n  Final Token Balances After Trading:`);
+      console.log(`    Trader1 - YES: ${ethers.formatEther(trader1YesFinal)}, NO: ${ethers.formatEther(trader1NoFinal)}`);
+      console.log(`    Trader2 - YES: ${ethers.formatEther(trader2YesFinal)}, NO: ${ethers.formatEther(trader2NoFinal)}`);
+      console.log(`    Fee Recipient - NO: ${ethers.formatEther(await ctf1155.balanceOf(feeRecipient.address, noTokenId))}`);
+      console.log("");
       
       // ========================================
       // PHASE 3: TRADING PERIOD ENDS
@@ -221,21 +435,38 @@ describe("Integration: FairWins Market Lifecycle", function () {
       console.log("  ✓ Market resolved with YES outcome");
       console.log("  ✓ Token holders can now redeem:");
       console.log("    - YES token holders: Redeem for 1.0 ETH per token");
-      console.log("    - NO token holders: Tokens worth 0 (no redemption value)\n");
+      console.log("    - NO token holders: Tokens worth 0 (no redemption value)");
+      
+      // Calculate expected redemption values based on trading outcomes
+      const trader1ExpectedValue = trader1YesFinal * yesValue / ethers.parseEther("1");
+      const trader2ExpectedValue = trader2YesFinal * yesValue / ethers.parseEther("1");
+      
+      console.log(`\n  Expected Redemption Values (YES wins):`);
+      console.log(`    Trader1: ${ethers.formatEther(trader1ExpectedValue)} ETH (from ${ethers.formatEther(trader1YesFinal)} YES tokens)`);
+      console.log(`    Trader2: ${ethers.formatEther(trader2ExpectedValue)} ETH (from ${ethers.formatEther(trader2YesFinal)} YES tokens)`);
+      
+      // Verify that traders who accumulated more YES tokens through trading will benefit more
+      expect(trader1YesFinal).to.be.lessThan(splitAmount1); // Trader1 sold YES tokens
+      expect(trader2YesFinal).to.be.greaterThan(splitAmount2); // Trader2 bought YES tokens
+      console.log(`    ✓ Trader2 will profit more (bought YES tokens during trading)`);
+      console.log(`    ✓ Trader1 will profit less (sold YES tokens during trading)`);
+      console.log("");
       
       console.log("=== Market Lifecycle Complete ===\n");
       console.log("Summary:");
       console.log("  • Market created for standalone prediction");
-      console.log("  • Trading period: 14 days");
+      console.log("  • Trading period: 14 days with PredictionMarketExchange");
+      console.log("  • Trading scenarios tested: single fill, batch fill, maker-to-maker");
       console.log("  • Oracle resolution: YES outcome");
       console.log("  • Winners can redeem tokens for 1:1 ETH value");
+      console.log("  • Trading outcomes reflected in final settlement values");
       console.log("");
     });
 
     it("Should handle NO outcome correctly", async function () {
       const { contracts, accounts } = await loadFixture(deployFairWinsFixture);
-      const { marketFactory, oracleResolver, collateralToken } = contracts;
-      const { owner, reporter } = accounts;
+      const { marketFactory, oracleResolver, collateralToken, ctf1155, exchange } = contracts;
+      const { owner, reporter, trader1, trader2, feeRecipient } = accounts;
 
       console.log("\n=== FairWins Market: NO Outcome Test ===\n");
 
@@ -264,8 +495,57 @@ describe("Integration: FairWins Market Lifecycle", function () {
       console.log(`  ✓ Market created: ID ${marketId}`);
       console.log("  ✓ Question: 'Will BTC surpass $150k by year end?'\n");
 
-      // Get market to find trading end time
+      // Get market to find trading end time and token IDs
       const market = await marketFactory.getMarket(marketId);
+      const yesTokenId = market.passPositionId;
+      const noTokenId = market.failPositionId;
+      
+      // Trading phase - traders betting on NO outcome will benefit
+      console.log("Phase: Trading");
+      const splitAmount = ethers.parseEther("500");
+      await collateralToken.connect(trader1).approve(await ctf1155.getAddress(), splitAmount);
+      await collateralToken.connect(trader2).approve(await ctf1155.getAddress(), splitAmount);
+      
+      await ctf1155.connect(trader1).splitPosition(
+        await collateralToken.getAddress(),
+        ethers.ZeroHash,
+        market.conditionId,
+        [1, 2],
+        splitAmount
+      );
+      
+      await ctf1155.connect(trader2).splitPosition(
+        await collateralToken.getAddress(),
+        ethers.ZeroHash,
+        market.conditionId,
+        [1, 2],
+        splitAmount
+      );
+      
+      await ctf1155.connect(trader1).setApprovalForAll(await exchange.getAddress(), true);
+      await ctf1155.connect(trader2).setApprovalForAll(await exchange.getAddress(), true);
+      
+      // Trader1 buys NO tokens (sells YES for NO)
+      const currentTime = await time.latest();
+      const { order, signature } = await createSignedOrder(trader1, exchange, {
+        makerAsset: await ctf1155.getAddress(),
+        takerAsset: await ctf1155.getAddress(),
+        makerAmount: ethers.parseEther("200"),
+        takerAmount: ethers.parseEther("200"),
+        nonce: 100,
+        expiration: currentTime + 3600,
+        isMakerERC1155: true,
+        isTakerERC1155: true,
+        makerTokenId: yesTokenId,
+        takerTokenId: noTokenId
+      });
+      
+      await exchange.connect(trader2).fillOrder(order, signature, ethers.parseEther("200"));
+      
+      const trader1NoTokens = await ctf1155.balanceOf(trader1.address, noTokenId);
+      const trader2YesTokens = await ctf1155.balanceOf(trader2.address, yesTokenId);
+      console.log(`  ✓ Trader1 accumulated ${ethers.formatEther(trader1NoTokens)} NO tokens (will win)`);
+      console.log(`  ✓ Trader2 accumulated ${ethers.formatEther(trader2YesTokens)} YES tokens (will lose)\n`);
       
       // End trading period
       await time.increaseTo(Number(market.tradingEndTime) + 1);
@@ -305,6 +585,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
       console.log("Settlement:");
       console.log("  ✓ YES tokens worth: 0 ETH (losers)");
       console.log("  ✓ NO tokens worth: 1 ETH (winners)");
+      console.log(`  ✓ Trader1 profits with ${ethers.formatEther(trader1NoTokens)} NO tokens`);
+      console.log(`  ✓ Trader2 loses with worthless YES tokens`);
 
       console.log("\n=== NO Outcome Test Complete ===\n");
     });
