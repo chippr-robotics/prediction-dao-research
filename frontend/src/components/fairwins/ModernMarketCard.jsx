@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { findSubcategoryById } from '../../config/subcategories'
 import './ModernMarketCard.css'
 
 // Category background images (using placeholders that represent each category)
@@ -12,6 +13,12 @@ const getCategoryThumbnail = (category) => {
     'pop-culture': 'linear-gradient(135deg, rgba(136, 14, 79, 0.6) 0%, rgba(194, 24, 91, 0.4) 100%)'
   }
   return thumbnails[category] || thumbnails.finance
+}
+
+// Get subcategory display name
+const getSubcategoryName = (subcategoryId) => {
+  const subcategory = findSubcategoryById(subcategoryId)
+  return subcategory ? subcategory.name : subcategoryId
 }
 
 // Format number for display
@@ -87,37 +94,27 @@ const formatTimeRemaining = (endTime) => {
   return `${hours}h`
 }
 
-// Generate random gamification stats based on market ID
-const getGamificationStats = (market) => {
-  const seed = market.id || 0
-  const stableRandom = (s) => {
-    const x = Math.sin(s) * 10000
-    return x - Math.floor(x)
-  }
-  
-  return {
-    points: Math.floor(5 + stableRandom(seed + 100) * 15),
-    streakBonus: Math.floor(stableRandom(seed + 200) * 20),
-    accuracy: Math.floor(60 + stableRandom(seed + 300) * 35),
-    comments: Math.floor(10 + stableRandom(seed + 400) * 90)
-  }
-}
-
 function ModernMarketCard({ 
   market, 
   onClick, 
   onTrade, 
   onSimulate,
-  isActive = false 
+  isActive = false,
+  isFirstRow = false 
 }) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(isFirstRow)
 
   const yesProb = useMemo(() => (parseFloat(market.passTokenPrice) * 100).toFixed(0), [market.passTokenPrice])
   const noProb = useMemo(() => (100 - parseFloat(yesProb)).toFixed(0), [yesProb])
   
   const sparklineData = useMemo(() => generateSparklineData(market), [market])
   const trend = useMemo(() => calculateTrend(sparklineData), [sparklineData])
-  const gamificationStats = useMemo(() => getGamificationStats(market), [market])
+  
+  // Get subcategory display name
+  const subcategoryName = useMemo(() => 
+    market.subcategory ? getSubcategoryName(market.subcategory) : null, 
+    [market.subcategory]
+  )
 
   // Create SVG path for sparkline
   const sparklinePath = useMemo(() => {
@@ -160,15 +157,19 @@ function ModernMarketCard({
     return `M ${firstX},${height - padding} L ${points.join(' L ')} L ${lastX},${height - padding} Z`
   }, [sparklineData])
 
-  // Calculate gauge arc
+  // Calculate gauge arc for full circle
   const gaugeArc = useMemo(() => {
     const percent = parseFloat(yesProb)
-    const circumference = Math.PI * 80 // Half circle with radius 80
+    const circumference = Math.PI * 2 * 40 // Full circle with radius 40
     const offset = (percent / 100) * circumference
     return { dashArray: `${offset} ${circumference}`, circumference }
   }, [yesProb])
 
   const handleClick = () => {
+    // Toggle expansion for non-first-row cards
+    if (!isFirstRow) {
+      setIsExpanded(!isExpanded)
+    }
     if (onClick) {
       onClick(market)
     }
@@ -181,10 +182,19 @@ function ModernMarketCard({
     }
   }
 
-  const handleTradeClick = (e) => {
+  const handleYesClick = (e) => {
     e.stopPropagation()
     if (onTrade) {
-      onTrade(market)
+      onTrade(market, 'yes')
+    } else if (onClick) {
+      onClick(market)
+    }
+  }
+
+  const handleNoClick = (e) => {
+    e.stopPropagation()
+    if (onTrade) {
+      onTrade(market, 'no')
     } else if (onClick) {
       onClick(market)
     }
@@ -197,12 +207,16 @@ function ModernMarketCard({
     }
   }
 
-  const handleMouseEnter = () => setIsExpanded(true)
-  const handleMouseLeave = () => setIsExpanded(false)
+  const handleMouseEnter = () => {
+    if (!isFirstRow) setIsExpanded(true)
+  }
+  const handleMouseLeave = () => {
+    if (!isFirstRow) setIsExpanded(false)
+  }
 
   return (
     <div 
-      className={`modern-market-card ${isActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
+      className={`modern-market-card ${isActive ? 'active' : ''} ${isExpanded || isFirstRow ? 'expanded' : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={handleMouseEnter}
@@ -226,12 +240,16 @@ function ModernMarketCard({
       {/* Header with badges */}
       <div className="card-header">
         <div className="card-badges">
-          <span className={`category-pill ${market.category}`}>
-            {market.category}
-          </span>
-          {market.correlationGroupId && (
-            <span className="category-pill crypto" style={{ background: 'linear-gradient(135deg, #4C9AFF 0%, #2980b9 100%)' }}>
-              Group
+          {/* Show subcategory instead of category since we pre-sort by category */}
+          {subcategoryName && (
+            <span className={`category-pill ${market.category}`}>
+              {subcategoryName}
+            </span>
+          )}
+          {/* Show correlation group name instead of "Group" */}
+          {market.correlationGroupName && (
+            <span className="correlation-group-pill" title={market.correlationGroupName}>
+              {market.correlationGroupName}
             </span>
           )}
         </div>
@@ -243,80 +261,78 @@ function ModernMarketCard({
       {/* Card title */}
       <h3 className="card-title">{market.proposalTitle}</h3>
 
-      {/* Probability gauge */}
-      <div className="gauge-section">
-        <div className="probability-gauge">
-          <svg viewBox="0 0 160 90">
+      {/* Top section: Ring gauge and trend aligned horizontally */}
+      <div className="gauge-trend-section">
+        {/* Full Ring Probability Gauge */}
+        <div className="probability-ring">
+          <svg viewBox="0 0 100 100">
             <defs>
-              <linearGradient id={`yesGradient-${market.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id={`ringGradient-${market.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#36B37E" />
-                <stop offset="50%" stopColor="#f1c40f" />
+                <stop offset="60%" stopColor="#f1c40f" />
                 <stop offset="100%" stopColor="#e17055" />
               </linearGradient>
             </defs>
-            {/* Background arc */}
-            <path
-              className="gauge-bg"
-              d="M 15 80 A 65 65 0 0 1 145 80"
+            {/* Background ring */}
+            <circle
+              className="ring-bg"
+              cx="50"
+              cy="50"
+              r="40"
               fill="none"
             />
-            {/* Filled arc based on YES probability */}
-            <path
-              className="gauge-fill yes"
-              d="M 15 80 A 65 65 0 0 1 145 80"
+            {/* Filled ring based on YES probability */}
+            <circle
+              className="ring-fill"
+              cx="50"
+              cy="50"
+              r="40"
               fill="none"
               style={{
-                stroke: `url(#yesGradient-${market.id})`,
-                strokeDasharray: gaugeArc.dashArray
+                stroke: `url(#ringGradient-${market.id})`,
+                strokeDasharray: gaugeArc.dashArray,
+                strokeDashoffset: gaugeArc.circumference * 0.25, // Start from top
+                transform: 'rotate(-90deg)',
+                transformOrigin: 'center'
               }}
             />
-            {/* Center indicator dot */}
-            <circle cx="80" cy="80" r="4" fill="#fff" opacity="0.9" />
           </svg>
           
           {/* Center content */}
-          <div className="gauge-center">
-            <span className="gauge-percentage">{yesProb}%</span>
-            <span className={`gauge-label yes`}>Yes</span>
-          </div>
-          
-          {/* Side outcomes */}
-          <div className="gauge-outcomes">
-            <div className="outcome-side yes-side">
-              <span className="outcome-percent">+{trend.change}%</span>
-            </div>
-            <div className="outcome-side no-side">
-              <span className="outcome-percent">{noProb}%</span>
-            </div>
+          <div className="ring-center">
+            <span className="ring-percentage">{yesProb}%</span>
+            <span className="ring-label">Yes</span>
           </div>
         </div>
-      </div>
 
-      {/* Sparkline trend */}
-      <div className="sparkline-section">
-        <div className="sparkline-container">
-          <svg viewBox="0 0 80 28" preserveAspectRatio="none">
-            <path
-              className="sparkline-area"
-              d={sparklineArea}
-              fill={trend.direction === 'up' ? '#36B37E' : '#e17055'}
-            />
-            <path
-              className="sparkline-line"
-              d={sparklinePath}
-              stroke={trend.direction === 'up' ? '#36B37E' : '#e17055'}
-            />
-          </svg>
-        </div>
-        <div className={`trend-indicator ${trend.direction}`}>
-          <span className="trend-arrow">{trend.direction === 'up' ? '↑' : '↓'}</span>
+        {/* Sparkline and trend */}
+        <div className="trend-section">
+          <div className="trend-label">Price History</div>
+          <div className="sparkline-container-v2">
+            <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+              <path
+                className="sparkline-area"
+                d={sparklineArea.replace(/80/g, '100').replace(/28/g, '40')}
+                fill={trend.direction === 'up' ? '#36B37E' : '#e17055'}
+              />
+              <path
+                className="sparkline-line"
+                d={sparklinePath.replace(/80/g, '100').replace(/28/g, '40')}
+                stroke={trend.direction === 'up' ? '#36B37E' : '#e17055'}
+              />
+            </svg>
+          </div>
+          <div className={`trend-indicator-v2 ${trend.direction}`}>
+            <span className="trend-arrow">{trend.direction === 'up' ? '↗' : '↘'}</span>
+            <span className="trend-change">{trend.direction === 'up' ? '+' : '-'}{trend.change}% today</span>
+          </div>
         </div>
       </div>
 
       {/* Stats row */}
       <div className="stats-row">
         <div className="stat-item">
-          <span className="stat-icon">💰</span>
+          <span className="stat-icon">📊</span>
           <span className="stat-label">Volume</span>
           <span className="stat-value">${formatNumber(market.volume24h || market.totalLiquidity * 0.08)}</span>
         </div>
@@ -326,66 +342,46 @@ function ModernMarketCard({
           <span className="stat-value">${formatNumber(market.totalLiquidity)}</span>
         </div>
         <div className="stat-item">
-          <span className="stat-icon">🔥</span>
+          <span className="stat-icon">👥</span>
           <span className="stat-label">Traders</span>
           <span className="stat-value">{market.uniqueTraders || formatNumber(market.tradesCount || 45)}</span>
         </div>
       </div>
 
-      {/* Gamification row */}
-      <div className="gamification-row">
-        <div className="gamification-left">
-          <div className="badge-item points-badge">
-            <span className="badge-icon">🏆</span>
-            <span>+{gamificationStats.points} pts</span>
-          </div>
-          <div className="badge-item streak-badge">
-            <span className="badge-icon">🔥</span>
-            <span>+{gamificationStats.streakBonus} pts</span>
-          </div>
-          <div className="accuracy-stat">
-            Your Accuracy: <span className="accuracy-value">{gamificationStats.accuracy}%</span>
-          </div>
+      {/* Tags row - use existing market tags */}
+      {market.tags && market.tags.length > 0 && (
+        <div className="tags-row">
+          {market.tags.slice(0, 4).map((tag, index) => (
+            <span key={index} className="market-tag">{tag}</span>
+          ))}
         </div>
-        <div className="hot-debate">
-          <span className="hot-debate-icon">💬</span>
-          <span>{gamificationStats.comments} comments</span>
-        </div>
-      </div>
+      )}
 
-      {/* Action buttons */}
+      {/* Binary action buttons: Yes/No */}
       <div className="action-buttons">
         <button 
-          className="action-btn primary"
-          onClick={handleTradeClick}
-          aria-label={`Trade on ${market.proposalTitle}`}
+          className="action-btn yes-btn"
+          onClick={handleYesClick}
+          aria-label={`Buy Yes on ${market.proposalTitle}`}
         >
-          Trade
+          <span className="btn-label">Yes</span>
+          <span className="btn-price">{yesProb}¢</span>
         </button>
         <button 
-          className="action-btn secondary"
-          onClick={handleSimulateClick}
-          aria-label={`Simulate ${market.proposalTitle}`}
+          className="action-btn no-btn"
+          onClick={handleNoClick}
+          aria-label={`Buy No on ${market.proposalTitle}`}
         >
-          Simulate
+          <span className="btn-label">No</span>
+          <span className="btn-price">{noProb}¢</span>
         </button>
       </div>
 
-      {/* Expanded content on hover */}
+      {/* Expanded content - visible for first row, on hover/click for others */}
       <div className="card-expanded-content">
         {market.description && (
           <p className="expanded-description">{market.description}</p>
         )}
-        {market.tags && market.tags.length > 0 && (
-          <div className="expanded-tags">
-            {market.tags.slice(0, 4).map((tag, index) => (
-              <span key={index} className="tag-chip">{tag}</span>
-            ))}
-          </div>
-        )}
-        <button className="quick-quiz-btn" onClick={(e) => e.stopPropagation()}>
-          Quick Quiz: Earn points
-        </button>
       </div>
     </div>
   )
