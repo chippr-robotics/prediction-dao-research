@@ -28,6 +28,9 @@ const SPARKLINE_DATA_POINTS = 12
 const SPARKLINE_MIN_PRICE = 0.05
 const SPARKLINE_MAX_PRICE = 0.95
 const SPARKLINE_TREND_FACTOR = 0.1
+const SPARKLINE_SEED_MULTIPLIER = 7
+const SPARKLINE_VARIATION_RANGE = 0.15
+const SPARKLINE_DEFAULT_PRICE = 0.5
 
 // Generate sparkline data points
 const generateSparklineData = (market) => {
@@ -38,11 +41,11 @@ const generateSparklineData = (market) => {
     return x - Math.floor(x)
   }
   
-  const basePrice = parseFloat(market.passTokenPrice) || 0.5
+  const basePrice = parseFloat(market.passTokenPrice) || SPARKLINE_DEFAULT_PRICE
   const points = []
   
   for (let i = 0; i < SPARKLINE_DATA_POINTS; i++) {
-    const variation = (stableRandom(seed + i * 7) - 0.5) * 0.15
+    const variation = (stableRandom(seed + i * SPARKLINE_SEED_MULTIPLIER) - 0.5) * SPARKLINE_VARIATION_RANGE
     const trendAdjustment = SPARKLINE_TREND_FACTOR * (SPARKLINE_DATA_POINTS - i) / SPARKLINE_DATA_POINTS
     const price = Math.max(SPARKLINE_MIN_PRICE, Math.min(SPARKLINE_MAX_PRICE, basePrice + variation - trendAdjustment))
     points.push(price)
