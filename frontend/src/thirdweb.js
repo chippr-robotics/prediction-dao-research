@@ -4,7 +4,7 @@ import { defineChain } from 'thirdweb/chains'
 // Get client ID from environment
 const envClientId = import.meta.env.VITE_THIRDWEB_CLIENT_ID
 
-// Validate client ID: allow demo ID only in development, fail fast in production
+// Validate client ID: allow demo ID only in development, warn in production
 if (!envClientId) {
   if (import.meta.env.DEV) {
     console.warn(
@@ -12,7 +12,7 @@ if (!envClientId) {
       'Get your client ID at https://thirdweb.com/dashboard'
     )
   } else {
-    throw new Error(
+    console.error(
       'ThirdWeb: VITE_THIRDWEB_CLIENT_ID must be set in production builds. ' +
       'Get your client ID at https://thirdweb.com/dashboard'
     )
