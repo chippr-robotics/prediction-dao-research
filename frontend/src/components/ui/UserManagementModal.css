@@ -124,51 +124,21 @@
   flex-direction: column;
   gap: 12px;
   margin-bottom: 24px;
+  align-items: center;
+  justify-content: center;
 }
 
-.connector-btn {
+.connector-options .thirdweb-wallet-button {
+  width: 100%;
+  max-width: 400px;
+}
+
+.connector-options .thirdweb-wallet-button button {
+  width: 100%;
   padding: 16px 24px;
   font-size: 16px;
   font-weight: 500;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
   border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.connector-btn:hover:not(:disabled) {
-  background: var(--color-surface-hover, rgba(54, 179, 126, 0.05));
-  border-color: var(--primary-button, #36B37E);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.connector-btn:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.connector-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.connection-error .error-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-}
-
-.connection-error .error-message {
-  font-size: 14px;
-  line-height: 1.5;
-  flex: 1;
-  color: var(--text-primary, #1F2933);
 }
 
 /* Wallet Help */

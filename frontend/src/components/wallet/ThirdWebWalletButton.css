@@ -1,0 +1,19 @@
+.thirdweb-wallet-button {
+  display: inline-block;
+}
+
+/* Override ThirdWeb button styles to match app theme */
+.thirdweb-wallet-button button {
+  font-family: inherit;
+  border-radius: var(--border-radius, 8px);
+  transition: all 0.2s ease;
+}
+
+.thirdweb-wallet-button button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.thirdweb-wallet-button button:active {
+  transform: translateY(0);
+}
