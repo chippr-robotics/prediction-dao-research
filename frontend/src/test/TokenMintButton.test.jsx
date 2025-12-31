@@ -3,9 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import TokenMintButton from '../components/TokenMintButton'
-import { RoleContext, ROLES, ROLE_INFO } from '../contexts/RoleContext'
-import { UIContext } from '../contexts/UIContext'
-import { UserPreferencesContext } from '../contexts/UserPreferencesContext'
+import { RoleContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
 
 // Mock wallet hook
 vi.mock('../hooks', () => ({

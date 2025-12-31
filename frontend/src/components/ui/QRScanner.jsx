@@ -117,7 +117,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
         onScanSuccess(decodedText)
       }
     }
-  }
+  }, [onScanSuccess, stopScanning])
 
   const handleClose = async () => {
     await stopScanning()
