@@ -22,10 +22,10 @@ const DAOFactoryABI = [
 // Replace with deployed factory address
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
-function Dashboard({ defaultTab = 'daos' }) {
+function Dashboard() {
   const { provider } = useEthers()
   const { account } = useAccount()
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  const [activeTab, setActiveTab] = useState('daos')
   const [userDAOs, setUserDAOs] = useState([])
   const [allDAOs, setAllDAOs] = useState([])
   const [isAdmin, setIsAdmin] = useState(false)

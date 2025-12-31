@@ -5,6 +5,7 @@ import { useWallet } from '../../hooks'
 import { useNavigate } from 'react-router-dom'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import TokenMintButton from '../TokenMintButton'
+import ClearPathButton from '../clearpath/ClearPathButton'
 import './HeaderBar.css'
 
 function HeaderBar({ isConnected, onScanMarket }) {
@@ -46,6 +47,7 @@ function HeaderBar({ isConnected, onScanMarket }) {
 
         <div className="header-right">
           <TokenMintButton />
+          <ClearPathButton />
           <button
             className="user-management-btn"
             onClick={handleOpenUserManagement}
