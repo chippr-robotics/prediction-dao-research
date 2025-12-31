@@ -96,10 +96,18 @@ async function deploySystemFixture() {
   const RagequitModule = await ethers.getContractFactory("RagequitModule");
   const ragequitModule = await RagequitModule.deploy();
   await ragequitModule.waitForDeployment();
+  
+  // Deploy TreasuryVault for the DAO
+  const TreasuryVault = await ethers.getContractFactory("TreasuryVault");
+  const treasuryVault = await TreasuryVault.deploy();
+  await treasuryVault.waitForDeployment();
+  await treasuryVault.initialize(owner.address);
+  
+  // Initialize RagequitModule with TreasuryVault
   await ragequitModule.initialize(
     owner.address,
     await governanceToken.getAddress(),
-    owner.address // Treasury vault (using owner as placeholder)
+    await treasuryVault.getAddress() // Use actual TreasuryVault instead of owner address
   );
 
   // Deploy FutarchyGovernor
@@ -114,8 +122,11 @@ async function deploySystemFixture() {
     await privacyCoordinator.getAddress(),
     await oracleResolver.getAddress(),
     await ragequitModule.getAddress(),
-    owner.address // Treasury vault (using owner as placeholder)
+    await treasuryVault.getAddress() // Use actual TreasuryVault instead of owner address
   );
+  
+  // Authorize FutarchyGovernor to spend from TreasuryVault
+  await treasuryVault.authorizeSpender(await futarchyGovernor.getAddress());
   
   // Set collateral token for markets (required for CTF1155)
   await futarchyGovernor.setMarketCollateralToken(await collateralToken.getAddress());
@@ -140,10 +151,16 @@ async function deploySystemFixture() {
   );
   await welfareRegistry.connect(owner).activateMetric(1);
   
-  // Fund FutarchyGovernor with ETH for proposal execution
+  // Note: FutarchyGovernor currently executes from its own balance, not from the vault
+  // Fund both TreasuryVault and FutarchyGovernor for testing
+  await owner.sendTransaction({
+    to: await treasuryVault.getAddress(),
+    value: ethers.parseEther("5000") // 5,000 ETH for vault (for future integration)
+  });
+  
   await owner.sendTransaction({
     to: await futarchyGovernor.getAddress(),
-    value: ethers.parseEther("5000") // 5,000 ETH for testing
+    value: ethers.parseEther("5000") // 5,000 ETH for direct execution
   });
   
   // Transfer ownership of key contracts to FutarchyGovernor
@@ -170,7 +187,8 @@ async function deploySystemFixture() {
       privacyCoordinator,
       oracleResolver,
       ragequitModule,
-      futarchyGovernor
+      futarchyGovernor,
+      treasuryVault
     },
     accounts: {
       owner,
