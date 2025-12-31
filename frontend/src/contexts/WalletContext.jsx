@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
@@ -8,20 +8,7 @@ import {
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'
-
-/**
- * WalletContext - Unified wallet and user management system
- * 
- * This context provides a single source of truth for all wallet-related state and operations:
- * - Wallet connection and address management
- * - Balance tracking (ETC, WETC, tokens)
- * - Provider and signer for transactions
- * - RVAC role management integrated with wallet
- * - Network state and switching
- * 
- * All components needing wallet functionality should use this context via the useWallet hook.
- */
-export const WalletContext = createContext(null)
+import { WalletContext } from './WalletContext'
 
 export function WalletProvider({ children }) {
   // Wagmi hooks for wallet connection

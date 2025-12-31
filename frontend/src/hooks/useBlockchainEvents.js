@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 import { useEthers } from './useWeb3'
 import { useNotification, useAnnouncement } from './useUI'
 

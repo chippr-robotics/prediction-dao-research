@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet } from '../hooks/useWalletManagement'
 import { ETCSWAP_ADDRESSES, TOKENS, FEE_TIERS, DEFAULT_SLIPPAGE } from '../constants/etcswap'
@@ -6,8 +6,7 @@ import { ERC20_ABI } from '../abis/ERC20'
 import { WETC_ABI } from '../abis/WETC'
 import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
 import { QUOTER_V2_ABI } from '../abis/QuoterV2'
-
-export const ETCswapContext = createContext(null)
+import { ETCswapContext } from './ETCswapContext'
 
 export function ETCswapProvider({ children }) {
   // Use unified wallet management

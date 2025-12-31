@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import RolePurchaseScreen from '../components/RolePurchaseScreen'
-import { WalletProvider } from '../contexts/WalletContext'
-import { UIContext } from '../contexts/UIContext'
-import { useAccount } from 'wagmi'
+import { WalletProvider, UIContext } from '../contexts'
 
 // Mock contexts
 const mockUIContext = {

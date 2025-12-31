@@ -90,6 +90,8 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          NODE_ENV: production
 
       - name: Verify build output
         run: |
@@ -97,11 +99,20 @@ jobs:
             echo "Error: dist directory not found after build"
             exit 1
           fi
+          if [ ! -f "dist/index.html" ]; then
+            echo "Error: dist/index.html not found after build"
+            exit 1
+          fi
           echo "Build output verified. Contents of dist:"
           ls -la dist/
+          echo "Checking index.html:"
+          head -20 dist/index.html
 
       - name: Run Lighthouse CI
         run: lhci autorun
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+          LHCI_BUILD_CONTEXT__COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
 
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4

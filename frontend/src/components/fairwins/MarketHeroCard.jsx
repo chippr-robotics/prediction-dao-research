@@ -104,6 +104,11 @@ const generateHolderDistribution = () => {
 }
 
 function MarketHeroCard({ market, onTrade }) {
+  // Early return must come before hooks
+  if (!market) {
+    return null
+  }
+
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [showShareModal, setShowShareModal] = useState(false)
@@ -115,11 +120,6 @@ function MarketHeroCard({ market, onTrade }) {
   // Generate unique IDs for SVG elements to avoid conflicts with multiple instances
   const gradientId = useId()
   const uniqueGradientId = `line-gradient-${gradientId}`
-
-  
-  if (!market) {
-    return null
-  }
 
   const calculateImpliedProbability = (passPrice) => {
     return (parseFloat(passPrice) * 100).toFixed(1)
@@ -151,8 +151,9 @@ function MarketHeroCard({ market, onTrade }) {
     }
   }
 
-  const yesProb = calculateImpliedProbability(market.passTokenPrice)
-  const noProb = calculateImpliedProbability(market.failTokenPrice)
+  // Remove unused variables
+  // const yesProb = calculateImpliedProbability(market.passTokenPrice)
+  // const noProb = calculateImpliedProbability(market.failTokenPrice)
   
   // Memoize mock data to prevent regeneration on every render
   const holderDistribution = useMemo(() => generateHolderDistribution(), [])

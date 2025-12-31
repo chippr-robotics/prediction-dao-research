@@ -10,7 +10,8 @@ import Fuse from 'fuse.js'
  */
 function useFuseSearch(items, searchQuery, optionsOverride = {}) {
   // Create a stable stringified version of options for dependency tracking
-  const optionsKey = useMemo(() => JSON.stringify(optionsOverride), [JSON.stringify(optionsOverride)])
+  const optionsJson = JSON.stringify(optionsOverride)
+  const optionsKey = useMemo(() => optionsJson, [optionsJson])
 
   // Create Fuse instance - memoized to avoid recreation on every render
   const fuse = useMemo(() => {

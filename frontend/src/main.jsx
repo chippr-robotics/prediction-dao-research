@@ -6,14 +6,15 @@ import { ThirdwebProvider } from 'thirdweb/react'
 import './index.css'
 import App from './App.jsx'
 import { config } from './wagmi'
-import { Web3Provider } from './contexts/Web3Context'
-import { WalletProvider } from './contexts/WalletContext'
-import { UIProvider } from './contexts/UIContext'
-import { ThemeProvider } from './contexts/ThemeContext'
-import { PriceProvider } from './contexts/PriceContext'
-import { ETCswapProvider } from './contexts/ETCswapContext'
-import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
-import { RoleProvider } from './contexts/RoleContext'
+import {
+  WalletProvider,
+  UIProvider,
+  ThemeProvider,
+  PriceProvider,
+  ETCswapProvider,
+  UserPreferencesProvider,
+  RoleProvider
+} from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'
 

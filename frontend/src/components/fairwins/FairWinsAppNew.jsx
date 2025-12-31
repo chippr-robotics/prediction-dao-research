@@ -52,6 +52,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   useEffect(() => {
     const categoryParam = searchParams.get('category')
     if (categoryParam && categoryParam !== selectedCategory) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setSelectedCategory(categoryParam)
     }
   }, [searchParams, selectedCategory])
@@ -70,6 +71,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadMarkets()
   }, [loadMarkets])
 
@@ -167,18 +169,18 @@ Trade Details:
     console.log('Token clicked:', token)
   }
 
-  // Handle subcategory toggle
-  const handleSubcategoryToggle = useCallback((subcategoryId) => {
-    setSelectedSubcategories(prev => {
-      if (prev.includes(subcategoryId)) {
-        // Remove subcategory
-        return prev.filter(id => id !== subcategoryId)
-      } else {
-        // Add subcategory
-        return [...prev, subcategoryId]
-      }
-    })
-  }, [])
+  // Handle subcategory toggle - currently unused but kept for future feature
+  // const handleSubcategoryToggle = useCallback((subcategoryId) => {
+  //   setSelectedSubcategories(prev => {
+  //     if (prev.includes(subcategoryId)) {
+  //       // Remove subcategory
+  //       return prev.filter(id => id !== subcategoryId)
+  //     } else {
+  //       // Add subcategory
+  //       return [...prev, subcategoryId]
+  //     }
+  //   })
+  // }, [])
 
   const handleScanMarket = (marketId) => {
     // Navigate directly to market page
@@ -240,6 +242,7 @@ Trade Details:
 
   // Load user tokens when account changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     loadUserTokens()
   }, [loadUserTokens])
 
@@ -255,7 +258,8 @@ Trade Details:
     })
   }, [roles, ROLES])
 
-  const marketsByCategory = getMarketsByCategory()
+  // Markets by category - currently unused but available for future features
+  // const marketsByCategory = getMarketsByCategory()
 
   // Memoize trending markets to avoid recalculation on every render
   const trendingMarkets = useMemo(() => {

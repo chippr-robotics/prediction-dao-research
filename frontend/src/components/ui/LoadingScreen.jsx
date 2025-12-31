@@ -55,6 +55,7 @@ const LoadingScreen = ({
       
       return () => clearTimeout(timer)
     } else {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setAnimated(false)
     }
   }, [visible, onAnimationComplete])

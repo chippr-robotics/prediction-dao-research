@@ -8,7 +8,7 @@ import TokenMintButton from '../TokenMintButton'
 import ClearPathButton from '../clearpath/ClearPathButton'
 import './HeaderBar.css'
 
-function HeaderBar({ isConnected, onScanMarket }) {
+function HeaderBar({ isConnected }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()

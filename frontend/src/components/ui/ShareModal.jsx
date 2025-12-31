@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import './ShareModal.css'
 
 function ShareModal({ isOpen, onClose, market, marketUrl }) {
-  const [copied, setCopied] = useState(false)
+  const [, setCopied] = useState(false)
   const qrRef = useRef(null)
 
   // Only compute url when we have data

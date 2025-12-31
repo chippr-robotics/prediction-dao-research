@@ -5,14 +5,16 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThirdwebProvider } from 'thirdweb/react'
 import UserManagementModal from '../components/ui/UserManagementModal'
-import { WalletProvider } from '../contexts/WalletContext'
-import { Web3Provider } from '../contexts/Web3Context'
-import { UserPreferencesProvider } from '../contexts/UserPreferencesContext'
-import { UIProvider } from '../contexts/UIContext'
-import { ThemeProvider } from '../contexts/ThemeContext'
-import { ETCswapProvider } from '../contexts/ETCswapContext'
-import { RoleProvider } from '../contexts/RoleContext'
-import { PriceProvider } from '../contexts/PriceContext'
+import {
+  WalletProvider,
+  Web3Provider,
+  UserPreferencesProvider,
+  UIProvider,
+  ThemeProvider,
+  ETCswapProvider,
+  RoleProvider,
+  PriceProvider
+} from '../contexts'
 
 // Mock ThirdWeb ConnectButton to render a simple button in tests
 vi.mock('thirdweb/react', () => ({
