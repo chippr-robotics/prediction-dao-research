@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { usePrice } from '../../contexts/PriceContext'
 import './ModernMarketCard.css'
 
 // Category background images (using placeholders that represent each category)
@@ -18,11 +17,17 @@ const getCategoryThumbnail = (category) => {
 // Format number for display
 const formatNumber = (num) => {
   const n = parseFloat(num)
-  if (Number.isNaN(n) || n == null) return '0'
+  if (Number.isNaN(n) || n === null) return '0'
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
   if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
   return parseFloat(n.toFixed(0)).toString()
 }
+
+// Sparkline generation constants
+const SPARKLINE_DATA_POINTS = 12
+const SPARKLINE_MIN_PRICE = 0.05
+const SPARKLINE_MAX_PRICE = 0.95
+const SPARKLINE_TREND_FACTOR = 0.1
 
 // Generate sparkline data points
 const generateSparklineData = (market) => {
@@ -36,9 +41,10 @@ const generateSparklineData = (market) => {
   const basePrice = parseFloat(market.passTokenPrice) || 0.5
   const points = []
   
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < SPARKLINE_DATA_POINTS; i++) {
     const variation = (stableRandom(seed + i * 7) - 0.5) * 0.15
-    const price = Math.max(0.05, Math.min(0.95, basePrice + variation - (0.1 * (12 - i) / 12)))
+    const trendAdjustment = SPARKLINE_TREND_FACTOR * (SPARKLINE_DATA_POINTS - i) / SPARKLINE_DATA_POINTS
+    const price = Math.max(SPARKLINE_MIN_PRICE, Math.min(SPARKLINE_MAX_PRICE, basePrice + variation - trendAdjustment))
     points.push(price)
   }
   
@@ -102,7 +108,6 @@ function ModernMarketCard({
   isActive = false 
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const { formatPrice } = usePrice()
 
   const yesProb = useMemo(() => (parseFloat(market.passTokenPrice) * 100).toFixed(0), [market.passTokenPrice])
   const noProb = useMemo(() => (100 - parseFloat(yesProb)).toFixed(0), [yesProb])
