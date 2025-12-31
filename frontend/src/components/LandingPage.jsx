@@ -419,42 +419,47 @@ function LandingPage() {
       {/* TokenMint Add-on Section */}
       <section className="tokenmint-section">
         <div className="container">
-          <h2 className="section-title">TokenMint: Enterprise Token Management Add-on</h2>
+          <h2 className="section-title">TokenMint: Enterprise Tokenization Add-on</h2>
           <p className="section-intro">
-            Create and manage custom tokens for your DAO or organization
+            Define, generate, and deploy digital assets with clarity and confidence
           </p>
           <div className="tokenmint-content">
             <div className="tokenmint-description">
               <p>
-                TokenMint is an optional add-on that enables organizations to create governance tokens, 
-                reward tokens, or custom assets with advanced distribution and access control features.
+                TokenMint is a tokenization add-on that enables organizations to define, generate, and deploy 
+                digital assets with clarity and confidence. Built around the Token Taxonomy Framework, TokenMint 
+                allows institutions to model token standards that reflect real-world assets and intellectual property, 
+                then automatically assembles secure, production-ready smart contracts using modular components. 
+                The platform simplifies the path from asset definition to on-chain deployment, making it easier for 
+                enterprises to tokenize traditional assets and intangible rights while maintaining consistency, 
+                compliance awareness, and technical rigor.
               </p>
               <div className="tokenmint-features-grid">
                 <div className="tokenmint-feature">
-                  <h4>🪙 Token Creation</h4>
-                  <p>Deploy custom ERC-20 tokens with configurable parameters including name, symbol, supply, and decimals</p>
+                  <h4>🏗️ Token Taxonomy Framework</h4>
+                  <p>Model token standards that reflect real-world assets and intellectual property with structured definitions</p>
                 </div>
                 <div className="tokenmint-feature">
-                  <h4>📅 Vesting Schedules</h4>
-                  <p>Set up time-based token releases for team members, advisors, or community distributions</p>
+                  <h4>🔧 Modular Components</h4>
+                  <p>Automatically assemble secure, production-ready smart contracts using tested modular building blocks</p>
                 </div>
                 <div className="tokenmint-feature">
-                  <h4>🔐 Access Control</h4>
-                  <p>Role-based permissions for minting, burning, and administrative operations</p>
+                  <h4>📜 Compliance Awareness</h4>
+                  <p>Maintain consistency and compliance awareness throughout the tokenization lifecycle</p>
                 </div>
                 <div className="tokenmint-feature">
-                  <h4>🔗 Platform Integration</h4>
-                  <p>Seamlessly integrate your tokens with FairWins markets and ClearPath governance</p>
+                  <h4>🚀 Simplified Deployment</h4>
+                  <p>Streamlined path from asset definition to on-chain deployment with technical rigor</p>
                 </div>
               </div>
             </div>
             <div className="tokenmint-use-cases">
               <h3>Common Use Cases</h3>
               <ul>
-                <li><strong>DAO Governance Tokens:</strong> Create voting tokens for ClearPath governance</li>
-                <li><strong>Reward Programs:</strong> Issue tokens as rewards for platform participation</li>
-                <li><strong>Community Tokens:</strong> Build token economies for your community or project</li>
-                <li><strong>Access Tokens:</strong> Gate features or content with custom tokens</li>
+                <li><strong>Real-World Asset Tokenization:</strong> Model and deploy tokens representing physical assets like real estate, commodities, or equipment</li>
+                <li><strong>Intellectual Property Rights:</strong> Tokenize patents, copyrights, trademarks, and other intangible assets</li>
+                <li><strong>Enterprise Digital Assets:</strong> Create custom tokens for loyalty programs, carbon credits, or supply chain tracking</li>
+                <li><strong>Governance & Utility Tokens:</strong> Deploy voting tokens for ClearPath governance or utility tokens for platform access</li>
               </ul>
             </div>
           </div>
