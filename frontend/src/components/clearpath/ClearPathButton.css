@@ -21,7 +21,20 @@
   padding: 6px;
 }
 
-.clearpath-button:hover {
+.clearpath-button.inactive {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--color-secondary-light, #718096);
+  border-color: var(--color-secondary-light, #718096);
+}
+
+.clearpath-button.inactive:hover {
+  opacity: 0.4;
+  transform: none;
+  box-shadow: none;
+}
+
+.clearpath-button:not(.inactive):hover {
   background: var(--color-secondary-dark, #2D3748);
   transform: scale(1.05);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -29,6 +42,10 @@
 
 .clearpath-button:active {
   transform: scale(0.98);
+}
+
+.clearpath-button.inactive:active {
+  transform: none;
 }
 
 .clearpath-button:focus-visible {

@@ -61,16 +61,20 @@ describe('TokenMintButton Component', () => {
   })
 
   describe('Rendering', () => {
-    it('does not render when wallet is not connected', () => {
+    it('renders button when wallet is not connected but appears inactive', () => {
       useWallet.mockReturnValue({ isConnected: false })
-      const { container } = renderWithProviders(<TokenMintButton />)
-      expect(container.firstChild).toBeNull()
+      renderWithProviders(<TokenMintButton />)
+      const button = screen.getByRole('button', { name: /tokenmint/i })
+      expect(button).toBeInTheDocument()
+      expect(button).toHaveClass('inactive')
+      expect(button).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('renders button when wallet is connected', () => {
       renderWithProviders(<TokenMintButton />)
       const button = screen.getByRole('button', { name: /tokenmint/i })
       expect(button).toBeInTheDocument()
+      expect(button).not.toHaveClass('inactive')
     })
 
     it('renders TokenMint logo image', () => {
@@ -81,6 +85,17 @@ describe('TokenMintButton Component', () => {
   })
 
   describe('Dropdown Interaction', () => {
+    it('does not open dropdown when button is clicked while inactive', async () => {
+      const user = userEvent.setup()
+      useWallet.mockReturnValue({ isConnected: false })
+      renderWithProviders(<TokenMintButton />)
+      
+      const button = screen.getByRole('button', { name: /tokenmint/i })
+      await user.click(button)
+      
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    })
+
     it('opens dropdown when button is clicked', async () => {
       const user = userEvent.setup()
       renderWithProviders(<TokenMintButton />)

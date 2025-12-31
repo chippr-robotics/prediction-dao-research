@@ -21,7 +21,20 @@
   padding: 6px;
 }
 
-.tokenmint-button:hover {
+.tokenmint-button.inactive {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--color-primary-light, #48bb78);
+  border-color: var(--color-primary-light, #48bb78);
+}
+
+.tokenmint-button.inactive:hover {
+  opacity: 0.4;
+  transform: none;
+  box-shadow: none;
+}
+
+.tokenmint-button:not(.inactive):hover {
   background: var(--color-primary-dark, #1e5a37);
   transform: scale(1.05);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -29,6 +42,10 @@
 
 .tokenmint-button:active {
   transform: scale(0.98);
+}
+
+.tokenmint-button.inactive:active {
+  transform: none;
 }
 
 .tokenmint-button:focus-visible {

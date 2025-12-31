@@ -197,22 +197,18 @@ function TokenMintButton() {
 
   const menuOptions = getMenuOptions()
 
-  // Don't show button if not connected
-  if (!isConnected) {
-    return null
-  }
-
   return (
     <>
       <div className="tokenmint-button-container">
         <button
           ref={buttonRef}
-          className="tokenmint-button"
-          onClick={toggleDropdown}
+          className={`tokenmint-button ${!isConnected ? 'inactive' : ''}`}
+          onClick={isConnected ? toggleDropdown : undefined}
           aria-label="TokenMint - Create tokens and markets"
           aria-expanded={isOpen}
           aria-haspopup="true"
-          title="TokenMint"
+          aria-disabled={!isConnected}
+          title={isConnected ? "TokenMint" : "TokenMint (Connect wallet to use)"}
         >
           <img 
             src="/assets/tokenmint_no-text_logo.svg" 
@@ -221,7 +217,7 @@ function TokenMintButton() {
           />
         </button>
 
-        {isOpen && (
+        {isOpen && isConnected && (
           <div 
             ref={dropdownRef}
             className="tokenmint-dropdown"

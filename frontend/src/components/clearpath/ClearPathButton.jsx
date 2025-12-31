@@ -151,21 +151,17 @@ function ClearPathButton() {
 
   const menuOptions = getMenuOptions()
 
-  // Don't show button if not connected
-  if (!isConnected) {
-    return null
-  }
-
   return (
     <div className="clearpath-button-container">
       <button
         ref={buttonRef}
-        className="clearpath-button"
-        onClick={toggleDropdown}
+        className={`clearpath-button ${!isConnected ? 'inactive' : ''}`}
+        onClick={isConnected ? toggleDropdown : undefined}
         aria-label="ClearPath - DAO Governance"
         aria-expanded={isOpen}
         aria-haspopup="true"
-        title="ClearPath"
+        aria-disabled={!isConnected}
+        title={isConnected ? "ClearPath" : "ClearPath (Connect wallet to use)"}
       >
         <img 
           src="/assets/clearpath_no-text_logo.svg" 
@@ -174,7 +170,7 @@ function ClearPathButton() {
         />
       </button>
 
-      {isOpen && (
+      {isOpen && isConnected && (
         <div 
           ref={dropdownRef}
           className="clearpath-dropdown"
