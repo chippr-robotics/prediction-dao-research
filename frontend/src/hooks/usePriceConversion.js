@@ -44,8 +44,9 @@ function usePriceConversion() {
       console.error('Error fetching ETC price:', err)
       setError(err.message)
       // Set a fallback rate if fetch fails (approximate historical average)
-      // In production, consider using environment variable or cached value
-      setEtcUsdRate(process.env.VITE_ETC_USD_FALLBACK || 20)
+      // Use environment variable fallback value or default to 20
+      const fallbackRate = import.meta.env.VITE_ETC_USD_FALLBACK || 20
+      setEtcUsdRate(fallbackRate)
     } finally {
       setLoading(false)
     }

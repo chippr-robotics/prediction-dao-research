@@ -7,7 +7,7 @@ import BlockiesAvatar from '../ui/BlockiesAvatar'
 import TokenMintButton from '../TokenMintButton'
 import './HeaderBar.css'
 
-function HeaderBar({ isConnected, onScanMarket }) {
+function HeaderBar({ isConnected }) {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()

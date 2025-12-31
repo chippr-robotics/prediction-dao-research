@@ -18,7 +18,7 @@ vi.mock('../utils/mockDataLoader')
 // Mock D3 to avoid rendering issues in test environment
 vi.mock('d3', () => {
   const createChainableMock = () => {
-    const mock = vi.fn(() => chainable)
+    vi.fn(() => chainable)
     const chainable = {
       attr: vi.fn(() => chainable),
       append: vi.fn(() => chainable),

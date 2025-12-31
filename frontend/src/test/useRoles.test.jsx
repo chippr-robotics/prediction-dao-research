@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import React from 'react'
-import { RoleContext } from '../contexts/RoleContext'
+import { RoleContext } from '../contexts'
 import { useRoles } from '../hooks/useRoles'
 
 describe('useRoles hook', () => {

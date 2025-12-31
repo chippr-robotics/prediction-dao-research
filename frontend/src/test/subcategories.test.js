@@ -160,7 +160,7 @@ describe('subcategories configuration', () => {
     })
 
     it('should have at least 3 subcategories per category', () => {
-      Object.entries(SUBCATEGORIES).forEach(([category, subcats]) => {
+      Object.entries(SUBCATEGORIES).forEach(([, subcats]) => {
         expect(subcats.length).toBeGreaterThanOrEqual(3)
       })
     })

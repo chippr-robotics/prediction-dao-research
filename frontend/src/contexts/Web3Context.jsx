@@ -1,9 +1,8 @@
-import { createContext, useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
-
-export const Web3Context = createContext(null)
+import { Web3Context } from './Web3Context'
 
 export function Web3Provider({ children }) {
   const { address, isConnected } = useAccount()
@@ -41,6 +40,7 @@ export function Web3Provider({ children }) {
   useEffect(() => {
     if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
       const expectedChain = getExpectedChain()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
     } else {
       setNetworkError(null)

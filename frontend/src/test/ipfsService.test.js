@@ -1,4 +1,3 @@
-/* eslint-disable no-undef -- 'global' is used for mocking fetch in vitest test environment */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   fetchFromIpfs,
