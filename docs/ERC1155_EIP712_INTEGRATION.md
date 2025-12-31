@@ -254,7 +254,7 @@ const types = {
 };
 
 // Sign
-const signature = await signer._signTypedData(domain, types, splitIntent);
+const signature = await signer.signTypedData(domain, types, splitIntent);
 
 // Submit (can be done by any relayer)
 const tx = await intentHandler.executeSplitIntent(splitIntent, signature);

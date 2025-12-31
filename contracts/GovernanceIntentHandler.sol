@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "./ConditionalMarketFactory.sol";
@@ -91,6 +92,9 @@ contract GovernanceIntentHandler is EIP712, Ownable, ReentrancyGuard, ERC1155Hol
     bytes32 public constant REDEEM_INTENT_TYPEHASH = keccak256(
         "RedeemIntent(address participant,uint256 marketId,uint256[] indexSets,uint256 nonce,uint256 deadline)"
     );
+
+    /// @notice Maximum batch size for batch operations
+    uint256 public constant MAX_BATCH_SIZE = 50;
 
     // ============ State Variables ============
 
@@ -373,7 +377,7 @@ contract GovernanceIntentHandler is EIP712, Ownable, ReentrancyGuard, ERC1155Hol
         bytes[] calldata signatures
     ) external nonReentrant returns (uint256[] memory amountsOut) {
         require(intents.length == signatures.length, "Length mismatch");
-        require(intents.length > 0 && intents.length <= 50, "Invalid batch size");
+        require(intents.length > 0 && intents.length <= MAX_BATCH_SIZE, "Invalid batch size");
 
         amountsOut = new uint256[](intents.length);
 
@@ -383,9 +387,11 @@ contract GovernanceIntentHandler is EIP712, Ownable, ReentrancyGuard, ERC1155Hol
                 continue;
             }
 
-            try this.executeTradeIntentInternal(intents[i], signatures[i]) returns (uint256 amount) {
+            // Try to execute intent with internal error handling
+            (bool success, uint256 amount) = _tryExecuteTradeIntent(intents[i], signatures[i]);
+            if (success) {
                 amountsOut[i] = amount;
-            } catch {
+            } else {
                 // Silently fail individual intents
                 amountsOut[i] = 0;
             }
@@ -501,14 +507,78 @@ contract GovernanceIntentHandler is EIP712, Ownable, ReentrancyGuard, ERC1155Hol
     // ============ Internal Functions ============
 
     /**
-     * @notice Internal function for batch execution (allows try/catch)
+     * @notice Internal function to try executing a trade intent (for batch operations)
+     * @param intent The trade intent
+     * @param signature EIP-712 signature
+     * @return success Whether execution succeeded
+     * @return amountOut Amount of tokens received
      */
-    function executeTradeIntentInternal(
+    function _tryExecuteTradeIntent(
         TradeIntent calldata intent,
         bytes calldata signature
-    ) external returns (uint256) {
-        require(msg.sender == address(this), "Internal only");
-        return this.executeTradeIntent(intent, signature);
+    ) internal returns (bool success, uint256 amountOut) {
+        // Validate intent (will revert on failure)
+        bytes32 structHash = _hashTradeIntentStruct(intent);
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = hash.recover(signature);
+        
+        // Check signature validity without reverting
+        if (signer != intent.participant) {
+            return (false, 0);
+        }
+        if (intent.amount == 0) {
+            return (false, 0);
+        }
+        if (block.timestamp > intent.deadline) {
+            return (false, 0);
+        }
+        
+        // Mark nonce as used
+        usedNonces[intent.participant][intent.nonce] = true;
+        
+        // Get market info
+        ConditionalMarketFactory.Market memory market = marketFactory.getMarket(intent.marketId);
+        if (market.status != ConditionalMarketFactory.MarketStatus.Active) {
+            return (false, 0);
+        }
+        
+        // Execute trade through market factory
+        if (intent.isBuy) {
+            // For buy: transfer collateral from participant to this contract, then buy
+            IERC20(market.collateralToken).transferFrom(intent.participant, address(this), intent.amount);
+            IERC20(market.collateralToken).approve(address(marketFactory), intent.amount);
+            
+            amountOut = marketFactory.buyTokens(intent.marketId, intent.buyPass, intent.amount);
+            
+            // Transfer resulting tokens to participant
+            uint256 positionId = intent.buyPass ? market.passPositionId : market.failPositionId;
+            ctf1155.safeTransferFrom(address(this), intent.participant, positionId, amountOut, "");
+        } else {
+            // For sell: transfer position tokens from participant, then sell
+            uint256 positionId = intent.buyPass ? market.passPositionId : market.failPositionId;
+            ctf1155.safeTransferFrom(intent.participant, address(this), positionId, intent.amount, "");
+            
+            amountOut = marketFactory.sellTokens(intent.marketId, intent.buyPass, intent.amount);
+            
+            // Transfer collateral back to participant
+            IERC20(market.collateralToken).transfer(intent.participant, amountOut);
+        }
+        
+        // Check slippage
+        if (amountOut < intent.minAmountOut) {
+            return (false, 0);
+        }
+        
+        emit TradeIntentExecuted(
+            intent.participant,
+            intent.marketId,
+            intent.buyPass,
+            intent.amount,
+            amountOut,
+            intent.nonce
+        );
+        
+        return (true, amountOut);
     }
 
     function _validateTradeIntent(
