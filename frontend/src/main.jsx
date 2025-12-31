@@ -14,7 +14,8 @@ import {
   PriceProvider,
   ETCswapProvider,
   UserPreferencesProvider,
-  RoleProvider
+  RoleProvider,
+  Web3Provider
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'
