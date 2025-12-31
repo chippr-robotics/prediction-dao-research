@@ -84,7 +84,7 @@
   object-position: center;
 }
 
-/* Dark overlay gradient for text readability */
+/* Dark overlay gradient for text readability - stronger for clear visibility */
 .thumbnail-overlay {
   position: absolute;
   top: 0;
@@ -93,9 +93,9 @@
   bottom: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.3) 0%,
-    rgba(0, 0, 0, 0.5) 50%,
-    rgba(0, 0, 0, 0.7) 100%
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.65) 50%,
+    rgba(0, 0, 0, 0.85) 100%
   );
   display: flex;
   flex-direction: column;
@@ -103,13 +103,13 @@
   padding: 0;
 }
 
-/* Light mode overlay adjustment */
+/* Light mode overlay adjustment - even stronger */
 .theme-light .thumbnail-overlay {
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.35) 0%,
-    rgba(0, 0, 0, 0.55) 50%,
-    rgba(0, 0, 0, 0.75) 100%
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.7) 50%,
+    rgba(0, 0, 0, 0.9) 100%
   );
 }
 
@@ -124,27 +124,27 @@
   gap: 8px;
 }
 
-/* Card title - Primary text over background */
+/* Card title - Primary text over background - BOLD and VISIBLE */
 .card-title {
   position: relative;
   z-index: 1;
   padding: 8px 14px 14px;
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: 1.1rem;
+  font-weight: 800;
   color: #ffffff;
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 /* Light mode title - still white over dark overlay */
 .theme-light .card-title {
   color: #ffffff;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
 }
 
 .card-badges {
@@ -435,26 +435,53 @@
   opacity: 0.9;
 }
 
+/* Yes button - faint green background */
 .action-btn.yes-btn {
-  background: linear-gradient(135deg, var(--yes-color) 0%, #2d9968 100%);
-  color: #fff;
+  background: rgba(54, 179, 126, 0.15);
+  color: var(--yes-color);
+  border: 1px solid rgba(54, 179, 126, 0.4);
 }
 
 .action-btn.yes-btn:hover {
-  background: linear-gradient(135deg, #45c492 0%, var(--yes-color) 100%);
+  background: rgba(54, 179, 126, 0.25);
+  border-color: var(--yes-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.3);
+  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.2);
 }
 
+/* No button - faint red background */
 .action-btn.no-btn {
-  background: linear-gradient(135deg, var(--no-color) 0%, #c0392b 100%);
-  color: #fff;
+  background: rgba(225, 112, 85, 0.15);
+  color: var(--no-color);
+  border: 1px solid rgba(225, 112, 85, 0.4);
 }
 
 .action-btn.no-btn:hover {
-  background: linear-gradient(135deg, #f08070 0%, var(--no-color) 100%);
+  background: rgba(225, 112, 85, 0.25);
+  border-color: var(--no-color);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(225, 112, 85, 0.3);
+  box-shadow: 0 4px 12px rgba(225, 112, 85, 0.2);
+}
+
+/* Light mode button adjustments */
+.theme-light .action-btn.yes-btn {
+  background: rgba(54, 179, 126, 0.12);
+  color: #2d9968;
+  border: 1px solid rgba(54, 179, 126, 0.35);
+}
+
+.theme-light .action-btn.yes-btn:hover {
+  background: rgba(54, 179, 126, 0.2);
+}
+
+.theme-light .action-btn.no-btn {
+  background: rgba(225, 112, 85, 0.12);
+  color: #c0392b;
+  border: 1px solid rgba(225, 112, 85, 0.35);
+}
+
+.theme-light .action-btn.no-btn:hover {
+  background: rgba(225, 112, 85, 0.2);
 }
 
 /* Card expanded state */
