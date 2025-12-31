@@ -426,13 +426,13 @@ function LandingPage() {
           <div className="tokenmint-content">
             <div className="tokenmint-description">
               <p>
-                TokenMint is a tokenization add-on that enables organizations to define, generate, and deploy 
-                digital assets with clarity and confidence. Built around the Token Taxonomy Framework, TokenMint 
-                allows institutions to model token standards that reflect real-world assets and intellectual property, 
-                then automatically assembles secure, production-ready smart contracts using modular components. 
-                The platform simplifies the path from asset definition to on-chain deployment, making it easier for 
-                enterprises to tokenize traditional assets and intangible rights while maintaining consistency, 
-                compliance awareness, and technical rigor.
+                TokenMint is a tokenization add-on that streamlines how organizations design, configure, and launch 
+                digital assets at scale. Built around the Token Taxonomy Framework, TokenMint allows institutions to 
+                model token standards that reflect real-world assets and intellectual property, then automatically 
+                assembles secure, production-ready smart contracts using modular components. The platform simplifies 
+                the path from asset definition to on-chain deployment, making it easier for enterprises to tokenize 
+                traditional assets and intangible rights while maintaining consistency, compliance awareness, and 
+                technical rigor.
               </p>
               <div className="tokenmint-features-grid">
                 <div className="tokenmint-feature">
