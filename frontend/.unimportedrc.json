@@ -1,0 +1,39 @@
+{
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/*.tests.{js,jsx,ts,tsx}",
+    "**/*.test.{js,jsx,ts,tsx}",
+    "**/*.spec.{js,jsx,ts,tsx}",
+    "**/tests/**",
+    "**/__tests__/**",
+    "**/*.d.ts",
+    "**/cypress/**",
+    "**/*.cy.{js,jsx,ts,tsx}"
+  ],
+  "ignoreUnimported": [
+    "src/main.jsx",
+    "src/test/setup.js",
+    "vite.config.js",
+    "cypress.config.js",
+    "eslint.config.js",
+    "lighthouserc.json"
+  ],
+  "ignoreUnused": [
+    "@vitejs/plugin-react",
+    "vite",
+    "eslint",
+    "vitest",
+    "cypress",
+    "@testing-library/*",
+    "@vitest/*",
+    "jsdom",
+    "globals",
+    "axe-core",
+    "vitest-axe",
+    "start-server-and-test",
+    "cypress-wait-until",
+    "@cypress/*"
+  ],
+  "ignoreUnresolved": [],
+  "respectGitignore": true
+}
