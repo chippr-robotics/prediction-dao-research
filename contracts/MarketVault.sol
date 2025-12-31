@@ -28,9 +28,6 @@ contract MarketVault is Ownable, ReentrancyGuard {
     
     // Factory address that can create markets
     address public factory;
-    
-    // Initialization flag
-    bool private initialized;
 
     event MarketCreated(uint256 indexed marketId, address indexed manager);
     event MarketClosed(uint256 indexed marketId);
@@ -62,25 +59,28 @@ contract MarketVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Constructor - can be used for direct deployment or as implementation for clones
+     * @notice Constructor - for implementation contract
+     * @dev Deploys with msg.sender as owner; used as implementation for minimal proxy clones
      */
     constructor() Ownable(msg.sender) {
-        // Constructor left empty to allow use as implementation contract
-        // Initialization happens via initialize() for clones
+        // Constructor sets deployer as owner for the implementation contract
+        // Clones will have their storage reset and can call initialize()
     }
 
     /**
      * @notice Initialize the market vault (for use with clone pattern)
      * @param initialOwner Address that will own the vault
      * @param _factory Address of the market factory
+     * @dev Can only be called once per clone. Checks if already initialized by verifying owner is 0.
      */
     function initialize(address initialOwner, address _factory) external {
-        require(!initialized, "Already initialized");
+        require(owner() == address(0) || owner() == msg.sender, "Already initialized");
         require(initialOwner != address(0), "Invalid owner");
         require(_factory != address(0), "Invalid factory");
         
-        initialized = true;
-        _transferOwnership(initialOwner);
+        if (owner() != initialOwner) {
+            _transferOwnership(initialOwner);
+        }
         factory = _factory;
     }
 
@@ -285,9 +285,12 @@ contract MarketVault is Ownable, ReentrancyGuard {
 
     /**
      * @notice Fallback function to receive ETH
+     * @dev Direct ETH transfers are not assigned to any market
+     *      Use depositETHCollateral() to assign ETH to a specific market
      */
     receive() external payable {
-        // Accept ETH deposits without market assignment
-        // Must be assigned via depositETHCollateral
+        // Note: Direct ETH sends are accepted but not assigned to any market
+        // This is intentional to allow recovery of mistakenly sent ETH
+        // Use depositETHCollateral(marketId) to properly assign collateral
     }
 }

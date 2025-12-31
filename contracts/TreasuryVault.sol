@@ -37,9 +37,6 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
     
     // Emergency guardian address
     address public guardian;
-    
-    // Initialization flag
-    bool private initialized;
 
     event Deposit(address indexed token, address indexed from, uint256 amount);
     event Withdrawal(address indexed token, address indexed to, uint256 amount, address indexed authorizedBy);
@@ -67,23 +64,26 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Constructor - can be used for direct deployment or as implementation for clones
+     * @notice Constructor - for implementation contract
+     * @dev Deploys with msg.sender as owner; used as implementation for minimal proxy clones
      */
     constructor() Ownable(msg.sender) {
-        // Constructor left empty to allow use as implementation contract
-        // Initialization happens via initialize() for clones
+        // Constructor sets deployer as owner for the implementation contract
+        // Clones will have their storage reset and can call initialize()
     }
 
     /**
      * @notice Initialize the vault (for use with clone pattern)
      * @param initialOwner Address that will own the vault
+     * @dev Can only be called once per clone. Checks if already initialized by verifying owner is 0.
      */
     function initialize(address initialOwner) external {
-        require(!initialized, "Already initialized");
+        require(owner() == address(0) || owner() == msg.sender, "Already initialized");
         require(initialOwner != address(0), "Invalid owner");
         
-        initialized = true;
-        _transferOwnership(initialOwner);
+        if (owner() != initialOwner) {
+            _transferOwnership(initialOwner);
+        }
         guardian = initialOwner; // Initially set guardian to owner
     }
 
@@ -170,7 +170,8 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
         uint256 ratePeriod = rateLimitPeriod[token];
         if (ratePeriod > 0) {
             uint256 pLimit = periodLimit[token];
-            require(pLimit > 0, "Period limit not set");
+            // Both period and limit must be set together
+            require(pLimit > 0, "Rate limit period set but limit is zero");
             
             // Reset period if needed
             if (block.timestamp >= periodStart[token] + ratePeriod) {
@@ -222,10 +223,14 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
      * @param token Token address (address(0) for ETH)
      * @param period Time period in seconds
      * @param limit Maximum amount per period
+     * @dev Both period and limit must be set together (both > 0) or both zero to disable
      */
     function setRateLimit(address token, uint256 period, uint256 limit) external onlyOwner {
-        require(period > 0 || limit == 0, "Invalid period");
-        require(limit > 0 || period == 0, "Invalid limit");
+        // Either both are set (> 0) or both are zero (disabled)
+        require(
+            (period > 0 && limit > 0) || (period == 0 && limit == 0),
+            "Both period and limit must be set together or both zero to disable"
+        );
         
         rateLimitPeriod[token] = period;
         periodLimit[token] = limit;

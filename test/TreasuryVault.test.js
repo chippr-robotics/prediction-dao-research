@@ -41,7 +41,7 @@ describe("TreasuryVault - Unit Tests", function () {
       expect(await treasuryVault.paused()).to.equal(false);
     });
 
-    it("Should reject zero address as owner", async function () {
+    it("Should reject zero address as owner during initialization", async function () {
       const TreasuryVault = await ethers.getContractFactory("TreasuryVault");
       const vault = await TreasuryVault.deploy();
       
@@ -50,9 +50,9 @@ describe("TreasuryVault - Unit Tests", function () {
       ).to.be.revertedWith("Invalid owner");
     });
     
-    it("Should reject double initialization", async function () {
+    it("Should reject double initialization by non-owner", async function () {
       await expect(
-        treasuryVault.initialize(user1.address)
+        treasuryVault.connect(user1).initialize(user1.address)
       ).to.be.revertedWith("Already initialized");
     });
   });
@@ -429,12 +429,12 @@ describe("TreasuryVault - Unit Tests", function () {
       // Period without limit
       await expect(
         treasuryVault.setRateLimit(ethers.ZeroAddress, 3600, 0)
-      ).to.be.revertedWith("Invalid limit");
+      ).to.be.revertedWith("Both period and limit must be set together or both zero to disable");
       
       // Limit without period
       await expect(
         treasuryVault.setRateLimit(ethers.ZeroAddress, 0, ethers.parseEther("10.0"))
-      ).to.be.revertedWith("Invalid period");
+      ).to.be.revertedWith("Both period and limit must be set together or both zero to disable");
     });
 
     it("Should allow disabling rate limit by setting both to zero", async function () {

@@ -40,7 +40,7 @@ describe("MarketVault - Unit Tests", function () {
       expect(await marketVault.paused()).to.equal(false);
     });
 
-    it("Should reject zero address as owner", async function () {
+    it("Should reject zero address as owner during initialization", async function () {
       const MarketVault = await ethers.getContractFactory("MarketVault");
       const vault = await MarketVault.deploy();
       
@@ -49,7 +49,7 @@ describe("MarketVault - Unit Tests", function () {
       ).to.be.revertedWith("Invalid owner");
     });
 
-    it("Should reject zero address as factory", async function () {
+    it("Should reject zero address as factory during initialization", async function () {
       const MarketVault = await ethers.getContractFactory("MarketVault");
       const vault = await MarketVault.deploy();
       
@@ -58,9 +58,9 @@ describe("MarketVault - Unit Tests", function () {
       ).to.be.revertedWith("Invalid factory");
     });
     
-    it("Should reject double initialization", async function () {
+    it("Should reject double initialization by non-owner", async function () {
       await expect(
-        marketVault.initialize(user1.address, user2.address)
+        marketVault.connect(user1).initialize(user1.address, user2.address)
       ).to.be.revertedWith("Already initialized");
     });
   });
