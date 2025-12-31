@@ -102,12 +102,14 @@ function SwapPanel() {
         tx = await wrapETC(amount)
         setSuccess(`Successfully wrapped ${amount} ETC to WETC`)
       } else if (swapMode === 'unwrap') {
-        tx = await unwrapWETC(amount)
+        // Execute unwrap
+        await unwrapWETC(amount)
         setSuccess(`Successfully unwrapped ${amount} WETC to ETC`)
       } else {
         const tokenInAddr = fromToken === 'WETC' ? addresses.WETC : addresses.USC_STABLECOIN
         const tokenOutAddr = toToken === 'WETC' ? addresses.WETC : addresses.USC_STABLECOIN
-        tx = await swap(tokenInAddr, tokenOutAddr, amount)
+        // Execute swap
+        await swap(tokenInAddr, tokenOutAddr, amount)
         setSuccess(`Successfully swapped ${amount} ${fromToken} to ${toToken}`)
       }
       

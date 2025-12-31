@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import './QRScanner.css'
 
@@ -76,7 +76,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
           // Success callback
           handleScanSuccess(decodedText)
         },
-        (errorMessage) => {
+        () => {
           // Error callback (scanning errors, not failures)
           // This fires constantly while scanning, so we don't log it
         }
@@ -101,7 +101,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }
 
-  const handleScanSuccess = async (decodedText) => {
+  const handleScanSuccess = useCallback(async (decodedText) => {
     // Stop scanning first
     await stopScanning()
 
@@ -111,7 +111,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
       if (onScanSuccess) {
         onScanSuccess(decodedText, url)
       }
-    } catch (err) {
+    } catch {
       // If it's not a valid URL, still pass it along
       if (onScanSuccess) {
         onScanSuccess(decodedText)

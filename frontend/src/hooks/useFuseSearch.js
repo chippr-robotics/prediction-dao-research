@@ -11,9 +11,11 @@ import Fuse from 'fuse.js'
 function useFuseSearch(items, searchQuery, optionsOverride = {}) {
   // Create a stable stringified version of options for dependency tracking
   const optionsJson = JSON.stringify(optionsOverride)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const optionsKey = useMemo(() => optionsJson, [optionsJson])
 
   // Create Fuse instance - memoized to avoid recreation on every render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const fuse = useMemo(() => {
     if (!items || items.length === 0) {
       return null

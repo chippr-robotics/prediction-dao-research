@@ -1,4 +1,5 @@
 import { usePrice } from '../../contexts/PriceContext'
+import { useCallback } from 'react'
 import './MarketDetailsPanel.css'
 
 /**
@@ -23,7 +24,7 @@ function MarketDetailsPanel({ market }) {
   }
 
   // Calculate time until settlement
-  const getTimeUntilSettlement = (endTime) => {
+  const getTimeUntilSettlement = useCallback((endTime) => {
     const now = Date.now()
     const end = new Date(endTime).getTime()
     const diff = end - now
