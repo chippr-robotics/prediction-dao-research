@@ -336,26 +336,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  font-size: 0.65rem;
+  gap: 1px;
+  font-size: 0.55rem;
   color: var(--card-text-secondary);
 }
 
 .stat-icon {
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   opacity: 0.8;
 }
 
 .stat-label {
-  font-size: 0.55rem;
+  font-size: 0.5rem;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   color: var(--card-text-muted);
 }
 
 .stat-value {
-  font-weight: 700;
-  font-size: 0.75rem;
+  font-weight: 600;
+  font-size: 0.65rem;
   color: var(--card-text-primary);
 }
 
@@ -384,6 +384,7 @@
   position: relative;
   z-index: 1;
   display: flex;
+  flex-direction: row;
   gap: 8px;
   padding: 12px 14px;
   background: var(--card-action-bg);
@@ -399,9 +400,10 @@
   transition: all 0.2s ease;
   border: none;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 6px;
 }
 
 .action-btn .btn-label {
@@ -506,12 +508,31 @@
 
   .stats-row {
     flex-wrap: wrap;
-    gap: 8px;
-    justify-content: flex-start;
+    gap: 6px;
+    justify-content: center;
+    padding: 8px 10px;
   }
 
   .stat-item {
-    width: calc(33% - 8px);
+    width: calc(33% - 6px);
+  }
+
+  .action-buttons {
+    flex-direction: row;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .action-btn {
+    padding: 8px 10px;
+  }
+
+  .action-btn .btn-label {
+    font-size: 0.75rem;
+  }
+
+  .action-btn .btn-price {
+    font-size: 0.6rem;
   }
 }
 
