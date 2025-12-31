@@ -424,19 +424,36 @@ describe("RoleManager - Unit Tests", function () {
       ).to.be.revertedWith("Role is not active");
     });
 
-    it("Should allow default admin to withdraw funds", async function () {
+    it("Should allow operations admin to withdraw funds", async function () {
+      // Setup operations admin
+      await roleManager.grantRole(CORE_SYSTEM_ADMIN_ROLE, coreAdmin.address);
+      await roleManager.connect(coreAdmin).grantRole(OPERATIONS_ADMIN_ROLE, opsAdmin.address);
+      
       // User purchases role
       await roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: ethers.parseEther("100") });
       
       const contractBalance = await ethers.provider.getBalance(await roleManager.getAddress());
       expect(contractBalance).to.equal(ethers.parseEther("100"));
       
-      const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
+      const opsAdminBalanceBefore = await ethers.provider.getBalance(opsAdmin.address);
       
-      await roleManager.connect(owner).withdraw();
+      await roleManager.connect(opsAdmin).withdraw();
       
-      const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
-      expect(ownerBalanceAfter).to.be.gt(ownerBalanceBefore);
+      const opsAdminBalanceAfter = await ethers.provider.getBalance(opsAdmin.address);
+      expect(opsAdminBalanceAfter).to.be.gt(opsAdminBalanceBefore);
+    });
+
+    it("Should reject withdraw from default admin", async function () {
+      // User purchases role
+      await roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: ethers.parseEther("100") });
+      
+      const contractBalance = await ethers.provider.getBalance(await roleManager.getAddress());
+      expect(contractBalance).to.equal(ethers.parseEther("100"));
+      
+      // Default admin should not be able to withdraw
+      await expect(
+        roleManager.connect(owner).withdraw()
+      ).to.be.reverted;
     });
   });
 
