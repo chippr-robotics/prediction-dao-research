@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
 import { getMockMarkets } from '../utils/mockDataLoader'
-import { usePrice } from '../contexts/PriceContext'
 import './CorrelatedMarketsPage.css'
 
 const TIME_HORIZONS = {

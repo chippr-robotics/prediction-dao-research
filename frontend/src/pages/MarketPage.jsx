@@ -70,7 +70,7 @@ function MarketPage() {
       const currentSpotPrice = selectedOutcome === 'YES' 
         ? (!isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5)
         : (!isNaN(failPrice) && failPrice > 0 ? failPrice : 0.5)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPrice(currentSpotPrice.toFixed(2))
     }
   }, [selectedOutcome, orderType, market])
