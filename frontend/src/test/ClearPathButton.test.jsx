@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
-import TokenMintButton from '../components/TokenMintButton'
-import { RoleContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
+import ClearPathButton from '../components/clearpath/ClearPathButton'
+import { RoleContext, ROLES, ROLE_INFO } from '../contexts/RoleContext'
+import { UIContext } from '../contexts/UIContext'
+import { UserPreferencesContext } from '../contexts/UserPreferencesContext'
 
 // Mock wallet hook
 vi.mock('../hooks', () => ({
@@ -12,7 +14,7 @@ vi.mock('../hooks', () => ({
 
 import { useWallet } from '../hooks'
 
-describe('TokenMintButton Component', () => {
+describe('ClearPathButton Component', () => {
   const mockShowModal = vi.fn()
   const mockHideModal = vi.fn()
   
@@ -61,24 +63,24 @@ describe('TokenMintButton Component', () => {
   describe('Rendering', () => {
     it('renders button when wallet is not connected but appears inactive', () => {
       useWallet.mockReturnValue({ isConnected: false })
-      renderWithProviders(<TokenMintButton />)
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      renderWithProviders(<ClearPathButton />)
+      const button = screen.getByRole('button', { name: /clearpath/i })
       expect(button).toBeInTheDocument()
       expect(button).toHaveClass('inactive')
       expect(button).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('renders button when wallet is connected', () => {
-      renderWithProviders(<TokenMintButton />)
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      renderWithProviders(<ClearPathButton />)
+      const button = screen.getByRole('button', { name: /clearpath/i })
       expect(button).toBeInTheDocument()
       expect(button).not.toHaveClass('inactive')
     })
 
-    it('renders TokenMint logo image', () => {
-      renderWithProviders(<TokenMintButton />)
-      const img = screen.getByAltText('TokenMint')
-      expect(img).toHaveAttribute('src', '/assets/tokenmint_no-text_logo.svg')
+    it('renders ClearPath logo image', () => {
+      renderWithProviders(<ClearPathButton />)
+      const img = screen.getByAltText('ClearPath')
+      expect(img).toHaveAttribute('src', '/assets/clearpath_no-text_logo.svg')
     })
   })
 
@@ -86,9 +88,9 @@ describe('TokenMintButton Component', () => {
     it('does not open dropdown when button is clicked while inactive', async () => {
       const user = userEvent.setup()
       useWallet.mockReturnValue({ isConnected: false })
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       expect(screen.queryByRole('menu')).not.toBeInTheDocument()
@@ -96,21 +98,21 @@ describe('TokenMintButton Component', () => {
 
     it('opens dropdown when button is clicked', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       await waitFor(() => {
-        expect(screen.getByRole('menu', { name: /tokenmint options/i })).toBeInTheDocument()
+        expect(screen.getByRole('menu', { name: /clearpath options/i })).toBeInTheDocument()
       })
     })
 
     it('closes dropdown when button is clicked again', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       await user.click(button)
       
@@ -121,9 +123,9 @@ describe('TokenMintButton Component', () => {
 
     it('closes dropdown on Escape key', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       await waitFor(() => {
@@ -139,39 +141,28 @@ describe('TokenMintButton Component', () => {
   })
 
   describe('Role-based Menu Options', () => {
-    it('shows token creation option for users with TOKENMINT role', async () => {
+    it('shows governance options for users with CLEARPATH_USER role', async () => {
       const user = userEvent.setup()
       const roleContext = {
         ...defaultRoleContext,
-        roles: [ROLES.TOKENMINT],
-        hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
+        roles: [ROLES.CLEARPATH_USER],
+        hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
+      }
+      const preferencesContext = {
+        preferences: {
+          clearPathStatus: { active: true, lastUpdated: Date.now() }
+        }
       }
       
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<ClearPathButton />, { roleContext, preferencesContext })
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       await waitFor(() => {
-        expect(screen.getByText('Create New Token')).toBeInTheDocument()
-      })
-    })
-
-    it('shows market creation option for users with MARKET_MAKER role', async () => {
-      const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
-        roles: [ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
-      }
-      
-      renderWithProviders(<TokenMintButton />, { roleContext })
-      
-      const button = screen.getByRole('button', { name: /tokenmint/i })
-      await user.click(button)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Create New Market')).toBeInTheDocument()
+        expect(screen.getByText('Governance Dashboard')).toBeInTheDocument()
+        expect(screen.getByText('My DAOs')).toBeInTheDocument()
+        expect(screen.getByText('Proposals')).toBeInTheDocument()
       })
     })
 
@@ -183,74 +174,58 @@ describe('TokenMintButton Component', () => {
         }
       }
       
-      renderWithProviders(<TokenMintButton />, { preferencesContext })
+      renderWithProviders(<ClearPathButton />, { preferencesContext })
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       await waitFor(() => {
-        expect(screen.getByText('Purchase Membership')).toBeInTheDocument()
+        expect(screen.getByText('Purchase ClearPath Membership')).toBeInTheDocument()
       })
     })
 
-    it('shows multiple options for users with multiple roles', async () => {
+    it('does not show governance options for users without role', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
-        roles: [ROLES.TOKENMINT, ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.TOKENMINT || role === ROLES.MARKET_MAKER)
+      const preferencesContext = {
+        preferences: {
+          clearPathStatus: { active: false, lastUpdated: null }
+        }
       }
       
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<ClearPathButton />, { preferencesContext })
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       await waitFor(() => {
-        expect(screen.getByText('Create New Token')).toBeInTheDocument()
-        expect(screen.getByText('Create New Market')).toBeInTheDocument()
+        expect(screen.queryByText('Governance Dashboard')).not.toBeInTheDocument()
+        expect(screen.queryByText('My DAOs')).not.toBeInTheDocument()
+        expect(screen.queryByText('Proposals')).not.toBeInTheDocument()
       })
     })
   })
 
   describe('Modal Integration', () => {
-    it('opens token builder modal when create token option is clicked', async () => {
+    it('opens governance modal when governance dashboard option is clicked', async () => {
       const user = userEvent.setup()
       const roleContext = {
         ...defaultRoleContext,
-        roles: [ROLES.TOKENMINT],
-        hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
+        roles: [ROLES.CLEARPATH_USER],
+        hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
+      }
+      const preferencesContext = {
+        preferences: {
+          clearPathStatus: { active: true, lastUpdated: Date.now() }
+        }
       }
       
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<ClearPathButton />, { roleContext, preferencesContext })
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
-      const createTokenOption = await screen.findByText('Create New Token')
-      await user.click(createTokenOption)
-      
-      // Modal should be rendered (TokenMintBuilderModal)
-      await waitFor(() => {
-        expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-      })
-    })
-
-    it('shows market creation modal when create market option is clicked', async () => {
-      const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
-        roles: [ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
-      }
-      
-      renderWithProviders(<TokenMintButton />, { roleContext })
-      
-      const button = screen.getByRole('button', { name: /tokenmint/i })
-      await user.click(button)
-      
-      const createMarketOption = await screen.findByText('Create New Market')
-      await user.click(createMarketOption)
+      const governanceOption = await screen.findByText('Governance Dashboard')
+      await user.click(governanceOption)
       
       await waitFor(() => {
         expect(mockShowModal).toHaveBeenCalled()
@@ -260,13 +235,39 @@ describe('TokenMintButton Component', () => {
     it('shows role purchase modal when purchase membership is clicked', async () => {
       const user = userEvent.setup()
       
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
-      const purchaseOption = await screen.findByText('Purchase Membership')
+      const purchaseOption = await screen.findByText('Purchase ClearPath Membership')
       await user.click(purchaseOption)
+      
+      await waitFor(() => {
+        expect(mockShowModal).toHaveBeenCalled()
+      })
+    })
+
+    it('opens DAO modal when My DAOs option is clicked', async () => {
+      const user = userEvent.setup()
+      const roleContext = {
+        ...defaultRoleContext,
+        roles: [ROLES.CLEARPATH_USER],
+        hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
+      }
+      const preferencesContext = {
+        preferences: {
+          clearPathStatus: { active: true, lastUpdated: Date.now() }
+        }
+      }
+      
+      renderWithProviders(<ClearPathButton />, { roleContext, preferencesContext })
+      
+      const button = screen.getByRole('button', { name: /clearpath/i })
+      await user.click(button)
+      
+      const daosOption = await screen.findByText('My DAOs')
+      await user.click(daosOption)
       
       await waitFor(() => {
         expect(mockShowModal).toHaveBeenCalled()
@@ -276,14 +277,14 @@ describe('TokenMintButton Component', () => {
 
   describe('Accessibility', () => {
     it('has no accessibility violations', async () => {
-      const { container } = renderWithProviders(<TokenMintButton />)
+      const { container } = renderWithProviders(<ClearPathButton />)
       const results = await axe(container)
       expect(results).toHaveNoViolations()
     })
 
     it('has proper ARIA attributes on button', () => {
-      renderWithProviders(<TokenMintButton />)
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      renderWithProviders(<ClearPathButton />)
+      const button = screen.getByRole('button', { name: /clearpath/i })
       
       expect(button).toHaveAttribute('aria-label')
       expect(button).toHaveAttribute('aria-expanded')
@@ -292,9 +293,9 @@ describe('TokenMintButton Component', () => {
 
     it('updates aria-expanded when dropdown opens', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       expect(button).toHaveAttribute('aria-expanded', 'false')
       
       await user.click(button)
@@ -306,22 +307,22 @@ describe('TokenMintButton Component', () => {
 
     it('dropdown has proper role and aria-label', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
       
       await waitFor(() => {
-        const menu = screen.getByRole('menu', { name: /tokenmint options/i })
+        const menu = screen.getByRole('menu', { name: /clearpath options/i })
         expect(menu).toBeInTheDocument()
       })
     })
 
     it('is keyboard accessible', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       button.focus()
       expect(button).toHaveFocus()
       
@@ -335,16 +336,16 @@ describe('TokenMintButton Component', () => {
 
   describe('Button States', () => {
     it('has correct initial aria-expanded state', () => {
-      renderWithProviders(<TokenMintButton />)
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      renderWithProviders(<ClearPathButton />)
+      const button = screen.getByRole('button', { name: /clearpath/i })
       expect(button).toHaveAttribute('aria-expanded', 'false')
     })
 
     it('applies hover styles on hover', async () => {
       const user = userEvent.setup()
-      renderWithProviders(<TokenMintButton />)
+      renderWithProviders(<ClearPathButton />)
       
-      const button = screen.getByRole('button', { name: /tokenmint/i })
+      const button = screen.getByRole('button', { name: /clearpath/i })
       await user.hover(button)
       
       expect(button).toBeInTheDocument()

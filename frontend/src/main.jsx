@@ -28,9 +28,8 @@ createRoot(document.getElementById('root')).render(
       <ThirdwebProvider>
         <WagmiProvider config={config}>
           <QueryClientProvider client={queryClient}>
-            <ThemeProvider>
-              {/* Web3Provider provides base wallet context used by useWeb3 hook */}
-              <Web3Provider>
+            <Web3Provider>
+              <ThemeProvider>
                 {/* WalletProvider is the primary wallet management - wraps everything */}
                 <WalletProvider>
                   <UserPreferencesProvider>
@@ -46,8 +45,8 @@ createRoot(document.getElementById('root')).render(
                     </RoleProvider>
                   </UserPreferencesProvider>
                 </WalletProvider>
-              </Web3Provider>
-            </ThemeProvider>
+              </ThemeProvider>
+            </Web3Provider>
           </QueryClientProvider>
         </WagmiProvider>
       </ThirdwebProvider>
