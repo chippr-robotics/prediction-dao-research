@@ -14,6 +14,14 @@ import { ETCswapProvider } from '../contexts/ETCswapContext'
 import { RoleProvider } from '../contexts/RoleContext'
 import { PriceProvider } from '../contexts/PriceContext'
 
+// Mock ThirdWeb ConnectButton to render a simple button in tests
+vi.mock('thirdweb/react', () => ({
+  ConnectButton: ({ connectButton }) => (
+    <button>{connectButton?.label || 'Connect Wallet'}</button>
+  ),
+  ThirdwebProvider: ({ children }) => children,
+}))
+
 // Create mockable functions for wagmi hooks
 const mockUseAccount = vi.fn()
 const mockUseConnect = vi.fn()
