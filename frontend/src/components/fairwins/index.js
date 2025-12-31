@@ -2,6 +2,7 @@
 export { default as SidebarNav } from './SidebarNav'
 export { default as HeaderBar } from './HeaderBar'
 export { default as MarketTile } from './MarketTile'
+export { default as ModernMarketCard } from './ModernMarketCard'
 export { default as MarketGrid } from './MarketGrid'
 export { default as CompactMarketView } from './CompactMarketView'
 export { default as ViewToggle } from './ViewToggle'
