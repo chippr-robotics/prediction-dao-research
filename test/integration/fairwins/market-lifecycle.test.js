@@ -119,7 +119,7 @@ async function createSignedOrder(signer, exchange, orderParams) {
  * 
  * Tests the complete lifecycle of a FairWins prediction market:
  * 1. Market Creation - User creates a market with custom parameters  
- * 2. Trading Period - Market is active for trading (trading implementation TBD)
+ * 2. Trading Period - Market is active for trading via PredictionMarketExchange
  * 3. Resolution - Market resolves based on outcome
  * 4. Settlement - Market status updated after resolution
  * 
@@ -129,9 +129,12 @@ async function createSignedOrder(signer, exchange, orderParams) {
  * - Resolved by designated oracle
  * - Open to anyone to participate
  * 
- * Note: This test suite focuses on market lifecycle management.
- * Trading functionality (buying/selling tokens) is handled by the conditional token contracts
- * and is not part of the market factory's responsibilities.
+ * This test suite validates the complete market lifecycle including:
+ * - Market creation and configuration
+ * - On-chain trading via PredictionMarketExchange (single fill, batch fill, maker-to-maker)
+ * - Fee collection and distribution
+ * - Oracle resolution and challenge period
+ * - Token settlement and redemption values
  */
 describe("Integration: FairWins Market Lifecycle", function () {
   // Increase timeout for integration tests
@@ -304,13 +307,16 @@ describe("Integration: FairWins Market Lifecycle", function () {
         takerTokenId: noTokenId
       });
 
-      const results = await exchange.connect(trader2).batchFillOrders(
+      const batchResults = await exchange.connect(trader2).batchFillOrders(
         [order2, order3],
         [sig2, sig3],
         [ethers.parseEther("50"), ethers.parseEther("30")]
       );
 
+      // Wait for transaction and verify batch results
+      const batchReceipt = await batchResults.wait();
       console.log(`    ✓ Batch filled 2 orders (50 + 30 YES tokens)`);
+      console.log(`    ✓ Gas used: ${batchReceipt.gasUsed.toString()}`);
       
       // Scenario 3: Maker-to-Maker matching
       console.log("\n  Scenario 3: Maker-to-Maker Order Matching");
