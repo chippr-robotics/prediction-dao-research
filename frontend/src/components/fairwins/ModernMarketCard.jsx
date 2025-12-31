@@ -2,17 +2,27 @@ import { useState, useMemo } from 'react'
 import { findSubcategoryById } from '../../config/subcategories'
 import './ModernMarketCard.css'
 
-// Category background images (using placeholders that represent each category)
+// Import category background images
+import politicsImg from '../../assets/politics_no_text.svg'
+import sportsImg from '../../assets/sports_no_text.svg'
+import cryptoImg from '../../assets/crypto_no_text.svg'
+import financeImg from '../../assets/finance_no_text.svg'
+import techImg from '../../assets/tech_no_text.svg'
+import popCultureImg from '../../assets/pop-culture_no_text.svg'
+import otherMarketsImg from '../../assets/other_markets_no_text.svg'
+
+// Category background images mapping
 const getCategoryThumbnail = (category) => {
   const thumbnails = {
-    politics: 'linear-gradient(135deg, rgba(183, 28, 28, 0.6) 0%, rgba(136, 14, 79, 0.4) 100%)',
-    sports: 'linear-gradient(135deg, rgba(27, 94, 32, 0.6) 0%, rgba(0, 77, 64, 0.4) 100%)',
-    crypto: 'linear-gradient(135deg, rgba(245, 127, 23, 0.6) 0%, rgba(230, 81, 0, 0.4) 100%)',
-    finance: 'linear-gradient(135deg, rgba(13, 71, 161, 0.6) 0%, rgba(21, 101, 192, 0.4) 100%)',
-    tech: 'linear-gradient(135deg, rgba(74, 20, 140, 0.6) 0%, rgba(106, 27, 154, 0.4) 100%)',
-    'pop-culture': 'linear-gradient(135deg, rgba(136, 14, 79, 0.6) 0%, rgba(194, 24, 91, 0.4) 100%)'
+    politics: politicsImg,
+    sports: sportsImg,
+    crypto: cryptoImg,
+    finance: financeImg,
+    tech: techImg,
+    'pop-culture': popCultureImg,
+    other: otherMarketsImg
   }
-  return thumbnails[category] || thumbnails.finance
+  return thumbnails[category] || financeImg
 }
 
 // Get subcategory display name
@@ -257,10 +267,13 @@ function ModernMarketCard({
       )}
 
       {/* Background thumbnail */}
-      <div 
-        className="card-thumbnail"
-        style={{ background: getCategoryThumbnail(market.category) }}
-      />
+      <div className="card-thumbnail">
+        <img 
+          src={getCategoryThumbnail(market.category)} 
+          alt={`${market.category} category`}
+          className="thumbnail-image"
+        />
+      </div>
 
       {/* Header with badges */}
       <div className="card-header">
