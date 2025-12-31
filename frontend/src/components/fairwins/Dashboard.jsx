@@ -4,14 +4,6 @@ import { getMockMarkets } from '../../utils/mockDataLoader'
 import * as d3 from 'd3'
 import './Dashboard.css'
 
-// Import SVG icons
-import sportsIcon from '../../assets/sports_no_text.svg'
-import politicsIcon from '../../assets/politics_no_text.svg'
-import financeIcon from '../../assets/finance_no_text.svg'
-import techIcon from '../../assets/tech_no_text.svg'
-import cryptoIcon from '../../assets/crypto_no_text.svg'
-import popCultureIcon from '../../assets/pop-culture_no_text.svg'
-
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -47,6 +39,19 @@ const getTimeRemaining = (endTime) => {
 const stableRandom = (seed) => {
   const x = Math.sin(seed) * 10000
   return x - Math.floor(x)
+}
+
+// Get category icon emoji
+const getCategoryIcon = (category) => {
+  const icons = {
+    sports: '⚽',
+    politics: '🏛️',
+    finance: '💰',
+    tech: '💻',
+    crypto: '₿',
+    'pop-culture': '🎬'
+  }
+  return icons[category] || '📊'
 }
 
 // ============================================================================
@@ -118,13 +123,13 @@ function CategoryDonutChart({ markets, categories }) {
         .attr('stroke', 'var(--bg-primary)')
         .attr('stroke-width', 2)
         .style('cursor', 'pointer')
-        .on('mouseenter', function(event, d) {
+        .on('mouseenter', function() {
           d3.select(this)
             .transition()
             .duration(200)
             .attr('d', hoverArc)
         })
-        .on('mouseleave', function(event, d) {
+        .on('mouseleave', function() {
           d3.select(this)
             .transition()
             .duration(200)
@@ -802,6 +807,66 @@ function SparklineCard({ category }) {
 }
 
 // ============================================================================
+// MARKET CRAWLER (Scrolling Ticker)
+// ============================================================================
+
+function MarketCrawler({ markets }) {
+  const [isPaused, setIsPaused] = useState(false)
+
+  const latestMarkets = useMemo(() => {
+    if (!markets?.length) return []
+    
+    // Get latest active markets sorted by trading end time (latest ending first)
+    return [...markets]
+      .filter(m => m.status === 'Active')
+      .sort((a, b) => new Date(b.tradingEndTime) - new Date(a.tradingEndTime))
+      .slice(0, 12)
+  }, [markets])
+
+  // Duplicate markets for seamless infinite scroll
+  const allMarkets = [...latestMarkets, ...latestMarkets]
+
+  const handleFocus = () => setIsPaused(true)
+  const handleBlur = () => setIsPaused(false)
+
+  return (
+    <div 
+      className="market-crawler"
+      role="region"
+      aria-label="Latest markets ticker"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      <div className={`crawler-track ${isPaused ? 'paused' : ''}`}>
+        {allMarkets.map((market, index) => {
+          const passPrice = parseFloat(market.passTokenPrice) || 0
+          const isHighConfidence = passPrice > 0.7 || passPrice < 0.3
+          
+          return (
+            <div 
+              key={`${market.id}-${index}`} 
+              className="crawler-item"
+              tabIndex={0}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
+              role="article"
+              aria-label={`${market.proposalTitle}, ${Math.round(passPrice * 100)}% YES probability`}
+            >
+              <span className="crawler-icon" aria-hidden="true">{getCategoryIcon(market.category)}</span>
+              <span className="crawler-title">{market.proposalTitle}</span>
+              <span className={`crawler-price ${isHighConfidence ? 'high-confidence' : ''}`}>
+                {Math.round(passPrice * 100)}% YES
+              </span>
+              <span className="crawler-separator" aria-hidden="true">•</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // TRENDING MARKETS LIST
 // ============================================================================
 
@@ -815,22 +880,10 @@ function TrendingMarketsList({ markets, onMarketClick }) {
       .slice(0, 5)
   }, [markets])
 
-  const getCategoryIcon = (category) => {
-    const icons = {
-      sports: '⚽',
-      politics: '🏛️',
-      finance: '💰',
-      tech: '💻',
-      crypto: '₿',
-      'pop-culture': '🎬'
-    }
-    return icons[category] || '📊'
-  }
-
   return (
     <div className="trending-list">
       {trendingMarkets.map((market, index) => {
-        const passPrice = parseFloat(market.passTokenPrice)
+        const passPrice = parseFloat(market.passTokenPrice) || 0
         const isHighConfidence = passPrice > 0.7 || passPrice < 0.3
         
         return (
@@ -944,12 +997,12 @@ function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   const categories = useMemo(() => [
-    { id: 'sports', name: 'Sports', icon: sportsIcon },
-    { id: 'politics', name: 'Politics', icon: politicsIcon },
-    { id: 'finance', name: 'Finance', icon: financeIcon },
-    { id: 'tech', name: 'Tech', icon: techIcon },
-    { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
-    { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon }
+    { id: 'sports', name: 'Sports', icon: '⚽' },
+    { id: 'politics', name: 'Politics', icon: '🏛️' },
+    { id: 'finance', name: 'Finance', icon: '💰' },
+    { id: 'tech', name: 'Tech', icon: '💻' },
+    { id: 'crypto', name: 'Crypto', icon: '₿' },
+    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' }
   ], [])
 
   useEffect(() => {
@@ -1053,6 +1106,9 @@ function Dashboard() {
         </div>
       </section>
 
+      {/* Market Crawler - Latest Markets Ticker */}
+      <MarketCrawler markets={markets} />
+
       {/* Main Charts Grid */}
       <section className="charts-section">
         <div className="charts-row">
@@ -1072,6 +1128,26 @@ function Dashboard() {
               <span className="chart-subtitle">Overall market health score</span>
             </div>
             <MarketHealthGauge markets={markets} />
+          </div>
+        </div>
+
+        {/* Activity Section - Moved up */}
+        <div className="bottom-grid">
+          {/* Trending Markets */}
+          <div className="bottom-card">
+            <div className="bottom-header">
+              <h3>🔥 Trending Markets</h3>
+              <button className="view-all-btn">View All →</button>
+            </div>
+            <TrendingMarketsList markets={markets} onMarketClick={handleMarketClick} />
+          </div>
+
+          {/* Recent Activity */}
+          <div className="bottom-card">
+            <div className="bottom-header">
+              <h3>⚡ Recent Activity</h3>
+            </div>
+            <RecentActivityFeed markets={markets} />
           </div>
         </div>
 
@@ -1111,28 +1187,6 @@ function Dashboard() {
             <span className="chart-subtitle">Top markets by liquidity with YES probability</span>
           </div>
           <PriceMomentumChart markets={markets} />
-        </div>
-      </section>
-
-      {/* Bottom Section - Trending & Activity */}
-      <section className="bottom-section">
-        <div className="bottom-grid">
-          {/* Trending Markets */}
-          <div className="bottom-card">
-            <div className="bottom-header">
-              <h3>🔥 Trending Markets</h3>
-              <button className="view-all-btn">View All →</button>
-            </div>
-            <TrendingMarketsList markets={markets} onMarketClick={handleMarketClick} />
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bottom-card">
-            <div className="bottom-header">
-              <h3>⚡ Recent Activity</h3>
-            </div>
-            <RecentActivityFeed markets={markets} />
-          </div>
         </div>
       </section>
     </div>

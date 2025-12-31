@@ -7,6 +7,7 @@
   max-width: 1600px;
   margin: 0 auto;
   min-height: calc(100vh - 70px);
+  height: auto;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -161,6 +162,107 @@
 }
 
 /* ============================================================================
+   MARKET CRAWLER (Scrolling Ticker)
+   ============================================================================ */
+
+.market-crawler {
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(0, 184, 148, 0.08) 0%, rgba(0, 206, 201, 0.05) 100%);
+  border: 1px solid rgba(0, 184, 148, 0.15);
+  border-radius: 12px;
+  padding: 0.75rem 0;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.market-crawler::before,
+.market-crawler::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.market-crawler::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-primary, #1a1a2e), transparent);
+}
+
+.market-crawler::after {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-primary, #1a1a2e), transparent);
+}
+
+.crawler-track {
+  display: flex;
+  gap: 2rem;
+  animation: scroll-left 40s linear infinite;
+  width: fit-content;
+}
+
+.crawler-track.paused {
+  animation-play-state: paused;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crawler-track {
+    animation: none;
+  }
+}
+
+.crawler-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.crawler-icon {
+  font-size: 1rem;
+}
+
+.crawler-title {
+  color: var(--text-primary);
+  font-weight: 500;
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crawler-price {
+  color: var(--brand-primary, #00b894);
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  background: rgba(0, 184, 148, 0.15);
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.crawler-price.high-confidence {
+  background: rgba(0, 184, 148, 0.25);
+  color: #00b894;
+}
+
+.crawler-separator {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+/* ============================================================================
    CHARTS SECTION
    ============================================================================ */
 
@@ -175,6 +277,14 @@
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 1.5rem;
+}
+
+/* Bottom grid within charts section for activity tables */
+.charts-section .bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
 }
 
 .chart-card {
