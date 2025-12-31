@@ -2,14 +2,14 @@ import { useState, useMemo } from 'react'
 import { findSubcategoryById } from '../../config/subcategories'
 import './ModernMarketCard.css'
 
-// Import category background images
-import politicsImg from '../../assets/politics_no_text.svg'
-import sportsImg from '../../assets/sports_no_text.svg'
-import cryptoImg from '../../assets/crypto_no_text.svg'
-import financeImg from '../../assets/finance_no_text.svg'
-import techImg from '../../assets/tech_no_text.svg'
-import popCultureImg from '../../assets/pop-culture_no_text.svg'
-import otherMarketsImg from '../../assets/other_markets_no_text.svg'
+// Import category background images from assets/default/
+import politicsImg from '../../assets/default/politics_0000.jpg'
+import sportsImg from '../../assets/default/sports_0005.jpg'
+import cryptoImg from '../../assets/default/crypto_0019.jpg'
+import financeImg from '../../assets/default/finance_0014.jpg'
+import techImg from '../../assets/default/tech_0030.jpg'
+import popCultureImg from '../../assets/default/pop-culture_0010.jpg'
+import weatherImg from '../../assets/default/weather_0024.jpg'
 
 // Category background images mapping
 const getCategoryThumbnail = (category) => {
@@ -20,7 +20,8 @@ const getCategoryThumbnail = (category) => {
     finance: financeImg,
     tech: techImg,
     'pop-culture': popCultureImg,
-    other: otherMarketsImg
+    weather: weatherImg,
+    other: financeImg
   }
   return thumbnails[category] || financeImg
 }
@@ -266,38 +267,39 @@ function ModernMarketCard({
         <div className="correlation-indicator" title={market.correlationGroupName} />
       )}
 
-      {/* Background thumbnail */}
+      {/* Background thumbnail with question text overlay */}
       <div className="card-thumbnail">
         <img 
           src={getCategoryThumbnail(market.category)} 
           alt={`${market.category} category`}
           className="thumbnail-image"
         />
-      </div>
-
-      {/* Header with badges */}
-      <div className="card-header">
-        <div className="card-badges">
-          {/* Show subcategory instead of category since we pre-sort by category */}
-          {subcategoryName && (
-            <span className={`category-pill ${market.category}`}>
-              {subcategoryName}
+        <div className="thumbnail-overlay">
+          {/* Header with badges - positioned at top of image */}
+          <div className="card-header">
+            <div className="card-badges">
+              {/* Show subcategory instead of category since we pre-sort by category */}
+              {subcategoryName && (
+                <span className={`category-pill ${market.category}`}>
+                  {subcategoryName}
+                </span>
+              )}
+              {/* Show correlation group name instead of "Group" */}
+              {market.correlationGroupName && (
+                <span className="correlation-group-pill" title={market.correlationGroupName}>
+                  {market.correlationGroupName}
+                </span>
+              )}
+            </div>
+            <span className="resolution-date">
+              {formatTimeRemaining(market.tradingEndTime)}
             </span>
-          )}
-          {/* Show correlation group name instead of "Group" */}
-          {market.correlationGroupName && (
-            <span className="correlation-group-pill" title={market.correlationGroupName}>
-              {market.correlationGroupName}
-            </span>
-          )}
+          </div>
+          
+          {/* Primary question text over the background image */}
+          <h3 className="card-title">{market.proposalTitle}</h3>
         </div>
-        <span className="resolution-date">
-          {formatTimeRemaining(market.tradingEndTime)}
-        </span>
       </div>
-
-      {/* Card title */}
-      <h3 className="card-title">{market.proposalTitle}</h3>
 
       {/* Top section: Ring gauge and trend aligned horizontally */}
       <div className="gauge-trend-section">
