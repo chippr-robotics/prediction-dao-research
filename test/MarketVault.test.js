@@ -9,10 +9,13 @@ describe("MarketVault - Unit Tests", function () {
   beforeEach(async function () {
     [owner, factory, manager1, manager2, user1, user2] = await ethers.getSigners();
 
-    // Deploy MarketVault
+    // Deploy MarketVault directly (not using clone pattern in tests)
     const MarketVault = await ethers.getContractFactory("MarketVault");
-    marketVault = await MarketVault.deploy(owner.address, factory.address);
+    marketVault = await MarketVault.deploy();
     await marketVault.waitForDeployment();
+    
+    // Initialize with owner and factory
+    await marketVault.initialize(owner.address, factory.address);
 
     // Deploy mock ERC20 token for testing
     const MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -39,16 +42,26 @@ describe("MarketVault - Unit Tests", function () {
 
     it("Should reject zero address as owner", async function () {
       const MarketVault = await ethers.getContractFactory("MarketVault");
+      const vault = await MarketVault.deploy();
+      
       await expect(
-        MarketVault.deploy(ethers.ZeroAddress, factory.address)
-      ).to.be.reverted;
+        vault.initialize(ethers.ZeroAddress, factory.address)
+      ).to.be.revertedWith("Invalid owner");
     });
 
     it("Should reject zero address as factory", async function () {
       const MarketVault = await ethers.getContractFactory("MarketVault");
+      const vault = await MarketVault.deploy();
+      
       await expect(
-        MarketVault.deploy(owner.address, ethers.ZeroAddress)
+        vault.initialize(owner.address, ethers.ZeroAddress)
       ).to.be.revertedWith("Invalid factory");
+    });
+    
+    it("Should reject double initialization", async function () {
+      await expect(
+        marketVault.initialize(user1.address, user2.address)
+      ).to.be.revertedWith("Already initialized");
     });
   });
 

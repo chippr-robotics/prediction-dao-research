@@ -37,6 +37,9 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
     
     // Emergency guardian address
     address public guardian;
+    
+    // Initialization flag
+    bool private initialized;
 
     event Deposit(address indexed token, address indexed from, uint256 amount);
     event Withdrawal(address indexed token, address indexed to, uint256 amount, address indexed authorizedBy);
@@ -64,11 +67,23 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Initialize the vault with an owner
+     * @notice Constructor - can be used for direct deployment or as implementation for clones
+     */
+    constructor() Ownable(msg.sender) {
+        // Constructor left empty to allow use as implementation contract
+        // Initialization happens via initialize() for clones
+    }
+
+    /**
+     * @notice Initialize the vault (for use with clone pattern)
      * @param initialOwner Address that will own the vault
      */
-    constructor(address initialOwner) Ownable(initialOwner) {
+    function initialize(address initialOwner) external {
+        require(!initialized, "Already initialized");
         require(initialOwner != address(0), "Invalid owner");
+        
+        initialized = true;
+        _transferOwnership(initialOwner);
         guardian = initialOwner; // Initially set guardian to owner
     }
 

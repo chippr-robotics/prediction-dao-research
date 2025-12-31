@@ -28,6 +28,9 @@ contract MarketVault is Ownable, ReentrancyGuard {
     
     // Factory address that can create markets
     address public factory;
+    
+    // Initialization flag
+    bool private initialized;
 
     event MarketCreated(uint256 indexed marketId, address indexed manager);
     event MarketClosed(uint256 indexed marketId);
@@ -59,13 +62,25 @@ contract MarketVault is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Initialize the market vault
+     * @notice Constructor - can be used for direct deployment or as implementation for clones
+     */
+    constructor() Ownable(msg.sender) {
+        // Constructor left empty to allow use as implementation contract
+        // Initialization happens via initialize() for clones
+    }
+
+    /**
+     * @notice Initialize the market vault (for use with clone pattern)
      * @param initialOwner Address that will own the vault
      * @param _factory Address of the market factory
      */
-    constructor(address initialOwner, address _factory) Ownable(initialOwner) {
+    function initialize(address initialOwner, address _factory) external {
+        require(!initialized, "Already initialized");
         require(initialOwner != address(0), "Invalid owner");
         require(_factory != address(0), "Invalid factory");
+        
+        initialized = true;
+        _transferOwnership(initialOwner);
         factory = _factory;
     }
 

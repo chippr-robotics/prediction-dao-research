@@ -10,10 +10,13 @@ describe("TreasuryVault - Unit Tests", function () {
   beforeEach(async function () {
     [owner, spender1, spender2, guardian, user1, user2] = await ethers.getSigners();
 
-    // Deploy TreasuryVault
+    // Deploy TreasuryVault directly (not using clone pattern in tests)
     const TreasuryVault = await ethers.getContractFactory("TreasuryVault");
-    treasuryVault = await TreasuryVault.deploy(owner.address);
+    treasuryVault = await TreasuryVault.deploy();
     await treasuryVault.waitForDeployment();
+    
+    // Initialize with owner
+    await treasuryVault.initialize(owner.address);
 
     // Deploy mock ERC20 token for testing
     const MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -40,9 +43,17 @@ describe("TreasuryVault - Unit Tests", function () {
 
     it("Should reject zero address as owner", async function () {
       const TreasuryVault = await ethers.getContractFactory("TreasuryVault");
+      const vault = await TreasuryVault.deploy();
+      
       await expect(
-        TreasuryVault.deploy(ethers.ZeroAddress)
-      ).to.be.reverted;
+        vault.initialize(ethers.ZeroAddress)
+      ).to.be.revertedWith("Invalid owner");
+    });
+    
+    it("Should reject double initialization", async function () {
+      await expect(
+        treasuryVault.initialize(user1.address)
+      ).to.be.revertedWith("Already initialized");
     });
   });
 
