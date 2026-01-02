@@ -5,34 +5,41 @@
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   z-index: 9999;
-  padding: 2rem 1rem;
+  padding: 1rem;
   backdrop-filter: blur(4px);
-  overflow-y: auto;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* New Modal Container */
 .market-modal-container-new {
   width: 100%;
-  margin: auto 0;
+  max-width: 480px;
+  max-height: calc(100vh - 2rem);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* New Modal Card - Now Theme-Aware */
 .market-modal-new {
   background: var(--bg-secondary);
   border-radius: 24px;
-  padding: 1.5rem;
+  padding: 1.25rem;
   color: var(--text-primary);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
+  max-height: calc(100vh - 2rem);
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* Carousel Wrapper - Contains and hides overflow */
@@ -40,6 +47,8 @@
   overflow: hidden;
   width: 100%;
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Carousel Container */
@@ -51,7 +60,11 @@
 
 .carousel-panel {
   min-width: 100%;
+  max-width: 100%;
+  width: 100%;
   flex-shrink: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* Screen reader only */
@@ -68,17 +81,17 @@
 }
 
 /* Panel Indicators */
-.panel-indicators {
+.market-modal-new .panel-indicators {
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
+  gap: 0.25rem;
+  padding: 0.25rem 0;
 }
 
-.indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.market-modal-new .indicator {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
   background: var(--border-color);
   border: none;
   padding: 0;
@@ -86,13 +99,14 @@
   transition: all 0.3s ease;
 }
 
-.indicator.active {
+.market-modal-new .indicator.active {
   background: var(--brand-primary, #36B37E);
-  width: 24px;
-  border-radius: 4px;
+  width: 12px !important;
+  height: 6px !important;
+  border-radius: 3px !important;
 }
 
-.indicator:hover {
+.market-modal-new .indicator:hover {
   opacity: 0.7;
 }
 
@@ -170,18 +184,19 @@
 .prediction-gauge-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .gauge-container {
   display: flex;
   justify-content: center;
-  padding: 0.5rem 0;
+  padding: 0.25rem 0;
 }
 
 .gauge-svg {
-  width: 200px;
-  height: 120px;
+  width: 160px;
+  height: 100px;
 }
 
 /* Market Info Display */
@@ -257,9 +272,12 @@
 .orders-section {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border-color);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Order Type Toggle */
@@ -494,9 +512,10 @@
   justify-content: center;
   align-items: center;
   gap: 0.5rem;
-  padding-top: 0.75rem;
+  padding-top: 0.5rem;
   border-top: 1px solid var(--border-color);
   font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
 .footer-label {
@@ -510,9 +529,14 @@
 
 /* Responsive Design */
 @media (max-width: 480px) {
+  .market-modal-backdrop {
+    padding: 0.5rem;
+  }
+
   .market-modal-new {
-    padding: 1.25rem;
-    gap: 0.875rem;
+    padding: 1rem;
+    gap: 0.5rem;
+    max-height: calc(100vh - 1rem);
   }
 
   .modal-title-new {
@@ -520,29 +544,62 @@
   }
 
   .gauge-svg {
-    width: 180px;
-    height: 100px;
+    width: 140px;
+    height: 85px;
   }
 }
 
 @media (max-height: 700px) {
   .market-modal-backdrop {
-    padding: 1rem;
+    padding: 0.5rem;
   }
 
   .market-modal-new {
-    padding: 1rem;
-    gap: 0.75rem;
+    padding: 0.875rem;
+    gap: 0.5rem;
+    max-height: calc(100vh - 1rem);
   }
 
   .gauge-svg {
-    width: 160px;
-    height: 90px;
+    width: 120px;
+    height: 75px;
   }
 
   .prediction-gauge-section,
   .orders-section {
+    gap: 0.375rem;
+  }
+
+  .outcome-btn {
+    padding: 0.5rem;
+  }
+
+  .form-input {
+    padding: 0.5rem;
+  }
+
+  .send-btn {
+    padding: 0.625rem;
+  }
+}
+
+@media (max-height: 600px) {
+  .gauge-svg {
+    width: 100px;
+    height: 60px;
+  }
+
+  .market-info-display {
+    padding: 0.25rem;
     gap: 0.5rem;
+  }
+
+  .info-value {
+    font-size: 0.875rem;
+  }
+
+  .calc-display {
+    padding: 0.5rem;
   }
 }
 
@@ -551,8 +608,11 @@
   /* Remove ShareModal's backdrop and adjust positioning */
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 500px;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .share-panel-wrapper .share-modal-backdrop {
@@ -560,15 +620,46 @@
   background: transparent;
   backdrop-filter: none;
   padding: 0;
-  overflow: visible;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 .share-panel-wrapper .share-modal {
   position: relative;
   box-shadow: none;
   max-width: 100%;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 12px;
+}
+
+.share-panel-wrapper .share-modal-content {
+  gap: 1rem;
 }
 
 .share-panel-wrapper .share-modal-close {
   display: none;
+}
+
+.share-panel-wrapper .qr-code-container {
+  padding: 12px;
+}
+
+.share-panel-wrapper .qr-code-frame {
+  padding: 8px;
+}
+
+.share-panel-wrapper .brand-section {
+  display: none;
+}
+
+.share-panel-wrapper .scan-to-share {
+  font-size: 1rem;
+  gap: 8px;
+}
+
+.share-panel-wrapper .chevron-left,
+.share-panel-wrapper .chevron-right {
+  font-size: 1.25rem;
 }
