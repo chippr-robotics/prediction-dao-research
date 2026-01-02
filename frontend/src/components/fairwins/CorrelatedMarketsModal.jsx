@@ -487,7 +487,6 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
 
               {/* Options Section */}
               <div className="correlated-options-section">
-                <h3 className="correlated-options-title">Options</h3>
                 <div className="correlated-options-table-wrapper">
                   <table className="correlated-options-table">
                     <thead>

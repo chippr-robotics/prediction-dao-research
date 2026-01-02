@@ -113,7 +113,7 @@
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   gap: 0.75rem;
-  align-items: flex-start;
+  align-items: center flex-start;
   background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.05);
   border-radius: 16px;
   padding: 0.75rem;
