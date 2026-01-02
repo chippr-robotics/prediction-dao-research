@@ -41,6 +41,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [selectedSubcategories, setSelectedSubcategories] = useState([]) // Subcategory filter state
   const [showHero, setShowHero] = useState(false) // Hero view state
   const [showTokenBuilder, setShowTokenBuilder] = useState(false) // Token builder state
+  const [showFilters, setShowFilters] = useState(false) // Collapsible filters state
   const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
@@ -480,44 +481,62 @@ Trade Details:
                 /* Full Grid View for specific category */
             <div className="grid-view-container">
               <div className="grid-controls">
-                <div className="grid-header">
-                  <h2>
-                    {categories.find(c => c.id === selectedCategory)?.icon}{' '}
-                    {categories.find(c => c.id === selectedCategory)?.name} Markets
-                  </h2>
-                  <span className="market-count">
-                    ({searchFilteredMarkets.length} {searchQuery ? 'matching' : 'active'} markets)
-                  </span>
-                    </div>
-                    <div className="search-and-sort-controls">
-                      <SearchBar 
-                        value={searchQuery}
-                        onChange={handleSearchChange}
-                        placeholder="Search markets..."
-                        ariaLabel={`Search ${categories.find(c => c.id === selectedCategory)?.name} markets`}
-                      />
-                      <div className="sort-controls">
-                        <label htmlFor="sort-select">Sort by:</label>
-                        <select 
-                          id="sort-select"
-                          value={sortBy} 
-                          onChange={(e) => setSortBy(e.target.value)}
-                          className="sort-select"
-                        >
-                          <option value="endTime">Ending Time</option>
-                          <option value="marketValue">Market Value</option>
-                          <option value="volume24h">Volume (24h)</option>
-                          <option value="activity">Activity (Trades)</option>
-                          <option value="popularity">Popularity (Traders)</option>
-                          <option value="probability">Probability (YES%)</option>
-                        </select>
-                      </div>
-                      <ViewToggle 
-                        currentView={viewMode}
-                        onViewChange={handleViewChange}
-                      />
+                {/* Main header row - always visible */}
+                <div className="grid-header-main">
+                  <div className="grid-header-left">
+                    <h2>
+                      {categories.find(c => c.id === selectedCategory)?.icon}{' '}
+                      {categories.find(c => c.id === selectedCategory)?.name}
+                    </h2>
+                    <span className="market-count">
+                      ({searchFilteredMarkets.length})
+                    </span>
+                  </div>
+                  <div className="grid-header-center">
+                    <SearchBar 
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      placeholder="Search markets..."
+                      ariaLabel={`Search ${categories.find(c => c.id === selectedCategory)?.name} markets`}
+                    />
+                  </div>
+                  <div className="grid-header-right">
+                    <button 
+                      className="filter-toggle-btn"
+                      onClick={() => setShowFilters(!showFilters)}
+                      aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+                      aria-expanded={showFilters}
+                    >
+                      {showFilters ? '▲' : '▼'} Filters
+                    </button>
+                    <ViewToggle 
+                      currentView={viewMode}
+                      onViewChange={handleViewChange}
+                    />
+                  </div>
+                </div>
+                {/* Collapsible filters row */}
+                {showFilters && (
+                  <div className="grid-filters-collapsible">
+                    <div className="sort-controls">
+                      <label htmlFor="sort-select">Sort by:</label>
+                      <select 
+                        id="sort-select"
+                        value={sortBy} 
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="sort-select"
+                      >
+                        <option value="endTime">Ending Time</option>
+                        <option value="marketValue">Market Value</option>
+                        <option value="volume24h">Volume (24h)</option>
+                        <option value="activity">Activity (Trades)</option>
+                        <option value="popularity">Popularity (Traders)</option>
+                        <option value="probability">Probability (YES%)</option>
+                      </select>
                     </div>
                   </div>
+                )}
+              </div>
                   {viewMode === VIEW_MODES.GRID ? (
                     <MarketGrid 
                       markets={getFilteredAndSortedMarkets()}

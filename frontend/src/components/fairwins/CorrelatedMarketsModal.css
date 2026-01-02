@@ -8,19 +8,20 @@
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   z-index: 9999;
   padding: 2rem 1rem;
   backdrop-filter: blur(4px);
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 /* Modal Container */
 .correlated-markets-modal-container {
   width: 100%;
-  max-width: 1200px;
-  margin: auto;
-  overflow: hidden;
+  max-width: min(1200px, calc(100vw - 2rem));
+  margin: 2rem auto;
+  box-sizing: border-box;
 }
 
 /* Modal Card */
@@ -33,8 +34,10 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-height: 90vh;
+  max-height: calc(100vh - 8rem);
   overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 /* Header */
@@ -44,6 +47,7 @@
   gap: 0.75rem;
   padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .correlated-modal-logo {
@@ -87,6 +91,7 @@
   color: var(--text-secondary);
   margin: 0;
   text-align: center;
+  flex-shrink: 0;
 }
 
 /* Main Content Area - Scrollable */
@@ -95,118 +100,196 @@
   flex-direction: column;
   gap: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.5rem;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
-/* Radar and Options Row */
+/* Radar and Options Row - ALWAYS side by side */
 .correlated-content-row {
-  display: flex;
-  gap: 1.5rem;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 0.75rem;
   align-items: flex-start;
   background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.05);
   border-radius: 16px;
-  padding: 1.5rem;
+  padding: 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* Radar Chart Section */
+/* Radar Chart Section - 30% width */
 .correlated-radar-section {
-  flex: 0 0 45%;
-  display: flex;
+  flex: 0 0 30%;
+  width: 30%;
+  max-width: 30%;
+  min-width: 120px;
+  display: inline-flex;
   justify-content: center;
   align-items: center;
-  padding: 0.5rem;
+  box-sizing: border-box;
+  padding: 0.25rem;
 }
 
 .correlated-radar-chart {
   width: 100%;
-  max-width: 350px;
+  max-width: 100%;
   height: auto;
+  display: block;
 }
 
-/* Options Section */
+/* Options Section - remaining width */
 .correlated-options-section {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  min-width: 250px;
+  gap: 0.25rem;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .correlated-options-title {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 0.5rem 0;
+  margin: 0;
+  flex-shrink: 0;
 }
 
-.correlated-options-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.correlated-options-table-wrapper {
+  width: 100%;
+  flex: 1 1 auto;
+  overflow-x: auto;
   overflow-y: auto;
-  max-height: 400px;
-  padding-right: 0.5rem;
-  /* Standard scrollbar styling for Firefox */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3) rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
-}
-
-/* Scrollbar styling for Webkit browsers (Chrome, Safari, Edge) */
-.correlated-options-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.correlated-options-list::-webkit-scrollbar-track {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
-  border-radius: 4px;
-}
-
-.correlated-options-list::-webkit-scrollbar-thumb {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
-  border-radius: 4px;
-}
-
-.correlated-options-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.5);
-}
-
-.correlated-option-card {
-  background: var(--bg-secondary);
-  border: 2px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
+  max-height: min(350px, 45vh);
   border-radius: 12px;
-  padding: 0.875rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  border: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.15);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  box-sizing: border-box;
+}
+
+.correlated-options-table {
+  width: 100%;
+  min-width: 320px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.correlated-options-table thead {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.12);
+}
+
+.correlated-options-table th {
   text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.5rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
 }
 
-.correlated-option-card:hover {
-  border-color: var(--brand-primary);
-  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.2);
-  transform: translateY(-2px);
+.correlated-options-table tbody tr {
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  border-bottom: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
 }
 
-.correlated-option-card.selected {
-  border-color: var(--brand-primary);
-  border-width: 3px;
-  background: linear-gradient(135deg, rgba(var(--brand-primary-rgb, 54, 179, 126), 0.15), rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08));
-  box-shadow: 0 4px 12px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.3);
+.correlated-options-table tbody tr:last-child {
+  border-bottom: none;
 }
 
-.correlated-option-card.hidden-market {
-  opacity: 0.5;
-  border-style: dashed;
+.correlated-options-table tbody tr:hover {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
 }
 
-.correlated-option-header {
-  display: flex;
+.correlated-options-row.selected {
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.18);
+  box-shadow: inset 0 0 0 1px rgba(var(--brand-primary-rgb, 54, 179, 126), 0.35);
+}
+
+.correlated-options-row.hidden-market {
+  opacity: 0.55;
+}
+
+.correlated-option-cell {
+  padding: 0.4rem 0.5rem;
+  vertical-align: middle;
+  border-right: 1px solid rgba(var(--brand-primary-rgb, 54, 179, 126), 0.08);
+}
+
+.correlated-option-cell:last-child {
+  border-right: none;
+}
+
+.correlated-option-toggle {
+  width: 40px;
+  text-align: center;
+}
+
+.correlated-visibility-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.25rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  color: var(--text-primary);
+}
+
+.correlated-visibility-btn:hover,
+.correlated-visibility-btn:focus-visible {
+  opacity: 1;
+  transform: scale(1.05);
+  outline: none;
+}
+
+.correlated-option-name {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 100%;
+}
+
+.correlated-option-name-text {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.correlated-selected-indicator {
+  color: var(--brand-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.correlated-option-probability,
+.correlated-option-volume {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.correlated-option-volume {
+  text-align: right;
+}
+
+.correlated-options-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 .correlated-option-controls {
@@ -358,11 +441,19 @@
   background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.05);
   border-radius: 12px;
   padding: 1rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
 }
 
 .correlated-timeline-chart {
   width: 100%;
+  max-width: 100%;
+  min-width: 600px;
   height: auto;
+  display: block;
 }
 
 .radar-labels-group text {
@@ -372,21 +463,20 @@
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .correlated-content-row {
-    flex-direction: column;
-  }
-
   .correlated-radar-section {
-    flex: 1 1 auto;
-    width: 100%;
+    flex: 0 0 30%;
+    width: 30%;
+    max-width: 30%;
+    min-width: 150px;
   }
 
   .correlated-options-section {
-    width: 100%;
+    flex: 1 1 auto;
+    flex-direction: column;
   }
 
-  .correlated-options-list {
-    max-height: 300px;
+  .correlated-options-table {
+    min-width: 300px;
   }
 }
 
@@ -395,8 +485,14 @@
     padding: 1rem 0.5rem;
   }
 
+  .correlated-markets-modal-container {
+    max-width: calc(100vw - 1rem);
+    margin: 1rem auto;
+  }
+
   .correlated-markets-modal {
     padding: 1.25rem;
+    max-height: calc(100vh - 2rem);
   }
 
   .correlated-modal-title {
@@ -404,7 +500,34 @@
   }
 
   .correlated-content-row {
-    padding: 1rem;
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+
+  .correlated-radar-section {
+    flex: 0 0 28%;
+    width: 28%;
+    max-width: 28%;
+    min-width: 120px;
+  }
+
+  .correlated-options-section {
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .correlated-options-table {
+    min-width: 280px;
+    font-size: 0.85rem;
+  }
+
+  .correlated-options-table th {
+    padding: 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .correlated-option-cell {
+    padding: 0.5rem;
   }
 
   .correlated-timeline-header {
@@ -425,30 +548,76 @@
 }
 
 @media (max-width: 480px) {
+  .correlated-markets-modal-backdrop {
+    padding: 0.5rem;
+  }
+
+  .correlated-markets-modal-container {
+    max-width: calc(100vw - 1rem);
+    margin: 0.5rem auto;
+  }
+
   .correlated-markets-modal {
     padding: 1rem;
     gap: 0.875rem;
+    max-height: calc(100vh - 1rem);
   }
 
   .correlated-modal-title {
     font-size: 1rem;
   }
 
-  .correlated-option-name {
-    font-size: 0.85rem;
+  .correlated-content-row {
+    padding: 0.5rem;
+    gap: 0.75rem;
   }
 
-  .correlated-stat-value {
-    font-size: 0.875rem;
+  .correlated-radar-section {
+    flex: 0 0 25%;
+    width: 25%;
+    max-width: 25%;
+    min-width: 80px;
+  }
+
+  .correlated-options-section {
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .correlated-options-table {
+    min-width: 240px;
+    font-size: 0.8rem;
+  }
+
+  .correlated-options-table th {
+    padding: 0.4rem;
+    font-size: 0.65rem;
+  }
+
+  .correlated-option-cell {
+    padding: 0.4rem;
+  }
+
+  .correlated-option-toggle {
+    width: 40px;
   }
 }
 
 @media (max-height: 700px) {
-  .correlated-markets-modal {
-    max-height: 95vh;
+  .correlated-markets-modal-backdrop {
+    padding: 0.5rem;
   }
 
-  .correlated-options-list {
-    max-height: 250px;
+  .correlated-markets-modal-container {
+    margin: 0.5rem auto;
+  }
+
+  .correlated-markets-modal {
+    max-height: calc(100vh - 1rem);
+    padding: 1rem;
+  }
+
+  .correlated-options-table-wrapper {
+    max-height: min(200px, 30vh);
   }
 }

@@ -488,66 +488,78 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
               {/* Options Section */}
               <div className="correlated-options-section">
                 <h3 className="correlated-options-title">Options</h3>
-                <div className="correlated-options-list">
-                  {correlatedMarkets && correlatedMarkets.length > 0 && correlatedMarkets.map((option) => {
-                    if (!option || !option.id) return null
-                    
-                    return (
-                    <button
-                      key={option.id}
-                      className={`correlated-option-card ${selectedOption === option.id ? 'selected' : ''} ${!visibleMarkets[option.id] ? 'hidden-market' : ''}`}
-                      onClick={() => handleMarketCardClick(option.id)}
-                    >
-                      <div className="correlated-option-header">
-                        <div className="correlated-option-controls">
-                          <button
-                            className="correlated-visibility-btn"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleMarketVisibility(option.id)
-                            }}
-                            aria-label={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
-                            title={visibleMarkets[option.id] ? 'Hide from analysis' : 'Show in analysis'}
-                          >
-                            <span aria-hidden="true">{visibleMarkets[option.id] ? '👁️' : '👁️‍🗨️'}</span>
-                          </button>
-                        </div>
-                        <span className="correlated-option-name">
-                          {parseProposalTitle(option.proposalTitle || '')}
-                        </span>
-                        {selectedOption === option.id && (
-                          <span className="correlated-selected-indicator">✓</span>
-                        )}
-                      </div>
-                      
-                      <div className="correlated-option-stats">
-                        <div className="correlated-option-stat">
-                          <span className="correlated-stat-label">Probability</span>
-                          <span className="correlated-stat-value">{(parseFloat(option.passTokenPrice || 0) * 100).toFixed(1)}%</span>
-                        </div>
-                        <div className="correlated-option-stat">
-                          <span className="correlated-stat-label">Volume</span>
-                          <span className="correlated-stat-value">{formatPrice(option.totalLiquidity || 0, { compact: true })}</span>
-                        </div>
-                      </div>
+                <div className="correlated-options-table-wrapper">
+                  <table className="correlated-options-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Show</th>
+                        <th scope="col">Market</th>
+                        <th scope="col">Probability</th>
+                        <th scope="col">Volume</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {correlatedMarkets && correlatedMarkets.length > 0 ? (
+                        correlatedMarkets.map((option) => {
+                          if (!option || !option.id) return null
 
-                      {/* Histogram bar */}
-                      <div className="correlated-price-histogram">
-                        <div className="correlated-histogram-bar-container">
-                          <div 
-                            className="correlated-histogram-bar"
-                            style={{ width: `${parseFloat(option.passTokenPrice || 0) * 100}%` }}
-                          />
-                        </div>
-                        <div className="correlated-histogram-labels">
-                          <span className="correlated-histogram-label">0%</span>
-                          <span className="correlated-histogram-label">50%</span>
-                          <span className="correlated-histogram-label">100%</span>
-                        </div>
-                      </div>
-                    </button>
-                    )
-                  })}
+                          const isSelected = selectedOption === option.id
+                          const isVisible = !!visibleMarkets[option.id]
+
+                          const handleRowKeyDown = (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault()
+                              handleMarketCardClick(option.id)
+                            }
+                          }
+
+                          return (
+                            <tr
+                              key={option.id}
+                              className={`correlated-options-row ${isSelected ? 'selected' : ''} ${!isVisible ? 'hidden-market' : ''}`}
+                              onClick={() => handleMarketCardClick(option.id)}
+                              onKeyDown={handleRowKeyDown}
+                              tabIndex={0}
+                            >
+                              <td className="correlated-option-cell correlated-option-toggle">
+                                <button
+                                  type="button"
+                                  className="correlated-visibility-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleMarketVisibility(option.id)
+                                  }}
+                                  aria-pressed={isVisible}
+                                  aria-label={isVisible ? 'Hide from analysis' : 'Show in analysis'}
+                                  title={isVisible ? 'Hide from analysis' : 'Show in analysis'}
+                                >
+                                  <span aria-hidden="true">{isVisible ? '👁️' : '👁️‍🗨️'}</span>
+                                </button>
+                              </td>
+                              <td className="correlated-option-cell correlated-option-name">
+                                <span className="correlated-option-name-text">
+                                  {parseProposalTitle(option.proposalTitle || '')}
+                                </span>
+                                {isSelected && <span className="correlated-selected-indicator" aria-hidden="true">✓</span>}
+                              </td>
+                              <td className="correlated-option-cell correlated-option-probability">
+                                {(parseFloat(option.passTokenPrice || 0) * 100).toFixed(1)}%
+                              </td>
+                              <td className="correlated-option-cell correlated-option-volume">
+                                {formatPrice(option.totalLiquidity || 0, { compact: true })}
+                              </td>
+                            </tr>
+                          )
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="correlated-options-empty">
+                            No correlated markets available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
