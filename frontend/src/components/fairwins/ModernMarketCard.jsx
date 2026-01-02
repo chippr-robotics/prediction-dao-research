@@ -278,6 +278,33 @@ function ModernMarketCard({
           alt={`${market.category} category`}
           className="thumbnail-image"
         />
+
+      {/* Stats row */}
+      <div className="stats-row">
+        <div className="stat-item volume" data-label="Volume" data-emoji="📊">
+          <div className="stat-label">Volume</div>
+          <div className="stat-value">
+            {market.volume24h != null
+              ? `$${formatNumber(market.volume24h)}`
+              : 'N/A'}
+          </div>
+        </div>
+        <div className="stat-item" data-label="Liquidity" data-emoji="💧">
+          <div className="stat-label">Liquidity</div>
+          <div className="stat-value">${formatNumber(market.totalLiquidity)}</div>
+        </div>
+        <div className="stat-item" data-label="Traders" data-emoji="👥">
+          <div className="stat-label">Traders</div>
+          <div className="stat-value">
+            {market.uniqueTraders != null
+              ? formatNumber(market.uniqueTraders)
+              : market.tradesCount != null
+                ? formatNumber(market.tradesCount)
+                : 'N/A'}
+          </div>
+        </div>
+      </div>
+
         <div className="thumbnail-overlay">
           {/* Header with badges - positioned at top of image */}
           <div className="card-header">
@@ -362,39 +389,8 @@ function ModernMarketCard({
               />
             </svg>
           </div>
-          <div className={`trend-indicator-v2 ${trend.direction}`}>
-            <span className="trend-arrow" aria-hidden="true">{trend.direction === 'up' ? '↗' : '↘'}</span>
-            <span className="trend-change">{trend.direction === 'up' ? '+' : '-'}{trend.change}% trend</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="stats-row">
-        <div className="stat-item volume" data-label="Volume" data-emoji="📊">
-          <div className="stat-label">Volume</div>
-          <div className="stat-value">
-            {market.volume24h != null
-              ? `$${formatNumber(market.volume24h)}`
-              : 'N/A'}
-          </div>
-        </div>
-        <div className="stat-item" data-label="Liquidity" data-emoji="💧">
-          <div className="stat-label">Liquidity</div>
-          <div className="stat-value">${formatNumber(market.totalLiquidity)}</div>
-        </div>
-        <div className="stat-item" data-label="Traders" data-emoji="👥">
-          <div className="stat-label">Traders</div>
-          <div className="stat-value">
-            {market.uniqueTraders != null
-              ? formatNumber(market.uniqueTraders)
-              : market.tradesCount != null
-                ? formatNumber(market.tradesCount)
-                : 'N/A'}
-          </div>
-        </div>
-      </div>
-
+          <div>
+          
       {/* Tags row - use existing market tags */}
       {market.tags && market.tags.length > 0 && (
         <div className="tags-row">
@@ -403,6 +399,12 @@ function ModernMarketCard({
           ))}
         </div>
       )}
+          </div>
+          
+        </div>
+      </div>
+
+
       {/* Binary action buttons: Yes/No */}
       { isExpanded && (
       <div className="action-buttons">
