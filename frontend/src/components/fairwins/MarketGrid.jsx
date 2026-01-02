@@ -27,7 +27,7 @@ function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = f
   }
 
   // Determine how many cards are in the first row based on grid layout (typically 3 on desktop)
-  const firstRowCount = 3
+  const firstRowCount = 0 // disable first row expand for now
 
   return (
     <div 

@@ -256,7 +256,7 @@ function ModernMarketCard({
 
   return (
     <div 
-      className={`modern-market-card ${isActive ? 'active' : ''} ${isExpanded || isFirstRow ? 'expanded' : ''}`}
+      className={`modern-market-card ${isActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={handleMouseEnter}
@@ -301,6 +301,9 @@ function ModernMarketCard({
           </div>
           
           {/* Primary question text over the background image */}
+          {market.description && (
+          <p className="card-description">{market.description}</p>
+        )}
           <h3 className="card-title">{market.proposalTitle}</h3>
         </div>
       </div>
@@ -368,22 +371,19 @@ function ModernMarketCard({
 
       {/* Stats row */}
       <div className="stats-row">
-        <div className="stat-item">
-          <span className="stat-icon" aria-hidden="true">📊</span>
-          <span className="stat-label">Volume</span>
-          <span className="stat-value">
+        <div class="stat-item volume" data-label="Volume" data-emoji="📊">
+          <div className="stat-label">Volume</div>
+          <div className="stat-value">
             {market.volume24h != null
               ? `$${formatNumber(market.volume24h)}`
               : 'N/A'}
-          </span>
+          </div>
         </div>
-        <div className="stat-item">
-          <span className="stat-icon" aria-hidden="true">💧</span>
+        <div className="stat-item" data-label="Liquidity" data-emoji="💧">
           <span className="stat-label">Liquidity</span>
           <span className="stat-value">${formatNumber(market.totalLiquidity)}</span>
         </div>
-        <div className="stat-item">
-          <span className="stat-icon" aria-hidden="true">👥</span>
+        <div className="stat-item" data-label="Traders" data-emoji="👥">
           <span className="stat-label">Traders</span>
           <span className="stat-value">
             {market.uniqueTraders != null
@@ -403,8 +403,8 @@ function ModernMarketCard({
           ))}
         </div>
       )}
-
       {/* Binary action buttons: Yes/No */}
+      { isExpanded && (
       <div className="action-buttons">
         <button 
           className="action-btn yes-btn"
@@ -423,13 +423,8 @@ function ModernMarketCard({
           <span className="btn-price">{noProb}¢</span>
         </button>
       </div>
-
-      {/* Expanded content - visible for first row, on hover/click for others */}
-      <div className="card-expanded-content">
-        {market.description && (
-          <p className="expanded-description">{market.description}</p>
-        )}
-      </div>
+      )}
+      
     </div>
   )
 }

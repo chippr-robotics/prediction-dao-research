@@ -128,21 +128,44 @@
 .card-title {
   position: relative;
   z-index: 1;
-  padding: 8px 14px 14px;
+  padding: 0px 14px;
   margin: 0;
-  font-size: 1.1rem;
+  font-size: .5rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #dddddd;
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: ;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 /* Light mode title - still white over dark overlay */
 .theme-light .card-title {
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
+}
+
+/* Card title - Primary text over background - BOLD and VISIBLE */
+.card-description {
+  position: relative;
+  z-index: 1;
+  padding: 0px 14px;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow-wrap: break-word;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* Light mode title - still white over dark overlay */
+.theme-light .card-description {
   color: #ffffff;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
 }
@@ -563,9 +586,9 @@
   .stats-row {
     flex-direction: row;
     flex-wrap: nowrap;
-    gap: 8px;
+    gap: 20px;
     justify-content: space-around;
-    padding: 10px 12px;
+    padding: 0px 0px;
   }
 
   .stat-item {
