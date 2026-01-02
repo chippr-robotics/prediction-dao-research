@@ -7,6 +7,7 @@ import BlockiesAvatar from '../ui/BlockiesAvatar'
 import TokenMintButton from '../TokenMintButton'
 import ClearPathButton from '../clearpath/ClearPathButton'
 import './HeaderBar.css'
+import ThirdWebWalletButton from '../wallet/ThirdWebWalletButton'
 
 function HeaderBar({ isConnected }) {
   const { isScrollingDown } = useScrollDirection(10)
@@ -18,7 +19,7 @@ function HeaderBar({ isConnected }) {
 
   const handleOpenUserManagement = () => {
     navigate('/wallet')
-  }
+  } 
 
   // Hide header on mobile when scrolling down
   const shouldHideHeader = isMobile && isScrollingDown && hasScrolled
@@ -48,6 +49,7 @@ function HeaderBar({ isConnected }) {
         <div className="header-right">
           <TokenMintButton />
           <ClearPathButton />
+          <ThirdWebWalletButton />
           <button
             className="user-management-btn"
             onClick={handleOpenUserManagement}

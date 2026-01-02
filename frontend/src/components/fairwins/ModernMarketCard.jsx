@@ -371,7 +371,7 @@ function ModernMarketCard({
 
       {/* Stats row */}
       <div className="stats-row">
-        <div class="stat-item volume" data-label="Volume" data-emoji="📊">
+        <div className="stat-item volume" data-label="Volume" data-emoji="📊">
           <div className="stat-label">Volume</div>
           <div className="stat-value">
             {market.volume24h != null
@@ -380,18 +380,18 @@ function ModernMarketCard({
           </div>
         </div>
         <div className="stat-item" data-label="Liquidity" data-emoji="💧">
-          <span className="stat-label">Liquidity</span>
-          <span className="stat-value">${formatNumber(market.totalLiquidity)}</span>
+          <div className="stat-label">Liquidity</div>
+          <div className="stat-value">${formatNumber(market.totalLiquidity)}</div>
         </div>
         <div className="stat-item" data-label="Traders" data-emoji="👥">
-          <span className="stat-label">Traders</span>
-          <span className="stat-value">
+          <div className="stat-label">Traders</div>
+          <div className="stat-value">
             {market.uniqueTraders != null
               ? formatNumber(market.uniqueTraders)
               : market.tradesCount != null
                 ? formatNumber(market.tradesCount)
                 : 'N/A'}
-          </span>
+          </div>
         </div>
       </div>
 
