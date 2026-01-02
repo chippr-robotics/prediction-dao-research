@@ -393,10 +393,10 @@ describe("Integration: Ragequit Protection Flow", function () {
 
       console.log("\n--- Test proportional calculation ---");
       
-      // Fund the ragequit module for payouts (use 85000 ETH to leave sufficient room for gas and prior test spending)
+      // Fund the ragequit module for payouts
       await owner.sendTransaction({
         to: await ragequitModule.getAddress(),
-        value: ethers.parseEther("85000")
+        value: ethers.parseEther("1000")
       });
       
       const ragequitAmount = ethers.parseEther("1000"); // 1000 tokens
