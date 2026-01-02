@@ -204,12 +204,14 @@ function ModernMarketCard({
     )} L ${lastX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} Z`
   }, [sparklinePoints])
 
-  // Calculate gauge arc for full circle
+  // Calculate gauge arc for full circle (use circumference and dashoffset so 100% => full circle)
   const gaugeArc = useMemo(() => {
-    const percent = parseFloat(yesProb)
+    const percent = Math.max(0, Math.min(100, parseFloat(yesProb) || 0))
     const circumference = Math.PI * 2 * RING_RADIUS
-    const offset = (percent / 100) * circumference
-    return { dashArray: `${offset} ${circumference}`, circumference }
+    const dashArray = circumference
+    // dashOffset: 0 = fully filled, circumference = hidden. We want percent fill: offset = circumference * (1 - percent/100)
+    const dashOffset = circumference * (1 - percent / 100)
+    return { dashArray, dashOffset, circumference }
   }, [yesProb])
 
   const handleClick = () => {
@@ -358,7 +360,7 @@ function ModernMarketCard({
               style={{
                 stroke: ringColor,
                 strokeDasharray: gaugeArc.dashArray,
-                strokeDashoffset: gaugeArc.circumference * RING_START_OFFSET,
+                strokeDashoffset: gaugeArc.dashOffset,
                 transform: 'rotate(-90deg)',
                 transformOrigin: 'center'
               }}
@@ -368,7 +370,7 @@ function ModernMarketCard({
           {/* Center content */}
           <div className="ring-center">
             <span className="ring-percentage" style={{ color: ringColor }}>{yesProb}%</span>
-            <span className="ring-label" style={{ color: ringColor }}>Yes</span>
+            <span className="ring-label" style={{ color: ringColor }}></span>
           </div>
         </div>
 

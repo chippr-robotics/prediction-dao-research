@@ -55,7 +55,7 @@
   border: 1px solid var(--card-border);
   display: flex;
   flex-direction: column;
-  min-height: 360px;
+  min-height: 100px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -63,7 +63,7 @@
 
 /* Expanded state - show full height */
 .modern-market-card.expanded {
-  min-height: 420px;
+  min-height: 300px;
 }
 
 .modern-market-card:hover {
@@ -280,8 +280,9 @@
 
 .ring-fill {
   stroke-width: 8;
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.6s ease-out;
+  /* Use butt to avoid rounded caps covering end points when near-full */
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 0.6s ease-out, stroke 0.2s ease;
 }
 
 .ring-center {
@@ -391,7 +392,7 @@
 }
 
 .stats-row .stat-item{
-  min-width: 72px;
+  min-width: 22px;
   flex: 0 0 auto;
 }
 
@@ -568,9 +569,9 @@
 
 /* Show action buttons when card is expanded */
 .modern-market-card.expanded .action-buttons {
-  max-height: 100px;
+  max-height: 150px;
   opacity: 1;
-  padding: 12px 14px;
+  
 }
 
 .action-btn {
@@ -681,11 +682,11 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .modern-market-card {
-    min-height: 340px;
+    min-height: 240px;
   }
 
   .modern-market-card.expanded {
-    min-height: 380px;
+    min-height: 280px;
   }
 
   .card-title {
@@ -958,17 +959,8 @@
   }
 }
 
-/* Animation for ring on mount */
-/* Note: 251 ≈ 2π × 40 (full circumference of ring with radius 40) */
-@keyframes ringLoad {
-  from {
-    stroke-dasharray: 0 251;
-  }
-}
-
-.ring-fill {
-  animation: ringLoad 0.8s ease-out forwards;
-}
+/* Ring animation removed - using CSS transition on stroke-dashoffset for smooth updates */
+/* Note: circumference ≈ 2π × 40 ≈ 251 */
 
 /* Shine effect on hover */
 .modern-market-card::before {
