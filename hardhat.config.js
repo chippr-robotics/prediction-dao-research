@@ -50,4 +50,19 @@ module.exports = {
     noColors: process.env.REPORT_GAS ? true : false,
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
   },
+  etherscan: {
+    apiKey: {
+      'mordor': 'empty'
+   },
+    customChains: [
+      {
+        network: "mordor",
+        chainId: 63,
+        urls: {
+          apiURL: "https://etc-mordor.blockscout.com/api",
+          browserURL: "https://etc-mordor.blockscout.com"
+        }
+      }
+    ]
+  }
 };
