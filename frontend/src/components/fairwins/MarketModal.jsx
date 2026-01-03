@@ -294,6 +294,16 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             {/* Gauge visualization */}
             <div className="gauge-container">
               <svg className="gauge-svg" viewBox="0 0 200 120">
+                {/* Glow filter */}
+                <defs>
+                  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
                 {/* Background arc */}
                 <path
                   d="M 20 100 A 80 80 0 0 1 180 100"
@@ -301,19 +311,45 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
                   stroke="#2d3e50"
                   strokeWidth="20"
                 />
-                {/* YES (green) arc */}
+                {/* YES (green) arc with glow */}
                 <path
                   d="M 20 100 A 80 80 0 0 1 180 100"
                   fill="none"
                   stroke="#36B37E"
                   strokeWidth="20"
                   strokeDasharray={`${yesProb * 2.51} ${100 * 2.51}`}
+                  filter="url(#glow)"
                 />
                 {/* Indicator */}
                 <circle cx="100" cy="100" r="4" fill="#fff" />
                 <text x="100" y="90" textAnchor="middle" fill="#fff" fontSize="24" fontWeight="bold">
                   {yesProb}%
                 </text>
+              </svg>
+            </div>
+
+            {/* Voting Timeline Mini Chart */}
+            <div className="voting-timeline-chart">
+              <svg className="voting-timeline-svg" viewBox="0 0 200 40" preserveAspectRatio="none">
+                {/* Grid lines */}
+                {[0, 25, 50, 75, 100].map((x) => (
+                  <line key={x} x1={x * 2} y1="0" x2={x * 2} y2="40" className="timeline-grid-line" />
+                ))}
+                {/* YES trend area */}
+                <path
+                  className="timeline-yes-area"
+                  d={`M 0 ${40 - yesProb * 0.35} 
+                      Q 50 ${40 - (yesProb - 5) * 0.35}, 100 ${40 - (yesProb + 3) * 0.35}
+                      T 200 ${40 - yesProb * 0.35}
+                      L 200 40 L 0 40 Z`}
+                />
+                {/* YES trend line */}
+                <path
+                  className="timeline-yes-line"
+                  d={`M 0 ${40 - yesProb * 0.35} 
+                      Q 50 ${40 - (yesProb - 5) * 0.35}, 100 ${40 - (yesProb + 3) * 0.35}
+                      T 200 ${40 - yesProb * 0.35}`}
+                />
               </svg>
             </div>
 
