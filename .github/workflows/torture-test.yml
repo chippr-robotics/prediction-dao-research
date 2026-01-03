@@ -256,6 +256,20 @@ jobs:
             --contract TokenMintFactory --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
+      - name: Run Manticore on TreasuryVault
+        run: |
+          echo "Running Manticore on TreasuryVault..."
+          timeout 600 python scripts/run-manticore.py contracts/TreasuryVault.sol \
+            --contract TreasuryVault --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
+      - name: Run Manticore on MarketVault
+        run: |
+          echo "Running Manticore on MarketVault..."
+          timeout 600 python scripts/run-manticore.py contracts/MarketVault.sol \
+            --contract MarketVault --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+        continue-on-error: true
+
       - name: Run Manticore on ZKKeyManager
         run: |
           echo "Running Manticore on ZKKeyManager..."

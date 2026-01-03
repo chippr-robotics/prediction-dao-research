@@ -47,6 +47,11 @@ describe("Integration: Traditional Voting Lifecycle", function () {
     proposalRegistry = await ProposalRegistry.deploy();
     await proposalRegistry.initialize(owner.address);
     
+    // Deploy TreasuryVault for the DAO (for future use)
+    const TreasuryVault = await ethers.getContractFactory("TreasuryVault");
+    const treasuryVault = await TreasuryVault.deploy();
+    await treasuryVault.initialize(owner.address);
+    
     // Deploy TraditionalGovernor
     const TraditionalGovernor = await ethers.getContractFactory("TraditionalGovernor");
     traditionalGovernor = await TraditionalGovernor.deploy();
@@ -54,10 +59,11 @@ describe("Integration: Traditional Voting Lifecycle", function () {
       owner.address,
       await proposalRegistry.getAddress(),
       await governanceToken.getAddress(),
-      owner.address // treasury vault
+      await treasuryVault.getAddress() // Use actual TreasuryVault for reference
     );
     
-    // Fund the governor for execution
+    // Note: TraditionalGovernor currently executes from its own balance, not from the vault
+    // Fund the governor directly for execution until integration is complete
     await owner.sendTransaction({
       to: await traditionalGovernor.getAddress(),
       value: ethers.parseEther("100")
