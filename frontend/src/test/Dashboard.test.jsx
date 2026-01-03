@@ -197,11 +197,7 @@ describe('Dashboard Component', () => {
         expect(screen.getByText('Real-time insights across all prediction markets')).toBeInTheDocument()
       })
     })
-
-
   })
-
-
 
   describe('Chart Sections', () => {
     it('should render market distribution chart section', async () => {
