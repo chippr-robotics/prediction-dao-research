@@ -4,6 +4,58 @@ import MarketDetailsPanel from './MarketDetailsPanel'
 import ShareModal from '../ui/ShareModal'
 import './MarketModal.css'
 
+// Import category background images
+import politicsImg from '../../assets/default/politics_0000.jpg'
+import sportsImg from '../../assets/default/sports_0005.jpg'
+import cryptoImg from '../../assets/default/crypto_0019.jpg'
+import financeImg from '../../assets/default/finance_0014.jpg'
+import techImg from '../../assets/default/tech_0030.jpg'
+import popCultureImg from '../../assets/default/pop-culture_0010.jpg'
+import weatherImg from '../../assets/default/weather_0024.jpg'
+
+// Category background images mapping
+const getCategoryThumbnail = (category) => {
+  const thumbnails = {
+    politics: politicsImg,
+    sports: sportsImg,
+    crypto: cryptoImg,
+    finance: financeImg,
+    tech: techImg,
+    'pop-culture': popCultureImg,
+    weather: weatherImg,
+    other: financeImg
+  }
+  return thumbnails[category] || financeImg
+}
+
+// Format number for display (from ModernMarketCard)
+const formatNumber = (num) => {
+  const n = parseFloat(num)
+  if (Number.isNaN(n)) return '0'
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return parseFloat(n.toFixed(0)).toString()
+}
+
+// Format time remaining
+const formatTimeRemaining = (endTime) => {
+  const now = new Date()
+  const end = new Date(endTime)
+  const diff = end - now
+  
+  if (diff <= 0) return 'Ended'
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+  
+  if (days > 30) {
+    const months = Math.floor(days / 30)
+    return `${months}mo`
+  }
+  if (days > 0) return `${days}d`
+  return `${hours}h`
+}
+
 // Quick action button values for market orders
 const QUICK_ACTION_AMOUNTS = [5, 25, 100, 500]
 
@@ -249,38 +301,6 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
             </button>
           </div>
 
-          {/* Panel Indicator */}
-          <div className="panel-indicators">
-            <button
-              type="button"
-              className={`indicator ${currentPanel === 0 ? 'active' : ''}`}
-              onClick={() => setCurrentPanel(0)}
-              aria-label="Go to Trading panel"
-              aria-current={currentPanel === 0 ? 'true' : undefined}
-            />
-            <button
-              type="button"
-              className={`indicator ${currentPanel === 1 ? 'active' : ''}`}
-              onClick={() => setCurrentPanel(1)}
-              aria-label="Go to Details panel"
-              aria-current={currentPanel === 1 ? 'true' : undefined}
-            />
-            <button
-              type="button"
-              className={`indicator ${currentPanel === 2 ? 'active' : ''}`}
-              onClick={() => setCurrentPanel(2)}
-              aria-label="Go to Share panel"
-              aria-current={currentPanel === 2 ? 'true' : undefined}
-            />
-          </div>
-
-          {/* Screen reader announcement for panel changes */}
-          <div aria-live="polite" aria-atomic="true" className="sr-only">
-            {currentPanel === 0 && 'Trading panel'}
-            {currentPanel === 1 && 'Market Details panel'}
-            {currentPanel === 2 && 'Share panel'}
-          </div>
-
           {/* Carousel Wrapper */}
           <div className="carousel-wrapper">
           {/* Carousel Container */}
@@ -290,40 +310,58 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
           >
             {/* Panel 0: Trading */}
             <div className="carousel-panel">
-          <div className="prediction-gauge-section">
-            {/* Gauge visualization */}
-            <div className="gauge-container">
-              <svg className="gauge-svg" viewBox="0 0 200 120">
-                {/* Background arc */}
-                <path
-                  d="M 20 100 A 80 80 0 0 1 180 100"
-                  fill="none"
-                  stroke="#2d3e50"
-                  strokeWidth="20"
-                />
-                {/* YES (green) arc */}
-                <path
-                  d="M 20 100 A 80 80 0 0 1 180 100"
-                  fill="none"
-                  stroke="#36B37E"
-                  strokeWidth="20"
-                  strokeDasharray={`${yesProb * 2.51} ${100 * 2.51}`}
-                />
-                {/* Indicator */}
-                <circle cx="100" cy="100" r="4" fill="#fff" />
-                <text x="100" y="90" textAnchor="middle" fill="#fff" fontSize="24" fontWeight="bold">
-                  {yesProb}%
-                </text>
-              </svg>
-            </div>
-
-            {/* Price and Market Value Display */}
-            <div className="market-info-display">
-              <div className="info-item">
-                <span className="info-label">Market Value</span>
-                <span className="info-value">{formatPrice(market.totalLiquidity, { compact: true })}</span>
+          {/* Hero Image Section with Text Overlay */}
+          <div 
+            className="modal-hero-section"
+            style={{ backgroundImage: `url(${getCategoryThumbnail(market.category)})` }}
+          >
+            <div className="modal-hero-overlay">
+              {/* Header with category and time */}
+              <div className="modal-hero-header">
+                <span className={`modal-category-pill ${market.category}`}>
+                  {market.category}
+                </span>
+                <span className="modal-resolution-date">
+                  {formatTimeRemaining(market.tradingEndTime)}
+                </span>
+              </div>
+              
+              {/* Title */}
+              <h3 className="modal-hero-title">{market.proposalTitle}</h3>
+              
+              {/* Probability display */}
+              <div className="modal-probability-display">
+                <span className="modal-prob-value">{yesProb}%</span>
+                <span className="modal-prob-label">chance</span>
               </div>
             </div>
+            
+            {/* Stats Row - positioned at bottom */}
+            <div className="modal-stats-row">
+              <div className="modal-stat-item volume">
+                <div className="modal-stat-label">Volume</div>
+                <div className="modal-stat-value">
+                  {market.volume24h != null ? `$${formatNumber(market.volume24h)}` : 'N/A'}
+                </div>
+              </div>
+              <div className="modal-stat-item liquidity">
+                <div className="modal-stat-label">Liquidity</div>
+                <div className="modal-stat-value">${formatNumber(market.totalLiquidity)}</div>
+              </div>
+              <div className="modal-stat-item traders">
+                <div className="modal-stat-label">Traders</div>
+                <div className="modal-stat-value">
+                  {market.uniqueTraders != null
+                    ? formatNumber(market.uniqueTraders)
+                    : market.tradesCount != null
+                      ? formatNumber(market.tradesCount)
+                      : 'N/A'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="prediction-gauge-section">
 
             {/* Binary Outcome Selection */}
             <div className="outcome-selection">
@@ -552,6 +590,39 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
               </div>
             </div>
           </div>
+          
+          {/* Panel Indicator */}
+          <div className="panel-indicators">
+            <button
+              type="button"
+              className={`indicator ${currentPanel === 0 ? 'active' : ''}`}
+              onClick={() => setCurrentPanel(0)}
+              aria-label="Go to Trading panel"
+              aria-current={currentPanel === 0 ? 'true' : undefined}
+            />
+            <button
+              type="button"
+              className={`indicator ${currentPanel === 1 ? 'active' : ''}`}
+              onClick={() => setCurrentPanel(1)}
+              aria-label="Go to Details panel"
+              aria-current={currentPanel === 1 ? 'true' : undefined}
+            />
+            <button
+              type="button"
+              className={`indicator ${currentPanel === 2 ? 'active' : ''}`}
+              onClick={() => setCurrentPanel(2)}
+              aria-label="Go to Share panel"
+              aria-current={currentPanel === 2 ? 'true' : undefined}
+            />
+          </div>
+
+          {/* Screen reader announcement for panel changes */}
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {currentPanel === 0 && 'Trading panel'}
+            {currentPanel === 1 && 'Market Details panel'}
+            {currentPanel === 2 && 'Share panel'}
+          </div>
+
           </div>
         </div>
       </div>

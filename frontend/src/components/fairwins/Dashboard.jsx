@@ -1064,48 +1064,9 @@ function Dashboard() {
           <h1>Market Overview</h1>
           <p className="dashboard-subtitle">Real-time insights across all prediction markets</p>
         </div>
-        {isConnected && (
-          <div className="header-wallet">
-            <span className="wallet-status">●</span>
-            <span className="wallet-address">{account?.slice(0, 6)}...{account?.slice(-4)}</span>
-          </div>
-        )}
       </header>
 
-      {/* Key Metrics */}
-      <section className="metrics-section">
-        <div className="metrics-grid">
-          <div className="metric-card primary">
-            <div className="metric-icon">🎯</div>
-            <div className="metric-content">
-              <div className="metric-value">{platformMetrics?.totalMarkets || 0}</div>
-              <div className="metric-label">Active Markets</div>
-            </div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-icon">💰</div>
-            <div className="metric-content">
-              <div className="metric-value">{formatETC(platformMetrics?.totalLiquidity)}</div>
-              <div className="metric-label">Total Liquidity</div>
-            </div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-icon">📈</div>
-            <div className="metric-content">
-              <div className="metric-value">{formatETC(platformMetrics?.volume24h)}</div>
-              <div className="metric-label">24h Volume</div>
-            </div>
-          </div>
-          <div className="metric-card">
-            <div className="metric-icon">👥</div>
-            <div className="metric-content">
-              <div className="metric-value">{platformMetrics?.activeTraders || 0}</div>
-              <div className="metric-label">Active Traders</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      
       {/* Market Crawler - Latest Markets Ticker */}
       <MarketCrawler markets={markets} />
 

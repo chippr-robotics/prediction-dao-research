@@ -1,16 +1,17 @@
 import { useMemo } from 'react'
 import { ConnectButton } from 'thirdweb/react'
 import { thirdwebClient, getThirdwebChain } from '../../thirdweb'
+import walletIcon from '../../assets/wallet_no_text.svg'
 import './ThirdWebWalletButton.css'
 
 /**
  * ThirdWeb ConnectButton wrapper component
  * Provides a modern, user-friendly wallet connection experience
+ * Uses custom wallet icon that triggers the connect modal
  */
 function ThirdWebWalletButton({ 
   className = '',
   theme = 'dark',
-  btnTitle,
   modalTitle = 'Connect Wallet',
   modalSize = 'compact',
   welcomeScreen,
@@ -26,7 +27,8 @@ function ThirdWebWalletButton({
         chain={chain}
         theme={theme}
         connectButton={{
-          label: btnTitle || 'Connect Wallet',
+          label: <img src={walletIcon} alt="Connect Wallet" className="wallet-icon-img" />,
+          className: 'wallet-icon-button',
         }}
         connectModal={{
           title: modalTitle,

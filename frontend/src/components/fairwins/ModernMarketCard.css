@@ -55,7 +55,15 @@
   border: 1px solid var(--card-border);
   display: flex;
   flex-direction: column;
-  min-height: 420px;
+  min-height: 100px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Expanded state - show full height */
+.modern-market-card.expanded {
+  min-height: 300px;
 }
 
 .modern-market-card:hover {
@@ -116,7 +124,7 @@
 /* Category pill badges */
 .card-header {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   padding: 12px 14px 8px;
   display: flex;
   justify-content: space-between;
@@ -127,22 +135,46 @@
 /* Card title - Primary text over background - BOLD and VISIBLE */
 .card-title {
   position: relative;
-  z-index: 1;
-  padding: 8px 14px 14px;
+  z-index: 5;
+  padding: 0px 14px;
   margin: 0;
-  font-size: 1.1rem;
+  font-size: .5rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #dddddd;
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: break-word;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 /* Light mode title - still white over dark overlay */
 .theme-light .card-title {
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
+}
+
+/* Card title - Primary text over background - BOLD and VISIBLE */
+.card-description {
+  position: relative;
+  z-index: 1;
+  padding: 0px 14px;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+  display: -webkit-box;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow-wrap: break-word;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* Light mode title - still white over dark overlay */
+.theme-light .card-description {
   color: #ffffff;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
 }
@@ -248,8 +280,9 @@
 
 .ring-fill {
   stroke-width: 8;
-  stroke-linecap: round;
-  transition: stroke-dasharray 0.6s ease-out;
+  /* Use butt to avoid rounded caps covering end points when near-full */
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 0.6s ease-out, stroke 0.2s ease;
 }
 
 .ring-center {
@@ -338,45 +371,165 @@
   font-weight: 500;
 }
 
-/* Stats row */
-.stats-row {
-  position: relative;
+/* Stats row sits over the thumbnail in the bottom-right */
+.stats-row{
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
   z-index: 1;
-  display: flex;
-  justify-content: space-around;
-  padding: 12px 14px;
-  background: var(--card-stats-bg);
-  border-top: 1px solid var(--card-border);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  gap:12px;
   align-items: center;
-  gap: 2px;
-  text-align: center;
+  padding: 8px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  max-width: calc(100% - 24px);
+  overflow: hidden;
 }
 
-.stat-icon {
-  font-size: 1rem;
-  opacity: 0.9;
-  margin-bottom: 2px;
+.stats-row .stat-item{
+  min-width: 22px;
+  flex: 0 0 auto;
 }
 
-.stat-label {
-  font-size: 0.55rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--card-text-muted);
-  margin-bottom: 1px;
+/* --- GAMIFIED STAT CARD --- */
+.stat-item{
+  position:relative;
+  flex:1;
+  padding:14px 16px 12px;
+  border-radius:16px;
+  overflow:hidden;
+  opacity: .25;
+  /* "HUD panel" look */
+  background:
+    radial-gradient(120% 120% at 20% 0%, rgba(255,255,255,0.9) 0%, rgba(245,246,248,0.95) 40%, rgba(235,238,242,0.95) 100%);
+  border:1px solid rgba(0,0,0,0.08);
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(0,0,0,0.10);
+
+  transform:translateZ(0);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
-.stat-value {
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--card-text-primary);
+/* hover = "level up" */
+.stat-item:hover{
+  transform:translateY(-3px) scale(1.01);
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 16px 40px rgba(0,0,0,0.14);
+  border-color:rgba(0,0,0,0.12);
 }
+
+/* top accent bar */
+.stat-item::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.40), rgba(255,255,255,0.0));
+  transform:translateX(-120%);
+  opacity:0.05;
+  pointer-events:none;
+}
+
+/* shine sweep on hover */
+.stat-item:hover::after{
+  animation:statShine .9s ease forwards;
+}
+
+@keyframes statShine{
+  to { transform:translateX(120%); }
+}
+
+/* ghost icon + label watermark */
+.stat-item::before{
+  content: attr(data-emoji);
+  position:absolute;
+  right:10px;
+  bottom:-8px;
+  font-size:3.2rem;
+  opacity:0.20;
+  filter: blur(0.2px);
+  pointer-events:none;
+  transform: rotate(-8deg);
+}
+
+/* small "badge dot" like a game rarity marker */
+.stat-item .stat-badge{
+  position:absolute;
+  top:10px;
+  right:10px;
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  box-shadow:0 0 0 3px rgba(255,255,255,0.8), 0 0 16px currentColor;
+  opacity:0.95;
+}
+
+/* label */
+.stat-label{
+  font-size:0.62rem;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:rgba(17,24,39,0.65);
+  margin-bottom:6px;
+}
+
+/* value = big "score" */
+.stat-value{
+  font-size:1.75rem;
+  font-weight:800;
+  letter-spacing:-0.02em;
+  color:#0b1220;
+  line-height:1.05;
+
+  /* subtle outline pop */
+  text-shadow: 0 1px 0 rgba(255,255,255,0.55);
+}
+
+/* tiny "subtext" slot if you ever want it */
+.stat-sub{
+  font-size:0.72rem;
+  color:rgba(17,24,39,0.55);
+  margin-top:6px;
+}
+
+/* --- PER-METRIC THEMES (game-y glow) --- */
+.stat-item.volume{
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(34,197,94,0.12),
+    0 10px 30px rgba(0,0,0,0.10);
+}
+.stat-item.volume .stat-badge{ color: rgba(34,197,94,0.95); background: rgba(34,197,94,0.95); }
+
+.stat-item.liquidity{
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(59,130,246,0.14),
+    0 10px 30px rgba(0,0,0,0.10);
+}
+.stat-item.liquidity .stat-badge{ color: rgba(59,130,246,0.95); background: rgba(59,130,246,0.95); }
+
+.stat-item.traders{
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(168,85,247,0.16),
+    0 10px 30px rgba(0,0,0,0.10);
+}
+.stat-item.traders .stat-badge{ color: rgba(168,85,247,0.95); background: rgba(168,85,247,0.95); }
+
+/* accessibility: reduce motion */
+@media (prefers-reduced-motion: reduce){
+  .stat-item, .stat-item:hover{ transition:none; transform:none; }
+  .stat-item:hover::after{ animation:none; }
+}
+
 
 /* Tags row */
 .tags-row {
@@ -407,6 +560,18 @@
   gap: 8px;
   padding: 12px 14px;
   background: var(--card-action-bg);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  padding: 0;
+  transition: all 0.35s ease;
+}
+
+/* Show action buttons when card is expanded */
+.modern-market-card.expanded .action-buttons {
+  max-height: 150px;
+  opacity: 1;
+  
 }
 
 .action-btn {
@@ -509,6 +674,7 @@
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -516,11 +682,40 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .modern-market-card {
-    min-height: 380px;
+    min-height: 240px;
+  }
+
+  .modern-market-card.expanded {
+    min-height: 280px;
   }
 
   .card-title {
     font-size: 0.9rem;
+  }
+
+  /* Shrink stats on tablet */
+  .stats-row {
+    gap: 8px;
+    padding: 6px;
+    right: 8px;
+    bottom: 8px;
+  }
+
+  .stats-row .stat-item {
+    min-width: 60px;
+    padding: 10px 12px 8px;
+  }
+
+  .stat-label {
+    font-size: 0.55rem;
+  }
+
+  .stat-value {
+    font-size: 1.4rem;
+  }
+
+  .stat-item::before {
+    font-size: 2.5rem;
   }
 
   .ring-percentage {
@@ -535,6 +730,10 @@
 
 @media (max-width: 480px) {
   .modern-market-card {
+    min-height: 300px;
+  }
+
+  .modern-market-card.expanded {
     min-height: 340px;
   }
 
@@ -560,27 +759,184 @@
     min-width: 0;
   }
 
-  .stats-row {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 8px;
-    justify-content: space-around;
-    padding: 10px 12px;
+  /* Mobile fallback: place stats under the image to avoid overlap on very small screens */
+  @media (max-width: 480px) {
+    .stats-row {
+      position: relative;
+      right: auto;
+      bottom: auto;
+      z-index: 2;
+      flex-direction: row;
+      width: 100%;
+      background: transparent;
+      padding: 8px 0 0 0;
+      box-shadow: none;
+      border-radius: 0;
+      max-width: 100%;
+      gap: 6px;
+    }
+
+    .stats-row .stat-item{
+      min-width: 0;
+      flex: 1 1 auto;
+      padding: 8px 10px 6px;
+    }
+
+    .stat-label {
+      font-size: 0.5rem;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 1.2rem;
+    }
+
+    .stat-item::before {
+      font-size: 2rem;
+      bottom: -6px;
+    }
   }
 
-  .stat-item {
-    flex: 1;
-    align-items: center;
+  /* Very small screens or landscape orientation - hide stats entirely */
+  @media (max-width: 380px), (max-height: 500px) {
+    .stats-row {
+      display: none;
+    }
   }
 
-  .stat-label {
-    font-size: 0.5rem;
-  }
+/* --- GAMIFIED STAT CARD --- */
+.stat-item{
+  position:relative;
+  flex:1;
+  padding:14px 16px 12px;
+  border-radius:16px;
+  overflow:hidden;
 
-  .stat-value {
-    font-size: 0.85rem;
-  }
+  /* "HUD panel" look */
+  background:
+    radial-gradient(120% 120% at 20% 0%, rgba(255,255,255,0.9) 0%, rgba(245,246,248,0.95) 40%, rgba(235,238,242,0.95) 100%);
+  border:1px solid rgba(0,0,0,0.08);
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(0,0,0,0.10);
 
+  transform:translateZ(0);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+/* hover = "level up" */
+.stat-item:hover{
+  transform:translateY(-3px) scale(1.01);
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 16px 40px rgba(0,0,0,0.14);
+  border-color:rgba(0,0,0,0.12);
+}
+
+/* top accent bar */
+.stat-item::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.40), rgba(255,255,255,0.0));
+  transform:translateX(-120%);
+  opacity:0.55;
+  pointer-events:none;
+}
+
+/* shine sweep on hover */
+.stat-item:hover::after{
+  animation:statShine .9s ease forwards;
+}
+
+@keyframes statShine{
+  to { transform:translateX(120%); }
+}
+
+/* ghost icon + label watermark */
+.stat-item::before{
+  content: attr(data-emoji);
+  position:absolute;
+  right:10px;
+  bottom:-8px;
+  font-size:3.2rem;
+  opacity:0.10;
+  filter: blur(0.2px);
+  pointer-events:none;
+  transform: rotate(-8deg);
+}
+
+/* small "badge dot" like a game rarity marker */
+.stat-item .stat-badge{
+  position:absolute;
+  top:10px;
+  right:10px;
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  box-shadow:0 0 0 3px rgba(255,255,255,0.8), 0 0 16px currentColor;
+  opacity:0.95;
+}
+
+/* label */
+.stat-label{
+  font-size:0.62rem;
+  letter-spacing:0.18em;
+  text-transform:uppercase;
+  color:rgba(17,24,39,0.65);
+  margin-bottom:6px;
+}
+
+/* value = big "score" */
+.stat-value{
+  font-size:1.75rem;
+  font-weight:800;
+  letter-spacing:-0.02em;
+  color:#0b1220;
+  line-height:1.05;
+
+  /* subtle outline pop */
+  text-shadow: 0 1px 0 rgba(255,255,255,0.55);
+}
+
+/* tiny "subtext" slot if you ever want it */
+.stat-sub{
+  font-size:0.72rem;
+  color:rgba(17,24,39,0.55);
+  margin-top:6px;
+}
+
+/* --- PER-METRIC THEMES (game-y glow) --- */
+.stat-item.volume{
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(34,197,94,0.12),
+    0 10px 30px rgba(0,0,0,0.10);
+}
+.stat-item.volume .stat-badge{ color: rgba(34,197,94,0.95); background: rgba(34,197,94,0.95); }
+
+.stat-item.liquidity{
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(59,130,246,0.14),
+    0 10px 30px rgba(0,0,0,0.10);
+}
+.stat-item.liquidity .stat-badge{ color: rgba(59,130,246,0.95); background: rgba(59,130,246,0.95); }
+
+.stat-item.traders{
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 10px 30px rgba(168,85,247,0.16),
+    0 10px 30px rgba(0,0,0,0.10);
+}
+.stat-item.traders .stat-badge{ color: rgba(168,85,247,0.95); background: rgba(168,85,247,0.95); }
+
+/* accessibility: reduce motion */
+@media (prefers-reduced-motion: reduce){
+  .stat-item, .stat-item:hover{ transition:none; transform:none; }
+  .stat-item:hover::after{ animation:none; }
+}
   /* Keep binary options on same horizontal row on mobile - ALWAYS */
   .action-buttons {
     flex-direction: row !important;
@@ -603,17 +959,8 @@
   }
 }
 
-/* Animation for ring on mount */
-/* Note: 251 ≈ 2π × 40 (full circumference of ring with radius 40) */
-@keyframes ringLoad {
-  from {
-    stroke-dasharray: 0 251;
-  }
-}
-
-.ring-fill {
-  animation: ringLoad 0.8s ease-out forwards;
-}
+/* Ring animation removed - using CSS transition on stroke-dashoffset for smooth updates */
+/* Note: circumference ≈ 2π × 40 ≈ 251 */
 
 /* Shine effect on hover */
 .modern-market-card::before {

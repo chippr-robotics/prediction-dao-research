@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
 /* Global focus styles for accessibility */
 *:focus-visible {
   outline: 2px solid var(--brand-primary);
@@ -42,6 +49,9 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .App-header {
@@ -128,9 +138,10 @@ body {
 .main-content {
   flex: 1;
   padding: 2rem;
-  max-width: 1400px;
+  max-width: min(1200px, 100vw);
   margin: 0 auto;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .not-connected {
@@ -279,7 +290,7 @@ select[aria-invalid="true"] {
 /* Proposal List */
 .proposal-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
   gap: 1.5rem;
 }
 
@@ -406,7 +417,7 @@ select[aria-invalid="true"] {
 /* Welfare Metrics */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
@@ -489,7 +500,7 @@ select[aria-invalid="true"] {
 /* Market Trading */
 .markets-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
@@ -649,6 +660,14 @@ select[aria-invalid="true"] {
   color: var(--text-secondary);
 }
 
+/* Responsive images and media */
+img,
+video,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
 @media (max-width: 768px) {
   .App-header h1 {
     font-size: 1.75rem;
@@ -656,10 +675,19 @@ select[aria-invalid="true"] {
 
   .main-content {
     padding: 1rem;
+    max-width: 100vw;
   }
 
   .section {
-    padding: 1.5rem;
+    padding: 1rem;
+  }
+
+  /* Ensure cards don't overflow on mobile */
+  .proposal-card,
+  .market-card,
+  .metric-card {
+    min-width: 0;
+    width: 100%;
   }
 
   .proposal-list,
@@ -707,6 +735,52 @@ select[aria-invalid="true"] {
 
   h3 {
     font-size: 1.25rem;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+  .main-content {
+    padding: 0.75rem;
+  }
+
+  .section {
+    padding: 0.75rem;
+  }
+
+  .App-header {
+    padding: 1.5rem 1rem;
+  }
+
+  .App-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  /* Stack market prices vertically on very small screens */
+  .market-prices {
+    grid-template-columns: 1fr;
+  }
+
+  /* Reduce gap spacing */
+  .proposal-list,
+  .markets-grid,
+  .metrics-grid {
+    gap: 1rem;
+  }
+
+  /* Reduce padding on cards */
+  .proposal-card,
+  .market-card,
+  .metric-card {
+    padding: 1rem;
+  }
+
+  .trading-panel {
+    padding: 1rem;
   }
 }
 

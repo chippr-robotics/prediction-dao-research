@@ -204,12 +204,14 @@ function ModernMarketCard({
     )} L ${lastX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} Z`
   }, [sparklinePoints])
 
-  // Calculate gauge arc for full circle
+  // Calculate gauge arc for full circle (use circumference and dashoffset so 100% => full circle)
   const gaugeArc = useMemo(() => {
-    const percent = parseFloat(yesProb)
+    const percent = Math.max(0, Math.min(100, parseFloat(yesProb) || 0))
     const circumference = Math.PI * 2 * RING_RADIUS
-    const offset = (percent / 100) * circumference
-    return { dashArray: `${offset} ${circumference}`, circumference }
+    const dashArray = circumference
+    // dashOffset: 0 = fully filled, circumference = hidden. We want percent fill: offset = circumference * (1 - percent/100)
+    const dashOffset = circumference * (1 - percent / 100)
+    return { dashArray, dashOffset, circumference }
   }, [yesProb])
 
   const handleClick = () => {
@@ -256,7 +258,7 @@ function ModernMarketCard({
 
   return (
     <div 
-      className={`modern-market-card ${isActive ? 'active' : ''} ${isExpanded || isFirstRow ? 'expanded' : ''}`}
+      className={`modern-market-card ${isActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={handleMouseEnter}
@@ -278,6 +280,33 @@ function ModernMarketCard({
           alt={`${market.category} category`}
           className="thumbnail-image"
         />
+
+      {/* Stats row */}
+      <div className="stats-row">
+        <div className="stat-item volume" data-label="Volume" data-emoji="📊">
+          <div className="stat-label">Volume</div>
+          <div className="stat-value">
+            {market.volume24h != null
+              ? `$${formatNumber(market.volume24h)}`
+              : 'N/A'}
+          </div>
+        </div>
+        <div className="stat-item" data-label="Liquidity" data-emoji="💧">
+          <div className="stat-label">Liquidity</div>
+          <div className="stat-value">${formatNumber(market.totalLiquidity)}</div>
+        </div>
+        <div className="stat-item" data-label="Traders" data-emoji="👥">
+          <div className="stat-label">Traders</div>
+          <div className="stat-value">
+            {market.uniqueTraders != null
+              ? formatNumber(market.uniqueTraders)
+              : market.tradesCount != null
+                ? formatNumber(market.tradesCount)
+                : 'N/A'}
+          </div>
+        </div>
+      </div>
+
         <div className="thumbnail-overlay">
           {/* Header with badges - positioned at top of image */}
           <div className="card-header">
@@ -301,6 +330,9 @@ function ModernMarketCard({
           </div>
           
           {/* Primary question text over the background image */}
+          {market.description && (
+          <p className="card-description">{market.description}</p>
+        )}
           <h3 className="card-title">{market.proposalTitle}</h3>
         </div>
       </div>
@@ -328,7 +360,7 @@ function ModernMarketCard({
               style={{
                 stroke: ringColor,
                 strokeDasharray: gaugeArc.dashArray,
-                strokeDashoffset: gaugeArc.circumference * RING_START_OFFSET,
+                strokeDashoffset: gaugeArc.dashOffset,
                 transform: 'rotate(-90deg)',
                 transformOrigin: 'center'
               }}
@@ -338,7 +370,7 @@ function ModernMarketCard({
           {/* Center content */}
           <div className="ring-center">
             <span className="ring-percentage" style={{ color: ringColor }}>{yesProb}%</span>
-            <span className="ring-label" style={{ color: ringColor }}>Yes</span>
+            <span className="ring-label" style={{ color: ringColor }}></span>
           </div>
         </div>
 
@@ -359,42 +391,8 @@ function ModernMarketCard({
               />
             </svg>
           </div>
-          <div className={`trend-indicator-v2 ${trend.direction}`}>
-            <span className="trend-arrow" aria-hidden="true">{trend.direction === 'up' ? '↗' : '↘'}</span>
-            <span className="trend-change">{trend.direction === 'up' ? '+' : '-'}{trend.change}% trend</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="stats-row">
-        <div className="stat-item">
-          <span className="stat-icon" aria-hidden="true">📊</span>
-          <span className="stat-label">Volume</span>
-          <span className="stat-value">
-            {market.volume24h != null
-              ? `$${formatNumber(market.volume24h)}`
-              : 'N/A'}
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-icon" aria-hidden="true">💧</span>
-          <span className="stat-label">Liquidity</span>
-          <span className="stat-value">${formatNumber(market.totalLiquidity)}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-icon" aria-hidden="true">👥</span>
-          <span className="stat-label">Traders</span>
-          <span className="stat-value">
-            {market.uniqueTraders != null
-              ? formatNumber(market.uniqueTraders)
-              : market.tradesCount != null
-                ? formatNumber(market.tradesCount)
-                : 'N/A'}
-          </span>
-        </div>
-      </div>
-
+          <div>
+          
       {/* Tags row - use existing market tags */}
       {market.tags && market.tags.length > 0 && (
         <div className="tags-row">
@@ -403,8 +401,14 @@ function ModernMarketCard({
           ))}
         </div>
       )}
+          </div>
+          
+        </div>
+      </div>
+
 
       {/* Binary action buttons: Yes/No */}
+      { isExpanded && (
       <div className="action-buttons">
         <button 
           className="action-btn yes-btn"
@@ -423,13 +427,8 @@ function ModernMarketCard({
           <span className="btn-price">{noProb}¢</span>
         </button>
       </div>
-
-      {/* Expanded content - visible for first row, on hover/click for others */}
-      <div className="card-expanded-content">
-        {market.description && (
-          <p className="expanded-description">{market.description}</p>
-        )}
-      </div>
+      )}
+      
     </div>
   )
 }

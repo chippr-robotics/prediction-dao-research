@@ -4,12 +4,14 @@
 
 .dashboard-container {
   padding: 1.5rem 2rem;
-  max-width: 1600px;
+  max-width: min(1600px, 100vw);
+  width: 100%;
   margin: 0 auto;
   min-height: calc(100vh - 70px);
   height: auto;
   overflow-y: auto;
   overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .dashboard-loading {
@@ -47,9 +49,12 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.75rem;
   border-bottom: 1px solid var(--border-color);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .header-content h1 {
@@ -101,13 +106,20 @@
    ============================================================================ */
 
 .metrics-section {
-  margin-bottom: 2rem;
+  margin-bottom: .5rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .metric-card {
@@ -119,6 +131,8 @@
   align-items: center;
   gap: 1rem;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .metric-card:hover {
@@ -162,18 +176,23 @@
 }
 
 /* ============================================================================
-   MARKET CRAWLER (Scrolling Ticker)
-   ============================================================================ */
+  MARKET CRAWLER (Scrolling Ticker)
+  ============================================================================ */
 
 .market-crawler {
   width: 100%;
+  max-width: 100%;
   overflow: hidden;
   background: linear-gradient(135deg, rgba(0, 184, 148, 0.08) 0%, rgba(0, 206, 201, 0.05) 100%);
   border: 1px solid rgba(0, 184, 148, 0.15);
   border-radius: 12px;
-  padding: 0.75rem 0;
-  margin-bottom: 2rem;
+  padding: 1rem 0;
+  margin-bottom: 0.75rem;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .market-crawler::before,
@@ -182,7 +201,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 60px;
+  width: 80px;
   pointer-events: none;
   z-index: 2;
 }
@@ -199,9 +218,10 @@
 
 .crawler-track {
   display: flex;
-  gap: 2rem;
+  gap: 1rem;
   animation: scroll-left 40s linear infinite;
   width: fit-content;
+  padding: 0 1rem;
 }
 
 .crawler-track.paused {
@@ -210,29 +230,30 @@
 
 @keyframes scroll-left {
   0% {
-    transform: translateX(0);
+   transform: translateX(0);
   }
   100% {
-    transform: translateX(-50%);
+   transform: translateX(-50%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .crawler-track {
-    animation: none;
+   animation: none;
   }
 }
 
 .crawler-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   white-space: nowrap;
   font-size: 0.85rem;
 }
 
 .crawler-icon {
   font-size: 1rem;
+  flex-shrink: 0;
 }
 
 .crawler-title {
@@ -246,10 +267,11 @@
 .crawler-price {
   color: var(--brand-primary, #00b894);
   font-weight: 600;
-  padding: 0.15rem 0.5rem;
+  padding: 0.25rem 0.6rem;
   background: rgba(0, 184, 148, 0.15);
   border-radius: 4px;
   font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .crawler-price.high-confidence {
@@ -260,6 +282,7 @@
 .crawler-separator {
   color: var(--text-muted);
   opacity: 0.5;
+  margin: 0 0.5rem;
 }
 
 /* ============================================================================
@@ -271,12 +294,19 @@
   flex-direction: column;
   gap: 1.5rem;
   margin-bottom: 2rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .charts-row {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Bottom grid within charts section for activity tables */
@@ -285,6 +315,9 @@
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
   margin-top: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-card {
@@ -293,6 +326,10 @@
   border-radius: 12px;
   padding: 1.25rem;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .chart-card:hover {
@@ -353,6 +390,9 @@
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .sparkline-card {
@@ -361,6 +401,8 @@
   border-radius: 10px;
   padding: 1rem;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .sparkline-card:hover {
@@ -430,12 +472,19 @@
 
 .bottom-section {
   margin-top: 2rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .bottom-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .bottom-card {
@@ -446,6 +495,8 @@
   max-height: 420px;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .bottom-header {
@@ -728,6 +779,7 @@
 @media (max-width: 768px) {
   .dashboard-container {
     padding: 1rem;
+    max-width: 100vw;
   }
   
   .dashboard-header {
@@ -743,6 +795,8 @@
   .metrics-grid {
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
   }
   
   .metric-card {
@@ -790,8 +844,14 @@
 }
 
 @media (max-width: 480px) {
+  .dashboard-container {
+    padding: 0.75rem;
+    max-width: 100vw;
+  }
+  
   .metrics-grid {
     grid-template-columns: 1fr;
+    width: 100%;
   }
   
   .sparklines-grid {

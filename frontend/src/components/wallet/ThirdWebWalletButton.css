@@ -1,19 +1,52 @@
 .thirdweb-wallet-button {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  z-index: 300;
+  overflow: visible;
 }
 
-/* Override ThirdWeb button styles to match app theme */
+/* Override ThirdWeb button styles for icon-only button */
 .thirdweb-wallet-button button {
   font-family: inherit;
-  border-radius: var(--border-radius, 8px);
+  border-radius: 50%;
   transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  padding: 0.5rem !important;
+  min-width: unset !important;
+  width: 42px !important;
+  height: 42px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative;
+  z-index: 301;
+  overflow: visible;
 }
 
 .thirdweb-wallet-button button:hover {
-  transform: translateY(-1px);
+  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.5) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .thirdweb-wallet-button button:active {
-  transform: translateY(0);
+  transform: scale(0.98);
+}
+
+/* Wallet icon image */
+.wallet-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* Connected state - show address nicely */
+.thirdweb-wallet-button [data-connected="true"] {
+  border-radius: 8px !important;
+  width: auto !important;
+  padding: 0.5rem 0.75rem !important;
 }
