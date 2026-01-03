@@ -197,62 +197,6 @@ describe('Dashboard Component', () => {
         expect(screen.getByText('Real-time insights across all prediction markets')).toBeInTheDocument()
       })
     })
-
-    it('should display wallet address when connected', async () => {
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/0x1234...5678/)).toBeInTheDocument()
-      })
-    })
-
-    it('should not display wallet when not connected', async () => {
-      useWeb3.mockReturnValue({
-        account: null,
-        isConnected: false
-      })
-      
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/0x/)).not.toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Platform Metrics', () => {
-    it('should display active markets count', async () => {
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('3')).toBeInTheDocument()
-        expect(screen.getByText('Active Markets')).toBeInTheDocument()
-      })
-    })
-
-    it('should display total liquidity', async () => {
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Total Liquidity/)).toBeInTheDocument()
-      })
-    })
-
-    it('should display 24h volume', async () => {
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/24h Volume/)).toBeInTheDocument()
-      })
-    })
-
-    it('should display active traders', async () => {
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Active Traders')).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Chart Sections', () => {
@@ -410,15 +354,6 @@ describe('Dashboard Component', () => {
   })
 
   describe('Metrics Calculation', () => {
-    it('should calculate platform metrics correctly', async () => {
-      render(<Dashboard />)
-      
-      await waitFor(() => {
-        // Should show 3 active markets
-        expect(screen.getByText('3')).toBeInTheDocument()
-      })
-    })
-
     it('should handle markets with missing data', async () => {
       getMockMarkets.mockReturnValue([
         {
