@@ -17,6 +17,19 @@ The platform integrates privacy-preserving mechanisms from Nightmarket (zero-kno
 [![Smart Contract Tests](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/test.yml/badge.svg)](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/test.yml)
 [![Torture Testing](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/torture-test.yml/badge.svg)](https://github.com/chippr-robotics/prediction-dao-research/actions/workflows/torture-test.yml)
 
+## Mordor Contracts
+
+Contracts are deployed at the following addresses:
+
+
+- WelfareMetricRegistry: [0x7F57BB570cc66f706A9F506dba84F1e419f3530c](https://etc-mordor.blockscout.com/address/0x7F57BB570cc66f706A9F506dba84F1e419f3530c)
+- ProposalRegistry: [0xC2B9047eC8DEc58a0b601428079382dCcF9d4541](https://etc-mordor.blockscout.com/address/0xC2B9047eC8DEc58a0b601428079382dCcF9d4541)
+- ConditionalMarketFactory: [0xbf243E69dF76Bfa3561B7B1c80C1966BA2BEAd34](https://etc-mordor.blockscout.com/address/0xbf243E69dF76Bfa3561B7B1c80C1966BA2BEAd34)
+- PrivacyCoordinator: [0xB8400de133343850a2ef6dDC1B93Feb7FEc24DB9](https://etc-mordor.blockscout.com/address/0xB8400de133343850a2ef6dDC1B93Feb7FEc24DB9)
+- OracleResolver: [0x9A669A42d481d519406285637827EBaC6Ee0B80A](https://etc-mordor.blockscout.com/address/0x9A669A42d481d519406285637827EBaC6Ee0B80A)
+- RagequitModule: [0xE494d7548dc3DAc0FAcC44609e97089c8D424CA8](https://etc-mordor.blockscout.com/address/0xE494d7548dc3DAc0FAcC44609e97089c8D424CA8)
+- FutarchyGovernor: [0x396C25b831fF3675fC93d8E69c61b8D9662FCd37](https://etc-mordor.blockscout.com/address/0x396C25b831fF3675fC93d8E69c61b8D9662FCd37)
+
 ## 📚 Documentation
 
 **[View the full documentation →](https://docs.FairWins.app)**

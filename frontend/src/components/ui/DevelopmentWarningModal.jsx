@@ -43,7 +43,7 @@ function DevelopmentWarningModal() {
             <div className="dev-warning-modal-body">
               <p className="dev-warning-modal-message">
                 <strong>FairWins</strong> is the core platform for creating and trading on prediction markets 
-                about any topic. Open to everyone, with transparent market-driven outcomes.
+                about any topic. Open to everyone, with transparent market-driven outcomes. For information contact: Howdy@FairWins.App
               </p>
               
               <div className="platform-addons">
