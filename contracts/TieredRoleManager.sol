@@ -13,9 +13,14 @@ import "./RoleManager.sol";
 contract TieredRoleManager is RoleManager {
     using SafeERC20 for IERC20;
 
-    address private constant SAFE_SINGLETON_FACTORY = address(0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7);
+    // NOTE: SAFE_SINGLETON_FACTORY is inherited from RoleManager
 
     bool private _initialized;
+
+    bool private _marketMakerTiersInitialized;
+    bool private _clearPathTiersInitialized;
+    bool private _tokenMintTiersInitialized;
+    bool private _friendMarketTiersInitialized;
     
     // ========== Tier Definitions ==========
     
@@ -106,8 +111,6 @@ contract TieredRoleManager is RoleManager {
     // ========== Constructor ==========
     
     constructor() RoleManager() {
-        _initializeTierMetadata();
-
         // For direct deployments, prevent initialize() from being called.
         // For Safe Singleton Factory (CREATE2) deployments, allow a one-time initialize()
         // so DEFAULT_ADMIN_ROLE isn't stuck on the factory.
@@ -128,6 +131,36 @@ contract TieredRoleManager is RoleManager {
         // Hand it over to the intended admin and revoke the factory.
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _revokeRole(DEFAULT_ADMIN_ROLE, SAFE_SINGLETON_FACTORY);
+    }
+
+    /**
+     * @notice Initialize tier metadata in smaller chunks.
+     * @dev Tier metadata initialization writes a lot of storage and can exceed low block gas limits
+     *      when done inside a constructor. These functions allow initializing the tiers post-deploy.
+     */
+
+    function initializeMarketMakerTiers() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!_marketMakerTiersInitialized, "Market maker tiers already initialized");
+        _marketMakerTiersInitialized = true;
+        _initializeMarketMakerTiers();
+    }
+
+    function initializeClearPathTiers() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!_clearPathTiersInitialized, "ClearPath tiers already initialized");
+        _clearPathTiersInitialized = true;
+        _initializeClearPathTiers();
+    }
+
+    function initializeTokenMintTiers() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!_tokenMintTiersInitialized, "Token mint tiers already initialized");
+        _tokenMintTiersInitialized = true;
+        _initializeTokenMintTiers();
+    }
+
+    function initializeFriendMarketTiers() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!_friendMarketTiersInitialized, "Friend market tiers already initialized");
+        _friendMarketTiersInitialized = true;
+        _initializeFriendMarketTiers();
     }
     
     // ========== Tier Metadata Initialization ==========

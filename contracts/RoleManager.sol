@@ -24,6 +24,12 @@ import "./ZKKeyManager.sol";
  */
 contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
+
+    // Safe Singleton Factory address for deterministic deployments
+    address internal constant SAFE_SINGLETON_FACTORY = 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7;
+
+    // Tracks whether role metadata has been initialized (for lazy init pattern)
+    bool internal _roleMetadataInitialized;
     
     // ========== Role Definitions ==========
     
@@ -127,7 +133,18 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         _setRoleAdmin(FRIEND_MARKET_ROLE, OPERATIONS_ADMIN_ROLE);
         _setRoleAdmin(OVERSIGHT_COMMITTEE_ROLE, DEFAULT_ADMIN_ROLE);
         
-        // Initialize role metadata
+        // NOTE: Role metadata initialization removed from constructor to reduce
+        // deployment gas for deterministic (CREATE2) deployments on low-gas-limit chains.
+        // Call initializeRoleMetadata() after deployment.
+    }
+
+    /**
+     * @notice Initialize role metadata (lazy init for gas-constrained deployments)
+     * @dev Can only be called once by an admin. Should be called after deployment.
+     */
+    function initializeRoleMetadata() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(!_roleMetadataInitialized, "Role metadata already initialized");
+        _roleMetadataInitialized = true;
         _initializeRoleMetadata();
     }
     

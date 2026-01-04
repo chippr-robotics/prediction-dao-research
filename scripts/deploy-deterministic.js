@@ -29,6 +29,14 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
         `check the contract is compiled and has no unlinked libraries.`
     );
   }
+
+  // Sanity checks
+  if (ethers.dataLength(salt) !== 32) {
+    throw new Error(`Invalid salt length for ${contractName}: expected 32 bytes, got ${ethers.dataLength(salt)}`);
+  }
+  if (ethers.dataLength(deploymentData) === 0) {
+    throw new Error(`Invalid initCode for ${contractName}: empty deployment bytecode`);
+  }
   
   // Compute deterministic address
   const initCodeHash = ethers.keccak256(deploymentData);
@@ -50,31 +58,77 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
       alreadyDeployed: true
     };
   }
-  
-  // Connect to the factory
-  const factory = await ethers.getContractAt(
-    ["function deploy(bytes memory _initCode, bytes32 _salt) public returns (address createdContract)"],
-    SINGLETON_FACTORY_ADDRESS,
-    deployer
-  );
-  
-  // Deploy using the factory
+
+  // Deploy using the Safe Singleton Factory.
+  // IMPORTANT: This contract is based on Arachnid's deterministic-deployment-proxy
+  // and expects calldata formatted as:
+  //   bytes32 salt || initCode
+  // (no ABI function selector).
   console.log(`  Deploying via Safe Singleton Factory...`);
-  
+
+  // Factory expects calldata: bytes32 salt || initCode
+  // Force hex string data to avoid provider serialization issues.
+  const txData = ethers.hexlify(ethers.concat([salt, deploymentData]));
+
+  if (ethers.dataLength(txData) <= 32) {
+    throw new Error(
+      `Invalid factory calldata for ${contractName}: expected > 32 bytes (salt + initCode), got ${ethers.dataLength(txData)}`
+    );
+  }
+
   // Estimate gas and add 20% buffer for safety
   let gasLimit;
   try {
-    const estimatedGas = await factory.deploy.estimateGas(deploymentData, salt);
-    gasLimit = (estimatedGas * 120n) / 100n; // Add 20% buffer
-    console.log(`  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} with buffer)`);
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const blockGasLimit = latestBlock?.gasLimit;
+    const estimatedGas = await ethers.provider.estimateGas({
+      from: deployer.address,
+      to: SINGLETON_FACTORY_ADDRESS,
+      data: txData,
+    });
+
+    // Add 20% buffer, but never exceed ~95% of the block gas limit.
+    const buffered = (estimatedGas * 120n) / 100n;
+    if (blockGasLimit) {
+      const cap = (blockGasLimit * 95n) / 100n;
+      gasLimit = buffered > cap ? cap : buffered;
+      if (gasLimit < estimatedGas) {
+        console.warn(
+          `  ⚠️  Gas cap applied: estimated=${estimatedGas.toString()} cap=${gasLimit.toString()} blockGasLimit=${blockGasLimit.toString()}`
+        );
+      } else {
+        console.log(
+          `  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} buffered; blockGasLimit=${blockGasLimit.toString()})`
+        );
+      }
+    } else {
+      gasLimit = buffered;
+      console.log(`  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} with buffer)`);
+    }
   } catch (error) {
-    // Fallback to conservative default if estimation fails
-    gasLimit = 5000000n;
-    console.log(`  Gas estimation failed, using default: ${gasLimit.toString()}`);
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const blockGasLimit = latestBlock?.gasLimit;
+    const message = error?.message || String(error);
+
+    // If estimation fails (common on some RPCs / with large initCode), fall back
+    // to a near-block gas limit so we don't accidentally OOG.
+    if (blockGasLimit) {
+      gasLimit = (blockGasLimit * 95n) / 100n;
+      console.warn(
+        `  ⚠️  Gas estimation failed; using cap=${gasLimit.toString()} blockGasLimit=${blockGasLimit.toString()} (${message.split("\n")[0]})`
+      );
+    } else {
+      gasLimit = 7_500_000n;
+      console.warn(
+        `  ⚠️  Gas estimation failed; using fallback=${gasLimit.toString()} (${message.split("\n")[0]})`
+      );
+    }
   }
-  
-  const tx = await factory.deploy(deploymentData, salt, {
-    gasLimit: gasLimit
+
+  const tx = await deployer.sendTransaction({
+    to: SINGLETON_FACTORY_ADDRESS,
+    data: txData,
+    gasLimit,
   });
   
   const receipt = await tx.wait();
@@ -114,6 +168,18 @@ async function tryInitializeIfPresent(name, contract, deployer) {
   } catch (error) {
     const message = error?.message || String(error);
     console.warn(`  ⚠️  ${name} initialize skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function tryCallNoArgsIfPresent(name, contract, functionName) {
+  if (!contract || typeof contract[functionName] !== "function") return;
+  try {
+    const tx = await contract[functionName]();
+    await tx.wait();
+    console.log(`  ✓ ${name}.${functionName} executed`);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name}.${functionName} skipped: ${message.split("\n")[0]}`);
   }
 }
 
@@ -259,15 +325,25 @@ async function main() {
   // Deploy all contracts deterministically
   const deployments = {};
 
-  // 0. Deploy TieredRoleManager (RBAC)
+  // 0. Deploy TieredRoleManagerLite (RBAC) - lightweight version for gas-constrained chains
   const tieredRoleManager = await deployDeterministic(
-    "TieredRoleManager",
+    "TieredRoleManagerLite",
     [],
-    generateSalt(saltPrefix + "TieredRoleManager"),
+    generateSalt(saltPrefix + "TieredRoleManagerLite"),
     deployer
   );
   deployments.tieredRoleManager = tieredRoleManager.address;
-  await tryInitializeIfPresent("TieredRoleManager", tieredRoleManager.contract, deployer);
+  await tryInitializeIfPresent("TieredRoleManagerLite", tieredRoleManager.contract, deployer);
+
+  // Initialize base role metadata (from RoleManager)
+  await tryCallNoArgsIfPresent(
+    "TieredRoleManagerLite",
+    tieredRoleManager.contract,
+    "initializeRoleMetadata"
+  );
+
+  // Note: Tier metadata should be set post-deploy via setTierMetadata() or batchSetTierMetadata()
+  // Run scripts/setup-tier-metadata.js after deployment to configure tiers
 
   // 1. Deploy WelfareMetricRegistry
   const welfareRegistry = await deployDeterministic(
@@ -525,7 +601,7 @@ async function main() {
 
   // Optional verification (set VERIFY=true)
   console.log("\nVerification (set VERIFY=true to enable):");
-  await verifyIfEnabled("TieredRoleManager", deployments.tieredRoleManager, []);
+  await verifyIfEnabled("TieredRoleManagerLite", deployments.tieredRoleManager, []);
   await verifyIfEnabled("WelfareMetricRegistry", deployments.welfareRegistry, []);
   await verifyIfEnabled("ProposalRegistry", deployments.proposalRegistry, []);
   await verifyIfEnabled("MetadataRegistry", deployments.metadataRegistry, []);
