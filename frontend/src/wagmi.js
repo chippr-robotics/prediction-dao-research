@@ -107,8 +107,11 @@ const chains = [ethereumClassic, mordor, hardhat]
 export const config = createConfig({
   chains,
   connectors: [
-    injected({ target: 'metaMask' }),
-    // WalletConnect is always available for hardware wallet support
+    // Generic injected connector - works with any browser wallet (MetaMask, Coinbase, etc.)
+    injected({
+      shimDisconnect: true,
+    }),
+    // WalletConnect is always available for hardware wallet and mobile wallet support
     walletConnect({
       projectId: walletConnectProjectId,
       metadata: {

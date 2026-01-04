@@ -31,7 +31,7 @@ function HeaderBar({ isConnected }) {
           <div className="header-branding">
             <div className="brand-logo">
               <img 
-                src="/logo_fairwins.svg" 
+                src="/assets/logo_fairwins.svg" 
                 alt="FairWins Logo" 
                 className="logo-image"
                 width="40"
@@ -50,17 +50,7 @@ function HeaderBar({ isConnected }) {
           <TokenMintButton />
           <ClearPathButton />
           <WalletButton theme="dark" />
-          <button
-            className="user-management-btn"
-            onClick={handleOpenUserManagement}
-            aria-label="Open user management"
-            title="User Management"
-          >
-            <BlockiesAvatar address={address} size={32} className="user-icon" />
-            {isConnected && preferences.clearPathStatus.active && (
-              <span className="clearpath-badge" aria-label="ClearPath Active">✓</span>
-            )}
-          </button>
+          
         </div>
       </div>
     </header>

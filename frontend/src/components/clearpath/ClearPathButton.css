@@ -5,44 +5,41 @@
   align-items: center;
 }
 
-/* ClearPath Button */
+/* ClearPath Button - Logo IS the button */
 .clearpath-button {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: var(--color-secondary, #4A5568);
-  border: 2px solid var(--color-secondary-dark, #2D3748);
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   flex-shrink: 0;
-  padding: 6px;
+  padding: 4px;
 }
 
 .clearpath-button.inactive {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
-  background: var(--color-secondary-light, #718096);
-  border-color: var(--color-secondary-light, #718096);
 }
 
 .clearpath-button.inactive:hover {
-  opacity: 0.4;
+  opacity: 0.35;
   transform: none;
-  box-shadow: none;
+  background: transparent;
 }
 
 .clearpath-button:not(.inactive):hover {
-  background: var(--color-secondary-dark, #2D3748);
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.1);
 }
 
-.clearpath-button:active {
-  transform: scale(0.98);
+.clearpath-button:not(.inactive):active {
+  transform: scale(0.95);
 }
 
 .clearpath-button.inactive:active {
@@ -50,15 +47,16 @@
 }
 
 .clearpath-button:focus-visible {
-  outline: 3px solid var(--color-secondary, #4A5568);
+  outline: 2px solid rgba(255, 255, 255, 0.5);
   outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .clearpath-icon {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: brightness(0) invert(1); /* Make icon white */
+  /* Keep original logo colors */
 }
 
 /* Dropdown Menu */

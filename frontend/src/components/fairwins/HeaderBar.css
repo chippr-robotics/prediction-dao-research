@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   transition: transform 0.3s ease, height 0.3s ease, box-shadow 0.3s ease, top 0.3s ease;
-  overflow-x: hidden;
+  /* Removed overflow-x: hidden to allow dropdowns to display */
   box-sizing: border-box;
 }
 
@@ -27,8 +27,8 @@
 }
 
 .header-bar-content {
-  width: 100%;
-  max-width: 100%;
+  width: 80%;
+  max-width: 85%;
   padding: 0 2rem;
   display: flex;
   flex-direction: row;
@@ -36,7 +36,7 @@
   justify-content: space-between;
   gap: 2rem;
   box-sizing: border-box;
-  overflow-x: hidden;
+  /* Removed overflow-x: hidden to allow dropdowns to display */
 }
 
 .header-left {
@@ -44,8 +44,6 @@
   align-items: center;
   gap: 1.5rem;
   flex-shrink: 0;
-  min-width: 0;
-  overflow: hidden;
 }
 
 .back-button {
@@ -145,10 +143,49 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   flex-shrink: 0;
-  min-width: 0;
-  overflow: hidden;
+  margin-right: 0;
+}
+
+/* Ensure wallet button container positions dropdown correctly */
+.header-bar .header-right .wallet-button-container {
+  position: relative;
+}
+
+/* Override wallet dropdown positioning within header */
+.header-bar .header-right .wallet-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+  min-width: 280px;
+  max-width: calc(100vw - 2rem);
+  z-index: 1001;
+}
+
+/* Wallet button styling for header (light on gradient) */
+.header-bar .header-right .wallet-connect-button,
+.header-bar .header-right .wallet-account-button {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.header-bar .header-right .wallet-connect-button:hover,
+.header-bar .header-right .wallet-account-button:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.header-bar .header-right .wallet-icon {
+  filter: brightness(0) invert(1);
+}
+
+/* TokenMint and ClearPath dropdown positioning in header */
+.header-bar .header-right .tokenmint-dropdown,
+.header-bar .header-right .clearpath-dropdown {
+  max-width: calc(100vw - 2rem);
 }
 
 .wallet-info-compact {
@@ -370,16 +407,21 @@
   }
 
   .header-left {
-    flex: 0 0 auto;
-    min-width: 0;
-    max-width: 50%;
+    flex: 0 1 auto;
+    min-width: fit-content;
   }
 
   .header-bar .header-right {
-    flex: 0 0 auto;
-    min-width: 0;
-    max-width: 50%;
+    flex: 0 1 auto;
     gap: 0.5rem;
+    margin-right: 0;
+  }
+
+  /* Mobile wallet dropdown positioning */
+  .header-bar .header-right .wallet-dropdown {
+    right: -0.5rem;
+    min-width: 260px;
+    max-width: calc(100vw - 1rem);
   }
 
   .wallet-info-compact {
@@ -432,16 +474,26 @@
 /* Extra small devices */
 @media (max-width: 480px) {
   .header-bar-content {
-    padding: 0 0.5rem;
+    padding: 0 0.75rem;
     gap: 0.5rem;
   }
 
   .header-left {
     gap: 0.5rem;
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .header-bar .header-right {
     gap: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  /* Extra small wallet dropdown positioning */
+  .header-bar .header-right .wallet-dropdown {
+    right: -0.25rem;
+    min-width: 240px;
+    max-width: calc(100vw - 1.5rem);
   }
 
   .brand-text h1 {
@@ -499,16 +551,16 @@
   position: absolute;
   top: -2px;
   right: -2px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   background: var(--color-success);
   color: white;
-  border-radius: 50%;
+  border-radius: 0%;
   font-size: 10px;
   font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--brand-primary);
+  border: 0px solid var(--brand-primary);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
