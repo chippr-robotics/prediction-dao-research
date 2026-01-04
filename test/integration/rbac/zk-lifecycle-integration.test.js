@@ -15,6 +15,9 @@ describe("ZK Key Lifecycle - Integration Tests", function () {
     roleManager = await RoleManager.deploy();
     await roleManager.waitForDeployment();
     
+    // Initialize role metadata
+    await roleManager.initializeRoleMetadata();
+    
     // Deploy ZKKeyManager
     const ZKKeyManager = await ethers.getContractFactory("ZKKeyManager");
     zkKeyManager = await ZKKeyManager.deploy();
@@ -84,6 +87,9 @@ describe("ZK Key Lifecycle - Integration Tests", function () {
       const roleManager2 = await RoleManager.deploy();
       await roleManager2.waitForDeployment();
       
+      // Initialize role metadata
+      await roleManager2.initializeRoleMetadata();
+      
       // Purchase role
       const price = ethers.parseEther("250");
       await roleManager2.connect(user1).purchaseRole(CLEARPATH_USER_ROLE, { value: price });
@@ -148,6 +154,9 @@ describe("ZK Key Lifecycle - Integration Tests", function () {
       const RoleManager = await ethers.getContractFactory("RoleManager");
       const roleManager2 = await RoleManager.deploy();
       await roleManager2.waitForDeployment();
+      
+      // Initialize role metadata
+      await roleManager2.initializeRoleMetadata();
       
       const price = ethers.parseEther("250");
       await roleManager2.connect(user1).purchaseRole(CLEARPATH_USER_ROLE, { value: price });

@@ -37,6 +37,12 @@ describe("RoleManager + MembershipPaymentManager Integration Tests", function ()
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
+    // Initialize role metadata and tiers
+    await roleManager.initializeRoleMetadata();
+    await tieredRoleManager.initializeRoleMetadata();
+    await tieredRoleManager.initializeMarketMakerTiers();
+    await tieredRoleManager.initializeClearPathTiers();
+    
     // Get role constants
     MARKET_MAKER_ROLE = await roleManager.MARKET_MAKER_ROLE();
     CLEARPATH_USER_ROLE = await roleManager.CLEARPATH_USER_ROLE();
