@@ -10,7 +10,7 @@
  * 
  * function MyComponent() {
  *   const { getMarkets, getProposals } = useDataFetcher()
- *   const markets = getMarkets()
+ *   const markets = await getMarkets()
  * }
  * ```
  */
@@ -26,6 +26,16 @@ import {
   getMockMarketsByCorrelationGroup
 } from './mockDataLoader'
 
+import {
+  fetchMarketsFromBlockchain,
+  fetchMarketsByCategoryFromBlockchain,
+  fetchMarketByIdFromBlockchain,
+  fetchProposalsFromBlockchain,
+  fetchPositionsFromBlockchain,
+  fetchWelfareMetricsFromBlockchain,
+  fetchCategoriesFromBlockchain
+} from './blockchainService'
+
 /**
  * Fetch markets based on demo mode
  * @param {boolean} demoMode - Whether to use mock data
@@ -38,21 +48,14 @@ export async function fetchMarkets(demoMode, contracts = null) {
     return getMockMarkets()
   }
   
-  // TODO: Implement live blockchain data fetching
-  // Example:
-  // if (!contracts?.marketFactory) {
-  //   throw new Error('Market factory contract not available')
-  // }
-  // const marketCount = await contracts.marketFactory.getMarketCount()
-  // const markets = []
-  // for (let i = 0; i < marketCount; i++) {
-  //   const market = await contracts.marketFactory.getMarket(i)
-  //   markets.push(market)
-  // }
-  // return markets
-  
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockMarkets()
+  try {
+    // Fetch from Mordor testnet
+    return await fetchMarketsFromBlockchain()
+  } catch (error) {
+    console.error('Failed to fetch markets from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockMarkets()
+  }
 }
 
 /**
@@ -67,9 +70,13 @@ export async function fetchMarketsByCategory(demoMode, category, contracts = nul
     return getMockMarketsByCategory(category)
   }
   
-  // TODO: Implement live blockchain data fetching with category filter
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockMarketsByCategory(category)
+  try {
+    return await fetchMarketsByCategoryFromBlockchain(category)
+  } catch (error) {
+    console.error('Failed to fetch markets by category from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockMarketsByCategory(category)
+  }
 }
 
 /**
@@ -84,9 +91,13 @@ export async function fetchMarketById(demoMode, id, contracts = null) {
     return getMockMarketById(id)
   }
   
-  // TODO: Implement live blockchain data fetching for single market
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockMarketById(id)
+  try {
+    return await fetchMarketByIdFromBlockchain(id)
+  } catch (error) {
+    console.error('Failed to fetch market by ID from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockMarketById(id)
+  }
 }
 
 /**
@@ -100,9 +111,13 @@ export async function fetchProposals(demoMode, contracts = null) {
     return getMockProposals()
   }
   
-  // TODO: Implement live blockchain data fetching
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockProposals()
+  try {
+    return await fetchProposalsFromBlockchain()
+  } catch (error) {
+    console.error('Failed to fetch proposals from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockProposals()
+  }
 }
 
 /**
@@ -117,9 +132,13 @@ export async function fetchPositions(demoMode, userAddress, contracts = null) {
     return getMockPositions()
   }
   
-  // TODO: Implement live blockchain data fetching for user positions
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockPositions()
+  try {
+    return await fetchPositionsFromBlockchain(userAddress)
+  } catch (error) {
+    console.error('Failed to fetch positions from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockPositions()
+  }
 }
 
 /**
@@ -133,9 +152,13 @@ export async function fetchWelfareMetrics(demoMode, contracts = null) {
     return getMockWelfareMetrics()
   }
   
-  // TODO: Implement live blockchain data fetching
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockWelfareMetrics()
+  try {
+    return await fetchWelfareMetricsFromBlockchain()
+  } catch (error) {
+    console.error('Failed to fetch welfare metrics from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockWelfareMetrics()
+  }
 }
 
 /**
@@ -149,9 +172,13 @@ export async function fetchCategories(demoMode, contracts = null) {
     return getMockCategories()
   }
   
-  // TODO: Implement live blockchain data fetching
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
-  return getMockCategories()
+  try {
+    return await fetchCategoriesFromBlockchain()
+  } catch (error) {
+    console.error('Failed to fetch categories from blockchain:', error)
+    console.warn('Falling back to mock data due to blockchain error')
+    return getMockCategories()
+  }
 }
 
 /**
@@ -166,7 +193,8 @@ export async function fetchMarketsByCorrelationGroup(demoMode, correlationGroupI
     return getMockMarketsByCorrelationGroup(correlationGroupId)
   }
   
-  // TODO: Implement live blockchain data fetching
-  console.warn('Live data fetching not yet implemented. Falling back to mock data.')
+  // Note: Correlation groups are currently a frontend-only feature
+  // When implemented on-chain, this should fetch from blockchain
+  console.warn('Correlation groups not yet implemented on blockchain. Using mock data.')
   return getMockMarketsByCorrelationGroup(correlationGroupId)
 }

@@ -6,6 +6,7 @@
  * based on the user's settings.
  */
 
+import { useMemo, useCallback } from 'react'
 import { useUserPreferences } from './useUserPreferences'
 import {
   fetchMarkets,
@@ -26,22 +27,71 @@ export function useDataFetcher() {
   const { preferences } = useUserPreferences()
   const demoMode = preferences.demoMode
 
-  return {
-    demoMode,
-    getMarkets: (contracts = null) => fetchMarkets(demoMode, contracts),
-    getMarketsByCategory: (category, contracts = null) => 
-      fetchMarketsByCategory(demoMode, category, contracts),
-    getMarketById: (id, contracts = null) => 
-      fetchMarketById(demoMode, id, contracts),
-    getProposals: (contracts = null) => 
-      fetchProposals(demoMode, contracts),
-    getPositions: (userAddress, contracts = null) => 
-      fetchPositions(demoMode, userAddress, contracts),
-    getWelfareMetrics: (contracts = null) => 
-      fetchWelfareMetrics(demoMode, contracts),
-    getCategories: (contracts = null) => 
-      fetchCategories(demoMode, contracts),
-    getMarketsByCorrelationGroup: (correlationGroupId, contracts = null) =>
-      fetchMarketsByCorrelationGroup(demoMode, correlationGroupId, contracts)
-  }
+  // Memoize individual functions to ensure stable references
+  const getMarkets = useCallback(
+    (contracts = null) => fetchMarkets(demoMode, contracts),
+    [demoMode]
+  )
+
+  const getMarketsByCategory = useCallback(
+    (category, contracts = null) => fetchMarketsByCategory(demoMode, category, contracts),
+    [demoMode]
+  )
+
+  const getMarketById = useCallback(
+    (id, contracts = null) => fetchMarketById(demoMode, id, contracts),
+    [demoMode]
+  )
+
+  const getProposals = useCallback(
+    (contracts = null) => fetchProposals(demoMode, contracts),
+    [demoMode]
+  )
+
+  const getPositions = useCallback(
+    (userAddress, contracts = null) => fetchPositions(demoMode, userAddress, contracts),
+    [demoMode]
+  )
+
+  const getWelfareMetrics = useCallback(
+    (contracts = null) => fetchWelfareMetrics(demoMode, contracts),
+    [demoMode]
+  )
+
+  const getCategories = useCallback(
+    (contracts = null) => fetchCategories(demoMode, contracts),
+    [demoMode]
+  )
+
+  const getMarketsByCorrelationGroup = useCallback(
+    (correlationGroupId, contracts = null) =>
+      fetchMarketsByCorrelationGroup(demoMode, correlationGroupId, contracts),
+    [demoMode]
+  )
+
+  // Memoize the returned object to prevent unnecessary re-renders
+  return useMemo(
+    () => ({
+      demoMode,
+      getMarkets,
+      getMarketsByCategory,
+      getMarketById,
+      getProposals,
+      getPositions,
+      getWelfareMetrics,
+      getCategories,
+      getMarketsByCorrelationGroup
+    }),
+    [
+      demoMode,
+      getMarkets,
+      getMarketsByCategory,
+      getMarketById,
+      getProposals,
+      getPositions,
+      getWelfareMetrics,
+      getCategories,
+      getMarketsByCorrelationGroup
+    ]
+  )
 }
