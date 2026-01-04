@@ -77,7 +77,7 @@ function DevelopmentWarningModal() {
               <div className="dev-warning-notice">
                 <p className="dev-warning-modal-message">
                   ⚠️ <strong>Development Notice:</strong> This site is under active development. 
-                  Features and functionality may change. Contact Howdy@FairWins.app for more information.
+                  Features and functionality may change. 
                 </p>
               </div>
             </div>
