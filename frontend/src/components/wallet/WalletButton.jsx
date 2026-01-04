@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useModal } from '../../hooks/useUI'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
+import UserManagementModal from '../ui/UserManagementModal'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 
@@ -70,7 +71,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
       await connect({ connector })
       setIsOpen(false)
     } catch (error) {
-      console.error('Error connecting wallet:', error)
+      console.error('Error connecting wallet with', connector.name, ':', error)
     }
   }
 
@@ -81,14 +82,10 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
   const handleOpenUserManagement = () => {
     setIsOpen(false)
-    // Open user management modal through the modal system
-    import('../ui/UserManagementModal').then((module) => {
-      const UserManagementModal = module.default
-      showModal(<UserManagementModal />, {
-        title: 'User Management',
-        size: 'large',
-        closable: true
-      })
+    showModal(<UserManagementModal />, {
+      title: 'User Management',
+      size: 'large',
+      closable: true
     })
   }
 
@@ -203,16 +200,18 @@ function WalletButton({ className = '', theme = 'dark' }) {
                   onClick={handleOpenUserManagement}
                   className="action-button"
                   role="menuitem"
+                  aria-label="Manage settings and preferences"
                 >
-                  <span>⚙️</span>
+                  <span aria-hidden="true">⚙️</span>
                   <span>Manage Settings</span>
                 </button>
                 <button
                   onClick={handleDisconnect}
                   className="action-button disconnect-button"
                   role="menuitem"
+                  aria-label="Disconnect wallet"
                 >
-                  <span>🔌</span>
+                  <span aria-hidden="true">🔌</span>
                   <span>Disconnect</span>
                 </button>
               </div>
