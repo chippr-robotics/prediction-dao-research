@@ -15,6 +15,13 @@ describe("TokenMintFactory", function () {
     roleManager = await RoleManager.deploy();
     await roleManager.waitForDeployment();
 
+    // Initialize role metadata and all tiers
+    await roleManager.initializeRoleMetadata();
+    await roleManager.initializeMarketMakerTiers();
+    await roleManager.initializeClearPathTiers();
+    await roleManager.initializeTokenMintTiers();
+    await roleManager.initializeFriendMarketTiers();
+
     // Deploy TokenMintFactory
     const TokenMintFactory = await ethers.getContractFactory("TokenMintFactory");
     tokenMintFactory = await TokenMintFactory.deploy(await roleManager.getAddress());

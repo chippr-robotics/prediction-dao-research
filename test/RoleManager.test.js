@@ -23,6 +23,9 @@ describe("RoleManager - Unit Tests", function () {
     roleManager = await RoleManager.deploy();
     await roleManager.waitForDeployment();
     
+    // Initialize role metadata
+    await roleManager.initializeRoleMetadata();
+    
     // Get role constants
     DEFAULT_ADMIN_ROLE = await roleManager.DEFAULT_ADMIN_ROLE();
     CORE_SYSTEM_ADMIN_ROLE = await roleManager.CORE_SYSTEM_ADMIN_ROLE();
