@@ -5,7 +5,9 @@ import {
   getUserPreference, 
   clearUserPreferences,
   getClearPathStatus,
-  updateClearPathStatus
+  updateClearPathStatus,
+  getDemoMode,
+  updateDemoMode
 } from '../utils/userStorage'
 import { UserPreferencesContext } from './UserPreferencesContext'
 
@@ -21,7 +23,8 @@ export function UserPreferencesProvider({ children }) {
     recentSearches: [],
     favoriteMarkets: [],
     defaultSlippage: 0.5,
-    clearPathStatus: { active: false, lastUpdated: null }
+    clearPathStatus: { active: false, lastUpdated: null },
+    demoMode: true // Default to demo mode (mock data)
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -35,7 +38,8 @@ export function UserPreferencesProvider({ children }) {
         recentSearches: [],
         favoriteMarkets: [],
         defaultSlippage: 0.5,
-        clearPathStatus: { active: false, lastUpdated: null }
+        clearPathStatus: { active: false, lastUpdated: null },
+        demoMode: true
       })
     }
   }, [account, isConnected])
@@ -47,12 +51,14 @@ export function UserPreferencesProvider({ children }) {
       const favoriteMarkets = getUserPreference(walletAddress, 'favorite_markets', [], true)
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
       const clearPathStatus = getClearPathStatus(walletAddress)
+      const demoMode = getDemoMode(walletAddress)
 
       setPreferences({
         recentSearches,
         favoriteMarkets,
         defaultSlippage,
-        clearPathStatus
+        clearPathStatus,
+        demoMode
       })
     } catch (error) {
       console.error('Error loading user preferences:', error)
@@ -126,6 +132,16 @@ export function UserPreferencesProvider({ children }) {
     }))
   }, [account])
 
+  const setDemoMode = useCallback((enabled) => {
+    if (!account) return
+
+    updateDemoMode(account, enabled)
+    setPreferences(prev => ({
+      ...prev,
+      demoMode: enabled
+    }))
+  }, [account])
+
   const clearAllPreferences = useCallback(() => {
     if (!account) return
 
@@ -134,7 +150,8 @@ export function UserPreferencesProvider({ children }) {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      clearPathStatus: { active: false, lastUpdated: null }
+      clearPathStatus: { active: false, lastUpdated: null },
+      demoMode: true
     })
   }, [account])
 
@@ -146,6 +163,7 @@ export function UserPreferencesProvider({ children }) {
     toggleFavoriteMarket,
     setDefaultSlippage,
     setClearPathStatus,
+    setDemoMode,
     savePreference,
     clearAllPreferences,
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
-import { getMockMarkets } from '../../utils/mockDataLoader'
+import { useDataFetcher } from '../../hooks/useDataFetcher'
 import * as d3 from 'd3'
 import './Dashboard.css'
 
@@ -993,6 +993,7 @@ function RecentActivityFeed({ markets }) {
 
 function Dashboard() {
   const { account, isConnected } = useWeb3()
+  const { getMarkets } = useDataFetcher()
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -1010,7 +1011,7 @@ function Dashboard() {
       try {
         setLoading(true)
         await new Promise(resolve => setTimeout(resolve, 300))
-        const allMarkets = getMockMarkets()
+        const allMarkets = await getMarkets()
         setMarkets(allMarkets)
       } catch (error) {
         console.error('Error loading markets:', error)
@@ -1019,7 +1020,7 @@ function Dashboard() {
       }
     }
     loadMarkets()
-  }, [])
+  }, [getMarkets])
 
   // Calculate platform metrics
   const platformMetrics = useMemo(() => {

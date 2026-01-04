@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
+import { useDataFetcher } from '../../hooks/useDataFetcher'
 import useFuseSearch from '../../hooks/useFuseSearch'
-import { getMockMarkets } from '../../utils/mockDataLoader'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import { getSubcategoriesForCategory } from '../../config/subcategories'
 import SidebarNav from './SidebarNav'
@@ -29,6 +29,7 @@ import './FairWinsAppNew.css'
 function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
   const { roles, ROLES } = useRoles()
+  const { getMarkets } = useDataFetcher()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
@@ -62,14 +63,14 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     try {
       setLoading(true)
       await new Promise(resolve => setTimeout(resolve, 500))
-      const allMarkets = getMockMarkets()
+      const allMarkets = await getMarkets()
       setMarkets(allMarkets)
       setLoading(false)
     } catch (error) {
       console.error('Error loading markets:', error)
       setLoading(false)
     }
-  }, [])
+  }, [getMarkets])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps

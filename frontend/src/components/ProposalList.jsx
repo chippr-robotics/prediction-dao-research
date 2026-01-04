@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react'
-import { getMockProposals } from '../utils/mockDataLoader'
+import { useDataFetcher } from '../hooks/useDataFetcher'
 
 function ProposalList() {
+  const { getProposals } = useDataFetcher()
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Load mock data from centralized source
-    // In production, this would fetch from ProposalRegistry contract
-    const mockProposals = getMockProposals()
-
-    // Initial data load - legitimate use case for setting state in effect
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProposals(mockProposals)
-    setLoading(false)
-  }, [])
+    // Load data based on user's demo mode preference
+    // In production with demo mode off, this would fetch from ProposalRegistry contract
+    const loadProposals = async () => {
+      const fetchedProposals = await getProposals()
+      setProposals(fetchedProposals)
+      setLoading(false)
+    }
+    
+    loadProposals()
+  }, [getProposals])
 
   const getStatusConfig = (status) => {
     const configs = {

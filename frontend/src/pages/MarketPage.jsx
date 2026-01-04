@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
-import { getMockMarkets } from '../utils/mockDataLoader'
+import { useDataFetcher } from '../hooks/useDataFetcher'
 import MarketDetailsPanel from '../components/fairwins/MarketDetailsPanel'
 import ShareModal from '../components/ui/ShareModal'
 import { usePrice } from '../contexts/PriceContext'
@@ -15,6 +15,7 @@ const QUICK_ACTION_AMOUNTS = [5, 25, 100, 500]
 function MarketPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { getMarkets } = useDataFetcher()
   const [market, setMarket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedOutcome, setSelectedOutcome] = useState('YES')
@@ -31,7 +32,7 @@ function MarketPage() {
     const loadMarket = async () => {
       try {
         setLoading(true)
-        const markets = getMockMarkets()
+        const markets = await getMarkets()
         const foundMarket = markets.find(m => m.id === parseInt(id))
         
         if (!foundMarket) {
@@ -60,7 +61,7 @@ function MarketPage() {
     }
     
     loadMarket()
-  }, [id, navigate])
+  }, [id, navigate, getMarkets])
 
   // Update limit price when outcome changes
   useEffect(() => {

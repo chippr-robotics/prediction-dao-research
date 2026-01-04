@@ -15,7 +15,7 @@ function UserManagementModal({ onScanMarket }) {
   const { address, isConnected } = useWallet()
   const { disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
-  const { preferences, setClearPathStatus } = useUserPreferences()
+  const { preferences, setClearPathStatus, setDemoMode } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
@@ -42,6 +42,10 @@ function UserManagementModal({ onScanMarket }) {
 
   const handleToggleClearPath = () => {
     setClearPathStatus(!preferences.clearPathStatus.active)
+  }
+
+  const handleToggleDemoMode = () => {
+    setDemoMode(!preferences.demoMode)
   }
 
   const handleSearchSubmit = (e) => {
@@ -218,6 +222,28 @@ function UserManagementModal({ onScanMarket }) {
                       <span className="pref-label">Default Slippage:</span>
                       <span className="pref-value">{preferences.defaultSlippage}%</span>
                     </div>
+                  </div>
+                </div>
+
+                <div className="section">
+                  <h3>Data Source</h3>
+                  <div className="demo-mode-section">
+                    <div className="status-display">
+                      <span className={`status-badge ${preferences.demoMode ? 'demo' : 'live'}`}>
+                        {preferences.demoMode ? 'Demo Mode' : 'Live Mode'}
+                      </span>
+                    </div>
+                    <button 
+                      onClick={handleToggleDemoMode}
+                      className="toggle-demo-btn"
+                    >
+                      Switch to {preferences.demoMode ? 'Live' : 'Demo'} Mode
+                    </button>
+                    <p className="demo-mode-description">
+                      {preferences.demoMode 
+                        ? '🎭 Demo Mode: Using mock data for testing and demonstrations. Switch to Live Mode to interact with real blockchain data.'
+                        : '🌐 Live Mode: Connected to testnet blockchain. All transactions are real and require gas fees.'}
+                    </p>
                   </div>
                 </div>
 
