@@ -13,7 +13,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          web3: ['ethers', 'wagmi', 'viem', 'thirdweb']
+          web3: ['ethers', 'wagmi', 'viem']
         }
       }
     }
