@@ -476,6 +476,13 @@ describe("ConditionalMarketFactory", function () {
       const TieredRoleManager = await ethers.getContractFactory("TieredRoleManager");
       roleManager = await TieredRoleManager.deploy();
       
+      // Initialize role metadata and all tiers
+      await roleManager.initializeRoleMetadata();
+      await roleManager.initializeMarketMakerTiers();
+      await roleManager.initializeClearPathTiers();
+      await roleManager.initializeTokenMintTiers();
+      await roleManager.initializeFriendMarketTiers();
+      
       // Set role manager in market factory
       await marketFactory.setRoleManager(roleManager.target);
       

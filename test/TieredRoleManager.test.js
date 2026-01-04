@@ -25,6 +25,13 @@ describe("TieredRoleManager - Unit Tests", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
+    // Initialize role metadata and all tiers
+    await tieredRoleManager.initializeRoleMetadata();
+    await tieredRoleManager.initializeMarketMakerTiers();
+    await tieredRoleManager.initializeClearPathTiers();
+    await tieredRoleManager.initializeTokenMintTiers();
+    await tieredRoleManager.initializeFriendMarketTiers();
+    
     MARKET_MAKER_ROLE = await tieredRoleManager.MARKET_MAKER_ROLE();
     CLEARPATH_USER_ROLE = await tieredRoleManager.CLEARPATH_USER_ROLE();
     TOKENMINT_ROLE = await tieredRoleManager.TOKENMINT_ROLE();

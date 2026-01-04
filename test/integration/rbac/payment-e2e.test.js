@@ -33,6 +33,14 @@ describe("Real Payments Processing - E2E Tests", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
+    // Initialize role metadata and all tiers
+    await roleManager.initializeRoleMetadata();
+    await tieredRoleManager.initializeRoleMetadata();
+    await tieredRoleManager.initializeMarketMakerTiers();
+    await tieredRoleManager.initializeClearPathTiers();
+    await tieredRoleManager.initializeTokenMintTiers();
+    await tieredRoleManager.initializeFriendMarketTiers();
+    
     // Get role identifiers
     MARKET_MAKER_ROLE = await roleManager.MARKET_MAKER_ROLE();
     CLEARPATH_USER_ROLE = await roleManager.CLEARPATH_USER_ROLE();

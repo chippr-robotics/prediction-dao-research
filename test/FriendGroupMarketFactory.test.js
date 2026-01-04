@@ -44,6 +44,13 @@ describe("FriendGroupMarketFactory", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
+    // Initialize role metadata and all tiers
+    await tieredRoleManager.initializeRoleMetadata();
+    await tieredRoleManager.initializeMarketMakerTiers();
+    await tieredRoleManager.initializeClearPathTiers();
+    await tieredRoleManager.initializeTokenMintTiers();
+    await tieredRoleManager.initializeFriendMarketTiers();
+    
     // Deploy MembershipPaymentManager
     const MembershipPaymentManager = await ethers.getContractFactory("MembershipPaymentManager");
     paymentManager = await MembershipPaymentManager.deploy(owner.address); // owner as treasury
