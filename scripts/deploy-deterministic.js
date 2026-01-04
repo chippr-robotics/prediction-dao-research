@@ -20,7 +20,15 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
   const ContractFactory = await ethers.getContractFactory(contractName, deployer);
   
   // Get deployment bytecode
-  const deploymentData = ContractFactory.getDeployTransaction(...constructorArgs).data;
+  const deployTx = await ContractFactory.getDeployTransaction(...constructorArgs);
+  const deploymentData = deployTx?.data;
+  if (!deploymentData) {
+    throw new Error(
+      `Failed to build initCode for ${contractName}. ` +
+        `Hardhat/ethers returned empty deployment data; ` +
+        `check the contract is compiled and has no unlinked libraries.`
+    );
+  }
   
   // Compute deterministic address
   const initCodeHash = ethers.keccak256(deploymentData);
@@ -231,6 +239,16 @@ async function main() {
 
   // Get deployer account
   const [deployer] = await ethers.getSigners();
+  if (!deployer) {
+    throw new Error(
+      `No deployer signer available for network '${hre.network.name}'.\n` +
+        `For testnets/mainnet you must configure an account, e.g.:\n` +
+        `  export PRIVATE_KEY=0x...\n` +
+        `  npx hardhat run --network ${hre.network.name} scripts/deploy-deterministic.js\n` +
+        `\n` +
+        `Current hardhat.config.js uses PRIVATE_KEY to populate network accounts.`
+    );
+  }
   console.log("Deploying contracts with account:", deployer.address);
   console.log("Account balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
   console.log();
