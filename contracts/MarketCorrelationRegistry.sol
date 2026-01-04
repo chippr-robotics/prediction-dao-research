@@ -21,6 +21,8 @@ import "./TieredRoleManager.sol";
  * - Admin functions require OPERATIONS_ADMIN_ROLE
  */
 contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
+
+    address private constant SAFE_SINGLETON_FACTORY = address(0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7);
     
     struct CorrelationGroup {
         string name;
@@ -87,8 +89,10 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
     }
     
     constructor() Ownable(msg.sender) {
-        // Mark as initialized for non-proxy deployments to prevent unauthorized initialization
-        _initialized = true;
+        // For direct deployments, prevent initialize() from being called.
+        // For Safe Singleton Factory (CREATE2) deployments, allow a one-time initialize()
+        // so ownership isn't stuck on the factory.
+        _initialized = msg.sender != SAFE_SINGLETON_FACTORY;
     }
     
     /**

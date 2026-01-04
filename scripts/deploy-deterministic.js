@@ -249,9 +249,23 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
     gasLimit = (estimatedGas * 120n) / 100n; // Add 20% buffer
     console.log(`  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} with buffer)`);
   } catch (error) {
-    // Fallback to conservative default if estimation fails
-    gasLimit = 5000000n;
-    console.log(`  Gas estimation failed, using default: ${gasLimit.toString()}`);
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const blockGasLimit = latestBlock?.gasLimit;
+    const message = error?.message || String(error);
+
+    // If estimation fails (common on some RPCs / with large initCode), fall back
+    // to a near-block gas limit so we don't accidentally OOG.
+    if (blockGasLimit) {
+      gasLimit = (blockGasLimit * 95n) / 100n;
+      console.warn(
+        `  ⚠️  Gas estimation failed; using cap=${gasLimit.toString()} blockGasLimit=${blockGasLimit.toString()} (${message.split("\n")[0]})`
+      );
+    } else {
+      gasLimit = 7_500_000n;
+      console.warn(
+        `  ⚠️  Gas estimation failed; using fallback=${gasLimit.toString()} (${message.split("\n")[0]})`
+      );
+    }
   }
 
   const tx = await deployer.sendTransaction({
@@ -285,6 +299,110 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
  */
 function generateSalt(identifier) {
   return ethers.id(identifier);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function tryInitializeIfPresent(name, contract, deployer) {
+  if (!contract || typeof contract.initialize !== "function") return;
+  try {
+    const tx = await contract.initialize(deployer.address);
+    await tx.wait();
+    console.log(`  ✓ ${name} initialized (owner set to ${deployer.address})`);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name} initialize skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function tryCallNoArgsIfPresent(name, contract, functionName) {
+  if (!contract || typeof contract[functionName] !== "function") return;
+  try {
+    const tx = await contract[functionName]();
+    await tx.wait();
+    console.log(`  ✓ ${name}.${functionName} executed`);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name}.${functionName} skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function trySetRoleManagerIfPresent(name, contract, roleManagerAddress) {
+  if (!contract || typeof contract.setRoleManager !== "function") return;
+
+  try {
+    // If the contract exposes roleManager(), skip if already set.
+    if (typeof contract.roleManager === "function") {
+      const current = await contract.roleManager();
+      if (String(current).toLowerCase() !== "0x0000000000000000000000000000000000000000") {
+        console.log(`  ✓ ${name} roleManager already set (${current})`);
+        return;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const tx = await contract.setRoleManager(roleManagerAddress);
+    await tx.wait();
+    console.log(`  ✓ ${name} roleManager set to ${roleManagerAddress}`);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name} setRoleManager skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function safeTransferOwnershipIfOwnedBy(name, contract, from, to) {
+  if (!contract || typeof contract.transferOwnership !== "function") return;
+  if (typeof contract.owner !== "function") return;
+
+  try {
+    const currentOwner = await contract.owner();
+    if (String(currentOwner).toLowerCase() === String(to).toLowerCase()) {
+      console.log(`  ✓ ${name} ownership already transferred (${to})`);
+      return;
+    }
+    if (String(currentOwner).toLowerCase() !== String(from).toLowerCase()) {
+      console.log(`  ⚠️  ${name} owner is ${currentOwner}; expected ${from}. Skipping transfer.`);
+      return;
+    }
+    console.log(`Transferring ${name} ownership...`);
+    const tx = await contract.transferOwnership(to);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name} transferOwnership skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function verifyIfEnabled(name, address, constructorArguments = []) {
+  const verifyEnabled = (process.env.VERIFY ?? "false").toLowerCase() === "true";
+  if (!verifyEnabled) return;
+  if (hre.network.name === "hardhat" || hre.network.name === "localhost") return;
+
+  const retries = Number(process.env.VERIFY_RETRIES ?? 5);
+  const delayMs = Number(process.env.VERIFY_DELAY_MS ?? 15000);
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await hre.run("verify:verify", { address, constructorArguments });
+      console.log(`  ✓ Verified ${name} at ${address}`);
+      return;
+    } catch (error) {
+      const message = error?.message || String(error);
+      const already = message.toLowerCase().includes("already verified");
+      if (already) {
+        console.log(`  ✓ ${name} already verified at ${address}`);
+        return;
+      }
+      console.warn(`  ⚠️  Verify attempt ${attempt}/${retries} failed for ${name}: ${message.split("\n")[0]}`);
+      if (attempt < retries) await sleep(delayMs);
+    }
+  }
 }
 
 async function main() {
@@ -348,6 +466,22 @@ async function main() {
   
   // Deploy all contracts deterministically
   const deployments = {};
+
+  // 0. Deploy RoleManagerCore (Modular RBAC) - ultra-lightweight for gas-constrained chains
+  const tieredRoleManager = await deployDeterministic(
+    "RoleManagerCore",
+    [],
+    generateSalt(saltPrefix + "RoleManagerCore"),
+    deployer
+  );
+  deployments.tieredRoleManager = tieredRoleManager.address;
+  await tryInitializeIfPresent("RoleManagerCore", tieredRoleManager.contract, deployer);
+
+  // Note: Deploy full modular RBAC system with scripts/deploy-modular-rbac.js for:
+  // - TierRegistry (tier metadata & limits)
+  // - PaymentProcessor (MembershipPaymentManager integration)
+  // - UsageTracker (usage stats & limit checking)
+  // - MembershipManager (duration & expiration)
 
   // 1. Deploy WelfareMetricRegistry
   const welfareRegistry = await deployDeterministic(
@@ -426,6 +560,12 @@ async function main() {
     console.log("  ✓ RagequitModule initialized");
   }
 
+  await trySetRoleManagerIfPresent(
+    "RagequitModule",
+    ragequitModule.contract,
+    tieredRoleManager.address
+  );
+
   // 7. Deploy FutarchyGovernor
   const futarchyGovernor = await deployDeterministic(
     "FutarchyGovernor",
@@ -450,6 +590,22 @@ async function main() {
     );
     await tx.wait();
     console.log("  ✓ FutarchyGovernor initialized");
+  }
+
+  // Wire RBAC into FutarchyGovernor (onlyOwner)
+  try {
+    const current = await futarchyGovernor.contract.roleManager();
+    if (String(current).toLowerCase() === "0x0000000000000000000000000000000000000000") {
+      console.log("Setting FutarchyGovernor role manager...");
+      const tx = await futarchyGovernor.contract.setRoleManager(tieredRoleManager.address);
+      await tx.wait();
+      console.log(`  ✓ FutarchyGovernor roleManager set to ${tieredRoleManager.address}`);
+    } else {
+      console.log(`  ✓ FutarchyGovernor roleManager already set (${current})`);
+    }
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  FutarchyGovernor setRoleManager skipped: ${message.split("\n")[0]}`);
   }
 
   // Setup initial configuration (only if contracts are newly deployed)
@@ -569,13 +725,29 @@ async function main() {
   console.log("Salt Prefix:", saltPrefix);
   console.log("\nDeployed Contracts:");
   console.log("==================");
+  console.log("TieredRoleManager:", deployments.tieredRoleManager);
   console.log("WelfareMetricRegistry:", deployments.welfareRegistry);
   console.log("ProposalRegistry:", deployments.proposalRegistry);
+  console.log("MetadataRegistry:", deployments.metadataRegistry);
+  console.log("MarketCorrelationRegistry:", deployments.marketCorrelationRegistry);
   console.log("ConditionalMarketFactory:", deployments.marketFactory);
   console.log("PrivacyCoordinator:", deployments.privacyCoordinator);
   console.log("OracleResolver:", deployments.oracleResolver);
   console.log("RagequitModule:", deployments.ragequitModule);
   console.log("FutarchyGovernor:", deployments.futarchyGovernor);
+
+  // Optional verification (set VERIFY=true)
+  console.log("\nVerification (set VERIFY=true to enable):");
+  await verifyIfEnabled("RoleManagerCore", deployments.tieredRoleManager, []);
+  await verifyIfEnabled("WelfareMetricRegistry", deployments.welfareRegistry, []);
+  await verifyIfEnabled("ProposalRegistry", deployments.proposalRegistry, []);
+  await verifyIfEnabled("MetadataRegistry", deployments.metadataRegistry, []);
+  await verifyIfEnabled("MarketCorrelationRegistry", deployments.marketCorrelationRegistry, []);
+  await verifyIfEnabled("ConditionalMarketFactory", deployments.marketFactory, []);
+  await verifyIfEnabled("PrivacyCoordinator", deployments.privacyCoordinator, []);
+  await verifyIfEnabled("OracleResolver", deployments.oracleResolver, []);
+  await verifyIfEnabled("RagequitModule", deployments.ragequitModule, []);
+  await verifyIfEnabled("FutarchyGovernor", deployments.futarchyGovernor, []);
   console.log("\n✓ Deployment completed successfully!");
   console.log("\nNote: These addresses are deterministic and will be the same on any");
   console.log("      EVM-compatible network where Safe Singleton Factory is deployed.");
