@@ -9,7 +9,7 @@ import {
   getDemoMode,
   updateDemoMode
 } from '../utils/userStorage'
-import { UserPreferencesContext } from './UserPreferencesContext'
+import { UserPreferencesContext } from './UserPreferencesContext.js'
 
 /**
  * UserPreferencesProvider manages user preferences tied to wallet address

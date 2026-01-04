@@ -241,8 +241,8 @@ function UserManagementModal({ onScanMarket }) {
                     </button>
                     <p className="demo-mode-description">
                       {preferences.demoMode 
-                        ? '🎭 Demo Mode: Using mock data for testing and demonstrations. Switch to Live Mode to interact with real blockchain data.'
-                        : '🌐 Live Mode: Connected to testnet blockchain. All transactions are real and require gas fees.'}
+                        ? <><span aria-hidden="true">🎭</span> Demo Mode: Using mock data for testing and demonstrations. Switch to Live Mode to interact with real blockchain data.</>
+                        : <><span aria-hidden="true">🌐</span> Live Mode: Connected to testnet blockchain. All transactions are real and require gas fees.</>}
                     </p>
                   </div>
                 </div>
