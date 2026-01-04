@@ -6,3 +6,12 @@
 "oracleResolver": "0x19374Dd329fD61C5e404e0AE8397418E0f322Fba"
 "ragequitModule": "0x243c90c69Cd8f035D93DD5100dbc5b3753E8a593" 
 "futarchyGovernor": "0xD37907b23d063F0839Ff2405179481822862C27A"
+
+FairWinsToken:
+  Address:       0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB
+  Symbol:        FWGT
+  Initial Supply: 10000000.0 FWGT
+
+TreasuryVault:
+  Address:       0x93F7ee39C02d99289E3c29696f1F3a70656d0772
+  Owner:         0x52502d049571C7893447b86c4d8B38e6184bF6e1
