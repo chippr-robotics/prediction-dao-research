@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { usePrice } from '../contexts/PriceContext'
 import { useTheme } from '../hooks/useTheme'
-import { getMockMarkets } from '../utils/mockDataLoader'
+import { useDataFetcher } from '../hooks/useDataFetcher'
 import CurrencyToggle from './ui/CurrencyToggle'
 import './MarketTrading.css'
 
@@ -10,6 +10,7 @@ function MarketTrading() {
   const { isConnected } = useWeb3()
   const { formatPrice } = usePrice()
   const { isClearPath } = useTheme()
+  const { getMarkets } = useDataFetcher()
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [tradeAmount, setTradeAmount] = useState('')
@@ -20,17 +21,17 @@ function MarketTrading() {
 
   const loadMarkets = useCallback(async () => {
     try {
-      // Load mock data from centralized source
-      // In production, this would fetch from ConditionalMarketFactory contract
-      const mockMarkets = getMockMarkets()
+      // Load data based on user's demo mode preference
+      // In production with demo mode off, this would fetch from ConditionalMarketFactory contract
+      const fetchedMarkets = await getMarkets()
 
-      setMarkets(mockMarkets)
+      setMarkets(fetchedMarkets)
       setLoading(false)
     } catch (error) {
       console.error('Error loading markets:', error)
       setLoading(false)
     }
-  }, [])
+  }, [getMarkets])
 
   useEffect(() => {
     loadMarkets()

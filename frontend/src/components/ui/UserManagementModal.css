@@ -365,6 +365,47 @@
   line-height: 1.6;
 }
 
+/* Demo Mode Section */
+.demo-mode-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toggle-demo-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.toggle-demo-btn:hover {
+  background: var(--color-primary-dark);
+}
+
+.demo-mode-description {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.status-badge.demo {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.status-badge.live {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
 /* Preferences */
 .preferences-info {
   display: flex;

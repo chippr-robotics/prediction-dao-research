@@ -168,3 +168,21 @@ export function updateClearPathStatus(walletAddress, active) {
     lastUpdated: Date.now()
   }, true) // Use localStorage for persistence
 }
+
+/**
+ * Get demo mode status (true = mock data, false = real blockchain data)
+ * @param {string} walletAddress - User's wallet address
+ * @returns {boolean} Demo mode status
+ */
+export function getDemoMode(walletAddress) {
+  return getUserPreference(walletAddress, 'demo_mode', true, true) // Default to demo mode (mock data)
+}
+
+/**
+ * Update demo mode status
+ * @param {string} walletAddress - User's wallet address
+ * @param {boolean} enabled - Whether demo mode is enabled (true = mock, false = real)
+ */
+export function updateDemoMode(walletAddress, enabled) {
+  saveUserPreference(walletAddress, 'demo_mode', enabled, true) // Use localStorage for persistence
+}

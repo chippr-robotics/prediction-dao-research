@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEffect, useState, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
-import { getMockMarkets } from '../utils/mockDataLoader'
+import { useDataFetcher } from '../hooks/useDataFetcher'
 import './CorrelatedMarketsPage.css'
 
 const TIME_HORIZONS = {
@@ -18,6 +18,7 @@ const parseProposalTitle = (title) => {
 function CorrelatedMarketsPage() {
   const { groupId } = useParams()
   const navigate = useNavigate()
+  const { getMarkets } = useDataFetcher()
   const [correlatedMarkets, setCorrelatedMarkets] = useState([])
   const [selectedOption, setSelectedOption] = useState(null)
   const [visibleMarkets, setVisibleMarkets] = useState({})
@@ -33,7 +34,7 @@ function CorrelatedMarketsPage() {
     const loadMarkets = async () => {
       try {
         setLoading(true)
-        const allMarkets = getMockMarkets()
+        const allMarkets = await getMarkets()
         
         const correlated = allMarkets.filter(m => m.correlationGroupId === groupId)
         
@@ -54,7 +55,7 @@ function CorrelatedMarketsPage() {
     }
     
     loadMarkets()
-  }, [groupId, navigate])
+  }, [groupId, navigate, getMarkets])
 
   const handleClose = () => {
     // Check if there's browser history to go back to
