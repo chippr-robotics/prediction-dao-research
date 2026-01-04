@@ -268,6 +268,15 @@
   margin-top: 0.5rem;
 }
 
+.membership-note-sidebar a {
+  color: #2D7A4F;
+  text-decoration: underline;
+}
+
+.membership-note-sidebar a:hover {
+  text-decoration: none;
+}
+
 /* Social Links */
 .social-links {
   display: flex;
