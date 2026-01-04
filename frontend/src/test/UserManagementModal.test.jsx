@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ThirdwebProvider } from 'thirdweb/react'
 import UserManagementModal from '../components/ui/UserManagementModal'
 import {
   WalletProvider,
@@ -15,14 +14,6 @@ import {
   RoleProvider,
   PriceProvider
 } from '../contexts'
-
-// Mock ThirdWeb ConnectButton to render a simple button in tests
-vi.mock('thirdweb/react', () => ({
-  ConnectButton: ({ connectButton }) => (
-    <button>{connectButton?.label || 'Connect Wallet'}</button>
-  ),
-  ThirdwebProvider: ({ children }) => children,
-}))
 
 // Create mockable functions for wagmi hooks
 const mockUseAccount = vi.fn()
@@ -76,27 +67,25 @@ const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
   
   return render(
     <BrowserRouter>
-      <ThirdwebProvider>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <WalletProvider>
-              <Web3Provider>
-                <UserPreferencesProvider>
-                  <RoleProvider>
-                    <ETCswapProvider>
-                      <UIProvider>
-                        <PriceProvider>
-                          {ui}
-                        </PriceProvider>
-                      </UIProvider>
-                    </ETCswapProvider>
-                  </RoleProvider>
-                </UserPreferencesProvider>
-              </Web3Provider>
-            </WalletProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
-      </ThirdwebProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <WalletProvider>
+            <Web3Provider>
+              <UserPreferencesProvider>
+                <RoleProvider>
+                  <ETCswapProvider>
+                    <UIProvider>
+                      <PriceProvider>
+                        {ui}
+                      </PriceProvider>
+                    </UIProvider>
+                  </ETCswapProvider>
+                </RoleProvider>
+              </UserPreferencesProvider>
+            </Web3Provider>
+          </WalletProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </BrowserRouter>
   )
 }

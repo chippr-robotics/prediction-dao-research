@@ -6,8 +6,8 @@ import { useNavigate } from 'react-router-dom'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import TokenMintButton from '../TokenMintButton'
 import ClearPathButton from '../clearpath/ClearPathButton'
+import WalletButton from '../wallet/WalletButton'
 import './HeaderBar.css'
-import ThirdWebWalletButton from '../wallet/ThirdWebWalletButton'
 
 function HeaderBar({ isConnected }) {
   const { isScrollingDown } = useScrollDirection(10)
@@ -49,7 +49,7 @@ function HeaderBar({ isConnected }) {
         <div className="header-right">
           <TokenMintButton />
           <ClearPathButton />
-          <ThirdWebWalletButton />
+          <WalletButton theme="dark" />
           <button
             className="user-management-btn"
             onClick={handleOpenUserManagement}

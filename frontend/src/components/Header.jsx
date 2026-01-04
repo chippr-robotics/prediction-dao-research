@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import TokenMintButton from './TokenMintButton'
-import ThirdWebWalletButton from './wallet/ThirdWebWalletButton'
+import WalletButton from './wallet/WalletButton'
 import './Header.css'
 
 function Header({ showClearPathBranding = false, hideWalletButton = false }) {
@@ -82,11 +82,8 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
           {!hideWalletButton && (
             <>
               <TokenMintButton />
-              <ThirdWebWalletButton 
+              <WalletButton 
                 theme="dark"
-                btnTitle="Connect Wallet"
-                modalTitle="Connect Your Wallet"
-                modalSize="wide"
               />
             </>
           )}

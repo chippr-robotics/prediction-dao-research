@@ -7,7 +7,7 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import RolePurchaseModal from './RolePurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
-import ThirdWebWalletButton from '../wallet/ThirdWebWalletButton'
+import WalletButton from '../wallet/WalletButton'
 import './UserManagementModal.css'
 
 // eslint-disable-next-line no-unused-vars
@@ -103,12 +103,8 @@ function UserManagementModal({ onScanMarket }) {
             <p>Connect your Web3 wallet to access all features, manage your preferences, and interact with markets.</p>
             
             <div className="connector-options">
-              <ThirdWebWalletButton 
+              <WalletButton 
                 theme="dark"
-                btnTitle="Connect Wallet"
-                modalTitle="Connect Your Wallet"
-                modalSize="wide"
-                showAllWallets={true}
               />
             </div>
             
