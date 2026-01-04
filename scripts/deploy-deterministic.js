@@ -325,25 +325,21 @@ async function main() {
   // Deploy all contracts deterministically
   const deployments = {};
 
-  // 0. Deploy TieredRoleManagerLite (RBAC) - lightweight version for gas-constrained chains
+  // 0. Deploy RoleManagerCore (Modular RBAC) - ultra-lightweight for gas-constrained chains
   const tieredRoleManager = await deployDeterministic(
-    "TieredRoleManagerLite",
+    "RoleManagerCore",
     [],
-    generateSalt(saltPrefix + "TieredRoleManagerLite"),
+    generateSalt(saltPrefix + "RoleManagerCore"),
     deployer
   );
   deployments.tieredRoleManager = tieredRoleManager.address;
-  await tryInitializeIfPresent("TieredRoleManagerLite", tieredRoleManager.contract, deployer);
+  await tryInitializeIfPresent("RoleManagerCore", tieredRoleManager.contract, deployer);
 
-  // Initialize base role metadata (from RoleManager)
-  await tryCallNoArgsIfPresent(
-    "TieredRoleManagerLite",
-    tieredRoleManager.contract,
-    "initializeRoleMetadata"
-  );
-
-  // Note: Tier metadata should be set post-deploy via setTierMetadata() or batchSetTierMetadata()
-  // Run scripts/setup-tier-metadata.js after deployment to configure tiers
+  // Note: Deploy full modular RBAC system with scripts/deploy-modular-rbac.js for:
+  // - TierRegistry (tier metadata & limits)
+  // - PaymentProcessor (MembershipPaymentManager integration)
+  // - UsageTracker (usage stats & limit checking)
+  // - MembershipManager (duration & expiration)
 
   // 1. Deploy WelfareMetricRegistry
   const welfareRegistry = await deployDeterministic(
@@ -601,7 +597,7 @@ async function main() {
 
   // Optional verification (set VERIFY=true)
   console.log("\nVerification (set VERIFY=true to enable):");
-  await verifyIfEnabled("TieredRoleManagerLite", deployments.tieredRoleManager, []);
+  await verifyIfEnabled("RoleManagerCore", deployments.tieredRoleManager, []);
   await verifyIfEnabled("WelfareMetricRegistry", deployments.welfareRegistry, []);
   await verifyIfEnabled("ProposalRegistry", deployments.proposalRegistry, []);
   await verifyIfEnabled("MetadataRegistry", deployments.metadataRegistry, []);
