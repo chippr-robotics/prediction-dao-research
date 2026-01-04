@@ -12,6 +12,10 @@ import "./RoleManager.sol";
  */
 contract TieredRoleManager is RoleManager {
     using SafeERC20 for IERC20;
+
+    address private constant SAFE_SINGLETON_FACTORY = address(0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7);
+
+    bool private _initialized;
     
     // ========== Tier Definitions ==========
     
@@ -103,6 +107,27 @@ contract TieredRoleManager is RoleManager {
     
     constructor() RoleManager() {
         _initializeTierMetadata();
+
+        // For direct deployments, prevent initialize() from being called.
+        // For Safe Singleton Factory (CREATE2) deployments, allow a one-time initialize()
+        // so DEFAULT_ADMIN_ROLE isn't stuck on the factory.
+        _initialized = msg.sender != SAFE_SINGLETON_FACTORY;
+    }
+
+    /**
+     * @notice Initialize admin after deterministic deployment (CREATE2)
+     * @dev Only callable once, intended for Safe Singleton Factory deployments.
+     */
+    function initialize(address admin) external {
+        require(!_initialized, "Already initialized");
+        require(admin != address(0), "Invalid admin");
+
+        _initialized = true;
+
+        // RoleManager constructor granted DEFAULT_ADMIN_ROLE to the deployer (the factory).
+        // Hand it over to the intended admin and revoke the factory.
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _revokeRole(DEFAULT_ADMIN_ROLE, SAFE_SINGLETON_FACTORY);
     }
     
     // ========== Tier Metadata Initialization ==========

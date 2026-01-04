@@ -93,6 +93,98 @@ function generateSalt(identifier) {
   return ethers.id(identifier);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function tryInitializeIfPresent(name, contract, deployer) {
+  if (!contract || typeof contract.initialize !== "function") return;
+  try {
+    const tx = await contract.initialize(deployer.address);
+    await tx.wait();
+    console.log(`  ✓ ${name} initialized (owner set to ${deployer.address})`);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name} initialize skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function trySetRoleManagerIfPresent(name, contract, roleManagerAddress) {
+  if (!contract || typeof contract.setRoleManager !== "function") return;
+
+  try {
+    // If the contract exposes roleManager(), skip if already set.
+    if (typeof contract.roleManager === "function") {
+      const current = await contract.roleManager();
+      if (String(current).toLowerCase() !== "0x0000000000000000000000000000000000000000") {
+        console.log(`  ✓ ${name} roleManager already set (${current})`);
+        return;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const tx = await contract.setRoleManager(roleManagerAddress);
+    await tx.wait();
+    console.log(`  ✓ ${name} roleManager set to ${roleManagerAddress}`);
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name} setRoleManager skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function safeTransferOwnershipIfOwnedBy(name, contract, from, to) {
+  if (!contract || typeof contract.transferOwnership !== "function") return;
+  if (typeof contract.owner !== "function") return;
+
+  try {
+    const currentOwner = await contract.owner();
+    if (String(currentOwner).toLowerCase() === String(to).toLowerCase()) {
+      console.log(`  ✓ ${name} ownership already transferred (${to})`);
+      return;
+    }
+    if (String(currentOwner).toLowerCase() !== String(from).toLowerCase()) {
+      console.log(`  ⚠️  ${name} owner is ${currentOwner}; expected ${from}. Skipping transfer.`);
+      return;
+    }
+    console.log(`Transferring ${name} ownership...`);
+    const tx = await contract.transferOwnership(to);
+    await tx.wait();
+    console.log("  ✓ Ownership transferred");
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  ${name} transferOwnership skipped: ${message.split("\n")[0]}`);
+  }
+}
+
+async function verifyIfEnabled(name, address, constructorArguments = []) {
+  const verifyEnabled = (process.env.VERIFY ?? "false").toLowerCase() === "true";
+  if (!verifyEnabled) return;
+  if (hre.network.name === "hardhat" || hre.network.name === "localhost") return;
+
+  const retries = Number(process.env.VERIFY_RETRIES ?? 5);
+  const delayMs = Number(process.env.VERIFY_DELAY_MS ?? 15000);
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await hre.run("verify:verify", { address, constructorArguments });
+      console.log(`  ✓ Verified ${name} at ${address}`);
+      return;
+    } catch (error) {
+      const message = error?.message || String(error);
+      const already = message.toLowerCase().includes("already verified");
+      if (already) {
+        console.log(`  ✓ ${name} already verified at ${address}`);
+        return;
+      }
+      console.warn(`  ⚠️  Verify attempt ${attempt}/${retries} failed for ${name}: ${message.split("\n")[0]}`);
+      if (attempt < retries) await sleep(delayMs);
+    }
+  }
+}
+
 async function main() {
   console.log("Starting deterministic deployment using Safe Singleton Factory...\n");
   
@@ -149,6 +241,16 @@ async function main() {
   // Deploy all contracts deterministically
   const deployments = {};
 
+  // 0. Deploy TieredRoleManager (RBAC)
+  const tieredRoleManager = await deployDeterministic(
+    "TieredRoleManager",
+    [],
+    generateSalt(saltPrefix + "TieredRoleManager"),
+    deployer
+  );
+  deployments.tieredRoleManager = tieredRoleManager.address;
+  await tryInitializeIfPresent("TieredRoleManager", tieredRoleManager.contract, deployer);
+
   // 1. Deploy WelfareMetricRegistry
   const welfareRegistry = await deployDeterministic(
     "WelfareMetricRegistry",
@@ -157,6 +259,12 @@ async function main() {
     deployer
   );
   deployments.welfareRegistry = welfareRegistry.address;
+  await tryInitializeIfPresent("WelfareMetricRegistry", welfareRegistry.contract, deployer);
+  await trySetRoleManagerIfPresent(
+    "WelfareMetricRegistry",
+    welfareRegistry.contract,
+    tieredRoleManager.address
+  );
 
   // 2. Deploy ProposalRegistry
   const proposalRegistry = await deployDeterministic(
@@ -166,6 +274,41 @@ async function main() {
     deployer
   );
   deployments.proposalRegistry = proposalRegistry.address;
+  await tryInitializeIfPresent("ProposalRegistry", proposalRegistry.contract, deployer);
+  await trySetRoleManagerIfPresent(
+    "ProposalRegistry",
+    proposalRegistry.contract,
+    tieredRoleManager.address
+  );
+
+  // 2b. Deploy MetadataRegistry
+  const metadataRegistry = await deployDeterministic(
+    "MetadataRegistry",
+    [],
+    generateSalt(saltPrefix + "MetadataRegistry"),
+    deployer
+  );
+  deployments.metadataRegistry = metadataRegistry.address;
+  await tryInitializeIfPresent("MetadataRegistry", metadataRegistry.contract, deployer);
+
+  // 2c. Deploy MarketCorrelationRegistry
+  const marketCorrelationRegistry = await deployDeterministic(
+    "MarketCorrelationRegistry",
+    [],
+    generateSalt(saltPrefix + "MarketCorrelationRegistry"),
+    deployer
+  );
+  deployments.marketCorrelationRegistry = marketCorrelationRegistry.address;
+  await tryInitializeIfPresent(
+    "MarketCorrelationRegistry",
+    marketCorrelationRegistry.contract,
+    deployer
+  );
+  await trySetRoleManagerIfPresent(
+    "MarketCorrelationRegistry",
+    marketCorrelationRegistry.contract,
+    tieredRoleManager.address
+  );
 
   // 3. Deploy ConditionalMarketFactory
   const marketFactory = await deployDeterministic(
@@ -175,6 +318,12 @@ async function main() {
     deployer
   );
   deployments.marketFactory = marketFactory.address;
+  await tryInitializeIfPresent("ConditionalMarketFactory", marketFactory.contract, deployer);
+  await trySetRoleManagerIfPresent(
+    "ConditionalMarketFactory",
+    marketFactory.contract,
+    tieredRoleManager.address
+  );
 
   // 4. Deploy PrivacyCoordinator
   const privacyCoordinator = await deployDeterministic(
@@ -184,6 +333,12 @@ async function main() {
     deployer
   );
   deployments.privacyCoordinator = privacyCoordinator.address;
+  await tryInitializeIfPresent("PrivacyCoordinator", privacyCoordinator.contract, deployer);
+  await trySetRoleManagerIfPresent(
+    "PrivacyCoordinator",
+    privacyCoordinator.contract,
+    tieredRoleManager.address
+  );
 
   // 5. Deploy OracleResolver
   const oracleResolver = await deployDeterministic(
@@ -193,6 +348,12 @@ async function main() {
     deployer
   );
   deployments.oracleResolver = oracleResolver.address;
+  await tryInitializeIfPresent("OracleResolver", oracleResolver.contract, deployer);
+  await trySetRoleManagerIfPresent(
+    "OracleResolver",
+    oracleResolver.contract,
+    tieredRoleManager.address
+  );
 
   // 6. Deploy RagequitModule
   // Note: RagequitModule uses initialize pattern - deploy without constructor args
@@ -221,6 +382,12 @@ async function main() {
     console.log("  ✓ RagequitModule initialized");
   }
 
+  await trySetRoleManagerIfPresent(
+    "RagequitModule",
+    ragequitModule.contract,
+    tieredRoleManager.address
+  );
+
   // 7. Deploy FutarchyGovernor
   const futarchyGovernor = await deployDeterministic(
     "FutarchyGovernor",
@@ -247,46 +414,75 @@ async function main() {
     console.log("  ✓ FutarchyGovernor initialized");
   }
 
+  // Wire RBAC into FutarchyGovernor (onlyOwner)
+  try {
+    const current = await futarchyGovernor.contract.roleManager();
+    if (String(current).toLowerCase() === "0x0000000000000000000000000000000000000000") {
+      console.log("Setting FutarchyGovernor role manager...");
+      const tx = await futarchyGovernor.contract.setRoleManager(tieredRoleManager.address);
+      await tx.wait();
+      console.log(`  ✓ FutarchyGovernor roleManager set to ${tieredRoleManager.address}`);
+    } else {
+      console.log(`  ✓ FutarchyGovernor roleManager already set (${current})`);
+    }
+  } catch (error) {
+    const message = error?.message || String(error);
+    console.warn(`  ⚠️  FutarchyGovernor setRoleManager skipped: ${message.split("\n")[0]}`);
+  }
+
   // Setup initial configuration (only if contracts are newly deployed)
   console.log("\n\nSetting up initial configuration...");
   
   const txConfirmations = [];
   
-  // Only transfer ownership if the contract was just deployed (not already deployed)
-  if (!welfareRegistry.alreadyDeployed) {
-    console.log("Transferring WelfareMetricRegistry ownership...");
-    const tx = await welfareRegistry.contract.transferOwnership(futarchyGovernor.address);
-    await tx.wait();
-    console.log("  ✓ Ownership transferred");
-  }
-  
-  if (!proposalRegistry.alreadyDeployed) {
-    console.log("Transferring ProposalRegistry ownership...");
-    const tx = await proposalRegistry.contract.transferOwnership(futarchyGovernor.address);
-    await tx.wait();
-    console.log("  ✓ Ownership transferred");
-  }
-  
-  if (!marketFactory.alreadyDeployed) {
-    console.log("Transferring ConditionalMarketFactory ownership...");
-    const tx = await marketFactory.contract.transferOwnership(futarchyGovernor.address);
-    await tx.wait();
-    console.log("  ✓ Ownership transferred");
-  }
-  
-  if (!oracleResolver.alreadyDeployed) {
-    console.log("Transferring OracleResolver ownership...");
-    const tx = await oracleResolver.contract.transferOwnership(futarchyGovernor.address);
-    await tx.wait();
-    console.log("  ✓ Ownership transferred");
-  }
-  
-  if (!ragequitModule.alreadyDeployed) {
-    console.log("Transferring RagequitModule ownership...");
-    const tx = await ragequitModule.contract.transferOwnership(futarchyGovernor.address);
-    await tx.wait();
-    console.log("  ✓ Ownership transferred");
-  }
+  await safeTransferOwnershipIfOwnedBy(
+    "WelfareMetricRegistry",
+    welfareRegistry.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
+
+  await safeTransferOwnershipIfOwnedBy(
+    "ProposalRegistry",
+    proposalRegistry.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
+
+  await safeTransferOwnershipIfOwnedBy(
+    "MetadataRegistry",
+    metadataRegistry.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
+
+  await safeTransferOwnershipIfOwnedBy(
+    "MarketCorrelationRegistry",
+    marketCorrelationRegistry.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
+
+  await safeTransferOwnershipIfOwnedBy(
+    "ConditionalMarketFactory",
+    marketFactory.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
+
+  await safeTransferOwnershipIfOwnedBy(
+    "OracleResolver",
+    oracleResolver.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
+
+  await safeTransferOwnershipIfOwnedBy(
+    "RagequitModule",
+    ragequitModule.contract,
+    deployer.address,
+    futarchyGovernor.address
+  );
 
   // PrivacyCoordinator keeps deployer as owner for coordinator role
   console.log("PrivacyCoordinator coordinator remains as deployer");
@@ -298,13 +494,29 @@ async function main() {
   console.log("Salt Prefix:", saltPrefix);
   console.log("\nDeployed Contracts:");
   console.log("==================");
+  console.log("TieredRoleManager:", deployments.tieredRoleManager);
   console.log("WelfareMetricRegistry:", deployments.welfareRegistry);
   console.log("ProposalRegistry:", deployments.proposalRegistry);
+  console.log("MetadataRegistry:", deployments.metadataRegistry);
+  console.log("MarketCorrelationRegistry:", deployments.marketCorrelationRegistry);
   console.log("ConditionalMarketFactory:", deployments.marketFactory);
   console.log("PrivacyCoordinator:", deployments.privacyCoordinator);
   console.log("OracleResolver:", deployments.oracleResolver);
   console.log("RagequitModule:", deployments.ragequitModule);
   console.log("FutarchyGovernor:", deployments.futarchyGovernor);
+
+  // Optional verification (set VERIFY=true)
+  console.log("\nVerification (set VERIFY=true to enable):");
+  await verifyIfEnabled("TieredRoleManager", deployments.tieredRoleManager, []);
+  await verifyIfEnabled("WelfareMetricRegistry", deployments.welfareRegistry, []);
+  await verifyIfEnabled("ProposalRegistry", deployments.proposalRegistry, []);
+  await verifyIfEnabled("MetadataRegistry", deployments.metadataRegistry, []);
+  await verifyIfEnabled("MarketCorrelationRegistry", deployments.marketCorrelationRegistry, []);
+  await verifyIfEnabled("ConditionalMarketFactory", deployments.marketFactory, []);
+  await verifyIfEnabled("PrivacyCoordinator", deployments.privacyCoordinator, []);
+  await verifyIfEnabled("OracleResolver", deployments.oracleResolver, []);
+  await verifyIfEnabled("RagequitModule", deployments.ragequitModule, []);
+  await verifyIfEnabled("FutarchyGovernor", deployments.futarchyGovernor, []);
   console.log("\n✓ Deployment completed successfully!");
   console.log("\nNote: These addresses are deterministic and will be the same on any");
   console.log("      EVM-compatible network where Safe Singleton Factory is deployed.");

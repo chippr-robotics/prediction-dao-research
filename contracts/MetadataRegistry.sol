@@ -26,6 +26,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * 4. Frontend fetches CID from registry and metadata from IPFS
  */
 contract MetadataRegistry is Ownable {
+
+    address private constant SAFE_SINGLETON_FACTORY = address(0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7);
+
+    bool private _initialized;
     
     // ========== Data Structures ==========
     
@@ -120,6 +124,29 @@ contract MetadataRegistry is Ownable {
     constructor() Ownable(msg.sender) {
         // Owner is automatically an authorized updater
         authorizedUpdaters[msg.sender] = true;
+
+        // If deployed via Safe Singleton Factory (CREATE2), allow a one-time initialize()
+        // to transfer ownership to the intended admin.
+        _initialized = msg.sender != SAFE_SINGLETON_FACTORY;
+    }
+
+    /**
+     * @notice Initialize ownership after deterministic deployment (CREATE2)
+     * @dev Only callable once, intended for Safe Singleton Factory deployments.
+     *      For direct deployments, constructor marks as initialized.
+     */
+    function initialize(address initialOwner) external {
+        require(!_initialized, "Already initialized");
+        require(initialOwner != address(0), "Invalid owner");
+
+        address previousOwner = owner();
+        _initialized = true;
+        _transferOwnership(initialOwner);
+
+        // Ensure the intended owner can update metadata.
+        authorizedUpdaters[initialOwner] = true;
+        // Remove the factory as an updater if it was the deployer.
+        authorizedUpdaters[previousOwner] = false;
     }
     
     // ========== Modifiers ==========
