@@ -1,5 +1,48 @@
 require("@nomicfoundation/hardhat-toolbox");
 
+const { subtask } = require("hardhat/config");
+const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require("hardhat/builtin-tasks/task-names");
+
+subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async (args, hre, runSuper) => {
+  const solcBuild = await runSuper(args);
+
+  const isCodespaces = Boolean(process.env.CODESPACES || process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN);
+  const forceSolcJs =
+    (process.env.FORCE_SOLCJS ?? "").toLowerCase() === "true" ||
+    (isCodespaces && (process.env.FORCE_NATIVE_SOLC ?? "").toLowerCase() !== "true");
+
+  if (!forceSolcJs) {
+    return solcBuild;
+  }
+
+  let solcjsPath;
+  try {
+    solcjsPath = require.resolve("solc/soljson.js");
+  } catch (e) {
+    throw new Error(
+      "solc-js not found. Run `npm install` (or `npm i -D solc@0.8.24`) and retry."
+    );
+  }
+
+  let longVersion = solcBuild.longVersion;
+  try {
+    // eslint-disable-next-line global-require
+    const solc = require("solc");
+    if (typeof solc.version === "function") {
+      longVersion = solc.version();
+    }
+  } catch {
+    // ignore
+  }
+
+  return {
+    version: solcBuild.version,
+    longVersion,
+    compilerPath: solcjsPath,
+    isSolcJs: true,
+  };
+});
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
