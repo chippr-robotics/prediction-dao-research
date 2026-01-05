@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useModal } from '../../hooks/useUI'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
@@ -21,12 +21,91 @@ import './WalletButton.css'
 function WalletButton({ className = '', theme = 'dark' }) {
   const [isOpen, setIsOpen] = useState(false)
   const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
+  const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
   const { showModal } = useModal()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
+  const [connectorStatus, setConnectorStatus] = useState({})
+  const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
+  const [pendingConnector, setPendingConnector] = useState(null)
+
+  // Check connector availability on mount and when connectors change
+  useEffect(() => {
+    const checkConnectors = async () => {
+      setIsCheckingConnectors(true)
+      const status = {}
+      
+      for (const connector of connectors) {
+        try {
+          // For injected connectors, check if provider is available
+          if (connector.type === 'injected') {
+            // Check if there's an injected provider available
+            const hasProvider = typeof window !== 'undefined' && (
+              window.ethereum !== undefined ||
+              window.web3 !== undefined
+            )
+            status[connector.id] = hasProvider
+          } else if (connector.type === 'walletConnect') {
+            // WalletConnect is always available (it uses QR code / deep links)
+            status[connector.id] = true
+          } else {
+            // For other connectors, try to get provider
+            try {
+              const provider = await connector.getProvider()
+              status[connector.id] = !!provider
+            } catch {
+              status[connector.id] = true // Assume available if we can't check
+            }
+          }
+        } catch (error) {
+          console.warn(`Error checking connector ${connector.name}:`, error)
+          status[connector.id] = false
+        }
+      }
+      
+      setConnectorStatus(status)
+      setIsCheckingConnectors(false)
+    }
+    
+    checkConnectors()
+  }, [connectors])
+
+  // Helper to check if a connector is available
+  const isConnectorAvailable = useCallback((connector) => {
+    // WalletConnect is always available
+    if (connector.type === 'walletConnect') return true
+    // Check our cached status
+    return connectorStatus[connector.id] !== false
+  }, [connectorStatus])
+
+  // Track previous connection state to detect connection success
+  const wasConnected = useRef(isConnected)
+  
+  // Close dropdown only when connection state changes from disconnected to connected
+  // while we have a pending connection attempt
+  useEffect(() => {
+    // Only close if we were disconnected and now we're connected
+    // AND we initiated a connection (pendingConnector is set)
+    if (!wasConnected.current && isConnected && pendingConnector) {
+      setIsOpen(false)
+      setPendingConnector(null)
+    }
+    // Update the ref for next comparison
+    wasConnected.current = isConnected
+  }, [isConnected, pendingConnector])
+
+  // Reset pending connector when connection attempt finishes (success or failure)
+  useEffect(() => {
+    if (!isConnecting && pendingConnector) {
+      // Small delay to allow isConnected to update first
+      const timeout = setTimeout(() => {
+        setPendingConnector(null)
+      }, 100)
+      return () => clearTimeout(timeout)
+    }
+  }, [isConnecting, pendingConnector])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -66,13 +145,18 @@ function WalletButton({ className = '', theme = 'dark' }) {
     setIsOpen(!isOpen)
   }
 
-  const handleConnect = async (connector) => {
-    try {
-      await connect({ connector })
-      setIsOpen(false)
-    } catch (error) {
-      console.error('Error connecting wallet with', connector.name, ':', error)
-    }
+  const handleConnect = (connector) => {
+    // Track which connector we're trying to connect
+    setPendingConnector(connector.id)
+    
+    // Initiate connection - don't await, don't close dropdown
+    // The useEffect watching isConnected will close the dropdown when connected
+    connect({ connector }, {
+      onError: (error) => {
+        console.error('Error connecting wallet with', connector.name, ':', error)
+        setPendingConnector(null)
+      }
+    })
   }
 
   const handleDisconnect = () => {
@@ -96,10 +180,24 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
   const getConnectorName = (connector) => {
     // Format connector names nicely
-    if (connector.name === 'MetaMask') return 'MetaMask'
-    if (connector.name === 'WalletConnect') return 'WalletConnect'
-    if (connector.name === 'Injected') return 'Browser Wallet'
-    return connector.name
+    // Check connector name or type for better display
+    const name = connector.name?.toLowerCase() || ''
+    const type = connector.type?.toLowerCase() || ''
+    
+    if (name.includes('metamask') || type === 'metamask') return 'MetaMask'
+    if (name.includes('walletconnect') || type === 'walletconnect') return 'WalletConnect'
+    if (name.includes('coinbase')) return 'Coinbase Wallet'
+    if (name === 'injected' || type === 'injected') {
+      // Try to detect the actual wallet from window.ethereum
+      if (typeof window !== 'undefined' && window.ethereum) {
+        if (window.ethereum.isMetaMask) return 'MetaMask'
+        if (window.ethereum.isCoinbaseWallet) return 'Coinbase Wallet'
+        if (window.ethereum.isBraveWallet) return 'Brave Wallet'
+        if (window.ethereum.isRabby) return 'Rabby'
+      }
+      return 'Browser Wallet'
+    }
+    return connector.name || 'Wallet'
   }
 
   return (
@@ -134,22 +232,36 @@ function WalletButton({ className = '', theme = 'dark' }) {
                 <h3>Connect a Wallet</h3>
               </div>
               <div className="connector-list">
-                {connectors.map((connector) => (
-                  <button
-                    key={connector.id}
-                    onClick={() => handleConnect(connector)}
-                    className="connector-option"
-                    role="menuitem"
-                    disabled={!connector.ready}
-                  >
-                    <span className="connector-name">
-                      {getConnectorName(connector)}
-                    </span>
-                    {!connector.ready && (
-                      <span className="connector-status">Not Installed</span>
-                    )}
-                  </button>
-                ))}
+                {isCheckingConnectors ? (
+                  <div className="connector-loading">Detecting wallets...</div>
+                ) : (
+                  connectors.map((connector) => {
+                    const available = isConnectorAvailable(connector)
+                    const isThisConnecting = pendingConnector === connector.id && isConnecting
+                    return (
+                      <button
+                        key={connector.id}
+                        onClick={() => handleConnect(connector)}
+                        className={`connector-option ${!available ? 'unavailable' : ''} ${isThisConnecting ? 'connecting' : ''}`}
+                        role="menuitem"
+                        disabled={isConnecting}
+                      >
+                        <span className="connector-name">
+                          {getConnectorName(connector)}
+                        </span>
+                        {isThisConnecting && (
+                          <span className="connector-status connecting">Connecting...</span>
+                        )}
+                        {!isThisConnecting && !available && connector.type === 'injected' && (
+                          <span className="connector-status">Not Detected</span>
+                        )}
+                        {!isThisConnecting && connector.type === 'walletConnect' && (
+                          <span className="connector-badge">QR Code</span>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
               </div>
               <div className="dropdown-footer">
                 <p className="help-text">

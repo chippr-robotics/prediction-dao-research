@@ -1,10 +1,10 @@
 .user-management-modal {
   width: 100%;
-  max-width: 700px;
-  background: var(--color-surface);
-  border-radius: 12px;
+  max-width: none;
+  background: transparent;
+  border-radius: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .modal-header-section {
@@ -31,6 +31,20 @@
   font-family: monospace;
   font-size: 14px;
   color: var(--color-text-secondary);
+}
+
+.wallet-address-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wallet-address-full {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  opacity: 0.8;
+  word-break: break-all;
 }
 
 .status-dot {
@@ -232,8 +246,8 @@
 /* Tab Content */
 .tab-content {
   padding: 24px;
-  max-height: 500px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 /* Profile Section */
@@ -288,8 +302,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: white;
-  background: var(--color-error);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--danger-color, #dc2626);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -297,7 +311,7 @@
 }
 
 .disconnect-btn:hover {
-  background: var(--color-error-dark, #c53030);
+  background: var(--danger-color-hover, #b91c1c);
 }
 
 /* ClearPath Status */
@@ -345,8 +359,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--primary-button, #36B37E);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -355,7 +369,7 @@
 }
 
 .toggle-status-btn:hover {
-  background: var(--color-primary-dark);
+  background: var(--primary-button-hover, #2F9E6E);
 }
 
 .clearpath-description {
@@ -376,8 +390,8 @@
   padding: 10px 20px;
   font-size: 14px;
   font-weight: 500;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--primary-button, #36B37E);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -386,7 +400,7 @@
 }
 
 .toggle-demo-btn:hover {
-  background: var(--color-primary-dark);
+  background: var(--primary-button-hover, #2F9E6E);
 }
 
 .demo-mode-description {
@@ -468,8 +482,8 @@
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 500;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--primary-button, #36B37E);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -477,7 +491,7 @@
 }
 
 .search-btn:hover {
-  background: var(--color-primary-dark);
+  background: var(--primary-button-hover, #2F9E6E);
 }
 
 .recent-searches {
@@ -567,8 +581,8 @@
   padding: 14px 32px;
   font-size: 16px;
   font-weight: 600;
-  color: white;
-  background: var(--color-success);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--primary-button, #36B37E);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -577,7 +591,7 @@
 }
 
 .launch-market-btn:hover {
-  background: var(--color-success-dark, #2f855a);
+  background: var(--primary-button-hover, #2F9E6E);
   transform: translateY(-1px);
 }
 
@@ -639,7 +653,6 @@
 
   .tab-content {
     padding: 16px;
-    max-height: 400px;
   }
 
   .search-input-group {
@@ -850,8 +863,8 @@
   padding: 10px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: white;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent, #667eea));
+  color: var(--primary-button-text, #ffffff);
+  background: linear-gradient(135deg, var(--primary-button, #36B37E), var(--accent-color, #4C9AFF));
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -882,8 +895,8 @@
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: white;
-  background: var(--color-primary);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--primary-button, #36B37E);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -891,7 +904,7 @@
 }
 
 .manage-org-btn:hover {
-  background: var(--color-primary-dark);
+  background: var(--primary-button-hover, #2F9E6E);
   transform: translateY(-1px);
 }
 
@@ -907,8 +920,8 @@
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 600;
-  color: white;
-  background: var(--color-error);
+  color: var(--primary-button-text, #ffffff);
+  background: var(--danger-color, #dc2626);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -916,7 +929,7 @@
 }
 
 .admin-panel-btn:hover {
-  background: var(--color-error-dark, #c53030);
+  background: var(--danger-color-hover, #b91c1c);
   transform: translateY(-1px);
 }
 
