@@ -5,12 +5,13 @@ import { axe } from 'vitest-axe'
 import TokenMintButton from '../components/TokenMintButton'
 import { RoleContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
 
-// Mock wallet hook
+// Mock wallet and web3 hooks
 vi.mock('../hooks', () => ({
-  useWallet: vi.fn()
+  useWallet: vi.fn(),
+  useWeb3: vi.fn()
 }))
 
-import { useWallet } from '../hooks'
+import { useWallet, useWeb3 } from '../hooks'
 
 describe('TokenMintButton Component', () => {
   const mockShowModal = vi.fn()
@@ -56,6 +57,7 @@ describe('TokenMintButton Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useWallet.mockReturnValue({ isConnected: true })
+    useWeb3.mockReturnValue({ signer: {} })
   })
 
   describe('Rendering', () => {
@@ -252,8 +254,9 @@ describe('TokenMintButton Component', () => {
       const createMarketOption = await screen.findByText('Create New Market')
       await user.click(createMarketOption)
       
+      // The new implementation shows the MarketCreationModal component directly
       await waitFor(() => {
-        expect(mockShowModal).toHaveBeenCalled()
+        expect(screen.getByRole('dialog', { name: /create new/i })).toBeInTheDocument()
       })
     })
 

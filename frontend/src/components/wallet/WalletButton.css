@@ -136,8 +136,162 @@
   font-weight: 500;
 }
 
+.usc-balance {
+  font-size: 0.875rem;
+  color: var(--success-color, #4caf50);
+  font-weight: 600;
+}
+
+.get-usc-link {
+  font-size: 0.75rem;
+  color: var(--primary-color, #4a9eff);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.get-usc-link:hover {
+  color: var(--primary-hover, #6bb3ff);
+  text-decoration: underline;
+}
+
 .network-info {
   font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+}
+
+/* Extended Dropdown */
+.wallet-dropdown-extended {
+  min-width: 340px;
+}
+
+/* Dropdown Sections */
+.dropdown-section {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.wallet-section-title {
+  display: block;
+  margin: 0 0 0.375rem 0;
+  padding: 0;
+  font-size: 0.625rem !important;
+  font-weight: 500 !important;
+  color: var(--text-secondary, #888) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.section-title {
+  margin: 0 0 0.375rem 0;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Roles */
+.roles-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.role-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.role-badge {
+  font-size: 0.75rem;
+  color: var(--primary-color, #4a9eff);
+  background: rgba(74, 158, 255, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.premium-indicator {
+  color: var(--warning-color, #ffc107);
+  font-size: 0.75rem;
+}
+
+.get-roles-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Friend Markets Section */
+.friend-market-btn {
+  width: 100%;
+  justify-content: center;
+  background: var(--primary-color, #4a9eff);
+  border-color: var(--primary-color, #4a9eff);
+}
+
+.friend-market-btn:hover {
+  background: var(--primary-hover, #3a8eef);
+  border-color: var(--primary-hover, #3a8eef);
+}
+
+.friend-market-promo {
+  text-align: center;
+}
+
+.promo-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  margin: 0 0 0.5rem 0;
+}
+
+.purchase-access-btn {
+  width: 100%;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-color, #4a9eff), var(--success-color, #4caf50));
+  border: none;
+}
+
+.purchase-access-btn:hover {
+  opacity: 0.9;
+}
+
+/* Toggle Rows */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.toggle-label {
+  font-size: 0.875rem;
+  color: var(--text-primary, #ffffff);
+}
+
+.toggle-btn {
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-hover, #2a2a2a);
+  color: var(--text-primary, #ffffff);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: var(--surface-color, #1a1a1a);
+  border-color: var(--primary-color, #4a9eff);
+}
+
+.status-active {
+  color: var(--success-color, #4caf50);
+  font-weight: 600;
+}
+
+.status-inactive {
   color: var(--text-secondary, #888);
 }
 
@@ -275,6 +429,17 @@
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
   color: #ef4444;
+}
+
+.get-usdc-btn {
+  text-decoration: none;
+  color: var(--success-color, #4caf50);
+}
+
+.get-usdc-btn:hover {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: var(--success-color, #4caf50);
 }
 
 /* Dropdown Footer */

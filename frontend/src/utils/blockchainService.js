@@ -403,22 +403,37 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
     const treasuryAddress = getContractAddress('treasuryVault')
     const uscContract = new ethers.Contract(uscAddress, ERC20_ABI, signer)
 
-    // Convert price to USC wei (USC has 18 decimals)
-    const amountWei = ethers.parseEther(priceUSD.toString())
+    // Convert price to USC units (USC has 6 decimals like USDC)
+    // Use parseUnits with explicit decimals for precision
+    const amountWei = ethers.parseUnits(String(priceUSD), 6)
 
     // Check USC balance
     const userAddress = await signer.getAddress()
-    const balance = await uscContract.balanceOf(userAddress)
+    const balanceRaw = await uscContract.balanceOf(userAddress)
+    // Ensure balance is BigInt for proper comparison
+    const balance = BigInt(balanceRaw.toString())
+    const amount = BigInt(amountWei.toString())
 
-    if (balance < amountWei) {
-      throw new Error('Insufficient USC balance. You need ' + priceUSD + ' USC.')
+    // Debug logging for balance issues
+    console.log('USC Balance Check:', {
+      userAddress,
+      balanceWei: balance.toString(),
+      balanceFormatted: ethers.formatUnits(balance, 6),
+      requiredWei: amount.toString(),
+      requiredFormatted: priceUSD
+    })
+
+    if (balance < amount) {
+      const balanceFormatted = ethers.formatUnits(balance, 6)
+      throw new Error(`Insufficient USC balance. You have ${parseFloat(balanceFormatted).toFixed(2)} USC but need ${priceUSD} USC.`)
     }
 
     // Check allowance
-    const allowance = await uscContract.allowance(userAddress, treasuryAddress)
+    const allowanceRaw = await uscContract.allowance(userAddress, treasuryAddress)
+    const allowance = BigInt(allowanceRaw.toString())
 
     // Approve if needed
-    if (allowance < amountWei) {
+    if (allowance < amount) {
       const approveTx = await uscContract.approve(treasuryAddress, amountWei)
       await approveTx.wait()
     }

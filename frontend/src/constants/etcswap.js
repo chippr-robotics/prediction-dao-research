@@ -77,7 +77,7 @@ export const TOKENS = {
     address: ETCSWAP_ADDRESSES.USC_STABLECOIN,
     symbol: 'USC',
     name: 'Classic USD Stablecoin',
-    decimals: 18,
+    decimals: 6,
     icon: '💵'
   },
   ETC: {

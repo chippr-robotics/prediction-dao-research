@@ -140,6 +140,29 @@
   background: linear-gradient(135deg, rgba(45, 122, 79, 0.15) 0%, rgba(30, 90, 55, 0.15) 100%);
 }
 
+/* Disabled Option State */
+.dropdown-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dropdown-option.disabled:hover {
+  background: transparent;
+}
+
+.dropdown-option.disabled .option-label {
+  color: #9ca3af;
+}
+
+.dropdown-option.disabled .option-description {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.dropdown-option.disabled .option-icon {
+  filter: grayscale(100%);
+}
+
 /* Option Icon */
 .option-icon {
   font-size: 1.5rem;
