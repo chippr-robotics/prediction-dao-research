@@ -1,0 +1,592 @@
+/* MarketCreationModal Styles */
+
+.market-creation-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.market-creation-modal {
+  background: var(--card-background, #1a1a2e);
+  border-radius: 16px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+  animation: modalSlideUp 0.3s ease-out;
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Modal Header */
+.market-creation-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, #2d2d44);
+  position: sticky;
+  top: 0;
+  background: var(--card-background, #1a1a2e);
+  z-index: 10;
+}
+
+.market-creation-modal .modal-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #ffffff);
+}
+
+.market-creation-modal .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary, #a0a0b0);
+  padding: 0.25rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.market-creation-modal .close-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #2d2d44);
+  color: var(--text-primary, #ffffff);
+}
+
+.market-creation-modal .close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Tab Navigation */
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #2d2d44);
+  padding: 0;
+  background: var(--bg-secondary, #16162a);
+}
+
+.modal-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-secondary, #a0a0b0);
+}
+
+.modal-tab:hover:not(:disabled) {
+  background: var(--bg-hover, #1e1e35);
+  color: var(--text-primary, #ffffff);
+}
+
+.modal-tab.active {
+  background: var(--card-background, #1a1a2e);
+  border-bottom-color: var(--accent-primary, #4f46e5);
+  color: var(--text-primary, #ffffff);
+}
+
+.modal-tab:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tab-icon {
+  font-size: 1.5rem;
+}
+
+.tab-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Modal Body */
+.market-creation-modal .modal-body {
+  padding: 1.5rem;
+}
+
+.form-content {
+  min-height: 400px;
+}
+
+/* Form Sections */
+.market-creation-modal .form-section {
+  margin-bottom: 2rem;
+}
+
+.market-creation-modal .form-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.market-creation-modal .form-section h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color, #2d2d44);
+}
+
+.market-creation-modal .section-label {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 1rem;
+}
+
+/* Form Groups */
+.market-creation-modal .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.market-creation-modal .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.market-creation-modal .form-group label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 0.5rem;
+}
+
+.market-creation-modal .required {
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+.market-creation-modal .form-group input[type="text"],
+.market-creation-modal .form-group input[type="number"],
+.market-creation-modal .form-group input[type="datetime-local"],
+.market-creation-modal .form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #2d2d44);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: var(--bg-secondary, #16162a);
+  color: var(--text-primary, #ffffff);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.market-creation-modal .form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.market-creation-modal .form-group input:focus,
+.market-creation-modal .form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary, #4f46e5);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.market-creation-modal .form-group input.error,
+.market-creation-modal .form-group textarea.error {
+  border-color: #ef4444;
+}
+
+.market-creation-modal .form-group input:disabled,
+.market-creation-modal .form-group textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.market-creation-modal .field-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #a0a0b0);
+  margin-top: 0.4rem;
+  line-height: 1.4;
+}
+
+.market-creation-modal .error-message {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin-top: 0.4rem;
+  font-weight: 500;
+}
+
+/* Form Row */
+.market-creation-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Type Selectors (Market Type & Token Type) */
+.market-type-selector,
+.token-type-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.market-type-selector {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.token-type-selector {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.type-option {
+  background: var(--bg-secondary, #16162a);
+  border: 2px solid var(--border-color, #2d2d44);
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.type-option:hover:not(:disabled) {
+  border-color: var(--accent-primary, #4f46e5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.type-option.active {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(236, 72, 153, 0.1));
+  border-color: var(--accent-primary, #4f46e5);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.25);
+}
+
+.type-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.type-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.type-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 0.25rem;
+}
+
+.type-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #a0a0b0);
+}
+
+/* Checkbox Groups */
+.market-creation-modal .checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.market-creation-modal .checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+  padding: 1rem;
+  background: var(--bg-secondary, #16162a);
+  border: 1px solid var(--border-color, #2d2d44);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.market-creation-modal .checkbox-label:hover {
+  border-color: var(--accent-primary, #4f46e5);
+  background: var(--bg-hover, #1e1e35);
+}
+
+.market-creation-modal .checkbox-label input[type="checkbox"] {
+  margin-right: 1rem;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: var(--accent-primary, #4f46e5);
+}
+
+.market-creation-modal .checkbox-label input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.market-creation-modal .checkbox-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.market-creation-modal .checkbox-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.market-creation-modal .checkbox-title {
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 0.25rem;
+}
+
+.market-creation-modal .checkbox-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #a0a0b0);
+  line-height: 1.4;
+}
+
+/* Network Warning */
+.network-warning {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.network-warning > span:first-child {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.network-warning strong {
+  display: block;
+  color: #f59e0b;
+  margin-bottom: 0.25rem;
+}
+
+.network-warning p {
+  font-size: 0.9rem;
+  color: var(--text-primary, #ffffff);
+  margin: 0 0 0.75rem;
+}
+
+.switch-network-btn {
+  background: #f59e0b;
+  border: none;
+  color: #000;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.switch-network-btn:hover {
+  background: #d97706;
+}
+
+/* Submit Error */
+.market-creation-modal .submit-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 1rem;
+  color: #ef4444;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+/* Modal Actions */
+.market-creation-modal .modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color, #2d2d44);
+  margin-top: 1.5rem;
+}
+
+.market-creation-modal .cancel-btn {
+  background: var(--bg-secondary, #16162a);
+  border: 1px solid var(--border-color, #2d2d44);
+  color: var(--text-primary, #ffffff);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.market-creation-modal .cancel-btn:hover:not(:disabled) {
+  background: var(--bg-hover, #1e1e35);
+  border-color: var(--text-secondary, #a0a0b0);
+}
+
+.market-creation-modal .cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.market-creation-modal .create-btn {
+  background: linear-gradient(135deg, var(--accent-primary, #4f46e5), var(--accent-secondary, #ec4899));
+  border: none;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.market-creation-modal .create-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+}
+
+.market-creation-modal .create-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.market-creation-modal .create-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.market-creation-modal .spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .market-creation-modal {
+    max-height: 95vh;
+    margin: 0.5rem;
+  }
+
+  .market-creation-modal .modal-header,
+  .market-creation-modal .modal-body {
+    padding: 1rem;
+  }
+
+  .modal-tabs {
+    overflow-x: auto;
+  }
+
+  .modal-tab {
+    padding: 0.75rem 0.5rem;
+    min-width: 100px;
+  }
+
+  .tab-label {
+    font-size: 0.75rem;
+  }
+
+  .market-type-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .token-type-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .market-creation-modal .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .market-creation-modal .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .market-creation-modal .cancel-btn,
+  .market-creation-modal .create-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-tab {
+    padding: 0.5rem;
+  }
+
+  .tab-icon {
+    font-size: 1.25rem;
+  }
+
+  .type-option {
+    padding: 1rem 0.75rem;
+  }
+
+  .type-icon {
+    font-size: 1.5rem;
+  }
+
+  .type-name {
+    font-size: 0.9rem;
+  }
+
+  .type-desc {
+    font-size: 0.75rem;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .market-creation-modal {
+    animation: none;
+  }
+
+  .market-creation-modal .spinner-small {
+    animation: none;
+  }
+
+  .type-option:hover:not(:disabled),
+  .market-creation-modal .create-btn:hover:not(:disabled) {
+    transform: none;
+  }
+}

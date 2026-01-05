@@ -12,3 +12,8 @@ export { default as CategoryRow } from './CategoryRow'
 export { default as FairWinsAppNew } from './FairWinsAppNew'
 export { default as Dashboard } from './Dashboard'
 export { default as MarketsTable } from './MarketsTable'
+
+// Modal Components
+export { default as TokenMintBuilderModal } from './TokenMintBuilderModal'
+export { default as MarketCreationModal } from './MarketCreationModal'
+export { default as MarketModal } from './MarketModal'
