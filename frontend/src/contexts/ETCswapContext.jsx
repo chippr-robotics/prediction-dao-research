@@ -54,13 +54,13 @@ export function ETCswapProvider({ children }) {
       // Get WETC balance
       const wetcBalance = await contracts.wetc.balanceOf(address)
       
-      // Get USC balance
+      // Get USC balance (USC has 6 decimals like USDC)
       const uscBalance = await contracts.usc.balanceOf(address)
       
       const newBalances = {
         etc: ethers.formatEther(etcBalance),
         wetc: ethers.formatEther(wetcBalance),
-        usc: ethers.formatEther(uscBalance)
+        usc: ethers.formatUnits(uscBalance, 6)
       }
       
       setBalances(newBalances)

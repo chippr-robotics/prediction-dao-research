@@ -22,6 +22,7 @@ function RolePurchaseModal({ onClose }) {
     [ROLES.MARKET_MAKER]: 100,
     [ROLES.CLEARPATH_USER]: 250,
     [ROLES.TOKENMINT]: 150,
+    [ROLES.FRIEND_MARKET]: 50,
   }
 
   const handlePurchase = async () => {

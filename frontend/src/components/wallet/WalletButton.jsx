@@ -1,8 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
+import { useNavigate } from 'react-router-dom'
+import { useETCswap } from '../../hooks/useETCswap'
+import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { useWalletRoles } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
+import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
-import UserManagementModal from '../ui/UserManagementModal'
+import RolePurchaseModal from '../ui/RolePurchaseModal'
+import MarketCreationModal from '../fairwins/MarketCreationModal'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import './WalletButton.css'
 
@@ -20,11 +26,16 @@ import './WalletButton.css'
  */
 function WalletButton({ className = '', theme = 'dark' }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
+  const navigate = useNavigate()
   const { showModal } = useModal()
+  const { balances, loading: balanceLoading } = useETCswap()
+  const { preferences, setDemoMode } = useUserPreferences()
+  const { roles, hasRole } = useWalletRoles()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   const [connectorStatus, setConnectorStatus] = useState({})
@@ -164,13 +175,38 @@ function WalletButton({ className = '', theme = 'dark' }) {
     setIsOpen(false)
   }
 
-  const handleOpenUserManagement = () => {
+  const handleToggleDemoMode = () => {
+    setDemoMode(!preferences.demoMode)
+  }
+
+  const handleOpenPurchaseModal = () => {
     setIsOpen(false)
-    showModal(<UserManagementModal />, {
-      title: 'User Management',
+    showModal(<RolePurchaseModal onClose={() => showModal(null)} />, {
+      title: '',
       size: 'large',
-      closable: true
+      closable: false
     })
+  }
+
+  const handleOpenFriendMarket = () => {
+    setIsOpen(false)
+    setShowFriendMarketModal(true)
+  }
+
+  const handleFriendMarketCreation = async (data, signer) => {
+    console.log('Friend market creation:', data)
+    setShowFriendMarketModal(false)
+    // The MarketCreationModal handles the actual creation
+  }
+
+  const handleNavigateToClearPath = () => {
+    setIsOpen(false)
+    navigate('/clearpath')
+  }
+
+  const handleNavigateToAdmin = () => {
+    setIsOpen(false)
+    navigate('/admin/roles')
   }
 
   const shortenAddress = (addr) => {
@@ -295,7 +331,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
           {isOpen && (
             <div 
               ref={dropdownRef}
-              className="wallet-dropdown"
+              className="wallet-dropdown wallet-dropdown-extended"
               role="menu"
             >
               <div className="dropdown-header">
@@ -303,20 +339,116 @@ function WalletButton({ className = '', theme = 'dark' }) {
                   <BlockiesAvatar address={address} size={40} />
                   <div className="account-details">
                     <span className="account-address-full">{shortenAddress(address)}</span>
+                    <span className="usc-balance">
+                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.usc || 0).toFixed(2)} USC`}
+                    </span>
                     <span className="network-info">Chain ID: {chainId}</span>
                   </div>
                 </div>
               </div>
+
+              {/* Roles Section */}
+              <div className="dropdown-section">
+                <span className="wallet-section-title">Your Roles</span>
+                {roles.length > 0 ? (
+                  <div className="roles-list">
+                    {roles.map(role => {
+                      const roleInfo = ROLE_INFO[role]
+                      return (
+                        <div key={role} className="role-item">
+                          <span className="role-badge">{roleInfo?.name || role}</span>
+                          {roleInfo?.premium && <span className="premium-indicator">★</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleOpenPurchaseModal}
+                    className="action-button get-roles-btn"
+                    role="menuitem"
+                  >
+                    <span aria-hidden="true">🎫</span>
+                    <span>Get Premium Access</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Friend Markets Section */}
+              <div className="dropdown-section">
+                <span className="wallet-section-title">Friend Markets</span>
+                {hasRole(ROLES.FRIEND_MARKET) ? (
+                  <button 
+                    onClick={handleOpenFriendMarket}
+                    className="action-button friend-market-btn"
+                    role="menuitem"
+                  >
+                    <span aria-hidden="true">🎯</span>
+                    <span>Create Friend Market</span>
+                  </button>
+                ) : (
+                  <div className="friend-market-promo">
+                    <p className="promo-text">Create private prediction markets with friends!</p>
+                    <button 
+                      onClick={handleOpenPurchaseModal}
+                      className="action-button purchase-access-btn"
+                      role="menuitem"
+                    >
+                      <span aria-hidden="true">🔓</span>
+                      <span>Get Access - 50 USC</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Data Source Toggle */}
+              <div className="dropdown-section">
+                <div className="toggle-row">
+                  <span className="toggle-label">
+                    {preferences.demoMode ? '🎭 Demo Mode' : '🌐 Live Mode'}
+                  </span>
+                  <button 
+                    onClick={handleToggleDemoMode}
+                    className="toggle-btn"
+                    aria-label={`Switch to ${preferences.demoMode ? 'Live' : 'Demo'} Mode`}
+                  >
+                    {preferences.demoMode ? 'Go Live' : 'Use Demo'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation Actions */}
               <div className="dropdown-actions">
-                <button
-                  onClick={handleOpenUserManagement}
-                  className="action-button"
+                {hasRole(ROLES.CLEARPATH_USER) && (
+                  <button
+                    onClick={handleNavigateToClearPath}
+                    className="action-button"
+                    role="menuitem"
+                  >
+                    <span aria-hidden="true">🏛️</span>
+                    <span>Manage Organizations</span>
+                  </button>
+                )}
+                {hasRole(ROLES.ADMIN) && (
+                  <button
+                    onClick={handleNavigateToAdmin}
+                    className="action-button"
+                    role="menuitem"
+                  >
+                    <span aria-hidden="true">👑</span>
+                    <span>Role Management</span>
+                  </button>
+                )}
+                <a
+                  href="https://v3.etcswap.org/#/swap"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="action-button get-usdc-btn"
                   role="menuitem"
-                  aria-label="Manage settings and preferences"
                 >
-                  <span aria-hidden="true">⚙️</span>
-                  <span>Manage Settings</span>
-                </button>
+                  <span aria-hidden="true">💰</span>
+                  <span>Get USC</span>
+                </a>
                 <button
                   onClick={handleDisconnect}
                   className="action-button disconnect-button"
@@ -331,6 +463,14 @@ function WalletButton({ className = '', theme = 'dark' }) {
           )}
         </>
       )}
+
+      {/* Friend Market Creation Modal */}
+      <MarketCreationModal
+        isOpen={showFriendMarketModal}
+        onClose={() => setShowFriendMarketModal(false)}
+        onCreate={handleFriendMarketCreation}
+        defaultTab="friend"
+      />
     </div>
   )
 }

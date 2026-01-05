@@ -9,6 +9,7 @@ export const ROLES = {
   MARKET_MAKER: 'MARKET_MAKER',
   CLEARPATH_USER: 'CLEARPATH_USER',
   TOKENMINT: 'TOKENMINT',
+  FRIEND_MARKET: 'FRIEND_MARKET',
   ADMIN: 'ADMIN', // For role management
 }
 
@@ -29,6 +30,11 @@ export const ROLE_INFO = {
   [ROLES.TOKENMINT]: {
     name: 'Token Mint',
     description: 'Access to mint and manage NFTs and ERC20 tokens',
+    premium: true
+  },
+  [ROLES.FRIEND_MARKET]: {
+    name: 'Friend Markets',
+    description: 'Create private prediction markets with friends',
     premium: true
   },
   [ROLES.ADMIN]: {

@@ -311,26 +311,30 @@ function TokenMintButton() {
     const hasMembership = hasRole(ROLES.CLEARPATH_USER) && preferences.clearPathStatus?.active
 
     // Token creation options - requires TOKENMINT role
-    if (hasRole(ROLES.TOKENMINT)) {
-      options.push({
-        id: 'create-token',
-        label: 'Create New Token',
-        icon: '🪙',
-        description: 'Mint ERC20 or ERC721 tokens',
-        action: handleOpenTokenBuilder
-      })
-    }
+    const hasTokenMintRole = hasRole(ROLES.TOKENMINT)
+    options.push({
+      id: 'create-token',
+      label: 'Create New Token',
+      icon: '🪙',
+      description: hasTokenMintRole 
+        ? 'Mint ERC20 or ERC721 tokens' 
+        : 'Requires TokenMint role',
+      action: handleOpenTokenBuilder,
+      disabled: !hasTokenMintRole
+    })
 
     // Market creation options - requires MARKET_MAKER role
-    if (hasRole(ROLES.MARKET_MAKER)) {
-      options.push({
-        id: 'create-market',
-        label: 'Create New Market',
-        icon: '📊',
-        description: 'Create a prediction market',
-        action: handleCreateMarket
-      })
-    }
+    const hasMarketMakerRole = hasRole(ROLES.MARKET_MAKER)
+    options.push({
+      id: 'create-market',
+      label: 'Create New Market',
+      icon: '📊',
+      description: hasMarketMakerRole 
+        ? 'Create a prediction market' 
+        : 'Requires Market Maker role',
+      action: handleCreateMarket,
+      disabled: !hasMarketMakerRole
+    })
 
     // If no membership, show purchase option
     if (!hasMembership) {
@@ -338,9 +342,7 @@ function TokenMintButton() {
         id: 'purchase-membership',
         label: 'Purchase Membership',
         icon: '🎫',
-        description: options.length === 0 
-          ? 'Get access to token minting and market creation'
-          : 'Get access to premium features',
+        description: 'Get access to token minting and market creation',
         action: handlePurchaseMembership,
         highlight: true
       })
@@ -385,9 +387,11 @@ function TokenMintButton() {
               {menuOptions.map((option) => (
                 <button
                   key={option.id}
-                  className={`dropdown-option ${option.highlight ? 'highlight' : ''}`}
-                  onClick={option.action}
+                  className={`dropdown-option ${option.highlight ? 'highlight' : ''} ${option.disabled ? 'disabled' : ''}`}
+                  onClick={option.disabled ? undefined : option.action}
                   role="menuitem"
+                  aria-disabled={option.disabled}
+                  disabled={option.disabled}
                 >
                   <span className="option-icon" aria-hidden="true">{option.icon}</span>
                   <div className="option-content">

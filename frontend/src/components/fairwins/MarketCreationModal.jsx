@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import './MarketCreationModal.css'
 
@@ -12,12 +12,19 @@ import './MarketCreationModal.css'
  *
  * Integrates with Web3 for blockchain transactions
  */
-function MarketCreationModal({ isOpen, onClose, onCreate }) {
+function MarketCreationModal({ isOpen, onClose, onCreate, defaultTab = 'prediction' }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
 
   // Tab state
-  const [activeTab, setActiveTab] = useState('prediction') // 'prediction', 'friend', 'token'
+  const [activeTab, setActiveTab] = useState(defaultTab) // 'prediction', 'friend', 'token'
+
+  // Reset to default tab when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(defaultTab)
+    }
+  }, [isOpen, defaultTab])
 
   // Friend market sub-type
   const [friendMarketType, setFriendMarketType] = useState('oneVsOne') // 'oneVsOne', 'smallGroup', 'eventTracking'
