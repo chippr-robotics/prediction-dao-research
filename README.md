@@ -2,6 +2,10 @@
 
 # FairWins — Prediction Market Platform Suite
 
+> FairWins is not a place to bet on outcomes.
+It is a system designed to discover, discipline, and distill information—
+even when participants are automated, strategic, and adversarial.
+
 **Clear signals for collective decisions** — A comprehensive prediction market platform with optional DAO governance capabilities:
 
 - **FairWins** (Primary): Open prediction markets for anyone to create, join, and resolve markets
