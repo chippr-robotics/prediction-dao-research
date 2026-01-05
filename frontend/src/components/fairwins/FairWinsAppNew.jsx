@@ -4,8 +4,11 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
 import { useDataFetcher } from '../../hooks/useDataFetcher'
 import useFuseSearch from '../../hooks/useFuseSearch'
+import { useWalletTransactions } from '../../hooks/useWalletManagement'
+import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import { getSubcategoriesForCategory } from '../../config/subcategories'
+import { buyMarketShares, estimateBuyGas } from '../../utils/blockchainService'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -30,6 +33,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
   const { roles, ROLES } = useRoles()
   const { getMarkets } = useDataFetcher()
+  const { signer } = useWalletTransactions()
+  const { showNotification } = useNotification()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
@@ -135,13 +140,64 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleTrade = (tradeData) => {
-    alert(`Trading functionality requires deployed contracts.
+  const handleTrade = async (tradeData) => {
+    // Check wallet connection
+    if (!isConnected || !signer) {
+      showNotification('Please connect your wallet to trade', 'error', 5000)
+      return
+    }
 
-Trade Details:
-- Market: ${tradeData.market.proposalTitle}
-- Type: ${tradeData.type}
-- Amount: ${tradeData.amount} ETC`)
+    // Validate trade data
+    if (!tradeData.market?.id) {
+      showNotification('Invalid market data', 'error', 5000)
+      return
+    }
+
+    if (!tradeData.amount || tradeData.amount <= 0) {
+      showNotification('Invalid trade amount', 'error', 5000)
+      return
+    }
+
+    try {
+      const marketId = tradeData.market.id
+      const outcome = tradeData.type === 'PASS' // true for YES/PASS, false for NO/FAIL
+      const amount = tradeData.amount.toString()
+
+      // Show notification that transaction is being prepared
+      showNotification('Preparing transaction...', 'info', 3000)
+
+      // Estimate gas (optional, for better UX)
+      try {
+        const gasEstimate = await estimateBuyGas(signer, marketId, outcome, amount)
+        console.log('Estimated gas cost:', gasEstimate, 'ETC')
+      } catch (gasError) {
+        console.warn('Could not estimate gas:', gasError)
+      }
+
+      // Execute the transaction
+      showNotification('Please confirm the transaction in your wallet', 'info', 5000)
+
+      const receipt = await buyMarketShares(signer, marketId, outcome, amount)
+
+      // Show success notification with transaction hash
+      showNotification(
+        `Trade successful! ${tradeData.amount} ETC for ${tradeData.type} shares`,
+        'success',
+        7000
+      )
+
+      console.log('Transaction receipt:', receipt)
+
+      // Optionally refresh market data
+      await loadMarkets()
+
+    } catch (error) {
+      console.error('Trade error:', error)
+
+      // Show user-friendly error message
+      const errorMessage = error.message || 'Transaction failed'
+      showNotification(errorMessage, 'error', 7000)
+    }
   }
 
   const handleCloseHero = () => {

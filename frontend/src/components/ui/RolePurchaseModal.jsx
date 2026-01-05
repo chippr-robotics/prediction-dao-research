@@ -1,20 +1,23 @@
 import { useState } from 'react'
 import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
+import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { recordRolePurchase } from '../../utils/roleStorage'
+import { purchaseRoleWithUSC } from '../../utils/blockchainService'
 import './RolePurchaseModal.css'
 
 function RolePurchaseModal({ onClose }) {
   const { ROLES, ROLE_INFO, grantRole } = useRoles()
   const { account, isConnected } = useWeb3()
+  const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
   const [selectedRole, setSelectedRole] = useState(ROLES.CLEARPATH_USER)
   const [zkPublicKey, setZkPublicKey] = useState('')
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseStep, setPurchaseStep] = useState('select') // select, payment, register, complete
 
-  // Mock prices in USDC (6 decimals)
+  // Prices in USC stablecoin
   const ROLE_PRICES = {
     [ROLES.MARKET_MAKER]: 100,
     [ROLES.CLEARPATH_USER]: 250,
@@ -27,30 +30,36 @@ function RolePurchaseModal({ onClose }) {
       return
     }
 
+    if (!signer) {
+      showNotification('Wallet signer not available', 'error')
+      return
+    }
+
     setIsPurchasing(true)
     setPurchaseStep('payment')
 
     try {
-      // Simulate payment transaction
-      // In a real implementation, this would interact with a smart contract
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      const price = ROLE_PRICES[selectedRole]
+      const roleName = ROLE_INFO[selectedRole].name
+
+      // Show notification for wallet confirmation
+      showNotification('Please confirm the transaction in your wallet', 'info', 5000)
+
+      // Execute blockchain transaction
+      const receipt = await purchaseRoleWithUSC(signer, roleName, price)
 
       // Grant the role
       const success = grantRole(selectedRole)
-      
+
       if (success) {
         // Record the purchase
-        let txHash
-        // Mock tx hash for development/testing
-        txHash = 'MOCK_TX_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-
         recordRolePurchase(account, selectedRole, {
-          price: ROLE_PRICES[selectedRole],
-          currency: 'USDC',
-          txHash: txHash,
+          price: price,
+          currency: 'USC',
+          txHash: receipt.hash,
         })
 
-        showNotification(`Successfully purchased ${ROLE_INFO[selectedRole].name}!`, 'success')
+        showNotification(`Successfully purchased ${roleName}!`, 'success', 7000)
 
         // Move to registration step for ClearPath
         if (selectedRole === ROLES.CLEARPATH_USER) {
@@ -64,7 +73,7 @@ function RolePurchaseModal({ onClose }) {
       }
     } catch (error) {
       console.error('Purchase error:', error)
-      showNotification('Purchase failed: ' + error.message, 'error')
+      showNotification('Purchase failed: ' + error.message, 'error', 7000)
       setPurchaseStep('select')
     } finally {
       setIsPurchasing(false)
@@ -114,7 +123,7 @@ function RolePurchaseModal({ onClose }) {
         {purchaseStep === 'select' && (
           <div className="select-step">
             <p className="step-description">
-              Select a premium role to unlock exclusive features. All purchases are processed securely using stablecoin.
+              Select a premium role to unlock exclusive features. All purchases are processed securely using USC stablecoin.
             </p>
 
             <div className="role-options">
@@ -133,7 +142,7 @@ function RolePurchaseModal({ onClose }) {
                     <div className="role-option-content">
                       <div className="role-option-header">
                         <span className="role-option-name">{roleInfo.name}</span>
-                        <span className="role-option-price">${ROLE_PRICES[roleKey]} USDC</span>
+                        <span className="role-option-price">${ROLE_PRICES[roleKey]} USC</span>
                       </div>
                       <p className="role-option-description">{roleInfo.description}</p>
                     </div>
@@ -150,7 +159,7 @@ function RolePurchaseModal({ onClose }) {
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Price:</span>
-                  <span className="summary-value">${price} USDC</span>
+                  <span className="summary-value">${price} USC</span>
                 </div>
               </div>
             </div>
@@ -171,11 +180,11 @@ function RolePurchaseModal({ onClose }) {
               <div className="spinner"></div>
             </div>
             <h3>Processing Payment</h3>
-            <p>Please wait while we process your payment...</p>
+            <p>Confirm the transaction in your wallet and wait for confirmation...</p>
             <div className="payment-details">
               <div className="detail-row">
                 <span>Amount:</span>
-                <span>${price} USDC</span>
+                <span>${price} USC</span>
               </div>
               <div className="detail-row">
                 <span>Role:</span>

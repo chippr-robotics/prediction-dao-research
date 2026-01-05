@@ -10,6 +10,8 @@ import { getContractAddress, NETWORK_CONFIG } from '../config/contracts'
 import { MARKET_FACTORY_ABI } from '../abis/ConditionalMarketFactory'
 import { PROPOSAL_REGISTRY_ABI } from '../abis/ProposalRegistry'
 import { WELFARE_METRIC_REGISTRY_ABI } from '../abis/WelfareMetricRegistry'
+import { ERC20_ABI } from '../abis/ERC20'
+import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 
 /**
  * Get a provider for reading from the blockchain
@@ -259,4 +261,189 @@ function getProposalStatus(status) {
     4: 'Forfeited'
   }
   return statusMap[status] || 'Reviewing'
+}
+
+/**
+ * Buy shares in a prediction market
+ * @param {ethers.Signer} signer - Connected wallet signer
+ * @param {number} marketId - Market ID
+ * @param {boolean} outcome - true for YES, false for NO
+ * @param {string} amount - Amount in ETC to spend
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function buyMarketShares(signer, marketId, outcome, amount) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  try {
+    const contract = getContract('marketFactory', signer)
+    const amountWei = ethers.parseEther(amount.toString())
+
+    // Call the buy function with value
+    const tx = await contract.buy(marketId, outcome, amountWei, {
+      value: amountWei
+    })
+
+    // Wait for transaction confirmation
+    const receipt = await tx.wait()
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString()
+    }
+  } catch (error) {
+    console.error('Error buying market shares:', error)
+
+    // Parse common error messages
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else if (error.message.includes('insufficient funds')) {
+      throw new Error('Insufficient funds for transaction')
+    } else if (error.message.includes('Market not active')) {
+      throw new Error('Market is not active')
+    } else {
+      throw new Error(error.message || 'Transaction failed')
+    }
+  }
+}
+
+/**
+ * Estimate gas for buying shares
+ * @param {ethers.Signer} signer - Connected wallet signer
+ * @param {number} marketId - Market ID
+ * @param {boolean} outcome - true for YES, false for NO
+ * @param {string} amount - Amount in ETC to spend
+ * @returns {Promise<string>} Estimated gas in ETC
+ */
+export async function estimateBuyGas(signer, marketId, outcome, amount) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  try {
+    const contract = getContract('marketFactory', signer)
+    const amountWei = ethers.parseEther(amount.toString())
+
+    const gasEstimate = await contract.buy.estimateGas(marketId, outcome, amountWei, {
+      value: amountWei
+    })
+
+    // Get current gas price
+    const provider = signer.provider
+    const feeData = await provider.getFeeData()
+    const gasPrice = feeData.gasPrice || ethers.parseUnits('1', 'gwei')
+
+    // Calculate total gas cost
+    const gasCost = gasEstimate * gasPrice
+
+    return ethers.formatEther(gasCost)
+  } catch (error) {
+    console.error('Error estimating gas:', error)
+    // Return a default estimate if estimation fails
+    return '0.001'
+  }
+}
+
+/**
+ * Sell shares in a prediction market
+ * @param {ethers.Signer} signer - Connected wallet signer
+ * @param {number} marketId - Market ID
+ * @param {boolean} outcome - true for YES, false for NO
+ * @param {string} shares - Number of shares to sell
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function sellMarketShares(signer, marketId, outcome, shares) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  try {
+    const contract = getContract('marketFactory', signer)
+    const sharesWei = ethers.parseEther(shares.toString())
+
+    const tx = await contract.sell(marketId, outcome, sharesWei)
+    const receipt = await tx.wait()
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString()
+    }
+  } catch (error) {
+    console.error('Error selling market shares:', error)
+
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else if (error.message.includes('insufficient shares')) {
+      throw new Error('Insufficient shares to sell')
+    } else {
+      throw new Error(error.message || 'Transaction failed')
+    }
+  }
+}
+
+/**
+ * Purchase a role using USC stablecoin
+ * @param {ethers.Signer} signer - Connected wallet signer
+ * @param {string} roleName - Name of the role being purchased
+ * @param {number} priceUSD - Price in USD (will be converted to USC with 18 decimals)
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  try {
+    const uscAddress = ETCSWAP_ADDRESSES.USC_STABLECOIN
+    const treasuryAddress = getContractAddress('treasuryVault')
+    const uscContract = new ethers.Contract(uscAddress, ERC20_ABI, signer)
+
+    // Convert price to USC wei (USC has 18 decimals)
+    const amountWei = ethers.parseEther(priceUSD.toString())
+
+    // Check USC balance
+    const userAddress = await signer.getAddress()
+    const balance = await uscContract.balanceOf(userAddress)
+
+    if (balance < amountWei) {
+      throw new Error('Insufficient USC balance. You need ' + priceUSD + ' USC.')
+    }
+
+    // Check allowance
+    const allowance = await uscContract.allowance(userAddress, treasuryAddress)
+
+    // Approve if needed
+    if (allowance < amountWei) {
+      const approveTx = await uscContract.approve(treasuryAddress, amountWei)
+      await approveTx.wait()
+    }
+
+    // Transfer USC to treasury
+    const transferTx = await uscContract.transfer(treasuryAddress, amountWei)
+    const receipt = await transferTx.wait()
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
+      roleName: roleName,
+      amount: priceUSD
+    }
+  } catch (error) {
+    console.error('Error purchasing role:', error)
+
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else if (error.message.includes('Insufficient USC balance')) {
+      throw error
+    } else {
+      throw new Error(error.message || 'Transaction failed')
+    }
+  }
 }
