@@ -1,0 +1,1277 @@
+/**
+ * FairWins User Modal Styles
+ * 
+ * Comprehensive styling for the user management modal
+ * - Supports light/dark themes via CSS custom properties
+ * - Supports platform-specific styling (FairWins/ClearPath)
+ * - Fully accessible with focus states and reduced motion support
+ * - Responsive design for mobile/tablet/desktop
+ */
+
+/* ===========================
+   Base Modal Styles
+   =========================== */
+
+.fairwins-user-modal {
+  width: 100%;
+  max-width: 100%;
+  background: var(--bg-secondary, #ffffff);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  font-family: var(--font-family, system-ui, -apple-system, sans-serif);
+}
+
+/* ===========================
+   Header Section
+   =========================== */
+
+.fwum-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: var(--bg-primary, #f8fafc);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.fwum-wallet-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fwum-avatar {
+  border-radius: 50%;
+  border: 3px solid var(--brand-primary, #36B37E);
+  box-shadow: 0 0 0 2px var(--bg-primary, #f8fafc);
+}
+
+.fwum-wallet-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fwum-address {
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  color: var(--text-primary, #1a202c);
+}
+
+.fwum-address-full {
+  font-size: 0.75rem;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  color: var(--text-tertiary, #a0aec0);
+  word-break: break-all;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fwum-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.fwum-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary, #a0aec0);
+}
+
+.fwum-status-dot.connected {
+  background: var(--success-color, #48bb78);
+  box-shadow: 0 0 8px var(--success-color, #48bb78);
+  animation: pulse-status 2s infinite;
+}
+
+@keyframes pulse-status {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.fwum-status-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--success-color, #48bb78);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fwum-disconnect-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: white;
+  background: var(--danger-color, #e53e3e);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fwum-disconnect-btn:hover {
+  background: var(--danger-color-hover, #c53030);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);
+}
+
+.fwum-disconnect-btn:active {
+  transform: translateY(0);
+}
+
+/* ===========================
+   Tab Navigation
+   =========================== */
+
+.fwum-tabs {
+  display: flex;
+  background: var(--bg-secondary, #ffffff);
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.fwum-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.fwum-tab {
+  flex: 1;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary, #718096);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.fwum-tab:hover {
+  color: var(--text-primary, #1a202c);
+  background: var(--bg-primary, #f8fafc);
+}
+
+.fwum-tab.active {
+  color: var(--brand-primary, #36B37E);
+  border-bottom-color: var(--brand-primary, #36B37E);
+  background: var(--bg-primary, #f8fafc);
+}
+
+.fwum-tab:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: -2px;
+}
+
+.fwum-tab-icon {
+  font-size: 1.25rem;
+}
+
+.fwum-tab-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.25px;
+}
+
+/* ===========================
+   Content Panel
+   =========================== */
+
+.fwum-content {
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.fwum-panel {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fwum-panel-swap {
+  padding: 0;
+}
+
+/* ===========================
+   Section Styles
+   =========================== */
+
+.fwum-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.fwum-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.fwum-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.fwum-section-title span {
+  font-size: 1.125rem;
+}
+
+/* ===========================
+   Cards & Containers
+   =========================== */
+
+.fwum-wallet-card,
+.fwum-clearpath-card,
+.fwum-datasource-card {
+  padding: 1rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.fwum-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fwum-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-tertiary, #a0aec0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fwum-value {
+  font-size: 0.875rem;
+  color: var(--text-primary, #1a202c);
+  word-break: break-all;
+}
+
+.fwum-monospace {
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.fwum-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.fwum-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fwum-status-badge.active {
+  color: var(--success-color, #48bb78);
+  background: rgba(72, 187, 120, 0.1);
+  border: 1px solid var(--success-color, #48bb78);
+}
+
+.fwum-status-badge.inactive {
+  color: var(--text-tertiary, #a0aec0);
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.fwum-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 20px;
+}
+
+.fwum-mode-badge.demo {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.fwum-mode-badge.live {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.fwum-timestamp {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #a0aec0);
+}
+
+.fwum-description {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #718096);
+  line-height: 1.6;
+}
+
+/* ===========================
+   Action Buttons
+   =========================== */
+
+.fwum-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+  background: var(--brand-primary, #36B37E);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fwum-action-btn:hover {
+  background: var(--primary-button-hover, #2f9e6e);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.3);
+}
+
+.fwum-action-btn:active {
+  transform: translateY(0);
+}
+
+.fwum-action-btn.secondary {
+  color: var(--text-primary, #1a202c);
+  background: var(--bg-secondary, #ffffff);
+  border: 2px solid var(--border-color, #e2e8f0);
+}
+
+.fwum-action-btn.secondary:hover {
+  border-color: var(--brand-primary, #36B37E);
+  background: var(--bg-primary, #f8fafc);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.fwum-action-btn.primary {
+  background: var(--brand-primary, #36B37E);
+}
+
+.fwum-action-btn.danger {
+  background: var(--danger-color, #e53e3e);
+}
+
+.fwum-action-btn.danger:hover {
+  background: var(--danger-color-hover, #c53030);
+  box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);
+}
+
+/* ===========================
+   Roles Section
+   =========================== */
+
+.fwum-roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fwum-role-card {
+  padding: 1rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, #e2e8f0);
+  transition: all 0.2s ease;
+}
+
+.fwum-role-card:hover {
+  border-color: var(--brand-primary, #36B37E);
+}
+
+.fwum-role-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fwum-role-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-primary, #36B37E);
+  background: rgba(54, 179, 126, 0.1);
+  border: 1px solid var(--brand-primary, #36B37E);
+  border-radius: 12px;
+}
+
+.fwum-premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #1a202c;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fwum-role-description {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #718096);
+  line-height: 1.5;
+}
+
+.fwum-no-roles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg-primary, #f8fafc);
+  border: 2px dashed var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+}
+
+.fwum-no-roles-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.fwum-no-roles p {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #718096);
+}
+
+.fwum-premium-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--brand-primary, #36B37E), var(--accent-color, #4C9AFF));
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fwum-premium-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(54, 179, 126, 0.4);
+}
+
+/* Special Sections */
+.fwum-clearpath-section {
+  background: linear-gradient(135deg, rgba(54, 179, 126, 0.05), rgba(102, 126, 234, 0.05));
+  padding: 1rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--brand-primary, #36B37E);
+}
+
+.fwum-admin-section {
+  background: linear-gradient(135deg, rgba(237, 100, 166, 0.05), rgba(255, 77, 77, 0.05));
+  padding: 1rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--danger-color, #e53e3e);
+}
+
+/* Stats Grid */
+.fwum-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.fwum-stat-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, #e2e8f0);
+  text-align: center;
+}
+
+.fwum-stat-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-tertiary, #a0aec0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.fwum-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-primary, #36B37E);
+}
+
+/* ===========================
+   Settings Tab
+   =========================== */
+
+.fwum-setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, #e2e8f0);
+  transition: all 0.2s ease;
+}
+
+.fwum-setting-item:last-child {
+  margin-bottom: 0;
+}
+
+.fwum-setting-item:hover {
+  border-color: var(--brand-primary, #36B37E);
+}
+
+.fwum-setting-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.fwum-setting-icon {
+  font-size: 1.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #ffffff);
+  border-radius: var(--radius-md, 8px);
+  flex-shrink: 0;
+}
+
+.fwum-setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.fwum-setting-text strong {
+  font-size: 0.9375rem;
+  color: var(--text-primary, #1a202c);
+}
+
+.fwum-setting-text p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #718096);
+}
+
+/* Toggle Button */
+.fwum-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fwum-toggle-btn:hover {
+  background: var(--bg-secondary, #ffffff);
+}
+
+.fwum-toggle-btn:focus-visible {
+  outline: 2px solid var(--brand-primary, #36B37E);
+  outline-offset: 2px;
+}
+
+.fwum-toggle-track {
+  position: relative;
+  width: 3rem;
+  height: 1.5rem;
+  background: var(--border-color, #e2e8f0);
+  border-radius: 1rem;
+  transition: all 0.2s ease;
+}
+
+.fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track {
+  background: var(--brand-primary, #36B37E);
+}
+
+.fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.platform {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.currency {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+}
+
+.fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.data {
+  background: linear-gradient(135deg, #ed64a6, #d53f8c);
+}
+
+.fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.clearpath {
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+}
+
+.fwum-toggle-thumb {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+.fwum-toggle-thumb.active {
+  left: calc(100% - 1.375rem);
+}
+
+.fwum-toggle-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+  min-width: 4.5rem;
+  text-align: left;
+}
+
+/* Wallet Status in Settings */
+.fwum-wallet-status-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  border: 2px solid var(--success-color, #48bb78);
+}
+
+.fwum-wallet-connected {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fwum-wallet-status-icon {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border-radius: 50%;
+}
+
+.fwum-wallet-status-icon.connected {
+  background: var(--success-color, #48bb78);
+  color: white;
+}
+
+.fwum-wallet-status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.fwum-wallet-status-info strong {
+  font-size: 0.875rem;
+  color: var(--text-primary, #1a202c);
+}
+
+.fwum-wallet-address {
+  font-size: 0.75rem;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  color: var(--text-secondary, #718096);
+}
+
+.fwum-disconnect-settings-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  background: var(--danger-color, #e53e3e);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fwum-disconnect-settings-btn:hover {
+  background: var(--danger-color-hover, #c53030);
+}
+
+/* ===========================
+   Search Tab
+   =========================== */
+
+.fwum-search-form {
+  margin-bottom: 1.5rem;
+}
+
+.fwum-search-input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.fwum-search-input {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  font-size: 0.9375rem;
+  color: var(--text-primary, #1a202c);
+  background: var(--bg-primary, #f8fafc);
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.fwum-search-input:focus {
+  border-color: var(--brand-primary, #36B37E);
+  box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
+}
+
+.fwum-search-input::placeholder {
+  color: var(--text-tertiary, #a0aec0);
+}
+
+.fwum-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: white;
+  background: var(--brand-primary, #36B37E);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.fwum-search-btn:hover {
+  background: var(--primary-button-hover, #2f9e6e);
+}
+
+.fwum-recent-searches {
+  margin-bottom: 1.5rem;
+}
+
+.fwum-recent-searches h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-tertiary, #a0aec0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fwum-search-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fwum-search-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary, #1a202c);
+  background: var(--bg-primary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.fwum-search-item:hover {
+  border-color: var(--brand-primary, #36B37E);
+  background: var(--bg-secondary, #ffffff);
+}
+
+.fwum-search-help {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(66, 153, 225, 0.1);
+  border-left: 3px solid var(--info-color, #4299e1);
+  border-radius: var(--radius-md, 8px);
+}
+
+.fwum-help-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.fwum-search-help p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #718096);
+  line-height: 1.5;
+}
+
+/* ===========================
+   Launch Tab
+   =========================== */
+
+.fwum-launch-section {
+  border-bottom: none;
+}
+
+.fwum-launch-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.fwum-launch-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.fwum-launch-content h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  color: var(--text-primary, #1a202c);
+}
+
+.fwum-launch-description {
+  margin: 0 0 1.5rem;
+  font-size: 0.9375rem;
+  color: var(--text-secondary, #718096);
+  line-height: 1.6;
+}
+
+.fwum-launch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: var(--brand-primary, #36B37E);
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 1.5rem;
+}
+
+.fwum-launch-btn:hover {
+  background: var(--primary-button-hover, #2f9e6e);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(54, 179, 126, 0.4);
+}
+
+.fwum-launch-requirements {
+  width: 100%;
+  text-align: left;
+  padding: 1.25rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.fwum-launch-requirements h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.fwum-launch-requirements ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fwum-launch-requirements li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #718096);
+}
+
+.fwum-launch-requirements li span {
+  color: var(--success-color, #48bb78);
+}
+
+.fwum-market-maker-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.625rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--brand-primary, #36B37E);
+  background: rgba(54, 179, 126, 0.1);
+  border: 1px solid var(--brand-primary, #36B37E);
+  border-radius: 20px;
+}
+
+/* ===========================
+   Dark Theme Overrides
+   =========================== */
+
+:root.theme-dark .fairwins-user-modal {
+  background: var(--bg-secondary, #1a202c);
+}
+
+:root.theme-dark .fwum-header {
+  background: var(--bg-primary, #2d3748);
+  border-bottom-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-tabs {
+  background: var(--bg-secondary, #1a202c);
+  border-bottom-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-tab:hover {
+  background: var(--bg-primary, #2d3748);
+}
+
+:root.theme-dark .fwum-tab.active {
+  background: var(--bg-primary, #2d3748);
+}
+
+:root.theme-dark .fwum-wallet-card,
+:root.theme-dark .fwum-clearpath-card,
+:root.theme-dark .fwum-datasource-card,
+:root.theme-dark .fwum-role-card,
+:root.theme-dark .fwum-stat-card,
+:root.theme-dark .fwum-setting-item,
+:root.theme-dark .fwum-search-input,
+:root.theme-dark .fwum-search-item,
+:root.theme-dark .fwum-launch-requirements {
+  background: var(--bg-primary, #2d3748);
+  border-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-no-roles {
+  background: var(--bg-primary, #2d3748);
+  border-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-status-badge.inactive {
+  background: var(--bg-primary, #2d3748);
+  border-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-setting-icon {
+  background: var(--bg-secondary, #1a202c);
+}
+
+:root.theme-dark .fwum-toggle-track {
+  background: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-toggle-btn:hover {
+  background: var(--bg-primary, #2d3748);
+}
+
+:root.theme-dark .fwum-wallet-status-card {
+  background: var(--bg-primary, #2d3748);
+}
+
+:root.theme-dark .fwum-search-help {
+  background: rgba(66, 153, 225, 0.15);
+}
+
+:root.theme-dark .fwum-action-btn.secondary {
+  color: var(--text-primary, #f7fafc);
+  background: var(--bg-primary, #2d3748);
+  border-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .fwum-action-btn.secondary:hover {
+  background: var(--bg-secondary, #1a202c);
+}
+
+/* ===========================
+   ClearPath Platform Theme
+   =========================== */
+
+:root.platform-clearpath .fwum-avatar {
+  border-color: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-tab.active {
+  color: var(--clearpath-primary, #4C9AFF);
+  border-bottom-color: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-action-btn {
+  background: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-action-btn:hover {
+  background: #3182ce;
+  box-shadow: 0 4px 12px rgba(76, 154, 255, 0.3);
+}
+
+:root.platform-clearpath .fwum-premium-btn {
+  background: linear-gradient(135deg, #4C9AFF, #667eea);
+}
+
+:root.platform-clearpath .fwum-role-badge {
+  color: var(--clearpath-primary, #4C9AFF);
+  background: rgba(76, 154, 255, 0.1);
+  border-color: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-stat-value {
+  color: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-search-input:focus {
+  border-color: var(--clearpath-primary, #4C9AFF);
+  box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.15);
+}
+
+:root.platform-clearpath .fwum-search-btn,
+:root.platform-clearpath .fwum-launch-btn {
+  background: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-search-btn:hover,
+:root.platform-clearpath .fwum-launch-btn:hover {
+  background: #3182ce;
+  box-shadow: 0 6px 16px rgba(76, 154, 255, 0.4);
+}
+
+:root.platform-clearpath .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track {
+  background: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-market-maker-badge {
+  color: var(--clearpath-primary, #4C9AFF);
+  background: rgba(76, 154, 255, 0.1);
+  border-color: var(--clearpath-primary, #4C9AFF);
+}
+
+:root.platform-clearpath .fwum-setting-item:hover,
+:root.platform-clearpath .fwum-role-card:hover,
+:root.platform-clearpath .fwum-search-item:hover {
+  border-color: var(--clearpath-primary, #4C9AFF);
+}
+
+/* ===========================
+   Responsive Design
+   =========================== */
+
+@media (max-width: 768px) {
+  .fwum-header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .fwum-wallet-info {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .fwum-address-full {
+    max-width: 100%;
+  }
+
+  .fwum-disconnect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .fwum-tabs {
+    justify-content: flex-start;
+  }
+
+  .fwum-tab {
+    min-width: 70px;
+    padding: 0.75rem 0.5rem;
+  }
+
+  .fwum-tab-icon {
+    font-size: 1.125rem;
+  }
+
+  .fwum-tab-label {
+    font-size: 0.6875rem;
+  }
+
+  .fwum-content {
+    padding: 1rem;
+    max-height: 50vh;
+  }
+
+  .fwum-setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .fwum-toggle-btn {
+    width: 100%;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary, #ffffff);
+    border-radius: var(--radius-md, 8px);
+  }
+
+  .fwum-search-input-group {
+    flex-direction: column;
+  }
+
+  .fwum-search-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .fwum-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fwum-launch-icon {
+    font-size: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .fwum-tab {
+    min-width: 60px;
+    padding: 0.625rem 0.25rem;
+  }
+
+  .fwum-section-title {
+    font-size: 0.9375rem;
+  }
+
+  .fwum-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .fwum-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===========================
+   Reduced Motion Support
+   =========================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .fwum-status-dot.connected,
+  .fwum-panel,
+  .fwum-launch-icon {
+    animation: none;
+  }
+
+  .fwum-disconnect-btn,
+  .fwum-tab,
+  .fwum-action-btn,
+  .fwum-toggle-thumb,
+  .fwum-toggle-track,
+  .fwum-role-card,
+  .fwum-setting-item,
+  .fwum-search-input,
+  .fwum-search-item,
+  .fwum-premium-btn,
+  .fwum-launch-btn,
+  .fwum-disconnect-settings-btn {
+    transition: none;
+  }
+}
+
+/* ===========================
+   Print Styles
+   =========================== */
+
+@media print {
+  .fairwins-user-modal {
+    background: white;
+    color: black;
+  }
+
+  .fwum-disconnect-btn,
+  .fwum-tabs,
+  .fwum-action-btn,
+  .fwum-toggle-btn,
+  .fwum-premium-btn,
+  .fwum-launch-btn {
+    display: none;
+  }
+}

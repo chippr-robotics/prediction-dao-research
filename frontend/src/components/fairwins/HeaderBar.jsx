@@ -47,10 +47,9 @@ function HeaderBar({ isConnected }) {
         </div>
 
         <div className="header-right">
+          <WalletButton />
           <TokenMintButton />
           <ClearPathButton />
-          <WalletButton theme="dark" />
-          
         </div>
       </div>
     </header>
