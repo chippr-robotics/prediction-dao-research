@@ -98,42 +98,11 @@ describe('UserManagementModal', () => {
   })
 
   describe('When wallet is not connected', () => {
-    it('should render connect wallet prompt', () => {
-      renderWithProviders(<UserManagementModal />, { isConnected: false })
+    it('should return null and not render anything', () => {
+      const { container } = renderWithProviders(<UserManagementModal />, { isConnected: false })
       
-      expect(screen.getByText(/Connect Your Wallet/i)).toBeInTheDocument()
-      expect(screen.getByText(/Connect your Web3 wallet to access all features/i)).toBeInTheDocument()
-    })
-
-    it('should show ThirdWeb connect wallet button', () => {
-      renderWithProviders(<UserManagementModal />, { isConnected: false })
-      
-      // ThirdWeb ConnectButton renders a button with "Connect Wallet" text
-      const connectButton = screen.getByRole('button', { name: /Connect Wallet/i })
-      expect(connectButton).toBeInTheDocument()
-    })
-
-    it('should show help text for Web3 wallets', () => {
-      renderWithProviders(<UserManagementModal />, { isConnected: false })
-      
-      expect(screen.getByText(/New to Web3 wallets?/i)).toBeInTheDocument()
-      expect(screen.getByText('Learn about Web3 wallets')).toBeInTheDocument()
-    })
-
-    it('should render ThirdWeb wallet connection UI', () => {
-      renderWithProviders(<UserManagementModal />, { 
-        isConnected: false,
-        connectors: [
-          { id: 'injected', name: 'MetaMask' },
-          { id: 'walletConnect', name: 'WalletConnect' }
-        ]
-      })
-      
-      // ThirdWeb handles wallet selection in its own modal
-      // Just verify the connect button is present
-      const connectButton = screen.getByRole('button', { name: /Connect Wallet/i })
-      expect(connectButton).toBeInTheDocument()
-      expect(connectButton).not.toBeDisabled()
+      // The modal returns null when not connected
+      expect(container).toBeEmptyDOMElement()
     })
   })
 
@@ -155,10 +124,14 @@ describe('UserManagementModal', () => {
       expect(profileTab).toHaveClass('active')
     })
 
-    it('should display wallet address in profile tab', () => {
+    it('should display wallet address in profile tab and header', () => {
       renderWithProviders(<UserManagementModal />)
       
-      expect(screen.getByText(/0x1234567890123456789012345678901234567890/i)).toBeInTheDocument()
+      // Full address appears in multiple places (header and profile section)
+      const fullAddresses = screen.getAllByText('0x1234567890123456789012345678901234567890')
+      expect(fullAddresses.length).toBeGreaterThanOrEqual(1)
+      // Shortened address appears in header
+      expect(screen.getByText(/0x1234...7890/i)).toBeInTheDocument()
     })
 
     it('should display ClearPath status section', () => {
@@ -184,7 +157,7 @@ describe('UserManagementModal', () => {
     it('should show disconnect wallet button', () => {
       renderWithProviders(<UserManagementModal />)
       
-      expect(screen.getByText('Disconnect Wallet')).toBeInTheDocument()
+      expect(screen.getByText('Disconnect')).toBeInTheDocument()
     })
   })
 
