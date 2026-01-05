@@ -31,8 +31,6 @@ import RoleManagementAdmin from './components/RoleManagementAdmin'
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
-import StateManagementDemo from './components/StateManagementDemo'
-import { ComponentExamples } from './components/ui'
 
 //potential removal
 import PlatformSelector from './components/PlatformSelector'
@@ -127,12 +125,10 @@ function AppContent() {
           path="/" 
           element={<LandingPage />} 
         />
-        <Route 
-          path="/select" 
-          element={<PlatformSelector />} 
+        <Route
+          path="/select"
+          element={<PlatformSelector />}
         />
-        <Route path="/ui-components" element={<ComponentExamples />} />
-        <Route path="/state-demo" element={<StateManagementDemo />} />
         <Route 
           path="/clearpath" 
           element={

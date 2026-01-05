@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { ThemeContext } from './ThemeContext'
+import { createContext, useState, useEffect, useCallback } from 'react'
+
+export const ThemeContext = createContext(null)
 
 /**
  * ThemeProvider manages the application's theme state

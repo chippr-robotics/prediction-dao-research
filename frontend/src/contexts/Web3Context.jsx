@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { createContext, useState, useEffect, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
-import { Web3Context } from './Web3Context'
+
+export const Web3Context = createContext(null)
 
 export function Web3Provider({ children }) {
   const { address, isConnected } = useAccount()

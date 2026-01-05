@@ -1,15 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { createContext, useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
-import { 
-  saveUserPreference, 
-  getUserPreference, 
+import {
+  saveUserPreference,
+  getUserPreference,
   clearUserPreferences,
   getClearPathStatus,
   updateClearPathStatus,
   getDemoMode,
   updateDemoMode
 } from '../utils/userStorage'
-import { UserPreferencesContext } from './UserPreferencesContext.js'
+
+export const UserPreferencesContext = createContext(null)
 
 /**
  * UserPreferencesProvider manages user preferences tied to wallet address
