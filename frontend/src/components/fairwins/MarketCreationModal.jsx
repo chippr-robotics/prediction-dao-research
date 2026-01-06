@@ -653,6 +653,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                       <li><strong>Static:</strong> One-shot participation</li>
                       <li><strong>Discrete:</strong> Periodic updates</li>
                       <li><strong>Continuous:</strong> Real-time belief aggregation</li>
+                      <li><strong>Batched/Delayed:</strong> Controlled information release</li>
                     </ul>
                     <div className="mcm-dimension-note">
                       <span aria-hidden="true">✓</span> Agent-dominant systems often need <strong>Discrete</strong> or <strong>Batched</strong>
