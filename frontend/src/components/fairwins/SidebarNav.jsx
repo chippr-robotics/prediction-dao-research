@@ -24,8 +24,6 @@ const CATEGORIES = [
   { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon },
   { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
   { id: 'other', name: 'Other Markets', icon: otherMarketsIcon },
-  { id: 'clearpath', name: 'ClearPath', icon: politicsIcon, requiresRole: 'CLEARPATH_USER' },
-  { id: 'tokenmint', name: 'TokenMint', icon: cryptoIcon, requiresRole: 'TOKENMINT_ROLE' },
   { id: 'all-table', name: 'All Markets Table', icon: allMarketsIcon, powerUser: true }
 ]
 
