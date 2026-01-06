@@ -610,7 +610,7 @@ function FriendMarketsModal({
                             onClick={() => openQrScanner('opponent')}
                             disabled={submitting}
                             title="Scan QR code"
-                            aria-label="Scan QR code for opponent address"
+                            aria-label="Scan QR code"
                           >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <rect x="3" y="3" width="7" height="7"/>
@@ -702,7 +702,7 @@ function FriendMarketsModal({
                           onClick={() => openQrScanner('arbitrator')}
                           disabled={submitting}
                           title="Scan QR code"
-                          aria-label="Scan QR code for arbitrator address"
+                          aria-label="Scan QR code"
                         >
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <rect x="3" y="3" width="7" height="7"/>
