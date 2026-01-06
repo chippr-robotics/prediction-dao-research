@@ -1,12 +1,18 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
 import { useAdminContracts } from '../hooks/useAdminContracts'
-import { ROLES, ROLE_INFO, ADMIN_ROLES, isAdminRole } from '../contexts/RoleContext'
+import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
 import './AdminPanel.css'
+
+// Minimum withdrawal amount to prevent gas waste on dust transactions
+const MIN_WITHDRAWAL_AMOUNT = 0.000000000000000001
+
+// Maximum tier duration in days to prevent overflow issues
+const MAX_TIER_DURATION_DAYS = 3650 // ~10 years
 
 /**
  * Consolidated Admin Panel
@@ -22,37 +28,37 @@ import './AdminPanel.css'
  */
 function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
-  const { account, isConnected } = useWeb3()
+  const { account } = useWeb3()
   const { showNotification } = useNotification()
   const {
     isLoading,
     error,
     contractState,
-    MEMBERSHIP_TIERS,
-    TIER_NAMES,
     emergencyPause,
     emergencyUnpause,
     configureTier,
     grantTier,
-    grantRoleOnChain,
-    revokeRoleOnChain,
     withdraw,
-    fetchContractState,
-    roleManagerAddress
+    fetchContractState
   } = useAdminContracts()
 
   const [activeTab, setActiveTab] = useState('overview')
   const [confirmAction, setConfirmAction] = useState(null)
   const [pendingTx, setPendingTx] = useState(false)
+  
+  // Refs for focus management in confirmation dialogs
+  const confirmDialogRef = useRef(null)
+  const previousFocusRef = useRef(null)
 
-  // Check admin access
-  const isAdmin = hasRole(ROLES.ADMIN)
-  const isOperationsAdmin = hasRole(ROLES.OPERATIONS_ADMIN)
-  const isEmergencyGuardian = hasRole(ROLES.EMERGENCY_GUARDIAN)
-  const isCoreSystemAdmin = hasRole(ROLES.CORE_SYSTEM_ADMIN)
+  // Check admin access with proper null checks
+  const isAdmin = ROLES?.ADMIN ? hasRole(ROLES.ADMIN) : false
+  const isOperationsAdmin = ROLES?.OPERATIONS_ADMIN ? hasRole(ROLES.OPERATIONS_ADMIN) : false
+  const isEmergencyGuardian = ROLES?.EMERGENCY_GUARDIAN ? hasRole(ROLES.EMERGENCY_GUARDIAN) : false
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
 
-  // Determine which capabilities the current user has
+  // Note: Pause vs. unpause is intentionally asymmetric:
+  // - ADMIN, OPERATIONS_ADMIN and EMERGENCY_GUARDIAN can trigger an emergency pause.
+  // - Only ADMIN is allowed to unpause and restore normal operation.
   const canPause = isAdmin || isOperationsAdmin || isEmergencyGuardian
   const canUnpause = isAdmin // Only full admin can unpause
   const canConfigureTiers = isAdmin
@@ -81,16 +87,51 @@ function AdminPanel() {
     amount: ''
   })
 
-  // Refresh contract state periodically
+  // Refresh contract state periodically and clean up properly
   useEffect(() => {
-    const interval = setInterval(fetchContractState, 30000)
-    return () => clearInterval(interval)
-  }, [fetchContractState])
+    // Initial fetch
+    fetchContractState()
+    
+    // Set up periodic refresh
+    const interval = setInterval(() => {
+      // Only fetch if not currently fetching to avoid race conditions
+      fetchContractState()
+    }, 30000)
+    
+    return () => {
+      clearInterval(interval)
+    }
+  }, []) // Empty dependency array - only set up once on mount
+  
+  // Manage focus for confirmation dialogs
+  useEffect(() => {
+    if (confirmAction && confirmDialogRef.current) {
+      previousFocusRef.current = document.activeElement
+      confirmDialogRef.current.focus()
+    } else if (!confirmAction && previousFocusRef.current) {
+      previousFocusRef.current.focus()
+      previousFocusRef.current = null
+    }
+  }, [confirmAction])
+  
+  // Handle Escape key to close dialog
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && confirmAction) {
+        setConfirmAction(null)
+      }
+    }
+    
+    if (confirmAction) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [confirmAction])
 
   const handleEmergencyPause = useCallback(async () => {
     setPendingTx(true)
     try {
-      const result = await emergencyPause()
+      await emergencyPause()
       showNotification('Contract paused successfully', 'success')
       setConfirmAction(null)
     } catch (err) {
@@ -103,7 +144,7 @@ function AdminPanel() {
   const handleEmergencyUnpause = useCallback(async () => {
     setPendingTx(true)
     try {
-      const result = await emergencyUnpause()
+      await emergencyUnpause()
       showNotification('Contract unpaused successfully', 'success')
       setConfirmAction(null)
     } catch (err) {
@@ -115,9 +156,18 @@ function AdminPanel() {
 
   const handleConfigureTier = useCallback(async () => {
     const roleHash = contractState.roleHashes[tierConfig.roleKey]
-    if (!roleHash) {
-      showNotification('Role not found', 'error')
+    if (!roleHash || roleHash === null) {
+      showNotification('Invalid role hash. Role may not exist on this contract.', 'error')
       return
+    }
+    
+    // Validate price for potential issues
+    const priceNum = parseFloat(tierConfig.price)
+    if (priceNum === 0) {
+      // Confirm setting a free tier
+      if (!window.confirm('Setting price to 0 will make this a free tier. Continue?')) {
+        return
+      }
     }
 
     setPendingTx(true)
@@ -138,8 +188,14 @@ function AdminPanel() {
     }
 
     const roleHash = contractState.roleHashes[roleGrant.roleKey]
-    if (!roleHash) {
-      showNotification('Role not found', 'error')
+    if (!roleHash || roleHash === null) {
+      showNotification('Invalid role hash. Role may not exist on this contract.', 'error')
+      return
+    }
+    
+    // Validate duration
+    if (roleGrant.durationDays > MAX_TIER_DURATION_DAYS) {
+      showNotification(`Duration cannot exceed ${MAX_TIER_DURATION_DAYS} days`, 'error')
       return
     }
 
@@ -161,14 +217,36 @@ function AdminPanel() {
       return
     }
 
-    if (!withdrawalData.amount || parseFloat(withdrawalData.amount) <= 0) {
+    const rawAmount = (withdrawalData.amount ?? '').toString().trim()
+
+    // Validate amount: non-empty, valid decimal string, finite, and above minimum
+    if (!rawAmount) {
       showNotification('Invalid withdrawal amount', 'error')
+      return
+    }
+
+    // Allow only simple decimal representations to avoid unexpected parse behavior
+    if (!/^\d+(\.\d+)?$/.test(rawAmount)) {
+      showNotification('Invalid withdrawal amount format', 'error')
+      return
+    }
+
+    const amountNum = Number(rawAmount)
+    if (!Number.isFinite(amountNum) || amountNum <= 0 || amountNum < MIN_WITHDRAWAL_AMOUNT) {
+      showNotification('Invalid withdrawal amount', 'error')
+      return
+    }
+    
+    // Check if amount exceeds contract balance
+    const contractBalanceNum = parseFloat(contractState.contractBalance)
+    if (amountNum > contractBalanceNum) {
+      showNotification(`Withdrawal amount exceeds contract balance (${contractState.contractBalance} ETC)`, 'error')
       return
     }
 
     setPendingTx(true)
     try {
-      await withdraw(withdrawalData.toAddress, withdrawalData.amount)
+      await withdraw(withdrawalData.toAddress, rawAmount)
       showNotification('Withdrawal successful', 'success')
       setWithdrawalData({ toAddress: '', amount: '' })
       setConfirmAction(null)
@@ -177,7 +255,7 @@ function AdminPanel() {
     } finally {
       setPendingTx(false)
     }
-  }, [withdrawalData, withdraw, showNotification])
+  }, [withdrawalData, contractState.contractBalance, withdraw, showNotification])
 
   const shortenAddress = (address) => {
     if (!address) return ''
@@ -246,9 +324,24 @@ function AdminPanel() {
 
       {/* Confirmation Dialog */}
       {confirmAction && (
-        <div className="confirm-overlay" role="dialog" aria-modal="true">
-          <div className="confirm-dialog">
-            <h3>{confirmAction.title}</h3>
+        <div 
+          className="confirm-overlay" 
+          role="dialog" 
+          aria-modal="true"
+          aria-labelledby="confirm-dialog-title"
+          onClick={(e) => {
+            // Close on backdrop click
+            if (e.target.classList.contains('confirm-overlay')) {
+              setConfirmAction(null)
+            }
+          }}
+        >
+          <div 
+            className="confirm-dialog"
+            ref={confirmDialogRef}
+            tabIndex={-1}
+          >
+            <h3 id="confirm-dialog-title">{confirmAction.title}</h3>
             <p>{confirmAction.message}</p>
             {confirmAction.warning && (
               <div className="confirm-warning">
@@ -724,11 +817,13 @@ function AdminPanel() {
                         id="grant-duration"
                         type="number"
                         min="1"
+                        max={MAX_TIER_DURATION_DAYS}
                         value={roleGrant.durationDays}
                         onChange={(e) => setRoleGrant(prev => ({ ...prev, durationDays: Number(e.target.value) }))}
                         className="admin-input"
                         placeholder="30"
                       />
+                      <small className="input-hint">Maximum: {MAX_TIER_DURATION_DAYS} days</small>
                     </div>
                   </div>
 

@@ -1,15 +1,22 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { MINIMAL_ROLE_MANAGER_ABI, MEMBERSHIP_TIERS, TIER_NAMES } from '../abis/MinimalRoleManager'
 import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
+
+// Refresh interval for contract state (30 seconds)
+const CONTRACT_STATE_REFRESH_INTERVAL = 30000
+
+// Contract addresses - using deployer as placeholder for role manager
+// In production, this would be the actual deployed MinimalRoleManager address
+const ROLE_MANAGER_ADDRESS = DEPLOYED_CONTRACTS.deployer
 
 /**
  * Hook for interacting with admin contract functions
  * Provides methods for emergency controls, tier configuration, and role management
  */
 export function useAdminContracts() {
-  const { signer, account, isConnected, provider } = useWeb3()
+  const { signer, account, isConnected } = useWeb3()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [contractState, setContractState] = useState({
@@ -17,15 +24,15 @@ export function useAdminContracts() {
     contractBalance: '0',
     roleHashes: {}
   })
-
-  // Contract addresses - using deployer as placeholder for role manager
-  // In production, this would be the actual deployed MinimalRoleManager address
-  const ROLE_MANAGER_ADDRESS = DEPLOYED_CONTRACTS.deployer
+  
+  // Track if a fetch is in progress to prevent redundant calls
+  const fetchInProgressRef = useRef(false)
 
   /**
    * Get a read-only provider for querying contract state
+   * Memoized to reuse the same provider instance
    */
-  const getReadProvider = useCallback(() => {
+  const readProvider = useMemo(() => {
     return new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
   }, [])
 
@@ -33,17 +40,22 @@ export function useAdminContracts() {
    * Get the role manager contract instance
    */
   const getRoleManagerContract = useCallback((useSigner = false) => {
-    const providerOrSigner = useSigner && signer ? signer : getReadProvider()
+    const providerOrSigner = useSigner && signer ? signer : readProvider
     return new ethers.Contract(ROLE_MANAGER_ADDRESS, MINIMAL_ROLE_MANAGER_ABI, providerOrSigner)
-  }, [signer, getReadProvider])
+  }, [signer, readProvider])
 
   /**
    * Fetch current contract state
    */
   const fetchContractState = useCallback(async () => {
+    // Prevent redundant fetches
+    if (fetchInProgressRef.current) {
+      return null
+    }
+    
+    fetchInProgressRef.current = true
     try {
       const contract = getRoleManagerContract(false)
-      const readProvider = getReadProvider()
 
       // Fetch paused state and balance in parallel
       const [isPaused, balance] = await Promise.all([
@@ -85,8 +97,10 @@ export function useAdminContracts() {
       console.error('Error fetching contract state:', err)
       setError(err.message)
       return null
+    } finally {
+      fetchInProgressRef.current = false
     }
-  }, [getRoleManagerContract, getReadProvider])
+  }, [getRoleManagerContract, readProvider])
 
   /**
    * Emergency pause the contract
@@ -159,6 +173,10 @@ export function useAdminContracts() {
     if (!signer || !isConnected) {
       throw new Error('Wallet not connected')
     }
+    
+    if (!roleHash || roleHash === null) {
+      throw new Error('Invalid role hash. Role may not exist on this contract.')
+    }
 
     setIsLoading(true)
     setError(null)
@@ -194,6 +212,10 @@ export function useAdminContracts() {
 
     if (!ethers.isAddress(userAddress)) {
       throw new Error('Invalid user address')
+    }
+    
+    if (!roleHash || roleHash === null) {
+      throw new Error('Invalid role hash. Role may not exist on this contract.')
     }
 
     setIsLoading(true)

@@ -1,7 +1,7 @@
 /**
  * MinimalRoleManager ABI
  *
- * Minimal ABI for admin functions on the MinimalRoleManager contract.
+ * Minimal ABI for role manager contract functions.
  * Includes emergency controls, tier configuration, and role management.
  */
 
