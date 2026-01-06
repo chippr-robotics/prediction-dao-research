@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import './TokenManagementModal.css'
 
@@ -10,7 +10,7 @@ import './TokenManagementModal.css'
  * - Tabbed interface for Tokens, NFTs, and Markets
  * - Clean paginated table (10 items per page)
  * - Info button for viewing on-chain token details
- * - Token management controls (mint, burn, pause, freeze, etc.)
+ * - Token management controls (mint, burn, pause, etc.)
  */
 function TokenManagementModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('tokens')
@@ -21,6 +21,7 @@ function TokenManagementModal({ isOpen, onClose }) {
   const [actionModal, setActionModal] = useState(null)
   const [actionData, setActionData] = useState({})
   const [actionLoading, setActionLoading] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(null) // Track which address was copied
 
   // Data states
   const [tokens, setTokens] = useState([])
@@ -29,90 +30,151 @@ function TokenManagementModal({ isOpen, onClose }) {
   const [chainInfo, setChainInfo] = useState(null)
 
   const { address, isConnected } = useWallet()
-  const { provider, signer } = useWeb3()
+  useWeb3() // Initialize Web3 context
 
   const ITEMS_PER_PAGE = 10
+
+  // Helper function to format camelCase action names
+  const formatActionName = (actionName) => {
+    // Handle special cases
+    const specialCases = {
+      'setApprovalForAll': 'Set Approval for All',
+      'transferOwnership': 'Transfer Ownership',
+      'renounceOwnership': 'Renounce Ownership'
+    }
+    
+    if (specialCases[actionName]) {
+      return specialCases[actionName]
+    }
+    
+    // Capitalize first letter
+    return actionName.charAt(0).toUpperCase() + actionName.slice(1)
+  }
+
+  // Helper function to validate Ethereum address
+  const isValidAddress = (address) => {
+    return /^0x[a-fA-F0-9]{40}$/.test(address)
+  }
+
+  // Helper function to validate action inputs
+  const isActionValid = () => {
+    if (!actionModal || !selectedItem) return false
+
+    switch (actionModal) {
+      case 'mint':
+        if (selectedItem.type === 'ERC20') {
+          return isValidAddress(actionData.address || '') && actionData.amount && Number(actionData.amount) > 0
+        }
+        return isValidAddress(actionData.address || '') && actionData.tokenURI && actionData.tokenURI.trim().length > 0
+      
+      case 'burn':
+        return actionData.amount && Number(actionData.amount) > 0
+      
+      case 'transfer':
+        return isValidAddress(actionData.address || '') && actionData.amount && Number(actionData.amount) > 0
+      
+      case 'approve':
+        return isValidAddress(actionData.spender || '') && actionData.amount && Number(actionData.amount) > 0
+      
+      case 'setApprovalForAll':
+        return isValidAddress(actionData.operator || '')
+      
+      case 'transferOwnership':
+        return isValidAddress(actionData.newOwner || '')
+      
+      case 'renounceOwnership':
+        return actionData.confirmed === true
+      
+      case 'pause':
+      case 'unpause':
+        return true
+      
+      default:
+        return false
+    }
+  }
 
   // Mock data for demonstration - in production, these would be fetched from chain
   useEffect(() => {
     if (isOpen && isConnected) {
+      const loadData = async () => {
+        setLoading(true)
+        try {
+          // Simulate loading time
+          await new Promise(resolve => setTimeout(resolve, 500))
+
+          // Mock token data - in production, fetch from TokenMintFactory events
+          setTokens([
+            {
+              id: 1,
+              address: '0x1234567890abcdef1234567890abcdef12345678',
+              name: 'Demo Token',
+              symbol: 'DEMO',
+              type: 'ERC20',
+              totalSupply: '1000000',
+              decimals: 18,
+              isPausable: true,
+              isBurnable: true,
+              isPaused: false,
+              owner: address,
+              createdAt: Date.now() - 86400000 * 30
+            },
+            {
+              id: 2,
+              address: '0xabcdef1234567890abcdef1234567890abcdef12',
+              name: 'Reward Points',
+              symbol: 'RWD',
+              type: 'ERC20',
+              totalSupply: '5000000',
+              decimals: 18,
+              isPausable: true,
+              isBurnable: false,
+              isPaused: false,
+              owner: address,
+              createdAt: Date.now() - 86400000 * 15
+            }
+          ])
+
+          setNfts([
+            {
+              id: 1,
+              address: '0x9876543210fedcba9876543210fedcba98765432',
+              name: 'Art Collection',
+              symbol: 'ART',
+              type: 'ERC721',
+              totalSupply: '100',
+              baseURI: 'ipfs://QmXyz...',
+              isPausable: true,
+              isBurnable: true,
+              isPaused: false,
+              owner: address,
+              createdAt: Date.now() - 86400000 * 7
+            }
+          ])
+
+          setMarkets([
+            {
+              id: 1,
+              address: '0xfedcba9876543210fedcba9876543210fedcba98',
+              question: 'Will ETH reach $5000 by March 2025?',
+              type: 'Prediction',
+              status: 'Active',
+              totalLiquidity: '2.5',
+              tradingEnds: Date.now() + 86400000 * 30,
+              createdAt: Date.now() - 86400000 * 10
+            }
+          ])
+        } catch (error) {
+          console.error('Error loading data:', error)
+          window.alert('An error occurred while loading token data. Please try again.')
+        } finally {
+          setLoading(false)
+        }
+      }
+      
       loadData()
     }
   }, [isOpen, isConnected, address])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      // Simulate loading time
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Mock token data - in production, fetch from TokenMintFactory events
-      setTokens([
-        {
-          id: 1,
-          address: '0x1234567890abcdef1234567890abcdef12345678',
-          name: 'Demo Token',
-          symbol: 'DEMO',
-          type: 'ERC20',
-          totalSupply: '1000000',
-          decimals: 18,
-          isPausable: true,
-          isBurnable: true,
-          isPaused: false,
-          owner: address,
-          createdAt: Date.now() - 86400000 * 30
-        },
-        {
-          id: 2,
-          address: '0xabcdef1234567890abcdef1234567890abcdef12',
-          name: 'Reward Points',
-          symbol: 'RWD',
-          type: 'ERC20',
-          totalSupply: '5000000',
-          decimals: 18,
-          isPausable: true,
-          isBurnable: false,
-          isPaused: false,
-          owner: address,
-          createdAt: Date.now() - 86400000 * 15
-        }
-      ])
-
-      setNfts([
-        {
-          id: 1,
-          address: '0x9876543210fedcba9876543210fedcba98765432',
-          name: 'Art Collection',
-          symbol: 'ART',
-          type: 'ERC721',
-          totalSupply: '100',
-          baseURI: 'ipfs://QmXyz...',
-          isPausable: true,
-          isBurnable: true,
-          isPaused: false,
-          owner: address,
-          createdAt: Date.now() - 86400000 * 7
-        }
-      ])
-
-      setMarkets([
-        {
-          id: 1,
-          address: '0xfedcba9876543210fedcba9876543210fedcba98',
-          question: 'Will ETH reach $5000 by March 2025?',
-          type: 'Prediction',
-          status: 'Active',
-          totalLiquidity: '2.5',
-          tradingEnds: Date.now() + 86400000 * 30,
-          createdAt: Date.now() - 86400000 * 10
-        }
-      ])
-    } catch (error) {
-      console.error('Error loading data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -136,6 +198,26 @@ function TokenManagementModal({ isOpen, onClose }) {
     setSelectedItem(null)
     setShowInfoPanel(false)
   }, [activeTab])
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        if (actionModal) {
+          setActionModal(null)
+        } else if (showInfoPanel) {
+          setShowInfoPanel(false)
+        } else {
+          onClose()
+        }
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape)
+      return () => document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen, actionModal, showInfoPanel, onClose])
 
   const fetchChainInfo = async (item) => {
     setLoading(true)
@@ -169,6 +251,7 @@ function TokenManagementModal({ isOpen, onClose }) {
       setShowInfoPanel(true)
     } catch (error) {
       console.error('Error fetching chain info:', error)
+      window.alert('Unable to load on-chain token details. Please try again in a moment.')
     } finally {
       setLoading(false)
     }
@@ -202,6 +285,7 @@ function TokenManagementModal({ isOpen, onClose }) {
       setSelectedItem(null)
     } catch (error) {
       console.error(`Error executing ${actionModal}:`, error)
+      window.alert(`Failed to execute ${actionModal}. Please try again.`)
     } finally {
       setActionLoading(false)
     }
@@ -231,8 +315,11 @@ function TokenManagementModal({ isOpen, onClose }) {
   const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text)
+      setCopySuccess(text)
+      setTimeout(() => setCopySuccess(null), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
+      window.alert('Failed to copy to clipboard')
     }
   }
 
@@ -255,10 +342,13 @@ function TokenManagementModal({ isOpen, onClose }) {
         </div>
 
         {/* Tabs */}
-        <div className="tm-tabs">
+        <div className="tm-tabs" role="tablist">
           <button
             className={`tm-tab ${activeTab === 'tokens' ? 'active' : ''}`}
             onClick={() => setActiveTab('tokens')}
+            role="tab"
+            aria-selected={activeTab === 'tokens'}
+            aria-controls="tokens-panel"
           >
             <span className="tm-tab-icon">⬡</span>
             Tokens
@@ -267,6 +357,9 @@ function TokenManagementModal({ isOpen, onClose }) {
           <button
             className={`tm-tab ${activeTab === 'nfts' ? 'active' : ''}`}
             onClick={() => setActiveTab('nfts')}
+            role="tab"
+            aria-selected={activeTab === 'nfts'}
+            aria-controls="nfts-panel"
           >
             <span className="tm-tab-icon">◈</span>
             NFTs
@@ -275,6 +368,9 @@ function TokenManagementModal({ isOpen, onClose }) {
           <button
             className={`tm-tab ${activeTab === 'markets' ? 'active' : ''}`}
             onClick={() => setActiveTab('markets')}
+            role="tab"
+            aria-selected={activeTab === 'markets'}
+            aria-controls="markets-panel"
           >
             <span className="tm-tab-icon">◐</span>
             Markets
@@ -283,7 +379,7 @@ function TokenManagementModal({ isOpen, onClose }) {
         </div>
 
         {/* Content */}
-        <div className="tm-content">
+        <div className="tm-content" role="tabpanel" id={`${activeTab}-panel`} aria-labelledby={`${activeTab}-tab`}>
           {loading && !paginatedData.length ? (
             <div className="tm-loading">
               <div className="tm-spinner" />
@@ -336,7 +432,7 @@ function TokenManagementModal({ isOpen, onClose }) {
                         <td className="td-address">
                           <code>{formatAddress(item.address)}</code>
                           <button
-                            className="tm-copy-btn"
+                            className={`tm-copy-btn ${copySuccess === item.address ? 'success' : ''}`}
                             onClick={() => copyToClipboard(item.address)}
                             aria-label="Copy address"
                           >
@@ -514,7 +610,7 @@ function TokenManagementModal({ isOpen, onClose }) {
                     <div className="tm-address-row">
                       <code>{chainInfo.contractAddress}</code>
                       <button
-                        className="tm-copy-btn"
+                        className={`tm-copy-btn ${copySuccess === chainInfo.contractAddress ? 'success' : ''}`}
                         onClick={() => copyToClipboard(chainInfo.contractAddress)}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -529,7 +625,7 @@ function TokenManagementModal({ isOpen, onClose }) {
                     <div className="tm-address-row">
                       <code>{chainInfo.owner}</code>
                       <button
-                        className="tm-copy-btn"
+                        className={`tm-copy-btn ${copySuccess === chainInfo.owner ? 'success' : ''}`}
                         onClick={() => copyToClipboard(chainInfo.owner)}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -600,10 +696,19 @@ function TokenManagementModal({ isOpen, onClose }) {
                   <div className="tm-info-item full-width">
                     <label>Transaction Hash</label>
                     <div className="tm-address-row">
-                      <code>{formatAddress(chainInfo.transactionHash)}</code>
+                      <code>
+                        {typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0
+                          ? formatAddress(chainInfo.transactionHash)
+                          : 'N/A'}
+                      </code>
                       <button
-                        className="tm-copy-btn"
-                        onClick={() => copyToClipboard(chainInfo.transactionHash)}
+                        className={`tm-copy-btn ${copySuccess === chainInfo.transactionHash ? 'success' : ''}`}
+                        disabled={!(typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0)}
+                        onClick={() => {
+                          if (typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0) {
+                            copyToClipboard(chainInfo.transactionHash)
+                          }
+                        }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -623,7 +728,7 @@ function TokenManagementModal({ isOpen, onClose }) {
           <div className="tm-action-modal-overlay" onClick={() => setActionModal(null)}>
             <div className="tm-action-modal" onClick={e => e.stopPropagation()}>
               <div className="tm-action-header">
-                <h3>{actionModal.charAt(0).toUpperCase() + actionModal.slice(1)} {selectedItem.name}</h3>
+                <h3>{formatActionName(actionModal)} {selectedItem.name}</h3>
                 <button
                   className="tm-action-close"
                   onClick={() => setActionModal(null)}
@@ -824,7 +929,7 @@ function TokenManagementModal({ isOpen, onClose }) {
                 <button
                   className={`tm-btn-primary ${actionModal === 'renounceOwnership' ? 'danger' : ''}`}
                   onClick={executeAction}
-                  disabled={actionLoading || (actionModal === 'renounceOwnership' && !actionData.confirmed)}
+                  disabled={actionLoading || !isActionValid()}
                 >
                   {actionLoading ? (
                     <>
@@ -832,7 +937,7 @@ function TokenManagementModal({ isOpen, onClose }) {
                       Processing...
                     </>
                   ) : (
-                    `Confirm ${actionModal.charAt(0).toUpperCase() + actionModal.slice(1)}`
+                    `Confirm ${formatActionName(actionModal)}`
                   )}
                 </button>
               </div>

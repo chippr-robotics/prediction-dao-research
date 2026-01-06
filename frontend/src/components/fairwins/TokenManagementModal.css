@@ -372,6 +372,16 @@
   color: #4b5563;
 }
 
+.tm-copy-btn.success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.tm-copy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Date */
 .td-date {
   color: #6b7280;
@@ -740,7 +750,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 200;
   animation: tm-fadeIn 0.15s ease-out;
 }
 
