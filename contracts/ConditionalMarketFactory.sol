@@ -507,9 +507,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         emit BatchMarketsCreated(marketIds, block.timestamp, params.length);
     }
 
+    // Anti-flash-loan protection: Maximum position size for non-members
+    uint256 public constant MAX_NON_MEMBER_POSITION = 100 ether;
+
     /**
      * @notice Buy outcome tokens via ETCSwap or fallback LMSR
      * @dev Integrates with ETC Swap v3 when enabled, falls back to simplified LMSR for testing
+     * @dev Enforces position size limits based on user's membership tier to prevent flash loan attacks
      * @param marketId ID of the market
      * @param buyPass True to buy PASS tokens, false for FAIL tokens
      * @param amount Amount of collateral to spend
@@ -525,6 +529,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         require(market.status == MarketStatus.Active, "Market not active");
         require(block.timestamp < market.tradingEndTime, "Trading period ended");
         require(amount > 0, "Amount must be positive");
+
+        // AGENT PROTECTION: Enforce position size limits to prevent flash loan manipulation
+        _enforcePositionSizeLimit(amount);
 
         if (useETCSwap && address(etcSwapIntegration) != address(0)) {
             // Use ETCSwap v3 for actual DEX trading with ERC20 collateral
@@ -632,6 +639,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     /**
      * @notice Sell outcome tokens via ETCSwap or fallback LMSR
      * @dev Integrates with ETC Swap v3 when enabled, falls back to simplified LMSR for testing
+     * @dev Enforces position size limits based on user's membership tier
      * @param marketId ID of the market
      * @param sellPass True to sell PASS tokens, false for FAIL tokens
      * @param tokenAmount Amount of tokens to sell
@@ -647,6 +655,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         require(market.status == MarketStatus.Active, "Market not active");
         require(block.timestamp < market.tradingEndTime, "Trading period ended");
         require(tokenAmount > 0, "Amount must be positive");
+
+        // AGENT PROTECTION: Enforce position size limits on sells as well
+        _enforcePositionSizeLimit(tokenAmount);
 
         if (useETCSwap && address(etcSwapIntegration) != address(0)) {
             // Use ETCSwap v3 for actual DEX trading with ERC20 collateral
@@ -1089,12 +1100,36 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     function _updateMarketIndex(uint256 marketId, MarketStatus newStatus) internal {
         // Add to status index
         marketsByStatus[newStatus].push(marketId);
-        
+
         // Add to time-based index
         uint256 day = block.timestamp / 1 days;
         marketsByDay[day].push(marketId);
     }
-    
+
+    /**
+     * @notice Internal function to enforce position size limits
+     * @dev Prevents flash loan attacks and whale manipulation
+     * @param amount The position size to validate
+     */
+    function _enforcePositionSizeLimit(uint256 amount) internal view {
+        if (address(roleManager) != address(0)) {
+            bytes32 marketMakerRole = roleManager.MARKET_MAKER_ROLE();
+
+            if (roleManager.hasRole(marketMakerRole, msg.sender)) {
+                // Member with role: enforce tier-based limits
+                TieredRoleManager.MembershipTier tier = roleManager.getUserTier(msg.sender, marketMakerRole);
+                TieredRoleManager.TierLimits memory limits = roleManager.getTierLimits(marketMakerRole, tier);
+                require(amount <= limits.maxPositionSize, "Position exceeds tier limit");
+            } else {
+                // Non-member: enforce conservative default limit
+                require(amount <= MAX_NON_MEMBER_POSITION, "Position exceeds non-member limit");
+            }
+        } else {
+            // No role manager: enforce conservative default limit
+            require(amount <= MAX_NON_MEMBER_POSITION, "Position exceeds default limit");
+        }
+    }
+
     /**
      * @notice Struct for batch market creation parameters
      */

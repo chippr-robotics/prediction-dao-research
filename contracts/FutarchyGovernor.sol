@@ -200,30 +200,33 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
     /**
      * @notice Transition proposal to resolution phase
+     * @dev Follows CEI pattern - state updates before external calls
      * @param governanceProposalId ID of the governance proposal
      */
     function moveToResolution(uint256 governanceProposalId) external onlyOwner whenNotPaused {
         GovernanceProposal storage govProposal = governanceProposals[governanceProposalId];
         require(govProposal.phase == ProposalPhase.MarketTrading, "Invalid phase");
 
-        // Update state BEFORE external call (CEI pattern)
+        // CEI PATTERN: Update state BEFORE external call
         govProposal.phase = ProposalPhase.Resolution;
-        
-        // End market trading
-        marketFactory.endTrading(govProposal.marketId);
 
+        // EMIT: Event after state update but before external call for consistent indexing
         emit ProposalPhaseChanged(governanceProposalId, ProposalPhase.Resolution);
+
+        // EXTERNAL CALL: End market trading after state is finalized
+        marketFactory.endTrading(govProposal.marketId);
     }
 
     /**
      * @notice Finalize proposal after oracle resolution
+     * @dev Follows CEI pattern - all state updates before external calls
      * @param governanceProposalId ID of the governance proposal
      */
-    function finalizeProposal(uint256 governanceProposalId) external onlyOwner whenNotPaused {
+    function finalizeProposal(uint256 governanceProposalId) external onlyOwner whenNotPaused nonReentrant {
         GovernanceProposal storage govProposal = governanceProposals[governanceProposalId];
         require(govProposal.phase == ProposalPhase.Resolution, "Invalid phase");
 
-        // Get resolution from oracle
+        // Get resolution from oracle (view call - no reentrancy risk)
         (
             ,
             uint256 passValue,
@@ -233,28 +236,36 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
         require(finalized, "Resolution not finalized");
 
-        // Decide based on market prediction (simplified: pass if passValue > failValue)
-        // Update state BEFORE external calls (CEI pattern)
-        if (passValue > failValue) {
+        // CEI PATTERN: ALL state updates BEFORE external calls
+        bool proposalPassed = passValue > failValue;
+        uint256 executionTime;
+
+        if (proposalPassed) {
             govProposal.phase = ProposalPhase.Execution;
-            govProposal.executionTime = block.timestamp + MIN_TIMELOCK;
+            executionTime = block.timestamp + MIN_TIMELOCK;
+            govProposal.executionTime = executionTime;
         } else {
             govProposal.phase = ProposalPhase.Rejected;
         }
-        
-        // Resolve market AFTER state updates
-        marketFactory.resolveMarket(govProposal.marketId, passValue, failValue);
 
-        // Open ragequit window if proposal passed
-        if (passValue > failValue) {
+        // Cache values needed for external calls
+        uint256 marketId = govProposal.marketId;
+        uint256 proposalId = govProposal.proposalId;
+        ProposalPhase finalPhase = govProposal.phase;
+
+        // EMIT: Event after state update but before external calls
+        emit ProposalPhaseChanged(governanceProposalId, finalPhase);
+
+        // EXTERNAL CALLS: After all state is finalized
+        marketFactory.resolveMarket(marketId, passValue, failValue);
+
+        if (proposalPassed) {
             ragequitModule.openRagequitWindow(
-                govProposal.proposalId,
+                proposalId,
                 block.timestamp,
-                govProposal.executionTime
+                executionTime
             );
         }
-
-        emit ProposalPhaseChanged(governanceProposalId, govProposal.phase);
     }
 
     /**

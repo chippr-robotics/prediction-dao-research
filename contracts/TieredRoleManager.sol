@@ -596,22 +596,36 @@ contract TieredRoleManager is RoleManager {
         require(address(paymentManager) != address(0), "Payment manager not set");
         require(tier != MembershipTier.NONE, "Invalid tier");
         require(userTiers[msg.sender][role] == MembershipTier.NONE, "Already has role, use upgradeTier");
-        
+
         TierMetadata storage tierMeta = tierMetadata[role][tier];
         require(tierMeta.isActive, "Tier not active");
-        
+
         RoleMetadata storage roleMeta = roleMetadata[role];
         require(roleMeta.isPremium, "Role is not purchasable");
         require(roleMeta.maxMembers == 0 || roleMeta.currentMembers < roleMeta.maxMembers, "Role at max capacity");
-        
+
+        // CEI PATTERN: Update ALL state BEFORE external calls
+        // Grant role and set tier FIRST
+        _grantRole(role, msg.sender);
+        userTiers[msg.sender][role] = tier;
+        tierPurchases[msg.sender][role][tier] = block.timestamp;
+        roleMeta.currentMembers++;
+
+        // Initialize usage stats
+        _initializeUsageStats(msg.sender, role);
+
+        // EMIT: Event after state update but before external calls
+        emit TierPurchased(msg.sender, role, tier, amount);
+
+        // EXTERNAL CALLS: After all state is finalized
         // Transfer tokens from buyer to this contract
         IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
-        
+
         // Approve payment manager to transfer tokens from this contract
         IERC20(paymentToken).safeIncreaseAllowance(address(paymentManager), amount);
-        
+
         // Process payment through payment manager (payment manager will transfer from this contract)
-        bytes32 paymentId = paymentManager.processPayment(
+        paymentManager.processPayment(
             address(this), // payer is this contract (we already have the tokens)
             msg.sender,    // buyer is the actual user
             role,
@@ -619,17 +633,6 @@ contract TieredRoleManager is RoleManager {
             amount,
             uint8(tier)
         );
-        
-        // Grant role and set tier
-        _grantRole(role, msg.sender);
-        userTiers[msg.sender][role] = tier;
-        tierPurchases[msg.sender][role][tier] = block.timestamp;
-        roleMeta.currentMembers++;
-        
-        // Initialize usage stats
-        _initializeUsageStats(msg.sender, role);
-        
-        emit TierPurchased(msg.sender, role, tier, amount);
     }
     
     /**
@@ -660,6 +663,7 @@ contract TieredRoleManager is RoleManager {
     
     /**
      * @notice Upgrade to a higher tier with ERC20 token
+     * @dev Follows CEI pattern - state updates before external calls
      * @param role The role to upgrade
      * @param newTier The new tier
      * @param paymentToken The ERC20 token to use for payment
@@ -672,22 +676,30 @@ contract TieredRoleManager is RoleManager {
         uint256 amount
     ) external nonReentrant whenNotPaused {
         require(address(paymentManager) != address(0), "Payment manager not set");
-        
+
         MembershipTier currentTier = userTiers[msg.sender][role];
         require(currentTier != MembershipTier.NONE, "Must have role first");
         require(newTier > currentTier, "Can only upgrade to higher tier");
-        
+
         TierMetadata storage tierMeta = tierMetadata[role][newTier];
         require(tierMeta.isActive, "Tier not active");
-        
+
+        // CEI PATTERN: Update ALL state BEFORE external calls
+        userTiers[msg.sender][role] = newTier;
+        tierPurchases[msg.sender][role][newTier] = block.timestamp;
+
+        // EMIT: Event after state update but before external calls
+        emit TierUpgraded(msg.sender, role, currentTier, newTier);
+
+        // EXTERNAL CALLS: After all state is finalized
         // Transfer tokens from buyer to this contract
         IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
-        
+
         // Approve payment manager to transfer tokens from this contract
         IERC20(paymentToken).safeIncreaseAllowance(address(paymentManager), amount);
-        
+
         // Process payment through payment manager (payment manager will transfer from this contract)
-        bytes32 paymentId = paymentManager.processPayment(
+        paymentManager.processPayment(
             address(this), // payer is this contract (we already have the tokens)
             msg.sender,    // buyer is the actual user
             role,
@@ -695,12 +707,6 @@ contract TieredRoleManager is RoleManager {
             amount,
             uint8(newTier)
         );
-        
-        // Upgrade tier
-        userTiers[msg.sender][role] = newTier;
-        tierPurchases[msg.sender][role][newTier] = block.timestamp;
-        
-        emit TierUpgraded(msg.sender, role, currentTier, newTier);
     }
     
     // ========== Usage Tracking & Enforcement ==========
