@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useEthers, useAccount } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -34,6 +35,10 @@ const DAOFactoryABI = [
 ]
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+
+// Date validation constants
+const MIN_VALID_DATE = new Date('2000-01-01T00:00:00Z').getTime()
+const MAX_VALID_DATE = new Date('2100-01-01T00:00:00Z').getTime()
 
 // Demo DAO data
 const DEMO_USER_DAOS = [
@@ -225,7 +230,7 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
       const daoIds = await factory.getUserDAOs(account)
 
-      // Batch fetch all DAO data to avoid N+1 queries
+      // Batch fetch all DAO data in parallel
       const daoPromises = daoIds.map(daoId => factory.getDAO(daoId))
       const daoResults = await Promise.all(daoPromises)
       
@@ -237,14 +242,15 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       setUserDAOs(daos)
     } catch (err) {
       console.error('Error loading user DAOs:', err)
-      // Provide more specific error messages based on error type
       let errorMessage = 'Failed to load your DAOs'
-      if (err.message?.includes('network')) {
-        errorMessage = 'Network error: Please check your connection and try again'
-      } else if (err.message?.includes('call revert')) {
-        errorMessage = 'Contract error: Unable to fetch DAO data. Please verify contract address'
-      } else if (!account) {
-        errorMessage = 'Please connect your wallet to view your DAOs'
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error: Please check your connection'
+      } else if (err.code === 'CALL_EXCEPTION') {
+        errorMessage = 'Contract error: Please verify contract address and network'
+      } else if (err.message?.includes('missing provider')) {
+        errorMessage = 'Please connect your wallet first'
+      } else if (err.message) {
+        errorMessage = `Error: ${err.message}`
       }
       setError(errorMessage)
     } finally {
@@ -266,8 +272,8 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       const userDaoIds = await factory.getUserDAOs(account)
       const userDaoIdSet = new Set(userDaoIds.map(id => id.toString()))
 
-      // Filter out user DAOs and batch fetch the rest
-      const browseDaoIds = allDaoIds.filter(id => !userDaoIdSet.has(id.toString()))
+      // Filter out user DAOs and batch fetch remaining DAO data in parallel
+      const browseDaoIds = allDaoIds.filter(daoId => !userDaoIdSet.has(daoId.toString()))
       const daoPromises = browseDaoIds.map(daoId => factory.getDAO(daoId))
       const daoResults = await Promise.all(daoPromises)
       
@@ -279,12 +285,15 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       setAllDAOs(daos)
     } catch (err) {
       console.error('Error loading all DAOs:', err)
-      // Provide more specific error messages
       let errorMessage = 'Failed to load available DAOs'
-      if (err.message?.includes('network')) {
-        errorMessage = 'Network error: Please check your connection and try again'
-      } else if (err.message?.includes('call revert')) {
-        errorMessage = 'Contract error: Unable to fetch DAO data. Please verify contract address'
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error: Please check your connection'
+      } else if (err.code === 'CALL_EXCEPTION') {
+        errorMessage = 'Contract error: Please verify contract address and network'
+      } else if (err.message?.includes('missing provider')) {
+        errorMessage = 'Please connect your wallet first'
+      } else if (err.message) {
+        errorMessage = `Error: ${err.message}`
       }
       setBrowseError(errorMessage)
     } finally {
@@ -341,12 +350,9 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
 
       // Reasonable date range validation (prevent absurd past/future dates)
       const time = date.getTime()
-      const currentYear = new Date().getFullYear()
-      const minTime = new Date(`${currentYear - 50}-01-01T00:00:00Z`).getTime()
-      const maxTime = new Date(`${currentYear + 100}-01-01T00:00:00Z`).getTime()
-      if (time < minTime || time > maxTime) return 'N/A'
+      if (time < MIN_VALID_DATE || time > MAX_VALID_DATE) return 'N/A'
 
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     } catch {
       // In case of any unexpected errors during conversion/formatting
       return 'N/A'
@@ -661,16 +667,12 @@ function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) 
       onSelect(dao)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (index < daos.length - 1) {
-        const nextButton = document.querySelector(`.cp-dao-card:nth-child(${index + 2})`)
-        if (nextButton) nextButton.focus()
-      }
+      const nextButton = e.currentTarget.nextElementSibling
+      if (nextButton) nextButton.focus()
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      if (index > 0) {
-        const prevButton = document.querySelector(`.cp-dao-card:nth-child(${index})`)
-        if (prevButton) prevButton.focus()
-      }
+      const prevButton = e.currentTarget.previousElementSibling
+      if (prevButton) prevButton.focus()
     }
   }
 
@@ -683,13 +685,14 @@ function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) 
           onClick={() => onSelect(dao)}
           onKeyDown={(e) => handleKeyDown(e, dao, index)}
           type="button"
+          aria-label={`${dao.name}, ${dao.memberCount || 0} members, ${dao.treasuryBalance || '0 ETC'} treasury`}
         >
           <div className="cp-dao-card-main">
             <div className="cp-dao-avatar">
               {dao.name.charAt(0).toUpperCase()}
             </div>
             <div className="cp-dao-info">
-              <h4>{dao.name}</h4>
+              <h3>{dao.name}</h3>
               <p>{dao.description}</p>
             </div>
           </div>
@@ -809,16 +812,12 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
       onSelect(proposal)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (index < proposals.length - 1) {
-        const nextButton = document.querySelector(`.cp-proposal-card:nth-child(${index + 2})`)
-        if (nextButton) nextButton.focus()
-      }
+      const nextButton = e.currentTarget.nextElementSibling
+      if (nextButton) nextButton.focus()
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      if (index > 0) {
-        const prevButton = document.querySelector(`.cp-proposal-card:nth-child(${index})`)
-        if (prevButton) prevButton.focus()
-      }
+      const prevButton = e.currentTarget.previousElementSibling
+      if (prevButton) prevButton.focus()
     }
   }
 
@@ -831,9 +830,10 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
           onClick={() => onSelect(proposal)}
           onKeyDown={(e) => handleKeyDown(e, proposal, index)}
           type="button"
+          aria-label={`${proposal.title}, ${proposal.status} status, ${proposal.votesFor} for, ${proposal.votesAgainst} against`}
         >
           <div className="cp-proposal-main">
-            <h4>{proposal.title}</h4>
+            <h3>{proposal.title}</h3>
             <p className="cp-proposal-dao">{proposal.daoName}</p>
           </div>
           <div className="cp-proposal-meta">
@@ -992,7 +992,7 @@ function MetricsOverview({ daos, demoMode }) {
       </div>
 
       <div className="cp-welfare-section">
-        <h4>Welfare Indicators</h4>
+        <h3>Welfare Indicators</h3>
         <div className="cp-welfare-grid">
           <div className="cp-welfare-item">
             <div className="cp-welfare-header">
@@ -1073,26 +1073,20 @@ function LaunchDAOForm({ onSuccess }) {
     } else if (formData.description.length < 20) {
       newErrors.description = 'Description must be at least 20 characters'
     }
-    
-    // Validate treasury vault address if provided
     const treasuryVaultAddress = formData.treasuryVault.trim()
     if (treasuryVaultAddress && !ethers.isAddress(treasuryVaultAddress)) {
       newErrors.treasuryVault = 'Treasury vault must be a valid Ethereum address'
     }
-    
-    // Validate admin addresses if provided (optimized single pass)
     const adminsInput = formData.admins.trim()
     if (adminsInput) {
-      const invalidAddresses = adminsInput
-        .split(',')
-        .map(addr => addr.trim())
-        .filter(addr => addr && !ethers.isAddress(addr))
-      
-      if (invalidAddresses.length > 0) {
-        newErrors.admins = `Invalid Ethereum address(es): ${invalidAddresses.join(', ')}`
+      const adminAddresses = adminsInput.split(',').map(addr => addr.trim()).filter(Boolean)
+      for (const addr of adminAddresses) {
+        if (!ethers.isAddress(addr)) {
+          newErrors.admins = 'All admin addresses must be valid Ethereum addresses'
+          break
+        }
       }
     }
-    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -1233,6 +1227,7 @@ function LaunchDAOForm({ onSuccess }) {
             disabled={creating}
             className={errors.treasuryVault ? 'error' : ''}
           />
+          {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
           <span className="cp-hint">Leave empty to create a new treasury vault</span>
           {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
         </div>
@@ -1250,6 +1245,7 @@ function LaunchDAOForm({ onSuccess }) {
             disabled={creating}
             className={errors.admins ? 'error' : ''}
           />
+          {errors.admins && <span className="cp-error">{errors.admins}</span>}
           <span className="cp-hint">Your address will be added automatically</span>
           {errors.admins && <span className="cp-error">{errors.admins}</span>}
         </div>
@@ -1283,6 +1279,12 @@ function LaunchDAOForm({ onSuccess }) {
       </form>
     </div>
   )
+}
+
+ClearPathModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  defaultTab: PropTypes.oneOf(['daos', 'browse', 'proposals', 'metrics', 'launch'])
 }
 
 export default ClearPathModal

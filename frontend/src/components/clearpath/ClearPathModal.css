@@ -186,7 +186,7 @@
 
 /* Badge with WCAG AA compliant contrast ratio: 5.9:1 (white on #2B5797) */
 .cp-tab-badge {
-  background: #2B5797;
+  background: #2563EB;
   color: white;
   font-size: 0.65rem;
   font-weight: 600;
@@ -376,7 +376,7 @@
   min-width: 0;
 }
 
-.cp-dao-info h4 {
+.cp-dao-info h3 {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary, #E6EDF3);
@@ -475,7 +475,7 @@
   min-width: 0;
 }
 
-.cp-proposal-main h4 {
+.cp-proposal-main h3 {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary, #E6EDF3);
