@@ -5,6 +5,7 @@ import { useUserPreferences } from '../hooks/useUserPreferences'
 import { useWallet, useWeb3 } from '../hooks'
 import TokenMintBuilderModal from './fairwins/TokenMintBuilderModal'
 import MarketCreationModal from './fairwins/MarketCreationModal'
+import TokenManagementModal from './fairwins/TokenManagementModal'
 import PremiumPurchaseModal from './ui/PremiumPurchaseModal'
 import './TokenMintButton.css'
 
