@@ -29,7 +29,8 @@ const DAOFactoryABI = [
   "function getAllDAOs() external view returns (uint256[])",
   "function getDAO(uint256 daoId) external view returns (tuple(string name, string description, address futarchyGovernor, address welfareRegistry, address proposalRegistry, address marketFactory, address privacyCoordinator, address oracleResolver, address ragequitModule, address treasuryVault, address creator, uint256 createdAt, bool active))",
   "function hasDAORole(uint256 daoId, address user, bytes32 role) external view returns (bool)",
-  "function DAO_ADMIN_ROLE() external view returns (bytes32)"
+  "function DAO_ADMIN_ROLE() external view returns (bytes32)",
+  "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
 ]
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
@@ -1031,6 +1032,7 @@ function MetricsOverview({ daos, demoMode }) {
  * Launch DAO form component
  */
 function LaunchDAOForm({ onSuccess }) {
+  const { signer, account, isConnected } = useEthers()
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -1091,13 +1093,80 @@ function LaunchDAOForm({ onSuccess }) {
     e.preventDefault()
     if (!validate()) return
 
+    // Check wallet connection
+    if (!isConnected || !signer || !account) {
+      setErrors({ submit: 'Please connect your wallet to create a DAO' })
+      return
+    }
+
     setCreating(true)
     try {
-      // TODO: Implement actual DAO creation
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      onSuccess()
+      // Create contract instance with signer
+      const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, signer)
+
+      // Parse admin addresses
+      const adminAddresses = formData.admins
+        ? formData.admins.split(',').map(a => a.trim()).filter(a => a)
+        : []
+
+      // Determine treasury vault address
+      // If empty, use a zero address which the contract should handle
+      const treasuryAddress = formData.treasuryVault.trim() || ethers.ZeroAddress
+
+      // Create DAO transaction
+      const tx = await factory.createDAO(
+        formData.name,
+        formData.description,
+        treasuryAddress,
+        adminAddresses
+      )
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait()
+
+      // Check if transaction was successful
+      if (receipt.status === 1) {
+        // Clear form data
+        setFormData({
+          name: '',
+          description: '',
+          treasuryVault: '',
+          admins: ''
+        })
+        setErrors({})
+        
+        // Call success callback to refresh DAO list and switch tabs
+        onSuccess()
+      } else {
+        throw new Error('Transaction failed')
+      }
     } catch (err) {
-      setErrors({ submit: err.message || 'Failed to create DAO' })
+      console.error('Error creating DAO:', err)
+      
+      // Handle common error cases
+      let errorMessage = 'Failed to create DAO'
+      
+      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+        errorMessage = 'Transaction was rejected by user'
+      } else if (err.code === 'INSUFFICIENT_FUNDS') {
+        errorMessage = 'Insufficient funds for transaction'
+      } else if (err.message?.includes('DAO_CREATOR_ROLE')) {
+        errorMessage = 'Your account does not have permission to create DAOs. Please contact an administrator.'
+      } else if (err.message?.includes('Name cannot be empty')) {
+        errorMessage = 'DAO name cannot be empty'
+      } else if (err.message?.includes('Invalid treasury vault')) {
+        errorMessage = 'Invalid treasury vault address'
+      } else if (err.message) {
+        // Try to extract a readable error message
+        const match = err.message.match(/reason="([^"]+)"/)
+        if (match) {
+          errorMessage = match[1]
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      setErrors({ submit: errorMessage })
     } finally {
       setCreating(false)
     }
