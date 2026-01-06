@@ -17,6 +17,11 @@ import './ClearPathModal.css'
  * - Submit: Create new proposals
  * - Metrics: Welfare metrics dashboard
  * - Launch: Create new DAOs
+ * 
+ * @param {Object} props - Component props
+ * @param {boolean} props.isOpen - Whether the modal is open (required)
+ * @param {() => void} props.onClose - Function to call when modal should close (required)
+ * @param {string} [props.defaultTab='daos'] - Default tab to show when modal opens
  */
 
 const DAOFactoryABI = [
@@ -154,7 +159,6 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
   const [userDAOs, setUserDAOs] = useState([])
   const [allDAOs, setAllDAOs] = useState([])
   const [proposals, setProposals] = useState([])
-  const [isAdmin, setIsAdmin] = useState(false)
 
   // Loading states
   const [loading, setLoading] = useState(true)
@@ -186,7 +190,6 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
     setTimeout(() => {
       setUserDAOs(DEMO_USER_DAOS)
       setProposals(DEMO_PROPOSALS)
-      setIsAdmin(true)
       setLoading(false)
     }, 300)
   }, [])
@@ -213,26 +216,28 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
       const daoIds = await factory.getUserDAOs(account)
 
-      const daos = []
-      for (let i = 0; i < daoIds.length; i++) {
-        const dao = await factory.getDAO(daoIds[i])
-        daos.push({ id: daoIds[i].toString(), ...dao })
-      }
+      // Batch fetch all DAO data to avoid N+1 queries
+      const daoPromises = daoIds.map(daoId => factory.getDAO(daoId))
+      const daoResults = await Promise.all(daoPromises)
+      
+      const daos = daoResults.map((dao, index) => ({
+        id: daoIds[index].toString(),
+        ...dao
+      }))
 
       setUserDAOs(daos)
-
-      const adminRole = await factory.DAO_ADMIN_ROLE()
-      let hasAdminRole = false
-      for (let i = 0; i < daoIds.length; i++) {
-        if (await factory.hasDAORole(daoIds[i], account, adminRole)) {
-          hasAdminRole = true
-          break
-        }
-      }
-      setIsAdmin(hasAdminRole)
     } catch (err) {
       console.error('Error loading user DAOs:', err)
-      setError(err.message || 'Failed to load your DAOs')
+      // Provide more specific error messages based on error type
+      let errorMessage = 'Failed to load your DAOs'
+      if (err.message?.includes('network')) {
+        errorMessage = 'Network error: Please check your connection and try again'
+      } else if (err.message?.includes('call revert')) {
+        errorMessage = 'Contract error: Unable to fetch DAO data. Please verify contract address'
+      } else if (!account) {
+        errorMessage = 'Please connect your wallet to view your DAOs'
+      }
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -252,19 +257,27 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       const userDaoIds = await factory.getUserDAOs(account)
       const userDaoIdSet = new Set(userDaoIds.map(id => id.toString()))
 
-      const daos = []
-      for (let i = 0; i < allDaoIds.length; i++) {
-        const daoId = allDaoIds[i].toString()
-        if (!userDaoIdSet.has(daoId)) {
-          const dao = await factory.getDAO(allDaoIds[i])
-          daos.push({ id: daoId, ...dao })
-        }
-      }
+      // Filter out user DAOs and batch fetch the rest
+      const browseDaoIds = allDaoIds.filter(id => !userDaoIdSet.has(id.toString()))
+      const daoPromises = browseDaoIds.map(daoId => factory.getDAO(daoId))
+      const daoResults = await Promise.all(daoPromises)
+      
+      const daos = daoResults.map((dao, index) => ({
+        id: browseDaoIds[index].toString(),
+        ...dao
+      }))
 
       setAllDAOs(daos)
     } catch (err) {
       console.error('Error loading all DAOs:', err)
-      setBrowseError(err.message || 'Failed to load available DAOs')
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load available DAOs'
+      if (err.message?.includes('network')) {
+        errorMessage = 'Network error: Please check your connection and try again'
+      } else if (err.message?.includes('call revert')) {
+        errorMessage = 'Contract error: Unable to fetch DAO data. Please verify contract address'
+      }
+      setBrowseError(errorMessage)
     } finally {
       setBrowseLoading(false)
     }
@@ -306,11 +319,28 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
 
   // Format helpers
   const formatDate = (dateInput) => {
-    const date = typeof dateInput === 'bigint'
-      ? new Date(Number(dateInput))
-      : new Date(dateInput)
-    if (Number.isNaN(date.getTime())) return 'N/A'
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    // Guard against clearly invalid/empty inputs
+    if (dateInput === null || dateInput === undefined || dateInput === '') return 'N/A'
+
+    try {
+      const date = typeof dateInput === 'bigint'
+        ? new Date(Number(dateInput))
+        : new Date(dateInput)
+
+      // Invalid Date handling
+      if (Number.isNaN(date.getTime())) return 'N/A'
+
+      // Reasonable date range validation (prevent absurd past/future dates)
+      const time = date.getTime()
+      const minTime = new Date('2000-01-01T00:00:00Z').getTime()
+      const maxTime = new Date('2100-01-01T00:00:00Z').getTime()
+      if (time < minTime || time > maxTime) return 'N/A'
+
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    } catch {
+      // In case of any unexpected errors during conversion/formatting
+      return 'N/A'
+    }
   }
 
   const formatAddress = (address) => {
@@ -615,13 +645,29 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
  * Compact list component for DAOs
  */
 function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) {
+  const handleKeyDown = (e, dao, index) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(dao)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextButton = e.currentTarget.nextElementSibling
+      if (nextButton) nextButton.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevButton = e.currentTarget.previousElementSibling
+      if (prevButton) prevButton.focus()
+    }
+  }
+
   return (
     <div className="cp-dao-list">
-      {daos.map((dao) => (
+      {daos.map((dao, index) => (
         <button
           key={dao.id}
           className="cp-dao-card"
           onClick={() => onSelect(dao)}
+          onKeyDown={(e) => handleKeyDown(e, dao, index)}
           type="button"
         >
           <div className="cp-dao-card-main">
@@ -743,13 +789,29 @@ function DAODetailView({ dao, onBack, formatDate, formatAddress, account, showJo
  * Compact list component for proposals
  */
 function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }) {
+  const handleKeyDown = (e, proposal, index) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(proposal)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextButton = e.currentTarget.nextElementSibling
+      if (nextButton) nextButton.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevButton = e.currentTarget.previousElementSibling
+      if (prevButton) prevButton.focus()
+    }
+  }
+
   return (
     <div className="cp-proposal-list">
-      {proposals.map((proposal) => (
+      {proposals.map((proposal, index) => (
         <button
           key={proposal.id}
           className="cp-proposal-card"
           onClick={() => onSelect(proposal)}
+          onKeyDown={(e) => handleKeyDown(e, proposal, index)}
           type="button"
         >
           <div className="cp-proposal-main">
@@ -781,7 +843,7 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
  */
 function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getStatusClass, account }) {
   const totalVotes = proposal.votesFor + proposal.votesAgainst
-  const forPercentage = totalVotes > 0 ? (proposal.votesFor / totalVotes) * 100 : 50
+  const forPercentage = totalVotes > 0 ? (proposal.votesFor / totalVotes) * 100 : 0
 
   return (
     <div className="cp-detail">
@@ -808,21 +870,29 @@ function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getSt
 
       <p className="cp-detail-desc">{proposal.description}</p>
 
-      <div className="cp-vote-progress">
-        <div className="cp-vote-bar">
-          <div className="cp-vote-bar-for" style={{ width: `${forPercentage}%` }}></div>
+      {totalVotes > 0 ? (
+        <div className="cp-vote-progress">
+          <div className="cp-vote-bar">
+            <div className="cp-vote-bar-for" style={{ width: `${forPercentage}%` }}></div>
+          </div>
+          <div className="cp-vote-labels">
+            <span className="cp-vote-for-label">
+              <span className="cp-vote-dot cp-vote-dot-for"></span>
+              For: {proposal.votesFor}
+            </span>
+            <span className="cp-vote-against-label">
+              <span className="cp-vote-dot cp-vote-dot-against"></span>
+              Against: {proposal.votesAgainst}
+            </span>
+          </div>
         </div>
-        <div className="cp-vote-labels">
-          <span className="cp-vote-for-label">
-            <span className="cp-vote-dot cp-vote-dot-for"></span>
-            For: {proposal.votesFor}
-          </span>
-          <span className="cp-vote-against-label">
-            <span className="cp-vote-dot cp-vote-dot-against"></span>
-            Against: {proposal.votesAgainst}
-          </span>
+      ) : (
+        <div className="cp-vote-progress">
+          <p className="cp-no-votes-message" style={{ textAlign: 'center', color: '#6B7280', padding: '1rem' }}>
+            No votes yet. Be the first to vote on this proposal!
+          </p>
         </div>
-      </div>
+      )}
 
       <div className="cp-detail-grid">
         <div className="cp-detail-item">
@@ -984,6 +1054,23 @@ function LaunchDAOForm({ onSuccess }) {
     } else if (formData.description.length < 20) {
       newErrors.description = 'Description must be at least 20 characters'
     }
+    
+    // Validate treasury vault address if provided
+    const treasuryVaultAddress = formData.treasuryVault.trim()
+    if (treasuryVaultAddress && !ethers.isAddress(treasuryVaultAddress)) {
+      newErrors.treasuryVault = 'Treasury vault must be a valid Ethereum address'
+    }
+    
+    // Validate admin addresses if provided
+    const adminsInput = formData.admins.trim()
+    if (adminsInput) {
+      const adminAddresses = adminsInput.split(',').map(addr => addr.trim()).filter(addr => addr)
+      const invalidAddresses = adminAddresses.filter(addr => !ethers.isAddress(addr))
+      if (invalidAddresses.length > 0) {
+        newErrors.admins = `Invalid Ethereum address(es): ${invalidAddresses.join(', ')}`
+      }
+    }
+    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -1055,8 +1142,10 @@ function LaunchDAOForm({ onSuccess }) {
             onChange={(e) => handleChange('treasuryVault', e.target.value)}
             placeholder="0x... (optional - will create new if empty)"
             disabled={creating}
+            className={errors.treasuryVault ? 'error' : ''}
           />
           <span className="cp-hint">Leave empty to create a new treasury vault</span>
+          {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
         </div>
 
         <div className="cp-form-group">
@@ -1070,8 +1159,10 @@ function LaunchDAOForm({ onSuccess }) {
             onChange={(e) => handleChange('admins', e.target.value)}
             placeholder="0x123..., 0x456... (comma-separated)"
             disabled={creating}
+            className={errors.admins ? 'error' : ''}
           />
           <span className="cp-hint">Your address will be added automatically</span>
+          {errors.admins && <span className="cp-error">{errors.admins}</span>}
         </div>
 
         {errors.submit && (
