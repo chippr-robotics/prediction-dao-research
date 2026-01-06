@@ -1,53 +1,67 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://fairwins.app/schemas/market-metadata-v1.json",
-  "title": "Market Metadata Schema",
-  "description": "Schema for prediction market metadata following OpenSea standards",
+  "title": "Market Metadata Schema v1.1",
+  "description": "Schema for prediction market metadata stored in IPFS. This schema defines the off-chain data structure for markets, while essential parameters are stored on-chain in the ConditionalMarketFactory contract. Data separation: On-chain (contract) stores: tradingEndTime, betType, collateralToken, liquidityParameter, resolved status, passValue/failValue. Off-chain (IPFS) stores: market question, description, resolution criteria, category, tags, and media.",
   "type": "object",
   "required": ["name", "description", "image", "attributes"],
   "properties": {
     "name": {
       "type": "string",
-      "description": "Market title",
-      "minLength": 1,
-      "maxLength": 200
+      "description": "Market question/title - the primary prediction question",
+      "minLength": 10,
+      "maxLength": 200,
+      "examples": [
+        "Will Bitcoin reach $100,000 by end of 2025?",
+        "Will SpaceX land humans on Mars by 2030?"
+      ]
     },
     "description": {
       "type": "string",
-      "description": "Detailed market description with resolution criteria (markdown supported)",
-      "minLength": 10
+      "description": "Detailed market description with context and background. May include markdown formatting. Resolution criteria should be included either here or in properties.resolution_criteria.",
+      "minLength": 30
     },
     "external_url": {
       "type": "string",
       "format": "uri",
-      "description": "Link to market page on FairWins"
+      "description": "Link to source information or market page on FairWins"
     },
     "image": {
       "type": "string",
       "format": "uri",
-      "description": "Market image URI (IPFS preferred)",
+      "description": "Market image URI (IPFS preferred). Use ipfs:// format for decentralized storage.",
       "pattern": "^(ipfs://|https://)"
     },
     "animation_url": {
       "type": "string",
       "format": "uri",
-      "description": "Optional video or animation URI"
+      "description": "Optional video or animation URI for rich media markets"
     },
     "background_color": {
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{6}$",
-      "description": "6-character hex color (without #)"
+      "description": "6-character hex color (without #) for UI theming"
     },
     "attributes": {
       "type": "array",
-      "description": "Array of market attributes for filtering and sorting",
+      "description": "Array of market attributes for filtering, sorting, and display. Common attributes: Category, Bet Type, Trading Period, Initial Liquidity.",
       "items": {
         "type": "object",
         "required": ["trait_type", "value"],
         "properties": {
           "trait_type": {
             "type": "string",
-            "description": "Attribute name"
+            "description": "Attribute name",
+            "enum": [
+              "Category",
+              "Bet Type",
+              "Trading Period",
+              "Initial Liquidity",
+              "Creator",
+              "Network",
+              "Status",
+              "Resolution Date"
+            ]
           },
           "value": {
             "type": ["string", "number"],
@@ -55,39 +69,105 @@
           },
           "display_type": {
             "enum": ["string", "number", "date", "boost_number", "boost_percentage"],
-            "description": "How to display the value"
+            "description": "How to display the value in UI"
           },
           "max_value": {
             "type": "number",
-            "description": "Maximum value for progress bars"
+            "description": "Maximum value for progress bar displays"
           }
         }
       },
-      "minItems": 1
+      "minItems": 1,
+      "examples": [
+        [
+          { "trait_type": "Category", "value": "Crypto" },
+          { "trait_type": "Bet Type", "value": "Yes / No" },
+          { "trait_type": "Trading Period", "value": "14 days", "display_type": "string" },
+          { "trait_type": "Initial Liquidity", "value": 1000, "display_type": "number" }
+        ]
+      ]
     },
     "properties": {
       "type": "object",
-      "description": "Additional market-specific properties",
+      "description": "Additional market-specific properties not displayed as attributes",
       "properties": {
-        "market_id": { "type": "number" },
-        "proposal_id": { "type": "number" },
-        "pass_token": { "type": "string" },
-        "fail_token": { "type": "string" },
-        "collateral_token": { "type": "string" },
-        "creator": { "type": "string" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "correlation_group_id": { "type": "string" },
+        "schema_version": {
+          "type": "string",
+          "description": "Metadata schema version",
+          "default": "1.1.0"
+        },
+        "resolution_criteria": {
+          "type": "string",
+          "description": "Detailed criteria for how the market will be resolved. Should specify data sources, timing, and edge cases.",
+          "minLength": 20
+        },
+        "market_id": {
+          "type": "number",
+          "description": "On-chain market ID (reference only, source of truth is contract)"
+        },
+        "proposal_id": {
+          "type": "number",
+          "description": "Associated governance proposal ID if applicable"
+        },
+        "creator": {
+          "type": "string",
+          "pattern": "^0x[a-fA-F0-9]{40}$",
+          "description": "Creator wallet address"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of metadata creation"
+        },
+        "uploaded_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of IPFS upload"
+        },
         "tags": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string" },
+          "description": "Searchable tags for market discovery"
         },
         "oracle_sources": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string", "format": "uri" },
+          "description": "URLs or identifiers for data sources used in resolution"
         },
-        "resolution_bond": { "type": "string" },
-        "challenge_period_hours": { "type": "number" }
+        "correlation_group_id": {
+          "type": "string",
+          "description": "ID linking related markets for correlation analysis"
+        },
+        "resolution_bond": {
+          "type": "string",
+          "description": "Required bond amount for resolution (if applicable)"
+        },
+        "challenge_period_hours": {
+          "type": "number",
+          "description": "Hours to challenge resolution outcome"
+        }
       }
     }
-  }
+  },
+  "examples": [
+    {
+      "name": "Will Bitcoin reach $100,000 by end of 2025?",
+      "description": "This market resolves to YES if the price of Bitcoin (BTC) reaches or exceeds $100,000 USD on any major exchange before January 1, 2026 00:00 UTC.",
+      "image": "ipfs://QmExampleImageCid",
+      "external_url": "https://coinmarketcap.com/currencies/bitcoin/",
+      "attributes": [
+        { "trait_type": "Category", "value": "Crypto" },
+        { "trait_type": "Bet Type", "value": "Yes / No" },
+        { "trait_type": "Trading Period", "value": "14 days", "display_type": "string" },
+        { "trait_type": "Initial Liquidity", "value": 1000, "display_type": "number" }
+      ],
+      "properties": {
+        "schema_version": "1.1.0",
+        "resolution_criteria": "Market resolves YES if Bitcoin price reaches $100,000 USD on CoinGecko, CoinMarketCap, or Binance before January 1, 2026 00:00 UTC. Resolves NO if this threshold is not met by the deadline.",
+        "creator": "0x1234567890abcdef1234567890abcdef12345678",
+        "created_at": "2025-01-06T12:00:00Z",
+        "tags": ["bitcoin", "btc", "price", "2025", "cryptocurrency"]
+      }
+    }
+  ]
 }
