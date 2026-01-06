@@ -25,8 +25,9 @@ import CorrelatedMarketsPage from './pages/CorrelatedMarketsPage'
 import WalletPage from './pages/WalletPage'
 
 
-//admin 
+//admin
 import RoleManagementAdmin from './components/RoleManagementAdmin'
+import AdminPanel from './components/AdminPanel'
 
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
@@ -177,6 +178,8 @@ function AppContent() {
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/tokenmint" element={<TokenMintPage />} />
 
+        {/* Admin routes - restricted to users with admin roles */}
+        <Route path="/admin" element={<AdminPanel />} />
         <Route path="/admin/roles" element={<RoleManagementAdmin />} />
         <Route path="/purchase-roles" element={<RolePurchaseScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />

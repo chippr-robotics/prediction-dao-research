@@ -6,7 +6,7 @@ import {
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'
-import { RoleContext, ROLES, ROLE_INFO } from './RoleContext'
+import { RoleContext, ROLES, ROLE_INFO, ADMIN_ROLES, isAdminRole } from './RoleContext'
 
 /**
  * RoleProvider manages user roles tied to wallet address
@@ -138,8 +138,10 @@ export function RoleProvider({ children }) {
     grantRoleToUser,
     revokeRoleFromUser,
     getRoleInfo,
+    isAdminRole,
     ROLES,
-    ROLE_INFO
+    ROLE_INFO,
+    ADMIN_ROLES
   }
 
   return (
