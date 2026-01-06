@@ -148,6 +148,14 @@ const DEMO_PROPOSALS = [
 ]
 
 function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
+  // Validate required props
+  if (typeof isOpen !== 'boolean') {
+    console.error('ClearPathModal: isOpen prop is required and must be a boolean')
+  }
+  if (typeof onClose !== 'function') {
+    console.error('ClearPathModal: onClose prop is required and must be a function')
+  }
+
   const { provider } = useEthers()
   const { account } = useAccount()
   const { preferences } = useUserPreferences()
