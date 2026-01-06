@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
-import { useAdminContracts } from '../hooks/useAdminContracts'
+import { useAdminContracts, CONTRACT_STATE_REFRESH_INTERVAL } from '../hooks/useAdminContracts'
 import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
@@ -96,7 +96,7 @@ function AdminPanel() {
     const interval = setInterval(() => {
       // Only fetch if not currently fetching to avoid race conditions
       fetchContractState()
-    }, 30000)
+    }, CONTRACT_STATE_REFRESH_INTERVAL)
     
     return () => {
       clearInterval(interval)
@@ -164,10 +164,27 @@ function AdminPanel() {
     // Validate price for potential issues
     const priceNum = parseFloat(tierConfig.price)
     if (priceNum === 0) {
-      // Confirm setting a free tier
-      if (!window.confirm('Setting price to 0 will make this a free tier. Continue?')) {
-        return
-      }
+      // Confirm setting a free tier using the confirmation dialog
+      setConfirmAction({
+        title: 'Confirm Free Tier',
+        message: 'Setting price to 0 will make this a free tier. Are you sure you want to continue?',
+        warning: 'Users will be able to access this tier without payment.',
+        confirmText: 'Yes, Set as Free',
+        danger: false,
+        onConfirm: async () => {
+          setPendingTx(true)
+          try {
+            await configureTier(roleHash, tierConfig.tier, tierConfig.price, tierConfig.isActive)
+            showNotification('Tier configured successfully', 'success')
+            setConfirmAction(null)
+          } catch (err) {
+            showNotification(err.message, 'error')
+          } finally {
+            setPendingTx(false)
+          }
+        }
+      })
+      return
     }
 
     setPendingTx(true)
@@ -225,14 +242,14 @@ function AdminPanel() {
       return
     }
 
-    // Allow only simple decimal representations to avoid unexpected parse behavior
-    if (!/^\d+(\.\d+)?$/.test(rawAmount)) {
+    // Allow decimal representations like '0.5', '.5', '5.0', and '5'
+    if (!/^\d+(\.\d*)?$|^\.\d+$/.test(rawAmount)) {
       showNotification('Invalid withdrawal amount format', 'error')
       return
     }
 
     const amountNum = Number(rawAmount)
-    if (!Number.isFinite(amountNum) || amountNum <= 0 || amountNum < MIN_WITHDRAWAL_AMOUNT) {
+    if (!Number.isFinite(amountNum) || amountNum < MIN_WITHDRAWAL_AMOUNT) {
       showNotification('Invalid withdrawal amount', 'error')
       return
     }

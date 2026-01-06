@@ -5,7 +5,7 @@ import { MINIMAL_ROLE_MANAGER_ABI, MEMBERSHIP_TIERS, TIER_NAMES } from '../abis/
 import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
 
 // Refresh interval for contract state (30 seconds)
-const CONTRACT_STATE_REFRESH_INTERVAL = 30000
+export const CONTRACT_STATE_REFRESH_INTERVAL = 30000
 
 // Contract addresses - using deployer as placeholder for role manager
 // In production, this would be the actual deployed MinimalRoleManager address
@@ -415,8 +415,6 @@ export function useAdminContracts() {
     isLoading,
     error,
     contractState,
-    MEMBERSHIP_TIERS,
-    TIER_NAMES,
 
     // Actions
     emergencyPause,
