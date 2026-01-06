@@ -526,7 +526,7 @@ export async function registerZKKey(signer, publicKey) {
     const receipt = await tx.wait()
 
     return {
-      hash: receipt.hash,
+      hash: receipt.transactionHash,
       blockNumber: receipt.blockNumber,
       status: receipt.status === 1 ? 'success' : 'failed',
       gasUsed: receipt.gasUsed.toString()

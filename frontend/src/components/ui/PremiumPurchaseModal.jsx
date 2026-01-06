@@ -4,7 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithUSC } from '../../utils/blockchainService'
+import { purchaseRoleWithUSC, registerZKKey } from '../../utils/blockchainService'
 import './PremiumPurchaseModal.css'
 
 /**
@@ -252,8 +252,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       // Handle ZK key registration for ClearPath (optional, only if key provided)
       if (zkPublicKey.trim() && selectedRoles.includes('CLEARPATH_USER')) {
         try {
-          // Import and call ZK key registration
-          const { registerZKKey } = await import('../../utils/blockchainService')
           await registerZKKey(signer, zkPublicKey.trim())
           showNotification('ZK key registered successfully', 'success', 5000)
         } catch (zkError) {
