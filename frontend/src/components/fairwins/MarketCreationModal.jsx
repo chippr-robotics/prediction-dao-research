@@ -43,6 +43,7 @@ const CATEGORIES = [
 
 const STEPS = [
   { id: 'metadata', label: 'Content', icon: '📝' },
+  { id: 'education', label: 'Design', icon: '💡' },
   { id: 'parameters', label: 'Parameters', icon: '⚙️' },
   { id: 'review', label: 'Review', icon: '✓' }
 ]
@@ -164,7 +165,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       }
     }
 
-    if (step === 1) {
+    // Step 1 is educational, no validation needed
+
+    if (step === 2) {
       // Parameters validation
       const days = parseInt(paramsForm.tradingPeriodDays)
       if (isNaN(days) || days < 7 || days > 21) {
@@ -247,7 +250,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
   // Submit handler
   const handleSubmit = async () => {
-    if (!validateStep(0) || !validateStep(1)) {
+    if (!validateStep(0) || !validateStep(2)) {
       return
     }
 
@@ -534,8 +537,188 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
             </div>
           )}
 
-          {/* Step 2: Parameters */}
+          {/* Step 1: Education on Market Design */}
           {currentStep === 1 && (
+            <div className="mcm-panel" role="tabpanel" aria-labelledby="step-education">
+              <section className="mcm-section">
+                <div className="mcm-education-header">
+                  <h3 className="mcm-section-title">
+                    <span aria-hidden="true">🎯</span> Designing Markets for Information Discovery
+                  </h3>
+                  <p className="mcm-education-intro">
+                    FairWins is not a place to bet on outcomes. It's a system designed to <strong>discover, discipline, and distill information</strong>—even when participants are automated, strategic, and adversarial.
+                  </p>
+                </div>
+
+                <div className="mcm-education-card mcm-education-primary">
+                  <div className="mcm-education-icon" aria-hidden="true">💡</div>
+                  <div className="mcm-education-content">
+                    <h4>Key Principle</h4>
+                    <p>Markets are evaluated by the <strong>quality of information they discover</strong>, not by the apparent confidence or stability of prices.</p>
+                  </div>
+                </div>
+
+                <div className="mcm-education-divider">
+                  <span>Market Dimensions</span>
+                </div>
+
+                <div className="mcm-dimensions-grid">
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">🔍</span>
+                      <h4>Resolution Ontology</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">What does it mean for the market to resolve?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>Revelatory:</strong> Reveals a pre-existing fact</li>
+                      <li><strong>Eventual:</strong> Occurs via exogenous unfolding</li>
+                      <li><strong>Performative:</strong> Caused by the mechanism itself</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Information discovery works best with <strong>Revelatory</strong> or <strong>Eventual</strong> modes
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">🔗</span>
+                      <h4>Ontological Coupling</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">To what extent do beliefs influence outcomes?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>Decoupled:</strong> Beliefs cannot influence outcome</li>
+                      <li><strong>Weakly coupled:</strong> Beliefs influence indirectly</li>
+                      <li><strong>Strongly coupled:</strong> Beliefs materially alter probability</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Best for discovery: <strong>Decoupled</strong> or <strong>Weakly coupled</strong>
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">🎮</span>
+                      <h4>Agency Influence</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">Can participants act on the outcome domain?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>None:</strong> Participants are observers only</li>
+                      <li><strong>External:</strong> May influence outcomes outside the market</li>
+                      <li><strong>Internal:</strong> Participation itself alters the outcome</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Discovery degrades as agency increases: prefer <strong>None</strong> or <strong>External</strong>
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">📊</span>
+                      <h4>Epistemic Structure</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">What kind of information is being aggregated?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>State signals:</strong> Facts about the world</li>
+                      <li><strong>Model judgments:</strong> Forecasts, interpretations</li>
+                      <li><strong>Strategic beliefs:</strong> Beliefs about others' actions</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Use <strong>State signals</strong> or <strong>Model judgments</strong> for discovery
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">🔐</span>
+                      <h4>Axiological Commitments</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">What constrains participation?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>Economic:</strong> Capital at risk</li>
+                      <li><strong>Reputational:</strong> Identity-bound signaling</li>
+                      <li><strong>Structural:</strong> Permissioned participation</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Discovery requires <strong>Economic</strong> and/or <strong>Reputational</strong> commitment
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">⏱️</span>
+                      <h4>Temporal Granularity</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">How do beliefs update over time?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>Static:</strong> One-shot participation</li>
+                      <li><strong>Discrete:</strong> Periodic updates</li>
+                      <li><strong>Continuous:</strong> Real-time belief aggregation</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Agent-dominant systems often need <strong>Discrete</strong> or <strong>Batched</strong>
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">🤖</span>
+                      <h4>Participant Substrate</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">Who is expected to participate?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>Human-bounded:</strong> Primarily human participants</li>
+                      <li><strong>Hybrid:</strong> Mixed human and AI agents</li>
+                      <li><strong>Agent-dominant:</strong> AI agents as default</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> FairWins assumes <strong>Agent-dominant</strong> by design
+                    </div>
+                  </div>
+
+                  <div className="mcm-dimension-card">
+                    <div className="mcm-dimension-header">
+                      <span className="mcm-dimension-icon" aria-hidden="true">🎯</span>
+                      <h4>Mechanism Intent</h4>
+                    </div>
+                    <p className="mcm-dimension-desc">What is the system optimizing for?</p>
+                    <ul className="mcm-dimension-list">
+                      <li><strong>Accuracy:</strong> Correct at resolution</li>
+                      <li><strong>Calibration:</strong> Probabilistic reliability</li>
+                      <li><strong>Early signal:</strong> Lead time detection</li>
+                    </ul>
+                    <div className="mcm-dimension-note">
+                      <span aria-hidden="true">✓</span> Focus on <strong>Accuracy</strong>, <strong>Calibration</strong>, or <strong>Early signal</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mcm-education-card mcm-education-highlight">
+                  <div className="mcm-education-icon" aria-hidden="true">🛡️</div>
+                  <div className="mcm-education-content">
+                    <h4>Discovery-Safe Region</h4>
+                    <p>Markets optimized for information discovery should generally satisfy:</p>
+                    <ul className="mcm-discovery-checklist">
+                      <li><span aria-hidden="true">✓</span> <strong>Resolution:</strong> Revelatory or Eventual</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Coupling:</strong> Decoupled or Weakly coupled</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Agency:</strong> None or External</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Epistemic:</strong> State signals or Model judgments</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Commitment:</strong> Economic and/or Reputational</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Temporal:</strong> Discrete or Batched</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Substrate:</strong> Agent-dominant assumed</li>
+                      <li><span aria-hidden="true">✓</span> <strong>Intent:</strong> Accuracy, Calibration, or Early signal</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mcm-education-footer">
+                  <p>Consider these dimensions as you design your market. Markets outside the discovery-safe region may still be valuable but require additional guardrails.</p>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* Step 2: Parameters */}
+          {currentStep === 2 && (
             <div className="mcm-panel" role="tabpanel" aria-labelledby="step-parameters">
               <section className="mcm-section">
                 <h3 className="mcm-section-title">
@@ -629,7 +812,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
           )}
 
           {/* Step 3: Review */}
-          {currentStep === 2 && (
+          {currentStep === 3 && (
             <div className="mcm-panel" role="tabpanel" aria-labelledby="step-review">
               <section className="mcm-section">
                 <h3 className="mcm-section-title">
