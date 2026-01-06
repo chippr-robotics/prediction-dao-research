@@ -10,6 +10,7 @@ import BlockiesAvatar from '../ui/BlockiesAvatar'
 import RolePurchaseModal from '../ui/RolePurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
 import walletIcon from '../../assets/wallet_no_text.svg'
+import { FriendMarketsModal } from '../fairwins'
 import './WalletButton.css'
 
 /**
@@ -465,11 +466,10 @@ function WalletButton({ className = '', theme = 'dark' }) {
       )}
 
       {/* Friend Market Creation Modal */}
-      <MarketCreationModal
+      <FriendMarketsModal
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
         onCreate={handleFriendMarketCreation}
-        defaultTab="friend"
       />
     </div>
   )
