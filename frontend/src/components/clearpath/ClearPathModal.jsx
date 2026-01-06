@@ -676,7 +676,7 @@ function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) 
               {dao.name.charAt(0).toUpperCase()}
             </div>
             <div className="cp-dao-info">
-              <h4>{dao.name}</h4>
+              <h3>{dao.name}</h3>
               <p>{dao.description}</p>
             </div>
           </div>
@@ -817,7 +817,7 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
           aria-label={`${proposal.title}, ${proposal.status} status, ${proposal.votesFor} for, ${proposal.votesAgainst} against`}
         >
           <div className="cp-proposal-main">
-            <h4>{proposal.title}</h4>
+            <h3>{proposal.title}</h3>
             <p className="cp-proposal-dao">{proposal.daoName}</p>
           </div>
           <div className="cp-proposal-meta">
@@ -968,7 +968,7 @@ function MetricsOverview({ daos, demoMode }) {
       </div>
 
       <div className="cp-welfare-section">
-        <h4>Welfare Indicators</h4>
+        <h3>Welfare Indicators</h3>
         <div className="cp-welfare-grid">
           <div className="cp-welfare-item">
             <div className="cp-welfare-header">
