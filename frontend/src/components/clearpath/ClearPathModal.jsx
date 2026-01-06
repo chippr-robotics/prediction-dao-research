@@ -152,13 +152,13 @@ const DEMO_PROPOSALS = [
   }
 ]
 
-function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
-  // Validate required props
-  if (typeof isOpen !== 'boolean') {
-    console.error('ClearPathModal: isOpen prop is required and must be a boolean')
+function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos' }) {
+  // Validate props if provided
+  if (isOpen !== undefined && typeof isOpen !== 'boolean') {
+    console.error('ClearPathModal: isOpen prop must be a boolean')
   }
-  if (typeof onClose !== 'function') {
-    console.error('ClearPathModal: onClose prop is required and must be a function')
+  if (onClose !== undefined && typeof onClose !== 'function') {
+    console.error('ClearPathModal: onClose prop must be a function')
   }
 
   const { provider } = useEthers()
@@ -1280,9 +1280,15 @@ function LaunchDAOForm({ onSuccess }) {
 }
 
 ClearPathModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
   defaultTab: PropTypes.oneOf(['daos', 'browse', 'proposals', 'metrics', 'launch'])
+}
+
+ClearPathModal.defaultProps = {
+  isOpen: true,
+  onClose: () => {},
+  defaultTab: 'daos'
 }
 
 export default ClearPathModal
