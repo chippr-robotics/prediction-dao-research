@@ -30,6 +30,10 @@ const DAOFactoryABI = [
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
 
+// Date validation constants
+const MIN_VALID_DATE = new Date('2000-01-01T00:00:00Z').getTime()
+const MAX_VALID_DATE = new Date('2100-01-01T00:00:00Z').getTime()
+
 // Demo DAO data
 const DEMO_USER_DAOS = [
   {
@@ -332,11 +336,9 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
 
       // Reasonable date range validation (prevent absurd past/future dates)
       const time = date.getTime()
-      const minTime = new Date('2000-01-01T00:00:00Z').getTime()
-      const maxTime = new Date('2100-01-01T00:00:00Z').getTime()
-      if (time < minTime || time > maxTime) return 'N/A'
+      if (time < MIN_VALID_DATE || time > MAX_VALID_DATE) return 'N/A'
 
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     } catch {
       // In case of any unexpected errors during conversion/formatting
       return 'N/A'
