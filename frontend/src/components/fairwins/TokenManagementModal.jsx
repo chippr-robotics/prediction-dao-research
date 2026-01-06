@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import './TokenManagementModal.css'
 
@@ -22,6 +22,7 @@ function TokenManagementModal({ isOpen, onClose }) {
   const [actionData, setActionData] = useState({})
   const [actionLoading, setActionLoading] = useState(false)
   const [copySuccess, setCopySuccess] = useState(null) // Track which address was copied
+  const modalRef = useRef(null)
 
   // Data states
   const [tokens, setTokens] = useState([])
@@ -219,6 +220,42 @@ function TokenManagementModal({ isOpen, onClose }) {
     }
   }, [isOpen, actionModal, showInfoPanel, onClose])
 
+  // Focus trap implementation
+  useEffect(() => {
+    if (!isOpen || !modalRef.current) return
+
+    const modal = modalRef.current
+    const focusableElements = modal.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+
+    // Focus the first element when modal opens
+    firstElement?.focus()
+
+    const handleTabKey = (e) => {
+      if (e.key !== 'Tab') return
+
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault()
+          lastElement?.focus()
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault()
+          firstElement?.focus()
+        }
+      }
+    }
+
+    modal.addEventListener('keydown', handleTabKey)
+    return () => modal.removeEventListener('keydown', handleTabKey)
+  }, [isOpen, actionModal, showInfoPanel])
+
   const fetchChainInfo = async (item) => {
     setLoading(true)
     try {
@@ -327,7 +364,7 @@ function TokenManagementModal({ isOpen, onClose }) {
 
   return (
     <div className="tm-modal-overlay" onClick={onClose}>
-      <div className="tm-modal" onClick={e => e.stopPropagation()}>
+      <div className="tm-modal" onClick={e => e.stopPropagation()} ref={modalRef}>
         {/* Header */}
         <div className="tm-header">
           <div className="tm-header-content">
