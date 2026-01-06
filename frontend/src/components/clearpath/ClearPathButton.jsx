@@ -68,7 +68,7 @@ function ClearPathButton() {
 
   const handleOpenGovernance = () => {
     setIsOpen(false)
-    showModal(<ClearPathModal />, {
+    showModal(<ClearPathModal isOpen={true} onClose={() => showModal(null)} />, {
       title: 'ClearPath Governance',
       size: 'large',
       closable: true
@@ -77,7 +77,7 @@ function ClearPathButton() {
 
   const handleViewDAOs = () => {
     setIsOpen(false)
-    showModal(<ClearPathModal defaultTab="daos" />, {
+    showModal(<ClearPathModal isOpen={true} onClose={() => showModal(null)} defaultTab="daos" />, {
       title: 'My DAOs',
       size: 'large',
       closable: true
@@ -86,7 +86,7 @@ function ClearPathButton() {
 
   const handleViewProposals = () => {
     setIsOpen(false)
-    showModal(<ClearPathModal defaultTab="proposals" />, {
+    showModal(<ClearPathModal isOpen={true} onClose={() => showModal(null)} defaultTab="proposals" />, {
       title: 'Proposals',
       size: 'large',
       closable: true
