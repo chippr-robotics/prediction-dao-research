@@ -4,6 +4,7 @@ import Dashboard from '../components/fairwins/Dashboard'
 import { useWeb3 } from '../hooks/useWeb3'
 import { getMockMarkets } from '../utils/mockDataLoader'
 import { useDataFetcher } from '../hooks/useDataFetcher'
+import { UserPreferencesContext } from '../contexts'
 
 // Mock ResizeObserver
 global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -166,6 +167,35 @@ describe('Dashboard Component', () => {
     }
   ]
 
+  const defaultPreferencesContext = {
+    preferences: {
+      recentSearches: [],
+      favoriteMarkets: [],
+      defaultSlippage: 0.5,
+      clearPathStatus: { active: false, lastUpdated: null },
+      demoMode: true
+    },
+    isLoading: false,
+    addRecentSearch: vi.fn(),
+    clearRecentSearches: vi.fn(),
+    toggleFavoriteMarket: vi.fn(),
+    setDefaultSlippage: vi.fn(),
+    setClearPathStatus: vi.fn(),
+    setDemoMode: vi.fn(),
+    savePreference: vi.fn(),
+    clearAllPreferences: vi.fn()
+  }
+
+  const renderWithProviders = (component, options = {}) => {
+    const { preferencesContext = defaultPreferencesContext } = options
+
+    return render(
+      <UserPreferencesContext.Provider value={preferencesContext}>
+        {component}
+      </UserPreferencesContext.Provider>
+    )
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     
@@ -200,7 +230,7 @@ describe('Dashboard Component', () => {
     // loading happens too fast to catch in tests
     
     it('should render dashboard header after loading', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Overview')).toBeInTheDocument()
@@ -208,17 +238,18 @@ describe('Dashboard Component', () => {
     })
 
     it('should render subtitle', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
-        expect(screen.getByText('Real-time insights across all prediction markets')).toBeInTheDocument()
+        // In demo mode, subtitle shows "Viewing sample market data"
+        expect(screen.getByText('Viewing sample market data')).toBeInTheDocument()
       })
     })
   })
 
   describe('Chart Sections', () => {
     it('should render market distribution chart section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Distribution by Category')).toBeInTheDocument()
@@ -226,7 +257,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should render platform health section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Platform Health')).toBeInTheDocument()
@@ -234,7 +265,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should render category performance section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Category Performance')).toBeInTheDocument()
@@ -242,7 +273,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should render liquidity flow section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Liquidity Flow')).toBeInTheDocument()
@@ -250,7 +281,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should render trading activity section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Trading Activity')).toBeInTheDocument()
@@ -258,7 +289,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should render market sentiment section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Sentiment')).toBeInTheDocument()
@@ -268,7 +299,7 @@ describe('Dashboard Component', () => {
 
   describe('Bottom Section', () => {
     it('should render trending markets section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText(/Trending Markets/)).toBeInTheDocument()
@@ -276,7 +307,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should render recent activity section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText(/Recent Activity/)).toBeInTheDocument()
@@ -284,7 +315,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should display View All button in trending section', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('View All →')).toBeInTheDocument()
@@ -307,7 +338,7 @@ describe('Dashboard Component', () => {
         getMarketsByCorrelationGroup: vi.fn()
       })
       
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(mockGetMarkets).toHaveBeenCalled()
@@ -327,7 +358,7 @@ describe('Dashboard Component', () => {
         getMarketsByCorrelationGroup: vi.fn()
       })
       
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Overview')).toBeInTheDocument()
@@ -350,7 +381,7 @@ describe('Dashboard Component', () => {
         getMarketsByCorrelationGroup: vi.fn()
       })
       
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Overview')).toBeInTheDocument()
@@ -362,7 +393,7 @@ describe('Dashboard Component', () => {
 
   describe('Accessibility', () => {
     it('should have proper heading hierarchy', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         const h1 = screen.getByRole('heading', { level: 1 })
@@ -371,7 +402,7 @@ describe('Dashboard Component', () => {
     })
 
     it('should have accessible trending market items', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         const trendingItems = screen.queryAllByRole('button')
@@ -382,7 +413,7 @@ describe('Dashboard Component', () => {
 
   describe('Responsive Design', () => {
     it('should render all sections on desktop', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Distribution by Category')).toBeInTheDocument()
@@ -394,7 +425,7 @@ describe('Dashboard Component', () => {
 
   describe('Categories', () => {
     it('should initialize with predefined categories', async () => {
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         // Categories should be used in the chart rendering
@@ -426,7 +457,7 @@ describe('Dashboard Component', () => {
         getMarketsByCorrelationGroup: vi.fn()
       })
       
-      render(<Dashboard />)
+      renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
         expect(screen.getByText('Market Overview')).toBeInTheDocument()
