@@ -1,16 +1,23 @@
 /**
  * IPFS Service
- * 
- * Service for interacting with IPFS gateway to retrieve token and market data.
+ *
+ * Service for interacting with IPFS gateway to retrieve and upload data.
  * Provides caching, retry logic, and error handling for IPFS requests.
+ *
+ * Features:
+ * - Fetch data from IPFS with caching
+ * - Upload JSON metadata to IPFS
+ * - Batch operations for multiple requests
+ * - Gateway health checks
  */
 
-import { 
-  IPFS_CONFIG, 
+import {
+  IPFS_CONFIG,
   IPFS_GATEWAY,
-  getIpfsUrl, 
+  IPFS_UPLOAD_API,
+  getIpfsUrl,
   buildIpfsPath,
-  isValidCid 
+  isValidCid
 } from '../constants/ipfs'
 
 /**
@@ -252,16 +259,226 @@ export const checkGatewayHealth = async () => {
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 5000)
-    
+
     // Try to fetch a known IPFS CID or health endpoint
     const response = await fetch(`${IPFS_GATEWAY}/`, {
       method: 'HEAD',
       signal: controller.signal,
     })
-    
+
     clearTimeout(timeoutId)
     return response.ok || response.status === 404 // 404 is ok, means gateway is up
   } catch {
     return false
   }
+}
+
+// ==========================================
+// IPFS Upload Functions
+// ==========================================
+
+/**
+ * Upload JSON data to IPFS
+ * @param {Object} data - JSON data to upload
+ * @param {Object} options - Upload options
+ * @param {string} options.name - Optional name for the content
+ * @returns {Promise<{cid: string, uri: string}>} Upload result with CID and URI
+ * @throws {Error} If upload fails
+ */
+export const uploadJson = async (data, options = {}) => {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Data must be a valid object')
+  }
+
+  // Validate that data can be stringified (no circular references)
+  let jsonString
+  try {
+    jsonString = JSON.stringify(data)
+  } catch (error) {
+    throw new Error(`Cannot stringify data: ${error.message}`)
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), IPFS_CONFIG.UPLOAD_TIMEOUT)
+
+  try {
+    const response = await fetch(`${IPFS_UPLOAD_API}/add`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: data,
+        name: options.name || 'metadata.json',
+        pin: true,
+      }),
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const responseText = await response.text()
+      let errorMessage
+      try {
+        const errorData = JSON.parse(responseText)
+        errorMessage = errorData && typeof errorData === 'object' ? errorData.message : null
+      } catch {
+        errorMessage = null
+      }
+      if (!errorMessage) {
+        const bodySnippet = responseText ? responseText.slice(0, 200) : ''
+        errorMessage = `Upload failed with status ${response.status}` + (bodySnippet ? `. Response body: ${bodySnippet}` : '')
+      }
+      throw new Error(errorMessage)
+    }
+
+    const result = await response.json()
+
+    if (!result.cid) {
+      throw new Error('Upload response missing CID')
+    }
+
+    return {
+      cid: result.cid,
+      uri: `ipfs://${result.cid}`,
+      size: result.size || new Blob([jsonString]).size,
+    }
+  } catch (error) {
+    clearTimeout(timeoutId)
+
+    if (error.name === 'AbortError') {
+      throw new Error('IPFS upload timeout')
+    }
+
+    throw new Error(`IPFS upload failed: ${error.message}`)
+  }
+}
+
+/**
+ * Upload market metadata to IPFS
+ * Validates and formats metadata according to OpenSea standard
+ * @param {Object} metadata - Market metadata object
+ * @returns {Promise<{cid: string, uri: string}>} Upload result
+ */
+export const uploadMarketMetadata = async (metadata) => {
+  // Validate required fields
+  if (!metadata.name) {
+    throw new Error('Market metadata requires a name/question field')
+  }
+  if (!metadata.description) {
+    throw new Error('Market metadata requires a description')
+  }
+
+  // Ensure proper format
+  const formattedMetadata = {
+    // Standard OpenSea fields
+    name: metadata.name,
+    description: metadata.description,
+    image: metadata.image || 'ipfs://QmDefaultMarketImage',
+    external_url: metadata.external_url,
+
+    // Attributes array for structured data
+    attributes: Array.isArray(metadata.attributes) ? metadata.attributes : [],
+
+    // Custom properties
+    properties: {
+      ...metadata.properties,
+      schema_version: '1.1.0',
+      uploaded_at: new Date().toISOString(),
+    },
+  }
+
+  return uploadJson(formattedMetadata, { name: 'market-metadata.json' })
+}
+
+/**
+ * Resolve a URI to fetch its content
+ * Handles ipfs://, https://, and raw CID formats
+ * @param {string} uri - URI to resolve
+ * @param {Object} options - Fetch options
+ * @returns {Promise<any>} Resolved content
+ */
+export const resolveUri = async (uri, options = {}) => {
+  if (!uri) {
+    throw new Error('URI is required')
+  }
+
+  // Handle IPFS URIs
+  if (uri.startsWith('ipfs://')) {
+    const cid = uri.replace('ipfs://', '').split('/')[0]
+    const path = uri.replace(`ipfs://${cid}`, '') || ''
+    return fetchFromIpfs(cid + path, options)
+  }
+
+  // Handle raw CIDs
+  if (isValidCid(uri)) {
+    return fetchByCid(uri, options)
+  }
+
+  // Handle HTTPS URLs
+  if (uri.startsWith('https://')) {
+    // Use caller-provided signal if present; otherwise create a timed abort controller
+    const hasCallerSignal = options && options.signal
+
+    if (hasCallerSignal) {
+      const response = await fetch(uri, { ...options })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${uri}: ${response.status}`)
+      }
+      return response.json()
+    }
+
+    const controller = new AbortController()
+    // Prefer a configured timeout if available, otherwise fall back to a sane default
+    const timeoutMs =
+      (IPFS_CONFIG && (IPFS_CONFIG.REQUEST_TIMEOUT_MS || IPFS_CONFIG.FETCH_TIMEOUT_MS)) || 10000
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      const response = await fetch(uri, { ...options, signal: controller.signal })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${uri}: ${response.status}`)
+      }
+      return response.json()
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  }
+
+  throw new Error(`Unsupported URI format: ${uri}`)
+}
+
+/**
+ * Upload and pin content with metadata registry integration
+ * Uploads to IPFS and optionally registers with MetadataRegistry contract
+ * Note: If registration fails, metadata remains uploaded to IPFS (orphaned content).
+ * This is by design to prevent data loss - the caller can retry registration later.
+ * @param {Object} content - Content to upload
+ * @param {Object} options - Options
+ * @param {string} options.resourceType - Resource type for registry (e.g., 'market')
+ * @param {string} options.resourceId - Resource ID for registry
+ * @param {Function} options.registerCallback - Callback to register with contract
+ * @returns {Promise<{cid: string, uri: string, registered: boolean}>}
+ */
+export const uploadAndRegister = async (content, options = {}) => {
+  // Upload to IPFS first
+  const uploadResult = await uploadJson(content, { name: options.name })
+
+  // If registration callback provided, register with MetadataRegistry
+  if (options.registerCallback && options.resourceType && options.resourceId) {
+    try {
+      await options.registerCallback(
+        options.resourceType,
+        options.resourceId,
+        uploadResult.cid
+      )
+      return { ...uploadResult, registered: true }
+    } catch (error) {
+      console.error('Failed to register metadata:', error)
+      return { ...uploadResult, registered: false, registrationError: error.message }
+    }
+  }
+
+  return { ...uploadResult, registered: false }
 }

@@ -1,6 +1,6 @@
 /**
  * IPFS Configuration
- * 
+ *
  * Configuration for accessing IPFS gateway hosted at ipfs.fairwins.app
  * Used for retrieving token metadata and market data
  */
@@ -12,18 +12,27 @@
 export const IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || 'https://ipfs.fairwins.app'
 
 /**
+ * IPFS Upload API Configuration
+ * Configurable upload endpoint for pinning content to IPFS
+ */
+export const IPFS_UPLOAD_API = import.meta.env.VITE_IPFS_UPLOAD_API || 'https://api.fairwins.app/ipfs'
+
+/**
  * IPFS API Configuration
  */
 export const IPFS_CONFIG = {
   // Request timeout in milliseconds
   TIMEOUT: 30000,
-  
+
+  // Upload timeout in milliseconds (2 minutes, intentionally higher to also support potential larger file uploads)
+  UPLOAD_TIMEOUT: 120000,
+
   // Number of retry attempts for failed requests
   MAX_RETRIES: 3,
-  
+
   // Delay between retries in milliseconds
   RETRY_DELAY: 1000,
-  
+
   // Cache duration in milliseconds (5 minutes)
   CACHE_DURATION: 300000,
 }
