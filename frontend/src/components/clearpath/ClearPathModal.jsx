@@ -645,14 +645,31 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
  * Compact list component for DAOs
  */
 function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) {
+  const handleKeyDown = (e, dao, index) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(dao)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextButton = e.currentTarget.nextElementSibling
+      if (nextButton) nextButton.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevButton = e.currentTarget.previousElementSibling
+      if (prevButton) prevButton.focus()
+    }
+  }
+
   return (
     <div className="cp-dao-list">
-      {daos.map((dao) => (
+      {daos.map((dao, index) => (
         <button
           key={dao.id}
           className="cp-dao-card"
           onClick={() => onSelect(dao)}
+          onKeyDown={(e) => handleKeyDown(e, dao, index)}
           type="button"
+          aria-label={`${dao.name}, ${dao.memberCount || 0} members, ${dao.treasuryBalance || '0 ETC'} treasury`}
         >
           <div className="cp-dao-card-main">
             <div className="cp-dao-avatar">
@@ -773,14 +790,31 @@ function DAODetailView({ dao, onBack, formatDate, formatAddress, account, showJo
  * Compact list component for proposals
  */
 function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }) {
+  const handleKeyDown = (e, proposal, index) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(proposal)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextButton = e.currentTarget.nextElementSibling
+      if (nextButton) nextButton.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prevButton = e.currentTarget.previousElementSibling
+      if (prevButton) prevButton.focus()
+    }
+  }
+
   return (
     <div className="cp-proposal-list">
-      {proposals.map((proposal) => (
+      {proposals.map((proposal, index) => (
         <button
           key={proposal.id}
           className="cp-proposal-card"
           onClick={() => onSelect(proposal)}
+          onKeyDown={(e) => handleKeyDown(e, proposal, index)}
           type="button"
+          aria-label={`${proposal.title}, ${proposal.status} status, ${proposal.votesFor} for, ${proposal.votesAgainst} against`}
         >
           <div className="cp-proposal-main">
             <h4>{proposal.title}</h4>
