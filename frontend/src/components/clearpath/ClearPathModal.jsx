@@ -332,8 +332,9 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
 
       // Reasonable date range validation (prevent absurd past/future dates)
       const time = date.getTime()
-      const minTime = new Date('2000-01-01T00:00:00Z').getTime()
-      const maxTime = new Date('2100-01-01T00:00:00Z').getTime()
+      const currentYear = new Date().getFullYear()
+      const minTime = new Date(`${currentYear - 50}-01-01T00:00:00Z`).getTime()
+      const maxTime = new Date(`${currentYear + 100}-01-01T00:00:00Z`).getTime()
       if (time < minTime || time > maxTime) return 'N/A'
 
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -651,12 +652,16 @@ function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) 
       onSelect(dao)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      const nextButton = e.currentTarget.nextElementSibling
-      if (nextButton) nextButton.focus()
+      if (index < daos.length - 1) {
+        const nextButton = document.querySelector(`.cp-dao-card:nth-child(${index + 2})`)
+        if (nextButton) nextButton.focus()
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      const prevButton = e.currentTarget.previousElementSibling
-      if (prevButton) prevButton.focus()
+      if (index > 0) {
+        const prevButton = document.querySelector(`.cp-dao-card:nth-child(${index})`)
+        if (prevButton) prevButton.focus()
+      }
     }
   }
 
@@ -795,12 +800,16 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
       onSelect(proposal)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      const nextButton = e.currentTarget.nextElementSibling
-      if (nextButton) nextButton.focus()
+      if (index < proposals.length - 1) {
+        const nextButton = document.querySelector(`.cp-proposal-card:nth-child(${index + 2})`)
+        if (nextButton) nextButton.focus()
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      const prevButton = e.currentTarget.previousElementSibling
-      if (prevButton) prevButton.focus()
+      if (index > 0) {
+        const prevButton = document.querySelector(`.cp-proposal-card:nth-child(${index})`)
+        if (prevButton) prevButton.focus()
+      }
     }
   }
 
@@ -1061,11 +1070,14 @@ function LaunchDAOForm({ onSuccess }) {
       newErrors.treasuryVault = 'Treasury vault must be a valid Ethereum address'
     }
     
-    // Validate admin addresses if provided
+    // Validate admin addresses if provided (optimized single pass)
     const adminsInput = formData.admins.trim()
     if (adminsInput) {
-      const adminAddresses = adminsInput.split(',').map(addr => addr.trim()).filter(addr => addr)
-      const invalidAddresses = adminAddresses.filter(addr => !ethers.isAddress(addr))
+      const invalidAddresses = adminsInput
+        .split(',')
+        .map(addr => addr.trim())
+        .filter(addr => addr && !ethers.isAddress(addr))
+      
       if (invalidAddresses.length > 0) {
         newErrors.admins = `Invalid Ethereum address(es): ${invalidAddresses.join(', ')}`
       }
