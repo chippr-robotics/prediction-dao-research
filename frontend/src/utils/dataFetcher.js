@@ -43,18 +43,26 @@ import {
  * @returns {Promise<Array>} Array of market objects
  */
 export async function fetchMarkets(demoMode, contracts = null) {
+  console.log('fetchMarkets called with demoMode:', demoMode)
+  
   if (demoMode) {
     // Return mock data
+    console.log('Using demo mode - returning mock markets')
     return getMockMarkets()
   }
   
   try {
     // Fetch from Mordor testnet
-    return await fetchMarketsFromBlockchain()
+    console.log('Live mode - fetching from blockchain')
+    const markets = await fetchMarketsFromBlockchain()
+    console.log('Fetched', markets.length, 'markets from blockchain')
+    return markets
   } catch (error) {
     console.error('Failed to fetch markets from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
-    return getMockMarkets()
+    // In live mode, return empty array instead of falling back to mock data
+    // This makes it clear to the user that blockchain data is not available
+    console.warn('Returning empty array - no blockchain data available')
+    return []
   }
 }
 

@@ -55,11 +55,31 @@ export function getContract(contractName, signerOrProvider = null) {
  */
 export async function fetchMarketsFromBlockchain() {
   try {
+    console.log('Fetching markets from blockchain...')
+    console.log('Contract address:', getContractAddress('marketFactory'))
+    console.log('RPC URL:', NETWORK_CONFIG.rpcUrl)
+    
     const contract = getContract('marketFactory')
+    
+    // First try to get market count to verify contract is accessible
+    let marketCount
+    try {
+      marketCount = await contract.getMarketCount()
+      console.log('Market count from blockchain:', marketCount.toString())
+    } catch (countError) {
+      console.warn('getMarketCount failed, trying getAllMarkets directly:', countError.message)
+    }
+    
     const markets = await contract.getAllMarkets()
+    console.log('Raw markets from blockchain:', markets)
+    
+    if (!markets || markets.length === 0) {
+      console.log('No markets found on blockchain, returning empty array')
+      return []
+    }
     
     // Transform blockchain data to match frontend format
-    return markets.map((market, index) => ({
+    const transformedMarkets = markets.map((market, index) => ({
       id: Number(market.id || index),
       proposalTitle: market.question || '',
       description: market.description || '',
@@ -71,8 +91,16 @@ export async function fetchMarketsFromBlockchain() {
       status: getMarketStatus(Number(market.status)),
       creator: market.creator || ethers.ZeroAddress
     }))
+    
+    console.log('Transformed markets:', transformedMarkets)
+    return transformedMarkets
   } catch (error) {
     console.error('Error fetching markets from blockchain:', error)
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      reason: error.reason
+    })
     throw error
   }
 }

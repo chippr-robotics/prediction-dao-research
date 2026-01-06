@@ -4,6 +4,7 @@ import './DAOList.css'
 import { useEthers } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
 import { useModal } from '../hooks/useUI'
+import LoadingScreen from './ui/LoadingScreen'
 
 const DAOFactoryABI = [
   "function joinDAO(uint256 daoId) external",
@@ -72,10 +73,12 @@ function DAOList({ daos, loading, error, onRefresh, showJoinButton = false }) {
 
   if (loading) {
     return (
-      <div className="loading-state" role="status" aria-live="polite">
-        <div className="spinner" aria-hidden="true"></div>
-        <p>Loading DAOs...</p>
-      </div>
+      <LoadingScreen 
+        visible={true} 
+        text="Loading DAOs"
+        inline
+        size="medium"
+      />
     )
   }
 
