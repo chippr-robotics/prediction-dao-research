@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ethers } from 'ethers'
 import { useEthers, useAccount } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -33,6 +33,10 @@ const DAOFactoryABI = [
 ]
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+
+// Date validation constants (years from current date)
+const DATE_VALIDATION_MIN_YEARS_AGO = 50
+const DATE_VALIDATION_MAX_YEARS_AHEAD = 100
 
 // Demo DAO data
 const DEMO_USER_DAOS = [
@@ -333,8 +337,8 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       // Reasonable date range validation (prevent absurd past/future dates)
       const time = date.getTime()
       const currentYear = new Date().getFullYear()
-      const minTime = new Date(`${currentYear - 50}-01-01T00:00:00Z`).getTime()
-      const maxTime = new Date(`${currentYear + 100}-01-01T00:00:00Z`).getTime()
+      const minTime = new Date(`${currentYear - DATE_VALIDATION_MIN_YEARS_AGO}-01-01T00:00:00Z`).getTime()
+      const maxTime = new Date(`${currentYear + DATE_VALIDATION_MAX_YEARS_AHEAD}-01-01T00:00:00Z`).getTime()
       if (time < minTime || time > maxTime) return 'N/A'
 
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -643,33 +647,45 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
 }
 
 /**
- * Compact list component for DAOs
+ * Custom hook for keyboard navigation in lists
+ * @param {number} itemCount - Number of items in the list
+ * @param {Function} onSelect - Callback when item is selected
  */
-function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) {
-  const handleKeyDown = (e, dao, index) => {
+function useKeyboardNavigation(itemCount, onSelect) {
+  const itemRefs = useRef([])
+
+  const handleKeyDown = (e, item, index) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      onSelect(dao)
+      onSelect(item)
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (index < daos.length - 1) {
-        const nextButton = document.querySelector(`.cp-dao-card:nth-child(${index + 2})`)
-        if (nextButton) nextButton.focus()
+      if (index < itemCount - 1) {
+        itemRefs.current[index + 1]?.focus()
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       if (index > 0) {
-        const prevButton = document.querySelector(`.cp-dao-card:nth-child(${index})`)
-        if (prevButton) prevButton.focus()
+        itemRefs.current[index - 1]?.focus()
       }
     }
   }
+
+  return { itemRefs, handleKeyDown }
+}
+
+/**
+ * Compact list component for DAOs
+ */
+function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) {
+  const { itemRefs, handleKeyDown } = useKeyboardNavigation(daos.length, onSelect)
 
   return (
     <div className="cp-dao-list">
       {daos.map((dao, index) => (
         <button
           key={dao.id}
+          ref={(el) => (itemRefs.current[index] = el)}
           className="cp-dao-card"
           onClick={() => onSelect(dao)}
           onKeyDown={(e) => handleKeyDown(e, dao, index)}
@@ -794,30 +810,14 @@ function DAODetailView({ dao, onBack, formatDate, formatAddress, account, showJo
  * Compact list component for proposals
  */
 function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }) {
-  const handleKeyDown = (e, proposal, index) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onSelect(proposal)
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      if (index < proposals.length - 1) {
-        const nextButton = document.querySelector(`.cp-proposal-card:nth-child(${index + 2})`)
-        if (nextButton) nextButton.focus()
-      }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      if (index > 0) {
-        const prevButton = document.querySelector(`.cp-proposal-card:nth-child(${index})`)
-        if (prevButton) prevButton.focus()
-      }
-    }
-  }
+  const { itemRefs, handleKeyDown } = useKeyboardNavigation(proposals.length, onSelect)
 
   return (
     <div className="cp-proposal-list">
       {proposals.map((proposal, index) => (
         <button
           key={proposal.id}
+          ref={(el) => (itemRefs.current[index] = el)}
           className="cp-proposal-card"
           onClick={() => onSelect(proposal)}
           onKeyDown={(e) => handleKeyDown(e, proposal, index)}
@@ -1070,16 +1070,14 @@ function LaunchDAOForm({ onSuccess }) {
       newErrors.treasuryVault = 'Treasury vault must be a valid Ethereum address'
     }
     
-    // Validate admin addresses if provided (optimized single pass)
+    // Validate admin addresses if provided (short-circuit on first invalid)
     const adminsInput = formData.admins.trim()
     if (adminsInput) {
-      const invalidAddresses = adminsInput
-        .split(',')
-        .map(addr => addr.trim())
-        .filter(addr => addr && !ethers.isAddress(addr))
+      const addresses = adminsInput.split(',').map(addr => addr.trim()).filter(addr => addr)
+      const firstInvalid = addresses.find(addr => !ethers.isAddress(addr))
       
-      if (invalidAddresses.length > 0) {
-        newErrors.admins = `Invalid Ethereum address(es): ${invalidAddresses.join(', ')}`
+      if (firstInvalid) {
+        newErrors.admins = `Invalid Ethereum address: ${firstInvalid}`
       }
     }
     
