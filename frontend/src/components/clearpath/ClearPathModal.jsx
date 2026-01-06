@@ -20,8 +20,8 @@ import './ClearPathModal.css'
  * - Launch: Create new DAOs
  * 
  * @param {Object} props - Component props
- * @param {boolean} props.isOpen - Whether the modal is open (required)
- * @param {() => void} props.onClose - Function to call when modal should close (required)
+ * @param {boolean} [props.isOpen=true] - Whether the modal is open (defaults to true)
+ * @param {() => void} [props.onClose=() => {}] - Function to call when modal should close (defaults to no-op)
  * @param {string} [props.defaultTab='daos'] - Default tab to show when modal opens
  */
 
@@ -153,11 +153,11 @@ const DEMO_PROPOSALS = [
 ]
 
 function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos' }) {
-  // Validate props if provided
-  if (isOpen !== undefined && typeof isOpen !== 'boolean') {
+  // Validate prop types
+  if (typeof isOpen !== 'boolean') {
     console.error('ClearPathModal: isOpen prop must be a boolean')
   }
-  if (onClose !== undefined && typeof onClose !== 'function') {
+  if (typeof onClose !== 'function') {
     console.error('ClearPathModal: onClose prop must be a function')
   }
 
@@ -1283,12 +1283,6 @@ ClearPathModal.propTypes = {
   isOpen: PropTypes.bool,
   onClose: PropTypes.func,
   defaultTab: PropTypes.oneOf(['daos', 'browse', 'proposals', 'metrics', 'launch'])
-}
-
-ClearPathModal.defaultProps = {
-  isOpen: true,
-  onClose: () => {},
-  defaultTab: 'daos'
 }
 
 export default ClearPathModal
