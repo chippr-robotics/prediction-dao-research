@@ -24,6 +24,7 @@ function TokenMintButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [showTokenBuilder, setShowTokenBuilder] = useState(false)
   const [showMarketCreation, setShowMarketCreation] = useState(false)
+  const [showTokenManagement, setShowTokenManagement] = useState(false)
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
 
@@ -79,6 +80,11 @@ function TokenMintButton() {
   const handleCreateMarket = () => {
     setIsOpen(false)
     setShowMarketCreation(true)
+  }
+
+  const handleManageTokens = () => {
+    setIsOpen(false)
+    setShowTokenManagement(true)
   }
 
   const handlePurchaseMembership = () => {
@@ -316,10 +322,22 @@ function TokenMintButton() {
       id: 'create-token',
       label: 'Create New Token',
       icon: '🪙',
-      description: hasTokenMintRole 
-        ? 'Mint ERC20 or ERC721 tokens' 
+      description: hasTokenMintRole
+        ? 'Mint ERC20 or ERC721 tokens'
         : 'Requires TokenMint role',
       action: handleOpenTokenBuilder,
+      disabled: !hasTokenMintRole
+    })
+
+    // Token management option - requires TOKENMINT role
+    options.push({
+      id: 'manage-tokens',
+      label: 'Manage Tokens',
+      icon: '⚙️',
+      description: hasTokenMintRole
+        ? 'Manage deployed tokens, NFTs & markets'
+        : 'Requires TokenMint role',
+      action: handleManageTokens,
       disabled: !hasTokenMintRole
     })
 
@@ -417,6 +435,12 @@ function TokenMintButton() {
         isOpen={showMarketCreation}
         onClose={() => setShowMarketCreation(false)}
         onCreate={handleMarketCreation}
+      />
+
+      {/* Token Management Modal */}
+      <TokenManagementModal
+        isOpen={showTokenManagement}
+        onClose={() => setShowTokenManagement(false)}
       />
     </>
   )
