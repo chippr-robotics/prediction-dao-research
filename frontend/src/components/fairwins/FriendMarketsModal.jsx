@@ -19,8 +19,7 @@ function FriendMarketsModal({
   onClose,
   onCreate,
   activeMarkets = [],
-  pastMarkets = [],
-  onMarketClick
+  pastMarkets = []
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
@@ -61,34 +60,8 @@ function FriendMarketsModal({
   const [marketLookupResult, setMarketLookupResult] = useState(null)
   const [marketLookupError, setMarketLookupError] = useState(null)
 
-  // Reset modal state when opened
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab('create')
-      setCreationStep('type')
-      setFriendMarketType(null)
-      setCreatedMarket(null)
-      setSelectedMarket(null)
-      setErrors({})
-      resetForm()
-    }
-  }, [isOpen])
-
-  // Handle escape key
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        handleClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen])
-
-  const resetForm = () => {
+  // Reset form function - memoized to prevent stale closures
+  const resetForm = useCallback(() => {
     setFormData({
       description: '',
       opponent: '',
@@ -103,13 +76,40 @@ function FriendMarketsModal({
     setMarketLookupId('')
     setMarketLookupResult(null)
     setMarketLookupError(null)
-  }
+  }, [])
 
-  const handleClose = () => {
+  // Reset modal state when opened
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('create')
+      setCreationStep('type')
+      setFriendMarketType(null)
+      setCreatedMarket(null)
+      setSelectedMarket(null)
+      setErrors({})
+      resetForm()
+    }
+  }, [isOpen, resetForm])
+
+  const handleClose = useCallback(() => {
     if (!submitting) {
       onClose()
     }
-  }
+  }, [submitting, onClose])
+
+  // Handle escape key
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, handleClose])
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
@@ -137,10 +137,15 @@ function FriendMarketsModal({
   const handleQrScanSuccess = (decodedText) => {
     // Try to extract Ethereum address from scanned data
     let address = decodedText
+    let isFromTrustedSource = false
 
     // If it's a URL, try to extract address from path or query
     try {
       const url = new URL(decodedText)
+      // Check if URL is from a trusted origin (same origin)
+      const trustedOrigins = [window.location.origin]
+      isFromTrustedSource = trustedOrigins.some(origin => url.origin === origin)
+      
       // Check for address in pathname (e.g., /address/0x...)
       const pathMatch = url.pathname.match(/0x[a-fA-F0-9]{40}/)
       if (pathMatch) {
@@ -149,6 +154,19 @@ function FriendMarketsModal({
         // Check query params
         const addrParam = url.searchParams.get('address') || url.searchParams.get('addr')
         if (addrParam) address = addrParam
+      }
+      
+      // Warn if from external source
+      if (!isFromTrustedSource) {
+        const proceed = window.confirm(
+          'This QR code contains a URL from an external source. ' +
+          'Please verify the address before proceeding. Continue?'
+        )
+        if (!proceed) {
+          setQrScannerOpen(false)
+          setQrScanTarget(null)
+          return
+        }
       }
     } catch {
       // Not a URL, check if it's a raw address
@@ -184,7 +202,9 @@ function FriendMarketsModal({
     setMarketLookupResult(null)
 
     try {
-      // Simulate market lookup - in production this would call your API/contract
+      // TODO: Replace with actual API call or contract query
+      // This mock implementation should be replaced with real market lookup functionality
+      // Example: const marketData = await fetchMarketById(marketLookupId)
       await new Promise(resolve => setTimeout(resolve, 800))
 
       // Mock result for demo purposes
@@ -229,6 +249,8 @@ function FriendMarketsModal({
         newErrors.opponent = 'Opponent address is required'
       } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.opponent.trim())) {
         newErrors.opponent = 'Invalid Ethereum address'
+      } else if (formData.opponent.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+        newErrors.opponent = 'Cannot use the zero address'
       } else if (formData.opponent.toLowerCase() === account?.toLowerCase()) {
         newErrors.opponent = 'Cannot bet against yourself'
       }
@@ -247,10 +269,28 @@ function FriendMarketsModal({
         } else if (addresses.length > maxMembers) {
           newErrors.members = `Maximum ${maxMembers} members allowed`
         } else {
+          // Check for invalid addresses
           for (const addr of addresses) {
             if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-              newErrors.members = `Invalid address: ${addr.slice(0, 10)}...`
+              newErrors.members = `Invalid address: "${addr}"`
               break
+            }
+            if (addr.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+              newErrors.members = 'Cannot use the zero address'
+              break
+            }
+          }
+          
+          // Check for duplicates
+          if (!newErrors.members) {
+            const lowerAddresses = addresses.map(a => a.toLowerCase())
+            const uniqueAddresses = new Set(lowerAddresses)
+            if (uniqueAddresses.size !== addresses.length) {
+              newErrors.members = 'Duplicate addresses are not allowed'
+            }
+            // Check if creator is in the list
+            if (account && lowerAddresses.includes(account.toLowerCase())) {
+              newErrors.members = 'Cannot include your own address in member list'
             }
           }
         }
@@ -270,8 +310,12 @@ function FriendMarketsModal({
       newErrors.tradingPeriod = 'Maximum trading period is 365 days'
     }
 
-    if (formData.arbitrator && !/^0x[a-fA-F0-9]{40}$/.test(formData.arbitrator.trim())) {
-      newErrors.arbitrator = 'Invalid arbitrator address'
+    if (formData.arbitrator) {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(formData.arbitrator.trim())) {
+        newErrors.arbitrator = 'Invalid arbitrator address'
+      } else if (formData.arbitrator.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+        newErrors.arbitrator = 'Cannot use the zero address'
+      }
     }
 
     setErrors(newErrors)
@@ -859,6 +903,16 @@ function FriendMarketsModal({
                       />
                     </div>
                     <p className="fm-qr-hint">Scan to join market</p>
+                    <div className="fm-qr-url">
+                      <label htmlFor="fm-market-url">Shareable market link</label>
+                      <input
+                        id="fm-market-url"
+                        type="text"
+                        value={getMarketUrl(createdMarket)}
+                        readOnly
+                        onFocus={(e) => e.target.select()}
+                      />
+                    </div>
                   </div>
 
                   <div className="fm-success-details">
@@ -887,8 +941,19 @@ function FriendMarketsModal({
                     <button
                       type="button"
                       className="fm-btn-primary"
-                      onClick={() => {
-                        navigator.clipboard.writeText(getMarketUrl(createdMarket))
+                      onClick={async () => {
+                        const url = getMarketUrl(createdMarket)
+                        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                          window.alert('Copy to clipboard is not supported in this browser. Please copy the link manually.')
+                          return
+                        }
+                        try {
+                          await navigator.clipboard.writeText(url)
+                          window.alert('Link copied to clipboard.')
+                        } catch (error) {
+                          console.error('Failed to copy link to clipboard:', error)
+                          window.alert('Failed to copy the link. Please copy it manually.')
+                        }
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1150,6 +1215,7 @@ function MarketDetailView({
           level="M"
           fgColor="#36B37E"
           bgColor="transparent"
+          aria-label="QR code to share this market"
         />
         <p>Share this market</p>
       </div>
@@ -1158,7 +1224,19 @@ function MarketDetailView({
         <button
           type="button"
           className="fm-btn-secondary"
-          onClick={() => navigator.clipboard.writeText(marketUrl)}
+          onClick={async () => {
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+              window.alert('Copy to clipboard is not supported in this browser. Please copy the link manually.')
+              return
+            }
+            try {
+              await navigator.clipboard.writeText(marketUrl)
+              window.alert('Link copied to clipboard.')
+            } catch (error) {
+              console.error('Failed to copy link to clipboard:', error)
+              window.alert('Failed to copy the link. Please copy it manually.')
+            }
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>

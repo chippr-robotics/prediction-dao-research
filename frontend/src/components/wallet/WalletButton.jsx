@@ -470,7 +470,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
         onCreate={handleFriendMarketCreation}
-        defaultTab="friend"
       />
     </div>
   )
