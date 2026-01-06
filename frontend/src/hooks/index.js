@@ -58,5 +58,8 @@ export {
 // Role hooks
 export { useRoles } from './useRoles'
 
+// Admin hooks
+export { useAdminContracts } from './useAdminContracts'
+
 // Data fetcher hooks
 export { useDataFetcher } from './useDataFetcher'

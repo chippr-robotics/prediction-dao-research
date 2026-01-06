@@ -11,6 +11,23 @@ vi.mock('../hooks', () => ({
   useWeb3: vi.fn()
 }))
 
+// Mock fairwins modal components to prevent infinite render loops
+vi.mock('../components/fairwins/TokenMintBuilderModal', () => ({
+  default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Token Builder Modal"><button onClick={onClose}>Close</button></div> : null
+}))
+
+vi.mock('../components/fairwins/MarketCreationModal', () => ({
+  default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Create New Market Modal"><button onClick={onClose}>Close</button></div> : null
+}))
+
+vi.mock('../components/fairwins/TokenManagementModal', () => ({
+  default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Token Management Modal"><button onClick={onClose}>Close</button></div> : null
+}))
+
+vi.mock('../components/ui/RolePurchaseModal', () => ({
+  default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Purchase Membership Modal"><button onClick={onClose}>Close</button></div> : null
+}))
+
 import { useWallet, useWeb3 } from '../hooks'
 
 describe('TokenMintButton Component', () => {
