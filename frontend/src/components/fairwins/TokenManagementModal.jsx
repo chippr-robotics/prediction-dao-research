@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { EXTENDED_ERC20_ABI } from '../../abis/ExtendedERC20'
+import { EXTENDED_ERC721_ABI } from '../../abis/ExtendedERC721'
 import './TokenManagementModal.css'
 
 /**
@@ -31,7 +34,7 @@ function TokenManagementModal({ isOpen, onClose }) {
   const [chainInfo, setChainInfo] = useState(null)
 
   const { address, isConnected } = useWallet()
-  useWeb3() // Initialize Web3 context
+  const { signer, isCorrectNetwork } = useWeb3()
 
   const ITEMS_PER_PAGE = 10
 
@@ -302,13 +305,118 @@ function TokenManagementModal({ isOpen, onClose }) {
 
   const executeAction = async () => {
     if (!selectedItem || !actionModal) return
+    
+    // Check if wallet is connected and on correct network
+    if (!isConnected) {
+      window.alert('Please connect your wallet to perform this action.')
+      return
+    }
+    
+    if (!isCorrectNetwork) {
+      window.alert('Please switch to the correct network to perform this action.')
+      return
+    }
+    
+    if (!signer) {
+      window.alert('Unable to access wallet signer. Please try reconnecting your wallet.')
+      return
+    }
 
     setActionLoading(true)
     try {
-      // In production, these would call actual contract methods
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Get the appropriate ABI based on token type
+      const abi = selectedItem.type === 'ERC721' ? EXTENDED_ERC721_ABI : EXTENDED_ERC20_ABI
+      const contract = new ethers.Contract(selectedItem.address, abi, signer)
+      
+      let tx
+      let actionDescription = ''
 
-      console.log(`Executing ${actionModal} on ${selectedItem.name}:`, actionData)
+      // Execute the appropriate contract method based on action
+      switch (actionModal) {
+        case 'mint':
+          if (selectedItem.type === 'ERC20') {
+            // ERC20: mint(address to, uint256 amount)
+            const mintAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
+            tx = await contract.mint(actionData.address, mintAmount)
+            actionDescription = `Minting ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(actionData.address)}`
+          } else {
+            // ERC721: safeMint(address to, string tokenURI)
+            tx = await contract.safeMint(actionData.address, actionData.tokenURI)
+            actionDescription = `Minting NFT to ${formatAddress(actionData.address)}`
+          }
+          break
+
+        case 'burn':
+          if (selectedItem.type === 'ERC20') {
+            // ERC20: burn(uint256 amount)
+            const burnAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
+            tx = await contract.burn(burnAmount)
+            actionDescription = `Burning ${actionData.amount} ${selectedItem.symbol}`
+          } else {
+            // ERC721: burn(uint256 tokenId) - amount field is used for tokenId
+            const tokenId = parseInt(actionData.amount)
+            tx = await contract.burn(tokenId)
+            actionDescription = `Burning NFT #${tokenId}`
+          }
+          break
+
+        case 'transfer':
+          // ERC20: transfer(address to, uint256 amount)
+          const transferAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
+          tx = await contract.transfer(actionData.address, transferAmount)
+          actionDescription = `Transferring ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(actionData.address)}`
+          break
+
+        case 'approve':
+          // ERC20: approve(address spender, uint256 amount)
+          const approveAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
+          tx = await contract.approve(actionData.spender, approveAmount)
+          actionDescription = `Approving ${actionData.amount} ${selectedItem.symbol} for ${formatAddress(actionData.spender)}`
+          break
+
+        case 'setApprovalForAll':
+          // ERC721: setApprovalForAll(address operator, bool approved)
+          tx = await contract.setApprovalForAll(actionData.operator, actionData.approved || true)
+          actionDescription = `Setting approval for ${formatAddress(actionData.operator)}`
+          break
+
+        case 'pause':
+          // pause()
+          tx = await contract.pause()
+          actionDescription = `Pausing ${selectedItem.name}`
+          break
+
+        case 'unpause':
+          // unpause()
+          tx = await contract.unpause()
+          actionDescription = `Unpausing ${selectedItem.name}`
+          break
+
+        case 'transferOwnership':
+          // transferOwnership(address newOwner)
+          tx = await contract.transferOwnership(actionData.newOwner)
+          actionDescription = `Transferring ownership to ${formatAddress(actionData.newOwner)}`
+          break
+
+        case 'renounceOwnership':
+          // renounceOwnership()
+          tx = await contract.renounceOwnership()
+          actionDescription = `Renouncing ownership of ${selectedItem.name}`
+          break
+
+        default:
+          throw new Error(`Unknown action: ${actionModal}`)
+      }
+
+      console.log(`Transaction submitted: ${tx.hash}`)
+      console.log(`Action: ${actionDescription}`)
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait()
+      console.log(`Transaction confirmed in block ${receipt.blockNumber}`)
+
+      // Show success message
+      window.alert(`Success! ${actionDescription}\n\nTransaction: ${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}`)
 
       // Update local state based on action
       if (actionModal === 'pause') {
@@ -322,7 +430,17 @@ function TokenManagementModal({ isOpen, onClose }) {
       setSelectedItem(null)
     } catch (error) {
       console.error(`Error executing ${actionModal}:`, error)
-      window.alert(`Failed to execute ${actionModal}. Please try again.`)
+      
+      // Handle user rejection
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        window.alert('Transaction was rejected.')
+      } else if (error.reason) {
+        window.alert(`Transaction failed: ${error.reason}`)
+      } else if (error.message) {
+        window.alert(`Failed to execute ${actionModal}: ${error.message}`)
+      } else {
+        window.alert(`Failed to execute ${actionModal}. Please try again.`)
+      }
     } finally {
       setActionLoading(false)
     }
