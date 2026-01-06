@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useEthers, useAccount } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -154,7 +155,6 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
   const [userDAOs, setUserDAOs] = useState([])
   const [allDAOs, setAllDAOs] = useState([])
   const [proposals, setProposals] = useState([])
-  const [isAdmin, setIsAdmin] = useState(false)
 
   // Loading states
   const [loading, setLoading] = useState(true)
@@ -186,7 +186,6 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
     setTimeout(() => {
       setUserDAOs(DEMO_USER_DAOS)
       setProposals(DEMO_PROPOSALS)
-      setIsAdmin(true)
       setLoading(false)
     }, 300)
   }, [])
@@ -213,26 +212,29 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
       const daoIds = await factory.getUserDAOs(account)
 
-      const daos = []
-      for (let i = 0; i < daoIds.length; i++) {
-        const dao = await factory.getDAO(daoIds[i])
-        daos.push({ id: daoIds[i].toString(), ...dao })
-      }
+      // Batch fetch all DAO data in parallel
+      const daoPromises = daoIds.map(daoId => factory.getDAO(daoId))
+      const daoResults = await Promise.all(daoPromises)
+      
+      const daos = daoResults.map((dao, index) => ({
+        id: daoIds[index].toString(),
+        ...dao
+      }))
 
       setUserDAOs(daos)
-
-      const adminRole = await factory.DAO_ADMIN_ROLE()
-      let hasAdminRole = false
-      for (let i = 0; i < daoIds.length; i++) {
-        if (await factory.hasDAORole(daoIds[i], account, adminRole)) {
-          hasAdminRole = true
-          break
-        }
-      }
-      setIsAdmin(hasAdminRole)
     } catch (err) {
       console.error('Error loading user DAOs:', err)
-      setError(err.message || 'Failed to load your DAOs')
+      let errorMessage = 'Failed to load your DAOs'
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error: Please check your connection'
+      } else if (err.code === 'CALL_EXCEPTION') {
+        errorMessage = 'Contract error: Please verify contract address and network'
+      } else if (err.message?.includes('missing provider')) {
+        errorMessage = 'Please connect your wallet first'
+      } else if (err.message) {
+        errorMessage = `Error: ${err.message}`
+      }
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -252,19 +254,30 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
       const userDaoIds = await factory.getUserDAOs(account)
       const userDaoIdSet = new Set(userDaoIds.map(id => id.toString()))
 
-      const daos = []
-      for (let i = 0; i < allDaoIds.length; i++) {
-        const daoId = allDaoIds[i].toString()
-        if (!userDaoIdSet.has(daoId)) {
-          const dao = await factory.getDAO(allDaoIds[i])
-          daos.push({ id: daoId, ...dao })
-        }
-      }
+      // Filter out user DAOs and batch fetch remaining DAO data in parallel
+      const browseDaoIds = allDaoIds.filter(daoId => !userDaoIdSet.has(daoId.toString()))
+      const daoPromises = browseDaoIds.map(daoId => factory.getDAO(daoId))
+      const daoResults = await Promise.all(daoPromises)
+      
+      const daos = daoResults.map((dao, index) => ({
+        id: browseDaoIds[index].toString(),
+        ...dao
+      }))
 
       setAllDAOs(daos)
     } catch (err) {
       console.error('Error loading all DAOs:', err)
-      setBrowseError(err.message || 'Failed to load available DAOs')
+      let errorMessage = 'Failed to load available DAOs'
+      if (err.code === 'NETWORK_ERROR') {
+        errorMessage = 'Network error: Please check your connection'
+      } else if (err.code === 'CALL_EXCEPTION') {
+        errorMessage = 'Contract error: Please verify contract address and network'
+      } else if (err.message?.includes('missing provider')) {
+        errorMessage = 'Please connect your wallet first'
+      } else if (err.message) {
+        errorMessage = `Error: ${err.message}`
+      }
+      setBrowseError(errorMessage)
     } finally {
       setBrowseLoading(false)
     }
@@ -306,11 +319,28 @@ function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
 
   // Format helpers
   const formatDate = (dateInput) => {
-    const date = typeof dateInput === 'bigint'
-      ? new Date(Number(dateInput))
-      : new Date(dateInput)
-    if (Number.isNaN(date.getTime())) return 'N/A'
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    // Guard against clearly invalid/empty inputs
+    if (dateInput === null || dateInput === undefined || dateInput === '') return 'N/A'
+
+    try {
+      const date = typeof dateInput === 'bigint'
+        ? new Date(Number(dateInput))
+        : new Date(dateInput)
+
+      // Invalid Date handling
+      if (Number.isNaN(date.getTime())) return 'N/A'
+
+      // Reasonable date range validation (prevent absurd past/future dates)
+      const time = date.getTime()
+      const minTime = new Date('2000-01-01T00:00:00Z').getTime()
+      const maxTime = new Date('2100-01-01T00:00:00Z').getTime()
+      if (time < minTime || time > maxTime) return 'N/A'
+
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    } catch {
+      // In case of any unexpected errors during conversion/formatting
+      return 'N/A'
+    }
   }
 
   const formatAddress = (address) => {
@@ -781,7 +811,7 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
  */
 function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getStatusClass, account }) {
   const totalVotes = proposal.votesFor + proposal.votesAgainst
-  const forPercentage = totalVotes > 0 ? (proposal.votesFor / totalVotes) * 100 : 50
+  const forPercentage = totalVotes > 0 ? (proposal.votesFor / totalVotes) * 100 : 0
 
   return (
     <div className="cp-detail">
@@ -984,6 +1014,20 @@ function LaunchDAOForm({ onSuccess }) {
     } else if (formData.description.length < 20) {
       newErrors.description = 'Description must be at least 20 characters'
     }
+    const treasuryVaultAddress = formData.treasuryVault.trim()
+    if (treasuryVaultAddress && !ethers.isAddress(treasuryVaultAddress)) {
+      newErrors.treasuryVault = 'Treasury vault must be a valid Ethereum address'
+    }
+    const adminsInput = formData.admins.trim()
+    if (adminsInput) {
+      const adminAddresses = adminsInput.split(',').map(addr => addr.trim()).filter(Boolean)
+      for (const addr of adminAddresses) {
+        if (!ethers.isAddress(addr)) {
+          newErrors.admins = 'All admin addresses must be valid Ethereum addresses'
+          break
+        }
+      }
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -1055,7 +1099,9 @@ function LaunchDAOForm({ onSuccess }) {
             onChange={(e) => handleChange('treasuryVault', e.target.value)}
             placeholder="0x... (optional - will create new if empty)"
             disabled={creating}
+            className={errors.treasuryVault ? 'error' : ''}
           />
+          {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
           <span className="cp-hint">Leave empty to create a new treasury vault</span>
         </div>
 
@@ -1070,7 +1116,9 @@ function LaunchDAOForm({ onSuccess }) {
             onChange={(e) => handleChange('admins', e.target.value)}
             placeholder="0x123..., 0x456... (comma-separated)"
             disabled={creating}
+            className={errors.admins ? 'error' : ''}
           />
+          {errors.admins && <span className="cp-error">{errors.admins}</span>}
           <span className="cp-hint">Your address will be added automatically</span>
         </div>
 
@@ -1103,6 +1151,12 @@ function LaunchDAOForm({ onSuccess }) {
       </form>
     </div>
   )
+}
+
+ClearPathModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  defaultTab: PropTypes.oneOf(['daos', 'browse', 'proposals', 'metrics', 'launch'])
 }
 
 export default ClearPathModal
