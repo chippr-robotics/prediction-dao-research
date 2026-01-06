@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useDataFetcher } from '../../hooks/useDataFetcher'
+import { useUserPreferences } from '../../hooks/useUserPreferences'
+import LoadingScreen from '../ui/LoadingScreen'
 import * as d3 from 'd3'
 import './Dashboard.css'
 
@@ -994,6 +996,8 @@ function RecentActivityFeed({ markets }) {
 function Dashboard() {
   const { account, isConnected } = useWeb3()
   const { getMarkets } = useDataFetcher()
+  const { preferences } = useUserPreferences()
+  const demoMode = preferences?.demoMode ?? true
   const [markets, setMarkets] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -1006,6 +1010,7 @@ function Dashboard() {
     { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' }
   ], [])
 
+  // Load markets - reloads when demoMode changes
   useEffect(() => {
     const loadMarkets = async () => {
       try {
@@ -1020,7 +1025,7 @@ function Dashboard() {
       }
     }
     loadMarkets()
-  }, [getMarkets])
+  }, [getMarkets, demoMode])
 
   // Calculate platform metrics
   const platformMetrics = useMemo(() => {
@@ -1049,9 +1054,39 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div className="dashboard-loading">
-          <div className="loading-spinner" />
-          <p>Loading market data...</p>
+        <LoadingScreen 
+          visible={true} 
+          text={demoMode ? 'Loading demo data' : 'Fetching blockchain data'}
+          inline
+          size="large"
+        />
+      </div>
+    )
+  }
+
+  // Show empty state when no markets in live mode
+  if (!demoMode && markets.length === 0) {
+    return (
+      <div className="dashboard-container">
+        <header className="dashboard-header">
+          <div className="header-content">
+            <div className="header-title-row">
+              <h1>Market Overview</h1>
+              <span className="live-mode-badge">🌐 Live Mode</span>
+            </div>
+            <p className="dashboard-subtitle">
+              Connected to Mordor Testnet
+            </p>
+          </div>
+        </header>
+        <div className="empty-state">
+          <div className="empty-state-icon">📊</div>
+          <h2>No Markets Found</h2>
+          <p>There are no prediction markets deployed on the blockchain yet.</p>
+          <p className="empty-state-hint">
+            Switch to Demo Mode to explore the platform with sample data, 
+            or create a new market to get started.
+          </p>
         </div>
       </div>
     )
@@ -1062,8 +1097,15 @@ function Dashboard() {
       {/* Header */}
       <header className="dashboard-header">
         <div className="header-content">
-          <h1>Market Overview</h1>
-          <p className="dashboard-subtitle">Real-time insights across all prediction markets</p>
+          <div className="header-title-row">
+            <h1>Market Overview</h1>
+            {demoMode && <span className="demo-mode-badge">🎭 Demo Mode</span>}
+          </div>
+          <p className="dashboard-subtitle">
+            {demoMode 
+              ? 'Viewing sample market data' 
+              : 'Real-time insights across all prediction markets'}
+          </p>
         </div>
       </header>
 

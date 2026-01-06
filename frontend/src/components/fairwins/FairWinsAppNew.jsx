@@ -27,6 +27,7 @@ import CorrelatedMarketsModal from './CorrelatedMarketsModal'
 import MarketModal from './MarketModal'
 import SearchBar from '../ui/SearchBar'
 import SubcategoryFilter from './SubcategoryFilter'
+import LoadingScreen from '../ui/LoadingScreen'
 import './FairWinsAppNew.css'
 
 function FairWinsAppNew({ onConnect, onDisconnect }) {
@@ -428,10 +429,12 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
           account={account}
         />
         <main className="main-canvas">
-          <div className="loading-screen">
-            <div className="loading-spinner"></div>
-            <p>Loading markets...</p>
-          </div>
+          <LoadingScreen 
+            visible={true} 
+            text="Loading markets"
+            inline
+            size="large"
+          />
         </main>
       </div>
     )
