@@ -3,7 +3,7 @@ import { useRoles } from '../../hooks/useRoles'
 import { useModal } from '../../hooks/useUI'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWallet } from '../../hooks'
-import RolePurchaseModal from '../ui/RolePurchaseModal'
+import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import ClearPathModal from './ClearPathModal'
 import './ClearPathButton.css'
 
@@ -95,10 +95,10 @@ function ClearPathButton() {
 
   const handlePurchaseMembership = () => {
     setIsOpen(false)
-    showModal(<RolePurchaseModal onClose={() => showModal(null)} />, {
-      title: 'Purchase ClearPath Membership',
+    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
+      title: '',
       size: 'large',
-      closable: true
+      closable: false
     })
   }
 

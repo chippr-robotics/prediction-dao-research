@@ -1,7 +1,7 @@
 import './ClearPathApp.css'
 import Dashboard from './Dashboard'
 import RoleGate from './ui/RoleGate'
-import RolePurchaseModal from './ui/RolePurchaseModal'
+import PremiumPurchaseModal from './ui/PremiumPurchaseModal'
 import BlockiesAvatar from './ui/BlockiesAvatar'
 import { useWeb3, useNetwork } from '../hooks/useWeb3'
 import { useRoles } from '../hooks/useRoles'
@@ -23,10 +23,10 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
   }
 
   const handlePurchaseClick = () => {
-    showModal(<RolePurchaseModal />, {
+    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
       title: '',
       size: 'large',
-      closable: true
+      closable: false
     })
   }
 

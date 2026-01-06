@@ -5,7 +5,7 @@ import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
-import RolePurchaseModal from './RolePurchaseModal'
+import PremiumPurchaseModal from './PremiumPurchaseModal'
 import BlockiesAvatar from './BlockiesAvatar'
 import './UserManagementModal.css'
 
@@ -52,7 +52,7 @@ function UserManagementModal({ onScanMarket }) {
   }
 
   const handleOpenPurchaseModal = () => {
-    showModal(<RolePurchaseModal onClose={hideModal} />, {
+    showModal(<PremiumPurchaseModal onClose={hideModal} />, {
       title: '',
       size: 'large',
       closable: false

@@ -7,7 +7,7 @@ import { useWalletRoles } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
-import RolePurchaseModal from '../ui/RolePurchaseModal'
+import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import { FriendMarketsModal } from '../fairwins'
@@ -182,7 +182,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
   const handleOpenPurchaseModal = () => {
     setIsOpen(false)
-    showModal(<RolePurchaseModal onClose={() => showModal(null)} />, {
+    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
       title: '',
       size: 'large',
       closable: false
