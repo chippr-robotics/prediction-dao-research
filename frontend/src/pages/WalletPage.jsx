@@ -5,7 +5,7 @@ import { useUserPreferences } from '../hooks/useUserPreferences'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import SwapPanel from '../components/fairwins/SwapPanel'
-import RolePurchaseModal from '../components/ui/RolePurchaseModal'
+import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import './WalletPage.css'
@@ -84,7 +84,7 @@ function WalletPage() {
   }
 
   const handleOpenPurchaseModal = () => {
-    showModal(<RolePurchaseModal onClose={hideModal} />, {
+    showModal(<PremiumPurchaseModal isOpen={true} onClose={hideModal} />, {
       title: '',
       size: 'large',
       closable: false
