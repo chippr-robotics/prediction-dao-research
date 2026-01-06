@@ -24,7 +24,7 @@ export const IPFS_CONFIG = {
   // Request timeout in milliseconds
   TIMEOUT: 30000,
 
-  // Upload timeout in milliseconds (2 minutes for larger files)
+  // Upload timeout in milliseconds (2 minutes, intentionally higher to also support potential larger file uploads)
   UPLOAD_TIMEOUT: 120000,
 
   // Number of retry attempts for failed requests
