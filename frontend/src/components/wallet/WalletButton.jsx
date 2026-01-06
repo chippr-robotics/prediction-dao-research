@@ -182,7 +182,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
   const handleOpenPurchaseModal = () => {
     setIsOpen(false)
-    showModal(<PremiumPurchaseModal isOpen={true} onClose={() => showModal(null)} />, {
+    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
       title: '',
       size: 'large',
       closable: false

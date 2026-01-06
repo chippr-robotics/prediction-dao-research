@@ -83,7 +83,7 @@ function TokenMintButton() {
 
   const handlePurchaseMembership = () => {
     setIsOpen(false)
-    showModal(<PremiumPurchaseModal isOpen={true} onClose={() => showModal(null)} />, {
+    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
       title: '',
       size: 'large',
       closable: false

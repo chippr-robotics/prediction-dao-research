@@ -11,6 +11,7 @@ import { MARKET_FACTORY_ABI } from '../abis/ConditionalMarketFactory'
 import { PROPOSAL_REGISTRY_ABI } from '../abis/ProposalRegistry'
 import { WELFARE_METRIC_REGISTRY_ABI } from '../abis/WelfareMetricRegistry'
 import { ERC20_ABI } from '../abis/ERC20'
+import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 
 /**
@@ -490,3 +491,56 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
     }
   }
 }
+
+/**
+ * Register a zero-knowledge public key for ClearPath governance
+ * @param {ethers.Signer} signer - Connected wallet signer
+ * @param {string} publicKey - Zero-knowledge public key (base64 or hex encoded)
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function registerZKKey(signer, publicKey) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  if (!publicKey || publicKey.trim().length === 0) {
+    throw new Error('Public key is required')
+  }
+
+  try {
+    // Get ZKKeyManager contract address (may not be deployed yet)
+    const zkKeyManagerAddress = getContractAddress('zkKeyManager')
+    
+    if (!zkKeyManagerAddress) {
+      throw new Error('ZKKeyManager contract not deployed yet. Please register your key later.')
+    }
+
+    const zkKeyManagerContract = new ethers.Contract(
+      zkKeyManagerAddress,
+      ZK_KEY_MANAGER_ABI,
+      signer
+    )
+
+    // Call registerKey function
+    const tx = await zkKeyManagerContract.registerKey(publicKey.trim())
+    const receipt = await tx.wait()
+
+    return {
+      hash: receipt.transactionHash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString()
+    }
+  } catch (error) {
+    console.error('Error registering ZK key:', error)
+
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else if (error.message.includes('not deployed')) {
+      throw error
+    } else {
+      throw new Error(error.message || 'ZK key registration failed')
+    }
+  }
+}
+

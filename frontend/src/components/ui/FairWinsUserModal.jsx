@@ -79,7 +79,7 @@ function FairWinsUserModal({ onScanMarket }) {
   }
 
   const handleOpenPurchaseModal = () => {
-    showModal(<PremiumPurchaseModal isOpen={true} onClose={hideModal} />, {
+    showModal(<PremiumPurchaseModal onClose={hideModal} />, {
       title: '',
       size: 'large',
       closable: false
