@@ -18,6 +18,11 @@ import './ClearPathModal.css'
  * - Submit: Create new proposals
  * - Metrics: Welfare metrics dashboard
  * - Launch: Create new DAOs
+ * 
+ * @param {Object} props - Component props
+ * @param {boolean} props.isOpen - Whether the modal is open (required)
+ * @param {() => void} props.onClose - Function to call when modal should close (required)
+ * @param {string} [props.defaultTab='daos'] - Default tab to show when modal opens
  */
 
 const DAOFactoryABI = [
@@ -25,7 +30,8 @@ const DAOFactoryABI = [
   "function getAllDAOs() external view returns (uint256[])",
   "function getDAO(uint256 daoId) external view returns (tuple(string name, string description, address futarchyGovernor, address welfareRegistry, address proposalRegistry, address marketFactory, address privacyCoordinator, address oracleResolver, address ragequitModule, address treasuryVault, address creator, uint256 createdAt, bool active))",
   "function hasDAORole(uint256 daoId, address user, bytes32 role) external view returns (bool)",
-  "function DAO_ADMIN_ROLE() external view returns (bytes32)"
+  "function DAO_ADMIN_ROLE() external view returns (bytes32)",
+  "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
 ]
 
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
@@ -147,6 +153,14 @@ const DEMO_PROPOSALS = [
 ]
 
 function ClearPathModal({ isOpen, onClose, defaultTab = 'daos' }) {
+  // Validate required props
+  if (typeof isOpen !== 'boolean') {
+    console.error('ClearPathModal: isOpen prop is required and must be a boolean')
+  }
+  if (typeof onClose !== 'function') {
+    console.error('ClearPathModal: onClose prop is required and must be a function')
+  }
+
   const { provider } = useEthers()
   const { account } = useAccount()
   const { preferences } = useUserPreferences()
@@ -874,21 +888,29 @@ function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getSt
 
       <p className="cp-detail-desc">{proposal.description}</p>
 
-      <div className="cp-vote-progress">
-        <div className="cp-vote-bar">
-          <div className="cp-vote-bar-for" style={{ width: `${forPercentage}%` }}></div>
+      {totalVotes > 0 ? (
+        <div className="cp-vote-progress">
+          <div className="cp-vote-bar">
+            <div className="cp-vote-bar-for" style={{ width: `${forPercentage}%` }}></div>
+          </div>
+          <div className="cp-vote-labels">
+            <span className="cp-vote-for-label">
+              <span className="cp-vote-dot cp-vote-dot-for"></span>
+              For: {proposal.votesFor}
+            </span>
+            <span className="cp-vote-against-label">
+              <span className="cp-vote-dot cp-vote-dot-against"></span>
+              Against: {proposal.votesAgainst}
+            </span>
+          </div>
         </div>
-        <div className="cp-vote-labels">
-          <span className="cp-vote-for-label">
-            <span className="cp-vote-dot cp-vote-dot-for"></span>
-            For: {proposal.votesFor}
-          </span>
-          <span className="cp-vote-against-label">
-            <span className="cp-vote-dot cp-vote-dot-against"></span>
-            Against: {proposal.votesAgainst}
-          </span>
+      ) : (
+        <div className="cp-vote-progress">
+          <p className="cp-no-votes-message" style={{ textAlign: 'center', color: '#6B7280', padding: '1rem' }}>
+            No votes yet. Be the first to vote on this proposal!
+          </p>
         </div>
-      </div>
+      )}
 
       <div className="cp-detail-grid">
         <div className="cp-detail-item">
@@ -1018,6 +1040,7 @@ function MetricsOverview({ daos, demoMode }) {
  * Launch DAO form component
  */
 function LaunchDAOForm({ onSuccess }) {
+  const { signer, account, isConnected } = useEthers()
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -1072,13 +1095,80 @@ function LaunchDAOForm({ onSuccess }) {
     e.preventDefault()
     if (!validate()) return
 
+    // Check wallet connection
+    if (!isConnected || !signer || !account) {
+      setErrors({ submit: 'Please connect your wallet to create a DAO' })
+      return
+    }
+
     setCreating(true)
     try {
-      // TODO: Implement actual DAO creation
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      onSuccess()
+      // Create contract instance with signer
+      const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, signer)
+
+      // Parse admin addresses
+      const adminAddresses = formData.admins
+        ? formData.admins.split(',').map(a => a.trim()).filter(a => a)
+        : []
+
+      // Determine treasury vault address
+      // If empty, use a zero address which the contract should handle
+      const treasuryAddress = formData.treasuryVault.trim() || ethers.ZeroAddress
+
+      // Create DAO transaction
+      const tx = await factory.createDAO(
+        formData.name,
+        formData.description,
+        treasuryAddress,
+        adminAddresses
+      )
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait()
+
+      // Check if transaction was successful
+      if (receipt.status === 1) {
+        // Clear form data
+        setFormData({
+          name: '',
+          description: '',
+          treasuryVault: '',
+          admins: ''
+        })
+        setErrors({})
+        
+        // Call success callback to refresh DAO list and switch tabs
+        onSuccess()
+      } else {
+        throw new Error('Transaction failed')
+      }
     } catch (err) {
-      setErrors({ submit: err.message || 'Failed to create DAO' })
+      console.error('Error creating DAO:', err)
+      
+      // Handle common error cases
+      let errorMessage = 'Failed to create DAO'
+      
+      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+        errorMessage = 'Transaction was rejected by user'
+      } else if (err.code === 'INSUFFICIENT_FUNDS') {
+        errorMessage = 'Insufficient funds for transaction'
+      } else if (err.message?.includes('DAO_CREATOR_ROLE')) {
+        errorMessage = 'Your account does not have permission to create DAOs. Please contact an administrator.'
+      } else if (err.message?.includes('Name cannot be empty')) {
+        errorMessage = 'DAO name cannot be empty'
+      } else if (err.message?.includes('Invalid treasury vault')) {
+        errorMessage = 'Invalid treasury vault address'
+      } else if (err.message) {
+        // Try to extract a readable error message
+        const match = err.message.match(/reason="([^"]+)"/)
+        if (match) {
+          errorMessage = match[1]
+        } else {
+          errorMessage = err.message
+        }
+      }
+      
+      setErrors({ submit: errorMessage })
     } finally {
       setCreating(false)
     }
@@ -1139,6 +1229,7 @@ function LaunchDAOForm({ onSuccess }) {
           />
           {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
           <span className="cp-hint">Leave empty to create a new treasury vault</span>
+          {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
         </div>
 
         <div className="cp-form-group">
@@ -1156,6 +1247,7 @@ function LaunchDAOForm({ onSuccess }) {
           />
           {errors.admins && <span className="cp-error">{errors.admins}</span>}
           <span className="cp-hint">Your address will be added automatically</span>
+          {errors.admins && <span className="cp-error">{errors.admins}</span>}
         </div>
 
         {errors.submit && (
