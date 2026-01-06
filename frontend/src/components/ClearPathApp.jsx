@@ -23,7 +23,7 @@ function ClearPathApp({ onConnect, onDisconnect, onBack }) {
   }
 
   const handlePurchaseClick = () => {
-    showModal(<PremiumPurchaseModal isOpen={true} onClose={() => showModal(null)} />, {
+    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
       title: '',
       size: 'large',
       closable: false

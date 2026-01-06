@@ -21,9 +21,8 @@ import './PremiumPurchaseModal.css'
 
 const STEPS = [
   { id: 'select', label: 'Select', icon: '1' },
-  { id: 'recipient', label: 'Recipient', icon: '2' },
-  { id: 'review', label: 'Review', icon: '3' },
-  { id: 'complete', label: 'Complete', icon: '4' }
+  { id: 'review', label: 'Review', icon: '2' },
+  { id: 'complete', label: 'Complete', icon: '3' }
 ]
 
 // Extended role information with features, duration, and fund destination
@@ -90,15 +89,11 @@ const ROLE_PRICES = {
   FRIEND_MARKET: 50
 }
 
-// Bundle discount tiers
-const BUNDLE_DISCOUNTS = {
-  2: 0.15, // 15% off for 2 roles
-  3: 0.20, // 20% off for 3 roles
-  4: 0.25  // 25% off for all 4 roles
-}
+// Note: Bundle discounts are not currently supported by the contract
+// Each role purchase is a separate transaction at individual price
 
-function PremiumPurchaseModal({ isOpen, onClose }) {
-  const { ROLES, ROLE_INFO, grantRole, hasRole } = useRoles()
+function PremiumPurchaseModal({ isOpen = true, onClose }) {
+  const { ROLE_INFO, grantRole, hasRole } = useRoles()
   const { account, isConnected, isCorrectNetwork, switchNetwork } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
@@ -109,11 +104,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
   // Selected roles (multi-select)
   const [selectedRoles, setSelectedRoles] = useState([])
 
-  // Recipient options
-  const [recipientType, setRecipientType] = useState('self') // 'self' or 'other'
-  const [recipientAddress, setRecipientAddress] = useState('')
-
-  // ZK key for ClearPath
+  // ZK key for ClearPath (optional)
   const [zkPublicKey, setZkPublicKey] = useState('')
 
   // UI state
@@ -121,32 +112,14 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
   const [purchaseResults, setPurchaseResults] = useState([])
   const [errors, setErrors] = useState({})
 
-  // Get available roles (not already owned by the recipient)
-  const availableRoles = useMemo(() => {
-    const targetAddress = recipientType === 'self' ? account : recipientAddress
-    return Object.keys(ROLE_PRICES).filter(roleKey => {
-      // Only filter out if purchasing for self
-      if (recipientType === 'self' && hasRole) {
-        return !hasRole(roleKey)
-      }
-      return true
-    })
-  }, [account, recipientType, recipientAddress, hasRole])
-
-  // Calculate pricing
+  // Calculate pricing (no bundle discounts - each role is separate transaction)
   const pricing = useMemo(() => {
-    const subtotal = selectedRoles.reduce((sum, role) => sum + ROLE_PRICES[role], 0)
+    const total = selectedRoles.reduce((sum, role) => sum + ROLE_PRICES[role], 0)
     const roleCount = selectedRoles.length
-    const discountPercent = BUNDLE_DISCOUNTS[roleCount] || 0
-    const discount = subtotal * discountPercent
-    const total = subtotal - discount
 
     return {
-      subtotal,
-      roleCount,
-      discountPercent: discountPercent * 100,
-      discount,
-      total
+      total,
+      roleCount
     }
   }, [selectedRoles])
 
@@ -154,8 +127,6 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
   const resetForm = useCallback(() => {
     setCurrentStep(0)
     setSelectedRoles([])
-    setRecipientType('self')
-    setRecipientAddress('')
     setZkPublicKey('')
     setPurchaseResults([])
     setErrors({})
@@ -188,23 +159,9 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
       }
     }
 
-    if (step === 1) {
-      if (recipientType === 'other') {
-        if (!recipientAddress.trim()) {
-          newErrors.recipientAddress = 'Recipient address is required'
-        } else if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress.trim())) {
-          newErrors.recipientAddress = 'Invalid Ethereum address'
-        } else if (recipientAddress.toLowerCase() === '0x0000000000000000000000000000000000000000') {
-          newErrors.recipientAddress = 'Cannot use the zero address'
-        } else if (recipientAddress.toLowerCase() === account?.toLowerCase()) {
-          newErrors.recipientAddress = 'For your own address, select "Purchase for Myself"'
-        }
-      }
-    }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [selectedRoles, recipientType, recipientAddress, account])
+  }, [selectedRoles])
 
   // Navigation
   const handleNext = useCallback(() => {
@@ -246,16 +203,16 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
     const results = []
 
     try {
-      const targetAddress = recipientType === 'self' ? account : recipientAddress
+      // Show notification about multiple transactions
+      const transactionCount = selectedRoles.length
+      const notificationMessage =
+        transactionCount > 1
+          ? `You will need to confirm ${transactionCount} separate transactions in your wallet (one per role, total ${pricing.total} USC). Each role purchase is a separate blockchain transaction.`
+          : `Please confirm the transaction in your wallet (${pricing.total} USC)`
 
-      // Show wallet confirmation notification
-      showNotification(
-        `Please confirm the transaction in your wallet (${pricing.total} USC)`,
-        'info',
-        10000
-      )
+      showNotification(notificationMessage, 'info', 10000)
 
-      // Process each role purchase
+      // Process each role purchase (each is a separate transaction)
       for (const roleKey of selectedRoles) {
         const roleName = ROLE_INFO[roleKey].name
         const price = ROLE_PRICES[roleKey]
@@ -264,18 +221,15 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
           // Execute blockchain transaction
           const receipt = await purchaseRoleWithUSC(signer, roleName, price)
 
-          // Grant the role (for self) or record for gift
-          if (recipientType === 'self') {
-            grantRole(roleKey)
-          }
+          // Grant the role to the current user
+          grantRole(roleKey)
 
           // Record the purchase
-          recordRolePurchase(targetAddress, roleKey, {
+          recordRolePurchase(account, roleKey, {
             price: price,
             currency: 'USC',
             txHash: receipt.hash,
-            purchasedBy: account,
-            isGift: recipientType === 'other'
+            purchasedBy: account
           })
 
           results.push({
@@ -295,6 +249,24 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
         }
       }
 
+      // Handle ZK key registration for ClearPath (optional, only if key provided)
+      if (zkPublicKey.trim() && selectedRoles.includes('CLEARPATH_USER')) {
+        try {
+          // Import and call ZK key registration
+          const { registerZKKey } = await import('../../utils/blockchainService')
+          await registerZKKey(signer, zkPublicKey.trim())
+          showNotification('ZK key registered successfully', 'success', 5000)
+        } catch (zkError) {
+          console.error('ZK key registration failed:', zkError)
+          // Don't fail the entire purchase if ZK key registration fails
+          showNotification(
+            'Role purchased successfully, but ZK key registration failed. You can register your key later.',
+            'warning',
+            7000
+          )
+        }
+      }
+
       setPurchaseResults(results)
 
       const successCount = results.filter(r => r.success).length
@@ -304,14 +276,14 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
           'success',
           7000
         )
-        setCurrentStep(3) // Move to complete step
+        setCurrentStep(2) // Move to complete step (now step index 2)
       } else if (successCount > 0) {
         showNotification(
-          `Partially completed: ${successCount}/${selectedRoles.length} roles purchased`,
+          `Partially completed: ${successCount}/${selectedRoles.length} roles purchased. Successful purchases have been applied.`,
           'warning',
-          7000
+          10000
         )
-        setCurrentStep(3)
+        setCurrentStep(2)
       } else {
         showNotification('All purchases failed. Please try again.', 'error', 7000)
       }
@@ -333,7 +305,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
 
   if (!isOpen) return null
 
-  const requiresZkKey = selectedRoles.includes('CLEARPATH_USER') && recipientType === 'self'
+  const requiresZkKey = selectedRoles.includes('CLEARPATH_USER')
 
   return (
     <div
@@ -389,7 +361,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                     <span aria-hidden="true">🎯</span> Select Premium Roles
                   </h3>
                   <p className="ppm-section-desc">
-                    Choose one or more roles to unlock. Bundle multiple roles for discounts!
+                    Choose one or more roles to unlock. Each role is a separate transaction.
                   </p>
                 </div>
 
@@ -399,7 +371,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                     .map(([roleKey, roleInfo]) => {
                       const details = ROLE_DETAILS[roleKey]
                       const isSelected = selectedRoles.includes(roleKey)
-                      const isOwned = recipientType === 'self' && hasRole && hasRole(roleKey)
+                      const isOwned = hasRole && hasRole(roleKey)
 
                       return (
                         <div
@@ -463,123 +435,26 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
 
                 {errors.roles && <div className="ppm-error">{errors.roles}</div>}
 
-                {/* Bundle Discount Info */}
-                {selectedRoles.length >= 2 && (
-                  <div className="ppm-bundle-info">
-                    <span className="ppm-bundle-icon" aria-hidden="true">🎁</span>
-                    <div>
-                      <strong>Bundle Discount Applied!</strong>
-                      <p>You&apos;re saving {pricing.discountPercent}% (${pricing.discount.toFixed(2)} USC) by purchasing {pricing.roleCount} roles together.</p>
-                    </div>
-                  </div>
-                )}
-
                 {/* Pricing Summary */}
                 {selectedRoles.length > 0 && (
                   <div className="ppm-pricing-summary">
                     <div className="ppm-pricing-row">
-                      <span>Subtotal ({pricing.roleCount} role{pricing.roleCount > 1 ? 's' : ''})</span>
-                      <span>${pricing.subtotal.toFixed(2)} USC</span>
+                      <span>Selected ({pricing.roleCount} role{pricing.roleCount > 1 ? 's' : ''})</span>
+                      <span>${pricing.total.toFixed(2)} USC</span>
                     </div>
-                    {pricing.discount > 0 && (
-                      <div className="ppm-pricing-row ppm-discount">
-                        <span>Bundle Discount ({pricing.discountPercent}%)</span>
-                        <span>-${pricing.discount.toFixed(2)} USC</span>
-                      </div>
-                    )}
                     <div className="ppm-pricing-row ppm-total">
                       <span>Total</span>
                       <span>${pricing.total.toFixed(2)} USC</span>
                     </div>
-                  </div>
-                )}
-              </section>
-            </div>
-          )}
-
-          {/* Step 2: Recipient */}
-          {currentStep === 1 && (
-            <div className="ppm-panel" role="tabpanel">
-              <section className="ppm-section">
-                <div className="ppm-section-header">
-                  <h3 className="ppm-section-title">
-                    <span aria-hidden="true">🎁</span> Who is this for?
-                  </h3>
-                  <p className="ppm-section-desc">
-                    Purchase for yourself or gift to another address.
-                  </p>
-                </div>
-
-                <div className="ppm-recipient-options">
-                  <label className={`ppm-recipient-card ${recipientType === 'self' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="recipientType"
-                      value="self"
-                      checked={recipientType === 'self'}
-                      onChange={() => setRecipientType('self')}
-                      disabled={isPurchasing}
-                    />
-                    <div className="ppm-recipient-content">
-                      <span className="ppm-recipient-icon" aria-hidden="true">👤</span>
-                      <div>
-                        <strong>Purchase for Myself</strong>
-                        <p>Roles will be activated for your connected wallet</p>
-                        {account && (
-                          <code className="ppm-address-preview">
-                            {account.slice(0, 6)}...{account.slice(-4)}
-                          </code>
-                        )}
+                    {pricing.roleCount > 1 && (
+                      <div className="ppm-pricing-note">
+                        <small>Note: Each role requires a separate transaction</small>
                       </div>
-                    </div>
-                  </label>
-
-                  <label className={`ppm-recipient-card ${recipientType === 'other' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="recipientType"
-                      value="other"
-                      checked={recipientType === 'other'}
-                      onChange={() => setRecipientType('other')}
-                      disabled={isPurchasing}
-                    />
-                    <div className="ppm-recipient-content">
-                      <span className="ppm-recipient-icon" aria-hidden="true">🎁</span>
-                      <div>
-                        <strong>Gift to Another Address</strong>
-                        <p>Send premium access to a friend or colleague</p>
-                      </div>
-                    </div>
-                  </label>
-                </div>
-
-                {recipientType === 'other' && (
-                  <div className="ppm-field">
-                    <label htmlFor="recipientAddress">
-                      Recipient Wallet Address <span className="ppm-required">*</span>
-                    </label>
-                    <input
-                      id="recipientAddress"
-                      type="text"
-                      value={recipientAddress}
-                      onChange={(e) => {
-                        setRecipientAddress(e.target.value)
-                        setErrors(prev => ({ ...prev, recipientAddress: null }))
-                      }}
-                      placeholder="0x..."
-                      disabled={isPurchasing}
-                      className={errors.recipientAddress ? 'error' : ''}
-                    />
-                    <div className="ppm-hint">
-                      Enter the Ethereum address that will receive the premium access
-                    </div>
-                    {errors.recipientAddress && (
-                      <div className="ppm-error">{errors.recipientAddress}</div>
                     )}
                   </div>
                 )}
 
-                {/* ZK Key Registration for ClearPath */}
+                {/* ZK Key Registration for ClearPath (optional) */}
                 {requiresZkKey && (
                   <div className="ppm-zk-section">
                     <div className="ppm-info-card">
@@ -613,8 +488,8 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Step 3: Review & Confirm */}
-          {currentStep === 2 && (
+          {/* Step 2: Review & Confirm (formerly step 3) */}
+          {currentStep === 1 && (
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section">
                 <h3 className="ppm-section-title">
@@ -642,17 +517,8 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                   <div className="ppm-review-recipient">
                     <span className="ppm-review-label">Recipient</span>
                     <span className="ppm-review-value">
-                      {recipientType === 'self' ? (
-                        <>
-                          <span className="ppm-recipient-badge">You</span>
-                          <code>{account?.slice(0, 6)}...{account?.slice(-4)}</code>
-                        </>
-                      ) : (
-                        <>
-                          <span className="ppm-recipient-badge ppm-gift">Gift</span>
-                          <code>{recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</code>
-                        </>
-                      )}
+                      <span className="ppm-recipient-badge">You</span>
+                      <code>{account?.slice(0, 6)}...{account?.slice(-4)}</code>
                     </span>
                   </div>
 
@@ -681,18 +547,8 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                   </div>
 
                   <div className="ppm-review-pricing">
-                    <div className="ppm-review-pricing-row">
-                      <span>Subtotal</span>
-                      <span>${pricing.subtotal.toFixed(2)} USC</span>
-                    </div>
-                    {pricing.discount > 0 && (
-                      <div className="ppm-review-pricing-row ppm-discount">
-                        <span>Bundle Discount ({pricing.discountPercent}%)</span>
-                        <span className="ppm-discount-amount">-${pricing.discount.toFixed(2)} USC</span>
-                      </div>
-                    )}
                     <div className="ppm-review-pricing-row ppm-total">
-                      <span>Total</span>
+                      <span>Total ({pricing.roleCount} transaction{pricing.roleCount > 1 ? 's' : ''})</span>
                       <span>${pricing.total.toFixed(2)} USC</span>
                     </div>
                   </div>
@@ -735,8 +591,8 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Step 4: Complete */}
-          {currentStep === 3 && (
+          {/* Step 3: Complete (formerly step 4) */}
+          {currentStep === 2 && (
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section ppm-complete-section">
                 <div className="ppm-success-icon" aria-hidden="true">
@@ -750,9 +606,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                 </h3>
 
                 <p className="ppm-complete-desc">
-                  {recipientType === 'self'
-                    ? 'Your premium access has been activated.'
-                    : `Premium access has been gifted to ${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}.`}
+                  Your premium access has been activated.
                 </p>
 
                 <div className="ppm-purchase-results">
@@ -824,7 +678,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
         {/* Footer Actions */}
         <footer className="ppm-footer">
           <div className="ppm-footer-left">
-            {currentStep > 0 && currentStep < 3 && (
+            {currentStep > 0 && currentStep < 2 && (
               <button
                 type="button"
                 className="ppm-btn-secondary"
@@ -836,7 +690,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
             )}
           </div>
           <div className="ppm-footer-right">
-            {currentStep < 3 && (
+            {currentStep < 2 && (
               <button
                 type="button"
                 className="ppm-btn-secondary"
@@ -846,7 +700,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                 Cancel
               </button>
             )}
-            {currentStep < 2 && (
+            {currentStep < 1 && (
               <button
                 type="button"
                 className="ppm-btn-primary"
@@ -856,7 +710,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                 Continue
               </button>
             )}
-            {currentStep === 2 && (
+            {currentStep === 1 && (
               <button
                 type="button"
                 className="ppm-btn-primary ppm-btn-purchase"
@@ -875,7 +729,7 @@ function PremiumPurchaseModal({ isOpen, onClose }) {
                 )}
               </button>
             )}
-            {currentStep === 3 && (
+            {currentStep === 2 && (
               <button
                 type="button"
                 className="ppm-btn-primary"
