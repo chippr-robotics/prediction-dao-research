@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
+import QRScanner from '../ui/QRScanner'
 import './FriendMarketsModal.css'
 
 /**
@@ -50,6 +51,16 @@ function FriendMarketsModal({
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
+  // QR Scanner state
+  const [qrScannerOpen, setQrScannerOpen] = useState(false)
+  const [qrScanTarget, setQrScanTarget] = useState(null) // 'opponent' or 'arbitrator'
+
+  // Market lookup state for event tracking
+  const [marketLookupId, setMarketLookupId] = useState('')
+  const [marketLookupLoading, setMarketLookupLoading] = useState(false)
+  const [marketLookupResult, setMarketLookupResult] = useState(null)
+  const [marketLookupError, setMarketLookupError] = useState(null)
+
   // Reset modal state when opened
   useEffect(() => {
     if (isOpen) {
@@ -89,6 +100,9 @@ function FriendMarketsModal({
       peggedMarketId: ''
     })
     setErrors({})
+    setMarketLookupId('')
+    setMarketLookupResult(null)
+    setMarketLookupError(null)
   }
 
   const handleClose = () => {
@@ -112,6 +126,93 @@ function FriendMarketsModal({
         return newErrors
       })
     }
+  }
+
+  // QR Scanner handlers
+  const openQrScanner = (target) => {
+    setQrScanTarget(target)
+    setQrScannerOpen(true)
+  }
+
+  const handleQrScanSuccess = (decodedText) => {
+    // Try to extract Ethereum address from scanned data
+    let address = decodedText
+
+    // If it's a URL, try to extract address from path or query
+    try {
+      const url = new URL(decodedText)
+      // Check for address in pathname (e.g., /address/0x...)
+      const pathMatch = url.pathname.match(/0x[a-fA-F0-9]{40}/)
+      if (pathMatch) {
+        address = pathMatch[0]
+      } else {
+        // Check query params
+        const addrParam = url.searchParams.get('address') || url.searchParams.get('addr')
+        if (addrParam) address = addrParam
+      }
+    } catch {
+      // Not a URL, check if it's a raw address
+      const addrMatch = decodedText.match(/0x[a-fA-F0-9]{40}/)
+      if (addrMatch) {
+        address = addrMatch[0]
+      }
+    }
+
+    // Update the appropriate field
+    if (qrScanTarget && /^0x[a-fA-F0-9]{40}$/.test(address)) {
+      handleFormChange(qrScanTarget, address)
+    }
+
+    setQrScannerOpen(false)
+    setQrScanTarget(null)
+  }
+
+  const handleQrScannerClose = () => {
+    setQrScannerOpen(false)
+    setQrScanTarget(null)
+  }
+
+  // Market lookup for event tracking
+  const handleMarketLookup = async () => {
+    if (!marketLookupId.trim()) {
+      setMarketLookupError('Please enter a market ID')
+      return
+    }
+
+    setMarketLookupLoading(true)
+    setMarketLookupError(null)
+    setMarketLookupResult(null)
+
+    try {
+      // Simulate market lookup - in production this would call your API/contract
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      // Mock result for demo purposes
+      const mockMarket = {
+        id: marketLookupId,
+        description: 'Sample prediction market for demonstration',
+        question: 'Will ETH reach $5000 by end of Q1 2026?',
+        totalVolume: '1,234.56',
+        participants: 42,
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'active'
+      }
+
+      setMarketLookupResult(mockMarket)
+      handleFormChange('peggedMarketId', marketLookupId)
+    } catch (error) {
+      console.error('Market lookup error:', error)
+      setMarketLookupError('Market not found or unable to fetch details')
+    } finally {
+      setMarketLookupLoading(false)
+    }
+  }
+
+  const clearMarketLookup = () => {
+    setMarketLookupId('')
+    setMarketLookupResult(null)
+    setMarketLookupError(null)
+    handleFormChange('peggedMarketId', '')
   }
 
   const validateForm = useCallback(() => {
@@ -493,15 +594,33 @@ function FriendMarketsModal({
                         <label htmlFor="fm-opponent">
                           Opponent Address <span className="fm-required">*</span>
                         </label>
-                        <input
-                          id="fm-opponent"
-                          type="text"
-                          value={formData.opponent}
-                          onChange={(e) => handleFormChange('opponent', e.target.value)}
-                          placeholder="0x..."
-                          disabled={submitting}
-                          className={errors.opponent ? 'error' : ''}
-                        />
+                        <div className="fm-input-with-action">
+                          <input
+                            id="fm-opponent"
+                            type="text"
+                            value={formData.opponent}
+                            onChange={(e) => handleFormChange('opponent', e.target.value)}
+                            placeholder="0x..."
+                            disabled={submitting}
+                            className={errors.opponent ? 'error' : ''}
+                          />
+                          <button
+                            type="button"
+                            className="fm-scan-btn"
+                            onClick={() => openQrScanner('opponent')}
+                            disabled={submitting}
+                            title="Scan QR code"
+                            aria-label="Scan QR code for opponent address"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="3" y="3" width="7" height="7"/>
+                              <rect x="14" y="3" width="7" height="7"/>
+                              <rect x="3" y="14" width="7" height="7"/>
+                              <rect x="14" y="14" width="3" height="3"/>
+                              <path d="M17 14h4v4h-4zM14 17v4h4"/>
+                            </svg>
+                          </button>
+                        </div>
                         {errors.opponent && <span className="fm-error">{errors.opponent}</span>}
                       </div>
                     )}
@@ -567,17 +686,104 @@ function FriendMarketsModal({
                       <label htmlFor="fm-arbitrator">
                         Arbitrator (Optional)
                       </label>
-                      <input
-                        id="fm-arbitrator"
-                        type="text"
-                        value={formData.arbitrator}
-                        onChange={(e) => handleFormChange('arbitrator', e.target.value)}
-                        placeholder="0x... (trusted third party)"
-                        disabled={submitting}
-                        className={errors.arbitrator ? 'error' : ''}
-                      />
+                      <div className="fm-input-with-action">
+                        <input
+                          id="fm-arbitrator"
+                          type="text"
+                          value={formData.arbitrator}
+                          onChange={(e) => handleFormChange('arbitrator', e.target.value)}
+                          placeholder="0x... (trusted third party)"
+                          disabled={submitting}
+                          className={errors.arbitrator ? 'error' : ''}
+                        />
+                        <button
+                          type="button"
+                          className="fm-scan-btn"
+                          onClick={() => openQrScanner('arbitrator')}
+                          disabled={submitting}
+                          title="Scan QR code"
+                          aria-label="Scan QR code for arbitrator address"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="7" height="7"/>
+                            <rect x="14" y="3" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/>
+                            <rect x="14" y="14" width="3" height="3"/>
+                            <path d="M17 14h4v4h-4zM14 17v4h4"/>
+                          </svg>
+                        </button>
+                      </div>
                       {errors.arbitrator && <span className="fm-error">{errors.arbitrator}</span>}
                     </div>
+
+                    {/* Market Lookup for Event Tracking */}
+                    {friendMarketType === 'eventTracking' && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-market-lookup">
+                          Peg to Existing Market (Optional)
+                        </label>
+                        <div className="fm-market-lookup">
+                          <div className="fm-input-with-action">
+                            <input
+                              id="fm-market-lookup"
+                              type="text"
+                              value={marketLookupId}
+                              onChange={(e) => setMarketLookupId(e.target.value)}
+                              placeholder="Enter market ID to look up..."
+                              disabled={submitting || marketLookupLoading}
+                            />
+                            <button
+                              type="button"
+                              className="fm-lookup-btn"
+                              onClick={handleMarketLookup}
+                              disabled={submitting || marketLookupLoading || !marketLookupId.trim()}
+                              title="Look up market"
+                            >
+                              {marketLookupLoading ? (
+                                <span className="fm-spinner-small"></span>
+                              ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="11" cy="11" r="8"/>
+                                  <path d="M21 21l-4.35-4.35"/>
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          {marketLookupError && (
+                            <span className="fm-error">{marketLookupError}</span>
+                          )}
+                          {marketLookupResult && (
+                            <div className="fm-lookup-result">
+                              <div className="fm-lookup-result-header">
+                                <span className="fm-lookup-result-title">Found Market</span>
+                                <button
+                                  type="button"
+                                  className="fm-lookup-clear"
+                                  onClick={clearMarketLookup}
+                                  title="Clear selection"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M18 6L6 18M6 6l12 12"/>
+                                  </svg>
+                                </button>
+                              </div>
+                              <div className="fm-lookup-result-content">
+                                <p className="fm-lookup-question">{marketLookupResult.question || marketLookupResult.description}</p>
+                                <div className="fm-lookup-meta">
+                                  <span>ID: {marketLookupResult.id}</span>
+                                  <span>&#8226;</span>
+                                  <span>{marketLookupResult.participants} participants</span>
+                                  <span>&#8226;</span>
+                                  <span className={`fm-lookup-status fm-lookup-status-${marketLookupResult.status}`}>
+                                    {marketLookupResult.status}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Network Warning */}
@@ -782,6 +988,13 @@ function FriendMarketsModal({
           )}
         </div>
       </div>
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={qrScannerOpen}
+        onClose={handleQrScannerClose}
+        onScanSuccess={handleQrScanSuccess}
+      />
     </div>
   )
 }
