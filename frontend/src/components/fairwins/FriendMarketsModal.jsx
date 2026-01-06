@@ -893,7 +893,7 @@ function FriendMarketsModal({
                         includeMargin={false}
                         fgColor="#36B37E"
                         bgColor="transparent"
-                        aria-label="QR code to share market"
+                        aria-label="QR code to share this market"
                         imageSettings={{
                           src: '/logo_fairwins.svg',
                           height: 32,
