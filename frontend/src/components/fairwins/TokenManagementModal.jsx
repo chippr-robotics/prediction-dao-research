@@ -354,24 +354,39 @@ function TokenManagementModal({ isOpen, onClose }) {
             actionDescription = `Burning ${actionData.amount} ${selectedItem.symbol}`
           } else {
             // ERC721: burn(uint256 tokenId) - amount field is used for tokenId
-            const tokenId = parseInt(actionData.amount)
+            const tokenId = BigInt(actionData.amount)
             tx = await contract.burn(tokenId)
-            actionDescription = `Burning NFT #${tokenId}`
+            actionDescription = `Burning NFT #${actionData.amount}`
           }
           break
 
         case 'transfer':
-          // ERC20: transfer(address to, uint256 amount)
-          const transferAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
-          tx = await contract.transfer(actionData.address, transferAmount)
-          actionDescription = `Transferring ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(actionData.address)}`
+          if (selectedItem.type === 'ERC20') {
+            // ERC20: transfer(address to, uint256 amount)
+            const transferAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
+            tx = await contract.transfer(actionData.address, transferAmount)
+            actionDescription = `Transferring ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(actionData.address)}`
+          } else {
+            // ERC721: transferFrom(address from, address to, uint256 tokenId)
+            const tokenId = BigInt(actionData.amount)
+            const ownerAddress = await contract.ownerOf(tokenId)
+            tx = await contract.transferFrom(ownerAddress, actionData.address, tokenId)
+            actionDescription = `Transferring NFT #${actionData.amount} to ${formatAddress(actionData.address)}`
+          }
           break
 
         case 'approve':
-          // ERC20: approve(address spender, uint256 amount)
-          const approveAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
-          tx = await contract.approve(actionData.spender, approveAmount)
-          actionDescription = `Approving ${actionData.amount} ${selectedItem.symbol} for ${formatAddress(actionData.spender)}`
+          if (selectedItem.type === 'ERC20') {
+            // ERC20: approve(address spender, uint256 amount)
+            const approveAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
+            tx = await contract.approve(actionData.spender, approveAmount)
+            actionDescription = `Approving ${actionData.amount} ${selectedItem.symbol} for ${formatAddress(actionData.spender)}`
+          } else {
+            // ERC721: approve(address to, uint256 tokenId)
+            const tokenId = BigInt(actionData.amount)
+            tx = await contract.approve(actionData.spender, tokenId)
+            actionDescription = `Approving NFT #${actionData.amount} for ${formatAddress(actionData.spender)}`
+          }
           break
 
         case 'setApprovalForAll':
