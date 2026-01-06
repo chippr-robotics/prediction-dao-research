@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
-import { isValidCid, getIpfsUrl } from '../../constants/ipfs'
+import { isValidCid } from '../../constants/ipfs'
 import './MarketCreationModal.css'
 
 /**
@@ -43,7 +43,7 @@ const CATEGORIES = [
 
 const STEPS = [
   { id: 'metadata', label: 'Content', icon: '📝' },
-  { id: 'education', label: 'Design', icon: '💡' },
+  { id: 'education', label: 'Education', icon: '💡' },
   { id: 'parameters', label: 'Parameters', icon: '⚙️' },
   { id: 'review', label: 'Review', icon: '✓' }
 ]
@@ -76,7 +76,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   const [paramsForm, setParamsForm] = useState({
     tradingPeriodDays: '14',
     initialLiquidity: '',
-    betType: 1, // Default to Pass/Fail
+    betType: 1, // Default to Pass/Fail (more appropriate for governance-style predictions)
     collateralToken: '' // Empty means use native token
   })
 
@@ -162,6 +162,29 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         if (!metadataForm.category) {
           newErrors.category = 'Please select a category'
         }
+
+        // Validate optional URI fields if provided
+        if (metadataForm.imageUri && metadataForm.imageUri.trim()) {
+          const uri = metadataForm.imageUri.trim()
+          if (!uri.startsWith('ipfs://') && !uri.startsWith('https://')) {
+            newErrors.imageUri = 'Image URI must start with ipfs:// or https://'
+          } else if (!isValidUri(uri)) {
+            newErrors.imageUri = 'Invalid image URI format'
+          }
+        }
+
+        if (metadataForm.sourceUrl && metadataForm.sourceUrl.trim()) {
+          const uri = metadataForm.sourceUrl.trim()
+          if (!uri.startsWith('https://')) {
+            newErrors.sourceUrl = 'Source URL must start with https://'
+          } else {
+            try {
+              new URL(uri)
+            } catch {
+              newErrors.sourceUrl = 'Invalid source URL format'
+            }
+          }
+        }
       }
     }
 
@@ -182,13 +205,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       }
 
       if (paramsForm.collateralToken && !/^0x[a-fA-F0-9]{40}$/.test(paramsForm.collateralToken)) {
-        newErrors.collateralToken = 'Invalid token address format'
+        newErrors.collateralToken = 'Invalid token address format (should be checksummed)'
       }
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [useCustomUri, customUri, metadataForm, paramsForm])
+  }, [useCustomUri, customUri, metadataForm, paramsForm, address])
 
   // Navigation handlers
   const handleNext = useCallback(() => {
@@ -218,16 +241,37 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       .map(t => t.trim())
       .filter(t => t.length > 0)
 
+    // Build description, avoiding duplicate resolution criteria if user already included it
+    let description = (metadataForm.description || '').trim()
+    const resolutionCriteria = (metadataForm.resolutionCriteria || '').trim()
+
+    if (resolutionCriteria) {
+      const descLower = description.toLowerCase()
+      const marker = 'resolution criteria'
+      const hasResolutionSection = descLower.includes(marker)
+
+      if (!hasResolutionSection) {
+        description = description
+          ? `${description}\n\n**Resolution Criteria:**\n${resolutionCriteria}`
+          : `**Resolution Criteria:**\n${resolutionCriteria}`
+      }
+    }
+
+    // Validate and parse initial liquidity value
+    const liquidityStr = (paramsForm.initialLiquidity || '').trim()
+    const liquidityNum = Number(liquidityStr)
+    const isValidLiquidity = liquidityStr !== '' && !isNaN(liquidityNum) && liquidityStr === String(liquidityNum)
+
     return {
       name: metadataForm.question,
-      description: `${metadataForm.description}\n\n**Resolution Criteria:**\n${metadataForm.resolutionCriteria}`,
+      description,
       image: metadataForm.imageUri || 'ipfs://QmDefaultMarketImage',
       external_url: metadataForm.sourceUrl || undefined,
       attributes: [
         { trait_type: 'Category', value: metadataForm.category },
         { trait_type: 'Bet Type', value: betType?.name || 'Pass / Fail' },
         { trait_type: 'Trading Period', value: `${paramsForm.tradingPeriodDays} days`, display_type: 'string' },
-        { trait_type: 'Initial Liquidity', value: parseFloat(paramsForm.initialLiquidity), display_type: 'number' }
+        { trait_type: 'Initial Liquidity', value: isValidLiquidity ? liquidityNum : 0, display_type: 'number' }
       ],
       properties: {
         creator: address,
@@ -269,7 +313,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     try {
       const submitData = {
         // On-chain parameters
-        tradingPeriod: parseInt(paramsForm.tradingPeriodDays) * 24 * 60 * 60, // Convert to seconds
+        // Trading period converted to seconds (7-21 days * 86400 seconds/day)
+        // Contract accepts values in this range as validated above
+        tradingPeriod: parseInt(paramsForm.tradingPeriodDays) * 24 * 60 * 60,
         initialLiquidity: paramsForm.initialLiquidity,
         betType: paramsForm.betType,
         collateralToken: paramsForm.collateralToken || null,
@@ -333,7 +379,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
               key={step.id}
               className={`mcm-step ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
               onClick={() => handleStepClick(index)}
-              disabled={submitting || (index > currentStep && !validateStep(currentStep))}
+              disabled={submitting || (index > currentStep && (index !== currentStep + 1 || !validateStep(currentStep)))}
               aria-current={index === currentStep ? 'step' : undefined}
             >
               <span className="mcm-step-icon" aria-hidden="true">
@@ -481,6 +527,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                             className={`mcm-category-btn ${metadataForm.category === cat ? 'active' : ''}`}
                             onClick={() => handleMetadataChange('category', cat)}
                             disabled={submitting}
+                            aria-label={`Select ${cat} category`}
                           >
                             {cat}
                           </button>
@@ -516,7 +563,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                         onChange={e => handleMetadataChange('imageUri', e.target.value)}
                         placeholder="ipfs://QmImageCID or https://..."
                         disabled={submitting}
+                        className={errors.imageUri ? 'error' : ''}
                       />
+                      {errors.imageUri && <div className="mcm-error">{errors.imageUri}</div>}
                     </div>
 
                     <div className="mcm-field">
@@ -528,8 +577,10 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                         onChange={e => handleMetadataChange('sourceUrl', e.target.value)}
                         placeholder="https://example.com/article"
                         disabled={submitting}
+                        className={errors.sourceUrl ? 'error' : ''}
                       />
                       <div className="mcm-hint">Link to supporting information</div>
+                      {errors.sourceUrl && <div className="mcm-error">{errors.sourceUrl}</div>}
                     </div>
                   </section>
                 </>
@@ -733,6 +784,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                       className={`mcm-bettype-btn ${paramsForm.betType === bt.id ? 'active' : ''}`}
                       onClick={() => handleParamsChange('betType', bt.id)}
                       disabled={submitting}
+                      aria-label={`Select ${bt.name} bet type: ${bt.description}`}
                     >
                       <span className="mcm-bettype-icon" aria-hidden="true">{bt.icon}</span>
                       <span className="mcm-bettype-name">{bt.name}</span>
@@ -760,6 +812,10 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                       onChange={e => handleParamsChange('tradingPeriodDays', e.target.value)}
                       disabled={submitting}
                       className="mcm-slider"
+                      aria-valuemin="7"
+                      aria-valuemax="21"
+                      aria-valuenow={paramsForm.tradingPeriodDays}
+                      aria-valuetext={`${paramsForm.tradingPeriodDays} days`}
                     />
                     <span className="mcm-range-value">{paramsForm.tradingPeriodDays} days</span>
                   </div>
@@ -970,7 +1026,7 @@ function isValidUri(uri) {
   // Check if it's an ipfs:// URI
   if (uri.startsWith('ipfs://')) {
     const cid = uri.replace('ipfs://', '').split('/')[0]
-    return isValidCid(cid) || cid.length > 0
+    return isValidCid(cid)
   }
 
   // Check if it's an https:// URL

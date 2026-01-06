@@ -290,6 +290,14 @@ export const uploadJson = async (data, options = {}) => {
     throw new Error('Data must be a valid object')
   }
 
+  // Validate that data can be stringified (no circular references)
+  let jsonString
+  try {
+    jsonString = JSON.stringify(data)
+  } catch (error) {
+    throw new Error(`Cannot stringify data: ${error.message}`)
+  }
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), IPFS_CONFIG.UPLOAD_TIMEOUT)
 
@@ -310,8 +318,19 @@ export const uploadJson = async (data, options = {}) => {
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.message || `Upload failed with status ${response.status}`)
+      const responseText = await response.text()
+      let errorMessage
+      try {
+        const errorData = JSON.parse(responseText)
+        errorMessage = errorData && typeof errorData === 'object' ? errorData.message : null
+      } catch {
+        errorMessage = null
+      }
+      if (!errorMessage) {
+        const bodySnippet = responseText ? responseText.slice(0, 200) : ''
+        errorMessage = `Upload failed with status ${response.status}` + (bodySnippet ? `. Response body: ${bodySnippet}` : '')
+      }
+      throw new Error(errorMessage)
     }
 
     const result = await response.json()
@@ -323,7 +342,7 @@ export const uploadJson = async (data, options = {}) => {
     return {
       cid: result.cid,
       uri: `ipfs://${result.cid}`,
-      size: result.size || JSON.stringify(data).length,
+      size: result.size || new Blob([jsonString]).size,
     }
   } catch (error) {
     clearTimeout(timeoutId)
@@ -345,7 +364,7 @@ export const uploadJson = async (data, options = {}) => {
 export const uploadMarketMetadata = async (metadata) => {
   // Validate required fields
   if (!metadata.name) {
-    throw new Error('Market metadata requires a name (question)')
+    throw new Error('Market metadata requires a name/question field')
   }
   if (!metadata.description) {
     throw new Error('Market metadata requires a description')
@@ -365,7 +384,7 @@ export const uploadMarketMetadata = async (metadata) => {
     // Custom properties
     properties: {
       ...metadata.properties,
-      schema_version: '1.0.0',
+      schema_version: '1.1.0',
       uploaded_at: new Date().toISOString(),
     },
   }
@@ -399,11 +418,32 @@ export const resolveUri = async (uri, options = {}) => {
 
   // Handle HTTPS URLs
   if (uri.startsWith('https://')) {
-    const response = await fetch(uri, { ...options })
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${uri}: ${response.status}`)
+    // Use caller-provided signal if present; otherwise create a timed abort controller
+    const hasCallerSignal = options && options.signal
+
+    if (hasCallerSignal) {
+      const response = await fetch(uri, { ...options })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${uri}: ${response.status}`)
+      }
+      return response.json()
     }
-    return response.json()
+
+    const controller = new AbortController()
+    // Prefer a configured timeout if available, otherwise fall back to a sane default
+    const timeoutMs =
+      (IPFS_CONFIG && (IPFS_CONFIG.REQUEST_TIMEOUT_MS || IPFS_CONFIG.FETCH_TIMEOUT_MS)) || 10000
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+      const response = await fetch(uri, { ...options, signal: controller.signal })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${uri}: ${response.status}`)
+      }
+      return response.json()
+    } finally {
+      clearTimeout(timeoutId)
+    }
   }
 
   throw new Error(`Unsupported URI format: ${uri}`)
@@ -412,6 +452,8 @@ export const resolveUri = async (uri, options = {}) => {
 /**
  * Upload and pin content with metadata registry integration
  * Uploads to IPFS and optionally registers with MetadataRegistry contract
+ * Note: If registration fails, metadata remains uploaded to IPFS (orphaned content).
+ * This is by design to prevent data loss - the caller can retry registration later.
  * @param {Object} content - Content to upload
  * @param {Object} options - Options
  * @param {string} options.resourceType - Resource type for registry (e.g., 'market')
