@@ -1091,6 +1091,222 @@
 }
 
 /* ===========================
+   Educational Step Styles
+   =========================== */
+
+.mcm-education-header {
+  margin-bottom: 1.5rem;
+}
+
+.mcm-education-intro {
+  margin: 0.75rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-education-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: var(--radius-md, 8px);
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #ffffff);
+}
+
+.mcm-education-card.mcm-education-primary {
+  background: rgba(54, 179, 126, 0.05);
+  border-color: rgba(54, 179, 126, 0.2);
+}
+
+.mcm-education-card.mcm-education-highlight {
+  background: rgba(66, 153, 225, 0.05);
+  border-color: rgba(66, 153, 225, 0.2);
+}
+
+.mcm-education-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+}
+
+.mcm-education-content {
+  flex: 1;
+}
+
+.mcm-education-content h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.mcm-education-content p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-education-divider {
+  display: flex;
+  align-items: center;
+  margin: 2rem 0 1.5rem;
+  text-align: center;
+  color: var(--text-tertiary, #a0aec0);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mcm-education-divider::before,
+.mcm-education-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color, #e2e8f0);
+}
+
+.mcm-education-divider span {
+  padding: 0 1rem;
+}
+
+.mcm-dimensions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.mcm-dimension-card {
+  padding: 1.25rem;
+  background: var(--bg-secondary, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.2s ease;
+}
+
+.mcm-dimension-card:hover {
+  border-color: var(--brand-primary, #36B37E);
+  box-shadow: 0 4px 12px rgba(54, 179, 126, 0.1);
+}
+
+.mcm-dimension-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.mcm-dimension-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.mcm-dimension-header h4 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.mcm-dimension-desc {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-dimension-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-dimension-list li {
+  margin-bottom: 0.25rem;
+}
+
+.mcm-dimension-list strong {
+  color: var(--text-primary, #1a202c);
+  font-weight: 600;
+}
+
+.mcm-dimension-note {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(54, 179, 126, 0.05);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #718096);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.mcm-dimension-note span {
+  color: var(--brand-primary, #36B37E);
+  flex-shrink: 0;
+}
+
+.mcm-dimension-note strong {
+  color: var(--text-primary, #1a202c);
+  font-weight: 600;
+}
+
+.mcm-discovery-checklist {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem;
+}
+
+.mcm-discovery-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-discovery-checklist li span {
+  color: var(--brand-primary, #36B37E);
+  flex-shrink: 0;
+}
+
+.mcm-discovery-checklist strong {
+  color: var(--text-primary, #1a202c);
+  font-weight: 600;
+}
+
+.mcm-education-footer {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-primary, #f8fafc);
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-education-footer p {
+  margin: 0;
+}
+
+/* ===========================
    Print Styles
    =========================== */
 
