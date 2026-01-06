@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { BrowserRouter } from 'react-router-dom'
@@ -697,8 +697,8 @@ describe('FriendMarketsModal', () => {
       expect(createButton).not.toBeDisabled()
     })
 
-    it('should show form validation before wallet check', async () => {
-      // When connected, validation should run first
+    it('should show validation errors when form is submitted with invalid data', async () => {
+      // When connected, validation errors should be displayed
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
       await userEvent.click(screen.getByText('1 vs 1'))
@@ -706,7 +706,7 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByRole('button', { name: /create market/i }))
 
       await waitFor(() => {
-        // Should show validation error, not wallet error
+        // Should show validation error
         expect(screen.getByText(/description is required/i)).toBeInTheDocument()
       })
     })
