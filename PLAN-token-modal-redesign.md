@@ -382,3 +382,229 @@ Replace emoji-based checkboxes with clean toggle cards:
 3. Zero confusion about gas costs
 4. Successful token visible in Token Management immediately after creation
 5. Mobile users have equivalent experience to desktop
+
+---
+
+## Comprehensive Modal Audit Results
+
+### Modal Inventory
+
+| Modal | Location | Web3 Status | Style | Imports |
+|-------|----------|-------------|-------|---------|
+| TokenMintBuilderModal | `components/fairwins/` | ❌ No web3 | ⚠️ Outdated | ✅ OK |
+| TokenManagementModal | `components/fairwins/` | ✅ Full integration | ✅ Modern | ✅ OK |
+| TokenMintHeroCard | `components/fairwins/` | ❌ No web3 | ⚠️ Mixed | ✅ OK |
+| MarketCreationModal | `components/fairwins/` | ⚠️ Partial | ✅ Modern | ✅ OK |
+| TokenMintButton | `components/` | ⚠️ Callback only | ✅ Modern | ✅ OK |
+| TokenMintPage | `pages/` | ❌ Mock data | ✅ OK | ✅ OK |
+
+---
+
+### Detailed Findings
+
+#### 1. TokenManagementModal ✅ GOOD
+
+**Web3 Integration: COMPLETE**
+- Uses `useWallet()` and `useWeb3()` hooks correctly
+- Full ethers.js contract interaction (`lines 326-462`)
+- Handles all token operations: mint, burn, transfer, approve, pause, unpause, transferOwnership, renounceOwnership
+- Proper error handling with user-friendly messages
+- Transaction confirmation with `tx.wait()`
+
+**Modern Style: YES**
+- Backdrop blur overlay
+- Clean tab interface with count badges
+- Modern table design with monospace addresses
+- Copy-to-clipboard with visual feedback
+- Slide-out info panel
+- Nested action modals for transactions
+
+**Issues Found:**
+- Uses mock data instead of real blockchain fetching (`lines 111-170`)
+- No gas estimation before transactions
+- Uses `window.alert()` for success/error messages instead of toast notifications
+
+---
+
+#### 2. TokenMintHeroCard ⚠️ NEEDS WORK
+
+**Web3 Integration: MISSING**
+- No web3 hooks imported
+- Actions (`onMint`, `onBurn`, `onTransfer`, `onListOnETCSwap`) are callbacks to parent
+- Parent page (`TokenMintPage`) doesn't implement actual transactions
+
+**Style: MIXED**
+- Uses emoji icons (📋, 🔥, ⏸️, ➕, 📤)
+- Has card-based layout but lacks modern animations
+- No backdrop blur
+
+**Issues Found:**
+- Tab content sections are placeholder text only (`lines 291-310`)
+- No loading states for actions
+- No transaction status feedback
+
+---
+
+#### 3. MarketCreationModal ✅ MOSTLY GOOD
+
+**Web3 Integration: PARTIAL**
+- Uses `useWallet()` and `useWeb3()` hooks
+- Passes `signer` to `onCreate` callback
+- Validates wallet connection and network before submit
+- BUT: Actual contract call happens in parent (`TokenMintButton`)
+
+**Modern Style: YES**
+- 4-step wizard with step indicator
+- Clean form sections with character counters
+- Category selection grid
+- Toggle for custom URI vs form input
+- Educational content on market design
+- Network warning with switch button
+
+**Issues Found:**
+- onCreate callback in `TokenMintButton` just shows a modal, doesn't call contract (`lines 164-311`)
+- No actual blockchain transaction execution
+
+---
+
+#### 4. TokenMintButton ⚠️ NEEDS WORK
+
+**Web3 Integration: PARTIAL**
+- Has `signer` from `useWeb3()` but doesn't use it for transactions
+- `handleCreateToken` just shows a confirmation modal (`lines 100-147`)
+- `handleMarketCreation` just shows a confirmation modal (`lines 153-311`)
+
+**Style: GOOD**
+- Clean dropdown menu
+- Role-based options
+- Disabled states for missing roles
+
+**Issues Found:**
+- No actual contract calls - just logging and showing modals
+- Comments say "in production, this would call..." but it's not implemented
+
+---
+
+#### 5. TokenMintPage ⚠️ NEEDS WORK
+
+**Web3 Integration: MISSING**
+- Uses mock data for tokens (`lines 28-55`)
+- Action handlers just show `alert()` messages (`lines 88-106`)
+- No contract interactions
+
+**Style: OK**
+- Uses shared CSS from FairWinsAppNew.css
+- Basic layout structure
+
+**Issues Found:**
+- Completely relies on mock data
+- No real blockchain fetching
+- All actions are placeholders
+
+---
+
+### Priority Fixes Required
+
+#### Critical (Must Fix)
+
+1. **TokenMintBuilderModal → TokenCreationModal**
+   - Complete redesign as specified in this plan
+   - Add full web3 integration
+   - Modern wizard-style UX
+
+2. **TokenMintButton - handleCreateToken**
+   - Implement actual `TokenMintFactory.createERC20()` / `createERC721()` calls
+   - Add transaction status tracking
+   - Replace alert with proper modal feedback
+
+3. **TokenMintButton - handleMarketCreation**
+   - Implement actual `ConditionalMarketFactory.deployMarketPair()` calls
+   - Implement `FriendGroupMarketFactory` methods
+   - Add transaction status tracking
+
+#### High Priority
+
+4. **TokenMintHeroCard**
+   - Add web3 hooks for direct contract interaction
+   - Replace emoji icons with SVG
+   - Add loading/transaction states
+   - Implement placeholder tab content
+
+5. **TokenMintPage**
+   - Fetch real token data from blockchain
+   - Use `TokenMintFactory` events to list user's tokens
+   - Connect action handlers to actual contracts
+
+6. **TokenManagementModal**
+   - Replace mock data with real blockchain fetching
+   - Add gas estimation before transactions
+   - Replace `window.alert()` with toast/notification system
+
+#### Nice to Have
+
+7. **Unified Transaction Status Component**
+   - Create reusable `TransactionStatus` component
+   - Use across all modals for consistent UX
+
+8. **Toast Notification System**
+   - Replace all `alert()` and `window.alert()` calls
+   - Use existing `useNotification` hook from `hooks/useUI`
+
+---
+
+### Import/Connection Verification ✅
+
+All imports verified as correct:
+
+```
+TokenMintButton.jsx imports:
+  ✅ TokenMintBuilderModal from './fairwins/TokenMintBuilderModal'
+  ✅ MarketCreationModal from './fairwins/MarketCreationModal'
+  ✅ TokenManagementModal from './fairwins/TokenManagementModal'
+  ✅ PremiumPurchaseModal from './ui/PremiumPurchaseModal'
+  ✅ useRoles from '../hooks/useRoles'
+  ✅ useModal from '../hooks/useUI'
+  ✅ useUserPreferences from '../hooks/useUserPreferences'
+  ✅ useWallet, useWeb3 from '../hooks'
+
+TokenMintPage.jsx imports:
+  ✅ TokenMintTab from '../components/fairwins/TokenMintTab'
+  ✅ TokenMintBuilderModal from '../components/fairwins/TokenMintBuilderModal'
+  ✅ TokenMintHeroCard from '../components/fairwins/TokenMintHeroCard'
+  ✅ useWeb3 from '../hooks/useWeb3'
+
+TokenManagementModal.jsx imports:
+  ✅ ethers from 'ethers'
+  ✅ useWallet, useWeb3 from '../../hooks'
+  ✅ EXTENDED_ERC20_ABI from '../../abis/ExtendedERC20'
+  ✅ EXTENDED_ERC721_ABI from '../../abis/ExtendedERC721'
+
+MarketCreationModal.jsx imports:
+  ✅ useWallet, useWeb3 from '../../hooks'
+  ✅ isValidCid from '../../constants/ipfs'
+```
+
+CSS files all exist:
+- ✅ TokenMintBuilderModal.css
+- ✅ TokenManagementModal.css
+- ✅ TokenMintHeroCard.css
+- ✅ TokenMintTab.css
+- ✅ MarketCreationModal.css
+- ✅ TokenMintButton.css
+
+---
+
+### Summary
+
+The codebase has **solid foundations** but critical gaps in web3 integration:
+
+| Component | Ready for Production? |
+|-----------|----------------------|
+| TokenManagementModal | ⚠️ Almost (needs real data) |
+| MarketCreationModal | ⚠️ Almost (needs contract calls) |
+| TokenMintBuilderModal | ❌ No (needs full redesign) |
+| TokenMintHeroCard | ❌ No (needs web3 + style update) |
+| TokenMintPage | ❌ No (needs real data + actions) |
+| TokenMintButton | ⚠️ Almost (needs contract calls) |
+
+**Recommendation**: Prioritize the TokenMintBuilderModal redesign first, then propagate the patterns (transaction status, gas estimation, notification system) to other components
