@@ -733,25 +733,26 @@ function TokenManagementModal({ isOpen, onClose }) {
                   <div className="tm-info-item full-width">
                     <label>Transaction Hash</label>
                     <div className="tm-address-row">
-                      <code>
-                        {typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0
-                          ? formatAddress(chainInfo.transactionHash)
-                          : 'N/A'}
-                      </code>
-                      <button
-                        className={`tm-copy-btn ${copySuccess === chainInfo.transactionHash ? 'success' : ''}`}
-                        disabled={!(typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0)}
-                        onClick={() => {
-                          if (typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0) {
-                            copyToClipboard(chainInfo.transactionHash)
-                          }
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="9" y="9" width="13" height="13" rx="2" />
-                          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                        </svg>
-                      </button>
+                      {(() => {
+                        const isValidHash = typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0
+                        return (
+                          <>
+                            <code>
+                              {isValidHash ? formatAddress(chainInfo.transactionHash) : 'N/A'}
+                            </code>
+                            <button
+                              className={`tm-copy-btn ${copySuccess === chainInfo.transactionHash ? 'success' : ''}`}
+                              disabled={!isValidHash}
+                              onClick={() => isValidHash && copyToClipboard(chainInfo.transactionHash)}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                              </svg>
+                            </button>
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
                 </div>
