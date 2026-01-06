@@ -1229,7 +1229,6 @@ function LaunchDAOForm({ onSuccess }) {
           />
           {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
           <span className="cp-hint">Leave empty to create a new treasury vault</span>
-          {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
         </div>
 
         <div className="cp-form-group">
@@ -1247,7 +1246,6 @@ function LaunchDAOForm({ onSuccess }) {
           />
           {errors.admins && <span className="cp-error">{errors.admins}</span>}
           <span className="cp-hint">Your address will be added automatically</span>
-          {errors.admins && <span className="cp-error">{errors.admins}</span>}
         </div>
 
         {errors.submit && (
