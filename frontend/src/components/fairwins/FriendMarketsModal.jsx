@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import QRScanner from '../ui/QRScanner'
+import CurrencySelector, {
+  CURRENCY_OPTIONS,
+  getDefaultCurrency,
+  getCurrencyById,
+  parseAmountForCurrency,
+  formatAmountForCurrency
+} from '../ui/CurrencySelector'
+import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { ERC20_ABI } from '../../abis/ERC20'
+import { WETC_ABI } from '../../abis/WETC'
 import './FriendMarketsModal.css'
 
 /**
@@ -21,7 +32,7 @@ function FriendMarketsModal({
   activeMarkets = [],
   pastMarkets = []
 }) {
-  const { isConnected, account } = useWallet()
+  const { isConnected, account, provider } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
 
   // Tab state
@@ -32,6 +43,9 @@ function FriendMarketsModal({
   const [friendMarketType, setFriendMarketType] = useState(null)
   const [createdMarket, setCreatedMarket] = useState(null)
 
+  // Currency selection state (USC stablecoin is default)
+  const [selectedCurrency, setSelectedCurrency] = useState('USC')
+
   // Form data
   const [formData, setFormData] = useState({
     description: '',
@@ -40,6 +54,7 @@ function FriendMarketsModal({
     memberLimit: '5',
     tradingPeriod: '7',
     stakeAmount: '10',
+    currency: 'USC', // Default to stablecoin
     arbitrator: '',
     peggedMarketId: ''
   })
@@ -69,9 +84,11 @@ function FriendMarketsModal({
       memberLimit: '5',
       tradingPeriod: '7',
       stakeAmount: '10',
+      currency: 'USC', // Default to stablecoin
       arbitrator: '',
       peggedMarketId: ''
     })
+    setSelectedCurrency('USC') // Reset to default stablecoin
     setErrors({})
     setMarketLookupId('')
     setMarketLookupResult(null)
@@ -127,6 +144,34 @@ function FriendMarketsModal({
       })
     }
   }
+
+  // Handle currency change
+  const handleCurrencyChange = useCallback((currencyId) => {
+    setSelectedCurrency(currencyId)
+    setFormData(prev => ({ ...prev, currency: currencyId }))
+    // Clear any stake amount errors when currency changes
+    if (errors.stakeAmount) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.stakeAmount
+        return newErrors
+      })
+    }
+  }, [errors.stakeAmount])
+
+  // Get currency-specific minimum stake
+  const getMinimumStake = useCallback((currencyId) => {
+    const currency = getCurrencyById(currencyId)
+    // USC (stablecoin) has minimum $1, others have 0.1 token minimum
+    if (currencyId === 'USC') return 1
+    return 0.1
+  }, [])
+
+  // Get currency symbol for display
+  const getCurrencySymbol = useCallback((currencyId) => {
+    const currency = getCurrencyById(currencyId)
+    return currency?.symbol || 'USC'
+  }, [])
 
   // QR Scanner handlers
   const openQrScanner = (target) => {
@@ -298,10 +343,12 @@ function FriendMarketsModal({
     }
 
     const stake = parseFloat(formData.stakeAmount)
+    const minStake = getMinimumStake(selectedCurrency)
+    const currencySymbol = getCurrencySymbol(selectedCurrency)
     if (!formData.stakeAmount || stake <= 0) {
       newErrors.stakeAmount = 'Valid stake amount is required'
-    } else if (stake < 0.1) {
-      newErrors.stakeAmount = 'Minimum stake is 0.1 ETC'
+    } else if (stake < minStake) {
+      newErrors.stakeAmount = `Minimum stake is ${minStake} ${currencySymbol}`
     }
 
     if (!formData.tradingPeriod || parseInt(formData.tradingPeriod) < 1) {
@@ -320,7 +367,7 @@ function FriendMarketsModal({
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [formData, friendMarketType, account])
+  }, [formData, friendMarketType, account, selectedCurrency, getMinimumStake, getCurrencySymbol])
 
   const handleSelectType = (type) => {
     setFriendMarketType(type)
@@ -351,20 +398,82 @@ function FriendMarketsModal({
 
     setSubmitting(true)
     try {
+      const currency = getCurrencyById(selectedCurrency)
+      const stakeAmount = parseFloat(formData.stakeAmount)
+
+      // For ERC20 tokens (USC, WETC), handle approval
+      let txOptions = {}
+
+      if (!currency.isNative) {
+        // Parse stake amount based on currency decimals
+        const stakeInWei = parseAmountForCurrency(stakeAmount.toString(), selectedCurrency)
+
+        // Get token contract
+        const tokenContract = new ethers.Contract(
+          currency.address,
+          selectedCurrency === 'WETC' ? WETC_ABI : ERC20_ABI,
+          signer
+        )
+
+        // Check balance
+        const balance = await tokenContract.balanceOf(account)
+        if (balance < stakeInWei) {
+          const formattedBalance = formatAmountForCurrency(balance, selectedCurrency)
+          setErrors({
+            submit: `Insufficient ${currency.symbol} balance. You have ${formattedBalance} ${currency.symbol}`
+          })
+          setSubmitting(false)
+          return
+        }
+
+        // The token address will be passed to the contract
+        txOptions.tokenAddress = currency.address
+        txOptions.tokenAmount = stakeInWei.toString()
+        txOptions.isNative = false
+      } else {
+        // For native ETC, send value with transaction
+        const stakeInWei = ethers.parseEther(stakeAmount.toString())
+
+        // Check ETC balance
+        if (provider) {
+          const balance = await provider.getBalance(account)
+          if (balance < stakeInWei) {
+            const formattedBalance = ethers.formatEther(balance)
+            setErrors({
+              submit: `Insufficient ETC balance. You have ${parseFloat(formattedBalance).toFixed(4)} ETC`
+            })
+            setSubmitting(false)
+            return
+          }
+        }
+
+        txOptions.value = stakeInWei.toString()
+        txOptions.isNative = true
+      }
+
       const submitData = {
         type: 'friend',
         marketType: friendMarketType,
-        data: formData
+        data: {
+          ...formData,
+          currency: selectedCurrency,
+          currencyAddress: currency.address,
+          currencySymbol: currency.symbol,
+          currencyDecimals: currency.decimals
+        },
+        transactionOptions: txOptions
       }
 
       const result = await onCreate(submitData, signer)
 
-      // Simulate created market for demo
+      // Created market for display
       const newMarket = {
         id: result?.id || `friend-${Date.now()}`,
         type: friendMarketType,
         description: formData.description,
         stakeAmount: formData.stakeAmount,
+        currency: selectedCurrency,
+        currencySymbol: currency.symbol,
         tradingPeriod: formData.tradingPeriod,
         participants: friendMarketType === 'oneVsOne'
           ? [account, formData.opponent]
@@ -377,7 +486,12 @@ function FriendMarketsModal({
       setCreationStep('success')
     } catch (error) {
       console.error('Error creating friend market:', error)
-      setErrors({ submit: error.message || 'Failed to create market. Please try again.' })
+      // Handle user rejection
+      if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
+        setErrors({ submit: 'Transaction rejected by user' })
+      } else {
+        setErrors({ submit: error.message || 'Failed to create market. Please try again.' })
+      }
     } finally {
       setSubmitting(false)
     }
@@ -690,18 +804,34 @@ function FriendMarketsModal({
                       </div>
                     )}
 
+                    {/* Currency Selection */}
+                    <div className="fm-form-group fm-form-full">
+                      <label htmlFor="fm-currency">
+                        Payment Currency <span className="fm-required">*</span>
+                      </label>
+                      <CurrencySelector
+                        selectedCurrency={selectedCurrency}
+                        onCurrencyChange={handleCurrencyChange}
+                        disabled={submitting}
+                        showBalances={isConnected}
+                      />
+                      <span className="fm-hint">
+                        Select the currency for this bet. USC (stablecoin) is recommended for price stability.
+                      </span>
+                    </div>
+
                     <div className="fm-form-group">
                       <label htmlFor="fm-stake">
-                        Stake (ETC) <span className="fm-required">*</span>
+                        Stake ({getCurrencySymbol(selectedCurrency)}) <span className="fm-required">*</span>
                       </label>
                       <input
                         id="fm-stake"
                         type="number"
                         value={formData.stakeAmount}
                         onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
-                        placeholder="10"
-                        min="0.1"
-                        step="0.1"
+                        placeholder={selectedCurrency === 'USC' ? '10' : '0.5'}
+                        min={getMinimumStake(selectedCurrency)}
+                        step={selectedCurrency === 'USC' ? '1' : '0.1'}
                         disabled={submitting}
                         className={errors.stakeAmount ? 'error' : ''}
                       />
@@ -922,7 +1052,13 @@ function FriendMarketsModal({
                     </div>
                     <div className="fm-detail-row">
                       <span>Stake</span>
-                      <span>{createdMarket.stakeAmount} ETC</span>
+                      <span>{createdMarket.stakeAmount} {createdMarket.currencySymbol || 'USC'}</span>
+                    </div>
+                    <div className="fm-detail-row">
+                      <span>Currency</span>
+                      <span className="fm-currency-badge">
+                        {getCurrencyById(createdMarket.currency || 'USC').icon} {createdMarket.currencySymbol || 'USC'}
+                      </span>
                     </div>
                     <div className="fm-detail-row">
                       <span>Duration</span>
@@ -1103,7 +1239,7 @@ function MarketsCompactTable({
             <td>
               <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
             </td>
-            <td className="fm-table-stake">{market.stakeAmount} ETC</td>
+            <td className="fm-table-stake">{market.stakeAmount} {market.currencySymbol || 'USC'}</td>
             <td className="fm-table-date">
               {isPast
                 ? (market.outcome || 'Resolved')
@@ -1159,13 +1295,19 @@ function MarketDetailView({
           <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
         </div>
         <div className="fm-detail-item">
+          <span className="fm-detail-label">Currency</span>
+          <span className="fm-detail-value fm-currency-display">
+            {CURRENCY_OPTIONS[market.currency || 'USC']?.icon || '💵'} {market.currencySymbol || 'USC'}
+          </span>
+        </div>
+        <div className="fm-detail-item">
           <span className="fm-detail-label">Stake</span>
-          <span className="fm-detail-value">{market.stakeAmount} ETC</span>
+          <span className="fm-detail-value">{market.stakeAmount} {market.currencySymbol || 'USC'}</span>
         </div>
         <div className="fm-detail-item">
           <span className="fm-detail-label">Total Pool</span>
           <span className="fm-detail-value">
-            {(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2)).toFixed(2)} ETC
+            {(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2)).toFixed(2)} {market.currencySymbol || 'USC'}
           </span>
         </div>
         <div className="fm-detail-item">

@@ -71,13 +71,15 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
-// Sample test data
+// Sample test data - now includes currency field (USC is default)
 const mockActiveMarkets = [
   {
     id: 'market-1',
     type: 'oneVsOne',
     description: 'Patriots will win the Super Bowl',
     stakeAmount: '10',
+    currency: 'USC',
+    currencySymbol: 'USC',
     tradingPeriod: '7',
     participants: ['0x1234567890123456789012345678901234567890', '0xabcdef1234567890123456789012345678901234'],
     creator: '0x1234567890123456789012345678901234567890',
@@ -90,6 +92,8 @@ const mockActiveMarkets = [
     type: 'smallGroup',
     description: 'BTC will reach $100k by EOY',
     stakeAmount: '25',
+    currency: 'ETC',
+    currencySymbol: 'ETC',
     tradingPeriod: '30',
     participants: [
       '0x1234567890123456789012345678901234567890',
@@ -109,6 +113,8 @@ const mockPastMarkets = [
     type: 'eventTracking',
     description: 'World Cup Final Winner',
     stakeAmount: '50',
+    currency: 'WETC',
+    currencySymbol: 'WETC',
     tradingPeriod: '14',
     participants: [
       '0x1234567890123456789012345678901234567890',
@@ -770,6 +776,130 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByRole('tab', { name: /active/i }))
 
       expect(screen.getByRole('table')).toBeInTheDocument()
+    })
+  })
+
+  describe('Currency Selection', () => {
+    it('should have currency selector in create form', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+
+      expect(screen.getByLabelText(/payment currency/i)).toBeInTheDocument()
+    })
+
+    it('should default to USC stablecoin', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+
+      // USC should be shown in the currency selector
+      expect(screen.getByText('USC')).toBeInTheDocument()
+    })
+
+    it('should show currency hint text', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+
+      expect(screen.getByText(/USC.*stablecoin.*recommended.*price stability/i)).toBeInTheDocument()
+    })
+
+    it('should show correct stake label based on selected currency', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+
+      // Default is USC, so stake label should show USC
+      expect(screen.getByLabelText(/stake.*usc/i)).toBeInTheDocument()
+    })
+
+    it('should validate stake amount based on currency minimum', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+
+      // Clear the stake field and enter a value below minimum
+      const stakeInput = screen.getByLabelText(/stake/i)
+      await userEvent.clear(stakeInput)
+      await userEvent.type(stakeInput, '0.5') // Below USC minimum of 1
+
+      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+
+      await waitFor(() => {
+        // Should show minimum stake error for USC (minimum is $1)
+        expect(screen.getByText(/minimum stake is 1 usc/i)).toBeInTheDocument()
+      })
+    })
+
+    it('should display currencies in active markets table', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
+
+      // Should display stake amounts with their currencies
+      expect(screen.getByText('10 USC')).toBeInTheDocument()
+      expect(screen.getByText('25 ETC')).toBeInTheDocument()
+    })
+
+    it('should display currency in past markets', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByRole('tab', { name: /past/i }))
+
+      expect(screen.getByText('50 WETC')).toBeInTheDocument()
+    })
+
+    it('should pass currency data to onCreate callback', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
+      renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+
+      await waitFor(() => {
+        expect(onCreate).toHaveBeenCalled()
+        const callArgs = onCreate.mock.calls[0][0]
+        expect(callArgs.data.currency).toBe('USC')
+        expect(callArgs.data.currencySymbol).toBe('USC')
+      })
+    })
+
+    it('should reset currency to USC when creating another market', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
+      renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+
+      // Create first market
+      await userEvent.click(screen.getByText('1 vs 1'))
+      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+
+      // Wait for success and click create another
+      await waitFor(() => {
+        expect(screen.getByText('Market Created!')).toBeInTheDocument()
+      })
+
+      await userEvent.click(screen.getByRole('button', { name: /create another/i }))
+
+      // Select type again
+      await userEvent.click(screen.getByText('1 vs 1'))
+
+      // Currency should be reset to USC (default)
+      expect(screen.getByText('USC')).toBeInTheDocument()
     })
   })
 })

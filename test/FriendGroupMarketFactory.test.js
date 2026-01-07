@@ -695,6 +695,199 @@ describe("FriendGroupMarketFactory", function () {
     });
   });
 
+  describe("Token Payment Support", function () {
+    let paymentToken;
+
+    beforeEach(async function () {
+      // Deploy a mock payment token (stablecoin)
+      const MockERC20 = await ethers.getContractFactory("MockERC20");
+      paymentToken = await MockERC20.deploy("USD Stablecoin", "USC", ethers.parseUnits("1000000", 6));
+      await paymentToken.waitForDeployment();
+
+      // Distribute tokens to test users
+      const amount = ethers.parseUnits("10000", 6);
+      await paymentToken.transfer(addr1.address, amount);
+      await paymentToken.transfer(addr2.address, amount);
+      await paymentToken.transfer(addr3.address, amount);
+    });
+
+    it("Should allow setting a payment token for markets", async function () {
+      const tokenAddress = await paymentToken.getAddress();
+
+      // Set the supported payment token
+      await expect(
+        friendGroupFactory.setSupportedPaymentToken(tokenAddress, true)
+      ).to.not.be.reverted;
+
+      expect(await friendGroupFactory.supportedPaymentTokens(tokenAddress)).to.equal(true);
+    });
+
+    it("Should reject unsupported payment tokens", async function () {
+      const unsupportedToken = ethers.Wallet.createRandom().address;
+
+      await expect(
+        friendGroupFactory.createOneVsOneMarketWithToken(
+          addr2.address,
+          "Test bet with token",
+          7 * 24 * 60 * 60,
+          ethers.ZeroAddress,
+          0,
+          unsupportedToken,
+          ethers.parseUnits("100", 6)
+        )
+      ).to.be.revertedWith("Token not supported");
+    });
+
+    it("Should create 1v1 market with stablecoin payment", async function () {
+      const tokenAddress = await paymentToken.getAddress();
+      const stakeAmount = ethers.parseUnits("100", 6); // 100 USC
+
+      // Enable the payment token
+      await friendGroupFactory.setSupportedPaymentToken(tokenAddress, true);
+
+      // Approve the contract to spend tokens
+      await paymentToken.connect(addr1).approve(
+        await friendGroupFactory.getAddress(),
+        stakeAmount
+      );
+
+      // Create market with token payment
+      await expect(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketWithToken(
+          addr2.address,
+          "Who wins the game?",
+          7 * 24 * 60 * 60,
+          ethers.ZeroAddress,
+          0,
+          tokenAddress,
+          stakeAmount
+        )
+      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+
+      // Verify market was created with correct token
+      const market = await friendGroupFactory.getFriendMarket(0);
+      expect(market.paymentToken).to.equal(tokenAddress);
+      expect(market.tokenStakeAmount).to.equal(stakeAmount);
+    });
+
+    it("Should create small group market with stablecoin payment", async function () {
+      const tokenAddress = await paymentToken.getAddress();
+      const stakeAmount = ethers.parseUnits("50", 6); // 50 USC per member
+
+      // Enable the payment token
+      await friendGroupFactory.setSupportedPaymentToken(tokenAddress, true);
+
+      // Approve tokens for creator
+      await paymentToken.approve(
+        await friendGroupFactory.getAddress(),
+        stakeAmount
+      );
+
+      await expect(
+        friendGroupFactory.createSmallGroupMarketWithToken(
+          "Group prediction market",
+          [addr1.address, addr2.address],
+          5,
+          14 * 24 * 60 * 60,
+          ethers.ZeroAddress,
+          0,
+          tokenAddress,
+          stakeAmount
+        )
+      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+    });
+
+    it("Should reject market creation with insufficient token balance", async function () {
+      const tokenAddress = await paymentToken.getAddress();
+      const hugeAmount = ethers.parseUnits("99999999", 6); // More than anyone has
+
+      await friendGroupFactory.setSupportedPaymentToken(tokenAddress, true);
+
+      // Approve the tokens (even though we don't have enough)
+      await paymentToken.connect(addr1).approve(
+        await friendGroupFactory.getAddress(),
+        hugeAmount
+      );
+
+      await expect(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketWithToken(
+          addr2.address,
+          "Bet with insufficient balance",
+          7 * 24 * 60 * 60,
+          ethers.ZeroAddress,
+          0,
+          tokenAddress,
+          hugeAmount
+        )
+      ).to.be.revertedWith("Insufficient token balance");
+    });
+
+    it("Should reject market creation without token approval", async function () {
+      const tokenAddress = await paymentToken.getAddress();
+      const stakeAmount = ethers.parseUnits("100", 6);
+
+      await friendGroupFactory.setSupportedPaymentToken(tokenAddress, true);
+
+      // Don't approve - should fail
+      await expect(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketWithToken(
+          addr2.address,
+          "Bet without approval",
+          7 * 24 * 60 * 60,
+          ethers.ZeroAddress,
+          0,
+          tokenAddress,
+          stakeAmount
+        )
+      ).to.be.reverted; // Will revert due to ERC20 transfer failure
+    });
+
+    it("Should allow both native ETC and token markets", async function () {
+      const tokenAddress = await paymentToken.getAddress();
+      const etcFee = ethers.parseEther("0.1");
+      const tokenStake = ethers.parseUnits("100", 6);
+
+      await friendGroupFactory.setSupportedPaymentToken(tokenAddress, true);
+
+      // Create ETC market
+      await friendGroupFactory.connect(addr1).createOneVsOneMarket(
+        addr2.address,
+        "ETC bet",
+        7 * 24 * 60 * 60,
+        ethers.ZeroAddress,
+        0,
+        { value: etcFee }
+      );
+
+      // Create token market
+      await paymentToken.connect(addr3).approve(
+        await friendGroupFactory.getAddress(),
+        tokenStake
+      );
+
+      await friendGroupFactory.connect(addr3).createOneVsOneMarketWithToken(
+        addr4.address,
+        "Token bet",
+        7 * 24 * 60 * 60,
+        ethers.ZeroAddress,
+        0,
+        tokenAddress,
+        tokenStake
+      );
+
+      // Both markets should exist
+      expect(await friendGroupFactory.friendMarketCount()).to.equal(2);
+
+      // First market should use native ETC
+      const market1 = await friendGroupFactory.getFriendMarket(0);
+      expect(market1.paymentToken).to.equal(ethers.ZeroAddress);
+
+      // Second market should use stablecoin
+      const market2 = await friendGroupFactory.getFriendMarket(1);
+      expect(market2.paymentToken).to.equal(tokenAddress);
+    });
+  });
+
   describe("Market Pegging", function () {
     it("Should create market with pegging parameter", async function () {
       const description = "Bet on event";
