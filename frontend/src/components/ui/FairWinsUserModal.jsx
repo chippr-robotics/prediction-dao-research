@@ -31,7 +31,7 @@ function FairWinsUserModal({ onScanMarket }) {
   const { address, isConnected } = useWallet()
   const { disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
-  const { preferences, setClearPathStatus, setDemoMode } = useUserPreferences()
+  const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
   const { mode, toggleMode, isDark, platform, setThemePlatform, isClearPath } = useTheme()
   const { showUsd, toggleCurrency, formatPrice } = usePrice()
@@ -51,10 +51,6 @@ function FairWinsUserModal({ onScanMarket }) {
   const handleDisconnect = () => {
     disconnectWallet()
     hideModal()
-  }
-
-  const handleToggleClearPath = () => {
-    setClearPathStatus(!preferences.clearPathStatus.active)
   }
 
   const handleToggleDemoMode = () => {
@@ -167,38 +163,6 @@ function FairWinsUserModal({ onScanMarket }) {
                   <span className="fwum-label">Address</span>
                   <span className="fwum-value fwum-monospace">{address}</span>
                 </div>
-              </div>
-            </section>
-
-            {/* ClearPath Status */}
-            <section className="fwum-section">
-              <h3 className="fwum-section-title">
-                <span aria-hidden="true">🛤️</span> ClearPath Status
-              </h3>
-              <div className="fwum-clearpath-card">
-                <div className="fwum-status-row">
-                  <span className={`fwum-status-badge ${preferences.clearPathStatus.active ? 'active' : 'inactive'}`}>
-                    <span aria-hidden="true">{preferences.clearPathStatus.active ? '✓' : '○'}</span>
-                    {preferences.clearPathStatus.active ? 'Active' : 'Inactive'}
-                  </span>
-                  {preferences.clearPathStatus.lastUpdated && (
-                    <span className="fwum-timestamp">
-                      Updated: {new Date(preferences.clearPathStatus.lastUpdated).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-                <p className="fwum-description">
-                  ClearPath provides institutional-grade governance through prediction markets.
-                  {preferences.clearPathStatus.active 
-                    ? ' You have access to advanced governance features.'
-                    : ' Activate to access governance features.'}
-                </p>
-                <button 
-                  onClick={handleToggleClearPath}
-                  className="fwum-action-btn"
-                >
-                  {preferences.clearPathStatus.active ? 'Deactivate' : 'Activate'} ClearPath
-                </button>
               </div>
             </section>
 
@@ -441,31 +405,6 @@ function FairWinsUserModal({ onScanMarket }) {
                   <span className="fwum-toggle-label">{preferences.demoMode ? 'Demo' : 'Live'}</span>
                 </button>
               </div>
-
-              {/* ClearPath Toggle */}
-              <div className="fwum-setting-item">
-                <div className="fwum-setting-info">
-                  <span className="fwum-setting-icon" aria-hidden="true">🛤️</span>
-                  <div className="fwum-setting-text">
-                    <strong>ClearPath</strong>
-                    <p>Enable institutional governance features</p>
-                  </div>
-                </div>
-                <button
-                  className="fwum-toggle-btn"
-                  onClick={handleToggleClearPath}
-                  aria-pressed={preferences.clearPathStatus.active}
-                  aria-label={`${preferences.clearPathStatus.active ? 'Deactivate' : 'Activate'} ClearPath`}
-                >
-                  <span className="fwum-toggle-track clearpath">
-                    <span className={`fwum-toggle-thumb ${preferences.clearPathStatus.active ? 'active' : ''}`} />
-                  </span>
-                  <span className="fwum-toggle-label">
-                    {preferences.clearPathStatus.active ? 'Active' : 'Inactive'}
-                  </span>
-                </button>
-              </div>
-            </section>
 
             {/* Wallet Section */}
             <section className="fwum-section">

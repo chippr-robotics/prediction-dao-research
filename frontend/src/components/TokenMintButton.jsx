@@ -352,8 +352,8 @@ function TokenMintButton() {
       disabled: !hasMarketMakerRole
     })
 
-    // If no membership, show purchase option
-    if (!hasMembership) {
+    // Show purchase option if user lacks both key roles
+    if (!hasTokenMintRole && !hasMarketMakerRole) {
       options.push({
         id: 'purchase-membership',
         label: 'Purchase Membership',
