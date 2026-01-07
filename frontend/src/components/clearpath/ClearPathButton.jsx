@@ -107,7 +107,7 @@ function ClearPathButton() {
     const options = []
     
     // Check if user has active ClearPath membership (ClearPath User role)
-    const hasMembership = hasRole(ROLES.CLEARPATH_USER) && preferences.clearPathStatus?.active
+    const hasMembership = hasRole(ROLES.CLEARPATH_USER) 
 
     // ClearPath governance options - requires CLEARPATH_USER role
     if (hasMembership) {

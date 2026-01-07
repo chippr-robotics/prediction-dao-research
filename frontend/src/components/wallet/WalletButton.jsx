@@ -200,11 +200,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
     // The MarketCreationModal handles the actual creation
   }
 
-  const handleNavigateToClearPath = () => {
-    setIsOpen(false)
-    navigate('/clearpath')
-  }
-
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
     navigate('/admin/roles')
@@ -420,16 +415,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
               {/* Navigation Actions */}
               <div className="dropdown-actions">
-                {hasRole(ROLES.CLEARPATH_USER) && (
-                  <button
-                    onClick={handleNavigateToClearPath}
-                    className="action-button"
-                    role="menuitem"
-                  >
-                    <span aria-hidden="true">🏛️</span>
-                    <span>Manage Organizations</span>
-                  </button>
-                )}
                 {hasRole(ROLES.ADMIN) && (
                   <button
                     onClick={handleNavigateToAdmin}
