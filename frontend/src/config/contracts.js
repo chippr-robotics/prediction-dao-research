@@ -15,8 +15,12 @@ export const DEPLOYED_CONTRACTS = {
   ragequitModule: '0x243c90c69Cd8f035D93DD5100dbc5b3753E8a593',
   futarchyGovernor: '0xD37907b23d063F0839Ff2405179481822862C27A',
   fairWinsToken: '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB',
-  treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772'
-  /** @todo Add zkKeyManager address when contract is deployed */
+  treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772',
+  /** 
+   * @todo Deploy dedicated MinimalRoleManager contract and update this address
+   * Currently using a placeholder - role manager needs to be deployed
+   */
+  roleManager: null // Set to deployed MinimalRoleManager address when available
 }
 
 /**

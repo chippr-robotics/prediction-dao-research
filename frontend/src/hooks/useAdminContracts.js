@@ -2,14 +2,35 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { MINIMAL_ROLE_MANAGER_ABI, MEMBERSHIP_TIERS, TIER_NAMES } from '../abis/MinimalRoleManager'
-import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
+import { DEPLOYED_CONTRACTS, NETWORK_CONFIG, getContractAddress } from '../config/contracts'
 
 // Refresh interval for contract state (30 seconds)
 export const CONTRACT_STATE_REFRESH_INTERVAL = 30000
 
-// Contract addresses - using deployer as placeholder for role manager
-// In production, this would be the actual deployed MinimalRoleManager address
-const ROLE_MANAGER_ADDRESS = DEPLOYED_CONTRACTS.deployer
+/**
+ * Get the role manager contract address
+ * Falls back to environment variable if deployed contract is not set
+ * @returns {string|null} Role manager address or null if not configured
+ */
+function getRoleManagerAddress() {
+  // First check for explicit role manager address in config
+  const configAddress = DEPLOYED_CONTRACTS.roleManager
+  if (configAddress) {
+    return configAddress
+  }
+  
+  // Check environment variable
+  const envAddress = import.meta.env.VITE_ROLE_MANAGER_ADDRESS
+  if (envAddress) {
+    return envAddress
+  }
+  
+  // Role manager not deployed yet - return null
+  console.warn('Role manager contract not deployed. Role persistence to blockchain is disabled.')
+  return null
+}
+
+const ROLE_MANAGER_ADDRESS = getRoleManagerAddress()
 
 /**
  * Hook for interacting with admin contract functions
@@ -22,7 +43,8 @@ export function useAdminContracts() {
   const [contractState, setContractState] = useState({
     isPaused: false,
     contractBalance: '0',
-    roleHashes: {}
+    roleHashes: {},
+    isDeployed: !!ROLE_MANAGER_ADDRESS
   })
   
   // Track if a fetch is in progress to prevent redundant calls
@@ -38,8 +60,12 @@ export function useAdminContracts() {
 
   /**
    * Get the role manager contract instance
+   * Returns null if role manager is not deployed
    */
   const getRoleManagerContract = useCallback((useSigner = false) => {
+    if (!ROLE_MANAGER_ADDRESS) {
+      return null
+    }
     const providerOrSigner = useSigner && signer ? signer : readProvider
     return new ethers.Contract(ROLE_MANAGER_ADDRESS, MINIMAL_ROLE_MANAGER_ABI, providerOrSigner)
   }, [signer, readProvider])
@@ -48,6 +74,17 @@ export function useAdminContracts() {
    * Fetch current contract state
    */
   const fetchContractState = useCallback(async () => {
+    // Role manager not deployed
+    if (!ROLE_MANAGER_ADDRESS) {
+      setContractState({
+        isPaused: false,
+        contractBalance: '0',
+        roleHashes: {},
+        isDeployed: false
+      })
+      return null
+    }
+
     // Prevent redundant fetches
     if (fetchInProgressRef.current) {
       return null
@@ -56,6 +93,9 @@ export function useAdminContracts() {
     fetchInProgressRef.current = true
     try {
       const contract = getRoleManagerContract(false)
+      if (!contract) {
+        return null
+      }
 
       // Fetch paused state and balance in parallel
       const [isPaused, balance] = await Promise.all([
@@ -89,10 +129,11 @@ export function useAdminContracts() {
       setContractState({
         isPaused,
         contractBalance: ethers.formatEther(balance),
-        roleHashes
+        roleHashes,
+        isDeployed: true
       })
 
-      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes }
+      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes, isDeployed: true }
     } catch (err) {
       console.error('Error fetching contract state:', err)
       setError(err.message)

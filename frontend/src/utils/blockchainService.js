@@ -415,12 +415,153 @@ export async function sellMarketShares(signer, marketId, outcome, shares) {
   }
 }
 
+// Role name to on-chain role hash mapping
+const ROLE_NAME_TO_HASH = {
+  'MARKET_MAKER': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
+  'CLEARPATH_USER': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
+  'TOKENMINT': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
+  'FRIEND_MARKET': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
+  'Market Maker': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
+  'ClearPath User': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
+  'Token Mint': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
+  'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
+}
+
+// Minimal ABI for role manager contract
+const ROLE_MANAGER_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" },
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "uint8", "name": "tier", "type": "uint8" },
+      { "internalType": "uint256", "name": "durationDays", "type": "uint256" }
+    ],
+    "name": "grantTier",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "hasRole",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" },
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" }
+    ],
+    "name": "isActiveMember",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
+/**
+ * Get the role hash for a given role name
+ * @param {string} roleName - Human readable role name or constant
+ * @returns {string|null} Role hash or null if not found
+ */
+export function getRoleHash(roleName) {
+  return ROLE_NAME_TO_HASH[roleName] || null
+}
+
+/**
+ * Check if user has a role on-chain
+ * @param {string} userAddress - User's wallet address
+ * @param {string} roleName - Role name or constant
+ * @returns {Promise<boolean>} True if user has the role on-chain
+ */
+export async function hasRoleOnChain(userAddress, roleName) {
+  try {
+    const roleManagerAddress = getContractAddress('roleManager')
+    if (!roleManagerAddress) {
+      console.warn('Role manager not deployed - cannot check on-chain role')
+      return false
+    }
+
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      console.warn(`Unknown role: ${roleName}`)
+      return false
+    }
+
+    const provider = getProvider()
+    const roleManagerContract = new ethers.Contract(
+      roleManagerAddress,
+      ROLE_MANAGER_ABI,
+      provider
+    )
+
+    return await roleManagerContract.hasRole(roleHash, userAddress)
+  } catch (error) {
+    console.error('Error checking on-chain role:', error)
+    return false
+  }
+}
+
+/**
+ * Grant a role to user on-chain (admin function)
+ * @param {ethers.Signer} signer - Connected wallet signer (must be admin)
+ * @param {string} userAddress - Address to grant role to
+ * @param {string} roleName - Role name to grant
+ * @param {number} durationDays - Duration in days (0 for permanent)
+ * @returns {Promise<Object>} Transaction receipt
+ */
+export async function grantRoleOnChain(signer, userAddress, roleName, durationDays = 365) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  const roleManagerAddress = getContractAddress('roleManager')
+  if (!roleManagerAddress) {
+    throw new Error('Role manager contract not deployed. Cannot grant role on-chain.')
+  }
+
+  const roleHash = getRoleHash(roleName)
+  if (!roleHash) {
+    throw new Error(`Unknown role: ${roleName}`)
+  }
+
+  try {
+    const roleManagerContract = new ethers.Contract(
+      roleManagerAddress,
+      ROLE_MANAGER_ABI,
+      signer
+    )
+
+    // Grant tier 1 (BRONZE) for basic access
+    const tx = await roleManagerContract.grantTier(userAddress, roleHash, 1, durationDays)
+    const receipt = await tx.wait()
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
+      roleName,
+      userAddress
+    }
+  } catch (error) {
+    console.error('Error granting role on-chain:', error)
+    throw new Error(error.message || 'Failed to grant role on-chain')
+  }
+}
+
 /**
  * Purchase a role using USC stablecoin
+ * This function handles the payment AND grants the role on-chain if the role manager is deployed.
+ * 
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
- * @param {number} priceUSD - Price in USD (will be converted to USC with 18 decimals)
- * @returns {Promise<Object>} Transaction receipt
+ * @param {number} priceUSD - Price in USD (will be converted to USC with 6 decimals)
+ * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
 export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
   if (!signer) {
@@ -430,6 +571,7 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
   try {
     const uscAddress = ETCSWAP_ADDRESSES.USC_STABLECOIN
     const treasuryAddress = getContractAddress('treasuryVault')
+    const roleManagerAddress = getContractAddress('roleManager')
     const uscContract = new ethers.Contract(uscAddress, ERC20_ABI, signer)
 
     // Convert price to USC units (USC has 6 decimals like USDC)
@@ -469,15 +611,39 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
 
     // Transfer USC to treasury
     const transferTx = await uscContract.transfer(treasuryAddress, amountWei)
-    const receipt = await transferTx.wait()
+    const paymentReceipt = await transferTx.wait()
+
+    // Track if role was granted on-chain
+    let roleGrantedOnChain = false
+    let roleGrantTxHash = null
+
+    // After successful payment, grant the role on-chain if role manager is deployed
+    if (roleManagerAddress) {
+      try {
+        console.log('Granting role on-chain after successful payment...')
+        const roleReceipt = await grantRoleOnChain(signer, userAddress, roleName, 365)
+        roleGrantedOnChain = roleReceipt.status === 'success'
+        roleGrantTxHash = roleReceipt.hash
+        console.log('Role granted on-chain:', roleReceipt)
+      } catch (roleError) {
+        // Log but don't fail the purchase - payment was successful
+        // The role can be granted later by an admin
+        console.error('Failed to grant role on-chain (payment successful):', roleError)
+        console.warn('Role will need to be granted manually by admin or the user needs to contact support')
+      }
+    } else {
+      console.warn('Role manager not deployed - role saved locally only. Deploy MinimalRoleManager to enable blockchain persistence.')
+    }
 
     return {
-      hash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      status: receipt.status === 1 ? 'success' : 'failed',
-      gasUsed: receipt.gasUsed.toString(),
+      hash: paymentReceipt.hash,
+      blockNumber: paymentReceipt.blockNumber,
+      status: paymentReceipt.status === 1 ? 'success' : 'failed',
+      gasUsed: paymentReceipt.gasUsed.toString(),
       roleName: roleName,
-      amount: priceUSD
+      amount: priceUSD,
+      roleGrantedOnChain,
+      roleGrantTxHash
     }
   } catch (error) {
     console.error('Error purchasing role:', error)
