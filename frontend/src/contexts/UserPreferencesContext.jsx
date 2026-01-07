@@ -57,10 +57,16 @@ export function UserPreferencesProvider({ children }) {
 
       // Automatically sync clearPathStatus with CLEARPATH_USER role
       // If user has the role, ensure clearPathStatus is active
+      // If user doesn't have the role, ensure clearPathStatus is inactive
       const hasClearPathRole = hasRole(walletAddress, ROLES.CLEARPATH_USER)
       if (hasClearPathRole && !clearPathStatus.active) {
-        clearPathStatus = { active: true, lastUpdated: Date.now() }
+        // User has role but status is inactive - activate it
+        clearPathStatus = { ...clearPathStatus, active: true, lastUpdated: Date.now() }
         updateClearPathStatus(walletAddress, true)
+      } else if (!hasClearPathRole && clearPathStatus.active) {
+        // User lost role but status is still active - deactivate it
+        clearPathStatus = { ...clearPathStatus, active: false, lastUpdated: Date.now() }
+        updateClearPathStatus(walletAddress, false)
       }
 
       setPreferences({
