@@ -44,5 +44,5 @@ export const NETWORK_CONFIG = {
   chainId: parseInt(import.meta.env.VITE_NETWORK_ID || '63', 10),
   name: 'Mordor Testnet',
   rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org',
-  blockExplorer: 'https://blockscout.com/etc/mordor'
+  blockExplorer: 'https://etc-mordor.blockscout.com'
 }
