@@ -314,9 +314,6 @@ function TokenMintButton() {
   const getMenuOptions = () => {
     const options = []
     
-    // Check if user has active FairWins membership (ClearPath User role)
-    const hasMembership = hasRole(ROLES.CLEARPATH_USER) && preferences.clearPathStatus?.active
-
     // Token creation options - requires TOKENMINT role
     const hasTokenMintRole = hasRole(ROLES.TOKENMINT)
     options.push({

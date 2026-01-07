@@ -4,13 +4,9 @@ import {
   saveUserPreference, 
   getUserPreference, 
   clearUserPreferences,
-  getClearPathStatus,
-  updateClearPathStatus,
   getDemoMode,
   updateDemoMode
 } from '../utils/userStorage'
-import { hasRole } from '../utils/roleStorage'
-import { ROLES } from './RoleContext'
 import { UserPreferencesContext } from './UserPreferencesContext.js'
 
 /**
@@ -25,7 +21,6 @@ export function UserPreferencesProvider({ children }) {
     recentSearches: [],
     favoriteMarkets: [],
     defaultSlippage: 0.5,
-    clearPathStatus: { active: false, lastUpdated: null },
     demoMode: true // Default to demo mode (mock data)
   })
   const [isLoading, setIsLoading] = useState(false)
@@ -40,7 +35,6 @@ export function UserPreferencesProvider({ children }) {
         recentSearches: [],
         favoriteMarkets: [],
         defaultSlippage: 0.5,
-        clearPathStatus: { active: false, lastUpdated: null },
         demoMode: true
       })
     }
@@ -52,28 +46,12 @@ export function UserPreferencesProvider({ children }) {
       const recentSearches = getUserPreference(walletAddress, 'recent_searches', [], true)
       const favoriteMarkets = getUserPreference(walletAddress, 'favorite_markets', [], true)
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
-      let clearPathStatus = getClearPathStatus(walletAddress)
       const demoMode = getDemoMode(walletAddress)
-
-      // Automatically sync clearPathStatus with CLEARPATH_USER role
-      // If user has the role, ensure clearPathStatus is active
-      // If user doesn't have the role, ensure clearPathStatus is inactive
-      const hasClearPathRole = hasRole(walletAddress, ROLES.CLEARPATH_USER)
-      if (hasClearPathRole && !clearPathStatus.active) {
-        // User has role but status is inactive - activate it
-        clearPathStatus = { ...clearPathStatus, active: true, lastUpdated: Date.now() }
-        updateClearPathStatus(walletAddress, true)
-      } else if (!hasClearPathRole && clearPathStatus.active) {
-        // User lost role but status is still active - deactivate it
-        clearPathStatus = { ...clearPathStatus, active: false, lastUpdated: Date.now() }
-        updateClearPathStatus(walletAddress, false)
-      }
 
       setPreferences({
         recentSearches,
         favoriteMarkets,
         defaultSlippage,
-        clearPathStatus,
         demoMode
       })
     } catch (error) {
@@ -138,16 +116,6 @@ export function UserPreferencesProvider({ children }) {
     setPreferences(prev => ({ ...prev, defaultSlippage: slippage }))
   }, [account])
 
-  const setClearPathStatus = useCallback((active) => {
-    if (!account) return
-
-    updateClearPathStatus(account, active)
-    setPreferences(prev => ({
-      ...prev,
-      clearPathStatus: { active, lastUpdated: Date.now() }
-    }))
-  }, [account])
-
   const setDemoMode = useCallback((enabled) => {
     if (!account) return
 
@@ -166,7 +134,6 @@ export function UserPreferencesProvider({ children }) {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      clearPathStatus: { active: false, lastUpdated: null },
       demoMode: true
     })
   }, [account])
@@ -178,7 +145,6 @@ export function UserPreferencesProvider({ children }) {
     clearRecentSearches,
     toggleFavoriteMarket,
     setDefaultSlippage,
-    setClearPathStatus,
     setDemoMode,
     savePreference,
     clearAllPreferences,
