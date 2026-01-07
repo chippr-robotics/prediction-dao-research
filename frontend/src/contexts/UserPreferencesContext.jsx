@@ -9,6 +9,8 @@ import {
   getDemoMode,
   updateDemoMode
 } from '../utils/userStorage'
+import { hasRole } from '../utils/roleStorage'
+import { ROLES } from './RoleContext'
 import { UserPreferencesContext } from './UserPreferencesContext.js'
 
 /**
@@ -50,8 +52,16 @@ export function UserPreferencesProvider({ children }) {
       const recentSearches = getUserPreference(walletAddress, 'recent_searches', [], true)
       const favoriteMarkets = getUserPreference(walletAddress, 'favorite_markets', [], true)
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
-      const clearPathStatus = getClearPathStatus(walletAddress)
+      let clearPathStatus = getClearPathStatus(walletAddress)
       const demoMode = getDemoMode(walletAddress)
+
+      // Automatically sync clearPathStatus with CLEARPATH_USER role
+      // If user has the role, ensure clearPathStatus is active
+      const hasClearPathRole = hasRole(walletAddress, ROLES.CLEARPATH_USER)
+      if (hasClearPathRole && !clearPathStatus.active) {
+        clearPathStatus = { active: true, lastUpdated: Date.now() }
+        updateClearPathStatus(walletAddress, true)
+      }
 
       setPreferences({
         recentSearches,
