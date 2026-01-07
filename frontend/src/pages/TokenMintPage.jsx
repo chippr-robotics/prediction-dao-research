@@ -1,66 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWeb3 } from '../hooks/useWeb3'
+import { useTokenMintFactory } from '../hooks'
 import TokenMintTab from '../components/fairwins/TokenMintTab'
 import TokenCreationModal from '../components/fairwins/TokenCreationModal'
 import TokenMintHeroCard from '../components/fairwins/TokenMintHeroCard'
 import '../components/fairwins/FairWinsAppNew.css'
 
 function TokenMintPage() {
-  const { account, isConnected } = useWeb3()
   const navigate = useNavigate()
-  const [tokens, setTokens] = useState([])
   const [selectedToken, setSelectedToken] = useState(null)
   const [showTokenBuilder, setShowTokenBuilder] = useState(false)
-  const [tokenLoading, setTokenLoading] = useState(false)
   const [showTokenDetails, setShowTokenDetails] = useState(false)
 
-  const loadUserTokens = useCallback(async () => {
-    if (!account || !isConnected) {
-      setTokens([])
-      return
-    }
-    
-    try {
-      setTokenLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      const mockTokens = [
-        {
-          tokenId: 1,
-          tokenType: 0,
-          tokenAddress: '0x1234567890123456789012345678901234567890',
-          owner: account,
-          name: 'Demo Token',
-          symbol: 'DEMO',
-          metadataURI: 'ipfs://QmDemo123',
-          createdAt: Math.floor(Date.now() / 1000) - 86400 * 7,
-          listedOnETCSwap: true,
-          isBurnable: true,
-          isPausable: false
-        },
-        {
-          tokenId: 2,
-          tokenType: 1,
-          tokenAddress: '0x0987654321098765432109876543210987654321',
-          owner: account,
-          name: 'Demo NFT Collection',
-          symbol: 'DNFT',
-          metadataURI: 'ipfs://QmNFTBase/',
-          createdAt: Math.floor(Date.now() / 1000) - 86400 * 3,
-          listedOnETCSwap: false,
-          isBurnable: false,
-          isPausable: false
-        }
-      ]
-      
-      setTokens(mockTokens)
-      setTokenLoading(false)
-    } catch (error) {
-      console.error('Error loading tokens:', error)
-      setTokenLoading(false)
-    }
-  }, [account, isConnected])
+  // Use the real blockchain data hook
+  const {
+    tokens,
+    isLoading: tokenLoading,
+    refreshTokens,
+    hasContract
+  } = useTokenMintFactory()
 
   /**
    * Handle successful token creation
@@ -68,8 +26,8 @@ function TokenMintPage() {
    */
   const handleTokenCreated = async (tokenData) => {
     console.log('Token created:', tokenData)
-    // Refresh token list to show the new token
-    await loadUserTokens()
+    // Refresh token list from blockchain to show the new token
+    await refreshTokens(true) // force refresh
   }
 
   const handleTokenClick = (token) => {
@@ -100,11 +58,6 @@ function TokenMintPage() {
   const handleClose = () => {
     navigate(-1)
   }
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUserTokens()
-  }, [loadUserTokens])
 
   return (
     <div className="tokenmint-page">

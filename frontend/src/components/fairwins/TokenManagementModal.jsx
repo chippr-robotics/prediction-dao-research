@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet, useWeb3 } from '../../hooks'
+import { useWallet, useWeb3, useTokenMintFactory } from '../../hooks'
 import { EXTENDED_ERC20_ABI } from '../../abis/ExtendedERC20'
 import { EXTENDED_ERC721_ABI } from '../../abis/ExtendedERC721'
 import './TokenManagementModal.css'
@@ -18,7 +18,6 @@ import './TokenManagementModal.css'
 function TokenManagementModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('tokens')
   const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [showInfoPanel, setShowInfoPanel] = useState(false)
   const [actionModal, setActionModal] = useState(null)
@@ -27,14 +26,57 @@ function TokenManagementModal({ isOpen, onClose }) {
   const [copySuccess, setCopySuccess] = useState(null) // Track which address was copied
   const modalRef = useRef(null)
 
-  // Data states
-  const [tokens, setTokens] = useState([])
-  const [nfts, setNfts] = useState([])
+  // Data states - markets still uses local state (different contract)
   const [markets, setMarkets] = useState([])
   const [chainInfo, setChainInfo] = useState(null)
 
   const { address, isConnected } = useWallet()
   const { signer, isCorrectNetwork } = useWeb3()
+
+  // Fetch real blockchain data for tokens
+  const {
+    erc20Tokens,
+    nftTokens,
+    isLoading: tokensLoading,
+    refreshTokens,
+    getExplorerUrl
+  } = useTokenMintFactory()
+
+  // Transform blockchain tokens to modal's expected format
+  const tokens = useMemo(() => {
+    return erc20Tokens.map(token => ({
+      id: token.tokenId,
+      address: token.tokenAddress,
+      name: token.name,
+      symbol: token.symbol,
+      type: 'ERC20',
+      totalSupply: '0', // Would need to fetch from token contract
+      decimals: 18,
+      isPausable: token.isPausable,
+      isBurnable: token.isBurnable,
+      isPaused: false, // Would need to fetch from token contract
+      owner: token.owner,
+      createdAt: token.createdAt * 1000 // Convert to milliseconds
+    }))
+  }, [erc20Tokens])
+
+  // Transform NFT tokens
+  const nfts = useMemo(() => {
+    return nftTokens.map(token => ({
+      id: token.tokenId,
+      address: token.tokenAddress,
+      name: token.name,
+      symbol: token.symbol,
+      type: 'ERC721',
+      totalSupply: '0', // Would need to fetch from token contract
+      baseURI: token.metadataURI,
+      isPausable: token.isPausable,
+      isBurnable: token.isBurnable,
+      isPaused: false,
+      owner: token.owner,
+      createdAt: token.createdAt * 1000
+    }))
+  }, [nftTokens])
 
   const ITEMS_PER_PAGE = 10
 
@@ -98,87 +140,28 @@ function TokenManagementModal({ isOpen, onClose }) {
     }
   }
 
-  // Mock data for demonstration - in production, these would be fetched from chain
+  // Combine hook loading state with local loading
+  const loading = tokensLoading
+
+  // Load markets data (still mock - uses different contract)
+  // TODO: Replace with real market factory data when available
   useEffect(() => {
     if (isOpen && isConnected) {
-      const loadData = async () => {
-        setLoading(true)
-        try {
-          // Simulate loading time
-          await new Promise(resolve => setTimeout(resolve, 500))
-
-          // Mock token data - in production, fetch from TokenMintFactory events
-          setTokens([
-            {
-              id: 1,
-              address: '0x1234567890abcdef1234567890abcdef12345678',
-              name: 'Demo Token',
-              symbol: 'DEMO',
-              type: 'ERC20',
-              totalSupply: '1000000',
-              decimals: 18,
-              isPausable: true,
-              isBurnable: true,
-              isPaused: false,
-              owner: address,
-              createdAt: Date.now() - 86400000 * 30
-            },
-            {
-              id: 2,
-              address: '0xabcdef1234567890abcdef1234567890abcdef12',
-              name: 'Reward Points',
-              symbol: 'RWD',
-              type: 'ERC20',
-              totalSupply: '5000000',
-              decimals: 18,
-              isPausable: true,
-              isBurnable: false,
-              isPaused: false,
-              owner: address,
-              createdAt: Date.now() - 86400000 * 15
-            }
-          ])
-
-          setNfts([
-            {
-              id: 1,
-              address: '0x9876543210fedcba9876543210fedcba98765432',
-              name: 'Art Collection',
-              symbol: 'ART',
-              type: 'ERC721',
-              totalSupply: '100',
-              baseURI: 'ipfs://QmXyz...',
-              isPausable: true,
-              isBurnable: true,
-              isPaused: false,
-              owner: address,
-              createdAt: Date.now() - 86400000 * 7
-            }
-          ])
-
-          setMarkets([
-            {
-              id: 1,
-              address: '0xfedcba9876543210fedcba9876543210fedcba98',
-              question: 'Will ETH reach $5000 by March 2025?',
-              type: 'Prediction',
-              status: 'Active',
-              totalLiquidity: '2.5',
-              tradingEnds: Date.now() + 86400000 * 30,
-              createdAt: Date.now() - 86400000 * 10
-            }
-          ])
-        } catch (error) {
-          console.error('Error loading data:', error)
-          window.alert('An error occurred while loading token data. Please try again.')
-        } finally {
-          setLoading(false)
+      // Mock market data - would be fetched from MarketFactory contract
+      setMarkets([
+        {
+          id: 1,
+          address: '0xfedcba9876543210fedcba9876543210fedcba98',
+          question: 'Will ETH reach $5000 by March 2025?',
+          type: 'Prediction',
+          status: 'Active',
+          totalLiquidity: '2.5',
+          tradingEnds: Date.now() + 86400000 * 30,
+          createdAt: Date.now() - 86400000 * 10
         }
-      }
-      
-      loadData()
+      ])
     }
-  }, [isOpen, isConnected, address])
+  }, [isOpen, isConnected])
 
   const getCurrentData = () => {
     switch (activeTab) {
@@ -461,12 +444,9 @@ function TokenManagementModal({ isOpen, onClose }) {
     }
   }
 
-  const updateItemState = (id, updates) => {
-    if (activeTab === 'tokens') {
-      setTokens(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t))
-    } else if (activeTab === 'nfts') {
-      setNfts(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n))
-    }
+  const updateItemState = async (id, updates) => {
+    // Refresh token data from blockchain after successful actions
+    await refreshTokens(true)
   }
 
   const formatAddress = (addr) => {
