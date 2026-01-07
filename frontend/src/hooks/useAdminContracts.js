@@ -44,6 +44,7 @@ export function useAdminContracts() {
     isPaused: false,
     contractBalance: '0',
     roleHashes: {},
+    supportsTiers: false,
     isDeployed: !!ROLE_MANAGER_ADDRESS
   })
   
@@ -126,14 +127,26 @@ export function useAdminContracts() {
         }
       }
 
+      // Detect whether tier extension functions are supported on this deployment.
+      // RoleManagerCore (deterministic deploy) does NOT include tier pricing/membership storage.
+      let supportsTiers = false
+      try {
+        // If the function selector doesn't exist, this call will revert.
+        await contract.tierPrices(ethers.ZeroHash, 1)
+        supportsTiers = true
+      } catch {
+        supportsTiers = false
+      }
+
       setContractState({
         isPaused,
         contractBalance: ethers.formatEther(balance),
         roleHashes,
+        supportsTiers,
         isDeployed: true
       })
 
-      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes, isDeployed: true }
+      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes, supportsTiers, isDeployed: true }
     } catch (err) {
       console.error('Error fetching contract state:', err)
       setError(err.message)
@@ -223,6 +236,10 @@ export function useAdminContracts() {
     setError(null)
 
     try {
+      if (!contractState.supportsTiers) {
+        throw new Error('Tier configuration not available: deploy the modular tier extensions (scripts/deploy-modular-rbac.js).')
+      }
+
       const contract = getRoleManagerContract(true)
       const priceWei = ethers.parseEther(priceInEth.toString())
 
@@ -241,7 +258,7 @@ export function useAdminContracts() {
     } finally {
       setIsLoading(false)
     }
-  }, [signer, isConnected, getRoleManagerContract])
+  }, [signer, isConnected, getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Grant a tier to a user
@@ -263,6 +280,10 @@ export function useAdminContracts() {
     setError(null)
 
     try {
+      if (!contractState.supportsTiers) {
+        throw new Error('Tier grants not available: deploy the modular membership extensions (scripts/deploy-modular-rbac.js).')
+      }
+
       const contract = getRoleManagerContract(true)
       const tx = await contract.grantTier(userAddress, roleHash, tier, durationDays)
       const receipt = await tx.wait()
@@ -279,7 +300,7 @@ export function useAdminContracts() {
     } finally {
       setIsLoading(false)
     }
-  }, [signer, isConnected, getRoleManagerContract])
+  }, [signer, isConnected, getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Grant a role to an address on-chain
@@ -360,7 +381,7 @@ export function useAdminContracts() {
       console.error('Error checking role:', err)
       return false
     }
-  }, [getRoleManagerContract])
+  }, [getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Withdraw funds from the contract
@@ -405,6 +426,10 @@ export function useAdminContracts() {
    */
   const getTierInfo = useCallback(async (roleHash, tier) => {
     try {
+      if (!contractState.supportsTiers) {
+        return null
+      }
+
       const contract = getRoleManagerContract(false)
       const [price, isActive] = await Promise.all([
         contract.tierPrices(roleHash, tier),
@@ -427,6 +452,10 @@ export function useAdminContracts() {
    */
   const getUserMembership = useCallback(async (userAddress, roleHash) => {
     try {
+      if (!contractState.supportsTiers) {
+        return null
+      }
+
       const contract = getRoleManagerContract(false)
       const [tier, expiration, isActive] = await Promise.all([
         contract.userTiers(userAddress, roleHash),
@@ -444,7 +473,7 @@ export function useAdminContracts() {
       console.error('Error getting user membership:', err)
       return null
     }
-  }, [getRoleManagerContract])
+  }, [getRoleManagerContract, contractState.supportsTiers])
 
   // Fetch contract state on mount and when account changes
   useEffect(() => {

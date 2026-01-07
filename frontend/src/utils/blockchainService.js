@@ -431,12 +431,20 @@ const ROLE_NAME_TO_HASH = {
 const ROLE_MANAGER_ABI = [
   {
     "inputs": [
-      { "internalType": "address", "name": "user", "type": "address" },
       { "internalType": "bytes32", "name": "role", "type": "bytes32" },
-      { "internalType": "uint8", "name": "tier", "type": "uint8" },
-      { "internalType": "uint256", "name": "durationDays", "type": "uint256" }
+      { "internalType": "address", "name": "account", "type": "address" }
     ],
-    "name": "grantTier",
+    "name": "grantRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "revokeRole",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -536,8 +544,8 @@ export async function grantRoleOnChain(signer, userAddress, roleName, durationDa
       signer
     )
 
-    // Grant tier 1 (BRONZE) for basic access
-    const tx = await roleManagerContract.grantTier(userAddress, roleHash, 1, durationDays)
+    // RoleManagerCore uses AccessControl: grantRole(role, account)
+    const tx = await roleManagerContract.grantRole(roleHash, userAddress)
     const receipt = await tx.wait()
 
     return {
@@ -632,7 +640,7 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
         console.warn('Role will need to be granted manually by admin or the user needs to contact support')
       }
     } else {
-      console.warn('Role manager not deployed - role saved locally only. Deploy MinimalRoleManager to enable blockchain persistence.')
+      console.warn('Role manager not configured - role saved locally only. Set VITE_ROLE_MANAGER_ADDRESS to enable blockchain persistence.')
     }
 
     return {
