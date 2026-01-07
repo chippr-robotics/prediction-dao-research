@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWeb3 } from '../hooks/useWeb3'
 import TokenMintTab from '../components/fairwins/TokenMintTab'
-import TokenMintBuilderModal from '../components/fairwins/TokenMintBuilderModal'
+import TokenCreationModal from '../components/fairwins/TokenCreationModal'
 import TokenMintHeroCard from '../components/fairwins/TokenMintHeroCard'
 import '../components/fairwins/FairWinsAppNew.css'
 
@@ -62,21 +62,13 @@ function TokenMintPage() {
     }
   }, [account, isConnected])
 
-  const handleCreateToken = async (tokenData) => {
-    console.log('Creating token:', tokenData)
-    alert(`Token creation requires deployed contracts.
-
-Token Details:
-- Type: ${tokenData.tokenType}
-- Name: ${tokenData.name}
-- Symbol: ${tokenData.symbol}
-${tokenData.tokenType === 'ERC20' ? `- Initial Supply: ${tokenData.initialSupply}` : ''}
-- Metadata URI: ${tokenData.metadataURI || 'None'}
-- Features: ${tokenData.isBurnable ? 'Burnable ' : ''}${tokenData.isPausable ? 'Pausable ' : ''}
-- List on ETCSwap: ${tokenData.listOnETCSwap ? 'Yes' : 'No'}
-
-This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchain.`)
-    
+  /**
+   * Handle successful token creation
+   * Called by TokenCreationModal after token is deployed on-chain
+   */
+  const handleTokenCreated = async (tokenData) => {
+    console.log('Token created:', tokenData)
+    // Refresh token list to show the new token
     await loadUserTokens()
   }
 
@@ -148,10 +140,10 @@ This would call TokenMintFactory.create${tokenData.tokenType}() on the blockchai
         />
       )}
 
-      <TokenMintBuilderModal 
+      <TokenCreationModal
         isOpen={showTokenBuilder}
         onClose={() => setShowTokenBuilder(false)}
-        onCreate={handleCreateToken}
+        onSuccess={handleTokenCreated}
       />
     </div>
   )
