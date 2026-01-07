@@ -31,11 +31,16 @@ export const DEPLOYED_CONTRACTS = {
  */
 export function getContractAddress(contractName) {
   // Check environment variables first (for custom deployments)
-  const envKey = `VITE_${contractName.toUpperCase()}_ADDRESS`
-  const envAddress = import.meta.env[envKey]
-  
-  if (envAddress) {
-    return envAddress
+  // Support both legacy style (VITE_ROLEMANAGER_ADDRESS) and snake-case style (VITE_ROLE_MANAGER_ADDRESS)
+  const upper = contractName.toUpperCase()
+  const snake = contractName
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toUpperCase()
+
+  const envKeys = [`VITE_${upper}_ADDRESS`, `VITE_${snake}_ADDRESS`]
+  for (const envKey of envKeys) {
+    const envAddress = import.meta.env[envKey]
+    if (envAddress) return envAddress
   }
   
   // Fall back to deployed contract addresses
