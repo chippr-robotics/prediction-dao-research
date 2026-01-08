@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { TOKENS, ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import { useWallet } from '../../hooks/useWalletManagement'
 import { ERC20_ABI } from '../../abis/ERC20'
 import { WETC_ABI } from '../../abis/WETC'
@@ -111,8 +111,8 @@ function CurrencySelector({
           provider
         )
         const uscBalance = await uscContract.balanceOf(address)
-        // USC has 6 decimals
-        newBalances.USC = ethers.formatUnits(uscBalance, 6)
+        // USC decimals defined in CURRENCY_OPTIONS
+        newBalances.USC = ethers.formatUnits(uscBalance, CURRENCY_OPTIONS.USC.decimals)
       } catch (e) {
         console.warn('Failed to fetch USC balance:', e)
         newBalances.USC = '0'
@@ -127,7 +127,7 @@ function CurrencySelector({
   }, [provider, address, isConnected])
 
   // Fetch balances when component mounts or address changes
-  useState(() => {
+  useEffect(() => {
     if (showBalances && isConnected) {
       fetchBalances()
     }
@@ -146,6 +146,41 @@ function CurrencySelector({
     }
   }, [disabled])
 
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback((e) => {
+    if (disabled) return
+
+    switch (e.key) {
+      case 'Escape':
+        if (isExpanded) {
+          setIsExpanded(false)
+          e.preventDefault()
+        }
+        break
+      case 'ArrowDown':
+      case 'ArrowUp':
+        if (isExpanded) {
+          e.preventDefault()
+          const options = Object.keys(CURRENCY_OPTIONS)
+          const currentIndex = options.indexOf(selectedCurrency)
+          const nextIndex = e.key === 'ArrowDown' 
+            ? (currentIndex + 1) % options.length
+            : (currentIndex - 1 + options.length) % options.length
+          handleCurrencySelect(options[nextIndex])
+        }
+        break
+      case 'Enter':
+      case ' ':
+        if (!isExpanded) {
+          setIsExpanded(true)
+          e.preventDefault()
+        }
+        break
+      default:
+        break
+    }
+  }, [disabled, isExpanded, selectedCurrency, handleCurrencySelect])
+
   // Format balance for display
   const formatBalance = (balance, decimals = 2) => {
     if (!balance || balance === '0') return '0.00'
@@ -161,6 +196,7 @@ function CurrencySelector({
         type="button"
         className={`currency-selector-trigger ${isExpanded ? 'expanded' : ''} ${disabled ? 'disabled' : ''}`}
         onClick={toggleExpanded}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
         aria-expanded={isExpanded}
         aria-haspopup="listbox"

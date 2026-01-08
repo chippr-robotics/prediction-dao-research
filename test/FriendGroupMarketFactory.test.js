@@ -740,7 +740,8 @@ describe("FriendGroupMarketFactory", function () {
 
     it("Should create 1v1 market with stablecoin payment", async function () {
       const tokenAddress = await paymentToken.getAddress();
-      const stakeAmount = ethers.parseUnits("100", 6); // 100 USC
+      // 100 USC with 6 decimals = 100000000 in smallest units
+      const stakeAmount = ethers.parseUnits("100", 6);
 
       // Enable the payment token
       await friendGroupFactory.setSupportedPaymentToken(tokenAddress, true);
@@ -839,7 +840,7 @@ describe("FriendGroupMarketFactory", function () {
           tokenAddress,
           stakeAmount
         )
-      ).to.be.reverted; // Will revert due to ERC20 transfer failure
+      ).to.be.revertedWith("ERC20: insufficient allowance"); // Will revert due to ERC20 transfer failure
     });
 
     it("Should allow both native ETC and token markets", async function () {
