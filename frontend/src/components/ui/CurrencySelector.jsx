@@ -163,9 +163,10 @@ function CurrencySelector({
           e.preventDefault()
           const options = Object.keys(CURRENCY_OPTIONS)
           const currentIndex = options.indexOf(selectedCurrency)
+          // Navigate to next/previous currency option with wrapping
           const nextIndex = e.key === 'ArrowDown' 
-            ? (currentIndex + 1) % options.length
-            : (currentIndex - 1 + options.length) % options.length
+            ? (currentIndex + 1) % options.length  // Move forward, wrap to start
+            : (currentIndex - 1 + options.length) % options.length  // Move backward, wrap to end
           const newCurrency = options[nextIndex]
           if (onCurrencyChange) {
             onCurrencyChange(newCurrency)
