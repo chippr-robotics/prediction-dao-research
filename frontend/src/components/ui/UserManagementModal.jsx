@@ -19,6 +19,7 @@ function UserManagementModal({ onScanMarket }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
+  const [clearPathActive, setClearPathActive] = useState(false)
 
   // If somehow opened without a connection, just close to avoid empty UI
   if (!isConnected) {
@@ -168,6 +169,22 @@ function UserManagementModal({ onScanMarket }) {
                     : <><span aria-hidden="true">🌐</span> Live Mode: Connected to testnet blockchain. All transactions are real and require gas fees.</>}
                 </p>
               </div>
+            </div>
+
+            {/* ClearPath Status Section */}
+            <div className="section clearpath-status-section">
+              <h3>ClearPath Status</h3>
+              <div className="status-indicator">
+                <span className={`status-badge ${clearPathActive ? 'active' : 'inactive'}`}>
+                  {clearPathActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <button 
+                className="clearpath-toggle-btn"
+                onClick={() => setClearPathActive(!clearPathActive)}
+              >
+                {clearPathActive ? 'Deactivate ClearPath' : 'Activate ClearPath'}
+              </button>
             </div>
 
             <div className="section">
