@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { BrowserRouter } from 'react-router-dom'
@@ -40,9 +40,9 @@ vi.mock('ethers', () => ({
     Contract: vi.fn(() => ({
       balanceOf: vi.fn().mockResolvedValue(BigInt('1000000000000000000000'))
     })),
-    parseUnits: vi.fn((value, decimals) => BigInt(value) * BigInt(10 ** decimals)),
-    formatUnits: vi.fn((value, decimals) => (Number(value) / (10 ** decimals)).toString()),
-    formatEther: vi.fn((value) => (Number(value) / 1e18).toString())
+    parseUnits: vi.fn((value, decimals) => BigInt(value) * (10n ** BigInt(decimals))),
+    formatUnits: vi.fn((value, decimals) => (BigInt(value) / (10n ** BigInt(decimals))).toString()),
+    formatEther: vi.fn((value) => (BigInt(value) / (10n ** 18n)).toString())
   }
 }))
 

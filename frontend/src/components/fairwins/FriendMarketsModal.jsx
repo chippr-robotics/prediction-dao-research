@@ -5,12 +5,10 @@ import { useWallet, useWeb3 } from '../../hooks'
 import QRScanner from '../ui/QRScanner'
 import CurrencySelector, {
   CURRENCY_OPTIONS,
-  getDefaultCurrency,
   getCurrencyById,
   parseAmountForCurrency,
   formatAmountForCurrency
 } from '../ui/CurrencySelector'
-import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import { ERC20_ABI } from '../../abis/ERC20'
 import { WETC_ABI } from '../../abis/WETC'
 import './FriendMarketsModal.css'
@@ -161,7 +159,6 @@ function FriendMarketsModal({
 
   // Get currency-specific minimum stake
   const getMinimumStake = useCallback((currencyId) => {
-    const currency = getCurrencyById(currencyId)
     // USC (stablecoin) has minimum $1, others have 0.1 token minimum
     if (currencyId === 'USC') return 1
     return 0.1
@@ -402,6 +399,9 @@ function FriendMarketsModal({
       const stakeAmount = parseFloat(formData.stakeAmount)
 
       // For ERC20 tokens (USC, WETC), handle approval
+      // txOptions structure differs based on payment type:
+      // - ERC20 tokens: { tokenAddress, tokenAmount, isNative: false }
+      // - Native ETC: { value, isNative: true }
       let txOptions = {}
 
       if (!currency.isNative) {
