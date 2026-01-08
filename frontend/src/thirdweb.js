@@ -46,8 +46,8 @@ export const ethereumClassic = defineChain({
   rpc: networkId === 61 ? rpcUrl : 'https://etc.rivet.link',
   blockExplorers: [
     {
-      name: 'BlockScout',
-      url: 'https://blockscout.com/etc/mainnet',
+      name: 'Blockscout',
+      url: 'https://etc.blockscout.com',
     },
   ],
   testnet: false,
@@ -65,8 +65,8 @@ export const mordor = defineChain({
   rpc: rpcUrl,
   blockExplorers: [
     {
-      name: 'BlockScout',
-      url: 'https://blockscout.com/etc/mordor',
+      name: 'Blockscout',
+      url: 'https://etc-mordor.blockscout.com',
     },
   ],
   testnet: true,

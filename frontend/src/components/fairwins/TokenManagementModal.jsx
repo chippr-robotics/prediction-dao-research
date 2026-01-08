@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3, useTokenMintFactory } from '../../hooks'
 import { EXTENDED_ERC20_ABI } from '../../abis/ExtendedERC20'
 import { EXTENDED_ERC721_ABI } from '../../abis/ExtendedERC721'
+import { getAddressUrl, getTransactionUrl } from '../../config/blockExplorer'
 import './TokenManagementModal.css'
 
 /**
@@ -31,7 +32,7 @@ function TokenManagementModal({ isOpen, onClose }) {
   const [chainInfo, setChainInfo] = useState(null)
 
   const { address, isConnected } = useWallet()
-  const { signer, isCorrectNetwork } = useWeb3()
+  const { signer, isCorrectNetwork, chainId } = useWeb3()
 
   // Fetch real blockchain data for tokens
   const {
@@ -767,6 +768,19 @@ function TokenManagementModal({ isOpen, onClose }) {
                           <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                         </svg>
                       </button>
+                      <a
+                        href={getAddressUrl(chainId || 63, chainInfo.contractAddress, 'contract')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="tm-explorer-link"
+                        title="View on Blockscout"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                          <polyline points="15,3 21,3 21,9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </a>
                     </div>
                   </div>
                   <div className="tm-info-item full-width">
@@ -862,6 +876,21 @@ function TokenManagementModal({ isOpen, onClose }) {
                                 <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                               </svg>
                             </button>
+                            {isValidHash && (
+                              <a
+                                href={getTransactionUrl(chainId || 63, chainInfo.transactionHash)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="tm-explorer-link"
+                                title="View on Blockscout"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                                  <polyline points="15,3 21,3 21,9" />
+                                  <line x1="10" y1="14" x2="21" y2="3" />
+                                </svg>
+                              </a>
+                            )}
                           </>
                         )
                       })()}

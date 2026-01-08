@@ -5,6 +5,7 @@ import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithUSC, registerZKKey } from '../../utils/blockchainService'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
 /**
@@ -94,7 +95,7 @@ const ROLE_PRICES = {
 
 function PremiumPurchaseModal({ isOpen = true, onClose }) {
   const { ROLE_INFO, grantRole, hasRole } = useRoles()
-  const { account, isConnected, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
 
@@ -626,7 +627,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                       </div>
                       {result.txHash && (
                         <a
-                          href={`https://blockscout.com/etc/mainnet/tx/${result.txHash}`}
+                          href={getTransactionUrl(chainId || 63, result.txHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ppm-tx-link"

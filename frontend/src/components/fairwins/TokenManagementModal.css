@@ -382,6 +382,27 @@
   cursor: not-allowed;
 }
 
+/* Explorer Link */
+.tm-explorer-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.tm-explorer-link:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
 /* Date */
 .td-date {
   color: #6b7280;
