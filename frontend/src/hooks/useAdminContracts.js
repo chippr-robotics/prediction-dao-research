@@ -7,9 +7,30 @@ import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
 // Refresh interval for contract state (30 seconds)
 export const CONTRACT_STATE_REFRESH_INTERVAL = 30000
 
-// Contract addresses - using deployer as placeholder for role manager
-// In production, this would be the actual deployed MinimalRoleManager address
-const ROLE_MANAGER_ADDRESS = DEPLOYED_CONTRACTS.deployer
+/**
+ * Get the role manager contract address
+ * Falls back to environment variable if deployed contract is not set
+ * @returns {string|null} Role manager address or null if not configured
+ */
+function getRoleManagerAddress() {
+  // First check for explicit role manager address in config
+  const configAddress = DEPLOYED_CONTRACTS.roleManager
+  if (configAddress) {
+    return configAddress
+  }
+  
+  // Check environment variable
+  const envAddress = import.meta.env.VITE_ROLE_MANAGER_ADDRESS
+  if (envAddress) {
+    return envAddress
+  }
+  
+  // Role manager not deployed yet - return null
+  console.warn('Role manager contract not deployed. Role persistence to blockchain is disabled.')
+  return null
+}
+
+const ROLE_MANAGER_ADDRESS = getRoleManagerAddress()
 
 /**
  * Hook for interacting with admin contract functions
@@ -22,7 +43,9 @@ export function useAdminContracts() {
   const [contractState, setContractState] = useState({
     isPaused: false,
     contractBalance: '0',
-    roleHashes: {}
+    roleHashes: {},
+    supportsTiers: false,
+    isDeployed: !!ROLE_MANAGER_ADDRESS
   })
   
   // Track if a fetch is in progress to prevent redundant calls
@@ -38,8 +61,12 @@ export function useAdminContracts() {
 
   /**
    * Get the role manager contract instance
+   * Returns null if role manager is not deployed
    */
   const getRoleManagerContract = useCallback((useSigner = false) => {
+    if (!ROLE_MANAGER_ADDRESS) {
+      return null
+    }
     const providerOrSigner = useSigner && signer ? signer : readProvider
     return new ethers.Contract(ROLE_MANAGER_ADDRESS, MINIMAL_ROLE_MANAGER_ABI, providerOrSigner)
   }, [signer, readProvider])
@@ -48,6 +75,17 @@ export function useAdminContracts() {
    * Fetch current contract state
    */
   const fetchContractState = useCallback(async () => {
+    // Role manager not deployed
+    if (!ROLE_MANAGER_ADDRESS) {
+      setContractState({
+        isPaused: false,
+        contractBalance: '0',
+        roleHashes: {},
+        isDeployed: false
+      })
+      return null
+    }
+
     // Prevent redundant fetches
     if (fetchInProgressRef.current) {
       return null
@@ -56,6 +94,9 @@ export function useAdminContracts() {
     fetchInProgressRef.current = true
     try {
       const contract = getRoleManagerContract(false)
+      if (!contract) {
+        return null
+      }
 
       // Fetch paused state and balance in parallel
       const [isPaused, balance] = await Promise.all([
@@ -86,13 +127,26 @@ export function useAdminContracts() {
         }
       }
 
+      // Detect whether tier extension functions are supported on this deployment.
+      // RoleManagerCore (deterministic deploy) does NOT include tier pricing/membership storage.
+      let supportsTiers = false
+      try {
+        // If the function selector doesn't exist, this call will revert.
+        await contract.tierPrices(ethers.ZeroHash, 1)
+        supportsTiers = true
+      } catch {
+        supportsTiers = false
+      }
+
       setContractState({
         isPaused,
         contractBalance: ethers.formatEther(balance),
-        roleHashes
+        roleHashes,
+        supportsTiers,
+        isDeployed: true
       })
 
-      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes }
+      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes, supportsTiers, isDeployed: true }
     } catch (err) {
       console.error('Error fetching contract state:', err)
       setError(err.message)
@@ -182,6 +236,10 @@ export function useAdminContracts() {
     setError(null)
 
     try {
+      if (!contractState.supportsTiers) {
+        throw new Error('Tier configuration not available: deploy the modular tier extensions (scripts/deploy-modular-rbac.js).')
+      }
+
       const contract = getRoleManagerContract(true)
       const priceWei = ethers.parseEther(priceInEth.toString())
 
@@ -200,7 +258,7 @@ export function useAdminContracts() {
     } finally {
       setIsLoading(false)
     }
-  }, [signer, isConnected, getRoleManagerContract])
+  }, [signer, isConnected, getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Grant a tier to a user
@@ -222,6 +280,10 @@ export function useAdminContracts() {
     setError(null)
 
     try {
+      if (!contractState.supportsTiers) {
+        throw new Error('Tier grants not available: deploy the modular membership extensions (scripts/deploy-modular-rbac.js).')
+      }
+
       const contract = getRoleManagerContract(true)
       const tx = await contract.grantTier(userAddress, roleHash, tier, durationDays)
       const receipt = await tx.wait()
@@ -238,7 +300,7 @@ export function useAdminContracts() {
     } finally {
       setIsLoading(false)
     }
-  }, [signer, isConnected, getRoleManagerContract])
+  }, [signer, isConnected, getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Grant a role to an address on-chain
@@ -319,7 +381,7 @@ export function useAdminContracts() {
       console.error('Error checking role:', err)
       return false
     }
-  }, [getRoleManagerContract])
+  }, [getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Withdraw funds from the contract
@@ -364,6 +426,10 @@ export function useAdminContracts() {
    */
   const getTierInfo = useCallback(async (roleHash, tier) => {
     try {
+      if (!contractState.supportsTiers) {
+        return null
+      }
+
       const contract = getRoleManagerContract(false)
       const [price, isActive] = await Promise.all([
         contract.tierPrices(roleHash, tier),
@@ -386,6 +452,10 @@ export function useAdminContracts() {
    */
   const getUserMembership = useCallback(async (userAddress, roleHash) => {
     try {
+      if (!contractState.supportsTiers) {
+        return null
+      }
+
       const contract = getRoleManagerContract(false)
       const [tier, expiration, isActive] = await Promise.all([
         contract.userTiers(userAddress, roleHash),
@@ -403,7 +473,7 @@ export function useAdminContracts() {
       console.error('Error getting user membership:', err)
       return null
     }
-  }, [getRoleManagerContract])
+  }, [getRoleManagerContract, contractState.supportsTiers])
 
   // Fetch contract state on mount and when account changes
   useEffect(() => {

@@ -347,3 +347,15 @@ Then visit http://localhost:8080
 ### Deployment
 
 See the main [DEPLOYMENT.md](../DEPLOYMENT.md) file for complete instructions on deploying to Google Cloud Run using GitHub Actions.
+
+## Dependencies
+
+### Planned/Future Dependencies
+
+The following dependencies are included in preparation for upcoming features:
+
+- **cross-fetch** (^4.1.0) - Universal fetch API for isomorphic applications. Reserved for server-side rendering or Node.js environment compatibility.
+- **eventemitter2** (^6.4.9) - Enhanced event emitter. Reserved for advanced event-driven features and real-time updates.
+- **socket.io-client** (^4.8.3) - WebSocket client library. Reserved for real-time market updates and live blockchain event streaming.
+
+These dependencies are not currently utilized in the codebase but are maintained for planned feature development.

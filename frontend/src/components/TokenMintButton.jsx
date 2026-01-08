@@ -3,7 +3,7 @@ import { useRoles } from '../hooks/useRoles'
 import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import { useWallet, useWeb3 } from '../hooks'
-import TokenMintBuilderModal from './fairwins/TokenMintBuilderModal'
+import TokenCreationModal from './fairwins/TokenCreationModal'
 import MarketCreationModal from './fairwins/MarketCreationModal'
 import TokenManagementModal from './fairwins/TokenManagementModal'
 import PremiumPurchaseModal from './ui/PremiumPurchaseModal'
@@ -97,53 +97,14 @@ function TokenMintButton() {
     })
   }
 
-  const handleCreateToken = async (tokenData) => {
-    console.log('Creating token:', tokenData)
-
-    // Show transaction dialog
-    // Note: In production, this would call the TokenMintFactory contract methods
-    // (tokenMintFactory.createERC20() or createERC721()) to initiate blockchain transaction
-    showModal(
-      <div className="transaction-modal">
-        <h3>Token Creation Transaction</h3>
-        <p>Token creation requires a blockchain transaction.</p>
-        <div className="token-details">
-          <div className="detail-row">
-            <span className="detail-label">Type:</span>
-            <span className="detail-value">{tokenData.tokenType}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Name:</span>
-            <span className="detail-value">{tokenData.name}</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Symbol:</span>
-            <span className="detail-value">{tokenData.symbol}</span>
-          </div>
-          {tokenData.tokenType === 'ERC20' && (
-            <div className="detail-row">
-              <span className="detail-label">Initial Supply:</span>
-              <span className="detail-value">{tokenData.initialSupply}</span>
-            </div>
-          )}
-          <div className="detail-row">
-            <span className="detail-label">Features:</span>
-            <span className="detail-value">
-              {tokenData.isBurnable ? 'Burnable ' : ''}
-              {tokenData.isPausable ? 'Pausable ' : ''}
-            </span>
-          </div>
-        </div>
-        <p className="transaction-note">
-          Please confirm the transaction in your wallet to proceed.
-        </p>
-      </div>,
-      {
-        title: 'Confirm Transaction',
-        size: 'medium',
-        closable: true
-      }
-    )
+  /**
+   * Handle successful token creation
+   * Called by TokenCreationModal after token is deployed
+   */
+  const handleTokenCreated = (tokenData) => {
+    console.log('Token created successfully:', tokenData)
+    // Token was created - the modal handles the success state
+    // We could refresh token lists here if needed
   }
 
   /**
@@ -424,11 +385,11 @@ function TokenMintButton() {
         )}
       </div>
 
-      {/* Token Builder Modal */}
-      <TokenMintBuilderModal
+      {/* Token Creation Modal - Full web3 integration */}
+      <TokenCreationModal
         isOpen={showTokenBuilder}
         onClose={() => setShowTokenBuilder(false)}
-        onCreate={handleCreateToken}
+        onSuccess={handleTokenCreated}
       />
 
       {/* Market Creation Modal - supports all creation types */}

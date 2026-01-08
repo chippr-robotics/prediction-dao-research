@@ -210,23 +210,28 @@ function AdminPanel() {
       return
     }
     
-    // Validate duration
-    if (roleGrant.durationDays > MAX_TIER_DURATION_DAYS) {
+    // Validate duration (tiered membership deployments only)
+    if (contractState.supportsTiers && roleGrant.durationDays > MAX_TIER_DURATION_DAYS) {
       showNotification(`Duration cannot exceed ${MAX_TIER_DURATION_DAYS} days`, 'error')
       return
     }
 
     setPendingTx(true)
     try {
-      await grantTier(roleGrant.userAddress, roleHash, roleGrant.tier, roleGrant.durationDays)
-      showNotification('Tier granted successfully', 'success')
+      if (contractState.supportsTiers) {
+        await grantTier(roleGrant.userAddress, roleHash, roleGrant.tier, roleGrant.durationDays)
+        showNotification('Tier granted successfully', 'success')
+      } else {
+        await grantRoleOnChain(roleHash, roleGrant.userAddress)
+        showNotification('Role granted successfully', 'success')
+      }
       setRoleGrant(prev => ({ ...prev, userAddress: '' }))
     } catch (err) {
       showNotification(err.message, 'error')
     } finally {
       setPendingTx(false)
     }
-  }, [roleGrant, contractState.roleHashes, grantTier, showNotification])
+  }, [roleGrant, contractState.roleHashes, contractState.supportsTiers, grantTier, grantRoleOnChain, showNotification])
 
   const handleWithdraw = useCallback(async () => {
     if (!isValidEthereumAddress(withdrawalData.toAddress)) {
@@ -681,6 +686,12 @@ function AdminPanel() {
                 </p>
 
                 <div className="tier-form">
+                  {!contractState.supportsTiers && (
+                    <div className="permission-notice">
+                      <span className="notice-icon">!</span>
+                      Tier pricing is not available on this deployment. Deploy the modular tier extensions to enable tiers.
+                    </div>
+                  )}
                   <div className="form-group">
                     <label htmlFor="tier-role">Role</label>
                     <select
@@ -738,7 +749,7 @@ function AdminPanel() {
                   <button
                     onClick={handleConfigureTier}
                     className="admin-btn primary"
-                    disabled={pendingTx || isLoading}
+                    disabled={pendingTx || isLoading || !contractState.supportsTiers}
                   >
                     {pendingTx ? 'Configuring...' : 'Configure Tier'}
                   </button>
@@ -778,11 +789,12 @@ function AdminPanel() {
             <div className="roles-grid">
               <div className="admin-card">
                 <div className="admin-card-header">
-                  <h3>Grant Role & Tier</h3>
+                  <h3>{contractState.supportsTiers ? 'Grant Role & Tier' : 'Grant Role'}</h3>
                 </div>
                 <p className="card-info">
-                  Grant a role with a specific tier to a user. This creates an on-chain
-                  record of their membership with an expiration date.
+                  {contractState.supportsTiers
+                    ? 'Grant a role with a specific tier to a user. This creates an on-chain record of their membership with an expiration date.'
+                    : 'Grant a role to a user using on-chain AccessControl (no tiered membership extensions deployed).'}
                 </p>
 
                 <div className="role-form">
@@ -820,6 +832,7 @@ function AdminPanel() {
                         value={roleGrant.tier}
                         onChange={(e) => setRoleGrant(prev => ({ ...prev, tier: Number(e.target.value) }))}
                         className="admin-select"
+                        disabled={!contractState.supportsTiers}
                       >
                         <option value={1}>Bronze</option>
                         <option value={2}>Silver</option>
@@ -839,6 +852,7 @@ function AdminPanel() {
                         onChange={(e) => setRoleGrant(prev => ({ ...prev, durationDays: Number(e.target.value) }))}
                         className="admin-input"
                         placeholder="30"
+                        disabled={!contractState.supportsTiers}
                       />
                       <small className="input-hint">Maximum: {MAX_TIER_DURATION_DAYS} days</small>
                     </div>
@@ -849,7 +863,7 @@ function AdminPanel() {
                     className="admin-btn primary"
                     disabled={pendingTx || isLoading || !roleGrant.userAddress}
                   >
-                    {pendingTx ? 'Granting...' : 'Grant Role & Tier'}
+                    {pendingTx ? 'Granting...' : (contractState.supportsTiers ? 'Grant Role & Tier' : 'Grant Role')}
                   </button>
                 </div>
               </div>
