@@ -164,8 +164,9 @@ vi.mock('wagmi', () => ({
   useSwitchChain: vi.fn(() => ({
     switchChain: vi.fn()
   })),
-  createConfig: vi.fn(),
-  http: vi.fn()
+  WagmiProvider: ({ children }) => children,
+  createConfig: vi.fn(() => ({})),
+  http: vi.fn(() => ({}))
 }))
 
 // Mock wagmi connectors
