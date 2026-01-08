@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 import "./ETCSwapV3Integration.sol";
 import "./TieredRoleManager.sol";
 import "./CTF1155.sol";
+import "./NullifierRegistry.sol";
 
 /**
  * @title ConditionalMarketFactory
@@ -116,7 +117,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     
     // CTF1155 integration - now required for all markets
     CTF1155 public ctf1155;
-    
+
+    // Nullifier registry for market protection
+    NullifierRegistry public nullifierRegistry;
+
+    // Whether to enforce nullification checks on-chain (default: false, frontend handles this)
+    bool public enforceNullificationOnChain;
+
     // Default initial price for pools (0.5 = equal probability)
     uint160 public constant DEFAULT_INITIAL_SQRT_PRICE = 79228162514264337593543950336; // sqrt(0.5) in Q64.96
 
@@ -194,7 +201,11 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     );
     
     event CTF1155Updated(address indexed ctf1155);
-    
+
+    event NullifierRegistryUpdated(address indexed nullifierRegistry);
+
+    event NullificationEnforcementUpdated(bool enforceOnChain);
+
     event CTFMarketCreated(
         uint256 indexed marketId,
         bytes32 indexed conditionId,
@@ -296,7 +307,78 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         ctf1155 = CTF1155(_ctf1155);
         emit CTF1155Updated(_ctf1155);
     }
-    
+
+    /**
+     * @notice Set the nullifier registry contract
+     * @param _nullifierRegistry Address of NullifierRegistry contract
+     */
+    function setNullifierRegistry(address _nullifierRegistry) external onlyOwner {
+        require(_nullifierRegistry != address(0), "Invalid nullifier registry address");
+        nullifierRegistry = NullifierRegistry(_nullifierRegistry);
+        emit NullifierRegistryUpdated(_nullifierRegistry);
+    }
+
+    /**
+     * @notice Enable or disable on-chain nullification enforcement
+     * @dev When enabled, trading functions will check nullification status
+     *      Frontend always checks regardless of this setting
+     * @param _enforce Whether to enforce nullification checks on-chain
+     */
+    function setNullificationEnforcement(bool _enforce) external onlyOwner {
+        enforceNullificationOnChain = _enforce;
+        emit NullificationEnforcementUpdated(_enforce);
+    }
+
+    /**
+     * @notice Compute the market hash for nullification purposes
+     * @param marketId The market ID
+     * @return marketHash The keccak256 hash of the market's immutable data
+     */
+    function computeMarketHash(uint256 marketId) public view returns (bytes32 marketHash) {
+        require(marketId < marketCount, "Invalid market ID");
+        Market storage m = markets[marketId];
+        return keccak256(abi.encodePacked(
+            "MARKET_V1",
+            m.proposalId,
+            m.collateralToken,
+            m.conditionId,
+            m.passPositionId,
+            m.failPositionId
+        ));
+    }
+
+    /**
+     * @notice Check if a market is nullified
+     * @param marketId The market ID
+     * @return True if the market is nullified
+     */
+    function isMarketNullified(uint256 marketId) public view returns (bool) {
+        if (address(nullifierRegistry) == address(0)) return false;
+        bytes32 marketHash = computeMarketHash(marketId);
+        return nullifierRegistry.isMarketNullified(marketHash);
+    }
+
+    /**
+     * @notice Modifier to check nullification status when on-chain enforcement is enabled
+     */
+    modifier checkNullification(uint256 marketId) {
+        if (enforceNullificationOnChain && address(nullifierRegistry) != address(0)) {
+            bytes32 marketHash = computeMarketHash(marketId);
+            require(!nullifierRegistry.isMarketNullified(marketHash), "Market is nullified");
+        }
+        _;
+    }
+
+    /**
+     * @notice Modifier to check if an address is nullified
+     */
+    modifier checkAddressNullification(address addr) {
+        if (enforceNullificationOnChain && address(nullifierRegistry) != address(0)) {
+            require(!nullifierRegistry.isAddressNullified(addr), "Address is nullified");
+        }
+        _;
+    }
+
     /**
      * @notice Create ETCSwap pools for an existing market
      * @param marketId ID of the market
@@ -519,7 +601,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         uint256 marketId,
         bool buyPass,
         uint256 amount
-    ) external payable nonReentrant returns (uint256 tokenAmount) {
+    ) external payable nonReentrant checkNullification(marketId) checkAddressNullification(msg.sender) returns (uint256 tokenAmount) {
         require(marketId < marketCount, "Invalid market ID");
         Market storage market = markets[marketId];
         require(market.status == MarketStatus.Active, "Market not active");
@@ -641,7 +723,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         uint256 marketId,
         bool sellPass,
         uint256 tokenAmount
-    ) external nonReentrant returns (uint256 collateralAmount) {
+    ) external nonReentrant checkNullification(marketId) checkAddressNullification(msg.sender) returns (uint256 collateralAmount) {
         require(marketId < marketCount, "Invalid market ID");
         Market storage market = markets[marketId];
         require(market.status == MarketStatus.Active, "Market not active");

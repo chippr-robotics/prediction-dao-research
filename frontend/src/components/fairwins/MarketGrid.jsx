@@ -1,7 +1,17 @@
+import { useMemo } from 'react'
 import ModernMarketCard from './ModernMarketCard'
+import { useMarketNullification } from '../../hooks/useMarketNullification'
 import './MarketGrid.css'
 
 function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = false }) {
+  // Get nullification filtering functionality
+  const { filterMarkets, isLoading: nullificationLoading } = useMarketNullification()
+
+  // Filter out nullified markets
+  const activeMarkets = useMemo(() => {
+    if (nullificationLoading) return markets
+    return filterMarkets(markets)
+  }, [markets, filterMarkets, nullificationLoading])
   if (loading) {
     return (
       <div className="market-grid-loading" role="status" aria-live="polite">
@@ -16,7 +26,7 @@ function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = f
     )
   }
 
-  if (markets.length === 0) {
+  if (activeMarkets.length === 0) {
     return (
       <div className="market-grid-empty" role="status">
         <div className="empty-icon" aria-hidden="true">📊</div>
@@ -30,14 +40,15 @@ function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = f
   const firstRowCount = 0 // disable first row expand for now
 
   return (
-    <div 
+    <div
       className="market-grid"
       role="grid"
       aria-label="Market grid"
+      data-filtered-count={markets.length - activeMarkets.length}
     >
-      {markets.map((market, index) => (
+      {activeMarkets.map((market, index) => (
         <div key={market.id} role="gridcell">
-          <ModernMarketCard 
+          <ModernMarketCard
             market={market}
             onClick={onMarketClick}
             onTrade={onMarketClick}

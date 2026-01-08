@@ -6,6 +6,7 @@ import { useAdminContracts, CONTRACT_STATE_REFRESH_INTERVAL } from '../hooks/use
 import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
+import NullifierTab from './admin/NullifierTab'
 import './AdminPanel.css'
 
 // Minimum withdrawal amount to prevent gas waste on dust transactions
@@ -28,7 +29,7 @@ const MAX_TIER_DURATION_DAYS = 3650 // ~10 years
  */
 function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
-  const { account } = useWeb3()
+  const { account, signer, provider } = useWeb3()
   const { showNotification } = useNotification()
   const {
     isLoading,
@@ -64,6 +65,7 @@ function AdminPanel() {
   const canConfigureTiers = isAdmin
   const canGrantRoles = isAdmin || isOperationsAdmin
   const canWithdraw = isAdmin
+  const canManageNullifier = isAdmin || isOperationsAdmin
 
   // Tier Configuration State
   const [tierConfig, setTierConfig] = useState({
@@ -474,6 +476,23 @@ function AdminPanel() {
               </svg>
             </span>
             Treasury
+          </button>
+        )}
+
+        {canManageNullifier && (
+          <button
+            role="tab"
+            aria-selected={activeTab === 'nullifier'}
+            className={`admin-panel-tab ${activeTab === 'nullifier' ? 'active' : ''}`}
+            onClick={() => setActiveTab('nullifier')}
+          >
+            <span className="tab-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+              </svg>
+            </span>
+            Nullifier
           </button>
         )}
       </nav>
@@ -973,6 +992,16 @@ function AdminPanel() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Nullifier Tab */}
+        {activeTab === 'nullifier' && canManageNullifier && (
+          <NullifierTab
+            provider={provider}
+            signer={signer}
+            account={account}
+            marketFactoryAddress={DEPLOYED_CONTRACTS.marketFactory}
+          />
         )}
       </main>
     </div>
