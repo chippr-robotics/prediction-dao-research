@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/uniswap-v3/IUniswapV3Factory.sol";
-import "./interfaces/uniswap-v3/IUniswapV3Pool.sol";
-import "./interfaces/uniswap-v3/ISwapRouter.sol";
-import "./interfaces/uniswap-v3/INonfungiblePositionManager.sol";
-import "./TieredRoleManager.sol";
+import "../interfaces/uniswap-v3/IUniswapV3Factory.sol";
+import "../interfaces/uniswap-v3/IUniswapV3Pool.sol";
+import "../interfaces/uniswap-v3/ISwapRouter.sol";
+import "../interfaces/uniswap-v3/INonfungiblePositionManager.sol";
+import "../access/TieredRoleManager.sol";
 
 /**
  * @title ETCSwapV3Integration

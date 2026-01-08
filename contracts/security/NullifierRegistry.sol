@@ -4,8 +4,8 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
-import "./libraries/RSAAccumulator.sol";
-import "./libraries/PrimeMapping.sol";
+import "../libraries/RSAAccumulator.sol";
+import "../libraries/PrimeMapping.sol";
 
 /**
  * @title NullifierRegistry

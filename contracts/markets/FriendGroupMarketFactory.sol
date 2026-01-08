@@ -6,9 +6,9 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ConditionalMarketFactory.sol";
-import "./RagequitModule.sol";
-import "./TieredRoleManager.sol";
-import "./MembershipPaymentManager.sol";
+import "../security/RagequitModule.sol";
+import "../access/TieredRoleManager.sol";
+import "../access/MembershipPaymentManager.sol";
 
 /**
  * @title FriendGroupMarketFactory

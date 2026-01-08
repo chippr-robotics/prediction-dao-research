@@ -8,10 +8,10 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "./ETCSwapV3Integration.sol";
-import "./TieredRoleManager.sol";
+import "../integrations/ETCSwapV3Integration.sol";
+import "../access/TieredRoleManager.sol";
 import "./CTF1155.sol";
-import "./NullifierRegistry.sol";
+import "../security/NullifierRegistry.sol";
 
 /**
  * @title ConditionalMarketFactory

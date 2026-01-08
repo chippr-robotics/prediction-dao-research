@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import "./ConditionalMarketFactory.sol";
-import "./CTF1155.sol";
+import "../markets/ConditionalMarketFactory.sol";
+import "../markets/CTF1155.sol";
 
 /**
  * @title GovernanceIntentHandler

@@ -6,10 +6,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./WelfareMetricRegistry.sol";
 import "./ProposalRegistry.sol";
-import "./ConditionalMarketFactory.sol";
-import "./PrivacyCoordinator.sol";
-import "./OracleResolver.sol";
-import "./RagequitModule.sol";
+import "../markets/ConditionalMarketFactory.sol";
+import "../privacy/PrivacyCoordinator.sol";
+import "../oracles/OracleResolver.sol";
+import "../security/RagequitModule.sol";
 import "./FutarchyGovernor.sol";
 
 /**

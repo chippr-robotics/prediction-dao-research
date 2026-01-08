@@ -7,11 +7,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./WelfareMetricRegistry.sol";
 import "./ProposalRegistry.sol";
-import "./ConditionalMarketFactory.sol";
-import "./PrivacyCoordinator.sol";
-import "./OracleResolver.sol";
-import "./RagequitModule.sol";
-import "./TieredRoleManager.sol";
+import "../markets/ConditionalMarketFactory.sol";
+import "../privacy/PrivacyCoordinator.sol";
+import "../oracles/OracleResolver.sol";
+import "../security/RagequitModule.sol";
+import "../access/TieredRoleManager.sol";
 
 /**
  * @title FutarchyGovernor
