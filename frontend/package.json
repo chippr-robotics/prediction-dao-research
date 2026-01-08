@@ -24,6 +24,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.12",
     "@walletconnect/ethereum-provider": "^2.21.10",
+    "@walletconnect/modal": "^2.7.0",
     "cross-fetch": "^4.1.0",
     "d3": "^7.9.0",
     "ethereum-blockies-base64": "^1.0.2",
