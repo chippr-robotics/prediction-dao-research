@@ -405,6 +405,7 @@ function FairWinsUserModal({ onScanMarket }) {
                   <span className="fwum-toggle-label">{preferences.demoMode ? 'Demo' : 'Live'}</span>
                 </button>
               </div>
+            </section>
 
             {/* Wallet Section */}
             <section className="fwum-section">
