@@ -258,10 +258,15 @@ describe('WalletButton Component - Market Creation', () => {
       const button = screen.getByRole('button', { name: /wallet account/i })
       await user.click(button)
 
-      // Get both section titles
+      // Get both section titles - use getAllByText since there may be multiple matches
       await waitFor(() => {
-        const friendMarketsSection = screen.getByText('Friend Markets')
+        const friendMarketsSections = screen.getAllByText('Friend Markets')
         const predictionMarketsSection = screen.getByText('Prediction Markets')
+
+        // Find the section title (not the role badge) by checking the className
+        const friendMarketsSection = friendMarketsSections.find(el => 
+          el.className.includes('wallet-section-title')
+        ) || friendMarketsSections[friendMarketsSections.length - 1]
 
         // Prediction Markets should come after Friend Markets in the DOM
         expect(friendMarketsSection.compareDocumentPosition(predictionMarketsSection))
