@@ -239,7 +239,8 @@
   border-color: var(--primary-hover, #3a8eef);
 }
 
-.friend-market-promo {
+.friend-market-promo,
+.create-market-promo {
   text-align: center;
 }
 
@@ -247,6 +248,19 @@
   font-size: 0.75rem;
   color: var(--text-secondary, #888);
   margin: 0 0 0.5rem 0;
+}
+
+/* Create Market Button */
+.create-market-btn {
+  width: 100%;
+  justify-content: center;
+  background: var(--success-color, #4caf50);
+  border-color: var(--success-color, #4caf50);
+}
+
+.create-market-btn:hover {
+  background: #3d8b40;
+  border-color: #3d8b40;
 }
 
 .purchase-access-btn {

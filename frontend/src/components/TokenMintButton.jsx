@@ -4,27 +4,27 @@ import { useModal } from '../hooks/useUI'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 import { useWallet, useWeb3 } from '../hooks'
 import TokenCreationModal from './fairwins/TokenCreationModal'
-import MarketCreationModal from './fairwins/MarketCreationModal'
 import TokenManagementModal from './fairwins/TokenManagementModal'
 import PremiumPurchaseModal from './ui/PremiumPurchaseModal'
 import './TokenMintButton.css'
 
 /**
  * TokenMintButton Component
- * 
+ *
  * Displays a button with the TokenMint logo that opens a dropdown menu
  * with options based on user's roles and permissions.
- * 
+ *
  * Features:
- * - Role-based menu options (Market Maker, Token Mint, ClearPath User)
- * - Integration with existing modals for token/market creation
+ * - Role-based menu options (Token Mint role)
+ * - Integration with existing modals for token creation and management
  * - Membership purchase flow for users without active membership
  * - Wallet transaction handling
+ *
+ * Note: Market creation functionality has been moved to the WalletButton component.
  */
 function TokenMintButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [showTokenBuilder, setShowTokenBuilder] = useState(false)
-  const [showMarketCreation, setShowMarketCreation] = useState(false)
   const [showTokenManagement, setShowTokenManagement] = useState(false)
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
@@ -78,11 +78,6 @@ function TokenMintButton() {
     setShowTokenBuilder(true)
   }
 
-  const handleCreateMarket = () => {
-    setIsOpen(false)
-    setShowMarketCreation(true)
-  }
-
   const handleManageTokens = () => {
     setIsOpen(false)
     setShowTokenManagement(true)
@@ -105,170 +100,6 @@ function TokenMintButton() {
     console.log('Token created successfully:', tokenData)
     // Token was created - the modal handles the success state
     // We could refresh token lists here if needed
-  }
-
-  /**
-   * Handle creation from the MarketCreationModal
-   * Supports prediction markets, friend markets, and ERC tokens
-   */
-  const handleMarketCreation = async (submitData, modalSigner) => {
-    console.log('Creating from modal:', submitData)
-
-    const activeSigner = modalSigner || signer
-
-    // Note: In production, these would call the appropriate smart contract methods
-    // For now, show a confirmation dialog based on the type
-
-    switch (submitData.type) {
-      case 'prediction': {
-        const { data } = submitData
-        showModal(
-          <div className="transaction-modal">
-            <h3>Prediction Market Creation</h3>
-            <p>Creating a new prediction market requires a blockchain transaction.</p>
-            <div className="token-details">
-              <div className="detail-row">
-                <span className="detail-label">Question:</span>
-                <span className="detail-value">{data.question}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Trading Ends:</span>
-                <span className="detail-value">{new Date(data.tradingEndTime).toLocaleString()}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Resolution Date:</span>
-                <span className="detail-value">{new Date(data.resolutionDate).toLocaleString()}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Initial Liquidity:</span>
-                <span className="detail-value">{data.initialLiquidity} ETC</span>
-              </div>
-            </div>
-            <p className="transaction-note">
-              This will call ConditionalMarketFactory.deployMarketPair() to create PASS/FAIL token pairs.
-            </p>
-          </div>,
-          {
-            title: 'Confirm Prediction Market',
-            size: 'medium',
-            closable: true
-          }
-        )
-        break
-      }
-
-      case 'friend': {
-        const { marketType, data } = submitData
-        const marketTypeLabels = {
-          oneVsOne: '1v1 Direct Bet',
-          smallGroup: 'Small Group Market',
-          eventTracking: 'Event Tracking Market'
-        }
-        const contractMethods = {
-          oneVsOne: 'createOneVsOneMarket()',
-          smallGroup: 'createSmallGroupMarket()',
-          eventTracking: 'createEventTrackingMarket()'
-        }
-
-        showModal(
-          <div className="transaction-modal">
-            <h3>Friend Market Creation</h3>
-            <p>Creating a {marketTypeLabels[marketType]} requires a blockchain transaction.</p>
-            <div className="token-details">
-              <div className="detail-row">
-                <span className="detail-label">Type:</span>
-                <span className="detail-value">{marketTypeLabels[marketType]}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Description:</span>
-                <span className="detail-value">{data.description}</span>
-              </div>
-              {marketType === 'oneVsOne' && (
-                <div className="detail-row">
-                  <span className="detail-label">Opponent:</span>
-                  <span className="detail-value">{data.opponent.slice(0, 10)}...{data.opponent.slice(-8)}</span>
-                </div>
-              )}
-              {(marketType === 'smallGroup' || marketType === 'eventTracking') && (
-                <div className="detail-row">
-                  <span className="detail-label">Members:</span>
-                  <span className="detail-value">{data.members.split(',').length} participants</span>
-                </div>
-              )}
-              <div className="detail-row">
-                <span className="detail-label">Trading Period:</span>
-                <span className="detail-value">{data.tradingPeriod} days</span>
-              </div>
-              {data.arbitrator && (
-                <div className="detail-row">
-                  <span className="detail-label">Arbitrator:</span>
-                  <span className="detail-value">{data.arbitrator.slice(0, 10)}...{data.arbitrator.slice(-8)}</span>
-                </div>
-              )}
-            </div>
-            <p className="transaction-note">
-              This will call FriendGroupMarketFactory.{contractMethods[marketType]}
-            </p>
-          </div>,
-          {
-            title: 'Confirm Friend Market',
-            size: 'medium',
-            closable: true
-          }
-        )
-        break
-      }
-
-      case 'token': {
-        const { tokenType, data } = submitData
-        showModal(
-          <div className="transaction-modal">
-            <h3>Token Creation Transaction</h3>
-            <p>Token creation requires a blockchain transaction.</p>
-            <div className="token-details">
-              <div className="detail-row">
-                <span className="detail-label">Type:</span>
-                <span className="detail-value">{tokenType}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Name:</span>
-                <span className="detail-value">{data.name}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Symbol:</span>
-                <span className="detail-value">{data.symbol}</span>
-              </div>
-              {tokenType === 'ERC20' && (
-                <div className="detail-row">
-                  <span className="detail-label">Initial Supply:</span>
-                  <span className="detail-value">{data.initialSupply}</span>
-                </div>
-              )}
-              <div className="detail-row">
-                <span className="detail-label">Features:</span>
-                <span className="detail-value">
-                  {data.isBurnable ? 'Burnable ' : ''}
-                  {data.isPausable ? 'Pausable ' : ''}
-                  {data.listOnETCSwap ? 'ETCSwap Listed' : ''}
-                </span>
-              </div>
-            </div>
-            <p className="transaction-note">
-              This will call TokenMintFactory.create{tokenType}() to deploy your token.
-            </p>
-          </div>,
-          {
-            title: 'Confirm Token Creation',
-            size: 'medium',
-            closable: true
-          }
-        )
-        break
-      }
-
-      default:
-        console.error('Unknown creation type:', submitData.type)
-    }
   }
 
   // Determine available options based on roles and membership
@@ -300,26 +131,13 @@ function TokenMintButton() {
       disabled: !hasTokenMintRole
     })
 
-    // Market creation options - requires MARKET_MAKER role
-    const hasMarketMakerRole = hasRole(ROLES.MARKET_MAKER)
-    options.push({
-      id: 'create-market',
-      label: 'Create New Market',
-      icon: '📊',
-      description: hasMarketMakerRole 
-        ? 'Create a prediction market' 
-        : 'Requires Market Maker role',
-      action: handleCreateMarket,
-      disabled: !hasMarketMakerRole
-    })
-
-    // Show purchase option if user lacks both key roles
-    if (!hasTokenMintRole && !hasMarketMakerRole) {
+    // Show purchase option if user lacks TokenMint role
+    if (!hasTokenMintRole) {
       options.push({
         id: 'purchase-membership',
         label: 'Purchase Membership',
         icon: '🎫',
-        description: 'Get access to token minting and market creation',
+        description: 'Get access to token minting features',
         action: handlePurchaseMembership,
         highlight: true
       })
@@ -337,7 +155,7 @@ function TokenMintButton() {
           ref={buttonRef}
           className={`tokenmint-button ${!isConnected ? 'inactive' : ''}`}
           onClick={isConnected ? toggleDropdown : undefined}
-          aria-label="TokenMint - Create tokens and markets"
+          aria-label="TokenMint - Create and manage tokens"
           aria-expanded={isOpen}
           aria-haspopup="true"
           aria-disabled={!isConnected}
@@ -387,13 +205,6 @@ function TokenMintButton() {
         isOpen={showTokenBuilder}
         onClose={() => setShowTokenBuilder(false)}
         onSuccess={handleTokenCreated}
-      />
-
-      {/* Market Creation Modal - supports all creation types */}
-      <MarketCreationModal
-        isOpen={showMarketCreation}
-        onClose={() => setShowMarketCreation(false)}
-        onCreate={handleMarketCreation}
       />
 
       {/* Token Management Modal */}
