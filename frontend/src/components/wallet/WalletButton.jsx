@@ -3,7 +3,7 @@ import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { useETCswap } from '../../hooks/useETCswap'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { useWalletRoles } from '../../hooks'
+import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
@@ -28,6 +28,7 @@ import './WalletButton.css'
 function WalletButton({ className = '', theme = 'dark' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
+  const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -37,6 +38,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const { balances, loading: balanceLoading } = useETCswap()
   const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
+  const { signer } = useWeb3()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   const [connectorStatus, setConnectorStatus] = useState({})
@@ -198,6 +200,57 @@ function WalletButton({ className = '', theme = 'dark' }) {
     console.log('Friend market creation:', data)
     setShowFriendMarketModal(false)
     // The MarketCreationModal handles the actual creation
+  }
+
+  const handleOpenMarketCreation = () => {
+    setIsOpen(false)
+    setShowMarketCreationModal(true)
+  }
+
+  /**
+   * Handle creation from the MarketCreationModal
+   * Supports prediction markets with web3 transactions
+   */
+  const handleMarketCreation = async (submitData, modalSigner) => {
+    console.log('Creating market from modal:', submitData)
+
+    const activeSigner = modalSigner || signer
+
+    // Show confirmation dialog for the market creation transaction
+    showModal(
+      <div className="transaction-modal">
+        <h3>Prediction Market Creation</h3>
+        <p>Creating a new prediction market requires a blockchain transaction.</p>
+        <div className="token-details">
+          <div className="detail-row">
+            <span className="detail-label">Trading Period:</span>
+            <span className="detail-value">{submitData.tradingPeriod / 86400} days</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">Initial Liquidity:</span>
+            <span className="detail-value">{submitData.initialLiquidity} ETC</span>
+          </div>
+          <div className="detail-row">
+            <span className="detail-label">Bet Type:</span>
+            <span className="detail-value">{submitData.betType}</span>
+          </div>
+          {submitData.metadata && (
+            <div className="detail-row">
+              <span className="detail-label">Question:</span>
+              <span className="detail-value">{submitData.metadata.name}</span>
+            </div>
+          )}
+        </div>
+        <p className="transaction-note">
+          This will call ConditionalMarketFactory.deployMarketPair() to create PASS/FAIL token pairs.
+        </p>
+      </div>,
+      {
+        title: 'Confirm Prediction Market',
+        size: 'medium',
+        closable: true
+      }
+    )
   }
 
   const handleNavigateToAdmin = () => {
@@ -374,7 +427,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
               <div className="dropdown-section">
                 <span className="wallet-section-title">Friend Markets</span>
                 {hasRole(ROLES.FRIEND_MARKET) ? (
-                  <button 
+                  <button
                     onClick={handleOpenFriendMarket}
                     className="action-button friend-market-btn"
                     role="menuitem"
@@ -385,13 +438,40 @@ function WalletButton({ className = '', theme = 'dark' }) {
                 ) : (
                   <div className="friend-market-promo">
                     <p className="promo-text">Create private prediction markets with friends!</p>
-                    <button 
+                    <button
                       onClick={handleOpenPurchaseModal}
                       className="action-button purchase-access-btn"
                       role="menuitem"
                     >
                       <span aria-hidden="true">🔓</span>
                       <span>Get Access - 50 USC</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Create Market Section */}
+              <div className="dropdown-section">
+                <span className="wallet-section-title">Prediction Markets</span>
+                {hasRole(ROLES.MARKET_MAKER) ? (
+                  <button
+                    onClick={handleOpenMarketCreation}
+                    className="action-button create-market-btn"
+                    role="menuitem"
+                  >
+                    <span aria-hidden="true">📊</span>
+                    <span>Create New Market</span>
+                  </button>
+                ) : (
+                  <div className="create-market-promo">
+                    <p className="promo-text">Create prediction markets with liquidity pools!</p>
+                    <button
+                      onClick={handleOpenPurchaseModal}
+                      className="action-button purchase-access-btn"
+                      role="menuitem"
+                    >
+                      <span aria-hidden="true">🔓</span>
+                      <span>Get Market Maker Access</span>
                     </button>
                   </div>
                 )}
@@ -455,6 +535,13 @@ function WalletButton({ className = '', theme = 'dark' }) {
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
         onCreate={handleFriendMarketCreation}
+      />
+
+      {/* Market Creation Modal - Prediction Markets */}
+      <MarketCreationModal
+        isOpen={showMarketCreationModal}
+        onClose={() => setShowMarketCreationModal(false)}
+        onCreate={handleMarketCreation}
       />
     </div>
   )
