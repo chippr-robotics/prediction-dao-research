@@ -13,8 +13,12 @@ import {
   computeMarketHash,
   computeAddressHash,
   isProbablePrime,
-  bigintToHex
+  bigintToHex,
+  computeMarketHashSimple
 } from './rsaAccumulator'
+
+// Re-export for convenience
+export { computeMarketHashSimple }
 
 // ============================================================================
 // Market Prime Mapping
