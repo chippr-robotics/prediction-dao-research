@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./NullifierRegistry.sol";
 
 /**
  * @title TreasuryVault
@@ -38,6 +39,12 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
     // Emergency guardian address
     address public guardian;
 
+    // Nullifier Registry for address restriction
+    NullifierRegistry public nullifierRegistry;
+
+    // Whether to enforce nullification checks on withdrawals
+    bool public enforceNullificationOnWithdrawals;
+
     event Deposit(address indexed token, address indexed from, uint256 amount);
     event Withdrawal(address indexed token, address indexed to, uint256 amount, address indexed authorizedBy);
     event SpenderAuthorized(address indexed spender);
@@ -47,6 +54,9 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
     event EmergencyPause(address indexed by);
     event EmergencyUnpause(address indexed by);
     event GuardianUpdated(address indexed oldGuardian, address indexed newGuardian);
+    event NullifierRegistryUpdated(address indexed nullifierRegistry);
+    event NullificationEnforcementUpdated(bool enforce);
+    event WithdrawalBlockedByNullification(address indexed recipient, address indexed token, uint256 amount);
 
     modifier onlyAuthorized() {
         require(authorizedSpenders[msg.sender] || msg.sender == owner(), "Not authorized");
@@ -60,6 +70,22 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
 
     modifier onlyGuardianOrOwner() {
         require(msg.sender == guardian || msg.sender == owner(), "Not guardian or owner");
+        _;
+    }
+
+    /**
+     * @notice Checks if the recipient address is not nullified (when enforcement is enabled)
+     * @param recipient The address to check
+     * @param token The token being withdrawn (for event logging)
+     * @param amount The amount being withdrawn (for event logging)
+     */
+    modifier checkRecipientNotNullified(address recipient, address token, uint256 amount) {
+        if (enforceNullificationOnWithdrawals && address(nullifierRegistry) != address(0)) {
+            if (nullifierRegistry.isAddressNullified(recipient)) {
+                emit WithdrawalBlockedByNullification(recipient, token, amount);
+                revert("Recipient address is nullified");
+            }
+        }
         _;
     }
 
@@ -113,11 +139,12 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
      * @param to Recipient address
      * @param amount Amount of ETH to withdraw
      */
-    function withdrawETH(address payable to, uint256 amount) 
-        external 
-        nonReentrant 
-        onlyAuthorized 
-        whenNotPaused 
+    function withdrawETH(address payable to, uint256 amount)
+        external
+        nonReentrant
+        onlyAuthorized
+        whenNotPaused
+        checkRecipientNotNullified(to, address(0), amount)
     {
         require(to != address(0), "Invalid recipient");
         require(amount > 0, "Amount must be greater than 0");
@@ -142,6 +169,7 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
         nonReentrant
         onlyAuthorized
         whenNotPaused
+        checkRecipientNotNullified(to, token, amount)
     {
         require(token != address(0), "Invalid token address");
         require(to != address(0), "Invalid recipient");
@@ -270,6 +298,35 @@ contract TreasuryVault is Ownable, ReentrancyGuard {
         address oldGuardian = guardian;
         guardian = newGuardian;
         emit GuardianUpdated(oldGuardian, newGuardian);
+    }
+
+    /**
+     * @notice Set the NullifierRegistry contract address
+     * @param _nullifierRegistry Address of the NullifierRegistry contract
+     */
+    function setNullifierRegistry(address _nullifierRegistry) external onlyOwner {
+        require(_nullifierRegistry != address(0), "Invalid nullifier registry address");
+        nullifierRegistry = NullifierRegistry(_nullifierRegistry);
+        emit NullifierRegistryUpdated(_nullifierRegistry);
+    }
+
+    /**
+     * @notice Enable or disable nullification enforcement on withdrawals
+     * @param _enforce Whether to enforce nullification checks
+     */
+    function setNullificationEnforcement(bool _enforce) external onlyOwner {
+        enforceNullificationOnWithdrawals = _enforce;
+        emit NullificationEnforcementUpdated(_enforce);
+    }
+
+    /**
+     * @notice Check if a recipient address is currently nullified
+     * @param recipient Address to check
+     * @return True if the address is nullified (and registry is configured)
+     */
+    function isRecipientNullified(address recipient) external view returns (bool) {
+        if (address(nullifierRegistry) == address(0)) return false;
+        return nullifierRegistry.isAddressNullified(recipient);
     }
 
     /**
