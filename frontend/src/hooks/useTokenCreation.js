@@ -277,7 +277,7 @@ export function useTokenCreation() {
     createdToken,
 
     // Gas estimation
-    estimatedGas: estimatedGas ? ethers.formatUnits(estimatedGas, 'wei') : null,
+    estimatedGas: estimatedGas ? estimatedGas.toString() : null, // Return raw BigInt value as string
     gasPrice: gasPrice ? ethers.formatUnits(gasPrice, 'gwei') : null,
     totalCostETC,
 
