@@ -168,7 +168,7 @@ function FriendMarketsModal({
   const getCurrencySymbol = useCallback((currencyId) => {
     const currency = getCurrencyById(currencyId)
     return currency?.symbol || 'USC'
-  }, [getCurrencyById])
+  }, [])
 
   // QR Scanner handlers
   const openQrScanner = (target) => {

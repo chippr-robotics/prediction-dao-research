@@ -166,7 +166,11 @@ function CurrencySelector({
           const nextIndex = e.key === 'ArrowDown' 
             ? (currentIndex + 1) % options.length
             : (currentIndex - 1 + options.length) % options.length
-          handleCurrencySelect(options[nextIndex])
+          const newCurrency = options[nextIndex]
+          if (onCurrencyChange) {
+            onCurrencyChange(newCurrency)
+          }
+          setIsExpanded(false)
         }
         break
       case 'Enter':
@@ -179,7 +183,7 @@ function CurrencySelector({
       default:
         break
     }
-  }, [disabled, isExpanded, selectedCurrency, handleCurrencySelect])
+  }, [disabled, isExpanded, selectedCurrency, onCurrencyChange])
 
   // Format balance for display
   const formatBalance = (balance, decimals = 2) => {
