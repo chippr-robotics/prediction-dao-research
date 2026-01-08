@@ -18,6 +18,9 @@ export const DEPLOYED_CONTRACTS = {
   futarchyGovernor: '0x352D9997a6454AA1E0CEAFb6f8199c501b48d886',
   fairWinsToken: '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB',
   treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772',
+  
+  // TODO: Deploy TokenMintFactory deterministically and update this address
+  tokenMintFactory: null, // Will be deployed with deterministic deployment
 
   // Back-compat aliases used throughout the frontend
   roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // alias for RoleManagerCore

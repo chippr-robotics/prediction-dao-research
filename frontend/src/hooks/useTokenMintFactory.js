@@ -2,9 +2,11 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from './index'
 import { TOKEN_MINT_FACTORY_ABI, TokenType } from '../abis/TokenMintFactory'
+import { getContractAddress } from '../config/contracts'
 
-// Contract address - should be moved to environment config
-const TOKEN_MINT_FACTORY_ADDRESS = import.meta.env.VITE_TOKEN_MINT_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+// Get TokenMintFactory address from environment or centralized config
+// Returns null if not deployed yet, which is handled gracefully by the hook
+const TOKEN_MINT_FACTORY_ADDRESS = import.meta.env.VITE_TOKEN_MINT_FACTORY_ADDRESS ?? getContractAddress('tokenMintFactory')
 
 /**
  * Loading states for data fetching
@@ -30,12 +32,11 @@ export function useTokenMintFactory() {
   const [loadState, setLoadState] = useState(LoadState.IDLE)
   const [error, setError] = useState(null)
   const [tokens, setTokens] = useState([])
-  const [tokenCount, setTokenCount] = useState(0)
   const [lastFetch, setLastFetch] = useState(null)
 
   // Read-only contract instance
   const contract = useMemo(() => {
-    if (!provider || !TOKEN_MINT_FACTORY_ADDRESS || TOKEN_MINT_FACTORY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    if (!provider || !TOKEN_MINT_FACTORY_ADDRESS) {
       return null
     }
     return new ethers.Contract(TOKEN_MINT_FACTORY_ADDRESS, TOKEN_MINT_FACTORY_ABI, provider)
@@ -45,7 +46,7 @@ export function useTokenMintFactory() {
    * Check if factory contract is available
    */
   const hasContract = useMemo(() => {
-    return !!contract && TOKEN_MINT_FACTORY_ADDRESS !== '0x0000000000000000000000000000000000000000'
+    return !!contract && !!TOKEN_MINT_FACTORY_ADDRESS
   }, [contract])
 
   /**
@@ -203,7 +204,9 @@ export function useTokenMintFactory() {
       setTokens([])
       setLoadState(LoadState.IDLE)
     }
-  }, [isConnected, address, hasContract, fetchUserTokens])
+    // Note: fetchUserTokens is intentionally excluded from dependencies to prevent infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, address, hasContract])
 
   return {
     // Connection state
@@ -222,7 +225,7 @@ export function useTokenMintFactory() {
     tokens,
     erc20Tokens,
     nftTokens,
-    tokenCount,
+    tokenCount: tokens.length, // Computed from tokens array
 
     // Actions
     fetchUserTokens,
