@@ -11,6 +11,139 @@ afterEach(() => {
   cleanup()
 })
 
+// Mock fetch globally to prevent real network requests
+global.fetch = vi.fn().mockImplementation(async (url, options) => {
+  // Mock CoinGecko API for price conversion
+  if (url.includes('coingecko.com')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        'ethereum-classic': {
+          usd: 25.50
+        }
+      })
+    }
+  }
+  
+  // Mock any RPC endpoints
+  if (url.includes('rpc') || url.includes('etccooperative')) {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        jsonrpc: '2.0',
+        id: 1,
+        result: '0x0de0b6b3a7640000' // 1 ETC in wei
+      })
+    }
+  }
+  
+  // Default mock response
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+    text: async () => ''
+  }
+})
+
+// Mock ethers.js providers to prevent real network calls
+vi.mock('ethers', async () => {
+  const actual = await vi.importActual('ethers')
+  
+  // Create mock provider that returns valid responses
+  class MockBrowserProvider {
+    constructor() {}
+    
+    async getBalance() {
+      return actual.ethers.parseEther('1.0')
+    }
+    
+    async getNetwork() {
+      return {
+        chainId: 61n,
+        name: 'ethereum-classic'
+      }
+    }
+    
+    async getBlockNumber() {
+      return 1000000
+    }
+    
+    getSigner() {
+      return {
+        getAddress: async () => '0x1234567890123456789012345678901234567890',
+        signMessage: async () => '0xmocksignature'
+      }
+    }
+  }
+  
+  class MockJsonRpcProvider {
+    constructor() {}
+    
+    async getBalance() {
+      return actual.ethers.parseEther('1.0')
+    }
+    
+    async getNetwork() {
+      return {
+        chainId: 61n,
+        name: 'ethereum-classic'
+      }
+    }
+    
+    async getBlockNumber() {
+      return 1000000
+    }
+    
+    async call() {
+      // Return a mock response for contract calls (1000 tokens with 18 decimals)
+      return actual.ethers.toBeHex(actual.ethers.parseEther('1000'))
+    }
+  }
+  
+  // Mock Contract class to return mock values
+  class MockContract {
+    constructor(address, abi, provider) {
+      this.address = address
+      this.abi = abi
+      this.provider = provider
+    }
+    
+    async balanceOf() {
+      return actual.ethers.parseEther('1000')
+    }
+    
+    async allowance() {
+      return actual.ethers.parseEther('1000')
+    }
+    
+    async totalSupply() {
+      return actual.ethers.parseEther('1000000')
+    }
+    
+    async hasRole() {
+      return false
+    }
+    
+    async getRoleMember() {
+      return '0x0000000000000000000000000000000000000000'
+    }
+    
+    async getRoleMemberCount() {
+      return 0n
+    }
+  }
+  
+  return {
+    ...actual,
+    BrowserProvider: MockBrowserProvider,
+    JsonRpcProvider: MockJsonRpcProvider,
+    Contract: MockContract
+  }
+})
+
 // Mock wagmi hooks for WalletProvider
 vi.mock('wagmi', () => ({
   useAccount: vi.fn(() => ({
@@ -43,15 +176,25 @@ window.ethereum = window.ethereum || {}
 
 // Create a mock that returns proper responses for ethers.js
 const mockEthereumProvider = {
-  request: vi.fn().mockImplementation(async ({ method }) => {
+  request: vi.fn().mockImplementation(async ({ method, params }) => {
     switch (method) {
       case 'eth_requestAccounts':
       case 'eth_accounts':
         return ['0x1234567890123456789012345678901234567890']
       case 'eth_chainId':
         return '0x3d' // Chain ID 61 (ETC)
+      case 'eth_getBalance':
+        // Return a valid hex string for 1 ETC in wei (1e18)
+        return '0x0de0b6b3a7640000'
+      case 'eth_call':
+        // Return a valid hex response for contract calls (simulating balance of 1000 tokens with 18 decimals)
+        return '0x00000000000000000000000000000000000000000000003635c9adc5dea00000'
+      case 'net_version':
+        return '61'
+      case 'eth_blockNumber':
+        return '0x1000000'
       default:
-        return null
+        return '0x0'
     }
   }),
   on: vi.fn(),
@@ -59,11 +202,23 @@ const mockEthereumProvider = {
   isMetaMask: true,
   selectedAddress: '0x1234567890123456789012345678901234567890',
   // Mock methods needed by ethers BrowserProvider
-  send: vi.fn().mockImplementation(async (method) => {
-    if (method === 'eth_accounts') {
-      return ['0x1234567890123456789012345678901234567890']
+  send: vi.fn().mockImplementation(async (method, params) => {
+    switch (method) {
+      case 'eth_accounts':
+        return ['0x1234567890123456789012345678901234567890']
+      case 'eth_getBalance':
+        return '0x0de0b6b3a7640000'
+      case 'eth_call':
+        return '0x00000000000000000000000000000000000000000000003635c9adc5dea00000'
+      case 'eth_chainId':
+        return '0x3d'
+      case 'net_version':
+        return '61'
+      case 'eth_blockNumber':
+        return '0x1000000'
+      default:
+        return '0x0'
     }
-    return {}
   })
 }
 

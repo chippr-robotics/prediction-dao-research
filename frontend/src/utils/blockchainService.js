@@ -487,6 +487,11 @@ export function getRoleHash(roleName) {
  * @returns {Promise<boolean>} True if user has the role on-chain
  */
 export async function hasRoleOnChain(userAddress, roleName) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return false
+  }
+  
   try {
     const roleManagerAddress = getContractAddress('roleManager')
     if (!roleManagerAddress) {

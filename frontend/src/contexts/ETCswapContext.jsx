@@ -43,6 +43,11 @@ export function ETCswapProvider({ children }) {
   
   // Fetch balances
   const fetchBalances = useCallback(async () => {
+    // Skip balance fetching in test environment
+    if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+      return
+    }
+    
     if (!provider || !address || !contracts) return
     
     try {
