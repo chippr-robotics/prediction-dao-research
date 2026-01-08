@@ -27,13 +27,19 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
-    testTimeout: 30000,
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    teardownTimeout: 5000,
     exclude: [
       'node_modules/**',
       'dist/**',
       'cypress/**',
       '**/useIpfs.test.js'
     ],
+    env: {
+      NODE_ENV: 'test',
+      VITE_SKIP_BLOCKCHAIN_CALLS: 'true'
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

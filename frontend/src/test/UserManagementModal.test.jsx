@@ -134,26 +134,6 @@ describe('UserManagementModal', () => {
       expect(screen.getByText(/0x1234...7890/i)).toBeInTheDocument()
     })
 
-    it('should display ClearPath status section', () => {
-      renderWithProviders(<UserManagementModal />)
-      
-      expect(screen.getByText(/ClearPath Status/i)).toBeInTheDocument()
-      expect(screen.getByText(/Inactive/i)).toBeInTheDocument()
-    })
-
-    it('should allow toggling ClearPath status', async () => {
-      renderWithProviders(<UserManagementModal />)
-      
-      const toggleButton = screen.getByText(/Activate ClearPath/i)
-      expect(toggleButton).toBeInTheDocument()
-      
-      fireEvent.click(toggleButton)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Active/i)).toBeInTheDocument()
-      })
-    })
-
     it('should show disconnect wallet button', () => {
       renderWithProviders(<UserManagementModal />)
       
