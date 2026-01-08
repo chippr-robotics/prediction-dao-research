@@ -4,8 +4,9 @@ import { useWallet, useWeb3 } from './index'
 import { TOKEN_MINT_FACTORY_ABI, TokenType } from '../abis/TokenMintFactory'
 import { getContractAddress } from '../config/contracts'
 
-// Get TokenMintFactory address from centralized config
-const TOKEN_MINT_FACTORY_ADDRESS = import.meta.env.VITE_TOKEN_MINT_FACTORY_ADDRESS || getContractAddress('tokenMintFactory')
+// Get TokenMintFactory address from environment or centralized config
+// Returns null if not deployed yet, which is handled gracefully by the hook
+const TOKEN_MINT_FACTORY_ADDRESS = import.meta.env.VITE_TOKEN_MINT_FACTORY_ADDRESS ?? getContractAddress('tokenMintFactory')
 
 /**
  * Loading states for data fetching
@@ -224,7 +225,7 @@ export function useTokenMintFactory() {
     tokens,
     erc20Tokens,
     nftTokens,
-    tokenCount,
+    tokenCount: tokens.length, // Computed from tokens array
 
     // Actions
     fetchUserTokens,
