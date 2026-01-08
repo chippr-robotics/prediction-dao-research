@@ -17,6 +17,9 @@ import "./CTF1155.sol";
  * @notice Automated deployment of pass-fail market pairs using Gnosis CTF standards
  * @dev Creates conditional prediction markets for proposals with role-based access control
  * 
+ * For a practical walkthrough of how this contract works, see:
+ * docs/user-guide/conditional-market-rain-example.md
+ * 
  * TRADING INTEGRATION:
  * This contract now integrates with ETC Swap v3 contracts for production-ready DEX trading.
  * The integration uses ETCSwapV3Integration contract for:
