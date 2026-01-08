@@ -212,8 +212,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
    * Supports prediction markets with web3 transactions
    */
   const handleMarketCreation = async (submitData, modalSigner) => {
-    console.log('Creating market from modal:', submitData)
-
     const activeSigner = modalSigner || signer
 
     // Show confirmation dialog for the market creation transaction
