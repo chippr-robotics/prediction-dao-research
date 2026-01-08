@@ -1,10 +1,11 @@
 import { useState, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from './index'
-import { TOKEN_MINT_FACTORY_ABI, TokenType } from '../abis/TokenMintFactory'
+import { TOKEN_MINT_FACTORY_ABI } from '../abis/TokenMintFactory'
+import { getContractAddress } from '../config/contracts'
 
-// Contract address - should be moved to environment config
-const TOKEN_MINT_FACTORY_ADDRESS = import.meta.env.VITE_TOKEN_MINT_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+// Get TokenMintFactory address from centralized config
+const TOKEN_MINT_FACTORY_ADDRESS = import.meta.env.VITE_TOKEN_MINT_FACTORY_ADDRESS || getContractAddress('tokenMintFactory')
 
 /**
  * Transaction states for UI feedback
@@ -40,7 +41,7 @@ export function useTokenCreation() {
 
   // Get contract instance
   const contract = useMemo(() => {
-    if (!signer || !TOKEN_MINT_FACTORY_ADDRESS || TOKEN_MINT_FACTORY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    if (!signer || !TOKEN_MINT_FACTORY_ADDRESS) {
       return null
     }
     return new ethers.Contract(TOKEN_MINT_FACTORY_ADDRESS, TOKEN_MINT_FACTORY_ABI, signer)
@@ -48,7 +49,7 @@ export function useTokenCreation() {
 
   // Read-only contract for estimation
   const readContract = useMemo(() => {
-    if (!provider || !TOKEN_MINT_FACTORY_ADDRESS || TOKEN_MINT_FACTORY_ADDRESS === '0x0000000000000000000000000000000000000000') {
+    if (!provider || !TOKEN_MINT_FACTORY_ADDRESS) {
       return null
     }
     return new ethers.Contract(TOKEN_MINT_FACTORY_ADDRESS, TOKEN_MINT_FACTORY_ABI, provider)

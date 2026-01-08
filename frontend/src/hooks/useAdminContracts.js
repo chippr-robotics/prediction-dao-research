@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { MINIMAL_ROLE_MANAGER_ABI, MEMBERSHIP_TIERS, TIER_NAMES } from '../abis/MinimalRoleManager'
-import { DEPLOYED_CONTRACTS, NETWORK_CONFIG, getContractAddress } from '../config/contracts'
+import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
 
 // Refresh interval for contract state (30 seconds)
 export const CONTRACT_STATE_REFRESH_INTERVAL = 30000

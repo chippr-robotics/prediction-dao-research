@@ -16,8 +16,7 @@ function TokenMintPage() {
   const {
     tokens,
     isLoading: tokenLoading,
-    refreshTokens,
-    hasContract
+    refreshTokens
   } = useTokenMintFactory()
 
   /**

@@ -38,8 +38,7 @@ function TokenManagementModal({ isOpen, onClose }) {
     erc20Tokens,
     nftTokens,
     isLoading: tokensLoading,
-    refreshTokens,
-    getExplorerUrl
+    refreshTokens
   } = useTokenMintFactory()
 
   // Transform blockchain tokens to modal's expected format
