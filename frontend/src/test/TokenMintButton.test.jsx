@@ -16,10 +16,6 @@ vi.mock('../components/fairwins/TokenMintBuilderModal', () => ({
   default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Token Builder Modal"><button onClick={onClose}>Close</button></div> : null
 }))
 
-vi.mock('../components/fairwins/MarketCreationModal', () => ({
-  default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Create New Market Modal"><button onClick={onClose}>Close</button></div> : null
-}))
-
 vi.mock('../components/fairwins/TokenManagementModal', () => ({
   default: ({ isOpen, onClose }) => isOpen ? <div role="dialog" aria-label="Token Management Modal"><button onClick={onClose}>Close</button></div> : null
 }))
@@ -176,21 +172,22 @@ describe('TokenMintButton Component', () => {
       })
     })
 
-    it('shows market creation option for users with MARKET_MAKER role', async () => {
+    it('does not show market creation option (moved to WalletButton)', async () => {
       const user = userEvent.setup()
       const roleContext = {
         ...defaultRoleContext,
         roles: [ROLES.MARKET_MAKER],
         hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
       }
-      
+
       renderWithProviders(<TokenMintButton />, { roleContext })
-      
+
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
-      
+
       await waitFor(() => {
-        expect(screen.getByText('Create New Market')).toBeInTheDocument()
+        // Market creation is now handled by WalletButton
+        expect(screen.queryByText('Create New Market')).not.toBeInTheDocument()
       })
     })
 
@@ -212,22 +209,22 @@ describe('TokenMintButton Component', () => {
       })
     })
 
-    it('shows multiple options for users with multiple roles', async () => {
+    it('shows token options for users with TOKENMINT role', async () => {
       const user = userEvent.setup()
       const roleContext = {
         ...defaultRoleContext,
-        roles: [ROLES.TOKENMINT, ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.TOKENMINT || role === ROLES.MARKET_MAKER)
+        roles: [ROLES.TOKENMINT],
+        hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
       }
-      
+
       renderWithProviders(<TokenMintButton />, { roleContext })
-      
+
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
-      
+
       await waitFor(() => {
         expect(screen.getByText('Create New Token')).toBeInTheDocument()
-        expect(screen.getByText('Create New Market')).toBeInTheDocument()
+        expect(screen.getByText('Manage Tokens')).toBeInTheDocument()
       })
     })
   })
@@ -255,25 +252,25 @@ describe('TokenMintButton Component', () => {
       })
     })
 
-    it('shows market creation modal when create market option is clicked', async () => {
+    it('opens token management modal when manage tokens option is clicked', async () => {
       const user = userEvent.setup()
       const roleContext = {
         ...defaultRoleContext,
-        roles: [ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
+        roles: [ROLES.TOKENMINT],
+        hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
       }
-      
+
       renderWithProviders(<TokenMintButton />, { roleContext })
-      
+
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
-      
-      const createMarketOption = await screen.findByText('Create New Market')
-      await user.click(createMarketOption)
-      
-      // The new implementation shows the MarketCreationModal component directly
+
+      const manageTokensOption = await screen.findByText('Manage Tokens')
+      await user.click(manageTokensOption)
+
+      // Token Management Modal should be rendered
       await waitFor(() => {
-        expect(screen.getByRole('dialog', { name: /create new/i })).toBeInTheDocument()
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument()
       })
     })
 
