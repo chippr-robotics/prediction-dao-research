@@ -33,7 +33,7 @@ function WalletPage() {
   const { address, isConnected, connectors } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
   const { showModal, hideModal } = useModal()
-  const { preferences, setClearPathStatus } = useUserPreferences()
+  const { preferences } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
@@ -68,10 +68,6 @@ function WalletPage() {
   const handleDisconnect = () => {
     disconnectWallet()
     navigate('/app')
-  }
-
-  const handleToggleClearPath = () => {
-    setClearPathStatus(!preferences.clearPathStatus.active)
   }
 
   const handleSearchSubmit = (e) => {
@@ -201,27 +197,6 @@ function WalletPage() {
                           <span className="value">{address}</span>
                         </div>
                         <button onClick={handleDisconnect} className="disconnect-btn">Disconnect Wallet</button>
-                      </div>
-                    </div>
-
-                    <div className="section">
-                      <h3>ClearPath Status</h3>
-                      <div className="clearpath-status-section">
-                        <div className="status-display">
-                          <span className={`status-badge ${preferences.clearPathStatus.active ? 'active' : 'inactive'}`}>
-                            {preferences.clearPathStatus.active ? 'Active' : 'Inactive'}
-                          </span>
-                          {preferences.clearPathStatus.lastUpdated && (
-                            <span className="last-updated">Updated: {new Date(preferences.clearPathStatus.lastUpdated).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                        <button onClick={handleToggleClearPath} className="toggle-status-btn">
-                          {preferences.clearPathStatus.active ? 'Deactivate' : 'Activate'} ClearPath
-                        </button>
-                        <p className="clearpath-description">
-                          ClearPath provides institutional-grade governance through prediction markets. 
-                          {preferences.clearPathStatus.active ? ' You have access to advanced governance features.' : ' Activate to access governance features.'}
-                        </p>
                       </div>
                     </div>
 
