@@ -46,6 +46,13 @@ The `TreasuryVault` contract manages DAO treasury funds with sophisticated acces
    - Deposits remain enabled during pause
    - Guardian can be updated by owner
 
+6. **Nullification Restrictions** (NEW)
+   - Integrates with NullifierRegistry for address blocking
+   - Can block withdrawals to nullified addresses
+   - Optional enforcement (can be enabled/disabled)
+   - Emits `WithdrawalBlockedByNullification` when blocking
+   - See [NULLIFIER_SYSTEM.md](./NULLIFIER_SYSTEM.md) for full details
+
 #### Usage Example
 
 ```solidity
@@ -68,6 +75,13 @@ vault.withdrawETH(recipient, 3 ether);
 
 // Emergency pause if needed
 vault.pause();
+
+// Configure nullification (optional)
+vault.setNullifierRegistry(nullifierRegistryAddress);
+vault.setNullificationEnforcement(true);
+
+// Check if address is nullified before withdrawal
+bool blocked = vault.isRecipientNullified(recipient);
 ```
 
 #### Security Considerations
@@ -77,6 +91,7 @@ vault.pause();
 - **Spending Limits**: Prevent single large withdrawals or rapid fund drainage
 - **Guardian Role**: Allows emergency pause without full admin control
 - **Event Logging**: Complete audit trail of all operations
+- **Nullification**: Optional blocking of withdrawals to known-bad addresses
 
 ### MarketVault
 
@@ -230,6 +245,9 @@ Before production deployment:
 - [ ] Verify upgrade/clone patterns work correctly
 - [ ] Run static analysis tools (Slither, Mythril)
 - [ ] Consider external security audit
+- [ ] Configure NullifierRegistry address if using nullification
+- [ ] Decide on nullification enforcement policy
+- [ ] Verify nullification admin roles are correctly assigned
 
 ## Gas Optimization Notes
 

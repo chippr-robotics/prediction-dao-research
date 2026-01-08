@@ -28,6 +28,7 @@ contract MinimalRoleManager is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant TOKENMINT_ROLE = keccak256("TOKENMINT_ROLE");
     bytes32 public constant FRIEND_MARKET_ROLE = keccak256("FRIEND_MARKET_ROLE");
     bytes32 public constant OVERSIGHT_COMMITTEE_ROLE = keccak256("OVERSIGHT_COMMITTEE_ROLE");
+    bytes32 public constant NULLIFIER_ADMIN_ROLE = keccak256("NULLIFIER_ADMIN_ROLE");
     
     // ========== Tier Definitions ==========
     
@@ -67,6 +68,7 @@ contract MinimalRoleManager is AccessControl, ReentrancyGuard, Pausable {
         _setRoleAdmin(TOKENMINT_ROLE, OPERATIONS_ADMIN_ROLE);
         _setRoleAdmin(FRIEND_MARKET_ROLE, OPERATIONS_ADMIN_ROLE);
         _setRoleAdmin(OVERSIGHT_COMMITTEE_ROLE, DEFAULT_ADMIN_ROLE);
+        _setRoleAdmin(NULLIFIER_ADMIN_ROLE, OPERATIONS_ADMIN_ROLE);
         
         // For CREATE2 deployments, allow one-time initialize
         _initialized = msg.sender != SAFE_SINGLETON_FACTORY;
