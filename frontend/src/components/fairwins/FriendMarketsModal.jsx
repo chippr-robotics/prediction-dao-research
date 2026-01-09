@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import QRScanner from '../ui/QRScanner'
 import './FriendMarketsModal.css'
+
+// Stable empty arrays to prevent re-renders from default prop recreation
+const EMPTY_ARRAY = []
 
 /**
  * FriendMarketsModal Component
@@ -18,8 +21,8 @@ function FriendMarketsModal({
   isOpen,
   onClose,
   onCreate,
-  activeMarkets = [],
-  pastMarkets = []
+  activeMarkets = EMPTY_ARRAY,
+  pastMarkets = EMPTY_ARRAY
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
