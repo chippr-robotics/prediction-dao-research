@@ -11,6 +11,20 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function hexByteLength(hex) {
+  if (!hex) return 0;
+  const s = String(hex);
+  const normalized = s.startsWith("0x") ? s.slice(2) : s;
+  return Math.floor(normalized.length / 2);
+}
+
+// EIP-3860 (Shanghai) limits initcode size to 49152 bytes.
+// If initcode exceeds this, CREATE/CREATE2 fails (often with no revert data).
+const DEFAULT_MAX_INITCODE_BYTES = 49_152;
+
+// EIP-170 limits deployed/runtime code size to 24,576 bytes.
+const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
+
 function isLikelyAlreadyVerifiedError(message) {
   const m = (message || "").toLowerCase();
   return (
@@ -213,6 +227,23 @@ async function safeTransferOwnership({ name, contract, from, to }) {
  */
 async function deployDeterministic(contractName, constructorArgs, salt, deployer) {
   console.log(`\nDeploying ${contractName} deterministically...`);
+
+  // Diagnostics: show sizes that commonly cause CREATE2 failures.
+  try {
+    const artifact = await hre.artifacts.readArtifact(contractName);
+    const runtimeBytes = hexByteLength(artifact?.deployedBytecode);
+    const maxRuntimeBytes = Number(process.env.MAX_RUNTIME_BYTES ?? DEFAULT_MAX_RUNTIME_BYTES);
+    if (runtimeBytes > 0) {
+      const warn = Number.isFinite(maxRuntimeBytes) && runtimeBytes > maxRuntimeBytes;
+      console.log(
+        `  Runtime code size: ${runtimeBytes} bytes` +
+          (Number.isFinite(maxRuntimeBytes) ? ` (MAX_RUNTIME_BYTES=${maxRuntimeBytes})` : "") +
+          (warn ? " ⚠️ exceeds EIP-170" : "")
+      );
+    }
+  } catch {
+    // ignore if artifact isn't readable
+  }
   
   // Get contract factory
   const ContractFactory = await ethers.getContractFactory(contractName, deployer);
@@ -225,6 +256,22 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
       `Failed to build initCode for ${contractName}. ` +
         `Hardhat/ethers returned empty deployment data; ` +
         `check the contract is compiled and has no unlinked libraries.`
+    );
+  }
+
+  // Preflight: initcode size limit (EIP-3860). This is a common cause of
+  // silent CREATE2 failures when deploying large factory-style contracts.
+  const initCodeBytes = hexByteLength(deploymentData);
+  const maxInitCodeBytes = Number(process.env.MAX_INITCODE_BYTES ?? DEFAULT_MAX_INITCODE_BYTES);
+  console.log(
+    `  Initcode size: ${initCodeBytes} bytes` +
+      (Number.isFinite(maxInitCodeBytes) ? ` (MAX_INITCODE_BYTES=${maxInitCodeBytes})` : "")
+  );
+  if (Number.isFinite(maxInitCodeBytes) && initCodeBytes > maxInitCodeBytes) {
+    throw new Error(
+      `${contractName} initcode is too large (${initCodeBytes} bytes > ${maxInitCodeBytes}). ` +
+        `On Shanghai+ networks (including most public chains), CREATE2 will fail. ` +
+        `Fix by reducing initcode size (e.g. split contracts / use minimal proxies).`
     );
   }
   
@@ -265,12 +312,58 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
       to: SINGLETON_FACTORY_ADDRESS,
       data: txData,
     });
-    gasLimit = (estimatedGas * 120n) / 100n; // Add 20% buffer
-    console.log(`  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} with buffer)`);
+
+    // Add buffer, but never exceed the block gas limit.
+    // IMPORTANT: don't clamp below estimateGas; if estimateGas itself is near the
+    // block limit, deploying on this chain may be impossible.
+    const bufferPct = BigInt(Number(process.env.GAS_BUFFER_PCT ?? 110));
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const blockGasLimit = latestBlock?.gasLimit;
+
+    let buffered = (estimatedGas * bufferPct) / 100n;
+    if (buffered < estimatedGas) buffered = estimatedGas;
+
+    if (blockGasLimit) {
+      const capPct = BigInt(Number(process.env.GAS_CAP_PCT ?? 99));
+      const cap = (blockGasLimit * capPct) / 100n;
+
+      if (estimatedGas > cap) {
+        console.warn(
+          `  ⚠️  estimateGas (${estimatedGas.toString()}) exceeds cap=${cap.toString()} (blockGasLimit=${blockGasLimit.toString()}). ` +
+            `This deployment likely cannot fit in a single block on this network.`
+        );
+      }
+
+      if (buffered > cap) {
+        console.warn(
+          `  ⚠️  Buffered gas (${buffered.toString()}) exceeds cap=${cap.toString()} (blockGasLimit=${blockGasLimit.toString()}); clamping.`
+        );
+        buffered = cap;
+      }
+    }
+
+    gasLimit = buffered;
+    console.log(`  Estimated gas: ${estimatedGas.toString()} (using ${gasLimit.toString()} with buffer+cap)`);
   } catch (error) {
     const latestBlock = await ethers.provider.getBlock("latest");
     const blockGasLimit = latestBlock?.gasLimit;
     const message = error?.message || String(error);
+
+    // Best-effort staticcall for more context (some RPCs include additional detail).
+    try {
+      await ethers.provider.call({
+        from: deployer.address,
+        to: SINGLETON_FACTORY_ADDRESS,
+        data: txData,
+      });
+    } catch (callErr) {
+      const callMsg = callErr?.message || String(callErr);
+      console.warn(`  ⚠️  eth_call simulation also failed: ${callMsg.split("\n")[0]}`);
+    }
+
+    console.warn(
+      `  ℹ️  ${contractName} initcode size: ${initCodeBytes} bytes (MAX_INITCODE_BYTES=${maxInitCodeBytes})`
+    );
 
     // If estimation fails (common on some RPCs / with large initCode), fall back
     // to a near-block gas limit so we don't accidentally OOG.
@@ -295,7 +388,12 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
   
   const receipt = await tx.wait();
   if (receipt && receipt.status === 0) {
-    throw new Error(`Deployment transaction reverted: ${receipt.hash}`);
+    throw new Error(
+      `Deployment transaction reverted: ${receipt.hash}. ` +
+        `Common causes: (1) initcode too large (EIP-3860), ` +
+        `(2) runtime code size too large (EIP-170), ` +
+        `(3) not enough gas within block limit for CREATE2.`
+    );
   }
   console.log(`  ✓ Deployed in tx: ${receipt.hash}`);
   console.log(`  ✓ Gas used: ${receipt.gasUsed.toString()}`);
@@ -642,10 +740,18 @@ async function main() {
   deployments.tokenMintFactory = tokenMintFactory.address;
 
   // 9. Deploy DAOFactory
-  // DAOFactory has no constructor args - it deploys implementation contracts internally
+  // DAOFactory takes implementation addresses (to keep initcode under EIP-3860 limits)
   const daoFactory = await deployDeterministic(
     "DAOFactory",
-    [], // No constructor arguments
+    [
+      welfareRegistry.address,
+      proposalRegistry.address,
+      marketFactory.address,
+      privacyCoordinator.address,
+      oracleResolver.address,
+      ragequitModule.address,
+      futarchyGovernor.address,
+    ],
     generateSalt(saltPrefix + "DAOFactory"),
     deployer
   );
@@ -760,7 +866,15 @@ async function main() {
     {
       name: "DAOFactory",
       address: daoFactory.address,
-      constructorArguments: [],
+      constructorArguments: [
+        welfareRegistry.address,
+        proposalRegistry.address,
+        marketFactory.address,
+        privacyCoordinator.address,
+        oracleResolver.address,
+        ragequitModule.address,
+        futarchyGovernor.address,
+      ],
     },
   ];
 
