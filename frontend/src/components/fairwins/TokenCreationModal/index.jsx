@@ -47,6 +47,8 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
     isConnected,
     isCorrectNetwork,
     walletAddress,
+    hasContract,
+    isContractDeployed,
     txState,
     txHash,
     txError,
@@ -288,10 +290,11 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
               totalCostETC={totalCostETC}
               walletAddress={walletAddress}
               isCorrectNetwork={isCorrectNetwork}
+              isContractDeployed={isContractDeployed}
               getExplorerUrl={getExplorerUrl}
               onDeploy={handleDeploy}
               onEstimateGas={handleEstimateGas}
-              disabled={isDeploying}
+              disabled={isDeploying || !isContractDeployed}
             />
           )}
         </div>

@@ -34,7 +34,13 @@ const DAOFactoryABI = [
   "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
 ]
 
-const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000000000000000000000000000000'
+// Check for factory address from environment or config
+const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || import.meta.env.VITE_DAO_FACTORY_ADDRESS || null
+
+// Helper to check if factory is deployed
+const isFactoryDeployed = () => {
+  return FACTORY_ADDRESS && FACTORY_ADDRESS !== ethers.ZeroAddress
+}
 
 // Date validation constants
 const MIN_VALID_DATE = new Date('2000-01-01T00:00:00Z').getTime()
@@ -1087,6 +1093,12 @@ function LaunchDAOForm({ onSuccess }) {
     e.preventDefault()
     if (!validate()) return
 
+    // Check factory deployment
+    if (!isFactoryDeployed()) {
+      setErrors({ submit: 'DAO Factory contract is not deployed on this network. DAO creation is temporarily unavailable.' })
+      return
+    }
+
     // Check wallet connection
     if (!isConnected || !signer || !account) {
       setErrors({ submit: 'Please connect your wallet to create a DAO' })
@@ -1171,6 +1183,17 @@ function LaunchDAOForm({ onSuccess }) {
       <h3 className="cp-section-title">Launch New DAO</h3>
       <p className="cp-launch-desc">Create a new decentralized autonomous organization with futarchy-based governance.</p>
 
+      {!isFactoryDeployed() && (
+        <div className="cp-warning-banner">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          <span>DAO Factory contract is not deployed on this network. DAO creation is temporarily unavailable.</span>
+        </div>
+      )}
+
       <form className="cp-launch-form" onSubmit={handleSubmit}>
         <div className="cp-form-group">
           <label htmlFor="dao-name">
@@ -1248,7 +1271,7 @@ function LaunchDAOForm({ onSuccess }) {
           <button
             type="submit"
             className="cp-btn-primary cp-btn-lg"
-            disabled={creating}
+            disabled={creating || !isFactoryDeployed()}
           >
             {creating ? (
               <>

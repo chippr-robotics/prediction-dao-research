@@ -243,31 +243,83 @@ function TokenManagementModal({ isOpen, onClose }) {
   }, [isOpen, actionModal, showInfoPanel])
 
   const fetchChainInfo = async (item) => {
-    setLoading(true)
     try {
-      // In production, fetch real on-chain data
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // Fetch real on-chain data from the token contract
+      const abi = item.type === 'ERC721' ? EXTENDED_ERC721_ABI : EXTENDED_ERC20_ABI
+      const provider = signer?.provider || window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null
 
-      const info = {
+      if (!provider) {
+        throw new Error('No provider available')
+      }
+
+      const contract = new ethers.Contract(item.address, abi, provider)
+
+      // Fetch common data
+      let info = {
         contractAddress: item.address,
         name: item.name,
         symbol: item.symbol,
         type: item.type,
         owner: item.owner || address,
-        ...(item.type === 'ERC20' && {
-          totalSupply: item.totalSupply,
-          decimals: item.decimals || 18,
-          balanceOfOwner: '500000'
-        }),
-        ...(item.type === 'ERC721' && {
-          totalSupply: item.totalSupply,
-          baseURI: item.baseURI
-        }),
-        isPaused: item.isPaused || false,
         isPausable: item.isPausable || false,
         isBurnable: item.isBurnable || false,
-        blockNumber: 12345678,
-        transactionHash: '0x' + 'a'.repeat(64)
+        isPaused: false,
+        blockNumber: null,
+        transactionHash: null
+      }
+
+      // Try to get paused state if pausable
+      if (item.isPausable) {
+        try {
+          info.isPaused = await contract.paused()
+        } catch {
+          // Contract may not have paused() function
+          info.isPaused = false
+        }
+      }
+
+      // Fetch ERC20 specific data
+      if (item.type === 'ERC20') {
+        try {
+          const [totalSupply, decimals, ownerBalance] = await Promise.all([
+            contract.totalSupply(),
+            contract.decimals(),
+            address ? contract.balanceOf(address) : Promise.resolve(0n)
+          ])
+          info.totalSupply = ethers.formatUnits(totalSupply, decimals)
+          info.decimals = Number(decimals)
+          info.balanceOfOwner = ethers.formatUnits(ownerBalance, decimals)
+        } catch (err) {
+          console.warn('Error fetching ERC20 details:', err)
+          info.totalSupply = item.totalSupply || '0'
+          info.decimals = 18
+          info.balanceOfOwner = '0'
+        }
+      }
+
+      // Fetch ERC721 specific data
+      if (item.type === 'ERC721') {
+        try {
+          const totalSupply = await contract.totalSupply()
+          info.totalSupply = totalSupply.toString()
+        } catch {
+          info.totalSupply = item.totalSupply || '0'
+        }
+
+        try {
+          const baseURI = await contract.baseURI()
+          info.baseURI = baseURI || item.baseURI
+        } catch {
+          info.baseURI = item.baseURI || ''
+        }
+      }
+
+      // Try to get owner if the contract has an owner() function
+      try {
+        info.owner = await contract.owner()
+      } catch {
+        // Contract may not have owner() function
+        info.owner = item.owner || address
       }
 
       setChainInfo(info)
@@ -275,8 +327,6 @@ function TokenManagementModal({ isOpen, onClose }) {
     } catch (error) {
       console.error('Error fetching chain info:', error)
       window.alert('Unable to load on-chain token details. Please try again in a moment.')
-    } finally {
-      setLoading(false)
     }
   }
 
