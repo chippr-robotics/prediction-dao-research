@@ -55,6 +55,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   // Step navigation
   const [currentStep, setCurrentStep] = useState(0)
 
+  // Safety check: Don't render if hooks returned undefined values (shouldn't happen but adds safety)
+  const hasRequiredContext = typeof isConnected !== 'undefined' && typeof isCorrectNetwork !== 'undefined'
+
   // Metadata source toggle
   const [useCustomUri, setUseCustomUri] = useState(false)
 
@@ -349,6 +352,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   )
 
   if (!isOpen) return null
+
+  // Safety check: Return null if contexts are not initialized properly
+  // This prevents rendering errors if hooks return undefined values
+  if (!hasRequiredContext) {
+    console.error('MarketCreationModal: Required contexts not initialized')
+    return null
+  }
 
   return (
     <div
