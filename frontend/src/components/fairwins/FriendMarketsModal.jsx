@@ -24,6 +24,9 @@ function FriendMarketsModal({
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
 
+  // Safety check: Don't render if hooks returned undefined values (shouldn't happen but adds safety)
+  const hasRequiredContext = typeof isConnected !== 'undefined' && typeof isCorrectNetwork !== 'undefined'
+
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
 
@@ -458,6 +461,13 @@ function FriendMarketsModal({
   }, [pastMarkets, account])
 
   if (!isOpen) return null
+
+  // Safety check: Return null if contexts are not initialized properly
+  // This prevents rendering errors if hooks return undefined values
+  if (!hasRequiredContext) {
+    console.error('FriendMarketsModal: Required contexts not initialized')
+    return null
+  }
 
   return (
     <div
