@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useEthers, useAccount } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { getContractAddress } from '../../config/contracts'
 import './ClearPathModal.css'
 
 /**
@@ -34,12 +35,12 @@ const DAOFactoryABI = [
   "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
 ]
 
-// Check for factory address from environment or config
-const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || import.meta.env.VITE_DAO_FACTORY_ADDRESS || null
+// Check for factory address from environment or deployed config
+const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || import.meta.env.VITE_DAO_FACTORY_ADDRESS || getContractAddress('daoFactory')
 
 // Helper to check if factory is deployed
 const isFactoryDeployed = () => {
-  return FACTORY_ADDRESS && FACTORY_ADDRESS !== ethers.ZeroAddress
+  return FACTORY_ADDRESS && FACTORY_ADDRESS !== ethers.ZeroAddress && FACTORY_ADDRESS !== null
 }
 
 // Date validation constants
