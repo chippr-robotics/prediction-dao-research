@@ -631,6 +631,26 @@ async function main() {
     console.warn(`  ⚠️  FutarchyGovernor setRoleManager skipped: ${message.split("\n")[0]}`);
   }
 
+  // 8. Deploy TokenMintFactory
+  // TokenMintFactory requires roleManager address for access control
+  const tokenMintFactory = await deployDeterministic(
+    "TokenMintFactory",
+    [tieredRoleManager.address], // Constructor arg: roleManager address
+    generateSalt(saltPrefix + "TokenMintFactory"),
+    deployer
+  );
+  deployments.tokenMintFactory = tokenMintFactory.address;
+
+  // 9. Deploy DAOFactory
+  // DAOFactory has no constructor args - it deploys implementation contracts internally
+  const daoFactory = await deployDeterministic(
+    "DAOFactory",
+    [], // No constructor arguments
+    generateSalt(saltPrefix + "DAOFactory"),
+    deployer
+  );
+  deployments.daoFactory = daoFactory.address;
+
   // Setup initial configuration (only if contracts are newly deployed)
   console.log("\n\nSetting up initial configuration...");
   
@@ -732,6 +752,16 @@ async function main() {
       address: futarchyGovernor.address,
       constructorArguments: [],
     },
+    {
+      name: "TokenMintFactory",
+      address: tokenMintFactory.address,
+      constructorArguments: [tieredRoleManager.address],
+    },
+    {
+      name: "DAOFactory",
+      address: daoFactory.address,
+      constructorArguments: [],
+    },
   ];
 
   for (const target of verificationTargets) {
@@ -787,6 +817,8 @@ async function main() {
   console.log("OracleResolver:", deployments.oracleResolver);
   console.log("RagequitModule:", deployments.ragequitModule);
   console.log("FutarchyGovernor:", deployments.futarchyGovernor);
+  console.log("TokenMintFactory:", deployments.tokenMintFactory);
+  console.log("DAOFactory:", deployments.daoFactory);
 
   console.log("\n✓ Deployment completed successfully!");
   console.log("\nNote: These addresses are deterministic and will be the same on any");
