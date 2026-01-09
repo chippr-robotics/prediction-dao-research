@@ -425,7 +425,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC20 = await ethers.getContractFactory("ERC20Basic");
+      const ERC20 = await ethers.getContractFactory("ERC20BasicImpl");
       const token = ERC20.attach(tokenInfo.tokenAddress);
 
       // Mint additional tokens
@@ -447,7 +447,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC20 = await ethers.getContractFactory("ERC20BurnableToken");
+      const ERC20 = await ethers.getContractFactory("ERC20BurnableImpl");
       const token = ERC20.attach(tokenInfo.tokenAddress);
 
       const initialBalance = await token.balanceOf(user1.address);
@@ -471,7 +471,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC20 = await ethers.getContractFactory("ERC20PausableToken");
+      const ERC20 = await ethers.getContractFactory("ERC20PausableImpl");
       const token = ERC20.attach(tokenInfo.tokenAddress);
 
       // Pause the token
@@ -500,7 +500,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC721 = await ethers.getContractFactory("ERC721Basic");
+      const ERC721 = await ethers.getContractFactory("ERC721BasicImpl");
       const nft = ERC721.attach(tokenInfo.tokenAddress);
 
       // Mint an NFT
@@ -522,7 +522,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC721 = await ethers.getContractFactory("ERC721BurnableCollection");
+      const ERC721 = await ethers.getContractFactory("ERC721BurnableImpl");
       const nft = ERC721.attach(tokenInfo.tokenAddress);
 
       // Mint an NFT
