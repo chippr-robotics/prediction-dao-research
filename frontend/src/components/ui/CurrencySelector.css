@@ -1,0 +1,265 @@
+/**
+ * CurrencySelector Styles
+ *
+ * Consistent with FairWins design system
+ * Colors: Green (#36B37E), Blue (#4C9AFF), Mint (#7BDCB5)
+ */
+
+.currency-selector {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+/* Trigger Button */
+.currency-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 8px;
+  color: var(--text-primary, #E6EDF3);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.currency-selector-trigger:hover:not(:disabled) {
+  border-color: rgba(54, 179, 126, 0.5);
+  background: rgba(54, 179, 126, 0.05);
+}
+
+.currency-selector-trigger:focus {
+  outline: none;
+  border-color: #36B37E;
+  box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
+}
+
+.currency-selector-trigger.expanded {
+  border-color: #36B37E;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.currency-selector-trigger.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Currency Icon */
+.currency-selector .currency-icon {
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
+/* Currency Symbol */
+.currency-selector .currency-symbol {
+  font-weight: 600;
+  color: var(--text-primary, #E6EDF3);
+}
+
+/* Currency Balance */
+.currency-selector .currency-balance {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #AAB6C2);
+  font-family: 'Fira Code', 'SF Mono', monospace;
+}
+
+/* Chevron */
+.currency-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary, #AAB6C2);
+  transition: transform 0.2s ease;
+}
+
+.currency-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* Dropdown */
+.currency-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid #36B37E;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  z-index: 100;
+  overflow: hidden;
+  animation: currencyDropdownSlide 0.15s ease-out;
+}
+
+@keyframes currencyDropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Currency Option */
+.currency-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-color, #23303D);
+  color: var(--text-primary, #E6EDF3);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.currency-option:last-child {
+  border-bottom: none;
+}
+
+.currency-option:hover {
+  background: rgba(54, 179, 126, 0.1);
+}
+
+.currency-option.selected {
+  background: rgba(54, 179, 126, 0.15);
+}
+
+.currency-option .currency-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Currency Info */
+.currency-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.currency-info .currency-symbol {
+  font-weight: 600;
+  color: var(--text-primary, #E6EDF3);
+}
+
+.currency-info .currency-name {
+  font-size: 0.75rem;
+  color: var(--text-muted, #7A8590);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Currency Balance in Option */
+.currency-option .currency-balance {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #AAB6C2);
+  font-family: 'Fira Code', 'SF Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* Default Badge */
+.currency-default-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  background: rgba(54, 179, 126, 0.15);
+  color: #36B37E;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* Check Mark */
+.currency-check {
+  color: #36B37E;
+  flex-shrink: 0;
+}
+
+/* Backdrop */
+.currency-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+}
+
+/* Compact Variant */
+.currency-selector.compact .currency-selector-trigger {
+  padding: 0.5rem 0.625rem;
+}
+
+.currency-selector.compact .currency-icon {
+  font-size: 1rem;
+}
+
+.currency-selector.compact .currency-symbol {
+  font-size: 0.8rem;
+}
+
+/* Inline Variant - for use in forms */
+.currency-selector.inline {
+  width: auto;
+  min-width: 140px;
+}
+
+/* Responsive Styles */
+@media (max-width: 640px) {
+  .currency-selector-trigger {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .currency-option {
+    padding: 0.625rem 0.75rem;
+  }
+
+  .currency-info .currency-name {
+    display: none;
+  }
+
+  .currency-default-badge {
+    display: none;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .currency-dropdown {
+    animation: none;
+  }
+
+  .currency-chevron {
+    transition: none;
+  }
+}
+
+/* Light Theme */
+.theme-light .currency-selector-trigger {
+  background: var(--bg-primary, #FFFFFF);
+  border-color: var(--border-color, #E5E5E5);
+}
+
+.theme-light .currency-dropdown {
+  background: var(--bg-primary, #FFFFFF);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.theme-light .currency-option {
+  border-color: var(--border-color, #E5E5E5);
+}
