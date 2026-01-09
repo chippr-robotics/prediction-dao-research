@@ -409,8 +409,8 @@ describe('FriendMarketsModal', () => {
       const stakeInput = screen.getByLabelText(/stake/i)
       // Default stake value should be 10
       expect(stakeInput).toHaveValue(10)
-      // Stake input should have min attribute for validation
-      expect(stakeInput).toHaveAttribute('min', '0.1')
+      // Stake input should have min attribute for validation (USC default has min=1)
+      expect(stakeInput).toHaveAttribute('min', '1')
     })
 
     it('should validate member addresses for group markets', async () => {
@@ -562,7 +562,7 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByRole('tab', { name: /active/i }))
 
-      expect(screen.getByText('10 ETC')).toBeInTheDocument()
+      expect(screen.getByText('10 USC')).toBeInTheDocument()
       expect(screen.getByText('25 ETC')).toBeInTheDocument()
     })
 
@@ -633,7 +633,7 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         // Check for detail view elements
         expect(screen.getByText('Back to list')).toBeInTheDocument()
-        expect(screen.getByText('10 ETC')).toBeInTheDocument()
+        expect(screen.getByText('10 USC')).toBeInTheDocument()
         expect(screen.getByText('Share this market')).toBeInTheDocument()
       })
     })
