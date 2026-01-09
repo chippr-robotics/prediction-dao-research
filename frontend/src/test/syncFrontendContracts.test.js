@@ -31,11 +31,13 @@ describe('sync-frontend-contracts script', () => {
             tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
             welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
             proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-            marketFactory: '0xF3dA3ec2700b050066609D90e5cDdFE02F923177',
+            marketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac',
             privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
             oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
             ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
-            futarchyGovernor: '0x352D9997a6454AA1E0CEAFb6f8199c501b48d886'
+            futarchyGovernor: '0xD379002D90a38245dC99D9dd7BE430Ab9C0B3e54',
+            tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
+            daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a'
           }
         },
         null,
@@ -62,5 +64,9 @@ describe('sync-frontend-contracts script', () => {
     expect(updated).toContain("tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
     expect(updated).toContain("roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
     expect(updated).toContain("roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
+
+    // Factory contracts
+    expect(updated).toContain("tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB'")
+    expect(updated).toContain("daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a'")
   })
 })

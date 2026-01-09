@@ -14,6 +14,14 @@ vi.mock('../hooks/useUserPreferences', () => ({
   useUserPreferences: vi.fn()
 }))
 
+// Mock contracts config
+vi.mock('../config/contracts', () => ({
+  getContractAddress: vi.fn((name) => {
+    if (name === 'daoFactory') return '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a'
+    return null
+  })
+}))
+
 import { useEthers, useAccount } from '../hooks/useWeb3'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 
