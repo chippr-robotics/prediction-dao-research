@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
@@ -90,7 +90,9 @@ export function Web3Provider({ children }) {
     }
   }, [switchChain])
 
-  const value = {
+  const isCorrectNetwork = isConnected && chainId === EXPECTED_CHAIN_ID
+
+  const value = useMemo(() => ({
     // Connection state
     account: address,
     isConnected,
@@ -102,13 +104,24 @@ export function Web3Provider({ children }) {
     
     // Network state
     networkError,
-    isCorrectNetwork: isConnected && chainId === EXPECTED_CHAIN_ID,
+    isCorrectNetwork,
     
     // Actions
     connectWallet,
     disconnectWallet,
     switchNetwork: handleSwitchNetwork,
-  }
+  }), [
+    address,
+    isConnected,
+    chainId,
+    provider,
+    signer,
+    networkError,
+    isCorrectNetwork,
+    connectWallet,
+    disconnectWallet,
+    handleSwitchNetwork,
+  ])
 
   return (
     <Web3Context.Provider value={value}>

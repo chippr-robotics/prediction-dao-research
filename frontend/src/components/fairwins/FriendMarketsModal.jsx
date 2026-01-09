@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import QRScanner from '../ui/QRScanner'
 import './FriendMarketsModal.css'
+
+// Stable empty arrays to prevent re-renders from default prop recreation
+const EMPTY_ARRAY = []
 
 /**
  * FriendMarketsModal Component
@@ -18,11 +21,14 @@ function FriendMarketsModal({
   isOpen,
   onClose,
   onCreate,
-  activeMarkets = [],
-  pastMarkets = []
+  activeMarkets = EMPTY_ARRAY,
+  pastMarkets = EMPTY_ARRAY
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+
+  // Safety check: Don't render if hooks returned undefined values (shouldn't happen but adds safety)
+  const hasRequiredContext = typeof isConnected !== 'undefined' && typeof isCorrectNetwork !== 'undefined'
 
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
@@ -458,6 +464,13 @@ function FriendMarketsModal({
   }, [pastMarkets, account])
 
   if (!isOpen) return null
+
+  // Safety check: Return null if contexts are not initialized properly
+  // This prevents rendering errors if hooks return undefined values
+  if (!hasRequiredContext) {
+    console.error('FriendMarketsModal: Required contexts not initialized')
+    return null
+  }
 
   return (
     <div

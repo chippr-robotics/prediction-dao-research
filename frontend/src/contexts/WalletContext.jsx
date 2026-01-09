@@ -309,7 +309,8 @@ export function WalletProvider({ children }) {
     [isConnected, chainId]
   )
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo(() => ({
     // Wallet state
     address,
     account: address, // Alias for backwards compatibility
@@ -354,7 +355,32 @@ export function WalletProvider({ children }) {
     hasAllRoles,
     grantRole,
     revokeRole,
-  }
+  }), [
+    address,
+    isConnected,
+    chainId,
+    connectors,
+    provider,
+    signer,
+    networkError,
+    isCorrectNetwork,
+    balances,
+    balancesLoading,
+    roles,
+    rolesLoading,
+    connectWallet,
+    disconnectWallet,
+    switchNetwork,
+    sendTransaction,
+    signMessage,
+    refreshBalances,
+    getTokenBalance,
+    hasRole,
+    hasAnyRole,
+    hasAllRoles,
+    grantRole,
+    revokeRole,
+  ])
 
   return (
     <WalletContext.Provider value={value}>
