@@ -30,12 +30,11 @@ export const DEPLOYED_CONTRACTS = {
   roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // alias for RoleManagerCore
   roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
 
-  // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac.js --network mordor
+  // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
-  tierRegistry: '0xB258929f3247897A788EBfE03c37b4B6C3282482',
+  tierRegistry: '0x31405f0359703109C424d31A86bd7CEF08836A12',
   membershipManager: '0x5fbc6c64CAF5EA21090b50e0E4bb07ADdA0eB661',
-  // Deploy via: npx hardhat run scripts/configure-payment-manager.js --network mordor
-  membershipPaymentManager: null  // MembershipPaymentManager for payment processing
+  membershipPaymentManager: '0xF06413E0968a356Fe231C005cd0549900EF442c2'
 }
 
 /**
