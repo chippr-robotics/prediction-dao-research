@@ -280,27 +280,15 @@ function WalletButton({ className = '', theme = 'dark' }) {
         }
       }
 
-      // If on-chain role check fails, check if localStorage says they have the role
-      // This handles cases where factory's roleManager might be misconfigured
-      // The actual contract call will be the final arbiter
+      // Always check blockchain for roles - roles could expire
       if (!isOwner && !hasMarketMakerRole) {
-        // Check localStorage role as fallback (what the UI uses to show the button)
-        const hasLocalStorageRole = hasRole(ROLES.FRIEND_MARKET) || hasRole(ROLES.MARKET_MAKER)
-        console.log('localStorage role check:', { hasLocalStorageRole })
-
-        if (hasLocalStorageRole) {
-          // UI says they have the role, on-chain check failed
-          // Log warning but proceed - let contract call be final arbiter
-          console.warn('On-chain role check failed but localStorage shows user has the required role. Proceeding with transaction.')
-          console.warn('If transaction fails with "Requires owner or MARKET_MAKER_ROLE", the factory may need to be reconfigured.')
-        } else if (roleManagerAddress === ethers.ZeroAddress) {
+        if (roleManagerAddress === ethers.ZeroAddress) {
           throw new Error('Friend market creation requires contract owner privileges. Role manager not configured on factory.')
-        } else {
-          throw new Error('You do not have the required role to create friend markets. Please purchase the Market Maker access.')
         }
+        throw new Error('You do not have the MARKET_MAKER role on-chain. Your role may have expired. Please purchase or renew your Market Maker access.')
       }
 
-      console.log('Pre-flight checks passed:', { isOwner, hasMarketMakerRole, ctf1155Address })
+      console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })
 
       // Calculate trading period in seconds (contract requires 7-21 days)
       const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
@@ -474,27 +462,15 @@ function WalletButton({ className = '', theme = 'dark' }) {
         }
       }
 
-      // If on-chain role check fails, check if localStorage says they have the role
-      // This handles cases where factory's roleManager might be misconfigured
-      // The actual contract call will be the final arbiter
+      // Always check blockchain for roles - roles could expire
       if (!isOwner && !hasMarketMakerRole) {
-        // Check localStorage role as fallback (what the UI uses to show the button)
-        const hasLocalStorageRole = hasRole(ROLES.MARKET_MAKER)
-        console.log('localStorage role check:', { hasLocalStorageRole, ROLES_MARKET_MAKER: ROLES.MARKET_MAKER })
-
-        if (hasLocalStorageRole) {
-          // UI says they have the role, on-chain check failed
-          // Log warning but proceed - let contract call be final arbiter
-          console.warn('On-chain role check failed but localStorage shows user has MARKET_MAKER role. Proceeding with transaction.')
-          console.warn('If transaction fails with "Requires owner or MARKET_MAKER_ROLE", the factory may need to be reconfigured.')
-        } else if (roleManagerAddress === ethers.ZeroAddress) {
+        if (roleManagerAddress === ethers.ZeroAddress) {
           throw new Error('Market creation requires contract owner privileges. Role manager not configured on factory.')
-        } else {
-          throw new Error('You do not have the MARKET_MAKER role required to create markets. Please purchase the Market Maker access.')
         }
+        throw new Error('You do not have the MARKET_MAKER role on-chain. Your role may have expired. Please purchase or renew your Market Maker access.')
       }
 
-      console.log('Pre-flight checks passed:', { isOwner, hasMarketMakerRole, ctf1155Address })
+      console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })
 
       // Calculate trading period in seconds (enforce contract limits: 7-21 days)
       const tradingPeriodSeconds = Math.max(
