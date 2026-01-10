@@ -242,22 +242,62 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
       let hasMarketMakerRole = false
 
+      // Log role check details for debugging
+      console.log('Friend Market role check details:', {
+        userAddress,
+        ownerAddress,
+        isOwner,
+        roleManagerFromFactory: roleManagerAddress,
+        expectedRoleManager: getContractAddress('roleManager')
+      })
+
       if (roleManagerAddress !== ethers.ZeroAddress) {
-        const roleManagerAbi = ['function hasRole(bytes32 role, address account) view returns (bool)', 'function MARKET_MAKER_ROLE() view returns (bytes32)']
+        const roleManagerAbi = [
+          'function hasRole(bytes32 role, address account) view returns (bool)',
+          'function MARKET_MAKER_ROLE() view returns (bytes32)',
+          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+        ]
         const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
         try {
           const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
+          console.log('MARKET_MAKER_ROLE hash:', marketMakerRole)
+
           hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+          console.log('hasRole result:', hasMarketMakerRole)
+
+          // If hasRole fails, try isActiveMember (TieredRoleManager specific)
+          if (!hasMarketMakerRole) {
+            try {
+              const isActive = await roleManager.isActiveMember(userAddress, marketMakerRole)
+              console.log('isActiveMember result:', isActive)
+              hasMarketMakerRole = isActive
+            } catch (activeMemberError) {
+              console.log('isActiveMember not available or failed:', activeMemberError.message)
+            }
+          }
         } catch (roleError) {
           console.warn('Could not verify on-chain role:', roleError)
         }
       }
 
+      // If on-chain role check fails, check if localStorage says they have the role
+      // This handles cases where factory's roleManager might be misconfigured
+      // The actual contract call will be the final arbiter
       if (!isOwner && !hasMarketMakerRole) {
-        if (roleManagerAddress === ethers.ZeroAddress) {
+        // Check localStorage role as fallback (what the UI uses to show the button)
+        const hasLocalStorageRole = hasRole(ROLES.FRIEND_MARKET) || hasRole(ROLES.MARKET_MAKER)
+        console.log('localStorage role check:', { hasLocalStorageRole })
+
+        if (hasLocalStorageRole) {
+          // UI says they have the role, on-chain check failed
+          // Log warning but proceed - let contract call be final arbiter
+          console.warn('On-chain role check failed but localStorage shows user has the required role. Proceeding with transaction.')
+          console.warn('If transaction fails with "Requires owner or MARKET_MAKER_ROLE", the factory may need to be reconfigured.')
+        } else if (roleManagerAddress === ethers.ZeroAddress) {
           throw new Error('Friend market creation requires contract owner privileges. Role manager not configured on factory.')
+        } else {
+          throw new Error('You do not have the required role to create friend markets. Please purchase the Market Maker access.')
         }
-        throw new Error('You do not have the required role to create friend markets. Please purchase the Market Maker access.')
       }
 
       console.log('Pre-flight checks passed:', { isOwner, hasMarketMakerRole, ctf1155Address })
@@ -394,23 +434,64 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
       let hasMarketMakerRole = false
 
+      // Log role check details for debugging
+      console.log('Role check details:', {
+        userAddress,
+        ownerAddress,
+        isOwner,
+        roleManagerFromFactory: roleManagerAddress,
+        expectedRoleManager: getContractAddress('roleManager')
+      })
+
       if (roleManagerAddress !== ethers.ZeroAddress) {
-        // Check on-chain role
-        const roleManagerAbi = ['function hasRole(bytes32 role, address account) view returns (bool)', 'function MARKET_MAKER_ROLE() view returns (bytes32)']
+        // Check on-chain role using the roleManager from factory
+        const roleManagerAbi = [
+          'function hasRole(bytes32 role, address account) view returns (bool)',
+          'function MARKET_MAKER_ROLE() view returns (bytes32)',
+          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+        ]
         const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
         try {
           const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
+          console.log('MARKET_MAKER_ROLE hash:', marketMakerRole)
+
+          // Try hasRole first
           hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+          console.log('hasRole result:', hasMarketMakerRole)
+
+          // If hasRole fails, try isActiveMember (TieredRoleManager specific)
+          if (!hasMarketMakerRole) {
+            try {
+              const isActive = await roleManager.isActiveMember(userAddress, marketMakerRole)
+              console.log('isActiveMember result:', isActive)
+              hasMarketMakerRole = isActive
+            } catch (activeMemberError) {
+              console.log('isActiveMember not available or failed:', activeMemberError.message)
+            }
+          }
         } catch (roleError) {
           console.warn('Could not verify on-chain role:', roleError)
         }
       }
 
+      // If on-chain role check fails, check if localStorage says they have the role
+      // This handles cases where factory's roleManager might be misconfigured
+      // The actual contract call will be the final arbiter
       if (!isOwner && !hasMarketMakerRole) {
-        if (roleManagerAddress === ethers.ZeroAddress) {
+        // Check localStorage role as fallback (what the UI uses to show the button)
+        const hasLocalStorageRole = hasRole(ROLES.MARKET_MAKER)
+        console.log('localStorage role check:', { hasLocalStorageRole, ROLES_MARKET_MAKER: ROLES.MARKET_MAKER })
+
+        if (hasLocalStorageRole) {
+          // UI says they have the role, on-chain check failed
+          // Log warning but proceed - let contract call be final arbiter
+          console.warn('On-chain role check failed but localStorage shows user has MARKET_MAKER role. Proceeding with transaction.')
+          console.warn('If transaction fails with "Requires owner or MARKET_MAKER_ROLE", the factory may need to be reconfigured.')
+        } else if (roleManagerAddress === ethers.ZeroAddress) {
           throw new Error('Market creation requires contract owner privileges. Role manager not configured on factory.')
+        } else {
+          throw new Error('You do not have the MARKET_MAKER role required to create markets. Please purchase the Market Maker access.')
         }
-        throw new Error('You do not have the MARKET_MAKER role required to create markets. Please purchase the Market Maker access.')
       }
 
       console.log('Pre-flight checks passed:', { isOwner, hasMarketMakerRole, ctf1155Address })
