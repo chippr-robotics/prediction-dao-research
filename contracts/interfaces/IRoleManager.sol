@@ -19,9 +19,10 @@ interface IRoleManager {
 
     /**
      * @notice Check if user is within market creation limits for a role
+     * @dev Note: TieredRoleManager's implementation modifies state (usage counters)
      * @param user The user to check
      * @param role The role to check limits for
      * @return bool True if within limits
      */
-    function checkMarketCreationLimitFor(address user, bytes32 role) external view returns (bool);
+    function checkMarketCreationLimitFor(address user, bytes32 role) external returns (bool);
 }
