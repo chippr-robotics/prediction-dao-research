@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
+import { ethers } from 'ethers'
 import { useETCswap } from '../../hooks/useETCswap'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
+import { getContractAddress } from '../../config/contracts'
+import { MARKET_FACTORY_ABI } from '../../abis/ConditionalMarketFactory'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -196,10 +199,83 @@ function WalletButton({ className = '', theme = 'dark' }) {
     setShowFriendMarketModal(true)
   }
 
-  const handleFriendMarketCreation = async (data, signer) => {
-    console.log('Friend market creation:', data)
-    setShowFriendMarketModal(false)
-    // The MarketCreationModal handles the actual creation
+  const handleFriendMarketCreation = async (data, modalSigner) => {
+    const activeSigner = modalSigner || signer
+
+    if (!activeSigner) {
+      console.error('No signer available for friend market creation')
+      throw new Error('Please connect your wallet to create a market')
+    }
+
+    console.log('Friend market creation data:', data)
+
+    try {
+      const marketFactoryAddress = getContractAddress('marketFactory')
+      if (!marketFactoryAddress) {
+        throw new Error('Market factory contract not deployed on this network')
+      }
+
+      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
+
+      // Calculate end time based on trading period (in days)
+      const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
+      const endTime = Math.floor(Date.now() / 1000) + (tradingPeriodDays * 24 * 60 * 60)
+
+      // Parse stake amount as initial liquidity
+      const stakeAmount = data.data.stakeAmount || '10'
+      const initialLiquidity = ethers.parseEther(stakeAmount)
+
+      // Build description with friend market metadata
+      let description = data.data.description
+      if (data.marketType === 'oneVsOne') {
+        description += `\n\n[Friend Market: 1v1 with ${data.data.opponent}]`
+      } else if (data.marketType === 'smallGroup') {
+        description += `\n\n[Friend Market: Group with ${data.data.members}]`
+      }
+      if (data.data.arbitrator) {
+        description += `\n[Arbitrator: ${data.data.arbitrator}]`
+      }
+
+      // Create the market on-chain
+      const tx = await contract.createMarket(
+        data.data.description, // question
+        description, // description with metadata
+        'Friend Market', // category
+        endTime,
+        initialLiquidity,
+        { value: initialLiquidity }
+      )
+
+      console.log('Friend market transaction sent:', tx.hash)
+      const receipt = await tx.wait()
+      console.log('Friend market created:', receipt)
+
+      // Extract market ID from event logs
+      const marketCreatedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log)
+          return parsed?.name === 'MarketCreated'
+        } catch {
+          return false
+        }
+      })
+
+      let marketId = null
+      if (marketCreatedEvent) {
+        const parsed = contract.interface.parseLog(marketCreatedEvent)
+        marketId = parsed?.args?.marketId?.toString()
+      }
+
+      setShowFriendMarketModal(false)
+
+      return {
+        id: marketId || `friend-${Date.now()}`,
+        txHash: receipt.hash
+      }
+    } catch (error) {
+      console.error('Error creating friend market:', error)
+      throw error
+    }
   }
 
   const handleOpenMarketCreation = () => {
@@ -214,41 +290,86 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const handleMarketCreation = async (submitData, modalSigner) => {
     const activeSigner = modalSigner || signer
 
-    // Show confirmation dialog for the market creation transaction
-    showModal(
-      <div className="transaction-modal">
-        <h3>Prediction Market Creation</h3>
-        <p>Creating a new prediction market requires a blockchain transaction.</p>
-        <div className="token-details">
-          <div className="detail-row">
-            <span className="detail-label">Trading Period:</span>
-            <span className="detail-value">{submitData.tradingPeriod / 86400} days</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Initial Liquidity:</span>
-            <span className="detail-value">{submitData.initialLiquidity} ETC</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Bet Type:</span>
-            <span className="detail-value">{submitData.betType}</span>
-          </div>
-          {submitData.metadata && (
-            <div className="detail-row">
-              <span className="detail-label">Question:</span>
-              <span className="detail-value">{submitData.metadata.name}</span>
-            </div>
-          )}
-        </div>
-        <p className="transaction-note">
-          This will call ConditionalMarketFactory.deployMarketPair() to create PASS/FAIL token pairs.
-        </p>
-      </div>,
-      {
-        title: 'Confirm Prediction Market',
-        size: 'medium',
-        closable: true
+    if (!activeSigner) {
+      console.error('No signer available for market creation')
+      throw new Error('Please connect your wallet to create a market')
+    }
+
+    console.log('Market creation data:', submitData)
+
+    try {
+      const marketFactoryAddress = getContractAddress('marketFactory')
+      if (!marketFactoryAddress) {
+        throw new Error('Market factory contract not deployed on this network')
       }
-    )
+
+      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
+
+      // Calculate end time from trading period (tradingPeriod is already in seconds)
+      const endTime = Math.floor(Date.now() / 1000) + submitData.tradingPeriod
+
+      // Parse initial liquidity as wei
+      const initialLiquidity = ethers.parseEther(submitData.initialLiquidity.toString())
+
+      // Extract question and description from metadata
+      let question = 'Prediction Market'
+      let description = ''
+      let category = 'Other'
+
+      if (submitData.metadata) {
+        question = submitData.metadata.name || question
+        description = submitData.metadata.description || ''
+        // Extract category from attributes
+        const categoryAttr = submitData.metadata.attributes?.find(
+          attr => attr.trait_type === 'Category'
+        )
+        category = categoryAttr?.value || category
+      } else if (submitData.metadataUri) {
+        // If using custom URI, use minimal info
+        question = `Market (${submitData.metadataUri.slice(0, 20)}...)`
+        description = `Metadata: ${submitData.metadataUri}`
+      }
+
+      // Create the market on-chain
+      const tx = await contract.createMarket(
+        question,
+        description,
+        category,
+        endTime,
+        initialLiquidity,
+        { value: initialLiquidity }
+      )
+
+      console.log('Market creation transaction sent:', tx.hash)
+      const receipt = await tx.wait()
+      console.log('Market created:', receipt)
+
+      // Extract market ID from event logs
+      const marketCreatedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log)
+          return parsed?.name === 'MarketCreated'
+        } catch {
+          return false
+        }
+      })
+
+      let marketId = null
+      if (marketCreatedEvent) {
+        const parsed = contract.interface.parseLog(marketCreatedEvent)
+        marketId = parsed?.args?.marketId?.toString()
+      }
+
+      setShowMarketCreationModal(false)
+
+      return {
+        id: marketId || `market-${Date.now()}`,
+        txHash: receipt.hash
+      }
+    } catch (error) {
+      console.error('Error creating market:', error)
+      throw error
+    }
   }
 
   const handleNavigateToAdmin = () => {
