@@ -16,6 +16,9 @@ contract TierRegistry is Ownable {
     
     // Reference to core role manager
     address public roleManagerCore;
+
+    // Authorized extensions (e.g., PaymentProcessor)
+    mapping(address => bool) public authorizedExtensions;
     
     // ========== Tier Definitions ==========
     
@@ -57,6 +60,7 @@ contract TierRegistry is Ownable {
     event TierActiveStatusChanged(bytes32 indexed role, MembershipTier indexed tier, bool active);
     event TierPriceUpdated(bytes32 indexed role, MembershipTier indexed tier, uint256 newPrice);
     event UserTierSet(address indexed user, bytes32 indexed role, MembershipTier tier);
+    event AuthorizedExtensionSet(address indexed extension, bool authorized);
     
     // ========== Constructor ==========
     
@@ -75,6 +79,11 @@ contract TierRegistry is Ownable {
     
     function setRoleManagerCore(address _roleManagerCore) external onlyOwner {
         roleManagerCore = _roleManagerCore;
+    }
+
+    function setAuthorizedExtension(address extension, bool authorized) external onlyOwner {
+        authorizedExtensions[extension] = authorized;
+        emit AuthorizedExtensionSet(extension, authorized);
     }
     
     // ========== Tier Metadata Management ==========
@@ -165,7 +174,8 @@ contract TierRegistry is Ownable {
     modifier onlyAuthorized() {
         require(
             msg.sender == owner() ||
-            msg.sender == roleManagerCore,
+            msg.sender == roleManagerCore ||
+            authorizedExtensions[msg.sender],
             "Not authorized"
         );
         _;
