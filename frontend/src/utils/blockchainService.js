@@ -705,14 +705,31 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
     const allowance = BigInt(allowanceRaw.toString())
 
     if (allowance < amount) {
-      console.log('Approving USC for PaymentProcessor...')
+      console.log('Approving USC for PaymentProcessor...', {
+        spender: paymentProcessorAddress,
+        amount: amountWei.toString(),
+        amountFormatted: ethers.formatUnits(amountWei, 6) + ' USC'
+      })
       try {
-        // Use explicit gas limit to avoid estimation issues
+        // First try to estimate gas to see if the transaction would succeed
+        let gasEstimate
+        try {
+          gasEstimate = await uscContract.approve.estimateGas(paymentProcessorAddress, amountWei)
+          console.log('Gas estimate for approve:', gasEstimate.toString())
+        } catch (estimateError) {
+          console.warn('Gas estimation failed, using default:', estimateError.message)
+          gasEstimate = 60000n // Standard approve gas
+        }
+
+        // Add 20% buffer to gas estimate
+        const gasLimit = (gasEstimate * 120n) / 100n
+
         const approveTx = await uscContract.approve(paymentProcessorAddress, amountWei, {
-          gasLimit: 100000 // Standard approve gas limit
+          gasLimit: gasLimit
         })
+        console.log('Approve transaction sent:', approveTx.hash)
         await approveTx.wait()
-        console.log('USC approved')
+        console.log('USC approved successfully')
       } catch (approveError) {
         console.error('Approve failed:', approveError)
         if (approveError.code === 'ACTION_REJECTED') {
@@ -721,6 +738,8 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
         // Try to provide more helpful error message
         throw new Error(`Failed to approve USC. Please ensure you have enough ETC for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
       }
+    } else {
+      console.log('USC already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
     }
 
     // Call purchaseTierWithToken on PaymentProcessor
