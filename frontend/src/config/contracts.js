@@ -23,9 +23,8 @@ export const DEPLOYED_CONTRACTS = {
   tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
   daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a',
 
-  // CTF1155 - Deploy via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
-  // Then update this address with the deployed contract
-  ctf1155: null, // TODO: Deploy and configure - required for market creation
+  // CTF1155 - Deployed via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
+  ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
 
   // Back-compat aliases used throughout the frontend
   roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // alias for RoleManagerCore
