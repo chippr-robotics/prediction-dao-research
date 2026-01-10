@@ -679,7 +679,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
             aria-haspopup="true"
           >
             <BlockiesAvatar address={address} size={24} />
-            <span className="account-address">{shortenAddress(address)}</span>
           </button>
 
           {isOpen && (
