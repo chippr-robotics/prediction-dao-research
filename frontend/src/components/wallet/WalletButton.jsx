@@ -224,6 +224,44 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
 
+      // Pre-flight checks: verify contract is properly configured
+      const [ctf1155Address, roleManagerAddress, ownerAddress] = await Promise.all([
+        contract.ctf1155(),
+        contract.roleManager(),
+        contract.owner()
+      ])
+
+      const userAddress = await activeSigner.getAddress()
+
+      // Check CTF1155 is configured
+      if (ctf1155Address === ethers.ZeroAddress) {
+        throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
+      }
+
+      // Check if user can create markets (Friend Market uses same role as Market Maker)
+      const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
+      let hasMarketMakerRole = false
+
+      if (roleManagerAddress !== ethers.ZeroAddress) {
+        const roleManagerAbi = ['function hasRole(bytes32 role, address account) view returns (bool)', 'function MARKET_MAKER_ROLE() view returns (bytes32)']
+        const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
+        try {
+          const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
+          hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+        } catch (roleError) {
+          console.warn('Could not verify on-chain role:', roleError)
+        }
+      }
+
+      if (!isOwner && !hasMarketMakerRole) {
+        if (roleManagerAddress === ethers.ZeroAddress) {
+          throw new Error('Friend market creation requires contract owner privileges. Role manager not configured on factory.')
+        }
+        throw new Error('You do not have the required role to create friend markets. Please purchase the Market Maker access.')
+      }
+
+      console.log('Pre-flight checks passed:', { isOwner, hasMarketMakerRole, ctf1155Address })
+
       // Calculate trading period in seconds (contract requires 7-21 days)
       const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
       const tradingPeriodSeconds = Math.max(
@@ -243,9 +281,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
       // Use WinLose bet type for friend markets (1v1 style)
       const betType = BetType.WinLose
-
-      // Get user address for allowance check
-      const userAddress = await activeSigner.getAddress()
 
       // Check and approve collateral token if needed
       const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
@@ -341,6 +376,45 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
 
+      // Pre-flight checks: verify contract is properly configured
+      const [ctf1155Address, roleManagerAddress, ownerAddress] = await Promise.all([
+        contract.ctf1155(),
+        contract.roleManager(),
+        contract.owner()
+      ])
+
+      const userAddress = await activeSigner.getAddress()
+
+      // Check CTF1155 is configured
+      if (ctf1155Address === ethers.ZeroAddress) {
+        throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
+      }
+
+      // Check if user can create markets
+      const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
+      let hasMarketMakerRole = false
+
+      if (roleManagerAddress !== ethers.ZeroAddress) {
+        // Check on-chain role
+        const roleManagerAbi = ['function hasRole(bytes32 role, address account) view returns (bool)', 'function MARKET_MAKER_ROLE() view returns (bytes32)']
+        const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
+        try {
+          const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
+          hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+        } catch (roleError) {
+          console.warn('Could not verify on-chain role:', roleError)
+        }
+      }
+
+      if (!isOwner && !hasMarketMakerRole) {
+        if (roleManagerAddress === ethers.ZeroAddress) {
+          throw new Error('Market creation requires contract owner privileges. Role manager not configured on factory.')
+        }
+        throw new Error('You do not have the MARKET_MAKER role required to create markets. Please purchase the Market Maker access.')
+      }
+
+      console.log('Pre-flight checks passed:', { isOwner, hasMarketMakerRole, ctf1155Address })
+
       // Calculate trading period in seconds (enforce contract limits: 7-21 days)
       const tradingPeriodSeconds = Math.max(
         TradingPeriod.MIN,
@@ -367,10 +441,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
         }
       }
 
-      // Get user address for allowance check
-      const userAddress = await activeSigner.getAddress()
-
-      // Check and approve collateral token if needed
+      // Check and approve collateral token if needed (userAddress already retrieved during pre-flight)
       const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
       if (currentAllowance < liquidityAmount) {
         console.log('Approving collateral token...')
