@@ -2,10 +2,12 @@ const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
 /**
- * Deploy TierRegistry and MembershipPaymentManager NORMALLY (not via factory)
+ * Deploy TierRegistry, MembershipManager, and MembershipPaymentManager NORMALLY (not via factory)
  * and configure all components for role purchases.
  *
  * This is a comprehensive fix for the modular RBAC payment system.
+ * It deploys new contracts with the authorizedExtensions feature to allow
+ * PaymentProcessor to call setUserTier and setMembershipExpiration.
  *
  * Run with: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
  */
@@ -14,7 +16,6 @@ const { ethers } = require("hardhat");
 const EXISTING = {
   roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
-  membershipManager: '0x5fbc6c64CAF5EA21090b50e0E4bb07ADdA0eB661',
 };
 
 const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
@@ -28,10 +29,15 @@ const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
 
 async function main() {
   console.log("=".repeat(70));
-  console.log("Deploy Modular RBAC Fix - TierRegistry & MembershipPaymentManager");
+  console.log("Deploy Modular RBAC Fix - Complete Redeployment");
   console.log("=".repeat(70));
 
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const deployer = signers[0];
+  if (!deployer) {
+    console.error("No deployer signer available. Make sure PRIVATE_KEY is set in .env");
+    process.exit(1);
+  }
   console.log("\nDeployer:", deployer.address);
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
 
@@ -55,9 +61,21 @@ async function main() {
   console.log("   Owner:", tierRegistryOwner);
   console.log("   Deployer is owner:", tierRegistryOwner === deployer.address);
 
-  // ========== 2. Deploy MembershipPaymentManager normally ==========
+  // ========== 2. Deploy MembershipManager normally ==========
   console.log("\n" + "=".repeat(50));
-  console.log("2. Deploying MembershipPaymentManager (normal deployment)...");
+  console.log("2. Deploying MembershipManager (normal deployment)...");
+  console.log("=".repeat(50));
+
+  const MembershipManager = await ethers.getContractFactory("MembershipManager");
+  const membershipManager = await MembershipManager.deploy();
+  await membershipManager.waitForDeployment();
+
+  const membershipManagerAddress = await membershipManager.getAddress();
+  console.log("   ✅ MembershipManager deployed at:", membershipManagerAddress);
+
+  // ========== 3. Deploy MembershipPaymentManager normally ==========
+  console.log("\n" + "=".repeat(50));
+  console.log("3. Deploying MembershipPaymentManager (normal deployment)...");
   console.log("=".repeat(50));
 
   const MembershipPaymentManager = await ethers.getContractFactory("MembershipPaymentManager");
@@ -67,9 +85,9 @@ async function main() {
   const paymentManagerAddress = await paymentManager.getAddress();
   console.log("   ✅ MembershipPaymentManager deployed at:", paymentManagerAddress);
 
-  // ========== 3. Configure TierRegistry ==========
+  // ========== 4. Configure TierRegistry ==========
   console.log("\n" + "=".repeat(50));
-  console.log("3. Configuring TierRegistry...");
+  console.log("4. Configuring TierRegistry...");
   console.log("=".repeat(50));
 
   // Set RoleManagerCore
@@ -123,9 +141,32 @@ async function main() {
   await tx.wait();
   console.log("   ✅ FRIEND_MARKET tier 1 configured");
 
-  // ========== 4. Configure MembershipPaymentManager ==========
+  // ========== 5. Configure MembershipManager ==========
   console.log("\n" + "=".repeat(50));
-  console.log("4. Configuring MembershipPaymentManager...");
+  console.log("5. Configuring MembershipManager...");
+  console.log("=".repeat(50));
+
+  // Set RoleManagerCore
+  console.log("   Setting roleManagerCore...");
+  tx = await membershipManager.setRoleManagerCore(EXISTING.roleManagerCore);
+  await tx.wait();
+  console.log("   ✅ roleManagerCore set");
+
+  // Set TierRegistry
+  console.log("   Setting tierRegistry...");
+  tx = await membershipManager.setTierRegistry(tierRegistryAddress);
+  await tx.wait();
+  console.log("   ✅ tierRegistry set");
+
+  // Authorize PaymentProcessor
+  console.log("   Authorizing PaymentProcessor as extension...");
+  tx = await membershipManager.setAuthorizedExtension(EXISTING.paymentProcessor, true);
+  await tx.wait();
+  console.log("   ✅ PaymentProcessor authorized");
+
+  // ========== 6. Configure MembershipPaymentManager ==========
+  console.log("\n" + "=".repeat(50));
+  console.log("6. Configuring MembershipPaymentManager...");
   console.log("=".repeat(50));
 
   // Add USC as payment token
@@ -145,9 +186,9 @@ async function main() {
   await tx.wait();
   console.log("   ✅ FRIEND_MARKET_ROLE price set");
 
-  // ========== 5. Configure PaymentProcessor ==========
+  // ========== 7. Configure PaymentProcessor ==========
   console.log("\n" + "=".repeat(50));
-  console.log("5. Configuring PaymentProcessor...");
+  console.log("7. Configuring PaymentProcessor...");
   console.log("=".repeat(50));
 
   const paymentProcessor = await ethers.getContractAt("PaymentProcessor", EXISTING.paymentProcessor);
@@ -156,30 +197,34 @@ async function main() {
   tx = await paymentProcessor.configureAll(
     EXISTING.roleManagerCore,
     tierRegistryAddress,
-    EXISTING.membershipManager,
+    membershipManagerAddress,
     paymentManagerAddress
   );
   await tx.wait();
   console.log("   ✅ PaymentProcessor configured");
 
-  // ========== 6. Verification ==========
+  // ========== 8. Verification ==========
   console.log("\n" + "=".repeat(50));
-  console.log("6. Verification...");
+  console.log("8. Verification...");
   console.log("=".repeat(50));
 
   const configuredTierRegistry = await paymentProcessor.tierRegistry();
+  const configuredMembershipManager = await paymentProcessor.membershipManager();
   const configuredPaymentManager = await paymentProcessor.paymentManager();
   const tier1Active = await tierRegistry.isTierActive(MARKET_MAKER_ROLE, MembershipTier.BRONZE);
   const uscActive = await paymentManager.paymentTokens(USC_ADDRESS);
   const mmPrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, USC_ADDRESS);
-  const ppAuthorized = await tierRegistry.authorizedExtensions(EXISTING.paymentProcessor);
+  const ppAuthorizedOnTierRegistry = await tierRegistry.authorizedExtensions(EXISTING.paymentProcessor);
+  const ppAuthorizedOnMembershipManager = await membershipManager.authorizedExtensions(EXISTING.paymentProcessor);
 
   console.log("   PaymentProcessor.tierRegistry:", configuredTierRegistry);
+  console.log("   PaymentProcessor.membershipManager:", configuredMembershipManager);
   console.log("   PaymentProcessor.paymentManager:", configuredPaymentManager);
   console.log("   TierRegistry MARKET_MAKER tier 1 active:", tier1Active);
   console.log("   MembershipPaymentManager USC active:", uscActive.isActive);
   console.log("   MembershipPaymentManager MARKET_MAKER price:", ethers.formatUnits(mmPrice, 6), "USC");
-  console.log("   TierRegistry PaymentProcessor authorized:", ppAuthorized);
+  console.log("   TierRegistry PaymentProcessor authorized:", ppAuthorizedOnTierRegistry);
+  console.log("   MembershipManager PaymentProcessor authorized:", ppAuthorizedOnMembershipManager);
 
   // ========== Summary ==========
   console.log("\n" + "=".repeat(70));
@@ -188,20 +233,21 @@ async function main() {
 
   console.log("\nDeployed Contracts:");
   console.log("  TierRegistry:              ", tierRegistryAddress);
+  console.log("  MembershipManager:         ", membershipManagerAddress);
   console.log("  MembershipPaymentManager:  ", paymentManagerAddress);
 
   console.log("\nExisting Contracts:");
   console.log("  RoleManagerCore:           ", EXISTING.roleManagerCore);
   console.log("  PaymentProcessor:          ", EXISTING.paymentProcessor);
-  console.log("  MembershipManager:         ", EXISTING.membershipManager);
 
   console.log("\n" + "-".repeat(70));
   console.log("Update frontend/src/config/contracts.js with:");
   console.log("-".repeat(70));
   console.log(`  tierRegistry: '${tierRegistryAddress}',`);
+  console.log(`  membershipManager: '${membershipManagerAddress}',`);
   console.log(`  membershipPaymentManager: '${paymentManagerAddress}'`);
 
-  const allGood = tier1Active && uscActive.isActive && mmPrice > 0n && ppAuthorized;
+  const allGood = tier1Active && uscActive.isActive && mmPrice > 0n && ppAuthorizedOnTierRegistry && ppAuthorizedOnMembershipManager;
   if (allGood) {
     console.log("\n✅ All configuration verified! Role purchases should now work.");
   } else {
