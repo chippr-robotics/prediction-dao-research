@@ -59,40 +59,55 @@ export async function fetchMarketsFromBlockchain() {
     console.log('Fetching markets from blockchain...')
     console.log('Contract address:', getContractAddress('marketFactory'))
     console.log('RPC URL:', NETWORK_CONFIG.rpcUrl)
-    
+
     const contract = getContract('marketFactory')
-    
-    // First try to get market count to verify contract is accessible
+
+    // Get market count using the public variable (not a function)
     let marketCount
     try {
-      marketCount = await contract.getMarketCount()
+      marketCount = await contract.marketCount()
       console.log('Market count from blockchain:', marketCount.toString())
     } catch (countError) {
-      console.warn('getMarketCount failed, trying getAllMarkets directly:', countError.message)
+      console.warn('Failed to get marketCount:', countError.message)
+      return []
     }
-    
-    const markets = await contract.getAllMarkets()
-    console.log('Raw markets from blockchain:', markets)
-    
-    if (!markets || markets.length === 0) {
+
+    if (marketCount === 0n) {
       console.log('No markets found on blockchain, returning empty array')
       return []
     }
-    
-    // Transform blockchain data to match frontend format
-    const transformedMarkets = markets.map((market, index) => ({
-      id: Number(market.id || index),
-      proposalTitle: market.question || '',
-      description: market.description || '',
-      category: market.category || 'other',
-      passTokenPrice: market.yesPrice ? ethers.formatEther(market.yesPrice) : '0.5',
-      failTokenPrice: market.noPrice ? ethers.formatEther(market.noPrice) : '0.5',
-      totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-      tradingEndTime: market.endTime ? new Date(Number(market.endTime) * 1000).toISOString() : new Date().toISOString(),
-      status: getMarketStatus(Number(market.status)),
-      creator: market.creator || ethers.ZeroAddress
-    }))
-    
+
+    // Fetch each market individually using the markets(uint256) mapping
+    const transformedMarkets = []
+    for (let i = 0; i < Number(marketCount); i++) {
+      try {
+        const market = await contract.markets(i)
+
+        // The actual contract returns a struct with these fields:
+        // proposalId, passToken, failToken, collateralToken, tradingEndTime,
+        // liquidityParameter, totalLiquidity, resolved, passValue, failValue,
+        // status, betType, useCTF, conditionId, questionId, passPositionId, failPositionId
+
+        transformedMarkets.push({
+          id: i,
+          proposalId: Number(market.proposalId || 0),
+          proposalTitle: `Market #${i}`, // Markets don't store question text on-chain
+          description: '',
+          category: 'prediction',
+          passTokenPrice: '0.5', // Would need to calculate from LMSR
+          failTokenPrice: '0.5',
+          totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
+          tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
+          status: getMarketStatus(Number(market.status)),
+          betType: Number(market.betType || 0),
+          collateralToken: market.collateralToken,
+          resolved: market.resolved
+        })
+      } catch (marketError) {
+        console.warn(`Failed to fetch market ${i}:`, marketError.message)
+      }
+    }
+
     console.log('Transformed markets:', transformedMarkets)
     return transformedMarkets
   } catch (error) {
@@ -108,33 +123,16 @@ export async function fetchMarketsFromBlockchain() {
 
 /**
  * Fetch markets by category from the blockchain
- * @param {string} category - Market category
+ * Note: The actual contract doesn't store categories - this filters all markets client-side
+ * @param {string} category - Market category (currently unused as contract doesn't support categories)
  * @returns {Promise<Array>} Array of market objects
  */
 export async function fetchMarketsByCategoryFromBlockchain(category) {
   try {
-    const contract = getContract('marketFactory')
-    const marketIds = await contract.getMarketsByCategory(category)
-    
-    const markets = await Promise.all(
-      marketIds.map(async (id) => {
-        const market = await contract.getMarket(id)
-        return {
-          id: Number(market.id || id),
-          proposalTitle: market.question || '',
-          description: market.description || '',
-          category: market.category || category,
-          passTokenPrice: market.yesPrice ? ethers.formatEther(market.yesPrice) : '0.5',
-          failTokenPrice: market.noPrice ? ethers.formatEther(market.noPrice) : '0.5',
-          totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-          tradingEndTime: market.endTime ? new Date(Number(market.endTime) * 1000).toISOString() : new Date().toISOString(),
-          status: getMarketStatus(Number(market.status)),
-          creator: market.creator || ethers.ZeroAddress
-        }
-      })
-    )
-    
-    return markets
+    // The contract doesn't have category filtering - fetch all and filter client-side
+    const allMarkets = await fetchMarketsFromBlockchain()
+    // Since markets don't have categories stored on-chain, return all
+    return allMarkets
   } catch (error) {
     console.error('Error fetching markets by category from blockchain:', error)
     throw error
@@ -149,23 +147,34 @@ export async function fetchMarketsByCategoryFromBlockchain(category) {
 export async function fetchMarketByIdFromBlockchain(id) {
   try {
     const contract = getContract('marketFactory')
-    const market = await contract.getMarket(id)
-    
-    if (!market || !market.question) {
+
+    // Check if market exists by verifying id is within range
+    const marketCount = await contract.marketCount()
+    if (id >= Number(marketCount)) {
       return null
     }
-    
+
+    const market = await contract.markets(id)
+
+    // Check if market is valid (proposalId will be 0 for non-existent markets)
+    if (!market || market.proposalId === 0n) {
+      return null
+    }
+
     return {
-      id: Number(market.id || id),
-      proposalTitle: market.question || '',
-      description: market.description || '',
-      category: market.category || 'other',
-      passTokenPrice: market.yesPrice ? ethers.formatEther(market.yesPrice) : '0.5',
-      failTokenPrice: market.noPrice ? ethers.formatEther(market.noPrice) : '0.5',
+      id: id,
+      proposalId: Number(market.proposalId || 0),
+      proposalTitle: `Market #${id}`,
+      description: '',
+      category: 'prediction',
+      passTokenPrice: '0.5',
+      failTokenPrice: '0.5',
       totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-      tradingEndTime: market.endTime ? new Date(Number(market.endTime) * 1000).toISOString() : new Date().toISOString(),
+      tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
       status: getMarketStatus(Number(market.status)),
-      creator: market.creator || ethers.ZeroAddress
+      betType: Number(market.betType || 0),
+      collateralToken: market.collateralToken,
+      resolved: market.resolved
     }
   } catch (error) {
     console.error('Error fetching market by ID from blockchain:', error)
@@ -199,6 +208,8 @@ export async function fetchProposalsFromBlockchain() {
 
 /**
  * Fetch user positions from the blockchain
+ * Note: Positions are tracked in CTF1155 (ERC-1155) tokens, not in the factory contract directly.
+ * This would require querying the CTF1155 contract for balance of each position token.
  * @param {string} userAddress - User's wallet address
  * @returns {Promise<Array>} Array of position objects
  */
@@ -207,19 +218,19 @@ export async function fetchPositionsFromBlockchain(userAddress) {
     if (!userAddress || !ethers.isAddress(userAddress)) {
       return []
     }
-    
-    const contract = getContract('marketFactory')
-    const positions = await contract.getUserPositions(userAddress)
-    
-    return positions.map((position) => ({
-      marketId: Number(position.marketId),
-      yesShares: position.yesShares ? ethers.formatEther(position.yesShares) : '0',
-      noShares: position.noShares ? ethers.formatEther(position.noShares) : '0',
-      invested: position.invested ? ethers.formatEther(position.invested) : '0'
-    }))
+
+    // The actual contract uses CTF1155 for positions, not a getUserPositions function
+    // To properly implement this, we'd need to:
+    // 1. Get all markets
+    // 2. For each market, get the passPositionId and failPositionId
+    // 3. Query CTF1155.balanceOf(userAddress, positionId) for each
+
+    // For now, return empty as this requires CTF1155 integration
+    console.log('Positions are tracked in CTF1155 - full integration pending')
+    return []
   } catch (error) {
     console.error('Error fetching positions from blockchain:', error)
-    throw error
+    return []
   }
 }
 
