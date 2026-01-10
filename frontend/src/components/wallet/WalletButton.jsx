@@ -8,7 +8,7 @@ import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
-import { MARKET_FACTORY_ABI } from '../../abis/ConditionalMarketFactory'
+import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -215,35 +215,64 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory contract not deployed on this network')
       }
 
+      // Get collateral token address (USC/FairWins token)
+      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      if (!collateralTokenAddress) {
+        throw new Error('Collateral token not configured')
+      }
+
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
+      const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
 
-      // Calculate end time based on trading period (in days)
+      // Calculate trading period in seconds (contract requires 7-21 days)
       const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
-      const endTime = Math.floor(Date.now() / 1000) + (tradingPeriodDays * 24 * 60 * 60)
+      const tradingPeriodSeconds = Math.max(
+        TradingPeriod.MIN,
+        Math.min(TradingPeriod.MAX, tradingPeriodDays * 24 * 60 * 60)
+      )
 
-      // Parse stake amount as initial liquidity
+      // Parse stake amount as liquidity (in token units)
       const stakeAmount = data.data.stakeAmount || '10'
-      const initialLiquidity = ethers.parseEther(stakeAmount)
+      const liquidityAmount = ethers.parseEther(stakeAmount)
 
-      // Build description with friend market metadata
-      let description = data.data.description
-      if (data.marketType === 'oneVsOne') {
-        description += `\n\n[Friend Market: 1v1 with ${data.data.opponent}]`
-      } else if (data.marketType === 'smallGroup') {
-        description += `\n\n[Friend Market: Group with ${data.data.members}]`
-      }
-      if (data.data.arbitrator) {
-        description += `\n[Arbitrator: ${data.data.arbitrator}]`
+      // Generate a unique proposal ID for the friend market
+      const proposalId = BigInt(Date.now())
+
+      // Default liquidity parameter for LMSR (higher = more liquidity depth)
+      const liquidityParameter = ethers.parseEther('100')
+
+      // Use WinLose bet type for friend markets (1v1 style)
+      const betType = BetType.WinLose
+
+      // Get user address for allowance check
+      const userAddress = await activeSigner.getAddress()
+
+      // Check and approve collateral token if needed
+      const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
+      if (currentAllowance < liquidityAmount) {
+        console.log('Approving collateral token...')
+        const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
+        await approveTx.wait()
+        console.log('Collateral approved')
       }
 
-      // Create the market on-chain
-      const tx = await contract.createMarket(
-        data.data.description, // question
-        description, // description with metadata
-        'Friend Market', // category
-        endTime,
-        initialLiquidity,
-        { value: initialLiquidity }
+      // Create the market on-chain using deployMarketPair
+      console.log('Deploying market pair...', {
+        proposalId: proposalId.toString(),
+        collateralToken: collateralTokenAddress,
+        liquidityAmount: liquidityAmount.toString(),
+        liquidityParameter: liquidityParameter.toString(),
+        tradingPeriodSeconds,
+        betType
+      })
+
+      const tx = await contract.deployMarketPair(
+        proposalId,
+        collateralTokenAddress,
+        liquidityAmount,
+        liquidityParameter,
+        tradingPeriodSeconds,
+        betType
       )
 
       console.log('Friend market transaction sent:', tx.hash)
@@ -285,7 +314,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
   /**
    * Handle creation from the MarketCreationModal
-   * Supports prediction markets with web3 transactions
+   * Supports prediction markets with web3 transactions using CTF1155
    */
   const handleMarketCreation = async (submitData, modalSigner) => {
     const activeSigner = modalSigner || signer
@@ -303,41 +332,70 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory contract not deployed on this network')
       }
 
-      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
-
-      // Calculate end time from trading period (tradingPeriod is already in seconds)
-      const endTime = Math.floor(Date.now() / 1000) + submitData.tradingPeriod
-
-      // Parse initial liquidity as wei
-      const initialLiquidity = ethers.parseEther(submitData.initialLiquidity.toString())
-
-      // Extract question and description from metadata
-      let question = 'Prediction Market'
-      let description = ''
-      let category = 'Other'
-
-      if (submitData.metadata) {
-        question = submitData.metadata.name || question
-        description = submitData.metadata.description || ''
-        // Extract category from attributes
-        const categoryAttr = submitData.metadata.attributes?.find(
-          attr => attr.trait_type === 'Category'
-        )
-        category = categoryAttr?.value || category
-      } else if (submitData.metadataUri) {
-        // If using custom URI, use minimal info
-        question = `Market (${submitData.metadataUri.slice(0, 20)}...)`
-        description = `Metadata: ${submitData.metadataUri}`
+      // Get collateral token address (USC/FairWins token)
+      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      if (!collateralTokenAddress) {
+        throw new Error('Collateral token not configured')
       }
 
-      // Create the market on-chain
-      const tx = await contract.createMarket(
-        question,
-        description,
-        category,
-        endTime,
-        initialLiquidity,
-        { value: initialLiquidity }
+      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
+      const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
+
+      // Calculate trading period in seconds (enforce contract limits: 7-21 days)
+      const tradingPeriodSeconds = Math.max(
+        TradingPeriod.MIN,
+        Math.min(TradingPeriod.MAX, submitData.tradingPeriod || TradingPeriod.DEFAULT)
+      )
+
+      // Parse initial liquidity as token amount
+      const liquidityAmount = ethers.parseEther(submitData.initialLiquidity.toString())
+
+      // Generate a unique proposal ID
+      const proposalId = BigInt(Date.now())
+
+      // Default liquidity parameter for LMSR
+      const liquidityParameter = ethers.parseEther('100')
+
+      // Determine bet type from metadata or default to YesNo
+      let betType = BetType.YesNo
+      if (submitData.metadata?.attributes) {
+        const betTypeAttr = submitData.metadata.attributes.find(
+          attr => attr.trait_type === 'BetType'
+        )
+        if (betTypeAttr?.value && BetType[betTypeAttr.value] !== undefined) {
+          betType = BetType[betTypeAttr.value]
+        }
+      }
+
+      // Get user address for allowance check
+      const userAddress = await activeSigner.getAddress()
+
+      // Check and approve collateral token if needed
+      const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
+      if (currentAllowance < liquidityAmount) {
+        console.log('Approving collateral token...')
+        const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
+        await approveTx.wait()
+        console.log('Collateral approved')
+      }
+
+      // Create the market on-chain using deployMarketPair
+      console.log('Deploying market pair...', {
+        proposalId: proposalId.toString(),
+        collateralToken: collateralTokenAddress,
+        liquidityAmount: liquidityAmount.toString(),
+        liquidityParameter: liquidityParameter.toString(),
+        tradingPeriodSeconds,
+        betType
+      })
+
+      const tx = await contract.deployMarketPair(
+        proposalId,
+        collateralTokenAddress,
+        liquidityAmount,
+        liquidityParameter,
+        tradingPeriodSeconds,
+        betType
       )
 
       console.log('Market creation transaction sent:', tx.hash)
