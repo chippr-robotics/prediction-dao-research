@@ -706,9 +706,21 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
 
     if (allowance < amount) {
       console.log('Approving USC for PaymentProcessor...')
-      const approveTx = await uscContract.approve(paymentProcessorAddress, amountWei)
-      await approveTx.wait()
-      console.log('USC approved')
+      try {
+        // Use explicit gas limit to avoid estimation issues
+        const approveTx = await uscContract.approve(paymentProcessorAddress, amountWei, {
+          gasLimit: 100000 // Standard approve gas limit
+        })
+        await approveTx.wait()
+        console.log('USC approved')
+      } catch (approveError) {
+        console.error('Approve failed:', approveError)
+        if (approveError.code === 'ACTION_REJECTED') {
+          throw new Error('Transaction rejected by user')
+        }
+        // Try to provide more helpful error message
+        throw new Error(`Failed to approve USC. Please ensure you have enough ETC for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
+      }
     }
 
     // Call purchaseTierWithToken on PaymentProcessor
