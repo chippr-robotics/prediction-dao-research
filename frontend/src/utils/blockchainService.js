@@ -479,8 +479,38 @@ const ROLE_MANAGER_ABI = [
     "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
     "stateMutability": "view",
     "type": "function"
+  },
+  // Purchase role with ERC20 token - handles payment and role granting internally
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "uint8", "name": "tier", "type": "uint8" },
+      { "internalType": "address", "name": "paymentToken", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "purchaseRoleWithTierToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // Check payment manager configuration
+  {
+    "inputs": [],
+    "name": "paymentManager",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
   }
 ]
+
+// Membership tier enum values
+const MembershipTier = {
+  NONE: 0,
+  BASIC: 1,
+  STANDARD: 2,
+  PREMIUM: 3,
+  ENTERPRISE: 4
+}
 
 /**
  * Get the role hash for a given role name
@@ -578,10 +608,36 @@ export async function grantRoleOnChain(signer, userAddress, roleName, durationDa
   }
 }
 
+// PaymentProcessor ABI for role purchases (modular RBAC system)
+const PAYMENT_PROCESSOR_ABI = [
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "uint8", "name": "tier", "type": "uint8" },
+      { "internalType": "address", "name": "paymentToken", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "purchaseTierWithToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paymentManager",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
 /**
  * Purchase a role using USC stablecoin
- * This function handles the payment AND grants the role on-chain if the role manager is deployed.
- * 
+ * This function calls the PaymentProcessor's purchaseTierWithToken function,
+ * which handles both the payment and role granting in a single transaction.
+ *
+ * Requires modular RBAC deployment: npx hardhat run scripts/deploy-modular-rbac.js --network mordor
+ *
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
  * @param {number} priceUSD - Price in USD (will be converted to USC with 6 decimals)
@@ -594,18 +650,21 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
 
   try {
     const uscAddress = ETCSWAP_ADDRESSES.USC_STABLECOIN
-    const treasuryAddress = getContractAddress('treasuryVault')
-    const roleManagerAddress = getContractAddress('roleManager')
+    const paymentProcessorAddress = getContractAddress('paymentProcessor')
+
+    if (!paymentProcessorAddress) {
+      throw new Error('PaymentProcessor not deployed. Run: npx hardhat run scripts/deploy-modular-rbac.js --network mordor')
+    }
+
     const uscContract = new ethers.Contract(uscAddress, ERC20_ABI, signer)
+    const paymentProcessor = new ethers.Contract(paymentProcessorAddress, PAYMENT_PROCESSOR_ABI, signer)
 
     // Convert price to USC units (USC has 6 decimals like USDC)
-    // Use parseUnits with explicit decimals for precision
     const amountWei = ethers.parseUnits(String(priceUSD), 6)
 
     // Check USC balance
     const userAddress = await signer.getAddress()
     const balanceRaw = await uscContract.balanceOf(userAddress)
-    // Ensure balance is BigInt for proper comparison
     const balance = BigInt(balanceRaw.toString())
     const amount = BigInt(amountWei.toString())
 
@@ -623,51 +682,63 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
       throw new Error(`Insufficient USC balance. You have ${parseFloat(balanceFormatted).toFixed(2)} USC but need ${priceUSD} USC.`)
     }
 
-    // Check allowance
-    const allowanceRaw = await uscContract.allowance(userAddress, treasuryAddress)
+    // Get role hash
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      throw new Error(`Unknown role: ${roleName}`)
+    }
+
+    // Check if payment manager is configured on PaymentProcessor
+    let paymentManagerAddress
+    try {
+      paymentManagerAddress = await paymentProcessor.paymentManager()
+    } catch (e) {
+      paymentManagerAddress = ethers.ZeroAddress
+    }
+
+    if (paymentManagerAddress === ethers.ZeroAddress) {
+      throw new Error('MembershipPaymentManager not configured. Run: npx hardhat run scripts/deploy-modular-rbac.js --network mordor')
+    }
+
+    // Check and approve USC for the PaymentProcessor
+    const allowanceRaw = await uscContract.allowance(userAddress, paymentProcessorAddress)
     const allowance = BigInt(allowanceRaw.toString())
 
-    // Approve if needed
     if (allowance < amount) {
-      const approveTx = await uscContract.approve(treasuryAddress, amountWei)
+      console.log('Approving USC for PaymentProcessor...')
+      const approveTx = await uscContract.approve(paymentProcessorAddress, amountWei)
       await approveTx.wait()
+      console.log('USC approved')
     }
 
-    // Transfer USC to treasury
-    const transferTx = await uscContract.transfer(treasuryAddress, amountWei)
-    const paymentReceipt = await transferTx.wait()
+    // Call purchaseTierWithToken on PaymentProcessor
+    // This handles both payment and role granting in a single atomic transaction
+    console.log('Purchasing role via PaymentProcessor...', {
+      roleHash,
+      tier: MembershipTier.BASIC,
+      paymentToken: uscAddress,
+      amount: amountWei.toString()
+    })
 
-    // Track if role was granted on-chain
-    let roleGrantedOnChain = false
-    let roleGrantTxHash = null
+    const purchaseTx = await paymentProcessor.purchaseTierWithToken(
+      roleHash,
+      MembershipTier.BASIC,  // Use BASIC tier for standard purchases
+      uscAddress,
+      amountWei
+    )
+    const receipt = await purchaseTx.wait()
 
-    // After successful payment, grant the role on-chain if role manager is deployed
-    if (roleManagerAddress) {
-      try {
-        console.log('Granting role on-chain after successful payment...')
-        const roleReceipt = await grantRoleOnChain(signer, userAddress, roleName, 365)
-        roleGrantedOnChain = roleReceipt.status === 'success'
-        roleGrantTxHash = roleReceipt.hash
-        console.log('Role granted on-chain:', roleReceipt)
-      } catch (roleError) {
-        // Log but don't fail the purchase - payment was successful
-        // The role can be granted later by an admin
-        console.error('Failed to grant role on-chain (payment successful):', roleError)
-        console.warn('Role will need to be granted manually by admin or the user needs to contact support')
-      }
-    } else {
-      console.warn('Role manager not configured - role saved locally only. Set VITE_ROLE_MANAGER_ADDRESS to enable blockchain persistence.')
-    }
+    console.log('Role purchased successfully:', receipt)
 
     return {
-      hash: paymentReceipt.hash,
-      blockNumber: paymentReceipt.blockNumber,
-      status: paymentReceipt.status === 1 ? 'success' : 'failed',
-      gasUsed: paymentReceipt.gasUsed.toString(),
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
       roleName: roleName,
       amount: priceUSD,
-      roleGrantedOnChain,
-      roleGrantTxHash
+      roleGrantedOnChain: receipt.status === 1,
+      roleGrantTxHash: receipt.hash
     }
   } catch (error) {
     console.error('Error purchasing role:', error)
