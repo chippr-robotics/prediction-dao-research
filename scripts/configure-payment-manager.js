@@ -172,6 +172,89 @@ async function main() {
     }
   }
 
+  // ========== Configure TierRegistry with active tiers ==========
+  console.log("\nConfiguring TierRegistry tiers...");
+  const tierRegistry = await ethers.getContractAt("TierRegistry", DEPLOYED.tierRegistry);
+
+  // Membership tiers (matching contract enum: NONE=0, BRONZE=1, SILVER=2, GOLD=3, PLATINUM=4)
+  const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
+
+  // Default tier limits
+  const defaultLimits = {
+    dailyBetLimit: ethers.parseUnits("10000", 6),
+    weeklyBetLimit: ethers.parseUnits("50000", 6),
+    monthlyMarketCreation: 10,
+    maxPositionSize: ethers.parseUnits("5000", 6),
+    maxConcurrentMarkets: 5,
+    withdrawalLimit: ethers.parseUnits("10000", 6),
+    canCreatePrivateMarkets: true,
+    canUseAdvancedFeatures: false,
+    feeDiscount: 0
+  };
+
+  // Configure MARKET_MAKER_ROLE tier 1 (BRONZE) - this is what the frontend uses as "BASIC"
+  const marketMakerTiers = [
+    {
+      tier: MembershipTier.BRONZE,
+      name: "Basic Market Maker",
+      description: "Basic market creation access",
+      price: ethers.parseUnits("100", 6),
+      limits: defaultLimits,
+      isActive: true
+    },
+    {
+      tier: MembershipTier.SILVER,
+      name: "Standard Market Maker",
+      description: "Enhanced market creation with higher limits",
+      price: ethers.parseUnits("250", 6),
+      limits: { ...defaultLimits, monthlyMarketCreation: 25, maxConcurrentMarkets: 10 },
+      isActive: true
+    }
+  ];
+
+  for (const tierConfig of marketMakerTiers) {
+    try {
+      console.log(`  Setting MARKET_MAKER tier ${tierConfig.tier} (${tierConfig.name})...`);
+      const tx = await tierRegistry.setTierMetadata(
+        MARKET_MAKER_ROLE,
+        tierConfig.tier,
+        tierConfig.name,
+        tierConfig.description,
+        tierConfig.price,
+        tierConfig.limits,
+        tierConfig.isActive
+      );
+      await tx.wait();
+      console.log(`  ✓ MARKET_MAKER tier ${tierConfig.tier} configured`);
+    } catch (error) {
+      console.warn(`  ⚠️  MARKET_MAKER tier ${tierConfig.tier} may already be set:`, error.message);
+    }
+  }
+
+  // Configure FRIEND_MARKET_ROLE tier 1 (BRONZE)
+  try {
+    console.log(`  Setting FRIEND_MARKET tier 1 (Basic Friend Access)...`);
+    const tx = await tierRegistry.setTierMetadata(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      "Basic Friend Access",
+      "Access to friend markets",
+      ethers.parseUnits("50", 6),
+      { ...defaultLimits, monthlyMarketCreation: 0, maxConcurrentMarkets: 0 },
+      true
+    );
+    await tx.wait();
+    console.log(`  ✓ FRIEND_MARKET tier 1 configured`);
+  } catch (error) {
+    console.warn(`  ⚠️  FRIEND_MARKET tier 1 may already be set:`, error.message);
+  }
+
+  // Verify TierRegistry configuration
+  console.log("\nVerifying TierRegistry configuration...");
+  const tier1Active = await tierRegistry.isTierActive(MARKET_MAKER_ROLE, MembershipTier.BRONZE);
+  const tier1Price = await tierRegistry.getTierPrice(MARKET_MAKER_ROLE, MembershipTier.BRONZE);
+  console.log(`  MARKET_MAKER tier 1 (BRONZE): active=${tier1Active}, price=${ethers.formatUnits(tier1Price, 6)} USC`)
+
   // Summary
   console.log("\n" + "=".repeat(60));
   console.log("Deployment Complete!");
