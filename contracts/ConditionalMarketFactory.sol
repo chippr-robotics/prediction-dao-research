@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "./ETCSwapV3Integration.sol";
-import "./TieredRoleManager.sol";
+import "./interfaces/IRoleManager.sol";
 import "./CTF1155.sol";
 
 /**
@@ -115,7 +115,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     bool public useETCSwap;
     
     // Role-based access control
-    TieredRoleManager public roleManager;
+    IRoleManager public roleManager;
     
     // CTF1155 integration - now required for all markets
     CTF1155 public ctf1155;
@@ -209,12 +209,11 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     
     /**
      * @notice Set the role manager contract
-     * @param _roleManager Address of TieredRoleManager contract
+     * @param _roleManager Address of role manager contract (TieredRoleManager or RoleManagerCore)
      */
     function setRoleManager(address _roleManager) external onlyOwner {
         require(_roleManager != address(0), "Invalid role manager address");
-        require(address(roleManager) == address(0), "Role manager already set");
-        roleManager = TieredRoleManager(_roleManager);
+        roleManager = IRoleManager(_roleManager);
     }
     
     /**

@@ -14,12 +14,6 @@ interface IRoleManagerCore {
     function paused() external view returns (bool);
 }
 
-// Interface for legacy TieredRoleManager (uses AccessControl grantRole)
-interface ILegacyRoleManager {
-    function grantRole(bytes32 role, address account) external;
-    function hasRole(bytes32 role, address account) external view returns (bool);
-}
-
 interface IMembershipManager {
     function setMembershipExpiration(address user, bytes32 role, uint256 expiration) external;
     function getMembershipExpiration(address user, bytes32 role) external view returns (uint256);
@@ -43,9 +37,6 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
     TierRegistry public tierRegistry;
     IMembershipManager public membershipManager;
     MembershipPaymentManager public paymentManager;
-
-    // Legacy role manager for backwards compatibility with ConditionalMarketFactory
-    ILegacyRoleManager public legacyRoleManager;
     
     // ========== Events ==========
     
@@ -98,10 +89,6 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         emit PaymentManagerUpdated(old, _paymentManager);
     }
 
-    function setLegacyRoleManager(address _legacyRoleManager) external onlyOwner {
-        legacyRoleManager = ILegacyRoleManager(_legacyRoleManager);
-    }
-
     function configureAll(
         address _roleManagerCore,
         address _tierRegistry,
@@ -145,14 +132,9 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         // Update tier
         tierRegistry.setUserTier(msg.sender, role, tier);
 
-        // Grant role if not already granted (on new RoleManagerCore)
+        // Grant role if not already granted
         if (!roleManagerCore.hasRole(role, msg.sender)) {
             roleManagerCore.grantRoleFromExtension(role, msg.sender);
-        }
-
-        // Also grant on legacy role manager if configured (for ConditionalMarketFactory compatibility)
-        if (address(legacyRoleManager) != address(0) && !legacyRoleManager.hasRole(role, msg.sender)) {
-            legacyRoleManager.grantRole(role, msg.sender);
         }
 
         // Set default membership duration (30 days) if membership manager is configured
@@ -210,15 +192,10 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         
         // Update tier
         tierRegistry.setUserTier(msg.sender, role, tier);
-        
-        // Grant role if not already granted (on new RoleManagerCore)
+
+        // Grant role if not already granted
         if (!roleManagerCore.hasRole(role, msg.sender)) {
             roleManagerCore.grantRoleFromExtension(role, msg.sender);
-        }
-
-        // Also grant on legacy role manager if configured (for ConditionalMarketFactory compatibility)
-        if (address(legacyRoleManager) != address(0) && !legacyRoleManager.hasRole(role, msg.sender)) {
-            legacyRoleManager.grantRole(role, msg.sender);
         }
 
         // Set default membership duration
@@ -251,11 +228,6 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
             roleManagerCore.grantRoleFromExtension(role, user);
         }
 
-        // Also grant on legacy role manager if configured
-        if (address(legacyRoleManager) != address(0) && !legacyRoleManager.hasRole(role, user)) {
-            legacyRoleManager.grantRole(role, user);
-        }
-        
         if (address(membershipManager) != address(0) && durationDays > 0) {
             membershipManager.setMembershipExpiration(
                 user,
