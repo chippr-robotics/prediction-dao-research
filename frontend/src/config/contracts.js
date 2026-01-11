@@ -11,7 +11,7 @@ export const DEPLOYED_CONTRACTS = {
   tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // RoleManagerCore
   welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
   proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac', // ConditionalMarketFactory
+  marketFactory: '0x08E5a4B716c06e92525E17495d0995A6F7102414', // ConditionalMarketFactory
   privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
   oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
   ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
@@ -28,14 +28,14 @@ export const DEPLOYED_CONTRACTS = {
 
   // Back-compat aliases used throughout the frontend
   roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // alias for RoleManagerCore
-  roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
+  roleManagerCore: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5',
 
   // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
-  tierRegistry: '0x31405f0359703109C424d31A86bd7CEF08836A12',
-  membershipManager: '0x5fbc6c64CAF5EA21090b50e0E4bb07ADdA0eB661',
+  tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
+  membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
   // Deploy via: npx hardhat run scripts/configure-payment-manager.js --network mordor
-  membershipPaymentManager: '0xF06413E0968a356Fe231C005cd0549900EF442c2',  // MembershipPaymentManager for payment processing
+  membershipPaymentManager: '0x8b09cbC2275398C00D43854393e09D40334a1B81',  // MembershipPaymentManager for payment processing
 }
 
 /**
