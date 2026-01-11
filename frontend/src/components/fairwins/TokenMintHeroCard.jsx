@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useEnsResolution } from '../../hooks/useEnsResolution'
 import { isValidEthereumAddress } from '../../utils/validation'
 import './TokenMintHeroCard.css'
@@ -27,7 +27,7 @@ function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListO
   const handleAction = async (action) => {
     try {
       // Validate address for actions that require it
-      if ((action === 'mint' || action === 'transfer') && actionData.address) {
+      if ((action === 'mint' || action === 'transfer') && actionData.address?.trim()) {
         if (isResolvingAddress) {
           alert('Please wait for ENS name to resolve')
           return

@@ -1,6 +1,5 @@
-import { forwardRef, useState, useEffect, useCallback } from 'react'
+import { forwardRef, useEffect, useCallback } from 'react'
 import { useEnsResolution, useEnsReverseLookup } from '../../hooks/useEnsResolution'
-import { isValidEthereumAddress, isEnsName } from '../../utils/validation'
 import styles from './AddressInput.module.css'
 
 /**
@@ -44,8 +43,6 @@ const AddressInput = forwardRef(({
   label,
   ...props
 }, ref) => {
-  const [isFocused, setIsFocused] = useState(false)
-
   // Use ENS resolution hook
   const {
     resolvedAddress,
@@ -74,14 +71,6 @@ const AddressInput = forwardRef(({
     }
   }, [onChange])
 
-  const handleFocus = useCallback(() => {
-    setIsFocused(true)
-  }, [])
-
-  const handleBlur = useCallback(() => {
-    setIsFocused(false)
-  }, [])
-
   // Determine error state
   const hasError = externalError || (value && !isLoading && resolutionError)
   const displayError = externalErrorMessage || resolutionError
@@ -108,8 +97,14 @@ const AddressInput = forwardRef(({
 
   // Generate unique IDs for ARIA
   const errorId = id ? `${id}-error` : undefined
-  const hintId = id ? `${id}-hint` : undefined
-  const describedBy = [ariaDescribedBy, hasError && errorId, hintId]
+  const resolvedHintId = id ? `${id}-resolved-hint` : undefined
+  const ensNameHintId = id ? `${id}-ens-hint` : undefined
+  const describedBy = [
+    ariaDescribedBy,
+    hasError && errorId,
+    (showResolvedAddress && isEns && resolvedAddress && !isLoading && !hasError) && resolvedHintId,
+    (showResolvedAddress && isAddress && ensName && !isLookingUp) && ensNameHintId
+  ]
     .filter(Boolean)
     .join(' ') || undefined
 
@@ -129,8 +124,6 @@ const AddressInput = forwardRef(({
           id={id}
           value={value}
           onChange={handleChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
           placeholder={placeholder}
           disabled={disabled}
           required={required}
@@ -156,14 +149,14 @@ const AddressInput = forwardRef(({
             </span>
           )}
           {showEnsLabel && !showLoading && (
-            <span className={styles.ensLabel}>ENS</span>
+            <span className={styles.ensLabel} aria-label="ENS name detected">ENS</span>
           )}
         </div>
       </div>
 
       {/* Resolved address preview */}
       {showResolvedAddress && isEns && resolvedAddress && !isLoading && !hasError && (
-        <div id={hintId} className={styles.resolvedHint}>
+        <div id={resolvedHintId} className={styles.resolvedHint}>
           <span className={styles.resolvedLabel}>Resolves to:</span>
           <code className={styles.resolvedAddress}>{formatAddress(resolvedAddress)}</code>
         </div>
@@ -171,7 +164,7 @@ const AddressInput = forwardRef(({
 
       {/* Show ENS name for direct address input */}
       {showResolvedAddress && isAddress && ensName && !isLookingUp && (
-        <div id={hintId} className={styles.resolvedHint}>
+        <div id={ensNameHintId} className={styles.resolvedHint}>
           <span className={styles.ensNameLabel}>{ensName}</span>
         </div>
       )}

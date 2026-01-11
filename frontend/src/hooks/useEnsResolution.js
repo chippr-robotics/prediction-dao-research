@@ -1,31 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
 import { useEnsAddress, useEnsName } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
 import { normalize } from 'viem/ens'
-
-/**
- * Check if a string looks like an ENS name
- * ENS names end with .eth (or other TLDs like .xyz, .app, etc.)
- * @param {string} input - The input to check
- * @returns {boolean} True if the input looks like an ENS name
- */
-export function isEnsName(input) {
-  if (!input || typeof input !== 'string') return false
-  const trimmed = input.trim().toLowerCase()
-  // Common ENS TLDs: .eth, .xyz, .app, .dao, .nft, .art, .club, .id
-  // Also support subdomains like sub.name.eth
-  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.(eth|xyz|app|dao|nft|art|club|id|luxe|kred|link|com|org|io)$/i.test(trimmed)
-}
-
-/**
- * Check if a string is a valid Ethereum address
- * @param {string} input - The input to check
- * @returns {boolean} True if the input is a valid Ethereum address
- */
-export function isValidAddress(input) {
-  if (!input || typeof input !== 'string') return false
-  return /^0x[a-fA-F0-9]{40}$/.test(input.trim())
-}
+import { isEnsName, isValidEthereumAddress } from '../utils/validation'
 
 /**
  * Hook to resolve ENS names to Ethereum addresses
@@ -43,7 +19,7 @@ export function isValidAddress(input) {
 export function useEnsResolution(nameOrAddress) {
   const trimmedInput = nameOrAddress?.trim() || ''
   const isEns = isEnsName(trimmedInput)
-  const isAddress = isValidAddress(trimmedInput)
+  const isAddress = isValidEthereumAddress(trimmedInput)
 
   // Normalize ENS name for resolution
   let normalizedName = null
@@ -118,7 +94,7 @@ export function useEnsResolution(nameOrAddress) {
  * // ensName: 'vitalik.eth'
  */
 export function useEnsReverseLookup(address) {
-  const isAddress = isValidAddress(address)
+  const isAddress = isValidEthereumAddress(address)
 
   const {
     data: ensName,

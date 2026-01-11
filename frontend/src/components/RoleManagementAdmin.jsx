@@ -4,7 +4,7 @@ import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
 import { useEnsResolution } from '../hooks/useEnsResolution'
 import { getAllUsersWithRoles } from '../utils/roleStorage'
-import { isValidEthereumAddress, isValidAddressOrEns } from '../utils/validation'
+import { isValidEthereumAddress } from '../utils/validation'
 import './RoleManagementAdmin.css'
 
 function RoleManagementAdmin() {
@@ -72,7 +72,10 @@ function RoleManagementAdmin() {
 
     const success = grantRoleToUser(resolvedNewUserAddress.toLowerCase(), selectedRole)
     if (success) {
-      const message = `Successfully granted ${ROLE_INFO[selectedRole].name} to ${shortenAddress(newUserAddress)}`
+      const displayTarget = isEnsInput
+        ? `${newUserAddress} (${shortenAddress(resolvedNewUserAddress)})`
+        : shortenAddress(resolvedNewUserAddress)
+      const message = `Successfully granted ${ROLE_INFO[selectedRole].name} to ${displayTarget}`
       setSuccessMessage(message)
       showNotification(message, 'success')
       setNewUserAddress('')

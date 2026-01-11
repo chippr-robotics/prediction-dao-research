@@ -72,7 +72,5 @@ export { useTokenMintFactory, LoadState } from './useTokenMintFactory'
 export {
   useEnsResolution,
   useEnsReverseLookup,
-  useAddressInput,
-  isEnsName,
-  isValidAddress
+  useAddressInput
 } from './useEnsResolution'
