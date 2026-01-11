@@ -325,7 +325,8 @@
 
 .mcm-field input[type="text"],
 .mcm-field input[type="number"],
-.mcm-field textarea {
+.mcm-field textarea,
+.mcm-field select {
   width: 100%;
   padding: 0.75rem 1rem;
   font-size: 0.9375rem;
@@ -338,8 +339,19 @@
   outline: none;
 }
 
+/* Token select dropdown */
+.mcm-token-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23718096' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
 .mcm-field input:focus,
-.mcm-field textarea:focus {
+.mcm-field textarea:focus,
+.mcm-field select:focus {
   border-color: var(--brand-primary, #36B37E);
   box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
 }
@@ -350,7 +362,8 @@
 }
 
 .mcm-field input:disabled,
-.mcm-field textarea:disabled {
+.mcm-field textarea:disabled,
+.mcm-field select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -857,12 +870,17 @@
 :root.theme-dark .mcm-toggle-row,
 :root.theme-dark .mcm-field input,
 :root.theme-dark .mcm-field textarea,
+:root.theme-dark .mcm-field select,
 :root.theme-dark .mcm-category-btn,
 :root.theme-dark .mcm-bettype-btn,
 :root.theme-dark .mcm-review-card,
 :root.theme-dark .mcm-review-item {
   background: var(--bg-primary, #2d3748);
   border-color: var(--border-color, #4a5568);
+}
+
+:root.theme-dark .mcm-token-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0aec0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
 }
 
 :root.theme-dark .mcm-toggle-track {
