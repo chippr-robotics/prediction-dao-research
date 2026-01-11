@@ -4,7 +4,7 @@ import { usePerpetualsContract, PositionSide, MarketCategory } from '../../hooks
 import './PerpetualFuturesModal.css'
 
 // Default factory address (to be configured via environment variable)
-const DEFAULT_FACTORY_ADDRESS = process.env.REACT_APP_PERPETUAL_FACTORY_ADDRESS ?? '' // Set after deployment
+const DEFAULT_FACTORY_ADDRESS = import.meta.env.VITE_PERPETUAL_FACTORY_ADDRESS ?? '' // Set after deployment
 
 // Leverage presets
 const LEVERAGE_PRESETS = [1, 2, 5, 10, 15, 20]
