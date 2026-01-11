@@ -483,7 +483,6 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
 
   try {
     const contract = getContract('marketFactory', signer)
-    const amountWei = ethers.parseEther(amount.toString())
 
     // Get the market to find the collateral token
     const market = await contract.markets(marketId)
@@ -493,6 +492,11 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
 
     const collateralTokenAddress = market.collateralToken
     const userAddress = await signer.getAddress()
+
+    // Determine token decimals - USC stablecoin has 6 decimals
+    const isUSC = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+    const tokenDecimals = isUSC ? 6 : 18
+    const amountWei = ethers.parseUnits(amount.toString(), tokenDecimals)
 
     // If collateral is not native ETC (zero address), we need to approve
     if (collateralTokenAddress !== ethers.ZeroAddress) {
@@ -578,11 +582,15 @@ export async function estimateBuyGas(signer, marketId, outcome, amount) {
 
   try {
     const contract = getContract('marketFactory', signer)
-    const amountWei = ethers.parseEther(amount.toString())
 
     // Get the market to find the collateral token
     const market = await contract.markets(marketId)
     const collateralTokenAddress = market?.collateralToken
+
+    // Determine token decimals - USC stablecoin has 6 decimals
+    const isUSC = collateralTokenAddress?.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+    const tokenDecimals = isUSC ? 6 : 18
+    const amountWei = ethers.parseUnits(amount.toString(), tokenDecimals)
 
     let gasEstimate
     if (collateralTokenAddress && collateralTokenAddress !== ethers.ZeroAddress) {

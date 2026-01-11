@@ -10,6 +10,7 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
 import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
+import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -262,11 +263,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory contract not deployed on this network')
       }
 
-      // Get collateral token address (USC/FairWins token)
-      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      // Get collateral token address - use form data or default to USC stablecoin
+      const collateralTokenAddress = data.data?.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
       if (!collateralTokenAddress) {
         throw new Error('Collateral token not configured')
       }
+
+      // Determine token decimals based on token address
+      const tokenDecimals = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+        ? TOKENS.USC.decimals  // 6 decimals for USC
+        : 18  // Default to 18 decimals for other tokens
 
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
@@ -344,15 +350,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
         Math.min(TradingPeriod.MAX, tradingPeriodDays * 24 * 60 * 60)
       )
 
-      // Parse stake amount as liquidity (in token units)
+      // Parse stake amount as liquidity using correct decimals for token
       const stakeAmount = data.data.stakeAmount || '10'
-      const liquidityAmount = ethers.parseEther(stakeAmount)
+      const liquidityAmount = ethers.parseUnits(stakeAmount, tokenDecimals)
 
       // Generate a unique proposal ID for the friend market
       const proposalId = BigInt(Date.now())
 
       // Default liquidity parameter for LMSR (higher = more liquidity depth)
-      const liquidityParameter = ethers.parseEther('100')
+      // Use same decimals as collateral token for consistency
+      const liquidityParameter = ethers.parseUnits('100', tokenDecimals)
 
       // Use WinLose bet type for friend markets (1v1 style)
       const betType = BetType.WinLose
@@ -469,11 +476,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory contract not deployed on this network')
       }
 
-      // Get collateral token address (USC/FairWins token)
-      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      // Get collateral token address - use form data or default to USC stablecoin
+      const collateralTokenAddress = submitData.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
       if (!collateralTokenAddress) {
         throw new Error('Collateral token not configured')
       }
+
+      // Determine token decimals based on token address
+      const tokenDecimals = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+        ? TOKENS.USC.decimals  // 6 decimals for USC
+        : 18  // Default to 18 decimals for other tokens
 
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
@@ -552,14 +564,15 @@ function WalletButton({ className = '', theme = 'dark' }) {
         Math.min(TradingPeriod.MAX, submitData.tradingPeriod || TradingPeriod.DEFAULT)
       )
 
-      // Parse initial liquidity as token amount
-      const liquidityAmount = ethers.parseEther(submitData.initialLiquidity.toString())
+      // Parse initial liquidity using correct decimals for token
+      const liquidityAmount = ethers.parseUnits(submitData.initialLiquidity.toString(), tokenDecimals)
 
       // Generate a unique proposal ID
       const proposalId = BigInt(Date.now())
 
       // Default liquidity parameter for LMSR
-      const liquidityParameter = ethers.parseEther('100')
+      // Use same decimals as collateral token for consistency
+      const liquidityParameter = ethers.parseUnits('100', tokenDecimals)
 
       // Determine bet type from metadata or default to YesNo
       let betType = BetType.YesNo
