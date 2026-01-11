@@ -269,7 +269,9 @@ async function main() {
   console.log("Deployer:", deployer.address);
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC\n");
 
-  const saltPrefix = "ClearPathDAO-v1.0-";
+  // Use v1.1 salt to deploy updated contract with fixed permissions
+  // (v1.0 had onlyOwner restriction on addMarketToGroup, v1.1 allows group creator)
+  const saltPrefix = "ClearPathDAO-v1.1-";
   const verificationResults = {};
 
   // ========== Deploy MarketCorrelationRegistry ==========
