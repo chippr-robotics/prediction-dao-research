@@ -29,6 +29,13 @@ vi.mock('wagmi', () => ({
   useSwitchChain: () => ({
     switchChain: vi.fn()
   }),
+  useWalletClient: () => ({
+    data: {
+      account: { address: '0x1234567890123456789012345678901234567890' },
+      chain: { id: 61 },
+      transport: {}
+    }
+  }),
   createConfig: vi.fn(),
   http: vi.fn()
 }))
