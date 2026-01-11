@@ -1,8 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
+import { TOKENS } from '../../constants/etcswap'
 import QRScanner from '../ui/QRScanner'
 import './FriendMarketsModal.css'
+
+// Stake token options derived from ETCswap tokens
+const STAKE_TOKEN_OPTIONS = [
+  { id: 'USC', ...TOKENS.USC, isDefault: true },
+  { id: 'WETC', ...TOKENS.WETC },
+  { id: 'ETC', ...TOKENS.ETC },
+  { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
+]
 
 /**
  * FriendMarketsModal Component
@@ -40,6 +49,8 @@ function FriendMarketsModal({
     memberLimit: '5',
     tradingPeriod: '7',
     stakeAmount: '10',
+    stakeTokenId: 'USC', // Default to USC stablecoin
+    customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
     peggedMarketId: ''
   })
@@ -69,6 +80,8 @@ function FriendMarketsModal({
       memberLimit: '5',
       tradingPeriod: '7',
       stakeAmount: '10',
+      stakeTokenId: 'USC',
+      customStakeTokenAddress: '',
       arbitrator: '',
       peggedMarketId: ''
     })
@@ -298,10 +311,20 @@ function FriendMarketsModal({
     }
 
     const stake = parseFloat(formData.stakeAmount)
+    const selectedToken = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
     if (!formData.stakeAmount || stake <= 0) {
       newErrors.stakeAmount = 'Valid stake amount is required'
     } else if (stake < 0.1) {
-      newErrors.stakeAmount = 'Minimum stake is 0.1 ETC'
+      newErrors.stakeAmount = `Minimum stake is 0.1 ${selectedToken?.symbol || 'tokens'}`
+    }
+
+    // Validate custom stake token address if custom token is selected
+    if (formData.stakeTokenId === 'CUSTOM') {
+      if (!formData.customStakeTokenAddress) {
+        newErrors.customStakeTokenAddress = 'Custom token address is required'
+      } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.customStakeTokenAddress)) {
+        newErrors.customStakeTokenAddress = 'Invalid token address format'
+      }
     }
 
     if (!formData.tradingPeriod || parseInt(formData.tradingPeriod) < 1) {
@@ -359,12 +382,30 @@ function FriendMarketsModal({
 
       const result = await onCreate(submitData, signer)
 
+      // Get the stake token info for display
+      const getStakeTokenInfo = () => {
+        if (formData.stakeTokenId === 'CUSTOM') {
+          return {
+            symbol: 'Custom',
+            address: formData.customStakeTokenAddress,
+            icon: '🔧'
+          }
+        }
+        const token = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
+        return token || STAKE_TOKEN_OPTIONS[0] // Default to USC if not found
+      }
+      const stakeToken = getStakeTokenInfo()
+
       // Simulate created market for demo
       const newMarket = {
         id: result?.id || `friend-${Date.now()}`,
         type: friendMarketType,
         description: formData.description,
         stakeAmount: formData.stakeAmount,
+        stakeTokenId: formData.stakeTokenId,
+        stakeTokenSymbol: stakeToken.symbol,
+        stakeTokenIcon: stakeToken.icon,
+        stakeTokenAddress: stakeToken.address,
         tradingPeriod: formData.tradingPeriod,
         participants: friendMarketType === 'oneVsOne'
           ? [account, formData.opponent]
@@ -441,6 +482,18 @@ function FriendMarketsModal({
       default: return 'status-default'
     }
   }
+
+  // Get selected stake token info for display
+  const selectedStakeToken = useMemo(() => {
+    const token = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
+    if (formData.stakeTokenId === 'CUSTOM' && formData.customStakeTokenAddress) {
+      return {
+        ...token,
+        displayAddress: formData.customStakeTokenAddress
+      }
+    }
+    return token
+  }, [formData.stakeTokenId, formData.customStakeTokenAddress])
 
   // Filter markets where user is participating
   const userActiveMarkets = useMemo(() => {
@@ -692,7 +745,7 @@ function FriendMarketsModal({
 
                     <div className="fm-form-group">
                       <label htmlFor="fm-stake">
-                        Stake (ETC) <span className="fm-required">*</span>
+                        Stake Amount <span className="fm-required">*</span>
                       </label>
                       <input
                         id="fm-stake"
@@ -707,6 +760,52 @@ function FriendMarketsModal({
                       />
                       {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
+
+                    <div className="fm-form-group">
+                      <label htmlFor="fm-stake-token">
+                        Stake Token
+                      </label>
+                      <select
+                        id="fm-stake-token"
+                        value={formData.stakeTokenId}
+                        onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
+                        disabled={submitting}
+                        className="fm-token-select"
+                      >
+                        {STAKE_TOKEN_OPTIONS.map(token => (
+                          <option key={token.id} value={token.id}>
+                            {token.icon} {token.symbol} - {token.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="fm-hint">
+                        {formData.stakeTokenId === 'ETC'
+                          ? 'Native ETC will be used for stakes'
+                          : formData.stakeTokenId === 'CUSTOM'
+                          ? 'Enter custom token address below'
+                          : `${selectedStakeToken?.name} from ETCswap`}
+                      </span>
+                    </div>
+
+                    {/* Custom token address input - only shown when CUSTOM is selected */}
+                    {formData.stakeTokenId === 'CUSTOM' && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-custom-token">
+                          Custom Token Address <span className="fm-required">*</span>
+                        </label>
+                        <input
+                          id="fm-custom-token"
+                          type="text"
+                          value={formData.customStakeTokenAddress}
+                          onChange={(e) => handleFormChange('customStakeTokenAddress', e.target.value)}
+                          placeholder="0x..."
+                          disabled={submitting}
+                          className={errors.customStakeTokenAddress ? 'error' : ''}
+                        />
+                        <span className="fm-hint">Enter a valid ERC-20 token address</span>
+                        {errors.customStakeTokenAddress && <span className="fm-error">{errors.customStakeTokenAddress}</span>}
+                      </div>
+                    )}
 
                     <div className="fm-form-group">
                       <label htmlFor="fm-period">
@@ -922,7 +1021,9 @@ function FriendMarketsModal({
                     </div>
                     <div className="fm-detail-row">
                       <span>Stake</span>
-                      <span>{createdMarket.stakeAmount} ETC</span>
+                      <span>
+                        {createdMarket.stakeTokenIcon} {createdMarket.stakeAmount} {createdMarket.stakeTokenSymbol || 'USC'}
+                      </span>
                     </div>
                     <div className="fm-detail-row">
                       <span>Duration</span>
@@ -1103,7 +1204,9 @@ function MarketsCompactTable({
             <td>
               <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
             </td>
-            <td className="fm-table-stake">{market.stakeAmount} ETC</td>
+            <td className="fm-table-stake">
+              {market.stakeTokenIcon || '💵'} {market.stakeAmount} {market.stakeTokenSymbol || 'USC'}
+            </td>
             <td className="fm-table-date">
               {isPast
                 ? (market.outcome || 'Resolved')
@@ -1160,12 +1263,14 @@ function MarketDetailView({
         </div>
         <div className="fm-detail-item">
           <span className="fm-detail-label">Stake</span>
-          <span className="fm-detail-value">{market.stakeAmount} ETC</span>
+          <span className="fm-detail-value">
+            {market.stakeTokenIcon || '💵'} {market.stakeAmount} {market.stakeTokenSymbol || 'USC'}
+          </span>
         </div>
         <div className="fm-detail-item">
           <span className="fm-detail-label">Total Pool</span>
           <span className="fm-detail-value">
-            {(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2)).toFixed(2)} ETC
+            {market.stakeTokenIcon || '💵'} {(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2)).toFixed(2)} {market.stakeTokenSymbol || 'USC'}
           </span>
         </div>
         <div className="fm-detail-item">
