@@ -3,8 +3,158 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+/**
+ * Deployment Script for MarketCorrelationRegistry
+ *
+ * Features:
+ * - Deploys MarketCorrelationRegistry using Safe Singleton Factory (deterministic)
+ * - Verifies contract on Blockscout
+ * - Automatically updates frontend/src/config/contracts.js
+ * - Saves deployment info to deployments/ directory
+ *
+ * Usage:
+ *   npx hardhat run scripts/deploy-correlation-registry.js --network mordor
+ *
+ * Environment variables:
+ *   VERIFY=true|false           Enable/disable Blockscout verification (default: true)
+ *   VERIFY_RETRIES=6            Number of verification retries (default: 6)
+ *   VERIFY_DELAY_MS=20000       Delay between retries in ms (default: 20000)
+ *   UPDATE_FRONTEND=true|false  Update frontend contracts.js (default: true)
+ *   ROLE_MANAGER_ADDRESS=0x...  Optional role manager address to configure
+ */
+
 // Safe Singleton Factory address (same on all EVM networks)
 const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
+
+// Utility functions
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isLikelyAlreadyVerifiedError(message) {
+  const m = (message || "").toLowerCase();
+  return (
+    m.includes("already verified") ||
+    m.includes("contract source code already verified") ||
+    m.includes("already been verified")
+  );
+}
+
+function isLikelyNotIndexedYetError(message) {
+  const m = (message || "").toLowerCase();
+  return (
+    m.includes("contract not found") ||
+    m.includes("unable to locate") ||
+    m.includes("does not have bytecode") ||
+    m.includes("doesn't have bytecode") ||
+    m.includes("not verified") ||
+    m.includes("unable to verify") ||
+    m.includes("request failed") ||
+    m.includes("timeout")
+  );
+}
+
+/**
+ * Verify contract on Blockscout with retries
+ */
+async function verifyOnBlockscout({ name, address, constructorArguments }) {
+  const verifyEnabled = (process.env.VERIFY ?? "true").toLowerCase() !== "false";
+  if (!verifyEnabled) {
+    console.log(`  ⏭️  Verification skipped (VERIFY=false)`);
+    return { status: "skipped" };
+  }
+
+  const networkName = hre.network.name;
+  if (networkName === "hardhat" || networkName === "localhost") {
+    console.log(`  ⏭️  Skipping verification on local network: ${networkName}`);
+    return { status: "skipped" };
+  }
+
+  const retries = Number(process.env.VERIFY_RETRIES ?? 6);
+  const delayMs = Number(process.env.VERIFY_DELAY_MS ?? 20000);
+
+  console.log(`  Verifying ${name} on Blockscout...`);
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await hre.run("verify:verify", {
+        address,
+        constructorArguments: constructorArguments ?? [],
+      });
+      console.log(`  ✓ Verified on Blockscout: ${address}`);
+      return { status: "verified" };
+    } catch (error) {
+      const message = error?.message || String(error);
+
+      if (isLikelyAlreadyVerifiedError(message)) {
+        console.log(`  ✓ Already verified: ${address}`);
+        return { status: "verified" };
+      }
+
+      const shouldRetry = attempt < retries && isLikelyNotIndexedYetError(message);
+      console.warn(`  ⚠️  Verify attempt ${attempt}/${retries} failed`);
+      console.warn(`      ${message.split("\n")[0]}`);
+
+      if (!shouldRetry) {
+        console.warn(`  ⚠️  Verification failed (continuing deployment)`);
+        return { status: "failed", error: message.split("\n")[0] };
+      }
+
+      console.log(`  ⏳ Waiting ${delayMs / 1000}s before retry...`);
+      await sleep(delayMs);
+    }
+  }
+
+  return { status: "failed", error: "Verification failed after retries" };
+}
+
+/**
+ * Update frontend contracts.js with new correlation registry address
+ */
+function updateFrontendContracts(deploymentInfo) {
+  const updateEnabled = (process.env.UPDATE_FRONTEND ?? "true").toLowerCase() !== "false";
+  if (!updateEnabled) {
+    console.log("  ⏭️  Frontend update skipped (UPDATE_FRONTEND=false)");
+    return false;
+  }
+
+  const contractsPath = path.join(__dirname, "../frontend/src/config/contracts.js");
+
+  if (!fs.existsSync(contractsPath)) {
+    console.warn(`  ⚠️  Frontend contracts.js not found at: ${contractsPath}`);
+    return false;
+  }
+
+  try {
+    let content = fs.readFileSync(contractsPath, "utf8");
+
+    // Check if marketCorrelationRegistry entry exists and update it
+    const hasEntry = content.includes("marketCorrelationRegistry:");
+
+    if (hasEntry) {
+      // Update existing entry (handles both null and address values)
+      content = content.replace(
+        /marketCorrelationRegistry:\s*(?:null|'[^']*'|"[^"]*"),?/,
+        `marketCorrelationRegistry: '${deploymentInfo.contracts.marketCorrelationRegistry}',`
+      );
+      console.log("  ✓ Updated marketCorrelationRegistry in contracts.js");
+    } else {
+      // Add new entry before the closing brace
+      const insertPoint = content.lastIndexOf("}");
+      if (insertPoint > 0) {
+        const newEntry = `\n  // Market Correlation Registry - Deployed via: npx hardhat run scripts/deploy-correlation-registry.js --network ${deploymentInfo.network}\n  marketCorrelationRegistry: '${deploymentInfo.contracts.marketCorrelationRegistry}',\n`;
+        content = content.slice(0, insertPoint) + newEntry + content.slice(insertPoint);
+        console.log("  ✓ Added marketCorrelationRegistry to contracts.js");
+      }
+    }
+
+    fs.writeFileSync(contractsPath, content);
+    return true;
+  } catch (error) {
+    console.warn(`  ⚠️  Failed to update contracts.js: ${error.message}`);
+    return false;
+  }
+}
 
 /**
  * Deploy a contract deterministically using Safe Singleton Factory
@@ -97,7 +247,10 @@ function generateSalt(identifier) {
 }
 
 async function main() {
-  console.log("Starting MarketCorrelationRegistry Deployment...\n");
+  console.log("=".repeat(60));
+  console.log("MarketCorrelationRegistry Deployment");
+  console.log("=".repeat(60));
+  console.log();
 
   const network = await ethers.provider.getNetwork();
   console.log(`Network: ${network.name} (Chain ID: ${network.chainId})`);
@@ -114,9 +267,10 @@ async function main() {
     throw new Error("No deployer signer available");
   }
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH\n");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC\n");
 
   const saltPrefix = "ClearPathDAO-v1.0-";
+  const verificationResults = {};
 
   // ========== Deploy MarketCorrelationRegistry ==========
   const correlationRegistry = await deployDeterministic(
@@ -144,7 +298,6 @@ async function main() {
   }
 
   // ========== Configure Role Manager (optional) ==========
-  // Check if ROLE_MANAGER_ADDRESS is provided
   const roleManagerAddress = process.env.ROLE_MANAGER_ADDRESS;
   if (roleManagerAddress && roleManagerAddress !== ethers.ZeroAddress) {
     try {
@@ -164,39 +317,67 @@ async function main() {
     console.log("\nSkipping Role Manager configuration (set ROLE_MANAGER_ADDRESS env var to configure)");
   }
 
-  // ========== Summary ==========
-  console.log("\n\n=== MarketCorrelationRegistry Deployment Summary ===");
-  console.log("Network:", network.name, `(Chain ID: ${network.chainId})`);
-  console.log("\nDeployed Contract:");
-  console.log("==================");
-  console.log("MarketCorrelationRegistry:", correlationRegistry.address);
+  // ========== Verify on Blockscout ==========
+  console.log("\n\nVerifying contracts on Blockscout...");
+  verificationResults.marketCorrelationRegistry = await verifyOnBlockscout({
+    name: "MarketCorrelationRegistry",
+    address: correlationRegistry.address,
+    constructorArguments: []
+  });
 
-  console.log("\n✓ Deployment completed!");
-  console.log("\nFrontend Integration:");
-  console.log("  - Update frontend/src/config/contracts.js with:");
-  console.log(`    marketCorrelationRegistry: '${correlationRegistry.address}'`);
-  console.log("\nNext steps:");
-  console.log("  1. Update frontend config with the contract address above");
-  console.log("  2. Optionally set role manager: setRoleManager(roleManagerAddress)");
-  console.log("  3. Create correlation groups for related markets");
-
-  // Save deployment JSON
-  const deploymentsDir = path.join(process.cwd(), "deployments");
-  if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
-
+  // ========== Prepare deployment info ==========
   const deploymentInfo = {
-    network: network.name,
+    network: hre.network.name,
     chainId: Number(network.chainId),
     deployer: deployer.address,
     contracts: {
       marketCorrelationRegistry: correlationRegistry.address
     },
+    verification: verificationResults,
     timestamp: new Date().toISOString()
   };
 
-  const outPath = path.join(deploymentsDir, `${network.name}-correlation-registry-deployment.json`);
+  // ========== Update frontend config ==========
+  console.log("\n\nUpdating frontend configuration...");
+  updateFrontendContracts(deploymentInfo);
+
+  // ========== Save deployment JSON ==========
+  const deploymentsDir = path.join(process.cwd(), "deployments");
+  if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
+
+  const outPath = path.join(deploymentsDir, `${hre.network.name}-correlation-registry-deployment.json`);
   fs.writeFileSync(outPath, JSON.stringify(deploymentInfo, null, 2));
   console.log(`\nDeployment JSON saved to: ${outPath}`);
+
+  // ========== Summary ==========
+  console.log("\n\n" + "=".repeat(60));
+  console.log("MarketCorrelationRegistry Deployment Summary");
+  console.log("=".repeat(60));
+  console.log();
+  console.log("Network:", hre.network.name, `(Chain ID: ${network.chainId})`);
+  console.log("\nDeployed Contract:");
+  console.log("==================");
+  console.log("MarketCorrelationRegistry:", correlationRegistry.address);
+  console.log();
+  console.log("Verification Status:");
+  console.log("==================");
+  console.log(`MarketCorrelationRegistry: ${verificationResults.marketCorrelationRegistry?.status || 'unknown'}`);
+  console.log();
+  console.log("=".repeat(60));
+  console.log("NEXT STEPS");
+  console.log("=".repeat(60));
+  console.log();
+  console.log("1. Frontend config updated automatically (if UPDATE_FRONTEND=true)");
+  console.log("   Or manually update frontend/src/config/contracts.js:");
+  console.log(`   marketCorrelationRegistry: '${correlationRegistry.address}'`);
+  console.log();
+  console.log("2. Optionally set role manager:");
+  console.log("   ROLE_MANAGER_ADDRESS=0x... npx hardhat run scripts/deploy-correlation-registry.js --network mordor");
+  console.log();
+  console.log("3. Create correlation groups for related markets");
+  console.log();
+
+  console.log("✓ Deployment completed!");
 
   return {
     marketCorrelationRegistry: correlationRegistry.address
