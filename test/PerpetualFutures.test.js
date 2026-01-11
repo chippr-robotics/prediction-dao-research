@@ -153,7 +153,7 @@ describe("Perpetual Futures System", function () {
       const creationFee = await perpFactory.creationFee();
       await expect(
         perpFactory.createMarket(params, { value: creationFee })
-      ).to.be.revertedWith("Collateral token not allowed");
+      ).to.be.revertedWith("Collateral not allowed");
     });
 
     it("should reject market creation with insufficient fee", async function () {
@@ -178,7 +178,7 @@ describe("Perpetual Futures System", function () {
 
       await expect(
         perpFactory.createMarket(params, { value: 0 })
-      ).to.be.revertedWith("Insufficient creation fee");
+      ).to.be.revertedWith("Insufficient fee");
     });
   });
 
