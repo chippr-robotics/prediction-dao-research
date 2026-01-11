@@ -404,7 +404,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
       }
 
       // Store the friend market for display in Activity tab
-      const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
       const endDate = new Date(Date.now() + tradingPeriodDays * 24 * 60 * 60 * 1000)
 
       const newMarket = {
