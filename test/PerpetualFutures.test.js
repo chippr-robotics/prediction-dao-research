@@ -6,9 +6,7 @@ describe("Perpetual Futures System", function () {
   let fundingRateEngine, perpFactory, perpMarket;
   let mockCollateralToken;
 
-  const PRICE_PRECISION = ethers.parseEther("1");
   const LEVERAGE_PRECISION = 10000n;
-  const RATE_PRECISION = 10000n;
 
   beforeEach(async function () {
     [owner, trader1, trader2, liquidator, feeRecipient] = await ethers.getSigners();
