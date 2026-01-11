@@ -11,20 +11,31 @@ export const DEPLOYED_CONTRACTS = {
   tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // RoleManagerCore
   welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
   proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0xF3dA3ec2700b050066609D90e5cDdFE02F923177', // ConditionalMarketFactory
+  marketFactory: '0x08E5a4B716c06e92525E17495d0995A6F7102414', // ConditionalMarketFactory
   privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
   oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
   ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
-  futarchyGovernor: '0x352D9997a6454AA1E0CEAFb6f8199c501b48d886',
+  futarchyGovernor: '0xD379002D90a38245dC99D9dd7BE430Ab9C0B3e54',
   fairWinsToken: '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB',
   treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772',
-  
-  // TODO: Deploy TokenMintFactory deterministically and update this address
-  tokenMintFactory: null, // Will be deployed with deterministic deployment
+
+  // Token and DAO factories
+  tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
+  daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a',
+
+  // CTF1155 - Deployed via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
+  ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
 
   // Back-compat aliases used throughout the frontend
   roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // alias for RoleManagerCore
-  roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'
+  roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
+
+  // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
+  paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
+  tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
+  membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
+  // Deploy via: npx hardhat run scripts/configure-payment-manager.js --network mordor
+  membershipPaymentManager: '0x8b09cbC2275398C00D43854393e09D40334a1B81',  // MembershipPaymentManager for payment processing
 }
 
 /**

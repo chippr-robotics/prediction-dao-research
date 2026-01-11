@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
 import './MarketCreationModal.css'
@@ -106,6 +106,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     setErrors({})
     setSubmitting(false)
   }, [])
+
+  // Reset form state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      resetForm()
+    }
+  }, [isOpen, resetForm])
 
   // Handle form changes
   const handleMetadataChange = useCallback((field, value) => {
@@ -348,6 +355,35 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     [paramsForm.betType]
   )
 
+  // Check if current step is valid WITHOUT triggering re-render (no setErrors)
+  // This is used in render for disabled state calculations
+  const isCurrentStepValid = useMemo(() => {
+    if (currentStep === 0) {
+      if (useCustomUri) {
+        return customUri.trim() && isValidUri(customUri.trim())
+      }
+      return (
+        metadataForm.question.trim().length >= 10 &&
+        metadataForm.question.length <= 200 &&
+        metadataForm.description.trim().length >= 30 &&
+        metadataForm.resolutionCriteria.trim().length >= 20 &&
+        metadataForm.category
+      )
+    }
+    if (currentStep === 1) {
+      return true // Education step, always valid
+    }
+    if (currentStep === 2) {
+      const days = parseInt(paramsForm.tradingPeriodDays)
+      const liquidity = parseFloat(paramsForm.initialLiquidity)
+      return (
+        !isNaN(days) && days >= 7 && days <= 21 &&
+        paramsForm.initialLiquidity && !isNaN(liquidity) && liquidity >= 100 && liquidity <= 1000000
+      )
+    }
+    return false
+  }, [currentStep, useCustomUri, customUri, metadataForm, paramsForm])
+
   if (!isOpen) return null
 
   return (
@@ -379,7 +415,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
               key={step.id}
               className={`mcm-step ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
               onClick={() => handleStepClick(index)}
-              disabled={submitting || (index > currentStep && (index !== currentStep + 1 || !validateStep(currentStep)))}
+              disabled={submitting || (index > currentStep && (index !== currentStep + 1 || !isCurrentStepValid))}
               aria-current={index === currentStep ? 'step' : undefined}
             >
               <span className="mcm-step-icon" aria-hidden="true">

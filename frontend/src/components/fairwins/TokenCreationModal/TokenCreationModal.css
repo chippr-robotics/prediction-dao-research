@@ -746,6 +746,24 @@
   color: #a16207;
 }
 
+/* Error warning variant (contract not deployed, etc.) */
+.tcm-warning.tcm-warning-error {
+  background: rgba(229, 83, 61, 0.1);
+  border: 1px solid rgba(229, 83, 61, 0.3);
+}
+
+.tcm-warning.tcm-warning-error svg {
+  color: #E5533D;
+}
+
+.tcm-warning.tcm-warning-error strong {
+  color: #E5533D;
+}
+
+.tcm-warning.tcm-warning-error p {
+  color: #c53025;
+}
+
 .tcm-deploy-warning {
   display: flex;
   align-items: flex-start;

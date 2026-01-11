@@ -81,8 +81,25 @@ export function useTokenCreation() {
    * Estimate gas for token creation
    */
   const estimateGas = useCallback(async (tokenConfig) => {
-    if (!readContract || !address) {
-      throw new Error('Contract or wallet not available')
+    if (!TOKEN_MINT_FACTORY_ADDRESS) {
+      const error = new Error('TokenMintFactory contract is not deployed on this network. Please check network configuration.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
+    }
+
+    if (!readContract) {
+      const error = new Error('Unable to connect to TokenMintFactory contract. Please check your network connection.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
+    }
+
+    if (!address) {
+      const error = new Error('Please connect your wallet to estimate gas.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
     }
 
     setTxState(TxState.ESTIMATING)
@@ -145,16 +162,32 @@ export function useTokenCreation() {
    * Create a new token
    */
   const createToken = useCallback(async (tokenConfig) => {
+    if (!TOKEN_MINT_FACTORY_ADDRESS) {
+      const error = new Error('TokenMintFactory contract is not deployed on this network. Please check network configuration.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
+    }
+
     if (!contract) {
-      throw new Error('Contract not available. Please connect your wallet.')
+      const error = new Error('Unable to connect to TokenMintFactory contract. Please check your wallet connection.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
     }
 
     if (!isConnected) {
-      throw new Error('Please connect your wallet')
+      const error = new Error('Please connect your wallet to create a token.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
     }
 
     if (!isCorrectNetwork) {
-      throw new Error('Please switch to the correct network')
+      const error = new Error('Please switch to the correct network to create a token.')
+      setTxState(TxState.ERROR)
+      setTxError(error.message)
+      throw error
     }
 
     setTxState(TxState.PENDING_SIGNATURE)
@@ -270,6 +303,7 @@ export function useTokenCreation() {
     walletAddress: address,
     factoryAddress: TOKEN_MINT_FACTORY_ADDRESS,
     hasContract: !!contract,
+    isContractDeployed: !!TOKEN_MINT_FACTORY_ADDRESS,
 
     // Transaction state
     txState,

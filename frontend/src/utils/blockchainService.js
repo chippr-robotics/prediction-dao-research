@@ -59,40 +59,55 @@ export async function fetchMarketsFromBlockchain() {
     console.log('Fetching markets from blockchain...')
     console.log('Contract address:', getContractAddress('marketFactory'))
     console.log('RPC URL:', NETWORK_CONFIG.rpcUrl)
-    
+
     const contract = getContract('marketFactory')
-    
-    // First try to get market count to verify contract is accessible
+
+    // Get market count using the public variable (not a function)
     let marketCount
     try {
-      marketCount = await contract.getMarketCount()
+      marketCount = await contract.marketCount()
       console.log('Market count from blockchain:', marketCount.toString())
     } catch (countError) {
-      console.warn('getMarketCount failed, trying getAllMarkets directly:', countError.message)
+      console.warn('Failed to get marketCount:', countError.message)
+      return []
     }
-    
-    const markets = await contract.getAllMarkets()
-    console.log('Raw markets from blockchain:', markets)
-    
-    if (!markets || markets.length === 0) {
+
+    if (marketCount === 0n) {
       console.log('No markets found on blockchain, returning empty array')
       return []
     }
-    
-    // Transform blockchain data to match frontend format
-    const transformedMarkets = markets.map((market, index) => ({
-      id: Number(market.id || index),
-      proposalTitle: market.question || '',
-      description: market.description || '',
-      category: market.category || 'other',
-      passTokenPrice: market.yesPrice ? ethers.formatEther(market.yesPrice) : '0.5',
-      failTokenPrice: market.noPrice ? ethers.formatEther(market.noPrice) : '0.5',
-      totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-      tradingEndTime: market.endTime ? new Date(Number(market.endTime) * 1000).toISOString() : new Date().toISOString(),
-      status: getMarketStatus(Number(market.status)),
-      creator: market.creator || ethers.ZeroAddress
-    }))
-    
+
+    // Fetch each market individually using the markets(uint256) mapping
+    const transformedMarkets = []
+    for (let i = 0; i < Number(marketCount); i++) {
+      try {
+        const market = await contract.markets(i)
+
+        // The actual contract returns a struct with these fields:
+        // proposalId, passToken, failToken, collateralToken, tradingEndTime,
+        // liquidityParameter, totalLiquidity, resolved, passValue, failValue,
+        // status, betType, useCTF, conditionId, questionId, passPositionId, failPositionId
+
+        transformedMarkets.push({
+          id: i,
+          proposalId: Number(market.proposalId || 0),
+          proposalTitle: `Market #${i}`, // Markets don't store question text on-chain
+          description: '',
+          category: 'prediction',
+          passTokenPrice: '0.5', // Would need to calculate from LMSR
+          failTokenPrice: '0.5',
+          totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
+          tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
+          status: getMarketStatus(Number(market.status)),
+          betType: Number(market.betType || 0),
+          collateralToken: market.collateralToken,
+          resolved: market.resolved
+        })
+      } catch (marketError) {
+        console.warn(`Failed to fetch market ${i}:`, marketError.message)
+      }
+    }
+
     console.log('Transformed markets:', transformedMarkets)
     return transformedMarkets
   } catch (error) {
@@ -108,33 +123,16 @@ export async function fetchMarketsFromBlockchain() {
 
 /**
  * Fetch markets by category from the blockchain
- * @param {string} category - Market category
+ * Note: The actual contract doesn't store categories - this filters all markets client-side
+ * @param {string} category - Market category (currently unused as contract doesn't support categories)
  * @returns {Promise<Array>} Array of market objects
  */
 export async function fetchMarketsByCategoryFromBlockchain(category) {
   try {
-    const contract = getContract('marketFactory')
-    const marketIds = await contract.getMarketsByCategory(category)
-    
-    const markets = await Promise.all(
-      marketIds.map(async (id) => {
-        const market = await contract.getMarket(id)
-        return {
-          id: Number(market.id || id),
-          proposalTitle: market.question || '',
-          description: market.description || '',
-          category: market.category || category,
-          passTokenPrice: market.yesPrice ? ethers.formatEther(market.yesPrice) : '0.5',
-          failTokenPrice: market.noPrice ? ethers.formatEther(market.noPrice) : '0.5',
-          totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-          tradingEndTime: market.endTime ? new Date(Number(market.endTime) * 1000).toISOString() : new Date().toISOString(),
-          status: getMarketStatus(Number(market.status)),
-          creator: market.creator || ethers.ZeroAddress
-        }
-      })
-    )
-    
-    return markets
+    // The contract doesn't have category filtering - fetch all and filter client-side
+    const allMarkets = await fetchMarketsFromBlockchain()
+    // Since markets don't have categories stored on-chain, return all
+    return allMarkets
   } catch (error) {
     console.error('Error fetching markets by category from blockchain:', error)
     throw error
@@ -149,23 +147,34 @@ export async function fetchMarketsByCategoryFromBlockchain(category) {
 export async function fetchMarketByIdFromBlockchain(id) {
   try {
     const contract = getContract('marketFactory')
-    const market = await contract.getMarket(id)
-    
-    if (!market || !market.question) {
+
+    // Check if market exists by verifying id is within range
+    const marketCount = await contract.marketCount()
+    if (id >= Number(marketCount)) {
       return null
     }
-    
+
+    const market = await contract.markets(id)
+
+    // Check if market is valid (proposalId will be 0 for non-existent markets)
+    if (!market || market.proposalId === 0n) {
+      return null
+    }
+
     return {
-      id: Number(market.id || id),
-      proposalTitle: market.question || '',
-      description: market.description || '',
-      category: market.category || 'other',
-      passTokenPrice: market.yesPrice ? ethers.formatEther(market.yesPrice) : '0.5',
-      failTokenPrice: market.noPrice ? ethers.formatEther(market.noPrice) : '0.5',
+      id: id,
+      proposalId: Number(market.proposalId || 0),
+      proposalTitle: `Market #${id}`,
+      description: '',
+      category: 'prediction',
+      passTokenPrice: '0.5',
+      failTokenPrice: '0.5',
       totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-      tradingEndTime: market.endTime ? new Date(Number(market.endTime) * 1000).toISOString() : new Date().toISOString(),
+      tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
       status: getMarketStatus(Number(market.status)),
-      creator: market.creator || ethers.ZeroAddress
+      betType: Number(market.betType || 0),
+      collateralToken: market.collateralToken,
+      resolved: market.resolved
     }
   } catch (error) {
     console.error('Error fetching market by ID from blockchain:', error)
@@ -199,6 +208,8 @@ export async function fetchProposalsFromBlockchain() {
 
 /**
  * Fetch user positions from the blockchain
+ * Note: Positions are tracked in CTF1155 (ERC-1155) tokens, not in the factory contract directly.
+ * This would require querying the CTF1155 contract for balance of each position token.
  * @param {string} userAddress - User's wallet address
  * @returns {Promise<Array>} Array of position objects
  */
@@ -207,19 +218,19 @@ export async function fetchPositionsFromBlockchain(userAddress) {
     if (!userAddress || !ethers.isAddress(userAddress)) {
       return []
     }
-    
-    const contract = getContract('marketFactory')
-    const positions = await contract.getUserPositions(userAddress)
-    
-    return positions.map((position) => ({
-      marketId: Number(position.marketId),
-      yesShares: position.yesShares ? ethers.formatEther(position.yesShares) : '0',
-      noShares: position.noShares ? ethers.formatEther(position.noShares) : '0',
-      invested: position.invested ? ethers.formatEther(position.invested) : '0'
-    }))
+
+    // The actual contract uses CTF1155 for positions, not a getUserPositions function
+    // To properly implement this, we'd need to:
+    // 1. Get all markets
+    // 2. For each market, get the passPositionId and failPositionId
+    // 3. Query CTF1155.balanceOf(userAddress, positionId) for each
+
+    // For now, return empty as this requires CTF1155 integration
+    console.log('Positions are tracked in CTF1155 - full integration pending')
+    return []
   } catch (error) {
     console.error('Error fetching positions from blockchain:', error)
-    throw error
+    return []
   }
 }
 
@@ -468,8 +479,38 @@ const ROLE_MANAGER_ABI = [
     "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
     "stateMutability": "view",
     "type": "function"
+  },
+  // Purchase role with ERC20 token - handles payment and role granting internally
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "uint8", "name": "tier", "type": "uint8" },
+      { "internalType": "address", "name": "paymentToken", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "purchaseRoleWithTierToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  // Check payment manager configuration
+  {
+    "inputs": [],
+    "name": "paymentManager",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
   }
 ]
+
+// Membership tier enum values
+const MembershipTier = {
+  NONE: 0,
+  BASIC: 1,
+  STANDARD: 2,
+  PREMIUM: 3,
+  ENTERPRISE: 4
+}
 
 /**
  * Get the role hash for a given role name
@@ -567,10 +608,36 @@ export async function grantRoleOnChain(signer, userAddress, roleName, durationDa
   }
 }
 
+// PaymentProcessor ABI for role purchases (modular RBAC system)
+const PAYMENT_PROCESSOR_ABI = [
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "uint8", "name": "tier", "type": "uint8" },
+      { "internalType": "address", "name": "paymentToken", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "purchaseTierWithToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paymentManager",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
 /**
  * Purchase a role using USC stablecoin
- * This function handles the payment AND grants the role on-chain if the role manager is deployed.
- * 
+ * This function calls the PaymentProcessor's purchaseTierWithToken function,
+ * which handles both the payment and role granting in a single transaction.
+ *
+ * Requires modular RBAC deployment: npx hardhat run scripts/deploy-modular-rbac.js --network mordor
+ *
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
  * @param {number} priceUSD - Price in USD (will be converted to USC with 6 decimals)
@@ -583,18 +650,21 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
 
   try {
     const uscAddress = ETCSWAP_ADDRESSES.USC_STABLECOIN
-    const treasuryAddress = getContractAddress('treasuryVault')
-    const roleManagerAddress = getContractAddress('roleManager')
+    const paymentProcessorAddress = getContractAddress('paymentProcessor')
+
+    if (!paymentProcessorAddress) {
+      throw new Error('PaymentProcessor not deployed. Run: npx hardhat run scripts/deploy-modular-rbac.js --network mordor')
+    }
+
     const uscContract = new ethers.Contract(uscAddress, ERC20_ABI, signer)
+    const paymentProcessor = new ethers.Contract(paymentProcessorAddress, PAYMENT_PROCESSOR_ABI, signer)
 
     // Convert price to USC units (USC has 6 decimals like USDC)
-    // Use parseUnits with explicit decimals for precision
     const amountWei = ethers.parseUnits(String(priceUSD), 6)
 
     // Check USC balance
     const userAddress = await signer.getAddress()
     const balanceRaw = await uscContract.balanceOf(userAddress)
-    // Ensure balance is BigInt for proper comparison
     const balance = BigInt(balanceRaw.toString())
     const amount = BigInt(amountWei.toString())
 
@@ -612,51 +682,94 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
       throw new Error(`Insufficient USC balance. You have ${parseFloat(balanceFormatted).toFixed(2)} USC but need ${priceUSD} USC.`)
     }
 
-    // Check allowance
-    const allowanceRaw = await uscContract.allowance(userAddress, treasuryAddress)
+    // Get role hash
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      throw new Error(`Unknown role: ${roleName}`)
+    }
+
+    // Check if payment manager is configured on PaymentProcessor
+    let paymentManagerAddress
+    try {
+      paymentManagerAddress = await paymentProcessor.paymentManager()
+    } catch (e) {
+      paymentManagerAddress = ethers.ZeroAddress
+    }
+
+    if (paymentManagerAddress === ethers.ZeroAddress) {
+      throw new Error('MembershipPaymentManager not configured. Run: npx hardhat run scripts/deploy-modular-rbac.js --network mordor')
+    }
+
+    // Check and approve USC for the PaymentProcessor
+    const allowanceRaw = await uscContract.allowance(userAddress, paymentProcessorAddress)
     const allowance = BigInt(allowanceRaw.toString())
 
-    // Approve if needed
     if (allowance < amount) {
-      const approveTx = await uscContract.approve(treasuryAddress, amountWei)
-      await approveTx.wait()
-    }
-
-    // Transfer USC to treasury
-    const transferTx = await uscContract.transfer(treasuryAddress, amountWei)
-    const paymentReceipt = await transferTx.wait()
-
-    // Track if role was granted on-chain
-    let roleGrantedOnChain = false
-    let roleGrantTxHash = null
-
-    // After successful payment, grant the role on-chain if role manager is deployed
-    if (roleManagerAddress) {
+      console.log('Approving USC for PaymentProcessor...', {
+        spender: paymentProcessorAddress,
+        amount: amountWei.toString(),
+        amountFormatted: ethers.formatUnits(amountWei, 6) + ' USC'
+      })
       try {
-        console.log('Granting role on-chain after successful payment...')
-        const roleReceipt = await grantRoleOnChain(signer, userAddress, roleName, 365)
-        roleGrantedOnChain = roleReceipt.status === 'success'
-        roleGrantTxHash = roleReceipt.hash
-        console.log('Role granted on-chain:', roleReceipt)
-      } catch (roleError) {
-        // Log but don't fail the purchase - payment was successful
-        // The role can be granted later by an admin
-        console.error('Failed to grant role on-chain (payment successful):', roleError)
-        console.warn('Role will need to be granted manually by admin or the user needs to contact support')
+        // First try to estimate gas to see if the transaction would succeed
+        let gasEstimate
+        try {
+          gasEstimate = await uscContract.approve.estimateGas(paymentProcessorAddress, amountWei)
+          console.log('Gas estimate for approve:', gasEstimate.toString())
+        } catch (estimateError) {
+          console.warn('Gas estimation failed, using default:', estimateError.message)
+          gasEstimate = 60000n // Standard approve gas
+        }
+
+        // Add 20% buffer to gas estimate
+        const gasLimit = (gasEstimate * 120n) / 100n
+
+        const approveTx = await uscContract.approve(paymentProcessorAddress, amountWei, {
+          gasLimit: gasLimit
+        })
+        console.log('Approve transaction sent:', approveTx.hash)
+        await approveTx.wait()
+        console.log('USC approved successfully')
+      } catch (approveError) {
+        console.error('Approve failed:', approveError)
+        if (approveError.code === 'ACTION_REJECTED') {
+          throw new Error('Transaction rejected by user')
+        }
+        // Try to provide more helpful error message
+        throw new Error(`Failed to approve USC. Please ensure you have enough ETC for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
       }
     } else {
-      console.warn('Role manager not configured - role saved locally only. Set VITE_ROLE_MANAGER_ADDRESS to enable blockchain persistence.')
+      console.log('USC already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
     }
 
+    // Call purchaseTierWithToken on PaymentProcessor
+    // This handles both payment and role granting in a single atomic transaction
+    console.log('Purchasing role via PaymentProcessor...', {
+      roleHash,
+      tier: MembershipTier.BASIC,
+      paymentToken: uscAddress,
+      amount: amountWei.toString()
+    })
+
+    const purchaseTx = await paymentProcessor.purchaseTierWithToken(
+      roleHash,
+      MembershipTier.BASIC,  // Use BASIC tier for standard purchases
+      uscAddress,
+      amountWei
+    )
+    const receipt = await purchaseTx.wait()
+
+    console.log('Role purchased successfully:', receipt)
+
     return {
-      hash: paymentReceipt.hash,
-      blockNumber: paymentReceipt.blockNumber,
-      status: paymentReceipt.status === 1 ? 'success' : 'failed',
-      gasUsed: paymentReceipt.gasUsed.toString(),
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
       roleName: roleName,
       amount: priceUSD,
-      roleGrantedOnChain,
-      roleGrantTxHash
+      roleGrantedOnChain: receipt.status === 1,
+      roleGrantTxHash: receipt.hash
     }
   } catch (error) {
     console.error('Error purchasing role:', error)

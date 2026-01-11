@@ -85,7 +85,15 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
 
     event DAOStatusUpdated(uint256 indexed daoId, bool active);
 
-    constructor() {
+    constructor(
+        address _welfareRegistryImpl,
+        address _proposalRegistryImpl,
+        address _marketFactoryImpl,
+        address _privacyCoordinatorImpl,
+        address _oracleResolverImpl,
+        address _ragequitModuleImpl,
+        address _futarchyGovernorImpl
+    ) {
         // Grant deployer the default admin role
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PLATFORM_ADMIN_ROLE, msg.sender);
@@ -95,14 +103,22 @@ contract DAOFactory is AccessControl, ReentrancyGuard {
         _setRoleAdmin(PLATFORM_ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
         _setRoleAdmin(DAO_CREATOR_ROLE, PLATFORM_ADMIN_ROLE);
 
-        // Deploy implementation contracts once
-        welfareRegistryImpl = address(new WelfareMetricRegistry());
-        proposalRegistryImpl = address(new ProposalRegistry());
-        marketFactoryImpl = address(new ConditionalMarketFactory());
-        privacyCoordinatorImpl = address(new PrivacyCoordinator());
-        oracleResolverImpl = address(new OracleResolver());
-        ragequitModuleImpl = address(new RagequitModule());
-        futarchyGovernorImpl = address(new FutarchyGovernor());
+        // Store implementation contract addresses (deployed separately).
+        require(_welfareRegistryImpl != address(0), "Invalid welfareRegistryImpl");
+        require(_proposalRegistryImpl != address(0), "Invalid proposalRegistryImpl");
+        require(_marketFactoryImpl != address(0), "Invalid marketFactoryImpl");
+        require(_privacyCoordinatorImpl != address(0), "Invalid privacyCoordinatorImpl");
+        require(_oracleResolverImpl != address(0), "Invalid oracleResolverImpl");
+        require(_ragequitModuleImpl != address(0), "Invalid ragequitModuleImpl");
+        require(_futarchyGovernorImpl != address(0), "Invalid futarchyGovernorImpl");
+
+        welfareRegistryImpl = _welfareRegistryImpl;
+        proposalRegistryImpl = _proposalRegistryImpl;
+        marketFactoryImpl = _marketFactoryImpl;
+        privacyCoordinatorImpl = _privacyCoordinatorImpl;
+        oracleResolverImpl = _oracleResolverImpl;
+        ragequitModuleImpl = _ragequitModuleImpl;
+        futarchyGovernorImpl = _futarchyGovernorImpl;
     }
 
     /**

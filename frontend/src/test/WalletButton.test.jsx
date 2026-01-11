@@ -240,7 +240,7 @@ describe('WalletButton Component - Market Creation', () => {
       await user.click(button)
 
       await waitFor(() => {
-        expect(screen.getByText('Create Friend Market')).toBeInTheDocument()
+        expect(screen.getByText('My Friend Markets')).toBeInTheDocument()
         expect(screen.getByText('Create New Market')).toBeInTheDocument()
       })
     })

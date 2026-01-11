@@ -107,6 +107,10 @@ function main() {
     ragequitModule: deployed.ragequitModule,
     futarchyGovernor: deployed.futarchyGovernor,
 
+    // Factory contracts
+    tokenMintFactory: deployed.tokenMintFactory,
+    daoFactory: deployed.daoFactory,
+
     // Aliases (same address)
     roleManager: deployed.tieredRoleManager,
     roleManagerCore: deployed.tieredRoleManager,

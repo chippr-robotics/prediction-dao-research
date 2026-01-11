@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
+import { ethers } from 'ethers'
 import { useETCswap } from '../../hooks/useETCswap'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
+import { getContractAddress } from '../../config/contracts'
+import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -25,10 +28,31 @@ import './WalletButton.css'
  * - Shows connector options when disconnected
  * - Integrates with existing modal system for user management
  */
+// Helper to load friend markets from localStorage
+const loadFriendMarketsFromStorage = () => {
+  try {
+    const stored = localStorage.getItem('friendMarkets')
+    return stored ? JSON.parse(stored) : []
+  } catch (e) {
+    console.warn('Failed to load friend markets from storage:', e)
+    return []
+  }
+}
+
+// Helper to save friend markets to localStorage
+const saveFriendMarketsToStorage = (markets) => {
+  try {
+    localStorage.setItem('friendMarkets', JSON.stringify(markets))
+  } catch (e) {
+    console.warn('Failed to save friend markets to storage:', e)
+  }
+}
+
 function WalletButton({ className = '', theme = 'dark' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
+  const [friendMarkets, setFriendMarkets] = useState(() => loadFriendMarketsFromStorage())
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -44,6 +68,30 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const [connectorStatus, setConnectorStatus] = useState({})
   const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
   const [pendingConnector, setPendingConnector] = useState(null)
+
+  // Filter friend markets into active and past based on end date and user
+  const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
+    const now = new Date()
+    const userAddr = address?.toLowerCase()
+
+    // Filter markets for current user
+    const userMarkets = friendMarkets.filter(m =>
+      m.creator?.toLowerCase() === userAddr ||
+      m.participants?.some(p => p.toLowerCase() === userAddr)
+    )
+
+    const active = userMarkets.filter(m => {
+      const endDate = new Date(m.endDate)
+      return endDate > now && m.status !== 'resolved'
+    })
+
+    const past = userMarkets.filter(m => {
+      const endDate = new Date(m.endDate)
+      return endDate <= now || m.status === 'resolved'
+    })
+
+    return { activeFriendMarkets: active, pastFriendMarkets: past }
+  }, [friendMarkets, address])
 
   // Check connector availability on mount and when connectors change
   useEffect(() => {
@@ -196,10 +244,202 @@ function WalletButton({ className = '', theme = 'dark' }) {
     setShowFriendMarketModal(true)
   }
 
-  const handleFriendMarketCreation = async (data, signer) => {
-    console.log('Friend market creation:', data)
-    setShowFriendMarketModal(false)
-    // The MarketCreationModal handles the actual creation
+  const handleFriendMarketCreation = async (data, modalSigner) => {
+    const activeSigner = modalSigner || signer
+
+    if (!activeSigner) {
+      console.error('No signer available for friend market creation')
+      throw new Error('Please connect your wallet to create a market')
+    }
+
+    console.log('Friend market creation data:', data)
+
+    try {
+      const marketFactoryAddress = getContractAddress('marketFactory')
+      if (!marketFactoryAddress) {
+        throw new Error('Market factory contract not deployed on this network')
+      }
+
+      // Get collateral token address (USC/FairWins token)
+      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      if (!collateralTokenAddress) {
+        throw new Error('Collateral token not configured')
+      }
+
+      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
+      const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
+
+      // Pre-flight checks: verify contract is properly configured
+      const [ctf1155Address, roleManagerAddress, ownerAddress] = await Promise.all([
+        contract.ctf1155(),
+        contract.roleManager(),
+        contract.owner()
+      ])
+
+      const userAddress = await activeSigner.getAddress()
+
+      // Check CTF1155 is configured
+      if (ctf1155Address === ethers.ZeroAddress) {
+        throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
+      }
+
+      // Check if user can create markets (Friend Market uses same role as Market Maker)
+      const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
+      let hasMarketMakerRole = false
+
+      // Log role check details for debugging
+      console.log('Friend Market role check details:', {
+        userAddress,
+        ownerAddress,
+        isOwner,
+        roleManagerFromFactory: roleManagerAddress,
+        expectedRoleManager: getContractAddress('roleManager')
+      })
+
+      if (roleManagerAddress !== ethers.ZeroAddress) {
+        const roleManagerAbi = [
+          'function hasRole(bytes32 role, address account) view returns (bool)',
+          'function MARKET_MAKER_ROLE() view returns (bytes32)',
+          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+        ]
+        const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
+        try {
+          const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
+          console.log('MARKET_MAKER_ROLE hash:', marketMakerRole)
+
+          hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+          console.log('hasRole result:', hasMarketMakerRole)
+
+          // If hasRole fails, try isActiveMember (TieredRoleManager specific)
+          if (!hasMarketMakerRole) {
+            try {
+              const isActive = await roleManager.isActiveMember(userAddress, marketMakerRole)
+              console.log('isActiveMember result:', isActive)
+              hasMarketMakerRole = isActive
+            } catch (activeMemberError) {
+              console.log('isActiveMember not available or failed:', activeMemberError.message)
+            }
+          }
+        } catch (roleError) {
+          console.warn('Could not verify on-chain role:', roleError)
+        }
+      }
+
+      // Always check blockchain for roles - roles could expire
+      if (!isOwner && !hasMarketMakerRole) {
+        if (roleManagerAddress === ethers.ZeroAddress) {
+          throw new Error('Friend market creation requires contract owner privileges. Role manager not configured on factory.')
+        }
+        throw new Error('You do not have the MARKET_MAKER role on-chain. Your role may have expired. Please purchase or renew your Market Maker access.')
+      }
+
+      console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })
+
+      // Calculate trading period in seconds (contract requires 7-21 days)
+      const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
+      const tradingPeriodSeconds = Math.max(
+        TradingPeriod.MIN,
+        Math.min(TradingPeriod.MAX, tradingPeriodDays * 24 * 60 * 60)
+      )
+
+      // Parse stake amount as liquidity (in token units)
+      const stakeAmount = data.data.stakeAmount || '10'
+      const liquidityAmount = ethers.parseEther(stakeAmount)
+
+      // Generate a unique proposal ID for the friend market
+      const proposalId = BigInt(Date.now())
+
+      // Default liquidity parameter for LMSR (higher = more liquidity depth)
+      const liquidityParameter = ethers.parseEther('100')
+
+      // Use WinLose bet type for friend markets (1v1 style)
+      const betType = BetType.WinLose
+
+      // Check and approve collateral token if needed
+      const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
+      if (currentAllowance < liquidityAmount) {
+        console.log('Approving collateral token...')
+        const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
+        await approveTx.wait()
+        console.log('Collateral approved')
+      }
+
+      // Create the market on-chain using deployMarketPair
+      console.log('Deploying market pair...', {
+        proposalId: proposalId.toString(),
+        collateralToken: collateralTokenAddress,
+        liquidityAmount: liquidityAmount.toString(),
+        liquidityParameter: liquidityParameter.toString(),
+        tradingPeriodSeconds,
+        betType
+      })
+
+      const tx = await contract.deployMarketPair(
+        proposalId,
+        collateralTokenAddress,
+        liquidityAmount,
+        liquidityParameter,
+        tradingPeriodSeconds,
+        betType
+      )
+
+      console.log('Friend market transaction sent:', tx.hash)
+      const receipt = await tx.wait()
+      console.log('Friend market created:', receipt)
+
+      // Extract market ID from event logs
+      const marketCreatedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log)
+          return parsed?.name === 'MarketCreated'
+        } catch {
+          return false
+        }
+      })
+
+      let marketId = null
+      if (marketCreatedEvent) {
+        const parsed = contract.interface.parseLog(marketCreatedEvent)
+        marketId = parsed?.args?.marketId?.toString()
+      }
+
+      // Store the friend market for display in Activity tab
+      const endDate = new Date(Date.now() + tradingPeriodDays * 24 * 60 * 60 * 1000)
+
+      const newMarket = {
+        id: marketId || `friend-${Date.now()}`,
+        type: data.marketType || 'oneVsOne',
+        description: data.data.description || 'Friend Market',
+        stakeAmount: data.data.stakeAmount || '10',
+        tradingPeriod: tradingPeriodDays.toString(),
+        participants: data.data.participants || [userAddress],
+        creator: userAddress,
+        createdAt: new Date().toISOString(),
+        endDate: endDate.toISOString(),
+        status: 'active',
+        txHash: receipt.hash,
+        proposalId: proposalId.toString()
+      }
+
+      // Update state and persist to localStorage
+      setFriendMarkets(prev => {
+        const updated = [...prev, newMarket]
+        saveFriendMarketsToStorage(updated)
+        return updated
+      })
+
+      console.log('Friend market stored:', newMarket)
+
+      setShowFriendMarketModal(false)
+
+      return {
+        id: marketId || `friend-${Date.now()}`,
+        txHash: receipt.hash
+      }
+    } catch (error) {
+      console.error('Error creating friend market:', error)
+      throw error
+    }
   }
 
   const handleOpenMarketCreation = () => {
@@ -209,46 +449,185 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
   /**
    * Handle creation from the MarketCreationModal
-   * Supports prediction markets with web3 transactions
+   * Supports prediction markets with web3 transactions using CTF1155
    */
   const handleMarketCreation = async (submitData, modalSigner) => {
     const activeSigner = modalSigner || signer
 
-    // Show confirmation dialog for the market creation transaction
-    showModal(
-      <div className="transaction-modal">
-        <h3>Prediction Market Creation</h3>
-        <p>Creating a new prediction market requires a blockchain transaction.</p>
-        <div className="token-details">
-          <div className="detail-row">
-            <span className="detail-label">Trading Period:</span>
-            <span className="detail-value">{submitData.tradingPeriod / 86400} days</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Initial Liquidity:</span>
-            <span className="detail-value">{submitData.initialLiquidity} ETC</span>
-          </div>
-          <div className="detail-row">
-            <span className="detail-label">Bet Type:</span>
-            <span className="detail-value">{submitData.betType}</span>
-          </div>
-          {submitData.metadata && (
-            <div className="detail-row">
-              <span className="detail-label">Question:</span>
-              <span className="detail-value">{submitData.metadata.name}</span>
-            </div>
-          )}
-        </div>
-        <p className="transaction-note">
-          This will call ConditionalMarketFactory.deployMarketPair() to create PASS/FAIL token pairs.
-        </p>
-      </div>,
-      {
-        title: 'Confirm Prediction Market',
-        size: 'medium',
-        closable: true
+    if (!activeSigner) {
+      console.error('No signer available for market creation')
+      throw new Error('Please connect your wallet to create a market')
+    }
+
+    console.log('Market creation data:', submitData)
+
+    try {
+      const marketFactoryAddress = getContractAddress('marketFactory')
+      if (!marketFactoryAddress) {
+        throw new Error('Market factory contract not deployed on this network')
       }
-    )
+
+      // Get collateral token address (USC/FairWins token)
+      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      if (!collateralTokenAddress) {
+        throw new Error('Collateral token not configured')
+      }
+
+      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
+      const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
+
+      // Pre-flight checks: verify contract is properly configured
+      const [ctf1155Address, roleManagerAddress, ownerAddress] = await Promise.all([
+        contract.ctf1155(),
+        contract.roleManager(),
+        contract.owner()
+      ])
+
+      const userAddress = await activeSigner.getAddress()
+
+      // Check CTF1155 is configured
+      if (ctf1155Address === ethers.ZeroAddress) {
+        throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
+      }
+
+      // Check if user can create markets
+      const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
+      let hasMarketMakerRole = false
+
+      // Log role check details for debugging
+      console.log('Role check details:', {
+        userAddress,
+        ownerAddress,
+        isOwner,
+        roleManagerFromFactory: roleManagerAddress,
+        expectedRoleManager: getContractAddress('roleManager')
+      })
+
+      if (roleManagerAddress !== ethers.ZeroAddress) {
+        // Check on-chain role using the roleManager from factory
+        const roleManagerAbi = [
+          'function hasRole(bytes32 role, address account) view returns (bool)',
+          'function MARKET_MAKER_ROLE() view returns (bytes32)',
+          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+        ]
+        const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
+        try {
+          const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
+          console.log('MARKET_MAKER_ROLE hash:', marketMakerRole)
+
+          // Try hasRole first
+          hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+          console.log('hasRole result:', hasMarketMakerRole)
+
+          // If hasRole fails, try isActiveMember (TieredRoleManager specific)
+          if (!hasMarketMakerRole) {
+            try {
+              const isActive = await roleManager.isActiveMember(userAddress, marketMakerRole)
+              console.log('isActiveMember result:', isActive)
+              hasMarketMakerRole = isActive
+            } catch (activeMemberError) {
+              console.log('isActiveMember not available or failed:', activeMemberError.message)
+            }
+          }
+        } catch (roleError) {
+          console.warn('Could not verify on-chain role:', roleError)
+        }
+      }
+
+      // Always check blockchain for roles - roles could expire
+      if (!isOwner && !hasMarketMakerRole) {
+        if (roleManagerAddress === ethers.ZeroAddress) {
+          throw new Error('Market creation requires contract owner privileges. Role manager not configured on factory.')
+        }
+        throw new Error('You do not have the MARKET_MAKER role on-chain. Your role may have expired. Please purchase or renew your Market Maker access.')
+      }
+
+      console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })
+
+      // Calculate trading period in seconds (enforce contract limits: 7-21 days)
+      const tradingPeriodSeconds = Math.max(
+        TradingPeriod.MIN,
+        Math.min(TradingPeriod.MAX, submitData.tradingPeriod || TradingPeriod.DEFAULT)
+      )
+
+      // Parse initial liquidity as token amount
+      const liquidityAmount = ethers.parseEther(submitData.initialLiquidity.toString())
+
+      // Generate a unique proposal ID
+      const proposalId = BigInt(Date.now())
+
+      // Default liquidity parameter for LMSR
+      const liquidityParameter = ethers.parseEther('100')
+
+      // Determine bet type from metadata or default to YesNo
+      let betType = BetType.YesNo
+      if (submitData.metadata?.attributes) {
+        const betTypeAttr = submitData.metadata.attributes.find(
+          attr => attr.trait_type === 'BetType'
+        )
+        if (betTypeAttr?.value && BetType[betTypeAttr.value] !== undefined) {
+          betType = BetType[betTypeAttr.value]
+        }
+      }
+
+      // Check and approve collateral token if needed (userAddress already retrieved during pre-flight)
+      const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
+      if (currentAllowance < liquidityAmount) {
+        console.log('Approving collateral token...')
+        const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
+        await approveTx.wait()
+        console.log('Collateral approved')
+      }
+
+      // Create the market on-chain using deployMarketPair
+      console.log('Deploying market pair...', {
+        proposalId: proposalId.toString(),
+        collateralToken: collateralTokenAddress,
+        liquidityAmount: liquidityAmount.toString(),
+        liquidityParameter: liquidityParameter.toString(),
+        tradingPeriodSeconds,
+        betType
+      })
+
+      const tx = await contract.deployMarketPair(
+        proposalId,
+        collateralTokenAddress,
+        liquidityAmount,
+        liquidityParameter,
+        tradingPeriodSeconds,
+        betType
+      )
+
+      console.log('Market creation transaction sent:', tx.hash)
+      const receipt = await tx.wait()
+      console.log('Market created:', receipt)
+
+      // Extract market ID from event logs
+      const marketCreatedEvent = receipt.logs.find(log => {
+        try {
+          const parsed = contract.interface.parseLog(log)
+          return parsed?.name === 'MarketCreated'
+        } catch {
+          return false
+        }
+      })
+
+      let marketId = null
+      if (marketCreatedEvent) {
+        const parsed = contract.interface.parseLog(marketCreatedEvent)
+        marketId = parsed?.args?.marketId?.toString()
+      }
+
+      setShowMarketCreationModal(false)
+
+      return {
+        id: marketId || `market-${Date.now()}`,
+        txHash: receipt.hash
+      }
+    } catch (error) {
+      console.error('Error creating market:', error)
+      throw error
+    }
   }
 
   const handleNavigateToAdmin = () => {
@@ -372,7 +751,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
             aria-haspopup="true"
           >
             <BlockiesAvatar address={address} size={24} />
-            <span className="account-address">{shortenAddress(address)}</span>
           </button>
 
           {isOpen && (
@@ -431,7 +809,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
                     role="menuitem"
                   >
                     <span aria-hidden="true">🎯</span>
-                    <span>Create Friend Market</span>
+                    <span>My Friend Markets</span>
                   </button>
                 ) : (
                   <div className="friend-market-promo">
@@ -533,6 +911,8 @@ function WalletButton({ className = '', theme = 'dark' }) {
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
         onCreate={handleFriendMarketCreation}
+        activeMarkets={activeFriendMarkets}
+        pastMarkets={pastFriendMarkets}
       />
 
       {/* Market Creation Modal - Prediction Markets */}

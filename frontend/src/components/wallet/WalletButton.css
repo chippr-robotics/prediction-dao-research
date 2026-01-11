@@ -135,7 +135,7 @@
 .account-address-full {
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
-  color: var(--text-primary, #ffffff);
+  color: var( --text-primary, #ffffff);
   font-weight: 500;
 }
 
