@@ -150,9 +150,21 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       return
     }
 
-    // Validate trade data
-    if (!tradeData.market?.id) {
-      showNotification('Invalid market data', 'error', 5000)
+    // Validate trade data - check for market object and valid id (including 0)
+    if (!tradeData?.market) {
+      showNotification('Invalid market data - market not found', 'error', 5000)
+      return
+    }
+
+    // Market ID can be 0, so check for undefined/null specifically
+    if (tradeData.market.id === undefined || tradeData.market.id === null) {
+      showNotification('Invalid market data - market ID is missing', 'error', 5000)
+      return
+    }
+
+    // Check if market has required fields for trading
+    if (!tradeData.market.passTokenPrice || !tradeData.market.failTokenPrice) {
+      showNotification('Market data is incomplete - cannot trade', 'error', 5000)
       return
     }
 
@@ -184,7 +196,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
       // Show success notification with transaction hash
       showNotification(
-        `Trade successful! ${tradeData.amount} ETC for ${tradeData.type} shares`,
+        `Trade successful! ${tradeData.amount} for ${tradeData.type} shares`,
         'success',
         7000
       )

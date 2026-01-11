@@ -51,6 +51,115 @@ export function getContract(contractName, signerOrProvider = null) {
 }
 
 /**
+ * Get bet type labels based on betType enum
+ * @param {number} betType - Bet type enum value
+ * @returns {Object} Object with passLabel and failLabel
+ */
+function getBetTypeLabels(betType) {
+  const labels = {
+    0: { passLabel: 'Yes', failLabel: 'No' },
+    1: { passLabel: 'Pass', failLabel: 'Fail' },
+    2: { passLabel: 'Above', failLabel: 'Below' },
+    3: { passLabel: 'Higher', failLabel: 'Lower' },
+    4: { passLabel: 'In', failLabel: 'Out' },
+    5: { passLabel: 'Over', failLabel: 'Under' },
+    6: { passLabel: 'For', failLabel: 'Against' },
+    7: { passLabel: 'True', failLabel: 'False' },
+    8: { passLabel: 'Win', failLabel: 'Lose' },
+    9: { passLabel: 'Up', failLabel: 'Down' }
+  }
+  return labels[betType] || labels[0]
+}
+
+/**
+ * Try to fetch market metadata from IPFS
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Metadata or null
+ */
+async function tryFetchMarketMetadata(contract, marketId) {
+  try {
+    // First try to get metadata URI from contract
+    const metadataUri = await contract.getMarketMetadataUri(marketId)
+    if (metadataUri && metadataUri.length > 0) {
+      // Import dynamically to avoid circular dependencies
+      const { resolveUri } = await import('./ipfsService')
+      const metadata = await resolveUri(metadataUri)
+      return metadata
+    }
+  } catch (error) {
+    // Function may not exist or metadata not set - this is expected
+    console.debug(`No metadata URI for market ${marketId}:`, error.message)
+  }
+  return null
+}
+
+/**
+ * Try to get prices from contract
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object>} Object with passPrice and failPrice
+ */
+async function tryGetPrices(contract, marketId) {
+  try {
+    const [passPrice, failPrice] = await contract.getPrices(marketId)
+    // Prices returned as wei (18 decimals), convert to decimal
+    return {
+      passPrice: ethers.formatEther(passPrice),
+      failPrice: ethers.formatEther(failPrice)
+    }
+  } catch (error) {
+    console.debug(`Could not get prices for market ${marketId}:`, error.message)
+    // Default to 50/50 if prices can't be fetched
+    return { passPrice: '0.5', failPrice: '0.5' }
+  }
+}
+
+/**
+ * Validate if a market is valid and should be displayed
+ * @param {Object} market - Raw market data from contract
+ * @returns {boolean} True if market is valid
+ */
+function isValidMarket(market) {
+  // Check if market has valid trading end time (not zero or in the past)
+  if (!market.tradingEndTime || market.tradingEndTime === 0n) {
+    return false
+  }
+
+  // Check if market has valid liquidity parameter
+  if (!market.liquidityParameter || market.liquidityParameter === 0n) {
+    return false
+  }
+
+  // Check if market has valid token addresses
+  if (!market.passToken || market.passToken === ethers.ZeroAddress) {
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Extract category from metadata attributes
+ * @param {Object} metadata - IPFS metadata
+ * @returns {string} Category or 'other'
+ */
+function extractCategory(metadata) {
+  if (!metadata || !metadata.attributes) return 'other'
+
+  const categoryAttr = metadata.attributes.find(
+    attr => attr.trait_type === 'Category' || attr.trait_type === 'category'
+  )
+
+  if (categoryAttr && categoryAttr.value) {
+    // Normalize category to lowercase for consistency with frontend
+    return categoryAttr.value.toLowerCase()
+  }
+
+  return 'other'
+}
+
+/**
  * Fetch all markets from the blockchain
  * @returns {Promise<Array>} Array of market objects
  */
@@ -83,32 +192,62 @@ export async function fetchMarketsFromBlockchain() {
       try {
         const market = await contract.markets(i)
 
-        // The actual contract returns a struct with these fields:
-        // proposalId, passToken, failToken, collateralToken, tradingEndTime,
-        // liquidityParameter, totalLiquidity, resolved, passValue, failValue,
-        // status, betType, useCTF, conditionId, questionId, passPositionId, failPositionId
+        // Validate market before adding
+        if (!isValidMarket(market)) {
+          console.log(`Skipping invalid market ${i}`)
+          continue
+        }
 
-        transformedMarkets.push({
+        // Try to get prices from contract
+        const prices = await tryGetPrices(contract, i)
+
+        // Try to fetch metadata from IPFS
+        const metadata = await tryFetchMarketMetadata(contract, i)
+
+        // Extract info from metadata or use defaults
+        const category = extractCategory(metadata)
+        const title = metadata?.name || `Market #${i}`
+        const description = metadata?.description || ''
+        const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
+
+        // Build the transformed market object
+        const transformedMarket = {
           id: i,
           proposalId: Number(market.proposalId || 0),
-          proposalTitle: `Market #${i}`, // Markets don't store question text on-chain
-          description: '',
-          category: 'prediction',
-          passTokenPrice: '0.5', // Would need to calculate from LMSR
-          failTokenPrice: '0.5',
+          proposalTitle: title,
+          description: description,
+          category: category,
+          subcategory: metadata?.properties?.subcategory || null,
+          passTokenPrice: prices.passPrice,
+          failTokenPrice: prices.failPrice,
           totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
+          liquidityParameter: market.liquidityParameter ? ethers.formatEther(market.liquidityParameter) : '0',
           tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
           status: getMarketStatus(Number(market.status)),
           betType: Number(market.betType || 0),
+          betTypeLabels: betTypeLabels,
           collateralToken: market.collateralToken,
-          resolved: market.resolved
-        })
+          passToken: market.passToken,
+          failToken: market.failToken,
+          resolved: market.resolved,
+          // Additional metadata fields
+          image: metadata?.image || null,
+          tags: metadata?.properties?.tags || [],
+          resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+          // CTF fields for trading
+          useCTF: market.useCTF,
+          conditionId: market.conditionId,
+          passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
+          failPositionId: market.failPositionId ? Number(market.failPositionId) : null
+        }
+
+        transformedMarkets.push(transformedMarket)
       } catch (marketError) {
         console.warn(`Failed to fetch market ${i}:`, marketError.message)
       }
     }
 
-    console.log('Transformed markets:', transformedMarkets)
+    console.log('Transformed markets:', transformedMarkets.length, 'valid markets')
     return transformedMarkets
   } catch (error) {
     console.error('Error fetching markets from blockchain:', error)
@@ -156,25 +295,51 @@ export async function fetchMarketByIdFromBlockchain(id) {
 
     const market = await contract.markets(id)
 
-    // Check if market is valid (proposalId will be 0 for non-existent markets)
-    if (!market || market.proposalId === 0n) {
+    // Validate market
+    if (!isValidMarket(market)) {
       return null
     }
+
+    // Try to get prices from contract
+    const prices = await tryGetPrices(contract, id)
+
+    // Try to fetch metadata from IPFS
+    const metadata = await tryFetchMarketMetadata(contract, id)
+
+    // Extract info from metadata or use defaults
+    const category = extractCategory(metadata)
+    const title = metadata?.name || `Market #${id}`
+    const description = metadata?.description || ''
+    const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
 
     return {
       id: id,
       proposalId: Number(market.proposalId || 0),
-      proposalTitle: `Market #${id}`,
-      description: '',
-      category: 'prediction',
-      passTokenPrice: '0.5',
-      failTokenPrice: '0.5',
+      proposalTitle: title,
+      description: description,
+      category: category,
+      subcategory: metadata?.properties?.subcategory || null,
+      passTokenPrice: prices.passPrice,
+      failTokenPrice: prices.failPrice,
       totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
+      liquidityParameter: market.liquidityParameter ? ethers.formatEther(market.liquidityParameter) : '0',
       tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
       status: getMarketStatus(Number(market.status)),
       betType: Number(market.betType || 0),
+      betTypeLabels: betTypeLabels,
       collateralToken: market.collateralToken,
-      resolved: market.resolved
+      passToken: market.passToken,
+      failToken: market.failToken,
+      resolved: market.resolved,
+      // Additional metadata fields
+      image: metadata?.image || null,
+      tags: metadata?.properties?.tags || [],
+      resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+      // CTF fields for trading
+      useCTF: market.useCTF,
+      conditionId: market.conditionId,
+      passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
+      failPositionId: market.failPositionId ? Number(market.failPositionId) : null
     }
   } catch (error) {
     console.error('Error fetching market by ID from blockchain:', error)
@@ -307,8 +472,8 @@ function getProposalStatus(status) {
  * Buy shares in a prediction market
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {number} marketId - Market ID
- * @param {boolean} outcome - true for YES, false for NO
- * @param {string} amount - Amount in ETC to spend
+ * @param {boolean} outcome - true for YES/PASS, false for NO/FAIL
+ * @param {string} amount - Amount in collateral tokens to spend
  * @returns {Promise<Object>} Transaction receipt
  */
 export async function buyMarketShares(signer, marketId, outcome, amount) {
@@ -320,19 +485,63 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
     const contract = getContract('marketFactory', signer)
     const amountWei = ethers.parseEther(amount.toString())
 
-    // Call the buy function with value
-    const tx = await contract.buy(marketId, outcome, amountWei, {
-      value: amountWei
-    })
+    // Get the market to find the collateral token
+    const market = await contract.markets(marketId)
+    if (!market || !market.collateralToken) {
+      throw new Error('Market not found or invalid')
+    }
 
-    // Wait for transaction confirmation
-    const receipt = await tx.wait()
+    const collateralTokenAddress = market.collateralToken
+    const userAddress = await signer.getAddress()
 
-    return {
-      hash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      status: receipt.status === 1 ? 'success' : 'failed',
-      gasUsed: receipt.gasUsed.toString()
+    // If collateral is not native ETC (zero address), we need to approve
+    if (collateralTokenAddress !== ethers.ZeroAddress) {
+      const collateralToken = new ethers.Contract(
+        collateralTokenAddress,
+        ERC20_ABI,
+        signer
+      )
+
+      // Check current allowance
+      const currentAllowance = await collateralToken.allowance(
+        userAddress,
+        getContractAddress('marketFactory')
+      )
+
+      // Approve if needed
+      if (currentAllowance < amountWei) {
+        console.log('Approving collateral token...')
+        const approveTx = await collateralToken.approve(
+          getContractAddress('marketFactory'),
+          amountWei
+        )
+        await approveTx.wait()
+        console.log('Collateral approved')
+      }
+
+      // Call buy function (ERC20 collateral - no value sent)
+      const tx = await contract.buy(marketId, outcome, amountWei)
+      const receipt = await tx.wait()
+
+      return {
+        hash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 1 ? 'success' : 'failed',
+        gasUsed: receipt.gasUsed.toString()
+      }
+    } else {
+      // Native ETC collateral - send value with transaction
+      const tx = await contract.buy(marketId, outcome, amountWei, {
+        value: amountWei
+      })
+      const receipt = await tx.wait()
+
+      return {
+        hash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 1 ? 'success' : 'failed',
+        gasUsed: receipt.gasUsed.toString()
+      }
     }
   } catch (error) {
     console.error('Error buying market shares:', error)
@@ -342,8 +551,12 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
       throw new Error('Transaction rejected by user')
     } else if (error.message.includes('insufficient funds')) {
       throw new Error('Insufficient funds for transaction')
+    } else if (error.message.includes('insufficient balance')) {
+      throw new Error('Insufficient token balance')
     } else if (error.message.includes('Market not active')) {
       throw new Error('Market is not active')
+    } else if (error.message.includes('execution reverted')) {
+      throw new Error('Transaction failed - market may be inactive or invalid')
     } else {
       throw new Error(error.message || 'Transaction failed')
     }
@@ -354,9 +567,9 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
  * Estimate gas for buying shares
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {number} marketId - Market ID
- * @param {boolean} outcome - true for YES, false for NO
- * @param {string} amount - Amount in ETC to spend
- * @returns {Promise<string>} Estimated gas in ETC
+ * @param {boolean} outcome - true for YES/PASS, false for NO/FAIL
+ * @param {string} amount - Amount in collateral tokens to spend
+ * @returns {Promise<string>} Estimated gas in native tokens
  */
 export async function estimateBuyGas(signer, marketId, outcome, amount) {
   if (!signer) {
@@ -367,9 +580,20 @@ export async function estimateBuyGas(signer, marketId, outcome, amount) {
     const contract = getContract('marketFactory', signer)
     const amountWei = ethers.parseEther(amount.toString())
 
-    const gasEstimate = await contract.buy.estimateGas(marketId, outcome, amountWei, {
-      value: amountWei
-    })
+    // Get the market to find the collateral token
+    const market = await contract.markets(marketId)
+    const collateralTokenAddress = market?.collateralToken
+
+    let gasEstimate
+    if (collateralTokenAddress && collateralTokenAddress !== ethers.ZeroAddress) {
+      // ERC20 collateral - no value sent
+      gasEstimate = await contract.buy.estimateGas(marketId, outcome, amountWei)
+    } else {
+      // Native token collateral - send value
+      gasEstimate = await contract.buy.estimateGas(marketId, outcome, amountWei, {
+        value: amountWei
+      })
+    }
 
     // Get current gas price
     const provider = signer.provider
