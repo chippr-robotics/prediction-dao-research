@@ -52,12 +52,6 @@ export function usePerpetualsContract(factoryAddress) {
     return new ethers.Contract(factoryAddress, PERP_FACTORY_ABI, provider)
   }, [provider, factoryAddress])
 
-  // Factory contract with signer for write operations
-  const factoryContractWithSigner = useMemo(() => {
-    if (!signer || !factoryAddress) return null
-    return new ethers.Contract(factoryAddress, PERP_FACTORY_ABI, signer)
-  }, [signer, factoryAddress])
-
   /**
    * Get market contract instance
    */

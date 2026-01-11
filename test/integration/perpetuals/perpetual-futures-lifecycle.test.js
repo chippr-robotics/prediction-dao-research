@@ -97,7 +97,7 @@ async function createTestMarket(perpFactory, name, asset, collateralToken, initi
 
   const creationFee = await perpFactory.creationFee();
   const tx = await perpFactory.createMarket(params, { value: creationFee });
-  const receipt = await tx.wait();
+  await tx.wait();
 
   // Get market address from event
   const marketCount = await perpFactory.marketCount();
@@ -115,7 +115,7 @@ async function createTestMarket(perpFactory, name, asset, collateralToken, initi
 async function openTestPosition(market, collateralToken, trader, side, size, collateral, leverage) {
   await collateralToken.connect(trader).approve(await market.getAddress(), collateral);
   const tx = await market.connect(trader).openPosition(side, size, collateral, leverage);
-  const receipt = await tx.wait();
+  await tx.wait();
 
   const positionIds = await market.getTraderPositions(trader.address);
   return positionIds[positionIds.length - 1];
@@ -162,7 +162,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       console.log("\n=== Multi-Market Creation Test ===\n");
 
       // Create BTC market
-      const { market: btcMarket, marketId: btcId } = await createTestMarket(
+      const { market: btcMarket } = await createTestMarket(
         perpFactory,
         "Bitcoin Perpetual",
         "BTC",
@@ -181,7 +181,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
         maxFundingRate: 2000n
       };
 
-      const { market: ethMarket, marketId: ethId } = await createTestMarket(
+      const { market: ethMarket } = await createTestMarket(
         perpFactory,
         "Ethereum Perpetual",
         "ETH",
@@ -191,7 +191,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       );
 
       // Create ETC market with WETC collateral
-      const { market: etcMarket, marketId: etcId } = await createTestMarket(
+      const { market: etcMarket } = await createTestMarket(
         perpFactory,
         "ETC Perpetual",
         "ETC",
@@ -376,7 +376,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
     it("Should handle multiple positions from same trader", async function () {
       const { contracts, accounts, constants } = await loadFixture(deployPerpetualFuturesFixture);
       const { perpFactory, collateralToken } = contracts;
-      const { trader1, owner } = accounts;
+      const { trader1 } = accounts;
       const { LEVERAGE_PRECISION } = constants;
 
       const { market } = await createTestMarket(
@@ -394,9 +394,9 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       const leverage = 5n * LEVERAGE_PRECISION;
 
       // Open 3 positions
-      const positionId1 = await openTestPosition(market, collateralToken, trader1, 0, size, collateral, leverage);
+      await openTestPosition(market, collateralToken, trader1, 0, size, collateral, leverage);
       const positionId2 = await openTestPosition(market, collateralToken, trader1, 1, size, collateral, leverage);
-      const positionId3 = await openTestPosition(market, collateralToken, trader1, 0, size, collateral, leverage);
+      await openTestPosition(market, collateralToken, trader1, 0, size, collateral, leverage);
 
       // Verify all positions are tracked
       const positions = await market.getTraderPositions(trader1.address);
@@ -803,9 +803,8 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
     });
 
     it("Should calculate positive funding rate when mark > index", async function () {
-      const { contracts, accounts } = await loadFixture(deployPerpetualFuturesFixture);
+      const { contracts } = await loadFixture(deployPerpetualFuturesFixture);
       const { perpFactory, fundingRateEngine, collateralToken } = contracts;
-      const { priceUpdater } = accounts;
 
       const { marketId } = await createTestMarket(
         perpFactory,
@@ -824,9 +823,8 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
     });
 
     it("Should calculate negative funding rate when mark < index", async function () {
-      const { contracts, accounts } = await loadFixture(deployPerpetualFuturesFixture);
+      const { contracts } = await loadFixture(deployPerpetualFuturesFixture);
       const { perpFactory, fundingRateEngine, collateralToken } = contracts;
-      const { priceUpdater } = accounts;
 
       const { marketId } = await createTestMarket(
         perpFactory,
@@ -981,7 +979,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
     it("Should allow deposits to insurance fund", async function () {
       const { contracts, accounts } = await loadFixture(deployPerpetualFuturesFixture);
       const { perpFactory, collateralToken } = contracts;
-      const { owner, trader1 } = accounts;
+      const { trader1 } = accounts;
 
       const { market } = await createTestMarket(
         perpFactory,

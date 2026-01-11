@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { usePerpetualsContract, PositionSide, MarketCategory } from '../../hooks/usePerpetualsContract'
-import { TOKENS } from '../../constants/etcswap'
 import './PerpetualFuturesModal.css'
 
-// Default factory address (to be configured)
-const DEFAULT_FACTORY_ADDRESS = '' // Set after deployment
+// Default factory address (to be configured via environment variable)
+const DEFAULT_FACTORY_ADDRESS = process.env.REACT_APP_PERPETUAL_FACTORY_ADDRESS ?? '' // Set after deployment
 
 // Leverage presets
 const LEVERAGE_PRESETS = [1, 2, 5, 10, 15, 20]
@@ -28,8 +27,8 @@ function PerpetualFuturesModal({
   onClose,
   factoryAddress = DEFAULT_FACTORY_ADDRESS
 }) {
-  const { isConnected, account } = useWallet()
-  const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { isConnected } = useWallet()
+  const { isCorrectNetwork, switchNetwork } = useWeb3()
 
   // Perpetuals hook
   const {
@@ -53,7 +52,6 @@ function PerpetualFuturesModal({
 
   // Trading form state
   const [tradeSide, setTradeSide] = useState(PositionSide.Long)
-  const [tradeSize, setTradeSize] = useState('')
   const [tradeCollateral, setTradeCollateral] = useState('')
   const [tradeLeverage, setTradeLeverage] = useState(1)
   const [collateralBalance, setCollateralBalance] = useState('0')
@@ -74,7 +72,6 @@ function PerpetualFuturesModal({
     if (isOpen) {
       setActiveTab('trade')
       setTradeSide(PositionSide.Long)
-      setTradeSize('')
       setTradeCollateral('')
       setTradeLeverage(1)
       setErrors({})
@@ -223,7 +220,6 @@ function PerpetualFuturesModal({
 
       setSuccessMessage(`Position opened successfully! ID: ${positionId}`)
       setTradeCollateral('')
-      setTradeSize('')
       setTradeLeverage(1)
 
       // Refresh positions
