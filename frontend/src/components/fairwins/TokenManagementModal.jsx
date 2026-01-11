@@ -141,9 +141,6 @@ function TokenManagementModal({ isOpen, onClose }) {
   const isActionValid = () => {
     if (!actionModal || !selectedItem) return false
 
-    // Check if any ENS resolution is in progress
-    const isAnyResolving = isResolvingRecipient || isResolvingSpender || isResolvingOperator || isResolvingNewOwner
-
     switch (actionModal) {
       case 'mint':
         if (isResolvingRecipient) return false

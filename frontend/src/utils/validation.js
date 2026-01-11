@@ -23,9 +23,9 @@ export function isValidEthereumAddress(address) {
 export function isEnsName(input) {
   if (!input || typeof input !== 'string') return false
   const trimmed = input.trim().toLowerCase()
-  // Common ENS TLDs: .eth, .xyz, .app, .dao, .nft, .art, .club, .id
+  // ENS TLDs: .eth, .xyz, .app, .dao, .nft, .art, .club, .id, .luxe, .kred, .link
   // Also support subdomains like sub.name.eth
-  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.(eth|xyz|app|dao|nft|art|club|id|luxe|kred|link|com|org|io)$/i.test(trimmed)
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.(eth|xyz|app|dao|nft|art|club|id|luxe|kred|link)$/i.test(trimmed)
 }
 
 /**
