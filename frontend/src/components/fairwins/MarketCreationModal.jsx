@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { useWallet, useWeb3 } from '../../hooks'
+import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
 import { TOKENS } from '../../constants/etcswap'
+import { isValidEthereumAddress } from '../../utils/validation'
 import './MarketCreationModal.css'
 
 /**
@@ -64,6 +65,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   // Step navigation
   const [currentStep, setCurrentStep] = useState(0)
 
+  // Note: ENS resolution hook is placed after state declarations below
+
   // Metadata source toggle
   const [useCustomUri, setUseCustomUri] = useState(false)
 
@@ -92,6 +95,20 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+
+  // ENS resolution for collateral token address
+  const {
+    resolvedAddress: resolvedCollateralAddress,
+    isLoading: isResolvingCollateral,
+    error: collateralResolutionError,
+    isEns: isCollateralEns
+  } = useEnsResolution(paramsForm.collateralToken || '')
+
+  // Helper to shorten address for display
+  const shortenAddressForHint = (addr) => {
+    if (!addr || addr.length < 10) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  }
 
   // Reset form when modal opens/closes
   const resetForm = useCallback(() => {
