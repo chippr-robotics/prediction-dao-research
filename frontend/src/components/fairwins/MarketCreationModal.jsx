@@ -3,6 +3,7 @@ import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
 import { TOKENS } from '../../constants/etcswap'
 import { isValidEthereumAddress } from '../../utils/validation'
+import H3MapSelector from './H3MapSelector'
 import './MarketCreationModal.css'
 
 /**
@@ -40,7 +41,7 @@ const BET_TYPES = [
 
 const CATEGORIES = [
   'Crypto', 'Politics', 'Sports', 'Entertainment', 'Science',
-  'Technology', 'Business', 'Finance', 'Culture', 'Other'
+  'Technology', 'Business', 'Finance', 'Culture', 'Weather', 'Other'
 ]
 
 // Collateral token options derived from ETCswap tokens
@@ -78,7 +79,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     category: '',
     tags: '',
     imageUri: '',
-    sourceUrl: ''
+    sourceUrl: '',
+    h3Index: null, // H3 hexagon index for weather markets
+    h3Resolution: 5 // H3 resolution for weather markets
   })
 
   // Custom URI input
@@ -121,7 +124,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       category: '',
       tags: '',
       imageUri: '',
-      sourceUrl: ''
+      sourceUrl: '',
+      h3Index: null,
+      h3Resolution: 5
     })
     setCustomUri('')
     setParamsForm({
@@ -196,6 +201,11 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
         if (!metadataForm.category) {
           newErrors.category = 'Please select a category'
+        }
+
+        // Validate H3 location for Weather category
+        if (metadataForm.category === 'Weather' && !metadataForm.h3Index) {
+          newErrors.h3Index = 'Please select a location on the map for weather markets'
         }
 
         // Validate optional URI fields if provided
@@ -317,7 +327,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         creator: address,
         created_at: new Date().toISOString(),
         tags: tags.length > 0 ? tags : undefined,
-        resolution_criteria: metadataForm.resolutionCriteria
+        resolution_criteria: metadataForm.resolutionCriteria,
+        // H3 location data for weather markets
+        ...(metadataForm.category === 'Weather' && metadataForm.h3Index ? {
+          h3_index: metadataForm.h3Index,
+          h3_resolution: metadataForm.h3Resolution
+        } : {})
       }
     }
   }, [metadataForm, paramsForm, address])
@@ -628,6 +643,26 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                       </div>
                       {errors.category && <div className="mcm-error">{errors.category}</div>}
                     </div>
+
+                    {/* H3 Location Selector for Weather Markets */}
+                    {metadataForm.category === 'Weather' && (
+                      <div className="mcm-field">
+                        <label>
+                          Location <span className="mcm-required">*</span>
+                        </label>
+                        <div className="mcm-hint" style={{ marginBottom: '0.5rem' }}>
+                          Select the geographic area for this weather prediction market
+                        </div>
+                        <H3MapSelector
+                          selectedH3={metadataForm.h3Index}
+                          onH3Select={(h3Index) => handleMetadataChange('h3Index', h3Index)}
+                          resolution={metadataForm.h3Resolution}
+                          disabled={submitting}
+                          height="350px"
+                        />
+                        {errors.h3Index && <div className="mcm-error">{errors.h3Index}</div>}
+                      </div>
+                    )}
 
                     <div className="mcm-field">
                       <label htmlFor="tags">Tags</label>

@@ -1,0 +1,203 @@
+/**
+ * H3MapSelector Styles
+ * Styles for the H3 hexagonal map selector component
+ */
+
+.h3-map-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.h3-map-selector.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Controls */
+.h3-map-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.h3-resolution-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.h3-resolution-control label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.h3-resolution-control select {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--border-color, #3f3f46);
+  background: var(--bg-secondary, #27272a);
+  color: var(--text-primary, #fafafa);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.h3-resolution-control select:hover {
+  border-color: var(--primary-color, #6366f1);
+}
+
+.h3-resolution-control select:focus {
+  outline: none;
+  border-color: var(--primary-color, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.h3-selection-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.h3-btn-secondary,
+.h3-btn-clear {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.h3-btn-secondary {
+  background: var(--bg-secondary, #27272a);
+  border: 1px solid var(--border-color, #3f3f46);
+  color: var(--text-secondary, #a1a1aa);
+}
+
+.h3-btn-secondary:hover {
+  background: var(--bg-tertiary, #3f3f46);
+  color: var(--text-primary, #fafafa);
+}
+
+.h3-btn-clear {
+  background: transparent;
+  border: 1px solid var(--error-color, #ef4444);
+  color: var(--error-color, #ef4444);
+}
+
+.h3-btn-clear:hover:not(:disabled) {
+  background: var(--error-color, #ef4444);
+  color: white;
+}
+
+.h3-btn-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Selection Info */
+.h3-selection-info {
+  background: var(--bg-secondary, #27272a);
+  border: 1px solid var(--border-color, #3f3f46);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.h3-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.h3-info-label {
+  color: var(--text-secondary, #a1a1aa);
+  min-width: 5.5rem;
+}
+
+.h3-cell-id {
+  background: var(--bg-tertiary, #3f3f46);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: var(--primary-color, #6366f1);
+  word-break: break-all;
+}
+
+/* Map Container */
+.h3-map-container {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border-color, #3f3f46);
+}
+
+/* Leaflet overrides for dark theme */
+.h3-map-container .leaflet-container {
+  background: var(--bg-primary, #18181b);
+}
+
+.h3-map-container .leaflet-control-zoom a {
+  background: var(--bg-secondary, #27272a);
+  color: var(--text-primary, #fafafa);
+  border-color: var(--border-color, #3f3f46);
+}
+
+.h3-map-container .leaflet-control-zoom a:hover {
+  background: var(--bg-tertiary, #3f3f46);
+}
+
+.h3-map-container .leaflet-control-attribution {
+  background: rgba(24, 24, 27, 0.8);
+  color: var(--text-secondary, #a1a1aa);
+  font-size: 0.625rem;
+}
+
+.h3-map-container .leaflet-control-attribution a {
+  color: var(--primary-color, #6366f1);
+}
+
+/* Help text */
+.h3-map-help {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #71717a);
+  text-align: center;
+  padding: 0.25rem 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .h3-map-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .h3-resolution-control {
+    width: 100%;
+  }
+
+  .h3-resolution-control select {
+    flex: 1;
+  }
+
+  .h3-selection-actions {
+    justify-content: flex-end;
+  }
+
+  .h3-info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.125rem;
+  }
+
+  .h3-info-label {
+    min-width: auto;
+  }
+}
