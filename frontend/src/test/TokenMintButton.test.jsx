@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import TokenMintButton from '../components/TokenMintButton'
-import { RoleContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
+import { WalletContext, UIContext, UserPreferencesContext, ROLES, ROLE_INFO } from '../contexts'
 
 // Mock wallet and web3 hooks
 vi.mock('../hooks', () => ({
@@ -29,12 +29,24 @@ import { useWallet, useWeb3 } from '../hooks'
 describe('TokenMintButton Component', () => {
   const mockShowModal = vi.fn()
   const mockHideModal = vi.fn()
-  
-  const defaultRoleContext = {
+
+  // WalletContext now provides roles (useRoles hook uses WalletContext)
+  const defaultWalletContext = {
     roles: [],
+    rolesLoading: false,
+    blockchainSynced: true,
     hasRole: vi.fn(() => false),
-    ROLES,
-    ROLE_INFO
+    hasAnyRole: vi.fn(() => false),
+    hasAllRoles: vi.fn(() => false),
+    grantRole: vi.fn(),
+    revokeRole: vi.fn(),
+    refreshRoles: vi.fn(),
+    // Wallet state
+    address: '0x1234567890123456789012345678901234567890',
+    account: '0x1234567890123456789012345678901234567890',
+    isConnected: true,
+    provider: null,
+    signer: null
   }
 
   const defaultUIContext = {
@@ -51,19 +63,19 @@ describe('TokenMintButton Component', () => {
 
   const renderWithProviders = (component, options = {}) => {
     const {
-      roleContext = defaultRoleContext,
+      walletContext = defaultWalletContext,
       uiContext = defaultUIContext,
       preferencesContext = defaultPreferencesContext
     } = options
 
     return render(
-      <RoleContext.Provider value={roleContext}>
+      <WalletContext.Provider value={walletContext}>
         <UIContext.Provider value={uiContext}>
           <UserPreferencesContext.Provider value={preferencesContext}>
             {component}
           </UserPreferencesContext.Provider>
         </UIContext.Provider>
-      </RoleContext.Provider>
+      </WalletContext.Provider>
     )
   }
 
@@ -156,13 +168,13 @@ describe('TokenMintButton Component', () => {
   describe('Role-based Menu Options', () => {
     it('shows token creation option for users with TOKENMINT role', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.TOKENMINT],
         hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
       }
       
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<TokenMintButton />, { walletContext })
       
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
@@ -174,13 +186,13 @@ describe('TokenMintButton Component', () => {
 
     it('does not show market creation option (moved to WalletButton)', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.MARKET_MAKER],
         hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
       }
 
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<TokenMintButton />, { walletContext })
 
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
@@ -211,13 +223,13 @@ describe('TokenMintButton Component', () => {
 
     it('shows token options for users with TOKENMINT role', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.TOKENMINT],
         hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
       }
 
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<TokenMintButton />, { walletContext })
 
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
@@ -232,13 +244,13 @@ describe('TokenMintButton Component', () => {
   describe('Modal Integration', () => {
     it('opens token builder modal when create token option is clicked', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.TOKENMINT],
         hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
       }
       
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<TokenMintButton />, { walletContext })
       
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)
@@ -254,13 +266,13 @@ describe('TokenMintButton Component', () => {
 
     it('opens token management modal when manage tokens option is clicked', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.TOKENMINT],
         hasRole: vi.fn((role) => role === ROLES.TOKENMINT)
       }
 
-      renderWithProviders(<TokenMintButton />, { roleContext })
+      renderWithProviders(<TokenMintButton />, { walletContext })
 
       const button = screen.getByRole('button', { name: /tokenmint/i })
       await user.click(button)

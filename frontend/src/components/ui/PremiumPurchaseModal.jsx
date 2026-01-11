@@ -94,7 +94,7 @@ const ROLE_PRICES = {
 // Each role purchase is a separate transaction at individual price
 
 function PremiumPurchaseModal({ isOpen = true, onClose }) {
-  const { ROLE_INFO, grantRole, hasRole } = useRoles()
+  const { ROLE_INFO, grantRole, hasRole, loadRoles, blockchainSynced, isLoading: rolesLoading } = useRoles()
   const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
@@ -269,6 +269,17 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       setPurchaseResults(results)
 
       const successCount = results.filter(r => r.success).length
+
+      // Refresh roles from blockchain to sync on-chain state
+      // This ensures the frontend reflects the actual on-chain roles after purchase
+      if (successCount > 0) {
+        try {
+          await loadRoles()
+        } catch (refreshError) {
+          console.warn('Failed to refresh roles from blockchain:', refreshError)
+        }
+      }
+
       if (successCount === selectedRoles.length) {
         showNotification(
           `Successfully purchased ${successCount} role${successCount > 1 ? 's' : ''}!`,

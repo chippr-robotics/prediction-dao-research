@@ -8,7 +8,7 @@ import { purchaseRoleWithUSC } from '../../utils/blockchainService'
 import './RolePurchaseModal.css'
 
 function RolePurchaseModal({ onClose }) {
-  const { ROLES, ROLE_INFO, grantRole } = useRoles()
+  const { ROLES, ROLE_INFO, grantRole, hasRole, loadRoles } = useRoles()
   const { account, isConnected } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
@@ -49,7 +49,7 @@ function RolePurchaseModal({ onClose }) {
       // Execute blockchain transaction
       const receipt = await purchaseRoleWithUSC(signer, roleName, price)
 
-      // Grant the role
+      // Grant the role locally first for immediate feedback
       const success = grantRole(selectedRole)
 
       if (success) {
@@ -59,6 +59,13 @@ function RolePurchaseModal({ onClose }) {
           currency: 'USC',
           txHash: receipt.hash,
         })
+
+        // Refresh roles from blockchain to sync on-chain state
+        try {
+          await loadRoles()
+        } catch (refreshError) {
+          console.warn('Failed to refresh roles from blockchain:', refreshError)
+        }
 
         showNotification(`Successfully purchased ${roleName}!`, 'success', 7000)
 
@@ -130,25 +137,33 @@ function RolePurchaseModal({ onClose }) {
             <div className="role-options">
               {Object.entries(ROLE_INFO)
                 .filter(([roleKey]) => ROLE_PRICES[roleKey])
-                .map(([roleKey, roleInfo]) => (
-                  <label key={roleKey} className="role-option">
-                    <input
-                      type="radio"
-                      name="role"
-                      value={roleKey}
-                      checked={selectedRole === roleKey}
-                      onChange={(e) => setSelectedRole(e.target.value)}
-                      className="role-radio"
-                    />
-                    <div className="role-option-content">
-                      <div className="role-option-header">
-                        <span className="role-option-name">{roleInfo.name}</span>
-                        <span className="role-option-price">${ROLE_PRICES[roleKey]} USC</span>
+                .map(([roleKey, roleInfo]) => {
+                  const isOwned = hasRole && hasRole(roleKey)
+                  return (
+                    <label key={roleKey} className={`role-option ${isOwned ? 'role-option-owned' : ''}`}>
+                      <input
+                        type="radio"
+                        name="role"
+                        value={roleKey}
+                        checked={selectedRole === roleKey}
+                        onChange={(e) => setSelectedRole(e.target.value)}
+                        className="role-radio"
+                        disabled={isOwned}
+                      />
+                      <div className="role-option-content">
+                        <div className="role-option-header">
+                          <span className="role-option-name">{roleInfo.name}</span>
+                          {isOwned ? (
+                            <span className="role-option-owned-badge">Already Owned</span>
+                          ) : (
+                            <span className="role-option-price">${ROLE_PRICES[roleKey]} USC</span>
+                          )}
+                        </div>
+                        <p className="role-option-description">{roleInfo.description}</p>
                       </div>
-                      <p className="role-option-description">{roleInfo.description}</p>
-                    </div>
-                  </label>
-                ))}
+                    </label>
+                  )
+                })}
             </div>
 
             <div className="selected-role-summary">

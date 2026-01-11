@@ -6,12 +6,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import UserManagementModal from '../components/ui/UserManagementModal'
 import {
   WalletProvider,
-  Web3Provider,
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
   ETCswapProvider,
-  RoleProvider,
   PriceProvider
 } from '../contexts'
 
@@ -70,19 +68,15 @@ const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <WalletProvider>
-            <Web3Provider>
-              <UserPreferencesProvider>
-                <RoleProvider>
-                  <ETCswapProvider>
-                    <UIProvider>
-                      <PriceProvider>
-                        {ui}
-                      </PriceProvider>
-                    </UIProvider>
-                  </ETCswapProvider>
-                </RoleProvider>
-              </UserPreferencesProvider>
-            </Web3Provider>
+            <UserPreferencesProvider>
+              <ETCswapProvider>
+                <UIProvider>
+                  <PriceProvider>
+                    {ui}
+                  </PriceProvider>
+                </UIProvider>
+              </ETCswapProvider>
+            </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>
       </QueryClientProvider>

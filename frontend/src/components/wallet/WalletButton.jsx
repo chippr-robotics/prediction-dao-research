@@ -833,7 +833,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
                       role="menuitem"
                     >
                       <span aria-hidden="true">🔓</span>
-                      <span>Get Access - 50 USC</span>
+                      <span>Get Access - $50 USC per Month</span>
                     </button>
                   </div>
                 )}
