@@ -61,7 +61,7 @@ export function RoleProvider({ children }) {
   /**
    * Sync local roles with blockchain state
    * If a role exists on-chain but not locally, add it
-   * If a role exists locally but not on-chain, keep it (may be pending or query failed)
+   * If a role exists locally but not on-chain, keep it (may be pending)
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
     try {
@@ -74,19 +74,15 @@ export function RoleProvider({ children }) {
         const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
         const hasLocally = localRoles.includes(roleName)
 
-        // hasOnChain can be: true (has role), false (no role), null (query failed)
-        if (hasOnChain === true && !hasLocally) {
+        if (hasOnChain && !hasLocally) {
           // Role exists on-chain but not locally - add it
           console.log(`Syncing role ${roleName} from blockchain to local storage`)
           updatedRoles.push(roleName)
           addUserRole(walletAddress, roleName)
           hasChanges = true
-        } else if (hasOnChain === null && hasLocally) {
-          // Query failed but role exists locally - preserve it
-          console.log(`Could not verify ${roleName} on-chain, preserving local role`)
         }
         // Note: We don't remove local roles that aren't on-chain
-        // because the role manager might not be deployed yet or query may have failed
+        // because the role manager might not be deployed yet
       }
 
       return hasChanges ? updatedRoles : localRoles
