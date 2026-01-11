@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
@@ -28,10 +28,31 @@ import './WalletButton.css'
  * - Shows connector options when disconnected
  * - Integrates with existing modal system for user management
  */
+// Helper to load friend markets from localStorage
+const loadFriendMarketsFromStorage = () => {
+  try {
+    const stored = localStorage.getItem('friendMarkets')
+    return stored ? JSON.parse(stored) : []
+  } catch (e) {
+    console.warn('Failed to load friend markets from storage:', e)
+    return []
+  }
+}
+
+// Helper to save friend markets to localStorage
+const saveFriendMarketsToStorage = (markets) => {
+  try {
+    localStorage.setItem('friendMarkets', JSON.stringify(markets))
+  } catch (e) {
+    console.warn('Failed to save friend markets to storage:', e)
+  }
+}
+
 function WalletButton({ className = '', theme = 'dark' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
+  const [friendMarkets, setFriendMarkets] = useState(() => loadFriendMarketsFromStorage())
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -47,6 +68,30 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const [connectorStatus, setConnectorStatus] = useState({})
   const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
   const [pendingConnector, setPendingConnector] = useState(null)
+
+  // Filter friend markets into active and past based on end date and user
+  const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
+    const now = new Date()
+    const userAddr = address?.toLowerCase()
+
+    // Filter markets for current user
+    const userMarkets = friendMarkets.filter(m =>
+      m.creator?.toLowerCase() === userAddr ||
+      m.participants?.some(p => p.toLowerCase() === userAddr)
+    )
+
+    const active = userMarkets.filter(m => {
+      const endDate = new Date(m.endDate)
+      return endDate > now && m.status !== 'resolved'
+    })
+
+    const past = userMarkets.filter(m => {
+      const endDate = new Date(m.endDate)
+      return endDate <= now || m.status === 'resolved'
+    })
+
+    return { activeFriendMarkets: active, pastFriendMarkets: past }
+  }, [friendMarkets, address])
 
   // Check connector availability on mount and when connectors change
   useEffect(() => {
@@ -357,6 +402,34 @@ function WalletButton({ className = '', theme = 'dark' }) {
         const parsed = contract.interface.parseLog(marketCreatedEvent)
         marketId = parsed?.args?.marketId?.toString()
       }
+
+      // Store the friend market for display in Activity tab
+      const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
+      const endDate = new Date(Date.now() + tradingPeriodDays * 24 * 60 * 60 * 1000)
+
+      const newMarket = {
+        id: marketId || `friend-${Date.now()}`,
+        type: data.marketType || 'oneVsOne',
+        description: data.data.description || 'Friend Market',
+        stakeAmount: data.data.stakeAmount || '10',
+        tradingPeriod: tradingPeriodDays.toString(),
+        participants: data.data.participants || [userAddress],
+        creator: userAddress,
+        createdAt: new Date().toISOString(),
+        endDate: endDate.toISOString(),
+        status: 'active',
+        txHash: receipt.hash,
+        proposalId: proposalId.toString()
+      }
+
+      // Update state and persist to localStorage
+      setFriendMarkets(prev => {
+        const updated = [...prev, newMarket]
+        saveFriendMarketsToStorage(updated)
+        return updated
+      })
+
+      console.log('Friend market stored:', newMarket)
 
       setShowFriendMarketModal(false)
 
@@ -839,6 +912,8 @@ function WalletButton({ className = '', theme = 'dark' }) {
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
         onCreate={handleFriendMarketCreation}
+        activeMarkets={activeFriendMarkets}
+        pastMarkets={pastFriendMarkets}
       />
 
       {/* Market Creation Modal - Prediction Markets */}
