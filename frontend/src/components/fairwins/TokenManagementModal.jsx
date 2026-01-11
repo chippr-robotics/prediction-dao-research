@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet, useWeb3, useTokenMintFactory } from '../../hooks'
+import { useWallet, useWeb3, useTokenMintFactory, useEnsResolution } from '../../hooks'
 import { EXTENDED_ERC20_ABI } from '../../abis/ExtendedERC20'
 import { EXTENDED_ERC721_ABI } from '../../abis/ExtendedERC721'
 import { getAddressUrl, getTransactionUrl } from '../../config/blockExplorer'
+import { isValidEthereumAddress } from '../../utils/validation'
 import './TokenManagementModal.css'
 
 /**
@@ -33,6 +34,45 @@ function TokenManagementModal({ isOpen, onClose }) {
 
   const { address, isConnected } = useWallet()
   const { signer, isCorrectNetwork, chainId } = useWeb3()
+
+  // ENS resolution for address inputs
+  // For mint/transfer recipient address
+  const {
+    resolvedAddress: resolvedRecipientAddress,
+    isLoading: isResolvingRecipient,
+    error: recipientResolutionError,
+    isEns: isRecipientEns
+  } = useEnsResolution(actionData.address || '')
+
+  // For approve spender address
+  const {
+    resolvedAddress: resolvedSpenderAddress,
+    isLoading: isResolvingSpender,
+    error: spenderResolutionError,
+    isEns: isSpenderEns
+  } = useEnsResolution(actionData.spender || '')
+
+  // For setApprovalForAll operator address
+  const {
+    resolvedAddress: resolvedOperatorAddress,
+    isLoading: isResolvingOperator,
+    error: operatorResolutionError,
+    isEns: isOperatorEns
+  } = useEnsResolution(actionData.operator || '')
+
+  // For transferOwnership new owner address
+  const {
+    resolvedAddress: resolvedNewOwnerAddress,
+    isLoading: isResolvingNewOwner,
+    error: newOwnerResolutionError,
+    isEns: isNewOwnerEns
+  } = useEnsResolution(actionData.newOwner || '')
+
+  // Helper to shorten address for display
+  const shortenAddressForHint = (addr) => {
+    if (!addr || addr.length < 10) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  }
 
   // Fetch real blockchain data for tokens
   const {
@@ -97,44 +137,47 @@ function TokenManagementModal({ isOpen, onClose }) {
     return actionName.charAt(0).toUpperCase() + actionName.slice(1)
   }
 
-  // Helper function to validate Ethereum address
-  const isValidAddress = (address) => {
-    return /^0x[a-fA-F0-9]{40}$/.test(address)
-  }
-
-  // Helper function to validate action inputs
+  // Helper function to validate action inputs (uses resolved addresses from ENS)
   const isActionValid = () => {
     if (!actionModal || !selectedItem) return false
 
+    // Check if any ENS resolution is in progress
+    const isAnyResolving = isResolvingRecipient || isResolvingSpender || isResolvingOperator || isResolvingNewOwner
+
     switch (actionModal) {
       case 'mint':
+        if (isResolvingRecipient) return false
         if (selectedItem.type === 'ERC20') {
-          return isValidAddress(actionData.address || '') && actionData.amount && Number(actionData.amount) > 0
+          return resolvedRecipientAddress && isValidEthereumAddress(resolvedRecipientAddress) && actionData.amount && Number(actionData.amount) > 0
         }
-        return isValidAddress(actionData.address || '') && actionData.tokenURI && actionData.tokenURI.trim().length > 0
-      
+        return resolvedRecipientAddress && isValidEthereumAddress(resolvedRecipientAddress) && actionData.tokenURI && actionData.tokenURI.trim().length > 0
+
       case 'burn':
         return actionData.amount && Number(actionData.amount) > 0
-      
+
       case 'transfer':
-        return isValidAddress(actionData.address || '') && actionData.amount && Number(actionData.amount) > 0
-      
+        if (isResolvingRecipient) return false
+        return resolvedRecipientAddress && isValidEthereumAddress(resolvedRecipientAddress) && actionData.amount && Number(actionData.amount) > 0
+
       case 'approve':
-        return isValidAddress(actionData.spender || '') && actionData.amount && Number(actionData.amount) > 0
-      
+        if (isResolvingSpender) return false
+        return resolvedSpenderAddress && isValidEthereumAddress(resolvedSpenderAddress) && actionData.amount && Number(actionData.amount) > 0
+
       case 'setApprovalForAll':
-        return isValidAddress(actionData.operator || '')
-      
+        if (isResolvingOperator) return false
+        return resolvedOperatorAddress && isValidEthereumAddress(resolvedOperatorAddress)
+
       case 'transferOwnership':
-        return isValidAddress(actionData.newOwner || '')
-      
+        if (isResolvingNewOwner) return false
+        return resolvedNewOwnerAddress && isValidEthereumAddress(resolvedNewOwnerAddress)
+
       case 'renounceOwnership':
         return actionData.confirmed === true
-      
+
       case 'pause':
       case 'unpause':
         return true
-      
+
       default:
         return false
     }
@@ -365,17 +408,18 @@ function TokenManagementModal({ isOpen, onClose }) {
       let actionDescription = ''
 
       // Execute the appropriate contract method based on action
+      // Use resolved addresses from ENS resolution
       switch (actionModal) {
         case 'mint':
           if (selectedItem.type === 'ERC20') {
             // ERC20: mint(address to, uint256 amount)
             const mintAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
-            tx = await contract.mint(actionData.address, mintAmount)
-            actionDescription = `Minting ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(actionData.address)}`
+            tx = await contract.mint(resolvedRecipientAddress, mintAmount)
+            actionDescription = `Minting ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(resolvedRecipientAddress)}`
           } else {
             // ERC721: safeMint(address to, string tokenURI)
-            tx = await contract.safeMint(actionData.address, actionData.tokenURI)
-            actionDescription = `Minting NFT to ${formatAddress(actionData.address)}`
+            tx = await contract.safeMint(resolvedRecipientAddress, actionData.tokenURI)
+            actionDescription = `Minting NFT to ${formatAddress(resolvedRecipientAddress)}`
           }
           break
 
@@ -397,14 +441,14 @@ function TokenManagementModal({ isOpen, onClose }) {
           if (selectedItem.type === 'ERC20') {
             // ERC20: transfer(address to, uint256 amount)
             const transferAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
-            tx = await contract.transfer(actionData.address, transferAmount)
-            actionDescription = `Transferring ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(actionData.address)}`
+            tx = await contract.transfer(resolvedRecipientAddress, transferAmount)
+            actionDescription = `Transferring ${actionData.amount} ${selectedItem.symbol} to ${formatAddress(resolvedRecipientAddress)}`
           } else {
             // ERC721: transferFrom(address from, address to, uint256 tokenId)
             const tokenId = BigInt(actionData.amount)
             const ownerAddress = await contract.ownerOf(tokenId)
-            tx = await contract.transferFrom(ownerAddress, actionData.address, tokenId)
-            actionDescription = `Transferring NFT #${actionData.amount} to ${formatAddress(actionData.address)}`
+            tx = await contract.transferFrom(ownerAddress, resolvedRecipientAddress, tokenId)
+            actionDescription = `Transferring NFT #${actionData.amount} to ${formatAddress(resolvedRecipientAddress)}`
           }
           break
 
@@ -412,20 +456,20 @@ function TokenManagementModal({ isOpen, onClose }) {
           if (selectedItem.type === 'ERC20') {
             // ERC20: approve(address spender, uint256 amount)
             const approveAmount = ethers.parseUnits(actionData.amount, selectedItem.decimals || 18)
-            tx = await contract.approve(actionData.spender, approveAmount)
-            actionDescription = `Approving ${actionData.amount} ${selectedItem.symbol} for ${formatAddress(actionData.spender)}`
+            tx = await contract.approve(resolvedSpenderAddress, approveAmount)
+            actionDescription = `Approving ${actionData.amount} ${selectedItem.symbol} for ${formatAddress(resolvedSpenderAddress)}`
           } else {
             // ERC721: approve(address to, uint256 tokenId)
             const tokenId = BigInt(actionData.amount)
-            tx = await contract.approve(actionData.spender, tokenId)
-            actionDescription = `Approving NFT #${actionData.amount} for ${formatAddress(actionData.spender)}`
+            tx = await contract.approve(resolvedSpenderAddress, tokenId)
+            actionDescription = `Approving NFT #${actionData.amount} for ${formatAddress(resolvedSpenderAddress)}`
           }
           break
 
         case 'setApprovalForAll':
           // ERC721: setApprovalForAll(address operator, bool approved)
-          tx = await contract.setApprovalForAll(actionData.operator, actionData.approved || true)
-          actionDescription = `Setting approval for ${formatAddress(actionData.operator)}`
+          tx = await contract.setApprovalForAll(resolvedOperatorAddress, actionData.approved || true)
+          actionDescription = `Setting approval for ${formatAddress(resolvedOperatorAddress)}`
           break
 
         case 'pause':
@@ -442,8 +486,8 @@ function TokenManagementModal({ isOpen, onClose }) {
 
         case 'transferOwnership':
           // transferOwnership(address newOwner)
-          tx = await contract.transferOwnership(actionData.newOwner)
-          actionDescription = `Transferring ownership to ${formatAddress(actionData.newOwner)}`
+          tx = await contract.transferOwnership(resolvedNewOwnerAddress)
+          actionDescription = `Transferring ownership to ${formatAddress(resolvedNewOwnerAddress)}`
           break
 
         case 'renounceOwnership':
@@ -972,14 +1016,35 @@ function TokenManagementModal({ isOpen, onClose }) {
                 {actionModal === 'mint' && (
                   <>
                     <div className="tm-form-group">
-                      <label htmlFor="mint-address">Recipient Address</label>
-                      <input
-                        id="mint-address"
-                        type="text"
-                        placeholder="0x..."
-                        value={actionData.address || ''}
-                        onChange={(e) => setActionData({...actionData, address: e.target.value})}
-                      />
+                      <label htmlFor="mint-address">Recipient Address or ENS Name</label>
+                      <div className="tm-address-input-wrapper">
+                        <input
+                          id="mint-address"
+                          type="text"
+                          placeholder="0x... or vitalik.eth"
+                          value={actionData.address || ''}
+                          onChange={(e) => setActionData({...actionData, address: e.target.value})}
+                          className={recipientResolutionError ? 'input-error' : resolvedRecipientAddress ? 'input-success' : ''}
+                        />
+                        {isResolvingRecipient && (
+                          <span className="tm-address-status resolving">
+                            <span className="tm-spinner-small"></span>
+                          </span>
+                        )}
+                        {resolvedRecipientAddress && !isResolvingRecipient && !recipientResolutionError && (
+                          <span className="tm-address-status success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      {isRecipientEns && resolvedRecipientAddress && !isResolvingRecipient && (
+                        <span className="tm-resolved-hint">Resolves to: <code>{shortenAddressForHint(resolvedRecipientAddress)}</code></span>
+                      )}
+                      {recipientResolutionError && (
+                        <span className="tm-error-hint">{recipientResolutionError}</span>
+                      )}
                     </div>
                     {selectedItem.type === 'ERC20' ? (
                       <div className="tm-form-group">
@@ -1025,14 +1090,35 @@ function TokenManagementModal({ isOpen, onClose }) {
                 {actionModal === 'transfer' && (
                   <>
                     <div className="tm-form-group">
-                      <label htmlFor="transfer-address">Recipient Address</label>
-                      <input
-                        id="transfer-address"
-                        type="text"
-                        placeholder="0x..."
-                        value={actionData.address || ''}
-                        onChange={(e) => setActionData({...actionData, address: e.target.value})}
-                      />
+                      <label htmlFor="transfer-address">Recipient Address or ENS Name</label>
+                      <div className="tm-address-input-wrapper">
+                        <input
+                          id="transfer-address"
+                          type="text"
+                          placeholder="0x... or vitalik.eth"
+                          value={actionData.address || ''}
+                          onChange={(e) => setActionData({...actionData, address: e.target.value})}
+                          className={recipientResolutionError ? 'input-error' : resolvedRecipientAddress ? 'input-success' : ''}
+                        />
+                        {isResolvingRecipient && (
+                          <span className="tm-address-status resolving">
+                            <span className="tm-spinner-small"></span>
+                          </span>
+                        )}
+                        {resolvedRecipientAddress && !isResolvingRecipient && !recipientResolutionError && (
+                          <span className="tm-address-status success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      {isRecipientEns && resolvedRecipientAddress && !isResolvingRecipient && (
+                        <span className="tm-resolved-hint">Resolves to: <code>{shortenAddressForHint(resolvedRecipientAddress)}</code></span>
+                      )}
+                      {recipientResolutionError && (
+                        <span className="tm-error-hint">{recipientResolutionError}</span>
+                      )}
                     </div>
                     <div className="tm-form-group">
                       <label htmlFor="transfer-amount">
@@ -1052,14 +1138,35 @@ function TokenManagementModal({ isOpen, onClose }) {
                 {actionModal === 'approve' && (
                   <>
                     <div className="tm-form-group">
-                      <label htmlFor="approve-spender">Spender Address</label>
-                      <input
-                        id="approve-spender"
-                        type="text"
-                        placeholder="0x..."
-                        value={actionData.spender || ''}
-                        onChange={(e) => setActionData({...actionData, spender: e.target.value})}
-                      />
+                      <label htmlFor="approve-spender">Spender Address or ENS Name</label>
+                      <div className="tm-address-input-wrapper">
+                        <input
+                          id="approve-spender"
+                          type="text"
+                          placeholder="0x... or vitalik.eth"
+                          value={actionData.spender || ''}
+                          onChange={(e) => setActionData({...actionData, spender: e.target.value})}
+                          className={spenderResolutionError ? 'input-error' : resolvedSpenderAddress ? 'input-success' : ''}
+                        />
+                        {isResolvingSpender && (
+                          <span className="tm-address-status resolving">
+                            <span className="tm-spinner-small"></span>
+                          </span>
+                        )}
+                        {resolvedSpenderAddress && !isResolvingSpender && !spenderResolutionError && (
+                          <span className="tm-address-status success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      {isSpenderEns && resolvedSpenderAddress && !isResolvingSpender && (
+                        <span className="tm-resolved-hint">Resolves to: <code>{shortenAddressForHint(resolvedSpenderAddress)}</code></span>
+                      )}
+                      {spenderResolutionError && (
+                        <span className="tm-error-hint">{spenderResolutionError}</span>
+                      )}
                     </div>
                     <div className="tm-form-group">
                       <label htmlFor="approve-amount">Amount</label>
@@ -1077,14 +1184,35 @@ function TokenManagementModal({ isOpen, onClose }) {
                 {actionModal === 'setApprovalForAll' && (
                   <>
                     <div className="tm-form-group">
-                      <label htmlFor="approval-operator">Operator Address</label>
-                      <input
-                        id="approval-operator"
-                        type="text"
-                        placeholder="0x..."
-                        value={actionData.operator || ''}
-                        onChange={(e) => setActionData({...actionData, operator: e.target.value})}
-                      />
+                      <label htmlFor="approval-operator">Operator Address or ENS Name</label>
+                      <div className="tm-address-input-wrapper">
+                        <input
+                          id="approval-operator"
+                          type="text"
+                          placeholder="0x... or vitalik.eth"
+                          value={actionData.operator || ''}
+                          onChange={(e) => setActionData({...actionData, operator: e.target.value})}
+                          className={operatorResolutionError ? 'input-error' : resolvedOperatorAddress ? 'input-success' : ''}
+                        />
+                        {isResolvingOperator && (
+                          <span className="tm-address-status resolving">
+                            <span className="tm-spinner-small"></span>
+                          </span>
+                        )}
+                        {resolvedOperatorAddress && !isResolvingOperator && !operatorResolutionError && (
+                          <span className="tm-address-status success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      {isOperatorEns && resolvedOperatorAddress && !isResolvingOperator && (
+                        <span className="tm-resolved-hint">Resolves to: <code>{shortenAddressForHint(resolvedOperatorAddress)}</code></span>
+                      )}
+                      {operatorResolutionError && (
+                        <span className="tm-error-hint">{operatorResolutionError}</span>
+                      )}
                     </div>
                     <div className="tm-form-group checkbox">
                       <input
@@ -1113,14 +1241,35 @@ function TokenManagementModal({ isOpen, onClose }) {
 
                 {actionModal === 'transferOwnership' && (
                   <div className="tm-form-group">
-                    <label htmlFor="new-owner">New Owner Address</label>
-                    <input
-                      id="new-owner"
-                      type="text"
-                      placeholder="0x..."
-                      value={actionData.newOwner || ''}
-                      onChange={(e) => setActionData({...actionData, newOwner: e.target.value})}
-                    />
+                    <label htmlFor="new-owner">New Owner Address or ENS Name</label>
+                    <div className="tm-address-input-wrapper">
+                      <input
+                        id="new-owner"
+                        type="text"
+                        placeholder="0x... or vitalik.eth"
+                        value={actionData.newOwner || ''}
+                        onChange={(e) => setActionData({...actionData, newOwner: e.target.value})}
+                        className={newOwnerResolutionError ? 'input-error' : resolvedNewOwnerAddress ? 'input-success' : ''}
+                      />
+                      {isResolvingNewOwner && (
+                        <span className="tm-address-status resolving">
+                          <span className="tm-spinner-small"></span>
+                        </span>
+                      )}
+                      {resolvedNewOwnerAddress && !isResolvingNewOwner && !newOwnerResolutionError && (
+                        <span className="tm-address-status success">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    {isNewOwnerEns && resolvedNewOwnerAddress && !isResolvingNewOwner && (
+                      <span className="tm-resolved-hint">Resolves to: <code>{shortenAddressForHint(resolvedNewOwnerAddress)}</code></span>
+                    )}
+                    {newOwnerResolutionError && (
+                      <span className="tm-error-hint">{newOwnerResolutionError}</span>
+                    )}
                     <span className="tm-field-hint">
                       This action cannot be undone. Make sure the address is correct.
                     </span>

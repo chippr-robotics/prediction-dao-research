@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useEnsResolution } from '../../hooks/useEnsResolution'
+import { isValidEthereumAddress } from '../../utils/validation'
 import './TokenMintHeroCard.css'
 
 function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListOnETCSwap }) {
@@ -6,19 +8,55 @@ function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListO
   const [actionMode, setActionMode] = useState(null) // 'mint', 'burn', 'transfer', null
   const [actionData, setActionData] = useState({ address: '', amount: '', tokenURI: '' })
 
+  // ENS resolution for address input
+  const {
+    resolvedAddress,
+    isLoading: isResolvingAddress,
+    error: addressResolutionError,
+    isEns: isEnsInput
+  } = useEnsResolution(actionData.address)
+
+  // Helper to shorten address for display
+  const shortenAddress = (addr) => {
+    if (!addr || addr.length < 10) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  }
+
   if (!token) return null
 
   const handleAction = async (action) => {
     try {
+      // Validate address for actions that require it
+      if ((action === 'mint' || action === 'transfer') && actionData.address) {
+        if (isResolvingAddress) {
+          alert('Please wait for ENS name to resolve')
+          return
+        }
+        if (addressResolutionError) {
+          alert(addressResolutionError)
+          return
+        }
+        if (!resolvedAddress || !isValidEthereumAddress(resolvedAddress)) {
+          alert('Invalid Ethereum address or ENS name')
+          return
+        }
+      }
+
+      // Use resolved address in action data
+      const resolvedActionData = {
+        ...actionData,
+        address: resolvedAddress || actionData.address
+      }
+
       switch (action) {
         case 'mint':
-          await onMint(token.tokenId, actionData)
+          await onMint(token.tokenId, resolvedActionData)
           break
         case 'burn':
-          await onBurn(token.tokenId, actionData)
+          await onBurn(token.tokenId, resolvedActionData)
           break
         case 'transfer':
-          await onTransfer(token.tokenId, actionData)
+          await onTransfer(token.tokenId, resolvedActionData)
           break
       }
       setActionMode(null)
@@ -160,13 +198,34 @@ function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListO
                 {actionMode === 'mint' && (
                   <>
                     <div className="form-group">
-                      <label>To Address</label>
-                      <input 
-                        type="text"
-                        placeholder="0x..."
-                        value={actionData.address}
-                        onChange={(e) => setActionData({...actionData, address: e.target.value})}
-                      />
+                      <label>To Address or ENS Name</label>
+                      <div className="address-input-wrapper">
+                        <input
+                          type="text"
+                          placeholder="0x... or vitalik.eth"
+                          value={actionData.address}
+                          onChange={(e) => setActionData({...actionData, address: e.target.value})}
+                          className={addressResolutionError ? 'input-error' : resolvedAddress ? 'input-success' : ''}
+                        />
+                        {isResolvingAddress && (
+                          <span className="address-status resolving">
+                            <span className="spinner-small"></span>
+                          </span>
+                        )}
+                        {resolvedAddress && !isResolvingAddress && !addressResolutionError && (
+                          <span className="address-status success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      {isEnsInput && resolvedAddress && !isResolvingAddress && (
+                        <div className="resolved-hint">Resolves to: <code>{shortenAddress(resolvedAddress)}</code></div>
+                      )}
+                      {addressResolutionError && (
+                        <div className="error-hint">{addressResolutionError}</div>
+                      )}
                     </div>
                     {token.tokenType === 0 ? (
                       <div className="form-group">
@@ -221,13 +280,34 @@ function TokenMintHeroCard({ token, onClose, onMint, onBurn, onTransfer, onListO
                 {actionMode === 'transfer' && (
                   <>
                     <div className="form-group">
-                      <label>To Address</label>
-                      <input 
-                        type="text"
-                        placeholder="0x..."
-                        value={actionData.address}
-                        onChange={(e) => setActionData({...actionData, address: e.target.value})}
-                      />
+                      <label>To Address or ENS Name</label>
+                      <div className="address-input-wrapper">
+                        <input
+                          type="text"
+                          placeholder="0x... or vitalik.eth"
+                          value={actionData.address}
+                          onChange={(e) => setActionData({...actionData, address: e.target.value})}
+                          className={addressResolutionError ? 'input-error' : resolvedAddress ? 'input-success' : ''}
+                        />
+                        {isResolvingAddress && (
+                          <span className="address-status resolving">
+                            <span className="spinner-small"></span>
+                          </span>
+                        )}
+                        {resolvedAddress && !isResolvingAddress && !addressResolutionError && (
+                          <span className="address-status success">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      {isEnsInput && resolvedAddress && !isResolvingAddress && (
+                        <div className="resolved-hint">Resolves to: <code>{shortenAddress(resolvedAddress)}</code></div>
+                      )}
+                      {addressResolutionError && (
+                        <div className="error-hint">{addressResolutionError}</div>
+                      )}
                     </div>
                     {token.tokenType === 0 && (
                       <div className="form-group">
