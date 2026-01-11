@@ -38,6 +38,11 @@ export const DEPLOYED_CONTRACTS = {
   membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
   // Deploy via: npx hardhat run scripts/configure-payment-manager.js --network mordor
   membershipPaymentManager: '0x8b09cbC2275398C00D43854393e09D40334a1B81',  // MembershipPaymentManager for payment processing
+
+  // Perpetual Futures - Deployed via: npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
+  fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
+  perpFactory: '0xAEfd08EF350B7132BDbE8a9de96C6d24eAbd7988',
+
 }
 
 /**
