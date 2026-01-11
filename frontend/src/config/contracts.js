@@ -28,7 +28,7 @@ export const DEPLOYED_CONTRACTS = {
 
   // Back-compat aliases used throughout the frontend
   roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8', // alias for RoleManagerCore
-  roleManagerCore: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5',
+  roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
 
   // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
