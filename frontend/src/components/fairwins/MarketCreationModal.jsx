@@ -657,6 +657,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                           selectedH3={metadataForm.h3Index}
                           onH3Select={(h3Index) => handleMetadataChange('h3Index', h3Index)}
                           resolution={metadataForm.h3Resolution}
+                          onResolutionChange={(resolution) => handleMetadataChange('h3Resolution', resolution)}
                           disabled={submitting}
                           height="350px"
                         />

@@ -11,7 +11,7 @@ import financeIcon from '../../assets/finance_no_text.svg'
 import techIcon from '../../assets/tech_no_text.svg'
 import popCultureIcon from '../../assets/pop-culture_no_text.svg'
 import cryptoIcon from '../../assets/crypto_no_text.svg'
-import weatherIcon from '../../assets/weather_no-text.svg'
+import weatherIcon from '../../assets/weather_no_text.svg'
 import otherMarketsIcon from '../../assets/other_markets_no_text.svg'
 import allMarketsIcon from '../../assets/all_markets_no_text.svg'
 
