@@ -8,7 +8,7 @@ import {
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'
-import { hasRoleOnChain } from '../utils/blockchainService'
+import { hasRoleOnChain, verifyContractAlignment } from '../utils/blockchainService'
 import { WalletContext } from './WalletContext'
 
 export function WalletProvider({ children }) {
@@ -38,6 +38,11 @@ export function WalletProvider({ children }) {
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
   const [blockchainSynced, setBlockchainSynced] = useState(false)
+
+  // Verify contract alignment on mount (helps catch config mismatches early)
+  useEffect(() => {
+    verifyContractAlignment().catch(console.error)
+  }, [])
 
   // Update provider and signer when connection changes
   useEffect(() => {
