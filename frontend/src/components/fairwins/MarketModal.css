@@ -739,24 +739,21 @@
 .total-value {
   font-size: 1.75rem;
   font-weight: 800;
-  color: #FFD700;
+  color: #36B37E;
   text-shadow: 
     /* White outline */
     -1px -1px 0 #fff,
-    1px -1px 0 #fff,
-    -1px 1px 0 #fff,
-    1px 1px 0 #fff,
-    /* Golden glow */
-    0 0 10px rgba(255, 215, 0, 0.6),
-    0 0 20px rgba(255, 193, 7, 0.4),
-    0 0 30px rgba(255, 165, 0, 0.2);
-  background: linear-gradient(135deg, #FFD700 0%, #FFF8DC 30%, #FFD700 50%, #FFA500 70%, #FFD700 100%);
+    /* Green glow */
+    0 0 10px rgba(54, 179, 126, 0.6),
+    0 0 20px rgba(54, 179, 126, 0.4),
+    0 0 30px rgba(54, 179, 126, 0.2);
+  background: linear-gradient(135deg, #36B37E 0%, #A8E6CF 30%, #36B37E 50%, #2E8B57 70%, #36B37E 100%);
   background-size: 200% 200%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: shimmer 2s ease-in-out infinite;
-  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(255, 215, 0, 0.4));
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 2px 4px rgba(54, 179, 126, 0.4));
 }
 
 @keyframes shimmer {

@@ -737,7 +737,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
                     role="menuitem"
                   >
                     <span aria-hidden="true">🎯</span>
-                    <span>Create Friend Market</span>
+                    <span>My Friend Markets</span>
                   </button>
                 ) : (
                   <div className="friend-market-promo">
