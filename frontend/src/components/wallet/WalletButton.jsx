@@ -468,7 +468,26 @@ function WalletButton({ className = '', theme = 'dark' }) {
       throw new Error('Please connect your wallet to create a market')
     }
 
+    // Verify signer is authorized for the connected address
+    try {
+      const signerAddress = await activeSigner.getAddress()
+      console.log('Market creation - Signer address:', signerAddress)
+      console.log('Market creation - Connected address:', address)
+
+      if (address && signerAddress.toLowerCase() !== address.toLowerCase()) {
+        console.warn('Signer address does not match connected address, reconnecting...')
+        // Request accounts to ensure authorization
+        if (window.ethereum) {
+          await window.ethereum.request({ method: 'eth_requestAccounts' })
+        }
+      }
+    } catch (addressError) {
+      console.error('Error verifying signer address:', addressError)
+      throw new Error('Wallet authorization failed. Please reconnect your wallet.')
+    }
+
     console.log('Market creation data:', submitData)
+    console.log('Collateral token from form:', submitData.collateralToken)
 
     try {
       const marketFactoryAddress = getContractAddress('marketFactory')
@@ -478,6 +497,9 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
       // Get collateral token address - use form data or default to USC stablecoin
       const collateralTokenAddress = submitData.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
+      console.log('Using collateral token:', collateralTokenAddress)
+      console.log('USC stablecoin address:', ETCSWAP_ADDRESSES.USC_STABLECOIN)
+
       if (!collateralTokenAddress) {
         throw new Error('Collateral token not configured')
       }

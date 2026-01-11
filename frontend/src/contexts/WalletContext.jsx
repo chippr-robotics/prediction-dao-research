@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
 import {
@@ -18,7 +18,8 @@ export function WalletProvider({ children }) {
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
-  
+  const { data: walletClient } = useWalletClient()
+
   // Provider and signer for transactions
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
@@ -40,14 +41,52 @@ export function WalletProvider({ children }) {
   const [blockchainSynced, setBlockchainSynced] = useState(false)
 
   // Update provider and signer when connection changes
+  // Use wagmi's walletClient for proper authorization
   useEffect(() => {
     const updateProviderAndSigner = async () => {
-      if (isConnected && window.ethereum) {
+      if (isConnected && walletClient) {
+        try {
+          // Create provider from walletClient's transport for proper authorization
+          // This ensures the signer is authorized for the connected account
+          const ethersProvider = new ethers.BrowserProvider(walletClient.transport, {
+            chainId: walletClient.chain?.id,
+            name: walletClient.chain?.name || 'Unknown'
+          })
+
+          // Get signer for the specific account that wagmi has authorized
+          const ethersSigner = await ethersProvider.getSigner(walletClient.account.address)
+          setProvider(ethersProvider)
+          setSigner(ethersSigner)
+          console.log('[WalletContext] Signer created for:', walletClient.account.address)
+        } catch (error) {
+          console.error('Error creating provider/signer from walletClient:', error)
+
+          // Fallback to window.ethereum if walletClient approach fails
+          if (window.ethereum) {
+            try {
+              const fallbackProvider = new ethers.BrowserProvider(window.ethereum)
+              const fallbackSigner = await fallbackProvider.getSigner()
+              setProvider(fallbackProvider)
+              setSigner(fallbackSigner)
+              console.log('[WalletContext] Using fallback signer')
+            } catch (fallbackError) {
+              console.error('Fallback signer creation also failed:', fallbackError)
+              setProvider(null)
+              setSigner(null)
+            }
+          } else {
+            setProvider(null)
+            setSigner(null)
+          }
+        }
+      } else if (isConnected && window.ethereum) {
+        // If walletClient is not available yet, try window.ethereum directly
         try {
           const ethersProvider = new ethers.BrowserProvider(window.ethereum)
           const ethersSigner = await ethersProvider.getSigner()
           setProvider(ethersProvider)
           setSigner(ethersSigner)
+          console.log('[WalletContext] Signer created from window.ethereum')
         } catch (error) {
           console.error('Error creating provider/signer:', error)
           setProvider(null)
@@ -58,9 +97,9 @@ export function WalletProvider({ children }) {
         setSigner(null)
       }
     }
-    
+
     updateProviderAndSigner()
-  }, [isConnected, address])
+  }, [isConnected, address, walletClient])
 
   // Check network compatibility
   useEffect(() => {
