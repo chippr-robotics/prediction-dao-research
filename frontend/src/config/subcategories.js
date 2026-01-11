@@ -55,6 +55,15 @@ export const SUBCATEGORIES = {
     { id: 'music', name: 'Music', parent: 'pop-culture' },
     { id: 'celebrities', name: 'Celebrities', parent: 'pop-culture' },
     { id: 'awards', name: 'Awards', parent: 'pop-culture' }
+  ],
+  weather: [
+    { id: 'temperature', name: 'Temperature', parent: 'weather' },
+    { id: 'precipitation', name: 'Precipitation', parent: 'weather' },
+    { id: 'storms', name: 'Storms & Hurricanes', parent: 'weather' },
+    { id: 'snowfall', name: 'Snowfall', parent: 'weather' },
+    { id: 'drought', name: 'Drought', parent: 'weather' },
+    { id: 'records', name: 'Weather Records', parent: 'weather' },
+    { id: 'seasonal', name: 'Seasonal Forecasts', parent: 'weather' }
   ]
 }
 

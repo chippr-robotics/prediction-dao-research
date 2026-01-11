@@ -5,6 +5,7 @@ import { ethers } from 'ethers'
 import { useETCswap } from '../../hooks/useETCswap'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
+import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
@@ -63,6 +64,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const { signer } = useWeb3()
+  const { mode, toggleMode, isDark } = useTheme()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   const [connectorStatus, setConnectorStatus] = useState({})
@@ -870,12 +872,28 @@ function WalletButton({ className = '', theme = 'dark' }) {
                   <span className="toggle-label">
                     {preferences.demoMode ? '🎭 Demo Mode' : '🌐 Live Mode'}
                   </span>
-                  <button 
+                  <button
                     onClick={handleToggleDemoMode}
                     className="toggle-btn"
                     aria-label={`Switch to ${preferences.demoMode ? 'Live' : 'Demo'} Mode`}
                   >
                     {preferences.demoMode ? 'Go Live' : 'Use Demo'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Theme Toggle */}
+              <div className="dropdown-section">
+                <div className="toggle-row">
+                  <span className="toggle-label">
+                    {isDark ? '🌙 Dark Theme' : '☀️ Light Theme'}
+                  </span>
+                  <button
+                    onClick={toggleMode}
+                    className="toggle-btn"
+                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+                  >
+                    {isDark ? 'Light Mode' : 'Dark Mode'}
                   </button>
                 </div>
               </div>

@@ -26,6 +26,7 @@ import ClearPathTab from './ClearPathTab'
 import CorrelatedMarketsModal from './CorrelatedMarketsModal'
 import MarketModal from './MarketModal'
 import PerpetualFuturesModal from './PerpetualFuturesModal'
+import WeatherMarketMap from './WeatherMarketMap'
 import SearchBar from '../ui/SearchBar'
 import SubcategoryFilter from './SubcategoryFilter'
 import LoadingScreen from '../ui/LoadingScreen'
@@ -91,7 +92,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     { id: 'finance', name: 'Finance', icon: '💰' },
     { id: 'tech', name: 'Tech', icon: '💻' },
     { id: 'crypto', name: 'Crypto', icon: '₿' },
-    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' }
+    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
+    { id: 'weather', name: 'Weather', icon: '🌤️' }
   ]
 
   const getMarketsByCategory = () => {
@@ -548,6 +550,51 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                       selectedCategory={selectedCategory}
                     />
                   )}
+                </div>
+              ) : selectedCategory === 'weather' ? (
+                /* Weather View - Show markets on H3 map */
+                <div className="grid-view-container">
+                  <div className="grid-controls">
+                    <div className="grid-header">
+                      <h2>🌤️ Weather Markets</h2>
+                      <span className="market-count">
+                        ({searchFilteredMarkets.length} markets)
+                      </span>
+                    </div>
+                    <ViewToggle
+                      currentView={viewMode}
+                      onViewChange={handleViewChange}
+                    />
+                  </div>
+
+                  {/* Weather Market Map */}
+                  <WeatherMarketMap
+                    markets={searchFilteredMarkets}
+                    onMarketClick={handleMarketClick}
+                    selectedMarket={selectedMarket}
+                    loading={loading}
+                    height="450px"
+                  />
+
+                  {/* Also show grid/compact view below the map */}
+                  <div className="weather-markets-list">
+                    <h3>All Weather Markets</h3>
+                    {viewMode === VIEW_MODES.GRID ? (
+                      <MarketGrid
+                        markets={getFilteredAndSortedMarkets()}
+                        onMarketClick={handleMarketClick}
+                        selectedMarketId={selectedMarket?.id}
+                        loading={loading}
+                      />
+                    ) : (
+                      <CompactMarketView
+                        markets={getFilteredAndSortedMarkets()}
+                        onMarketClick={handleMarketClick}
+                        loading={loading}
+                        selectedCategory={selectedCategory}
+                      />
+                    )}
+                  </div>
                 </div>
               ) : (
                 /* Full Grid View for specific category */
