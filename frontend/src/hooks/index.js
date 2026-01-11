@@ -74,3 +74,11 @@ export {
   useEnsReverseLookup,
   useAddressInput
 } from './useEnsResolution'
+
+// Perpetual Futures hooks
+export {
+  usePerpetualsContract,
+  PositionSide,
+  MarketCategory,
+  MarketStatus
+} from './usePerpetualsContract'

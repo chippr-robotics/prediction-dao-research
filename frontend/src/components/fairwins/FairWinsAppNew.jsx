@@ -25,6 +25,7 @@ import TokenMintTab from './TokenMintTab'
 import ClearPathTab from './ClearPathTab'
 import CorrelatedMarketsModal from './CorrelatedMarketsModal'
 import MarketModal from './MarketModal'
+import PerpetualFuturesModal from './PerpetualFuturesModal'
 import WeatherMarketMap from './WeatherMarketMap'
 import SearchBar from '../ui/SearchBar'
 import SubcategoryFilter from './SubcategoryFilter'
@@ -50,6 +51,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [showHero, setShowHero] = useState(false) // Hero view state
   const [showTokenBuilder, setShowTokenBuilder] = useState(false) // Token builder state
   const [showFilters, setShowFilters] = useState(false) // Collapsible filters state
+  const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
   const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
@@ -112,7 +114,11 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       navigate('/clearpath')
       return
     }
-    
+    if (categoryId === 'perpetuals') {
+      setShowPerpetualsModal(true)
+      return
+    }
+
     setSelectedCategory(categoryId)
     // Clear search when changing category
     setSearchQuery('')
@@ -476,6 +482,12 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             onClose={handleCloseHero}
             market={selectedMarket}
             onTrade={handleTrade}
+          />
+
+          {/* Perpetual Futures Modal */}
+          <PerpetualFuturesModal
+            isOpen={showPerpetualsModal}
+            onClose={() => setShowPerpetualsModal(false)}
           />
 
           {/* Primary Grid View - Always visible unless hero is open */}

@@ -85,7 +85,7 @@
   position: absolute;
   top: calc(100% + .5rem);
   right: 0;
-  min-width: 320px;
+  min-width: 520px;
   background: var(--surface-color, #1a1a1a);
   border: 1px solid var(--border-color, #333);
   border-radius: 16px;

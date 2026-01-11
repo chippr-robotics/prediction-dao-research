@@ -31,8 +31,8 @@ describe('SidebarNav Component', () => {
     it('renders all category buttons', () => {
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
       const categoryButtons = screen.getAllByRole('button')
-      // Should have toggle button + 11 category buttons (including "Weather" and "All Markets Table")
-      expect(categoryButtons.length).toBe(12)
+      // Should have toggle button + 12 category buttons (including "Weather", "Perpetuals" and "All Markets Table")
+      expect(categoryButtons.length).toBe(13)
     })
 
     it('starts in collapsed state by default', () => {

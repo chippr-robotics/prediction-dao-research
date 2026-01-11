@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWeb3, useWallet } from '../hooks/useWeb3'
+import { useWeb3 } from '../hooks/useWeb3'
 import Header from './Header'
 import './LandingPage.css'
 
 function LandingPage() {
   const navigate = useNavigate()
-  const { isConnected } = useWeb3()
-  const { connectWallet } = useWallet()
+  const { isConnected, connectWallet } = useWeb3()
   const [logoErrors, setLogoErrors] = useState({ fairwins: false })
 
   const handleBrowseMarkets = () => {

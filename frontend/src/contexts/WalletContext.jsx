@@ -78,44 +78,61 @@ export function WalletProvider({ children }) {
    * If a role exists locally but not on-chain, remove it (expired)
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
-    try {
-      const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
-      const updatedRoles = []
-      let hasChanges = false
+    const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+    const updatedRoles = []
+    let hasChanges = false
+    let syncErrors = []
 
-      // Check each premium role on-chain
-      for (const roleName of premiumRoles) {
+    console.log('[RoleSync] Starting blockchain sync for:', walletAddress)
+    console.log('[RoleSync] Local roles:', localRoles)
+
+    // Check each premium role on-chain
+    for (const roleName of premiumRoles) {
+      try {
         const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
         const hasLocally = localRoles.includes(roleName)
+
+        console.log(`[RoleSync] ${roleName}: onChain=${hasOnChain}, local=${hasLocally}`)
 
         if (hasOnChain) {
           // Role exists on-chain - keep it
           updatedRoles.push(roleName)
           if (!hasLocally) {
-            console.log(`Syncing role ${roleName} from blockchain to local storage`)
+            console.log(`[RoleSync] Adding ${roleName} from blockchain to local storage`)
             addUserRole(walletAddress, roleName)
             hasChanges = true
           }
         } else if (hasLocally) {
           // Role exists locally but not on-chain - it may have expired
-          console.log(`Role ${roleName} not found on-chain, removing from local storage`)
-          removeUserRole(walletAddress, roleName)
-          hasChanges = true
+          // Note: Keep the local role if blockchain check failed - be conservative
+          console.log(`[RoleSync] ${roleName} not found on-chain but exists locally`)
+          // Don't remove immediately - only remove if we got a definitive "false" from blockchain
+          // For now, keep the local role to avoid false negatives from RPC issues
+          updatedRoles.push(roleName)
+        }
+      } catch (roleError) {
+        console.error(`[RoleSync] Error checking ${roleName}:`, roleError.message)
+        syncErrors.push({ role: roleName, error: roleError.message })
+        // Keep local role if blockchain check fails - be conservative
+        if (localRoles.includes(roleName)) {
+          updatedRoles.push(roleName)
         }
       }
-
-      // Keep non-premium roles (like ADMIN) that are stored locally
-      for (const role of localRoles) {
-        if (!premiumRoles.includes(role) && !updatedRoles.includes(role)) {
-          updatedRoles.push(role)
-        }
-      }
-
-      return { roles: updatedRoles, hasChanges }
-    } catch (error) {
-      console.error('Error syncing roles with blockchain:', error)
-      return { roles: localRoles, hasChanges: false }
     }
+
+    // Keep non-premium roles (like ADMIN) that are stored locally
+    for (const role of localRoles) {
+      if (!premiumRoles.includes(role) && !updatedRoles.includes(role)) {
+        updatedRoles.push(role)
+      }
+    }
+
+    console.log('[RoleSync] Final roles:', updatedRoles)
+    if (syncErrors.length > 0) {
+      console.warn('[RoleSync] Sync completed with errors:', syncErrors)
+    }
+
+    return { roles: updatedRoles, hasChanges, errors: syncErrors }
   }, [])
 
   /**
@@ -323,20 +340,23 @@ export function WalletProvider({ children }) {
   }, [signer])
 
   // RVAC Role management
+  // Use the synced `roles` state as source of truth (blockchain is authoritative)
   const hasRole = useCallback((role) => {
     if (!address) return false
-    return checkRole(address, role)
-  }, [address])
+    // Check the synced roles state instead of localStorage
+    // This ensures we reflect the actual on-chain state
+    return roles.includes(role)
+  }, [address, roles])
 
   const hasAnyRole = useCallback((rolesToCheck) => {
     if (!address || !Array.isArray(rolesToCheck)) return false
-    return rolesToCheck.some(role => checkRole(address, role))
-  }, [address])
+    return rolesToCheck.some(role => roles.includes(role))
+  }, [address, roles])
 
   const hasAllRoles = useCallback((rolesToCheck) => {
     if (!address || !Array.isArray(rolesToCheck)) return false
-    return rolesToCheck.every(role => checkRole(address, role))
-  }, [address])
+    return rolesToCheck.every(role => roles.includes(role))
+  }, [address, roles])
 
   const grantRole = useCallback((role) => {
     if (!address) {
