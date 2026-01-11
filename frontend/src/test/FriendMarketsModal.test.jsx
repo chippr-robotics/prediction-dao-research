@@ -567,8 +567,11 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByRole('tab', { name: /active/i }))
 
       // Stakes now display with token symbol (USC is default)
-      expect(screen.getByText((_, node) => node?.textContent?.includes('10 USC'))).toBeInTheDocument()
-      expect(screen.getByText((_, node) => node?.textContent?.includes('25 USC'))).toBeInTheDocument()
+      // Use getAllByText since multiple elements may contain the stake text
+      const stakeElements10 = screen.getAllByText((_, node) => node?.textContent?.includes('10 USC'))
+      const stakeElements25 = screen.getAllByText((_, node) => node?.textContent?.includes('25 USC'))
+      expect(stakeElements10.length).toBeGreaterThan(0)
+      expect(stakeElements25.length).toBeGreaterThan(0)
     })
 
     it('should display empty state when no active markets', async () => {
@@ -639,7 +642,9 @@ describe('FriendMarketsModal', () => {
         // Check for detail view elements
         expect(screen.getByText('Back to list')).toBeInTheDocument()
         // Stake now displays with token symbol (USC is default)
-        expect(screen.getByText((_, node) => node?.textContent?.includes('10 USC'))).toBeInTheDocument()
+        // Use getAllByText since stake appears in multiple places (stake + total pool)
+        const stakeElements = screen.getAllByText((_, node) => node?.textContent?.includes('10 USC'))
+        expect(stakeElements.length).toBeGreaterThan(0)
         expect(screen.getByText('Share this market')).toBeInTheDocument()
       })
     })
