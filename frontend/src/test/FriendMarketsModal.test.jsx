@@ -7,12 +7,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import FriendMarketsModal from '../components/fairwins/FriendMarketsModal'
 import {
   WalletProvider,
-  Web3Provider,
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
   ETCswapProvider,
-  RoleProvider,
   PriceProvider
 } from '../contexts'
 
@@ -169,19 +167,15 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <WalletProvider>
-            <Web3Provider>
-              <UserPreferencesProvider>
-                <RoleProvider>
-                  <ETCswapProvider>
-                    <UIProvider>
-                      <PriceProvider>
-                        {ui}
-                      </PriceProvider>
-                    </UIProvider>
-                  </ETCswapProvider>
-                </RoleProvider>
-              </UserPreferencesProvider>
-            </Web3Provider>
+            <UserPreferencesProvider>
+              <ETCswapProvider>
+                <UIProvider>
+                  <PriceProvider>
+                    {ui}
+                  </PriceProvider>
+                </UIProvider>
+              </ETCswapProvider>
+            </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>
       </QueryClientProvider>

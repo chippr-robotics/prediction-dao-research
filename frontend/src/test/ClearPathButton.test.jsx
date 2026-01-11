@@ -3,9 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import ClearPathButton from '../components/clearpath/ClearPathButton'
-import { RoleContext, ROLES, ROLE_INFO } from '../contexts/RoleContext'
-import { UIContext } from '../contexts/UIContext'
-import { UserPreferencesContext } from '../contexts/UserPreferencesContext'
+import { WalletContext, UIContext, UserPreferencesContext, ROLES, ROLE_INFO } from '../contexts'
 
 // Mock wallet hook
 vi.mock('../hooks', () => ({
@@ -17,12 +15,24 @@ import { useWallet } from '../hooks'
 describe('ClearPathButton Component', () => {
   const mockShowModal = vi.fn()
   const mockHideModal = vi.fn()
-  
-  const defaultRoleContext = {
+
+  // WalletContext now provides roles (useRoles hook uses WalletContext)
+  const defaultWalletContext = {
     roles: [],
+    rolesLoading: false,
+    blockchainSynced: true,
     hasRole: vi.fn(() => false),
-    ROLES,
-    ROLE_INFO
+    hasAnyRole: vi.fn(() => false),
+    hasAllRoles: vi.fn(() => false),
+    grantRole: vi.fn(),
+    revokeRole: vi.fn(),
+    refreshRoles: vi.fn(),
+    // Wallet state
+    address: '0x1234567890123456789012345678901234567890',
+    account: '0x1234567890123456789012345678901234567890',
+    isConnected: true,
+    provider: null,
+    signer: null
   }
 
   const defaultUIContext = {
@@ -39,19 +49,19 @@ describe('ClearPathButton Component', () => {
 
   const renderWithProviders = (component, options = {}) => {
     const {
-      roleContext = defaultRoleContext,
+      walletContext = defaultWalletContext,
       uiContext = defaultUIContext,
       preferencesContext = defaultPreferencesContext
     } = options
 
     return render(
-      <RoleContext.Provider value={roleContext}>
+      <WalletContext.Provider value={walletContext}>
         <UIContext.Provider value={uiContext}>
           <UserPreferencesContext.Provider value={preferencesContext}>
             {component}
           </UserPreferencesContext.Provider>
         </UIContext.Provider>
-      </RoleContext.Provider>
+      </WalletContext.Provider>
     )
   }
 
@@ -143,8 +153,8 @@ describe('ClearPathButton Component', () => {
   describe('Role-based Menu Options', () => {
     it('shows governance options for users with CLEARPATH_USER role', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.CLEARPATH_USER],
         hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
       }
@@ -154,7 +164,7 @@ describe('ClearPathButton Component', () => {
         }
       }
       
-      renderWithProviders(<ClearPathButton />, { roleContext, preferencesContext })
+      renderWithProviders(<ClearPathButton />, { walletContext, preferencesContext })
       
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
@@ -208,8 +218,8 @@ describe('ClearPathButton Component', () => {
   describe('Modal Integration', () => {
     it('opens governance modal when governance dashboard option is clicked', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.CLEARPATH_USER],
         hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
       }
@@ -219,7 +229,7 @@ describe('ClearPathButton Component', () => {
         }
       }
       
-      renderWithProviders(<ClearPathButton />, { roleContext, preferencesContext })
+      renderWithProviders(<ClearPathButton />, { walletContext, preferencesContext })
       
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
@@ -250,8 +260,8 @@ describe('ClearPathButton Component', () => {
 
     it('opens DAO modal when My DAOs option is clicked', async () => {
       const user = userEvent.setup()
-      const roleContext = {
-        ...defaultRoleContext,
+      const walletContext = {
+        ...defaultWalletContext,
         roles: [ROLES.CLEARPATH_USER],
         hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
       }
@@ -261,7 +271,7 @@ describe('ClearPathButton Component', () => {
         }
       }
       
-      renderWithProviders(<ClearPathButton />, { roleContext, preferencesContext })
+      renderWithProviders(<ClearPathButton />, { walletContext, preferencesContext })
       
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)

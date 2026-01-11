@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import WalletButton from '../components/wallet/WalletButton'
-import { RoleContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
+import { WalletContext, ThemeContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
 import { BrowserRouter } from 'react-router-dom'
 
 // Mock wagmi hooks
@@ -79,16 +79,47 @@ describe('WalletButton Component - Market Creation', () => {
     modal: null
   }
 
+  const defaultThemeContext = {
+    theme: 'dark',
+    toggleTheme: vi.fn(),
+    setTheme: vi.fn()
+  }
+
+  // WalletContext now provides roles (useRoles hook uses WalletContext)
+  const defaultWalletContext = {
+    roles: [],
+    rolesLoading: false,
+    blockchainSynced: true,
+    hasRole: vi.fn(() => false),
+    hasAnyRole: vi.fn(() => false),
+    hasAllRoles: vi.fn(() => false),
+    grantRole: vi.fn(),
+    revokeRole: vi.fn(),
+    refreshRoles: vi.fn(),
+    // Wallet state
+    address: '0x1234567890123456789012345678901234567890',
+    account: '0x1234567890123456789012345678901234567890',
+    isConnected: true,
+    provider: null,
+    signer: null
+  }
+
   const renderWithProviders = (component, options = {}) => {
     const {
-      uiContext = defaultUIContext
+      uiContext = defaultUIContext,
+      themeContext = defaultThemeContext,
+      walletContext = defaultWalletContext
     } = options
 
     return render(
       <BrowserRouter>
-        <UIContext.Provider value={uiContext}>
-          {component}
-        </UIContext.Provider>
+        <ThemeContext.Provider value={themeContext}>
+          <WalletContext.Provider value={walletContext}>
+            <UIContext.Provider value={uiContext}>
+              {component}
+            </UIContext.Provider>
+          </WalletContext.Provider>
+        </ThemeContext.Provider>
       </BrowserRouter>
     )
   }
