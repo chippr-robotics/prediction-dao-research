@@ -717,8 +717,8 @@
       "tradesCount": 145,
       "uniqueTraders": 48,
       "tags": ["Heatwave", "Temperature", "NYC"],
-      "h3Index": "872a1073fffffff",
-      "h3Resolution": 5
+      "h3_index": "872a1073fffffff",
+      "h3_resolution": 5
     },
     {
       "id": 101,
@@ -735,8 +735,8 @@
       "tradesCount": 234,
       "uniqueTraders": 89,
       "tags": ["Hurricane", "Florida", "Storms"],
-      "h3Index": "8744c0bffffffff",
-      "h3Resolution": 5
+      "h3_index": "8744c0bffffffff",
+      "h3_resolution": 5
     },
     {
       "id": 102,
@@ -753,8 +753,8 @@
       "tradesCount": 87,
       "uniqueTraders": 32,
       "tags": ["Snow", "Winter", "Records"],
-      "h3Index": "8728a8bffffffff",
-      "h3Resolution": 5
+      "h3_index": "8728a8bffffffff",
+      "h3_resolution": 5
     },
     {
       "id": 103,
@@ -771,8 +771,8 @@
       "tradesCount": 178,
       "uniqueTraders": 65,
       "tags": ["Drought", "California", "Water"],
-      "h3Index": "8729a1bffffffff",
-      "h3Resolution": 5
+      "h3_index": "8729a1bffffffff",
+      "h3_resolution": 5
     },
     {
       "id": 104,
@@ -789,8 +789,8 @@
       "tradesCount": 112,
       "uniqueTraders": 41,
       "tags": ["Records", "Arizona", "Extreme Heat"],
-      "h3Index": "87290a3ffffffff",
-      "h3Resolution": 5
+      "h3_index": "87290a3ffffffff",
+      "h3_resolution": 5
     },
     {
       "id": 105,
@@ -807,8 +807,8 @@
       "tradesCount": 68,
       "uniqueTraders": 28,
       "tags": ["Rain", "Records", "Pacific Northwest"],
-      "h3Index": "8728929ffffffff",
-      "h3Resolution": 5
+      "h3_index": "8728929ffffffff",
+      "h3_resolution": 5
     },
     {
       "id": 106,
@@ -825,8 +825,8 @@
       "tradesCount": 134,
       "uniqueTraders": 52,
       "tags": ["Cold Wave", "Texas", "Winter"],
-      "h3Index": "8726a85ffffffff",
-      "h3Resolution": 5
+      "h3_index": "8726a85ffffffff",
+      "h3_resolution": 5
     },
     {
       "id": 107,
@@ -843,8 +843,8 @@
       "tradesCount": 156,
       "uniqueTraders": 58,
       "tags": ["Blizzard", "Colorado", "Snow"],
-      "h3Index": "872688bffffffff",
-      "h3Resolution": 5
+      "h3_index": "872688bffffffff",
+      "h3_resolution": 5
     }
   ],
   "positions": [

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { MapContainer, TileLayer, Polygon, Popup, useMap } from 'react-leaflet'
 import * as h3 from 'h3-js'
 import 'leaflet/dist/leaflet.css'
@@ -15,6 +15,8 @@ import './WeatherMarketMap.css'
  * @param {function} props.onMarketClick - Callback when a market is clicked
  * @param {Object} props.selectedMarket - Currently selected market
  * @param {boolean} props.loading - Whether markets are loading
+ * @param {string} props.height - Height of the map container (e.g. '500px')
+ * @param {string} props.className - Additional CSS class name(s) for the map container
  */
 
 // Helper to convert H3 cell to Leaflet polygon coordinates
@@ -50,13 +52,13 @@ function getMarketColor(passTokenPrice) {
 function FitBoundsToMarkets({ markets }) {
   const map = useMap()
 
-  useMemo(() => {
+  useEffect(() => {
     if (markets.length === 0) return
 
-    const validMarkets = markets.filter(m => m.h3Index)
+    const validMarkets = markets.filter(m => m.h3_index || m.h3Index)
     if (validMarkets.length === 0) return
 
-    const bounds = validMarkets.map(m => h3ToCenter(m.h3Index))
+    const bounds = validMarkets.map(m => h3ToCenter(m.h3_index || m.h3Index))
     if (bounds.length > 0) {
       try {
         map.fitBounds(bounds, { padding: [50, 50], maxZoom: 6 })
@@ -81,13 +83,13 @@ function WeatherMarketMap({
 
   // Filter markets that have H3 coordinates
   const weatherMarketsWithH3 = useMemo(() => {
-    return markets.filter(m => m.h3Index || m.properties?.h3_index)
+    return markets.filter(m => m.h3_index || m.h3Index || m.properties?.h3_index)
   }, [markets])
 
   // Build polygon data for each market
   const marketPolygons = useMemo(() => {
     return weatherMarketsWithH3.map(market => {
-      const h3Index = market.h3Index || market.properties?.h3_index
+      const h3Index = market.h3_index || market.h3Index || market.properties?.h3_index
       return {
         market,
         h3Index,

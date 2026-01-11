@@ -14,8 +14,12 @@ import './H3MapSelector.css'
  * @param {string} props.selectedH3 - Currently selected H3 cell index
  * @param {function} props.onH3Select - Callback when an H3 cell is selected
  * @param {number} props.resolution - H3 resolution level (0-15, default 5)
+ * @param {function} props.onResolutionChange - Callback when resolution changes
  * @param {boolean} props.disabled - Whether the selector is disabled
  * @param {Object} props.initialCenter - Initial map center {lat, lng}
+ * @param {boolean} props.showNeighbors - Whether to show neighboring H3 cells for context
+ * @param {string|number} props.height - Height of the map container (e.g., CSS height value)
+ * @param {string} props.className - Additional CSS class name(s) for the map container
  */
 
 // H3 Resolution descriptions for user guidance
@@ -57,8 +61,8 @@ function MapCenterUpdater({ center }) {
 function h3ToPolygon(h3Index) {
   try {
     const boundary = h3.cellToBoundary(h3Index)
-    // h3-js returns [lat, lng] pairs, Leaflet expects [lat, lng]
-    return boundary.map(([lat, lng]) => [lat, lng])
+    // h3-js cellToBoundary returns [lat, lng] pairs, which are directly usable by Leaflet
+    return boundary
   } catch (error) {
     console.error('Error converting H3 to polygon:', error)
     return []
@@ -79,6 +83,7 @@ function H3MapSelector({
   selectedH3 = null,
   onH3Select,
   resolution = 5,
+  onResolutionChange,
   disabled = false,
   initialCenter = { lat: 39.8283, lng: -98.5795 }, // Default: center of USA
   showNeighbors = true,
@@ -86,7 +91,7 @@ function H3MapSelector({
   className = ''
 }) {
   const [currentResolution, setCurrentResolution] = useState(resolution)
-  const [hoveredH3, setHoveredH3] = useState(null)
+  const [hoveredH3] = useState(null)
   const [mapCenter, setMapCenter] = useState(initialCenter)
 
   // Handle map click to select H3 cell
@@ -108,6 +113,11 @@ function H3MapSelector({
     const newResolution = parseInt(e.target.value, 10)
     setCurrentResolution(newResolution)
 
+    // Notify parent of resolution change
+    if (onResolutionChange) {
+      onResolutionChange(newResolution)
+    }
+
     // If there's a selected cell, recalculate at new resolution
     if (selectedH3 && onH3Select) {
       try {
@@ -118,7 +128,7 @@ function H3MapSelector({
         console.error('Error recalculating H3 at new resolution:', error)
       }
     }
-  }, [selectedH3, onH3Select])
+  }, [selectedH3, onH3Select, onResolutionChange])
 
   // Get polygon coordinates for selected cell
   const selectedPolygon = useMemo(() => {
