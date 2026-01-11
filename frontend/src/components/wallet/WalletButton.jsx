@@ -11,6 +11,11 @@ import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
 import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
 import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+import {
+  isCorrelationRegistryDeployed,
+  createCorrelationGroup,
+  addMarketToCorrelationGroup
+} from '../../utils/blockchainService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -653,6 +658,39 @@ function WalletButton({ className = '', theme = 'dark' }) {
       if (marketCreatedEvent) {
         const parsed = contract.interface.parseLog(marketCreatedEvent)
         marketId = parsed?.args?.marketId?.toString()
+      }
+
+      // Handle correlation group if provided
+      if (submitData.correlationGroup && marketId && isCorrelationRegistryDeployed()) {
+        console.log('Processing correlation group:', submitData.correlationGroup)
+
+        try {
+          let groupId = submitData.correlationGroup.existingGroupId
+
+          // Create new group if needed
+          if (submitData.correlationGroup.createNew) {
+            console.log('Creating new correlation group...')
+            const groupResult = await createCorrelationGroup(
+              activeSigner,
+              submitData.correlationGroup.newGroupName,
+              submitData.correlationGroup.newGroupDescription || '',
+              submitData.correlationGroup.category
+            )
+            groupId = groupResult.groupId
+            console.log('New correlation group created:', groupId)
+          }
+
+          // Add market to group
+          if (groupId !== null && groupId !== undefined) {
+            console.log('Adding market to correlation group:', { groupId, marketId })
+            await addMarketToCorrelationGroup(activeSigner, groupId, parseInt(marketId))
+            console.log('Market added to correlation group successfully')
+          }
+        } catch (correlationError) {
+          // Log but don't fail the entire transaction - market is already created
+          console.error('Error handling correlation group:', correlationError)
+          console.warn('Market was created but correlation group operation failed')
+        }
       }
 
       setShowMarketCreationModal(false)

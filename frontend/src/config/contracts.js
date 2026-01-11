@@ -43,6 +43,10 @@ export const DEPLOYED_CONTRACTS = {
   fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
   perpFactory: '0xAEfd08EF350B7132BDbE8a9de96C6d24eAbd7988',
 
+  // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
+  // Used for grouping related markets (e.g., election candidates, tournament brackets)
+  marketCorrelationRegistry: null, // TODO: Deploy and update address
+
 }
 
 /**

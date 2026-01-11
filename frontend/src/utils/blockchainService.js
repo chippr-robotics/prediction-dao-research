@@ -13,6 +13,7 @@ import { WELFARE_METRIC_REGISTRY_ABI } from '../abis/WelfareMetricRegistry'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
+import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
 
 /**
  * Get a provider for reading from the blockchain
@@ -42,6 +43,9 @@ export function getContract(contractName, signerOrProvider = null) {
       break
     case 'welfareRegistry':
       abi = WELFARE_METRIC_REGISTRY_ABI
+      break
+    case 'marketCorrelationRegistry':
+      abi = MARKET_CORRELATION_REGISTRY_ABI
       break
     default:
       throw new Error(`Unknown contract: ${contractName}`)
@@ -1065,6 +1069,373 @@ export async function registerZKKey(signer, publicKey) {
     } else {
       throw new Error(error.message || 'ZK key registration failed')
     }
+  }
+}
+
+// ============================================================================
+// CORRELATION GROUP FUNCTIONS
+// ============================================================================
+
+/**
+ * Check if the MarketCorrelationRegistry is deployed
+ * @returns {boolean} True if deployed
+ */
+export function isCorrelationRegistryDeployed() {
+  const address = getContractAddress('marketCorrelationRegistry')
+  return address && address !== ethers.ZeroAddress && address !== null
+}
+
+/**
+ * Get total number of correlation groups
+ * @returns {Promise<number>} Group count
+ */
+export async function getCorrelationGroupCount() {
+  if (!isCorrelationRegistryDeployed()) {
+    console.warn('MarketCorrelationRegistry not deployed')
+    return 0
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry')
+    const count = await contract.groupCount()
+    return Number(count)
+  } catch (error) {
+    console.error('Error getting correlation group count:', error)
+    return 0
+  }
+}
+
+/**
+ * Fetch all correlation groups from the blockchain
+ * @returns {Promise<Array>} Array of correlation group objects
+ */
+export async function fetchCorrelationGroups() {
+  if (!isCorrelationRegistryDeployed()) {
+    console.warn('MarketCorrelationRegistry not deployed')
+    return []
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry')
+    const groupCount = await contract.groupCount()
+    const count = Number(groupCount)
+
+    if (count === 0) {
+      return []
+    }
+
+    const groups = []
+    for (let i = 0; i < count; i++) {
+      try {
+        const group = await contract.correlationGroups(i)
+        const category = await contract.groupCategory(i)
+        const marketIds = await contract.getGroupMarkets(i)
+
+        groups.push({
+          id: i,
+          name: group.name,
+          description: group.description,
+          creator: group.creator,
+          createdAt: new Date(Number(group.createdAt) * 1000).toISOString(),
+          active: group.active,
+          category: category,
+          marketIds: marketIds.map(id => Number(id)),
+          marketCount: marketIds.length
+        })
+      } catch (groupError) {
+        console.warn(`Failed to fetch group ${i}:`, groupError.message)
+      }
+    }
+
+    return groups.filter(g => g.active) // Only return active groups
+  } catch (error) {
+    console.error('Error fetching correlation groups:', error)
+    return []
+  }
+}
+
+/**
+ * Fetch correlation groups filtered by category
+ * @param {string} category - Category to filter by
+ * @returns {Promise<Array>} Array of correlation group objects
+ */
+export async function fetchCorrelationGroupsByCategory(category) {
+  if (!isCorrelationRegistryDeployed()) {
+    console.warn('MarketCorrelationRegistry not deployed')
+    return []
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry')
+    const groupIds = await contract.getGroupsByCategory(category)
+
+    const groups = []
+    for (const id of groupIds) {
+      try {
+        const group = await contract.correlationGroups(id)
+
+        if (!group.active) continue // Skip inactive groups
+
+        const marketIds = await contract.getGroupMarkets(id)
+
+        groups.push({
+          id: Number(id),
+          name: group.name,
+          description: group.description,
+          creator: group.creator,
+          createdAt: new Date(Number(group.createdAt) * 1000).toISOString(),
+          active: group.active,
+          category: category,
+          marketIds: marketIds.map(mid => Number(mid)),
+          marketCount: marketIds.length
+        })
+      } catch (groupError) {
+        console.warn(`Failed to fetch group ${id}:`, groupError.message)
+      }
+    }
+
+    return groups
+  } catch (error) {
+    console.error('Error fetching correlation groups by category:', error)
+    return []
+  }
+}
+
+/**
+ * Get the correlation group for a market
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Correlation group object or null
+ */
+export async function getMarketCorrelationGroup(marketId) {
+  if (!isCorrelationRegistryDeployed()) {
+    return null
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry')
+    const groupId = await contract.getMarketGroup(marketId)
+
+    // Check if market is in a group (returns type(uint256).max if not)
+    const maxUint256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+    if (groupId === maxUint256) {
+      return null
+    }
+
+    const group = await contract.correlationGroups(groupId)
+    const category = await contract.groupCategory(groupId)
+    const marketIds = await contract.getGroupMarkets(groupId)
+
+    return {
+      id: Number(groupId),
+      name: group.name,
+      description: group.description,
+      creator: group.creator,
+      createdAt: new Date(Number(group.createdAt) * 1000).toISOString(),
+      active: group.active,
+      category: category,
+      marketIds: marketIds.map(id => Number(id)),
+      marketCount: marketIds.length
+    }
+  } catch (error) {
+    console.error('Error getting market correlation group:', error)
+    return null
+  }
+}
+
+/**
+ * Create a new correlation group
+ * @param {ethers.Signer} signer - Connected wallet signer
+ * @param {string} name - Group name
+ * @param {string} description - Group description
+ * @param {string} category - Group category
+ * @returns {Promise<Object>} Transaction result with groupId
+ */
+export async function createCorrelationGroup(signer, name, description, category) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  if (!isCorrelationRegistryDeployed()) {
+    throw new Error('MarketCorrelationRegistry not deployed')
+  }
+
+  if (!name || name.trim().length === 0) {
+    throw new Error('Group name is required')
+  }
+
+  if (!category || category.trim().length === 0) {
+    throw new Error('Category is required')
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry', signer)
+
+    console.log('Creating correlation group:', { name, description, category })
+
+    const tx = await contract.createCorrelationGroup(
+      name.trim(),
+      description?.trim() || '',
+      category.trim()
+    )
+    const receipt = await tx.wait()
+
+    // Extract groupId from event
+    let groupId = null
+    for (const log of receipt.logs) {
+      try {
+        const parsed = contract.interface.parseLog(log)
+        if (parsed?.name === 'CorrelationGroupCreated') {
+          groupId = Number(parsed.args.groupId)
+          break
+        }
+      } catch {
+        // Ignore logs we can't parse
+      }
+    }
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
+      groupId: groupId
+    }
+  } catch (error) {
+    console.error('Error creating correlation group:', error)
+
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else {
+      throw new Error(error.message || 'Failed to create correlation group')
+    }
+  }
+}
+
+/**
+ * Add a market to a correlation group
+ * Note: This requires owner permission on the MarketCorrelationRegistry
+ * @param {ethers.Signer} signer - Connected wallet signer (must be owner)
+ * @param {number} groupId - Correlation group ID
+ * @param {number} marketId - Market ID to add
+ * @returns {Promise<Object>} Transaction result
+ */
+export async function addMarketToCorrelationGroup(signer, groupId, marketId) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  if (!isCorrelationRegistryDeployed()) {
+    throw new Error('MarketCorrelationRegistry not deployed')
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry', signer)
+
+    console.log('Adding market to correlation group:', { groupId, marketId })
+
+    const tx = await contract.addMarketToGroup(groupId, marketId)
+    const receipt = await tx.wait()
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
+      groupId: groupId,
+      marketId: marketId
+    }
+  } catch (error) {
+    console.error('Error adding market to correlation group:', error)
+
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else if (error.message.includes('not active')) {
+      throw new Error('Correlation group is not active')
+    } else if (error.message.includes('already in a group')) {
+      throw new Error('Market is already in a correlation group')
+    } else {
+      throw new Error(error.message || 'Failed to add market to group')
+    }
+  }
+}
+
+/**
+ * Remove a market from its correlation group
+ * Note: This requires owner permission on the MarketCorrelationRegistry
+ * @param {ethers.Signer} signer - Connected wallet signer (must be owner)
+ * @param {number} marketId - Market ID to remove
+ * @returns {Promise<Object>} Transaction result
+ */
+export async function removeMarketFromCorrelationGroup(signer, marketId) {
+  if (!signer) {
+    throw new Error('Wallet not connected')
+  }
+
+  if (!isCorrelationRegistryDeployed()) {
+    throw new Error('MarketCorrelationRegistry not deployed')
+  }
+
+  try {
+    const contract = getContract('marketCorrelationRegistry', signer)
+
+    console.log('Removing market from correlation group:', { marketId })
+
+    const tx = await contract.removeMarketFromGroup(marketId)
+    const receipt = await tx.wait()
+
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
+      marketId: marketId
+    }
+  } catch (error) {
+    console.error('Error removing market from correlation group:', error)
+
+    if (error.code === 'ACTION_REJECTED') {
+      throw new Error('Transaction rejected by user')
+    } else if (error.message.includes('not in any group')) {
+      throw new Error('Market is not in a correlation group')
+    } else {
+      throw new Error(error.message || 'Failed to remove market from group')
+    }
+  }
+}
+
+/**
+ * Fetch all markets in a correlation group with their full data
+ * @param {number} groupId - Correlation group ID
+ * @returns {Promise<Array>} Array of market objects
+ */
+export async function fetchMarketsInCorrelationGroup(groupId) {
+  if (!isCorrelationRegistryDeployed()) {
+    return []
+  }
+
+  try {
+    const registryContract = getContract('marketCorrelationRegistry')
+    const marketIds = await registryContract.getGroupMarkets(groupId)
+
+    const markets = []
+    for (const marketId of marketIds) {
+      try {
+        const market = await fetchMarketByIdFromBlockchain(Number(marketId))
+        if (market) {
+          markets.push({
+            ...market,
+            correlationGroupId: groupId
+          })
+        }
+      } catch (marketError) {
+        console.warn(`Failed to fetch market ${marketId}:`, marketError.message)
+      }
+    }
+
+    return markets
+  } catch (error) {
+    console.error('Error fetching markets in correlation group:', error)
+    return []
   }
 }
 

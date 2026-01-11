@@ -3,6 +3,11 @@ import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
 import { TOKENS } from '../../constants/etcswap'
 import { isValidEthereumAddress } from '../../utils/validation'
+import {
+  isCorrelationRegistryDeployed,
+  fetchCorrelationGroups,
+  fetchCorrelationGroupsByCategory
+} from '../../utils/blockchainService'
 import H3MapSelector from './H3MapSelector'
 import './MarketCreationModal.css'
 
@@ -99,6 +104,15 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
+  // Correlation group state
+  const [correlationGroups, setCorrelationGroups] = useState([])
+  const [correlationGroupsLoading, setCorrelationGroupsLoading] = useState(false)
+  const [selectedCorrelationGroup, setSelectedCorrelationGroup] = useState(null)
+  const [createNewGroup, setCreateNewGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupDescription, setNewGroupDescription] = useState('')
+  const [correlationEnabled, setCorrelationEnabled] = useState(false)
+
   // ENS resolution for collateral token address
   const {
     resolvedAddress: resolvedCollateralAddress,
@@ -138,6 +152,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     })
     setErrors({})
     setSubmitting(false)
+    // Reset correlation group state
+    setSelectedCorrelationGroup(null)
+    setCreateNewGroup(false)
+    setNewGroupName('')
+    setNewGroupDescription('')
+    setCorrelationEnabled(false)
   }, [])
 
   // Reset form state when modal opens
@@ -146,6 +166,37 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       resetForm()
     }
   }, [isOpen, resetForm])
+
+  // Fetch correlation groups when modal opens or category changes
+  useEffect(() => {
+    const loadCorrelationGroups = async () => {
+      if (!isOpen) return
+      if (!isCorrelationRegistryDeployed()) {
+        setCorrelationGroups([])
+        return
+      }
+
+      setCorrelationGroupsLoading(true)
+      try {
+        let groups
+        if (metadataForm.category) {
+          // Fetch groups for the selected category
+          groups = await fetchCorrelationGroupsByCategory(metadataForm.category)
+        } else {
+          // Fetch all groups if no category selected
+          groups = await fetchCorrelationGroups()
+        }
+        setCorrelationGroups(groups)
+      } catch (error) {
+        console.error('Error loading correlation groups:', error)
+        setCorrelationGroups([])
+      } finally {
+        setCorrelationGroupsLoading(false)
+      }
+    }
+
+    loadCorrelationGroups()
+  }, [isOpen, metadataForm.category])
 
   // Handle form changes
   const handleMetadataChange = useCallback((field, value) => {
@@ -386,6 +437,14 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         initialLiquidity: paramsForm.initialLiquidity,
         betType: paramsForm.betType,
         collateralToken: getCollateralTokenAddress(),
+        // Correlation group data
+        correlationGroup: correlationEnabled ? {
+          existingGroupId: createNewGroup ? null : selectedCorrelationGroup?.id,
+          createNew: createNewGroup,
+          newGroupName: createNewGroup ? newGroupName : null,
+          newGroupDescription: createNewGroup ? newGroupDescription : null,
+          category: metadataForm.category
+        } : null,
         // Metadata
         metadataUri: getFinalUri(),
         metadata: useCustomUri ? null : buildMetadataJson()
@@ -1023,6 +1082,158 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                   </div>
                 )}
               </section>
+
+              {/* Correlation Group Section */}
+              <section className="mcm-section">
+                <h3 className="mcm-section-title">
+                  <span aria-hidden="true">🔗</span> Market Correlation
+                </h3>
+
+                {/* Enable/disable correlation toggle */}
+                <div className="mcm-toggle-row">
+                  <div className="mcm-toggle-info">
+                    <strong>Link to Correlation Group</strong>
+                    <p>Group related markets together (e.g., election candidates, tournament brackets)</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="mcm-toggle-btn"
+                    onClick={() => setCorrelationEnabled(!correlationEnabled)}
+                    aria-pressed={correlationEnabled}
+                    disabled={submitting || !isCorrelationRegistryDeployed()}
+                  >
+                    <span className="mcm-toggle-track">
+                      <span className={`mcm-toggle-thumb ${correlationEnabled ? 'active' : ''}`} />
+                    </span>
+                    <span className="mcm-toggle-label">{correlationEnabled ? 'Enabled' : 'Disabled'}</span>
+                  </button>
+                </div>
+
+                {!isCorrelationRegistryDeployed() && (
+                  <div className="mcm-info-card" style={{ marginTop: '1rem' }}>
+                    <span className="mcm-info-icon" aria-hidden="true">💡</span>
+                    <div>
+                      <strong>Coming Soon</strong>
+                      <p>Correlation groups will be available after the MarketCorrelationRegistry contract is deployed.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Correlation group options - only shown when enabled */}
+                {correlationEnabled && isCorrelationRegistryDeployed() && (
+                  <>
+                    {/* Choose between existing group or create new */}
+                    <div className="mcm-field" style={{ marginTop: '1rem' }}>
+                      <div className="mcm-radio-group">
+                        <label className="mcm-radio-label">
+                          <input
+                            type="radio"
+                            name="correlationMode"
+                            checked={!createNewGroup}
+                            onChange={() => setCreateNewGroup(false)}
+                            disabled={submitting}
+                          />
+                          <span>Join Existing Group</span>
+                        </label>
+                        <label className="mcm-radio-label">
+                          <input
+                            type="radio"
+                            name="correlationMode"
+                            checked={createNewGroup}
+                            onChange={() => setCreateNewGroup(true)}
+                            disabled={submitting}
+                          />
+                          <span>Create New Group</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Existing group selection */}
+                    {!createNewGroup && (
+                      <div className="mcm-field">
+                        <label htmlFor="correlationGroup">Select Correlation Group</label>
+                        {correlationGroupsLoading ? (
+                          <div className="mcm-hint">Loading groups...</div>
+                        ) : correlationGroups.length === 0 ? (
+                          <div className="mcm-info-card">
+                            <span className="mcm-info-icon" aria-hidden="true">💡</span>
+                            <div>
+                              <strong>No Groups Available</strong>
+                              <p>
+                                {metadataForm.category
+                                  ? `No correlation groups found for "${metadataForm.category}". Create a new one!`
+                                  : 'Select a category first to see available groups, or create a new one.'}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <select
+                            id="correlationGroup"
+                            value={selectedCorrelationGroup?.id ?? ''}
+                            onChange={(e) => {
+                              const groupId = e.target.value
+                              const group = correlationGroups.find(g => g.id === parseInt(groupId))
+                              setSelectedCorrelationGroup(group || null)
+                            }}
+                            disabled={submitting}
+                            className="mcm-token-select"
+                          >
+                            <option value="">-- Select a group --</option>
+                            {correlationGroups.map(group => (
+                              <option key={group.id} value={group.id}>
+                                {group.name} ({group.marketCount} markets)
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {selectedCorrelationGroup && (
+                          <div className="mcm-hint">
+                            {selectedCorrelationGroup.description || 'No description available'}
+                          </div>
+                        )}
+                        {errors.correlationGroup && <div className="mcm-error">{errors.correlationGroup}</div>}
+                      </div>
+                    )}
+
+                    {/* New group creation */}
+                    {createNewGroup && (
+                      <>
+                        <div className="mcm-field">
+                          <label htmlFor="newGroupName">
+                            Group Name <span className="mcm-required">*</span>
+                          </label>
+                          <input
+                            id="newGroupName"
+                            type="text"
+                            value={newGroupName}
+                            onChange={e => setNewGroupName(e.target.value)}
+                            placeholder="e.g., 2025 Presidential Election"
+                            disabled={submitting}
+                            maxLength={100}
+                            className={errors.newGroupName ? 'error' : ''}
+                          />
+                          {errors.newGroupName && <div className="mcm-error">{errors.newGroupName}</div>}
+                        </div>
+
+                        <div className="mcm-field">
+                          <label htmlFor="newGroupDescription">Group Description</label>
+                          <textarea
+                            id="newGroupDescription"
+                            value={newGroupDescription}
+                            onChange={e => setNewGroupDescription(e.target.value)}
+                            placeholder="Describe what markets in this group have in common..."
+                            disabled={submitting}
+                            rows={2}
+                          />
+                          <div className="mcm-hint">
+                            Category: {metadataForm.category || 'Select category in Content step'}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </section>
             </div>
           )}
 
@@ -1094,6 +1305,19 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                       )}
                     </span>
                   </div>
+                  {correlationEnabled && (
+                    <div className="mcm-review-item">
+                      <span className="mcm-review-label">Correlation Group</span>
+                      <span className="mcm-review-value">
+                        <span aria-hidden="true">🔗</span>{' '}
+                        {createNewGroup
+                          ? `New: ${newGroupName || '(unnamed)'}`
+                          : selectedCorrelationGroup
+                            ? selectedCorrelationGroup.name
+                            : '(none selected)'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </section>
 

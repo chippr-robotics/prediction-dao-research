@@ -300,6 +300,40 @@
 }
 
 /* ===========================
+   Radio Group
+   =========================== */
+
+.mcm-radio-group {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.mcm-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  color: var(--text-primary, #1a202c);
+}
+
+.mcm-radio-label input[type="radio"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--accent-color, #4F46E5);
+  cursor: pointer;
+}
+
+.mcm-radio-label span {
+  font-weight: 500;
+}
+
+.mcm-radio-label input[type="radio"]:disabled + span {
+  color: var(--text-muted, #a0aec0);
+}
+
+/* ===========================
    Form Fields
    =========================== */
 
