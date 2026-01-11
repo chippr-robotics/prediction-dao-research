@@ -226,6 +226,62 @@
   justify-content: center;
 }
 
+/* Roles Header with Refresh Button */
+.roles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+}
+
+.roles-header .wallet-section-title {
+  margin: 0;
+}
+
+.roles-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.roles-refresh-btn:hover:not(:disabled) {
+  background: var(--surface-hover, #2a2a2a);
+  border-color: var(--primary-color, #4a9eff);
+  color: var(--primary-color, #4a9eff);
+}
+
+.roles-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.refresh-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Friend Markets Section */
 .friend-market-btn {
   width: 100%;

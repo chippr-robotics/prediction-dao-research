@@ -140,24 +140,28 @@ export function useWalletTransactions() {
  * ```
  */
 export function useWalletRoles() {
-  const { 
-    roles, 
-    rolesLoading, 
-    hasRole, 
-    hasAnyRole, 
-    hasAllRoles, 
-    grantRole, 
-    revokeRole 
+  const {
+    roles,
+    rolesLoading,
+    blockchainSynced,
+    refreshRoles,
+    hasRole,
+    hasAnyRole,
+    hasAllRoles,
+    grantRole,
+    revokeRole
   } = useWallet()
-  
-  return { 
-    roles, 
-    rolesLoading, 
-    hasRole, 
-    hasAnyRole, 
-    hasAllRoles, 
-    grantRole, 
-    revokeRole 
+
+  return {
+    roles,
+    rolesLoading,
+    blockchainSynced,
+    refreshRoles,
+    hasRole,
+    hasAnyRole,
+    hasAllRoles,
+    grantRole,
+    revokeRole
   }
 }
 

@@ -61,7 +61,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const { showModal } = useModal()
   const { balances, loading: balanceLoading } = useETCswap()
   const { preferences, setDemoMode } = useUserPreferences()
-  const { roles, hasRole } = useWalletRoles()
+  const { roles, hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const { signer } = useWeb3()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
@@ -774,7 +774,18 @@ function WalletButton({ className = '', theme = 'dark' }) {
 
               {/* Roles Section */}
               <div className="dropdown-section">
-                <span className="wallet-section-title">Your Roles</span>
+                <div className="roles-header">
+                  <span className="wallet-section-title">Your Roles</span>
+                  <button
+                    onClick={refreshRoles}
+                    className="roles-refresh-btn"
+                    disabled={rolesLoading}
+                    aria-label="Refresh roles from blockchain"
+                    title="Refresh roles from blockchain"
+                  >
+                    <span className={`refresh-icon ${rolesLoading ? 'spinning' : ''}`}>&#8635;</span>
+                  </button>
+                </div>
                 {roles.length > 0 ? (
                   <div className="roles-list">
                     {roles.map(role => {

@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
-import { 
-  getUserRoles, 
+import {
+  getUserRoles,
   hasRole as checkRole,
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'
+import { hasRoleOnChain } from '../utils/blockchainService'
 import { WalletContext } from './WalletContext'
 
 export function WalletProvider({ children }) {
@@ -36,6 +37,7 @@ export function WalletProvider({ children }) {
   // RVAC roles integrated with wallet
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
+  const [blockchainSynced, setBlockchainSynced] = useState(false)
 
   // Update provider and signer when connection changes
   useEffect(() => {
@@ -70,19 +72,84 @@ export function WalletProvider({ children }) {
     }
   }, [chainId, isConnected])
 
-  // Load user roles from storage
-  const loadRoles = useCallback((walletAddress) => {
-    setRolesLoading(true)
+  /**
+   * Sync local roles with blockchain state
+   * If a role exists on-chain but not locally, add it
+   * If a role exists locally but not on-chain, remove it (expired)
+   */
+  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
     try {
-      const userRoles = getUserRoles(walletAddress)
-      setRoles(userRoles)
+      const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+      const updatedRoles = []
+      let hasChanges = false
+
+      // Check each premium role on-chain
+      for (const roleName of premiumRoles) {
+        const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
+        const hasLocally = localRoles.includes(roleName)
+
+        if (hasOnChain) {
+          // Role exists on-chain - keep it
+          updatedRoles.push(roleName)
+          if (!hasLocally) {
+            console.log(`Syncing role ${roleName} from blockchain to local storage`)
+            addUserRole(walletAddress, roleName)
+            hasChanges = true
+          }
+        } else if (hasLocally) {
+          // Role exists locally but not on-chain - it may have expired
+          console.log(`Role ${roleName} not found on-chain, removing from local storage`)
+          removeUserRole(walletAddress, roleName)
+          hasChanges = true
+        }
+      }
+
+      // Keep non-premium roles (like ADMIN) that are stored locally
+      for (const role of localRoles) {
+        if (!premiumRoles.includes(role) && !updatedRoles.includes(role)) {
+          updatedRoles.push(role)
+        }
+      }
+
+      return { roles: updatedRoles, hasChanges }
+    } catch (error) {
+      console.error('Error syncing roles with blockchain:', error)
+      return { roles: localRoles, hasChanges: false }
+    }
+  }, [])
+
+  /**
+   * Load roles from both localStorage and blockchain
+   * Blockchain is the source of truth for premium roles
+   */
+  const loadRoles = useCallback(async (walletAddress) => {
+    setRolesLoading(true)
+    setBlockchainSynced(false)
+    try {
+      // First load from local storage (immediate response)
+      const localRoles = getUserRoles(walletAddress)
+      setRoles(localRoles)
+
+      // Then sync with blockchain (authoritative source)
+      const { roles: syncedRoles } = await syncRolesWithBlockchain(walletAddress, localRoles)
+      setRoles(syncedRoles)
+      setBlockchainSynced(true)
     } catch (error) {
       console.error('Error loading user roles:', error)
       setRoles([])
     } finally {
       setRolesLoading(false)
     }
-  }, [])
+  }, [syncRolesWithBlockchain])
+
+  /**
+   * Manually refresh roles from blockchain
+   * Call this to get fresh role data from the chain
+   */
+  const refreshRoles = useCallback(async () => {
+    if (!address) return
+    await loadRoles(address)
+  }, [address, loadRoles])
 
   // Fetch wallet balances
   const fetchBalances = useCallback(async (walletAddress) => {
@@ -334,7 +401,9 @@ export function WalletProvider({ children }) {
     // RVAC roles
     roles,
     rolesLoading,
-    
+    blockchainSynced,
+    refreshRoles,
+
     // Wallet actions
     connectWallet,
     disconnectWallet,
