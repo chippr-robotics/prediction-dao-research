@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
+import { useEnsResolution } from '../hooks/useEnsResolution'
 import { useAdminContracts, CONTRACT_STATE_REFRESH_INTERVAL } from '../hooks/useAdminContracts'
 import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
@@ -86,6 +87,22 @@ function AdminPanel() {
     toAddress: '',
     amount: ''
   })
+
+  // ENS resolution for role grant user address
+  const {
+    resolvedAddress: resolvedRoleGrantAddress,
+    isLoading: isResolvingRoleGrantAddress,
+    error: roleGrantAddressError,
+    isEns: isRoleGrantEns
+  } = useEnsResolution(roleGrant.userAddress || '')
+
+  // ENS resolution for withdrawal recipient address
+  const {
+    resolvedAddress: resolvedWithdrawalAddress,
+    isLoading: isResolvingWithdrawalAddress,
+    error: withdrawalAddressError,
+    isEns: isWithdrawalEns
+  } = useEnsResolution(withdrawalData.toAddress || '')
 
   // Refresh contract state periodically and clean up properly
   useEffect(() => {
@@ -199,8 +216,21 @@ function AdminPanel() {
   }, [tierConfig, contractState.roleHashes, configureTier, showNotification])
 
   const handleGrantTier = useCallback(async () => {
-    if (!isValidEthereumAddress(roleGrant.userAddress)) {
-      showNotification('Invalid Ethereum address', 'error')
+    // Check if still resolving ENS
+    if (isResolvingRoleGrantAddress) {
+      showNotification('Please wait for ENS name to resolve', 'error')
+      return
+    }
+
+    // Check for resolution errors
+    if (roleGrantAddressError) {
+      showNotification(roleGrantAddressError, 'error')
+      return
+    }
+
+    // Validate resolved address
+    if (!resolvedRoleGrantAddress || !isValidEthereumAddress(resolvedRoleGrantAddress)) {
+      showNotification('Invalid Ethereum address or ENS name', 'error')
       return
     }
 
@@ -209,7 +239,7 @@ function AdminPanel() {
       showNotification('Invalid role hash. Role may not exist on this contract.', 'error')
       return
     }
-    
+
     // Validate duration (tiered membership deployments only)
     if (contractState.supportsTiers && roleGrant.durationDays > MAX_TIER_DURATION_DAYS) {
       showNotification(`Duration cannot exceed ${MAX_TIER_DURATION_DAYS} days`, 'error')
@@ -219,10 +249,10 @@ function AdminPanel() {
     setPendingTx(true)
     try {
       if (contractState.supportsTiers) {
-        await grantTier(roleGrant.userAddress, roleHash, roleGrant.tier, roleGrant.durationDays)
+        await grantTier(resolvedRoleGrantAddress, roleHash, roleGrant.tier, roleGrant.durationDays)
         showNotification('Tier granted successfully', 'success')
       } else {
-        await grantRoleOnChain(roleHash, roleGrant.userAddress)
+        await grantRoleOnChain(roleHash, resolvedRoleGrantAddress)
         showNotification('Role granted successfully', 'success')
       }
       setRoleGrant(prev => ({ ...prev, userAddress: '' }))
@@ -231,11 +261,24 @@ function AdminPanel() {
     } finally {
       setPendingTx(false)
     }
-  }, [roleGrant, contractState.roleHashes, contractState.supportsTiers, grantTier, grantRoleOnChain, showNotification])
+  }, [roleGrant, contractState.roleHashes, contractState.supportsTiers, grantTier, grantRoleOnChain, showNotification, resolvedRoleGrantAddress, isResolvingRoleGrantAddress, roleGrantAddressError])
 
   const handleWithdraw = useCallback(async () => {
-    if (!isValidEthereumAddress(withdrawalData.toAddress)) {
-      showNotification('Invalid recipient address', 'error')
+    // Check if still resolving ENS
+    if (isResolvingWithdrawalAddress) {
+      showNotification('Please wait for ENS name to resolve', 'error')
+      return
+    }
+
+    // Check for resolution errors
+    if (withdrawalAddressError) {
+      showNotification(withdrawalAddressError, 'error')
+      return
+    }
+
+    // Validate resolved address
+    if (!resolvedWithdrawalAddress || !isValidEthereumAddress(resolvedWithdrawalAddress)) {
+      showNotification('Invalid recipient address or ENS name', 'error')
       return
     }
 
@@ -258,7 +301,7 @@ function AdminPanel() {
       showNotification('Invalid withdrawal amount', 'error')
       return
     }
-    
+
     // Check if amount exceeds contract balance
     const contractBalanceNum = parseFloat(contractState.contractBalance)
     if (amountNum > contractBalanceNum) {
@@ -268,7 +311,7 @@ function AdminPanel() {
 
     setPendingTx(true)
     try {
-      await withdraw(withdrawalData.toAddress, rawAmount)
+      await withdraw(resolvedWithdrawalAddress, rawAmount)
       showNotification('Withdrawal successful', 'success')
       setWithdrawalData({ toAddress: '', amount: '' })
       setConfirmAction(null)
@@ -277,7 +320,7 @@ function AdminPanel() {
     } finally {
       setPendingTx(false)
     }
-  }, [withdrawalData, contractState.contractBalance, withdraw, showNotification])
+  }, [withdrawalData, contractState.contractBalance, withdraw, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError])
 
   const shortenAddress = (address) => {
     if (!address) return ''
@@ -799,15 +842,37 @@ function AdminPanel() {
 
                 <div className="role-form">
                   <div className="form-group">
-                    <label htmlFor="grant-address">User Address</label>
-                    <input
-                      id="grant-address"
-                      type="text"
-                      value={roleGrant.userAddress}
-                      onChange={(e) => setRoleGrant(prev => ({ ...prev, userAddress: e.target.value }))}
-                      className="admin-input"
-                      placeholder="0x..."
-                    />
+                    <label htmlFor="grant-address">User Address or ENS Name</label>
+                    <div className="address-input-wrapper">
+                      <input
+                        id="grant-address"
+                        type="text"
+                        value={roleGrant.userAddress}
+                        onChange={(e) => setRoleGrant(prev => ({ ...prev, userAddress: e.target.value }))}
+                        className={`admin-input ${roleGrantAddressError ? 'input-error' : ''} ${resolvedRoleGrantAddress && !roleGrantAddressError ? 'input-success' : ''}`}
+                        placeholder="0x... or vitalik.eth"
+                      />
+                      {isResolvingRoleGrantAddress && (
+                        <span className="address-status resolving" aria-label="Resolving ENS name">
+                          <span className="spinner-small"></span>
+                        </span>
+                      )}
+                      {resolvedRoleGrantAddress && !isResolvingRoleGrantAddress && !roleGrantAddressError && (
+                        <span className="address-status success" aria-label="Valid address">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    {isRoleGrantEns && resolvedRoleGrantAddress && !isResolvingRoleGrantAddress && !roleGrantAddressError && (
+                      <div className="resolved-address-hint">
+                        Resolves to: <code>{shortenAddress(resolvedRoleGrantAddress)}</code>
+                      </div>
+                    )}
+                    {roleGrantAddressError && (
+                      <div className="input-error-message">{roleGrantAddressError}</div>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -928,15 +993,37 @@ function AdminPanel() {
 
                 <div className="withdraw-form">
                   <div className="form-group">
-                    <label htmlFor="withdraw-address">Recipient Address</label>
-                    <input
-                      id="withdraw-address"
-                      type="text"
-                      value={withdrawalData.toAddress}
-                      onChange={(e) => setWithdrawalData(prev => ({ ...prev, toAddress: e.target.value }))}
-                      className="admin-input"
-                      placeholder="0x..."
-                    />
+                    <label htmlFor="withdraw-address">Recipient Address or ENS Name</label>
+                    <div className="address-input-wrapper">
+                      <input
+                        id="withdraw-address"
+                        type="text"
+                        value={withdrawalData.toAddress}
+                        onChange={(e) => setWithdrawalData(prev => ({ ...prev, toAddress: e.target.value }))}
+                        className={`admin-input ${withdrawalAddressError ? 'input-error' : ''} ${resolvedWithdrawalAddress && !withdrawalAddressError ? 'input-success' : ''}`}
+                        placeholder="0x... or vitalik.eth"
+                      />
+                      {isResolvingWithdrawalAddress && (
+                        <span className="address-status resolving" aria-label="Resolving ENS name">
+                          <span className="spinner-small"></span>
+                        </span>
+                      )}
+                      {resolvedWithdrawalAddress && !isResolvingWithdrawalAddress && !withdrawalAddressError && (
+                        <span className="address-status success" aria-label="Valid address">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </span>
+                      )}
+                    </div>
+                    {isWithdrawalEns && resolvedWithdrawalAddress && !isResolvingWithdrawalAddress && !withdrawalAddressError && (
+                      <div className="resolved-address-hint">
+                        Resolves to: <code>{shortenAddress(resolvedWithdrawalAddress)}</code>
+                      </div>
+                    )}
+                    {withdrawalAddressError && (
+                      <div className="input-error-message">{withdrawalAddressError}</div>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -966,7 +1053,7 @@ function AdminPanel() {
                   <button
                     onClick={() => setConfirmAction({
                       title: 'Confirm Withdrawal',
-                      message: `You are about to withdraw ${withdrawalData.amount} ETC to ${shortenAddress(withdrawalData.toAddress)}.`,
+                      message: `You are about to withdraw ${withdrawalData.amount} ETC to ${isWithdrawalEns ? `${withdrawalData.toAddress} (${shortenAddress(resolvedWithdrawalAddress)})` : shortenAddress(resolvedWithdrawalAddress || withdrawalData.toAddress)}.`,
                       warning: 'This action cannot be undone. Please verify the recipient address is correct.',
                       confirmText: 'Confirm Withdrawal',
                       danger: true,

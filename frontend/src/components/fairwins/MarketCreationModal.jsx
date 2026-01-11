@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { useWallet, useWeb3 } from '../../hooks'
+import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
+import { isValidEthereumAddress } from '../../utils/validation'
 import './MarketCreationModal.css'
 
 /**
@@ -55,6 +56,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   // Step navigation
   const [currentStep, setCurrentStep] = useState(0)
 
+  // Note: ENS resolution hook is placed after state declarations below
+
   // Metadata source toggle
   const [useCustomUri, setUseCustomUri] = useState(false)
 
@@ -82,6 +85,20 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+
+  // ENS resolution for collateral token address
+  const {
+    resolvedAddress: resolvedCollateralAddress,
+    isLoading: isResolvingCollateral,
+    error: collateralResolutionError,
+    isEns: isCollateralEns
+  } = useEnsResolution(paramsForm.collateralToken || '')
+
+  // Helper to shorten address for display
+  const shortenAddressForHint = (addr) => {
+    if (!addr || addr.length < 10) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  }
 
   // Reset form when modal opens/closes
   const resetForm = useCallback(() => {
@@ -211,8 +228,15 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         newErrors.initialLiquidity = 'Maximum liquidity is 1,000,000 ETC'
       }
 
-      if (paramsForm.collateralToken && !/^0x[a-fA-F0-9]{40}$/.test(paramsForm.collateralToken)) {
-        newErrors.collateralToken = 'Invalid token address format (should be checksummed)'
+      // Validate collateral token if provided (supports ENS names)
+      if (paramsForm.collateralToken) {
+        if (isResolvingCollateral) {
+          newErrors.collateralToken = 'Please wait for ENS name to resolve'
+        } else if (collateralResolutionError) {
+          newErrors.collateralToken = collateralResolutionError
+        } else if (!resolvedCollateralAddress || !isValidEthereumAddress(resolvedCollateralAddress)) {
+          newErrors.collateralToken = 'Invalid token address or ENS name'
+        }
       }
     }
 
@@ -325,7 +349,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         tradingPeriod: parseInt(paramsForm.tradingPeriodDays) * 24 * 60 * 60,
         initialLiquidity: paramsForm.initialLiquidity,
         betType: paramsForm.betType,
-        collateralToken: paramsForm.collateralToken || null,
+        // Use resolved address from ENS if available
+        collateralToken: paramsForm.collateralToken ? (resolvedCollateralAddress || null) : null,
         // Metadata
         metadataUri: getFinalUri(),
         metadata: useCustomUri ? null : buildMetadataJson()
@@ -888,16 +913,33 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                   <label htmlFor="collateralToken">
                     Collateral Token (Optional)
                   </label>
-                  <input
-                    id="collateralToken"
-                    type="text"
-                    value={paramsForm.collateralToken}
-                    onChange={e => handleParamsChange('collateralToken', e.target.value)}
-                    placeholder="0x... (leave empty for native ETC)"
-                    disabled={submitting}
-                    className={errors.collateralToken ? 'error' : ''}
-                  />
-                  <div className="mcm-hint">ERC-20 token address or leave empty for native ETC</div>
+                  <div className="mcm-address-input-wrapper">
+                    <input
+                      id="collateralToken"
+                      type="text"
+                      value={paramsForm.collateralToken}
+                      onChange={e => handleParamsChange('collateralToken', e.target.value)}
+                      placeholder="0x... or vitalik.eth (leave empty for native ETC)"
+                      disabled={submitting}
+                      className={`${errors.collateralToken ? 'error' : ''} ${collateralResolutionError ? 'input-error' : resolvedCollateralAddress ? 'input-success' : ''}`}
+                    />
+                    {isResolvingCollateral && (
+                      <span className="mcm-address-status resolving">
+                        <span className="mcm-spinner-small"></span>
+                      </span>
+                    )}
+                    {resolvedCollateralAddress && !isResolvingCollateral && !collateralResolutionError && (
+                      <span className="mcm-address-status success">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                  {isCollateralEns && resolvedCollateralAddress && !isResolvingCollateral && (
+                    <div className="mcm-resolved-hint">Resolves to: <code>{shortenAddressForHint(resolvedCollateralAddress)}</code></div>
+                  )}
+                  <div className="mcm-hint">ERC-20 token address, ENS name, or leave empty for native ETC</div>
                   {errors.collateralToken && <div className="mcm-error">{errors.collateralToken}</div>}
                 </div>
               </section>
@@ -962,9 +1004,15 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                   <div className="mcm-review-item">
                     <span className="mcm-review-label">Collateral</span>
                     <span className="mcm-review-value">
-                      {paramsForm.collateralToken
-                        ? `${paramsForm.collateralToken.slice(0, 6)}...${paramsForm.collateralToken.slice(-4)}`
-                        : 'Native ETC'}
+                      {paramsForm.collateralToken ? (
+                        isCollateralEns && resolvedCollateralAddress ? (
+                          <span title={resolvedCollateralAddress}>
+                            {paramsForm.collateralToken} ({shortenAddressForHint(resolvedCollateralAddress)})
+                          </span>
+                        ) : (
+                          `${paramsForm.collateralToken.slice(0, 6)}...${paramsForm.collateralToken.slice(-4)}`
+                        )
+                      ) : 'Native ETC'}
                     </span>
                   </div>
                 </div>
