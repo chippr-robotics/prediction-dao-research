@@ -312,6 +312,11 @@ describe("Perpetual Futures System", function () {
       });
 
       it("should calculate PnL correctly on close", async function () {
+        // Deposit funds to insurance fund to cover potential profits
+        const insuranceDeposit = ethers.parseEther("100");
+        await mockCollateralToken.connect(trader2).approve(await perpMarket.getAddress(), insuranceDeposit);
+        await perpMarket.connect(trader2).depositToInsuranceFund(insuranceDeposit);
+
         // Get initial balance
         const initialBalance = await mockCollateralToken.balanceOf(trader1.address);
 

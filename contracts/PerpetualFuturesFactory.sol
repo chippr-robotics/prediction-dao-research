@@ -275,6 +275,9 @@ contract PerpetualFuturesFactory is Ownable, ReentrancyGuard {
             fundingRateEngine.setMarketAuthorization(marketAddress, true);
         }
 
+        // Authorize the creator as a price updater for the market
+        newMarket.setPriceUpdater(msg.sender, true);
+
         // Store market info
         markets[marketId] = MarketInfo({
             marketId: marketId,
@@ -475,6 +478,21 @@ contract PerpetualFuturesFactory is Ownable, ReentrancyGuard {
                 }
             }
         }
+    }
+
+    /**
+     * @notice Withdraw from a market's insurance fund
+     * @param marketId ID of the market
+     * @param amount Amount to withdraw
+     * @param recipient Address to receive the funds
+     */
+    function withdrawFromMarketInsuranceFund(
+        uint256 marketId,
+        uint256 amount,
+        address recipient
+    ) external onlyOwner validMarketId(marketId) {
+        MarketInfo storage info = markets[marketId];
+        PerpetualFuturesMarket(info.marketAddress).withdrawFromInsuranceFund(amount, recipient);
     }
 
     // ============ Admin Functions ============

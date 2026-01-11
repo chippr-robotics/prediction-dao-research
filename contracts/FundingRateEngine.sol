@@ -158,7 +158,7 @@ contract FundingRateEngine is Ownable {
      * @param market Address of the market contract
      * @param authorized Whether to authorize or revoke
      */
-    function setMarketAuthorization(address market, bool authorized) external onlyOwner {
+    function setMarketAuthorization(address market, bool authorized) external onlyPriceUpdater {
         authorizedMarkets[market] = authorized;
         emit MarketAuthorized(market, authorized);
     }
@@ -194,7 +194,7 @@ contract FundingRateEngine is Ownable {
      * @notice Initialize funding state for a new market
      * @param marketId Market identifier
      */
-    function initializeMarket(uint256 marketId) external onlyOwner {
+    function initializeMarket(uint256 marketId) external onlyPriceUpdater {
         require(fundingStates[marketId].lastSettlementTime == 0, "Market already initialized");
 
         FundingConfig memory config = _getConfig(marketId);

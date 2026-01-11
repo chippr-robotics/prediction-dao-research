@@ -144,6 +144,9 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
     /// @notice Paused state
     bool public paused;
 
+    /// @notice Authorized price updaters
+    mapping(address => bool) public priceUpdaters;
+
     // ============ Events ============
 
     event PositionOpened(
@@ -229,6 +232,8 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         uint256 timestamp
     );
 
+    event PriceUpdaterUpdated(address indexed updater, bool authorized);
+
     // ============ Modifiers ============
 
     modifier whenNotPaused() {
@@ -249,6 +254,11 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
 
     modifier onlyPositionOwner(uint256 positionId) {
         require(positions[positionId].trader == msg.sender, "Not position owner");
+        _;
+    }
+
+    modifier onlyPriceUpdater() {
+        require(priceUpdaters[msg.sender] || msg.sender == owner(), "Not authorized price updater");
         _;
     }
 
@@ -650,7 +660,7 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
      * @notice Update the index price (from oracle)
      * @param newIndexPrice New index price
      */
-    function updateIndexPrice(uint256 newIndexPrice) external onlyOwner {
+    function updateIndexPrice(uint256 newIndexPrice) external onlyPriceUpdater {
         require(newIndexPrice > 0, "Price must be positive");
         indexPrice = newIndexPrice;
         emit PriceUpdated(indexPrice, markPrice, block.timestamp);
@@ -660,7 +670,7 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
      * @notice Update the mark price (perp price)
      * @param newMarkPrice New mark price
      */
-    function updateMarkPrice(uint256 newMarkPrice) external onlyOwner {
+    function updateMarkPrice(uint256 newMarkPrice) external onlyPriceUpdater {
         require(newMarkPrice > 0, "Price must be positive");
         markPrice = newMarkPrice;
         emit PriceUpdated(indexPrice, markPrice, block.timestamp);
@@ -671,11 +681,21 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
      * @param newIndexPrice New index price
      * @param newMarkPrice New mark price
      */
-    function updatePrices(uint256 newIndexPrice, uint256 newMarkPrice) external onlyOwner {
+    function updatePrices(uint256 newIndexPrice, uint256 newMarkPrice) external onlyPriceUpdater {
         require(newIndexPrice > 0 && newMarkPrice > 0, "Prices must be positive");
         indexPrice = newIndexPrice;
         markPrice = newMarkPrice;
         emit PriceUpdated(indexPrice, markPrice, block.timestamp);
+    }
+
+    /**
+     * @notice Set price updater authorization
+     * @param updater Address of the price updater
+     * @param authorized Whether to authorize or revoke
+     */
+    function setPriceUpdater(address updater, bool authorized) external onlyOwner {
+        priceUpdaters[updater] = authorized;
+        emit PriceUpdaterUpdated(updater, authorized);
     }
 
     // ============ Admin Functions ============
