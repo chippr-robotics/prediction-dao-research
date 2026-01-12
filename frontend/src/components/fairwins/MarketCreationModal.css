@@ -576,6 +576,52 @@
 }
 
 /* ===========================
+   DateTime Input
+   =========================== */
+
+.mcm-datetime-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #1a202c);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mcm-datetime-input:focus {
+  outline: none;
+  border-color: var(--brand-primary, #36B37E);
+  box-shadow: 0 0 0 3px rgba(54, 179, 126, 0.15);
+}
+
+.mcm-datetime-input:disabled {
+  background: var(--bg-secondary, #f1f5f9);
+  color: var(--text-muted, #94a3b8);
+  cursor: not-allowed;
+}
+
+.mcm-datetime-input.error {
+  border-color: var(--error-color, #e53e3e);
+}
+
+.mcm-datetime-input.error:focus {
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.15);
+}
+
+/* Dark mode support */
+:root.dark .mcm-datetime-input {
+  background: var(--bg-secondary, #1e293b);
+  border-color: var(--border-color, #334155);
+  color: var(--text-primary, #f8fafc);
+}
+
+:root.dark .mcm-datetime-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* ===========================
    Info Card
    =========================== */
 

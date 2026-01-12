@@ -16,6 +16,7 @@ import {
   createCorrelationGroup,
   addMarketToCorrelationGroup
 } from '../../utils/blockchainService'
+import { uploadMarketMetadata } from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -485,7 +486,9 @@ function WalletButton({ className = '', theme = 'dark' }) {
     // Calculate total steps based on configuration
     const hasCorrelation = submitData.correlationGroup && isCorrelationRegistryDeployed()
     const isNewGroup = hasCorrelation && submitData.correlationGroup.createNew
+    const hasMetadata = submitData.metadata && !submitData.metadataUri
     let totalSteps = 2 // Base: approve + create market
+    if (hasMetadata) totalSteps++ // + upload metadata to IPFS
     if (isNewGroup) totalSteps++ // + create group
     if (hasCorrelation) totalSteps++ // + add to group
 
@@ -661,27 +664,46 @@ function WalletButton({ className = '', theme = 'dark' }) {
         reportProgress(currentStep, totalSteps, 'Collateral already approved', 'completed')
       }
 
-      // Step 2: Create the market on-chain
+      // Step 2 (if hasMetadata): Upload metadata to IPFS
+      let metadataUri = submitData.metadataUri || ''
+      if (hasMetadata) {
+        currentStep++
+        reportProgress(currentStep, totalSteps, 'Uploading metadata to IPFS...', 'pending')
+        try {
+          console.log('Uploading market metadata to IPFS:', submitData.metadata)
+          const uploadResult = await uploadMarketMetadata(submitData.metadata)
+          metadataUri = uploadResult.uri
+          console.log('Metadata uploaded to IPFS:', metadataUri)
+          reportProgress(currentStep, totalSteps, 'Metadata uploaded to IPFS', 'completed')
+        } catch (uploadError) {
+          console.error('Failed to upload metadata to IPFS:', uploadError)
+          throw new Error(`Failed to upload metadata: ${uploadError.message}`)
+        }
+      }
+
+      // Step 3: Create the market on-chain
       currentStep++
       reportProgress(currentStep, totalSteps, 'Creating market...', 'signing')
-      console.log('Deploying market pair...', {
+      console.log('Deploying market pair with metadata...', {
         proposalId: proposalId.toString(),
         collateralToken: collateralTokenAddress,
         liquidityAmount: liquidityAmount.toString(),
         liquidityParameter: liquidityParameter.toString(),
         tradingPeriodSeconds,
-        betType
+        betType,
+        metadataUri
       })
 
       // First try a static call to get detailed error information if it would fail
       try {
-        await contract.deployMarketPair.staticCall(
+        await contract.deployMarketPairWithMetadata.staticCall(
           proposalId,
           collateralTokenAddress,
           liquidityAmount,
           liquidityParameter,
           tradingPeriodSeconds,
-          betType
+          betType,
+          metadataUri
         )
         console.log('Static call simulation passed')
       } catch (staticCallError) {
@@ -710,13 +732,14 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error(`Market creation simulation failed: ${staticCallError.message}`)
       }
 
-      const tx = await contract.deployMarketPair(
+      const tx = await contract.deployMarketPairWithMetadata(
         proposalId,
         collateralTokenAddress,
         liquidityAmount,
         liquidityParameter,
         tradingPeriodSeconds,
-        betType
+        betType,
+        metadataUri
       )
 
       console.log('Market creation transaction sent:', tx.hash)

@@ -92,9 +92,17 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   // Custom URI input
   const [customUri, setCustomUri] = useState('')
 
+  // Helper to get default resolution date (14 days from now)
+  const getDefaultResolutionDate = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 14)
+    // Format as YYYY-MM-DDTHH:mm for datetime-local input
+    return date.toISOString().slice(0, 16)
+  }
+
   // Form data for on-chain parameters
   const [paramsForm, setParamsForm] = useState({
-    tradingPeriodDays: '14',
+    resolutionDateTime: getDefaultResolutionDate(),
     initialLiquidity: '',
     betType: 1, // Default to Pass/Fail (more appropriate for governance-style predictions)
     collateralTokenId: 'USC', // Default to USC stablecoin
@@ -146,7 +154,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     })
     setCustomUri('')
     setParamsForm({
-      tradingPeriodDays: '14',
+      resolutionDateTime: getDefaultResolutionDate(),
       initialLiquidity: '',
       betType: 1,
       collateralTokenId: 'USC',
@@ -290,10 +298,18 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     // Step 1 is educational, no validation needed
 
     if (step === 2) {
-      // Parameters validation
-      const days = parseInt(paramsForm.tradingPeriodDays)
-      if (isNaN(days) || days < 7 || days > 21) {
-        newErrors.tradingPeriodDays = 'Trading period must be 7-21 days'
+      // Parameters validation - resolution date/time
+      const resolutionDate = new Date(paramsForm.resolutionDateTime)
+      const now = new Date()
+      const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day from now
+      const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year from now
+
+      if (!paramsForm.resolutionDateTime || isNaN(resolutionDate.getTime())) {
+        newErrors.resolutionDateTime = 'Please select a valid resolution date and time'
+      } else if (resolutionDate < minDate) {
+        newErrors.resolutionDateTime = 'Resolution must be at least 1 day from now'
+      } else if (resolutionDate > maxDate) {
+        newErrors.resolutionDateTime = 'Resolution must be within 1 year'
       }
 
       const liquidity = parseFloat(paramsForm.initialLiquidity)
@@ -374,7 +390,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       attributes: [
         { trait_type: 'Category', value: metadataForm.category },
         { trait_type: 'Bet Type', value: betType?.name || 'Pass / Fail' },
-        { trait_type: 'Trading Period', value: `${paramsForm.tradingPeriodDays} days`, display_type: 'string' },
+        { trait_type: 'Resolution Date', value: paramsForm.resolutionDateTime, display_type: 'date' },
         { trait_type: 'Initial Liquidity', value: isValidLiquidity ? liquidityNum : 0, display_type: 'number' }
       ],
       properties: {
@@ -432,11 +448,15 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         return token.address
       }
 
+      // Calculate trading period in seconds from resolution date
+      const resolutionDate = new Date(paramsForm.resolutionDateTime)
+      const now = new Date()
+      const tradingPeriodSeconds = Math.floor((resolutionDate.getTime() - now.getTime()) / 1000)
+
       const submitData = {
         // On-chain parameters
-        // Trading period converted to seconds (7-21 days * 86400 seconds/day)
-        // Contract accepts values in this range as validated above
-        tradingPeriod: parseInt(paramsForm.tradingPeriodDays) * 24 * 60 * 60,
+        // Trading period calculated from the difference between resolution date and now
+        tradingPeriod: tradingPeriodSeconds,
         initialLiquidity: paramsForm.initialLiquidity,
         betType: paramsForm.betType,
         collateralToken: getCollateralTokenAddress(),
@@ -517,10 +537,17 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       return true // Education step, always valid
     }
     if (currentStep === 2) {
-      const days = parseInt(paramsForm.tradingPeriodDays)
+      const resolutionDate = new Date(paramsForm.resolutionDateTime)
+      const now = new Date()
+      const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day
+      const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year
       const liquidity = parseFloat(paramsForm.initialLiquidity)
+      const isValidResolutionDate = paramsForm.resolutionDateTime &&
+        !isNaN(resolutionDate.getTime()) &&
+        resolutionDate >= minDate &&
+        resolutionDate <= maxDate
       return (
-        !isNaN(days) && days >= 7 && days <= 21 &&
+        isValidResolutionDate &&
         paramsForm.initialLiquidity && !isNaN(liquidity) && liquidity >= 100 && liquidity <= 1000000
       )
     }
@@ -996,31 +1023,26 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
               <section className="mcm-section">
                 <h3 className="mcm-section-title">
-                  <span aria-hidden="true">⏱️</span> Trading Period
+                  <span aria-hidden="true">📅</span> Resolution Date & Time
                 </h3>
                 <div className="mcm-field">
-                  <label htmlFor="tradingPeriod">
-                    Duration (Days) <span className="mcm-required">*</span>
+                  <label htmlFor="resolutionDateTime">
+                    When will this market resolve? <span className="mcm-required">*</span>
                   </label>
-                  <div className="mcm-range-input">
-                    <input
-                      id="tradingPeriod"
-                      type="range"
-                      min="7"
-                      max="21"
-                      value={paramsForm.tradingPeriodDays}
-                      onChange={e => handleParamsChange('tradingPeriodDays', e.target.value)}
-                      disabled={submitting}
-                      className="mcm-slider"
-                      aria-valuemin="7"
-                      aria-valuemax="21"
-                      aria-valuenow={paramsForm.tradingPeriodDays}
-                      aria-valuetext={`${paramsForm.tradingPeriodDays} days`}
-                    />
-                    <span className="mcm-range-value">{paramsForm.tradingPeriodDays} days</span>
+                  <input
+                    id="resolutionDateTime"
+                    type="datetime-local"
+                    value={paramsForm.resolutionDateTime}
+                    onChange={e => handleParamsChange('resolutionDateTime', e.target.value)}
+                    disabled={submitting}
+                    className={`mcm-datetime-input ${errors.resolutionDateTime ? 'error' : ''}`}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                  />
+                  <div className="mcm-hint">
+                    Select the exact date and time when trading ends and the market resolves (min: 1 day, max: 1 year from now)
                   </div>
-                  <div className="mcm-hint">Trading period: 7-21 days</div>
-                  {errors.tradingPeriodDays && <div className="mcm-error">{errors.tradingPeriodDays}</div>}
+                  {errors.resolutionDateTime && <div className="mcm-error">{errors.resolutionDateTime}</div>}
                 </div>
               </section>
 
@@ -1297,8 +1319,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                     </span>
                   </div>
                   <div className="mcm-review-item">
-                    <span className="mcm-review-label">Trading Period</span>
-                    <span className="mcm-review-value">{paramsForm.tradingPeriodDays} days</span>
+                    <span className="mcm-review-label">Resolution Date</span>
+                    <span className="mcm-review-value">
+                      {paramsForm.resolutionDateTime
+                        ? new Date(paramsForm.resolutionDateTime).toLocaleString()
+                        : 'Not set'}
+                    </span>
                   </div>
                   <div className="mcm-review-item">
                     <span className="mcm-review-label">Initial Liquidity</span>

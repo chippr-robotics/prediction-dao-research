@@ -145,14 +145,18 @@ const formatTimeRemaining = (endTime) => {
   return `${hours}h`
 }
 
-function ModernMarketCard({ 
-  market, 
-  onClick, 
-  onTrade, 
+function ModernMarketCard({
+  market,
+  onClick,
+  onTrade,
   isActive = false,
-  isFirstRow = false 
+  isFirstRow = false
 }) {
   const [isExpanded, setIsExpanded] = useState(isFirstRow)
+
+  // Get bet type labels from market or default to Yes/No
+  const passLabel = market.betTypeLabels?.passLabel || 'Yes'
+  const failLabel = market.betTypeLabels?.failLabel || 'No'
 
   const yesProb = useMemo(() => (parseFloat(market.passTokenPrice) * 100).toFixed(0), [market.passTokenPrice])
   const noProb = useMemo(() => (100 - parseFloat(yesProb)).toFixed(0), [yesProb])
@@ -407,23 +411,23 @@ function ModernMarketCard({
       </div>
 
 
-      {/* Binary action buttons: Yes/No */}
+      {/* Binary action buttons using bet type labels */}
       { isExpanded && (
       <div className="action-buttons">
-        <button 
+        <button
           className="action-btn yes-btn"
           onClick={handleYesClick}
-          aria-label={`Buy Yes on ${market.proposalTitle}`}
+          aria-label={`Buy ${passLabel} on ${market.proposalTitle}`}
         >
-          <span className="btn-label">Yes</span>
+          <span className="btn-label">{passLabel}</span>
           <span className="btn-price">{yesProb}¢</span>
         </button>
-        <button 
+        <button
           className="action-btn no-btn"
           onClick={handleNoClick}
-          aria-label={`Buy No on ${market.proposalTitle}`}
+          aria-label={`Buy ${failLabel} on ${market.proposalTitle}`}
         >
-          <span className="btn-label">No</span>
+          <span className="btn-label">{failLabel}</span>
           <span className="btn-price">{noProb}¢</span>
         </button>
       </div>
