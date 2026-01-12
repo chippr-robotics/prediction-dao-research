@@ -33,7 +33,9 @@ export const MARKET_FACTORY_ABI = [
       {"name": "conditionId", "type": "bytes32"},
       {"name": "questionId", "type": "bytes32"},
       {"name": "passPositionId", "type": "uint256"},
-      {"name": "failPositionId", "type": "uint256"}
+      {"name": "failPositionId", "type": "uint256"},
+      {"name": "passQuantity", "type": "uint256"},
+      {"name": "failQuantity", "type": "uint256"}
     ],
     "stateMutability": "view",
     "type": "function"
