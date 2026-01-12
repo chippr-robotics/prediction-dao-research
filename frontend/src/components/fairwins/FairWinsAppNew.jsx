@@ -8,7 +8,7 @@ import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import { getSubcategoriesForCategory } from '../../config/subcategories'
-import { buyMarketShares, estimateBuyGas } from '../../utils/blockchainService'
+import { buyMarketShares } from '../../utils/blockchainService'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -184,25 +184,36 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       const outcome = tradeData.type === 'PASS' // true for YES/PASS, false for NO/FAIL
       const amount = tradeData.amount.toString()
 
-      // Show notification that transaction is being prepared
-      showNotification('Preparing transaction...', 'info', 3000)
+      // Progress callback to show step-by-step notifications
+      const handleProgress = (step, message) => {
+        // Map steps to notification types
+        const notificationTypes = {
+          'checking': 'info',
+          'approval_needed': 'info',
+          'approval_pending': 'info',
+          'approval_confirmed': 'success',
+          'buy_pending': 'info',
+          'buy_confirmed': 'success'
+        }
 
-      // Estimate gas (optional, for better UX)
-      try {
-        const gasEstimate = await estimateBuyGas(signer, marketId, outcome, amount)
-        console.log('Estimated gas cost:', gasEstimate, 'ETC')
-      } catch (gasError) {
-        console.warn('Could not estimate gas:', gasError)
+        const type = notificationTypes[step] || 'info'
+        const duration = step.includes('pending') ? 10000 : 5000
+
+        showNotification(message, type, duration)
       }
 
-      // Execute the transaction
-      showNotification('Please confirm the transaction in your wallet', 'info', 5000)
+      // Show initial notification
+      showNotification('Preparing trade...', 'info', 3000)
 
-      const receipt = await buyMarketShares(signer, marketId, outcome, amount)
+      // Execute the transaction with progress updates
+      const receipt = await buyMarketShares(signer, marketId, outcome, amount, handleProgress)
 
-      // Show success notification with transaction hash
+      // Show final success notification
+      const txSummary = receipt.approvalRequired
+        ? `Trade complete! (2 transactions: approval + buy)`
+        : `Trade complete!`
       showNotification(
-        `Trade successful! ${tradeData.amount} for ${tradeData.type} shares`,
+        `${txSummary} ${tradeData.amount} USC for ${tradeData.type} shares`,
         'success',
         7000
       )

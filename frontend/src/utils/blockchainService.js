@@ -724,14 +724,25 @@ function getProposalStatus(status) {
  * @param {number} marketId - Market ID
  * @param {boolean} outcome - true for YES/PASS, false for NO/FAIL
  * @param {string} amount - Amount in collateral tokens to spend
+ * @param {Function} onProgress - Optional callback for progress updates: (step, message) => void
+ *   Steps: 'checking', 'approval_needed', 'approval_pending', 'approval_confirmed', 'buy_pending', 'buy_confirmed'
  * @returns {Promise<Object>} Transaction receipt
  */
-export async function buyMarketShares(signer, marketId, outcome, amount) {
+export async function buyMarketShares(signer, marketId, outcome, amount, onProgress = null) {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
 
+  const reportProgress = (step, message) => {
+    if (onProgress) {
+      onProgress(step, message)
+    }
+    console.log(`[Trade Progress] ${step}: ${message}`)
+  }
+
   try {
+    reportProgress('checking', 'Checking market and token allowance...')
+
     const contract = getContract('marketFactory', signer)
 
     // Get the market to find the collateral token
@@ -764,37 +775,55 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
 
       // Approve if needed
       if (currentAllowance < amountWei) {
-        console.log('Approving collateral token...')
+        reportProgress('approval_needed', 'Token approval required. Please confirm the approval transaction (1 of 2).')
+
         const approveTx = await collateralToken.approve(
           getContractAddress('marketFactory'),
           amountWei
         )
+
+        reportProgress('approval_pending', 'Approval transaction submitted. Waiting for confirmation...')
         await approveTx.wait()
-        console.log('Collateral approved')
+
+        reportProgress('approval_confirmed', 'Approval confirmed! Now submitting buy transaction (2 of 2).')
+      } else {
+        reportProgress('approval_confirmed', 'Token already approved. Submitting buy transaction...')
       }
 
       // Call buyTokens function (ERC20 collateral - no value sent)
+      reportProgress('buy_pending', 'Please confirm the buy transaction in your wallet.')
       const tx = await contract.buyTokens(marketId, outcome, amountWei)
+
+      reportProgress('buy_pending', 'Buy transaction submitted. Waiting for confirmation...')
       const receipt = await tx.wait()
+
+      reportProgress('buy_confirmed', 'Transaction confirmed!')
 
       return {
         hash: receipt.hash,
         blockNumber: receipt.blockNumber,
         status: receipt.status === 1 ? 'success' : 'failed',
-        gasUsed: receipt.gasUsed.toString()
+        gasUsed: receipt.gasUsed.toString(),
+        approvalRequired: currentAllowance < amountWei
       }
     } else {
       // Native ETC collateral - send value with transaction
+      reportProgress('buy_pending', 'Please confirm the transaction in your wallet.')
       const tx = await contract.buyTokens(marketId, outcome, amountWei, {
         value: amountWei
       })
+
+      reportProgress('buy_pending', 'Transaction submitted. Waiting for confirmation...')
       const receipt = await tx.wait()
+
+      reportProgress('buy_confirmed', 'Transaction confirmed!')
 
       return {
         hash: receipt.hash,
         blockNumber: receipt.blockNumber,
         status: receipt.status === 1 ? 'success' : 'failed',
-        gasUsed: receipt.gasUsed.toString()
+        gasUsed: receipt.gasUsed.toString(),
+        approvalRequired: false
       }
     }
   } catch (error) {
