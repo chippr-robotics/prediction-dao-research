@@ -184,6 +184,51 @@ async function getTokenDecimals(tokenAddress) {
 }
 
 /**
+ * Fetch trade statistics for a market from TokensPurchased events
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @param {number} collateralDecimals - Decimals for the collateral token
+ * @returns {Promise<Object>} Trade stats (tradesCount, uniqueTraders, totalVolume)
+ */
+async function tryGetMarketTradeStats(contract, marketId, collateralDecimals = 6) {
+  try {
+    // Query TokensPurchased events for this market
+    const filter = contract.filters.TokensPurchased(marketId)
+    const events = await contract.queryFilter(filter, 0, 'latest')
+
+    if (events.length === 0) {
+      return {
+        tradesCount: 0,
+        uniqueTraders: 0,
+        totalVolume: '0'
+      }
+    }
+
+    // Count unique traders
+    const uniqueAddresses = new Set()
+    let totalVolumeWei = 0n
+
+    for (const event of events) {
+      uniqueAddresses.add(event.args.buyer.toLowerCase())
+      totalVolumeWei += BigInt(event.args.collateralAmount)
+    }
+
+    return {
+      tradesCount: events.length,
+      uniqueTraders: uniqueAddresses.size,
+      totalVolume: ethers.formatUnits(totalVolumeWei, collateralDecimals)
+    }
+  } catch (error) {
+    console.debug(`Could not get trade stats for market ${marketId}:`, error.message)
+    return {
+      tradesCount: 0,
+      uniqueTraders: 0,
+      totalVolume: '0'
+    }
+  }
+}
+
+/**
  * Fetch market creation event data (creator, creation time)
  * @param {ethers.Contract} contract - Market factory contract
  * @param {number} marketId - Market ID
@@ -234,6 +279,9 @@ async function fetchSingleMarket(contract, marketId) {
     // Get collateral token decimals for proper formatting
     const collateralDecimals = await getTokenDecimals(market.collateralToken)
 
+    // Fetch trade statistics (needs collateralDecimals for volume formatting)
+    const tradeStats = await tryGetMarketTradeStats(contract, marketId, collateralDecimals)
+
     // Extract info from metadata or use defaults
     const category = extractCategory(metadata)
     const title = metadata?.name || `Market #${marketId}`
@@ -265,6 +313,10 @@ async function fetchSingleMarket(contract, marketId) {
       // Creator and creation time from event
       creator: creationEvent?.creator || null,
       creationTime: creationEvent?.createdAt ? new Date(creationEvent.createdAt).toISOString() : null,
+      // Trade statistics from events
+      tradesCount: tradeStats.tradesCount,
+      uniqueTraders: tradeStats.uniqueTraders,
+      volume24h: tradeStats.totalVolume, // Using total volume as volume24h for now
       // Additional metadata fields
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
@@ -482,6 +534,9 @@ export async function fetchMarketByIdFromBlockchain(id) {
     // Get collateral token decimals for proper formatting
     const collateralDecimals = await getTokenDecimals(market.collateralToken)
 
+    // Fetch trade statistics (needs collateralDecimals for volume formatting)
+    const tradeStats = await tryGetMarketTradeStats(contract, id, collateralDecimals)
+
     // Extract info from metadata or use defaults
     let category = extractCategory(metadata)
     // Use correlation group category if metadata category is 'other'
@@ -520,6 +575,10 @@ export async function fetchMarketByIdFromBlockchain(id) {
       // Creator and creation time from event
       creator: creationEvent?.creator || null,
       creationTime: creationEvent?.createdAt ? new Date(creationEvent.createdAt).toISOString() : null,
+      // Trade statistics from events
+      tradesCount: tradeStats.tradesCount,
+      uniqueTraders: tradeStats.uniqueTraders,
+      volume24h: tradeStats.totalVolume,
       // Additional metadata fields
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
