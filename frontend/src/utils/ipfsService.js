@@ -15,6 +15,7 @@ import {
   IPFS_CONFIG,
   IPFS_GATEWAY,
   IPFS_UPLOAD_API,
+  PINATA_CONFIG,
   getIpfsUrl,
   buildIpfsPath,
   isValidCid
@@ -274,11 +275,33 @@ export const checkGatewayHealth = async () => {
 }
 
 // ==========================================
-// IPFS Upload Functions
+// IPFS Upload Functions (Pinata Integration)
 // ==========================================
 
 /**
- * Upload JSON data to IPFS
+ * Get Pinata authentication headers
+ * Prefers JWT over API Key/Secret if available
+ * @returns {Object} Headers object with authorization
+ */
+const getPinataAuthHeaders = () => {
+  if (PINATA_CONFIG.JWT) {
+    return {
+      'Authorization': `Bearer ${PINATA_CONFIG.JWT}`,
+    }
+  }
+
+  if (PINATA_CONFIG.API_KEY && PINATA_CONFIG.API_SECRET) {
+    return {
+      'pinata_api_key': PINATA_CONFIG.API_KEY,
+      'pinata_secret_api_key': PINATA_CONFIG.API_SECRET,
+    }
+  }
+
+  throw new Error('Pinata authentication not configured. Please set VITE_PINATA_JWT or VITE_PINATA_API_KEY and VITE_PINATA_API_SECRET environment variables.')
+}
+
+/**
+ * Upload JSON data to IPFS via Pinata
  * @param {Object} data - JSON data to upload
  * @param {Object} options - Upload options
  * @param {string} options.name - Optional name for the content
@@ -302,15 +325,24 @@ export const uploadJson = async (data, options = {}) => {
   const timeoutId = setTimeout(() => controller.abort(), IPFS_CONFIG.UPLOAD_TIMEOUT)
 
   try {
-    const response = await fetch(`${IPFS_UPLOAD_API}/add`, {
+    // Get auth headers for Pinata
+    const authHeaders = getPinataAuthHeaders()
+
+    // Pinata pinJSONToIPFS endpoint
+    const response = await fetch(`${PINATA_CONFIG.API_URL}/pinning/pinJSONToIPFS`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...authHeaders,
       },
       body: JSON.stringify({
-        content: data,
-        name: options.name || 'metadata.json',
-        pin: true,
+        pinataContent: data,
+        pinataMetadata: {
+          name: options.name || 'metadata.json',
+        },
+        pinataOptions: {
+          cidVersion: 1, // Use CIDv1 for better compatibility
+        },
       }),
       signal: controller.signal,
     })
@@ -322,36 +354,51 @@ export const uploadJson = async (data, options = {}) => {
       let errorMessage
       try {
         const errorData = JSON.parse(responseText)
-        errorMessage = errorData && typeof errorData === 'object' ? errorData.message : null
+        errorMessage = errorData?.error?.reason || errorData?.error?.message || errorData?.message || null
       } catch {
         errorMessage = null
       }
       if (!errorMessage) {
         const bodySnippet = responseText ? responseText.slice(0, 200) : ''
-        errorMessage = `Upload failed with status ${response.status}` + (bodySnippet ? `. Response body: ${bodySnippet}` : '')
+        errorMessage = `Pinata upload failed with status ${response.status}` + (bodySnippet ? `. Response: ${bodySnippet}` : '')
       }
       throw new Error(errorMessage)
     }
 
     const result = await response.json()
 
-    if (!result.cid) {
-      throw new Error('Upload response missing CID')
+    // Pinata returns IpfsHash (CID) in the response
+    const cid = result.IpfsHash
+    if (!cid) {
+      throw new Error('Pinata response missing IpfsHash (CID)')
     }
 
+    console.log('Successfully pinned to Pinata:', {
+      cid,
+      name: options.name,
+      size: result.PinSize,
+      timestamp: result.Timestamp,
+    })
+
     return {
-      cid: result.cid,
-      uri: `ipfs://${result.cid}`,
-      size: result.size || new Blob([jsonString]).size,
+      cid,
+      uri: `ipfs://${cid}`,
+      size: result.PinSize || new Blob([jsonString]).size,
+      timestamp: result.Timestamp,
     }
   } catch (error) {
     clearTimeout(timeoutId)
 
     if (error.name === 'AbortError') {
-      throw new Error('IPFS upload timeout')
+      throw new Error('Pinata upload timeout')
     }
 
-    throw new Error(`IPFS upload failed: ${error.message}`)
+    // Re-throw auth errors as-is
+    if (error.message.includes('authentication not configured')) {
+      throw error
+    }
+
+    throw new Error(`Pinata upload failed: ${error.message}`)
   }
 }
 
