@@ -28,9 +28,10 @@ export const DEPLOYED_CONTRACTS = {
   ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
 
   // Back-compat aliases used throughout the frontend
-  // IMPORTANT: Must match tieredRoleManager above (the contract PaymentProcessor uses)
-  roleManager: '0x888332df7621EC341131d85e2228f00407777dD7', // alias for RoleManagerCore
-  roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
+  // IMPORTANT: Use the NEWER RoleManagerCore that has checkMarketCreationLimitFor function
+  // Old: '0x888332df7621EC341131d85e2228f00407777dD7' - does NOT have checkMarketCreationLimitFor
+  roleManager: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5', // NEWER RoleManagerCore with full IRoleManager interface
+  roleManagerCore: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5',
 
   // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
