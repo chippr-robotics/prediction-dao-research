@@ -464,9 +464,30 @@ function WalletButton({ className = '', theme = 'dark' }) {
   /**
    * Handle creation from the MarketCreationModal
    * Supports prediction markets with web3 transactions using CTF1155
+   *
+   * Transaction Flow:
+   * 1. Approve collateral token (if needed)
+   * 2. Create market on-chain
+   * 3. Create correlation group (if new group selected)
+   * 4. Add market to correlation group (if correlation enabled)
    */
-  const handleMarketCreation = async (submitData, modalSigner) => {
+  const handleMarketCreation = async (submitData, modalSigner, onProgress) => {
     const activeSigner = modalSigner || signer
+
+    // Helper to report progress
+    const reportProgress = (step, total, description, status = 'pending') => {
+      if (onProgress) {
+        onProgress({ step, total, description, status })
+      }
+      console.log(`[${step}/${total}] ${description} - ${status}`)
+    }
+
+    // Calculate total steps based on configuration
+    const hasCorrelation = submitData.correlationGroup && isCorrelationRegistryDeployed()
+    const isNewGroup = hasCorrelation && submitData.correlationGroup.createNew
+    let totalSteps = 2 // Base: approve + create market
+    if (isNewGroup) totalSteps++ // + create group
+    if (hasCorrelation) totalSteps++ // + add to group
 
     if (!activeSigner) {
       console.error('No signer available for market creation')
@@ -612,16 +633,22 @@ function WalletButton({ className = '', theme = 'dark' }) {
         }
       }
 
-      // Check and approve collateral token if needed (userAddress already retrieved during pre-flight)
+      // Step 1: Check and approve collateral token if needed
+      let currentStep = 1
       const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
       if (currentAllowance < liquidityAmount) {
-        console.log('Approving collateral token...')
+        reportProgress(currentStep, totalSteps, 'Approving collateral token...', 'signing')
         const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
+        reportProgress(currentStep, totalSteps, 'Waiting for approval confirmation...', 'confirming')
         await approveTx.wait()
-        console.log('Collateral approved')
+        reportProgress(currentStep, totalSteps, 'Collateral approved', 'completed')
+      } else {
+        reportProgress(currentStep, totalSteps, 'Collateral already approved', 'completed')
       }
 
-      // Create the market on-chain using deployMarketPair
+      // Step 2: Create the market on-chain
+      currentStep++
+      reportProgress(currentStep, totalSteps, 'Creating market...', 'signing')
       console.log('Deploying market pair...', {
         proposalId: proposalId.toString(),
         collateralToken: collateralTokenAddress,
@@ -641,8 +668,10 @@ function WalletButton({ className = '', theme = 'dark' }) {
       )
 
       console.log('Market creation transaction sent:', tx.hash)
+      reportProgress(currentStep, totalSteps, 'Waiting for market confirmation...', 'confirming')
       const receipt = await tx.wait()
       console.log('Market created:', receipt)
+      reportProgress(currentStep, totalSteps, 'Market created successfully', 'completed')
 
       // Extract market ID from event logs
       const marketCreatedEvent = receipt.logs.find(log => {
@@ -661,14 +690,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
       }
 
       // Handle correlation group if provided
-      if (submitData.correlationGroup && marketId && isCorrelationRegistryDeployed()) {
+      if (hasCorrelation && marketId) {
         console.log('Processing correlation group:', submitData.correlationGroup)
 
         try {
           let groupId = submitData.correlationGroup.existingGroupId
 
-          // Create new group if needed
-          if (submitData.correlationGroup.createNew) {
+          // Step 3 (optional): Create new group if needed
+          if (isNewGroup) {
+            currentStep++
+            reportProgress(currentStep, totalSteps, 'Creating correlation group...', 'signing')
             console.log('Creating new correlation group...')
             const groupResult = await createCorrelationGroup(
               activeSigner,
@@ -678,18 +709,29 @@ function WalletButton({ className = '', theme = 'dark' }) {
             )
             groupId = groupResult.groupId
             console.log('New correlation group created:', groupId)
+            reportProgress(currentStep, totalSteps, 'Correlation group created', 'completed')
           }
 
-          // Add market to group
+          // Step 3 or 4: Add market to group
           if (groupId !== null && groupId !== undefined) {
+            currentStep++
+            reportProgress(currentStep, totalSteps, 'Adding market to group...', 'signing')
             console.log('Adding market to correlation group:', { groupId, marketId })
             await addMarketToCorrelationGroup(activeSigner, groupId, parseInt(marketId))
             console.log('Market added to correlation group successfully')
+            reportProgress(currentStep, totalSteps, 'Market added to group', 'completed')
           }
         } catch (correlationError) {
-          // Log but don't fail the entire transaction - market is already created
+          // Log the error and notify user, but don't fail - market was already created
           console.error('Error handling correlation group:', correlationError)
           console.warn('Market was created but correlation group operation failed')
+          reportProgress(currentStep, totalSteps, `Group operation failed: ${correlationError.message}`, 'failed')
+
+          // Show user-friendly error message
+          const errorMessage = correlationError.message || 'Unknown error'
+          if (errorMessage.includes('group creator')) {
+            console.warn('Permission error: Only the group creator or owner can add markets to this group')
+          }
         }
       }
 

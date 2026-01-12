@@ -1313,8 +1313,8 @@ export async function createCorrelationGroup(signer, name, description, category
 
 /**
  * Add a market to a correlation group
- * Note: This requires owner permission on the MarketCorrelationRegistry
- * @param {ethers.Signer} signer - Connected wallet signer (must be owner)
+ * Note: This requires group creator or owner permission on the MarketCorrelationRegistry
+ * @param {ethers.Signer} signer - Connected wallet signer
  * @param {number} groupId - Correlation group ID
  * @param {number} marketId - Market ID to add
  * @returns {Promise<Object>} Transaction result
@@ -1330,8 +1330,31 @@ export async function addMarketToCorrelationGroup(signer, groupId, marketId) {
 
   try {
     const contract = getContract('marketCorrelationRegistry', signer)
+    const userAddress = await signer.getAddress()
 
     console.log('Adding market to correlation group:', { groupId, marketId })
+
+    // Pre-flight check: verify user has permission
+    const [group, contractOwner] = await Promise.all([
+      contract.correlationGroups(groupId),
+      contract.owner()
+    ])
+
+    const groupCreator = group.creator
+    const isGroupCreator = groupCreator.toLowerCase() === userAddress.toLowerCase()
+    const isOwner = contractOwner.toLowerCase() === userAddress.toLowerCase()
+
+    console.log('Permission check:', {
+      userAddress,
+      groupCreator,
+      contractOwner,
+      isGroupCreator,
+      isOwner
+    })
+
+    if (!isGroupCreator && !isOwner) {
+      throw new Error(`Only the group creator (${groupCreator.slice(0, 8)}...) or contract owner can add markets to this group`)
+    }
 
     const tx = await contract.addMarketToGroup(groupId, marketId)
     const receipt = await tx.wait()

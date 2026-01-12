@@ -1445,6 +1445,80 @@
 }
 
 /* ===========================
+   Transaction Progress Indicator
+   =========================== */
+
+.mcm-tx-progress {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--bg-secondary, #f8fafc);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  text-align: left;
+}
+
+.mcm-tx-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.mcm-tx-step {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #718096);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mcm-tx-status {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.mcm-tx-status-signing {
+  color: var(--warning-color, #f59e0b);
+}
+
+.mcm-tx-status-confirming {
+  color: var(--info-color, #3b82f6);
+}
+
+.mcm-tx-status-completed {
+  color: var(--success-color, #22c55e);
+}
+
+.mcm-tx-status-failed {
+  color: var(--error-color, #ef4444);
+}
+
+.mcm-tx-status-pending {
+  color: var(--text-secondary, #718096);
+}
+
+.mcm-tx-description {
+  font-size: 0.875rem;
+  color: var(--text-primary, #1a202c);
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.mcm-tx-progress-bar {
+  height: 4px;
+  background: var(--border-color, #e2e8f0);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mcm-tx-progress-fill {
+  height: 100%;
+  background: var(--accent-color, #4F46E5);
+  border-radius: 2px;
+  transition: width 0.3s ease-out;
+}
+
+/* ===========================
    Print Styles
    =========================== */
 

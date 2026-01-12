@@ -103,6 +103,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+  // Transaction progress tracking
+  const [transactionProgress, setTransactionProgress] = useState(null)
 
   // Correlation group state
   const [correlationGroups, setCorrelationGroups] = useState([])
@@ -152,6 +154,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     })
     setErrors({})
     setSubmitting(false)
+    setTransactionProgress(null)
     // Reset correlation group state
     setSelectedCorrelationGroup(null)
     setCreateNewGroup(false)
@@ -450,11 +453,20 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         metadata: useCustomUri ? null : buildMetadataJson()
       }
 
-      await onCreate(submitData, signer)
+      // Progress callback to update UI
+      const handleProgress = (progress) => {
+        setTransactionProgress(progress)
+      }
+
+      await onCreate(submitData, signer, handleProgress)
+      setTransactionProgress({ step: 0, total: 0, description: 'Complete!', status: 'completed' })
+      // Brief delay to show completion before closing
+      await new Promise(resolve => setTimeout(resolve, 1000))
       resetForm()
       onClose()
     } catch (error) {
       console.error('Error creating market:', error)
+      setTransactionProgress(null)
       setErrors({ submit: error.message || 'Failed to create market. Please try again.' })
     } finally {
       setSubmitting(false)
@@ -1391,6 +1403,30 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                 {submitting && <span className="mcm-spinner" aria-hidden="true" />}
                 {submitting ? 'Creating...' : 'Create Market'}
               </button>
+              {/* Transaction Progress Indicator */}
+              {submitting && transactionProgress && (
+                <div className="mcm-tx-progress" role="status" aria-live="polite">
+                  <div className="mcm-tx-progress-header">
+                    <span className="mcm-tx-step">
+                      Step {transactionProgress.step} of {transactionProgress.total}
+                    </span>
+                    <span className={`mcm-tx-status mcm-tx-status-${transactionProgress.status}`}>
+                      {transactionProgress.status === 'signing' && '🔐 Awaiting signature...'}
+                      {transactionProgress.status === 'confirming' && '⏳ Confirming...'}
+                      {transactionProgress.status === 'completed' && '✓'}
+                      {transactionProgress.status === 'failed' && '⚠️'}
+                      {transactionProgress.status === 'pending' && '...'}
+                    </span>
+                  </div>
+                  <div className="mcm-tx-description">{transactionProgress.description}</div>
+                  <div className="mcm-tx-progress-bar">
+                    <div
+                      className="mcm-tx-progress-fill"
+                      style={{ width: `${(transactionProgress.step / transactionProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             )}
           </div>
         </footer>
