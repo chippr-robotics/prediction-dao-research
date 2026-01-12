@@ -17,6 +17,7 @@ function MarketPage() {
   const navigate = useNavigate()
   const { getMarkets } = useDataFetcher()
   const [market, setMarket] = useState(null)
+  const [linkedMarkets, setLinkedMarkets] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedOutcome, setSelectedOutcome] = useState('YES')
   const [orderType, setOrderType] = useState('market')
@@ -39,8 +40,18 @@ function MarketPage() {
           navigate('/app')
           return
         }
-        
+
         setMarket(foundMarket)
+
+        // Get linked markets from correlation group
+        if (foundMarket.correlationGroup?.groupId !== undefined) {
+          const linked = markets.filter(m =>
+            m.correlationGroup?.groupId === foundMarket.correlationGroup.groupId
+          )
+          setLinkedMarkets(linked)
+        } else {
+          setLinkedMarkets([])
+        }
         setSelectedOutcome('YES')
         setOrderType('market')
         setAmount('1')
@@ -366,7 +377,7 @@ This is a transparent market - all trades are publicly visible on the blockchain
               </div>
 
               <div className="carousel-panel">
-                <MarketDetailsPanel market={market} />
+                <MarketDetailsPanel market={market} linkedMarkets={linkedMarkets} />
               </div>
 
               <div className="carousel-panel">

@@ -184,6 +184,32 @@ async function getTokenDecimals(tokenAddress) {
 }
 
 /**
+ * Fetch market creation event data (creator, creation time)
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Event data or null
+ */
+async function tryGetMarketCreationEvent(contract, marketId) {
+  try {
+    // Query MarketCreated events for this specific market
+    const filter = contract.filters.MarketCreated(marketId)
+    const events = await contract.queryFilter(filter, 0, 'latest')
+
+    if (events.length > 0) {
+      const event = events[0]
+      return {
+        creator: event.args.creator,
+        createdAt: Number(event.args.createdAt) * 1000, // Convert to milliseconds
+        betType: Number(event.args.betType)
+      }
+    }
+  } catch (error) {
+    console.debug(`Could not get creation event for market ${marketId}:`, error.message)
+  }
+  return null
+}
+
+/**
  * Fetch a single market's full data (market struct + prices + metadata)
  * @param {ethers.Contract} contract - Market factory contract
  * @param {number} marketId - Market ID
@@ -191,11 +217,12 @@ async function getTokenDecimals(tokenAddress) {
  */
 async function fetchSingleMarket(contract, marketId) {
   try {
-    // Fetch market struct, prices, and metadata concurrently
-    const [market, prices, metadata] = await Promise.all([
+    // Fetch market struct, prices, metadata, and creation event concurrently
+    const [market, prices, metadata, creationEvent] = await Promise.all([
       contract.markets(marketId),
       tryGetPrices(contract, marketId),
-      tryFetchMarketMetadata(contract, marketId)
+      tryFetchMarketMetadata(contract, marketId),
+      tryGetMarketCreationEvent(contract, marketId)
     ])
 
     // Validate market before adding
@@ -235,6 +262,9 @@ async function fetchSingleMarket(contract, marketId) {
       passToken: market.passToken,
       failToken: market.failToken,
       resolved: market.resolved,
+      // Creator and creation time from event
+      creator: creationEvent?.creator || null,
+      creationTime: creationEvent?.createdAt ? new Date(creationEvent.createdAt).toISOString() : null,
       // Additional metadata fields
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
@@ -437,12 +467,13 @@ export async function fetchMarketByIdFromBlockchain(id) {
       return null
     }
 
-    // Fetch market struct, prices, metadata, and correlation data concurrently
-    const [market, prices, metadata, correlationInfo] = await Promise.all([
+    // Fetch market struct, prices, metadata, correlation data, and creation event concurrently
+    const [market, prices, metadata, correlationInfo, creationEvent] = await Promise.all([
       contract.markets(id),
       tryGetPrices(contract, id),
       tryFetchMarketMetadata(contract, id),
-      tryGetMarketCorrelationGroup(id)
+      tryGetMarketCorrelationGroup(id),
+      tryGetMarketCreationEvent(contract, id)
     ])
 
     // Validate market
@@ -490,6 +521,9 @@ export async function fetchMarketByIdFromBlockchain(id) {
       passToken: market.passToken,
       failToken: market.failToken,
       resolved: market.resolved,
+      // Creator and creation time from event
+      creator: creationEvent?.creator || null,
+      creationTime: creationEvent?.createdAt ? new Date(creationEvent.createdAt).toISOString() : null,
       // Additional metadata fields
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],

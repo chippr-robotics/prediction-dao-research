@@ -494,6 +494,10 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             onClose={handleCloseHero}
             market={selectedMarket}
             onTrade={handleTrade}
+            linkedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
+              ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
+              : []
+            }
           />
 
           {/* Perpetual Futures Modal */}
