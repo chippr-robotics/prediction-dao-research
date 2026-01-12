@@ -164,7 +164,156 @@ function extractCategory(metadata) {
 }
 
 /**
+ * Fetch a single market's full data (market struct + prices + metadata)
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Transformed market or null if invalid
+ */
+async function fetchSingleMarket(contract, marketId) {
+  try {
+    // Fetch market struct, prices, and metadata concurrently
+    const [market, prices, metadata] = await Promise.all([
+      contract.markets(marketId),
+      tryGetPrices(contract, marketId),
+      tryFetchMarketMetadata(contract, marketId)
+    ])
+
+    // Validate market before adding
+    if (!isValidMarket(market)) {
+      console.debug(`Skipping invalid market ${marketId}`)
+      return null
+    }
+
+    // Extract info from metadata or use defaults
+    const category = extractCategory(metadata)
+    const title = metadata?.name || `Market #${marketId}`
+    const description = metadata?.description || ''
+    const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
+
+    // Build the transformed market object
+    return {
+      id: marketId,
+      proposalId: Number(market.proposalId || 0),
+      proposalTitle: title,
+      description: description,
+      category: category,
+      subcategory: metadata?.properties?.subcategory || null,
+      passTokenPrice: prices.passPrice,
+      failTokenPrice: prices.failPrice,
+      totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
+      liquidityParameter: market.liquidityParameter ? ethers.formatEther(market.liquidityParameter) : '0',
+      tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
+      status: getMarketStatus(Number(market.status)),
+      betType: Number(market.betType || 0),
+      betTypeLabels: betTypeLabels,
+      collateralToken: market.collateralToken,
+      passToken: market.passToken,
+      failToken: market.failToken,
+      resolved: market.resolved,
+      // Additional metadata fields
+      image: metadata?.image || null,
+      tags: metadata?.properties?.tags || [],
+      resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+      // CTF fields for trading
+      useCTF: market.useCTF,
+      conditionId: market.conditionId,
+      passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
+      failPositionId: market.failPositionId ? Number(market.failPositionId) : null
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch market ${marketId}:`, error.message)
+    return null
+  }
+}
+
+/**
+ * Try to get market's correlation group info (including category)
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Correlation group info or null
+ */
+async function tryGetMarketCorrelationGroup(marketId) {
+  try {
+    const registryAddress = getContractAddress('marketCorrelationRegistry')
+    if (!registryAddress || registryAddress === ethers.ZeroAddress) {
+      return null
+    }
+
+    const contract = getContract('marketCorrelationRegistry')
+
+    // Check if market is in a group
+    const isInGroup = await contract.isMarketInGroup(marketId)
+    if (!isInGroup) {
+      return null
+    }
+
+    // Get the group ID and group details
+    const groupId = await contract.getMarketGroup(marketId)
+    const [group, category] = await Promise.all([
+      contract.correlationGroups(groupId),
+      contract.groupCategory(groupId)
+    ])
+
+    return {
+      groupId: Number(groupId),
+      groupName: group.name,
+      groupDescription: group.description,
+      category: category?.toLowerCase() || null,
+      creator: group.creator,
+      active: group.active
+    }
+  } catch (error) {
+    console.debug(`Could not get correlation group for market ${marketId}:`, error.message)
+    return null
+  }
+}
+
+/**
+ * Enrich markets with correlation group data (including categories)
+ * @param {Array} markets - Array of market objects
+ * @returns {Promise<Array>} Markets enriched with correlation data
+ */
+async function enrichMarketsWithCorrelationData(markets) {
+  if (!markets || markets.length === 0) return markets
+
+  try {
+    const registryAddress = getContractAddress('marketCorrelationRegistry')
+    if (!registryAddress || registryAddress === ethers.ZeroAddress) {
+      console.debug('Correlation registry not deployed, skipping enrichment')
+      return markets
+    }
+
+    console.log('Enriching markets with correlation group data...')
+
+    // Fetch correlation data for all markets concurrently
+    const correlationPromises = markets.map(market =>
+      tryGetMarketCorrelationGroup(market.id)
+    )
+    const correlationResults = await Promise.all(correlationPromises)
+
+    // Merge correlation data into markets
+    return markets.map((market, index) => {
+      const correlationInfo = correlationResults[index]
+      if (correlationInfo) {
+        return {
+          ...market,
+          // Use correlation group category if market category is 'other'
+          category: market.category === 'other' && correlationInfo.category
+            ? correlationInfo.category
+            : market.category,
+          correlationGroup: correlationInfo
+        }
+      }
+      return market
+    })
+  } catch (error) {
+    console.warn('Failed to enrich markets with correlation data:', error.message)
+    return markets
+  }
+}
+
+/**
  * Fetch all markets from the blockchain
+ * Uses concurrent fetching for faster loading
  * @returns {Promise<Array>} Array of market objects
  */
 export async function fetchMarketsFromBlockchain() {
@@ -190,69 +339,28 @@ export async function fetchMarketsFromBlockchain() {
       return []
     }
 
-    // Fetch each market individually using the markets(uint256) mapping
-    const transformedMarkets = []
-    for (let i = 0; i < Number(marketCount); i++) {
-      try {
-        const market = await contract.markets(i)
+    // Create array of market IDs to fetch
+    const marketIds = Array.from({ length: Number(marketCount) }, (_, i) => i)
 
-        // Validate market before adding
-        if (!isValidMarket(market)) {
-          console.log(`Skipping invalid market ${i}`)
-          continue
-        }
+    // Fetch all markets concurrently
+    console.log(`Fetching ${marketIds.length} markets concurrently...`)
+    const startTime = Date.now()
 
-        // Try to get prices from contract
-        const prices = await tryGetPrices(contract, i)
+    const marketPromises = marketIds.map(id => fetchSingleMarket(contract, id))
+    const results = await Promise.all(marketPromises)
 
-        // Try to fetch metadata from IPFS
-        const metadata = await tryFetchMarketMetadata(contract, i)
+    // Filter out null results (invalid markets)
+    const transformedMarkets = results.filter(market => market !== null)
 
-        // Extract info from metadata or use defaults
-        const category = extractCategory(metadata)
-        const title = metadata?.name || `Market #${i}`
-        const description = metadata?.description || ''
-        const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
+    const fetchDuration = Date.now() - startTime
+    console.log(`Fetched ${transformedMarkets.length} valid markets in ${fetchDuration}ms`)
 
-        // Build the transformed market object
-        const transformedMarket = {
-          id: i,
-          proposalId: Number(market.proposalId || 0),
-          proposalTitle: title,
-          description: description,
-          category: category,
-          subcategory: metadata?.properties?.subcategory || null,
-          passTokenPrice: prices.passPrice,
-          failTokenPrice: prices.failPrice,
-          totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-          liquidityParameter: market.liquidityParameter ? ethers.formatEther(market.liquidityParameter) : '0',
-          tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
-          status: getMarketStatus(Number(market.status)),
-          betType: Number(market.betType || 0),
-          betTypeLabels: betTypeLabels,
-          collateralToken: market.collateralToken,
-          passToken: market.passToken,
-          failToken: market.failToken,
-          resolved: market.resolved,
-          // Additional metadata fields
-          image: metadata?.image || null,
-          tags: metadata?.properties?.tags || [],
-          resolutionCriteria: metadata?.properties?.resolution_criteria || '',
-          // CTF fields for trading
-          useCTF: market.useCTF,
-          conditionId: market.conditionId,
-          passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
-          failPositionId: market.failPositionId ? Number(market.failPositionId) : null
-        }
+    // Enrich markets with correlation group data (provides categories)
+    const enrichedMarkets = await enrichMarketsWithCorrelationData(transformedMarkets)
 
-        transformedMarkets.push(transformedMarket)
-      } catch (marketError) {
-        console.warn(`Failed to fetch market ${i}:`, marketError.message)
-      }
-    }
-
-    console.log('Transformed markets:', transformedMarkets.length, 'valid markets')
-    return transformedMarkets
+    const totalDuration = Date.now() - startTime
+    console.log(`Total market fetch + enrichment: ${totalDuration}ms`)
+    return enrichedMarkets
   } catch (error) {
     console.error('Error fetching markets from blockchain:', error)
     console.error('Error details:', {
@@ -297,21 +405,25 @@ export async function fetchMarketByIdFromBlockchain(id) {
       return null
     }
 
-    const market = await contract.markets(id)
+    // Fetch market struct, prices, metadata, and correlation data concurrently
+    const [market, prices, metadata, correlationInfo] = await Promise.all([
+      contract.markets(id),
+      tryGetPrices(contract, id),
+      tryFetchMarketMetadata(contract, id),
+      tryGetMarketCorrelationGroup(id)
+    ])
 
     // Validate market
     if (!isValidMarket(market)) {
       return null
     }
 
-    // Try to get prices from contract
-    const prices = await tryGetPrices(contract, id)
-
-    // Try to fetch metadata from IPFS
-    const metadata = await tryFetchMarketMetadata(contract, id)
-
     // Extract info from metadata or use defaults
-    const category = extractCategory(metadata)
+    let category = extractCategory(metadata)
+    // Use correlation group category if metadata category is 'other'
+    if (category === 'other' && correlationInfo?.category) {
+      category = correlationInfo.category
+    }
     const title = metadata?.name || `Market #${id}`
     const description = metadata?.description || ''
     const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
@@ -343,7 +455,9 @@ export async function fetchMarketByIdFromBlockchain(id) {
       useCTF: market.useCTF,
       conditionId: market.conditionId,
       passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
-      failPositionId: market.failPositionId ? Number(market.failPositionId) : null
+      failPositionId: market.failPositionId ? Number(market.failPositionId) : null,
+      // Correlation group info
+      correlationGroup: correlationInfo
     }
   } catch (error) {
     console.error('Error fetching market by ID from blockchain:', error)
