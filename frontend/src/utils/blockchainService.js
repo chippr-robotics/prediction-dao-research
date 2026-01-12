@@ -714,8 +714,8 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
         console.log('Collateral approved')
       }
 
-      // Call buy function (ERC20 collateral - no value sent)
-      const tx = await contract.buy(marketId, outcome, amountWei)
+      // Call buyTokens function (ERC20 collateral - no value sent)
+      const tx = await contract.buyTokens(marketId, outcome, amountWei)
       const receipt = await tx.wait()
 
       return {
@@ -726,7 +726,7 @@ export async function buyMarketShares(signer, marketId, outcome, amount) {
       }
     } else {
       // Native ETC collateral - send value with transaction
-      const tx = await contract.buy(marketId, outcome, amountWei, {
+      const tx = await contract.buyTokens(marketId, outcome, amountWei, {
         value: amountWei
       })
       const receipt = await tx.wait()
@@ -786,10 +786,10 @@ export async function estimateBuyGas(signer, marketId, outcome, amount) {
     let gasEstimate
     if (collateralTokenAddress && collateralTokenAddress !== ethers.ZeroAddress) {
       // ERC20 collateral - no value sent
-      gasEstimate = await contract.buy.estimateGas(marketId, outcome, amountWei)
+      gasEstimate = await contract.buyTokens.estimateGas(marketId, outcome, amountWei)
     } else {
       // Native token collateral - send value
-      gasEstimate = await contract.buy.estimateGas(marketId, outcome, amountWei, {
+      gasEstimate = await contract.buyTokens.estimateGas(marketId, outcome, amountWei, {
         value: amountWei
       })
     }
@@ -827,7 +827,7 @@ export async function sellMarketShares(signer, marketId, outcome, shares) {
     const contract = getContract('marketFactory', signer)
     const sharesWei = ethers.parseEther(shares.toString())
 
-    const tx = await contract.sell(marketId, outcome, sharesWei)
+    const tx = await contract.sellTokens(marketId, outcome, sharesWei)
     const receipt = await tx.wait()
 
     return {

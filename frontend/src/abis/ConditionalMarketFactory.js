@@ -74,11 +74,11 @@ export const MARKET_FACTORY_ABI = [
     "inputs": [
       {"name": "marketId", "type": "uint256"},
       {"name": "buyPass", "type": "bool"},
-      {"name": "collateralAmount", "type": "uint256"}
+      {"name": "amount", "type": "uint256"}
     ],
-    "name": "buy",
+    "name": "buyTokens",
     "outputs": [{"name": "tokenAmount", "type": "uint256"}],
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -87,7 +87,7 @@ export const MARKET_FACTORY_ABI = [
       {"name": "sellPass", "type": "bool"},
       {"name": "tokenAmount", "type": "uint256"}
     ],
-    "name": "sell",
+    "name": "sellTokens",
     "outputs": [{"name": "collateralAmount", "type": "uint256"}],
     "stateMutability": "nonpayable",
     "type": "function"
