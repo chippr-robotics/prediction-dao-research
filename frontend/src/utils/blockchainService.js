@@ -349,15 +349,13 @@ async function enrichMarketsWithCorrelationData(markets) {
     return markets.map((market, index) => {
       const correlationInfo = correlationResults[index]
       if (correlationInfo) {
-        // Check if title is generic (Market #X) and use group name as fallback
-        const hasGenericTitle = market.proposalTitle.startsWith('Market #')
-        const enhancedTitle = hasGenericTitle && correlationInfo.groupName
-          ? `${correlationInfo.groupName} - Market #${market.id}`
-          : market.proposalTitle
+        // Keep original title - don't override with correlation group name
+        // The correlation group info is available in correlationGroup property
+        // If metadata has the actual question, it will be in proposalTitle
+        // If not, keep generic "Market #X" and show correlation info separately
 
         return {
           ...market,
-          proposalTitle: enhancedTitle,
           // Use correlation group category if market category is 'other'
           category: market.category === 'other' && correlationInfo.category
             ? correlationInfo.category
@@ -491,13 +489,11 @@ export async function fetchMarketByIdFromBlockchain(id) {
       category = correlationInfo.category
     }
 
-    // Determine title - use group name if title is generic
-    let title = metadata?.name || `Market #${id}`
-    if (title.startsWith('Market #') && correlationInfo?.groupName) {
-      title = `${correlationInfo.groupName} - Market #${id}`
-    }
+    // Use actual title from metadata if available, otherwise generic
+    // Correlation group info is available separately in correlationGroup property
+    const title = metadata?.name || `Market #${id}`
 
-    const description = metadata?.description || correlationInfo?.groupDescription || ''
+    const description = metadata?.description || ''
     const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
 
     return {

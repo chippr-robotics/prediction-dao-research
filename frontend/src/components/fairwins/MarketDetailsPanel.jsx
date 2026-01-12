@@ -166,11 +166,19 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
         </div>
       )}
 
-      {/* Decision Criteria */}
+      {/* Description */}
       {market.description && (
         <div className="criteria-section">
-          <div className="section-label">Decision Criteria</div>
+          <div className="section-label">Description</div>
           <div className="criteria-content">{market.description}</div>
+        </div>
+      )}
+
+      {/* Resolution Criteria */}
+      {market.resolutionCriteria && (
+        <div className="criteria-section">
+          <div className="section-label">Resolution Criteria</div>
+          <div className="criteria-content">{market.resolutionCriteria}</div>
         </div>
       )}
     </div>
