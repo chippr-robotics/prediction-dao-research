@@ -7,7 +7,21 @@
  */
 
 export const MARKET_CORRELATION_REGISTRY_ABI = [
-  // View Functions
+  // View Functions (including inherited from Ownable)
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'roleManager',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
   {
     inputs: [],
     name: 'groupCount',
