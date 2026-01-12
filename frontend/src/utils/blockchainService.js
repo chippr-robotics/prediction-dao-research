@@ -164,6 +164,26 @@ function extractCategory(metadata) {
 }
 
 /**
+ * Get token decimals for a collateral token
+ * @param {string} tokenAddress - Token contract address
+ * @returns {Promise<number>} Number of decimals (defaults to 18)
+ */
+async function getTokenDecimals(tokenAddress) {
+  try {
+    if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
+      return 18
+    }
+    const provider = getProvider()
+    const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider)
+    const decimals = await tokenContract.decimals()
+    return Number(decimals)
+  } catch (error) {
+    console.debug(`Could not get decimals for token ${tokenAddress}:`, error.message)
+    return 18 // Default to 18 decimals
+  }
+}
+
+/**
  * Fetch a single market's full data (market struct + prices + metadata)
  * @param {ethers.Contract} contract - Market factory contract
  * @param {number} marketId - Market ID
@@ -184,6 +204,9 @@ async function fetchSingleMarket(contract, marketId) {
       return null
     }
 
+    // Get collateral token decimals for proper formatting
+    const collateralDecimals = await getTokenDecimals(market.collateralToken)
+
     // Extract info from metadata or use defaults
     const category = extractCategory(metadata)
     const title = metadata?.name || `Market #${marketId}`
@@ -200,8 +223,10 @@ async function fetchSingleMarket(contract, marketId) {
       subcategory: metadata?.properties?.subcategory || null,
       passTokenPrice: prices.passPrice,
       failTokenPrice: prices.failPrice,
-      totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-      liquidityParameter: market.liquidityParameter ? ethers.formatEther(market.liquidityParameter) : '0',
+      // Use correct decimals for collateral token (USC = 6, not 18)
+      totalLiquidity: market.totalLiquidity ? ethers.formatUnits(market.totalLiquidity, collateralDecimals) : '0',
+      liquidityParameter: market.liquidityParameter ? ethers.formatUnits(market.liquidityParameter, collateralDecimals) : '0',
+      collateralDecimals: collateralDecimals,
       tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
       status: getMarketStatus(Number(market.status)),
       betType: Number(market.betType || 0),
@@ -294,8 +319,15 @@ async function enrichMarketsWithCorrelationData(markets) {
     return markets.map((market, index) => {
       const correlationInfo = correlationResults[index]
       if (correlationInfo) {
+        // Check if title is generic (Market #X) and use group name as fallback
+        const hasGenericTitle = market.proposalTitle.startsWith('Market #')
+        const enhancedTitle = hasGenericTitle && correlationInfo.groupName
+          ? `${correlationInfo.groupName} - Market #${market.id}`
+          : market.proposalTitle
+
         return {
           ...market,
+          proposalTitle: enhancedTitle,
           // Use correlation group category if market category is 'other'
           category: market.category === 'other' && correlationInfo.category
             ? correlationInfo.category
@@ -418,14 +450,23 @@ export async function fetchMarketByIdFromBlockchain(id) {
       return null
     }
 
+    // Get collateral token decimals for proper formatting
+    const collateralDecimals = await getTokenDecimals(market.collateralToken)
+
     // Extract info from metadata or use defaults
     let category = extractCategory(metadata)
     // Use correlation group category if metadata category is 'other'
     if (category === 'other' && correlationInfo?.category) {
       category = correlationInfo.category
     }
-    const title = metadata?.name || `Market #${id}`
-    const description = metadata?.description || ''
+
+    // Determine title - use group name if title is generic
+    let title = metadata?.name || `Market #${id}`
+    if (title.startsWith('Market #') && correlationInfo?.groupName) {
+      title = `${correlationInfo.groupName} - Market #${id}`
+    }
+
+    const description = metadata?.description || correlationInfo?.groupDescription || ''
     const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
 
     return {
@@ -437,8 +478,10 @@ export async function fetchMarketByIdFromBlockchain(id) {
       subcategory: metadata?.properties?.subcategory || null,
       passTokenPrice: prices.passPrice,
       failTokenPrice: prices.failPrice,
-      totalLiquidity: market.totalLiquidity ? ethers.formatEther(market.totalLiquidity) : '0',
-      liquidityParameter: market.liquidityParameter ? ethers.formatEther(market.liquidityParameter) : '0',
+      // Use correct decimals for collateral token (USC = 6, not 18)
+      totalLiquidity: market.totalLiquidity ? ethers.formatUnits(market.totalLiquidity, collateralDecimals) : '0',
+      liquidityParameter: market.liquidityParameter ? ethers.formatUnits(market.liquidityParameter, collateralDecimals) : '0',
+      collateralDecimals: collateralDecimals,
       tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
       status: getMarketStatus(Number(market.status)),
       betType: Number(market.betType || 0),
