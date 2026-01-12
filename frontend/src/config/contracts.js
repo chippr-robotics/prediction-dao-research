@@ -45,7 +45,7 @@ export const DEPLOYED_CONTRACTS = {
 
   // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
   // Used for grouping related markets (e.g., election candidates, tournament brackets)
-  marketCorrelationRegistry: null, // TODO: Deploy and update address
+  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A', // TODO: Deploy and update address
 
 }
 
