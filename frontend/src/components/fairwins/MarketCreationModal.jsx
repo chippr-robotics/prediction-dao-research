@@ -1394,39 +1394,41 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                 Continue
               </button>
             ) : (
-              <button
-                type="button"
-                className="mcm-btn-primary mcm-btn-create"
-                onClick={handleSubmit}
-                disabled={submitting || !isConnected || !isCorrectNetwork}
-              >
-                {submitting && <span className="mcm-spinner" aria-hidden="true" />}
-                {submitting ? 'Creating...' : 'Create Market'}
-              </button>
-              {/* Transaction Progress Indicator */}
-              {submitting && transactionProgress && (
-                <div className="mcm-tx-progress" role="status" aria-live="polite">
-                  <div className="mcm-tx-progress-header">
-                    <span className="mcm-tx-step">
-                      Step {transactionProgress.step} of {transactionProgress.total}
-                    </span>
-                    <span className={`mcm-tx-status mcm-tx-status-${transactionProgress.status}`}>
-                      {transactionProgress.status === 'signing' && '🔐 Awaiting signature...'}
-                      {transactionProgress.status === 'confirming' && '⏳ Confirming...'}
-                      {transactionProgress.status === 'completed' && '✓'}
-                      {transactionProgress.status === 'failed' && '⚠️'}
-                      {transactionProgress.status === 'pending' && '...'}
-                    </span>
+              <>
+                <button
+                  type="button"
+                  className="mcm-btn-primary mcm-btn-create"
+                  onClick={handleSubmit}
+                  disabled={submitting || !isConnected || !isCorrectNetwork}
+                >
+                  {submitting && <span className="mcm-spinner" aria-hidden="true" />}
+                  {submitting ? 'Creating...' : 'Create Market'}
+                </button>
+                {/* Transaction Progress Indicator */}
+                {submitting && transactionProgress && (
+                  <div className="mcm-tx-progress" role="status" aria-live="polite">
+                    <div className="mcm-tx-progress-header">
+                      <span className="mcm-tx-step">
+                        Step {transactionProgress.step} of {transactionProgress.total}
+                      </span>
+                      <span className={`mcm-tx-status mcm-tx-status-${transactionProgress.status}`}>
+                        {transactionProgress.status === 'signing' && '🔐 Awaiting signature...'}
+                        {transactionProgress.status === 'confirming' && '⏳ Confirming...'}
+                        {transactionProgress.status === 'completed' && '✓'}
+                        {transactionProgress.status === 'failed' && '⚠️'}
+                        {transactionProgress.status === 'pending' && '...'}
+                      </span>
+                    </div>
+                    <div className="mcm-tx-description">{transactionProgress.description}</div>
+                    <div className="mcm-tx-progress-bar">
+                      <div
+                        className="mcm-tx-progress-fill"
+                        style={{ width: `${(transactionProgress.step / transactionProgress.total) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="mcm-tx-description">{transactionProgress.description}</div>
-                  <div className="mcm-tx-progress-bar">
-                    <div
-                      className="mcm-tx-progress-fill"
-                      style={{ width: `${(transactionProgress.step / transactionProgress.total) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+                )}
+              </>
             )}
           </div>
         </footer>
