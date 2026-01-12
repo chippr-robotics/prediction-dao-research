@@ -119,25 +119,6 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
         </table>
       </div>
 
-      {/* Current Prices Section */}
-      <div className="prices-section">
-        <div className="section-label">Current Prices</div>
-        <div className="price-grid">
-          <div className="price-item price-yes">
-            <span className="price-label">{market.betTypeLabels?.passLabel || 'YES'}</span>
-            <span className="price-value">
-              ${market.passTokenPrice ? parseFloat(market.passTokenPrice).toFixed(2) : '0.00'}
-            </span>
-          </div>
-          <div className="price-item price-no">
-            <span className="price-label">{market.betTypeLabels?.failLabel || 'NO'}</span>
-            <span className="price-value">
-              ${market.failTokenPrice ? parseFloat(market.failTokenPrice).toFixed(2) : '0.00'}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Correlation Group Section */}
       {correlationGroup && (
         <div className="correlation-section">

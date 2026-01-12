@@ -120,6 +120,13 @@ function MarketsTable({ markets = [], onMarketClick }) {
     return parseFloat(n.toFixed(2))
   }
 
+  // Format probability as percentage (0-100%)
+  const formatProbability = (price) => {
+    const prob = parseFloat(price) || 0
+    // Token prices are 0-1, convert to percentage
+    return `${Math.round(prob * 100)}%`
+  }
+
   const getCategoryIcon = (category) => {
     const icons = {
       sports: '⚽',
@@ -310,9 +317,9 @@ function MarketsTable({ markets = [], onMarketClick }) {
                   </td>
                   <td className="price-cell">
                     <div className="price-display">
-                      <span className="pass-price">{formatNumber(market.passTokenPrice || 0)}</span>
+                      <span className="pass-price">{formatProbability(market.passTokenPrice)}</span>
                       <span className="price-separator">/</span>
-                      <span className="fail-price">{formatNumber(market.failTokenPrice || 0)}</span>
+                      <span className="fail-price">{formatProbability(market.failTokenPrice)}</span>
                     </div>
                   </td>
                   <td className="time-cell">

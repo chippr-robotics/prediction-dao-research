@@ -92,7 +92,7 @@
   object-position: center;
 }
 
-/* Dark overlay gradient for text readability - stronger for clear visibility */
+/* Dark overlay gradient for text readability - balanced for image visibility */
 .thumbnail-overlay {
   position: absolute;
   top: 0;
@@ -101,9 +101,9 @@
   bottom: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.45) 0%,
-    rgba(0, 0, 0, 0.65) 50%,
-    rgba(0, 0, 0, 0.85) 100%
+    rgba(0, 0, 0, 0.15) 0%,
+    rgba(0, 0, 0, 0.35) 50%,
+    rgba(0, 0, 0, 0.6) 100%
   );
   display: flex;
   flex-direction: column;
@@ -111,13 +111,13 @@
   padding: 0;
 }
 
-/* Light mode overlay adjustment - even stronger */
+/* Light mode overlay adjustment */
 .theme-light .thumbnail-overlay {
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.5) 0%,
-    rgba(0, 0, 0, 0.7) 50%,
-    rgba(0, 0, 0, 0.9) 100%
+    rgba(0, 0, 0, 0.2) 0%,
+    rgba(0, 0, 0, 0.4) 50%,
+    rgba(0, 0, 0, 0.65) 100%
   );
 }
 

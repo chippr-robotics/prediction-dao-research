@@ -269,8 +269,8 @@ function ModernMarketCard({
       aria-pressed={isActive}
     >
       {/* Correlation group indicator */}
-      {market.correlationGroupId && (
-        <div className="correlation-indicator" title={market.correlationGroupName} />
+      {market.correlationGroup?.groupId !== undefined && (
+        <div className="correlation-indicator" title={market.correlationGroup.groupName} />
       )}
 
       {/* Background thumbnail with question text overlay */}
@@ -318,9 +318,9 @@ function ModernMarketCard({
                 </span>
               )}
               {/* Show correlation group name instead of "Group" */}
-              {market.correlationGroupName && (
-                <span className="correlation-group-pill" title={market.correlationGroupName}>
-                  {market.correlationGroupName}
+              {market.correlationGroup?.groupName && (
+                <span className="correlation-group-pill" title={market.correlationGroup.groupName}>
+                  {market.correlationGroup.groupName}
                 </span>
               )}
             </div>
