@@ -12,7 +12,7 @@ export const DEPLOYED_CONTRACTS = {
   tieredRoleManager: '0x888332df7621EC341131d85e2228f00407777dD7', // RoleManagerCore (modular RBAC)
   welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
   proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0x08E5a4B716c06e92525E17495d0995A6F7102414', // ConditionalMarketFactory
+  marketFactory: '0x20eEb76C5B98Da5a9504A65169C4791d4787ECdA', // ConditionalMarketFactory (new with LMSR)
   privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
   oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
   ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
