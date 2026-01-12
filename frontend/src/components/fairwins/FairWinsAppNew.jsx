@@ -258,8 +258,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const handleOpenIndividualMarket = (market) => {
     // When opening an individual market from a correlated group,
     // we want to show the MarketModal instead of CorrelatedMarketsModal
-    // To do this, we create a copy of the market without the correlationGroupId
-    const individualMarket = { ...market, correlationGroupId: null }
+    // To do this, we create a copy of the market without the correlationGroup
+    const individualMarket = { ...market, correlationGroup: undefined }
     setShowHero(false) // Close current modal
     // Use setTimeout to ensure state updates before reopening
     setTimeout(() => {
@@ -505,17 +505,19 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
         <div className="unified-view">
           {/* Correlated Markets Modal - For correlation groups */}
           <CorrelatedMarketsModal
-            isOpen={showHero && selectedMarket && selectedMarket.correlationGroupId}
+            isOpen={showHero && selectedMarket && selectedMarket.correlationGroup?.groupId !== undefined}
             onClose={handleCloseHero}
             market={selectedMarket}
-            correlatedMarkets={selectedMarket?.correlationGroupId ? markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId) : []}
+            correlatedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
+              ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
+              : []}
             onTrade={handleTrade}
             onOpenMarket={handleOpenIndividualMarket}
           />
 
           {/* Market Modal - For individual markets (non-correlated) */}
           <MarketModal
-            isOpen={showHero && selectedMarket && !selectedMarket.correlationGroupId}
+            isOpen={showHero && selectedMarket && selectedMarket.correlationGroup?.groupId === undefined}
             onClose={handleCloseHero}
             market={selectedMarket}
             onTrade={handleTrade}

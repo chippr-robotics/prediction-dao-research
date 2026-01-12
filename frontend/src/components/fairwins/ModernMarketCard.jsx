@@ -26,6 +26,36 @@ const getCategoryThumbnail = (category) => {
   return thumbnails[category] || financeImg
 }
 
+/**
+ * Get the image URL for a market
+ * Uses custom IPFS image if available, falls back to category thumbnail
+ * @param {Object} market - Market data
+ * @returns {string} Image URL
+ */
+const getMarketImage = (market) => {
+  // Check for custom image from IPFS metadata
+  if (market.image) {
+    // Handle ipfs:// URIs
+    if (market.image.startsWith('ipfs://')) {
+      const cid = market.image.replace('ipfs://', '')
+      // Use Pinata gateway or fallback
+      const gateway = import.meta.env.VITE_PINATA_GATEWAY || 'https://gateway.pinata.cloud'
+      return `${gateway}/ipfs/${cid}`
+    }
+    // Handle https:// URLs directly
+    if (market.image.startsWith('https://')) {
+      return market.image
+    }
+    // Handle raw CIDs
+    if (market.image.startsWith('Qm') || market.image.startsWith('b')) {
+      const gateway = import.meta.env.VITE_PINATA_GATEWAY || 'https://gateway.pinata.cloud'
+      return `${gateway}/ipfs/${market.image}`
+    }
+  }
+  // Fall back to category thumbnail
+  return getCategoryThumbnail(market.category)
+}
+
 // Get subcategory display name
 const getSubcategoryName = (subcategoryId) => {
   const subcategory = findSubcategoryById(subcategoryId)
@@ -279,10 +309,14 @@ function ModernMarketCard({
 
       {/* Background thumbnail with question text overlay */}
       <div className="card-thumbnail">
-        <img 
-          src={getCategoryThumbnail(market.category)} 
-          alt={`${market.category} category`}
+        <img
+          src={getMarketImage(market)}
+          alt={market.proposalTitle || `${market.category} category`}
           className="thumbnail-image"
+          onError={(e) => {
+            // Fall back to category thumbnail if custom image fails to load
+            e.target.src = getCategoryThumbnail(market.category)
+          }}
         />
 
       {/* Stats row */}
