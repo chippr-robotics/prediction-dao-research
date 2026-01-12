@@ -570,7 +570,8 @@ function WalletButton({ className = '', theme = 'dark' }) {
         const roleManagerAbi = [
           'function hasRole(bytes32 role, address account) view returns (bool)',
           'function MARKET_MAKER_ROLE() view returns (bytes32)',
-          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+          'function isActiveMember(address user, bytes32 role) view returns (bool)',
+          'function checkMarketCreationLimitFor(address user, bytes32 role) returns (bool)'
         ]
         const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
         try {
@@ -589,6 +590,20 @@ function WalletButton({ className = '', theme = 'dark' }) {
               hasMarketMakerRole = isActive
             } catch (activeMemberError) {
               console.log('isActiveMember not available or failed:', activeMemberError.message)
+            }
+          }
+
+          // Pre-check market creation limit (this is what the contract will call)
+          if (hasMarketMakerRole) {
+            try {
+              const limitCheck = await roleManager.checkMarketCreationLimitFor.staticCall(userAddress, marketMakerRole)
+              console.log('checkMarketCreationLimitFor result:', limitCheck)
+              if (!limitCheck) {
+                throw new Error('Market creation limit exceeded. You may need to wait or upgrade your tier.')
+              }
+            } catch (limitError) {
+              console.warn('checkMarketCreationLimitFor check failed:', limitError.message)
+              // Don't fail here - the contract might handle this differently
             }
           }
         } catch (roleError) {
@@ -657,6 +672,43 @@ function WalletButton({ className = '', theme = 'dark' }) {
         tradingPeriodSeconds,
         betType
       })
+
+      // First try a static call to get detailed error information if it would fail
+      try {
+        await contract.deployMarketPair.staticCall(
+          proposalId,
+          collateralTokenAddress,
+          liquidityAmount,
+          liquidityParameter,
+          tradingPeriodSeconds,
+          betType
+        )
+        console.log('Static call simulation passed')
+      } catch (staticCallError) {
+        console.error('Static call simulation failed:', staticCallError)
+        // Try to extract more detailed error info
+        if (staticCallError.reason) {
+          throw new Error(`Market creation would fail: ${staticCallError.reason}`)
+        }
+        if (staticCallError.data && staticCallError.data !== '0x') {
+          // Try to decode error
+          try {
+            const decoded = contract.interface.parseError(staticCallError.data)
+            if (decoded) {
+              throw new Error(`Market creation would fail: ${decoded.name}(${decoded.args.join(', ')})`)
+            }
+          } catch (decodeErr) {
+            // Check for standard Error(string) revert
+            if (staticCallError.data.startsWith('0x08c379a0')) {
+              const abiCoder = new ethers.AbiCoder()
+              const errorString = abiCoder.decode(['string'], '0x' + staticCallError.data.slice(10))[0]
+              throw new Error(`Market creation would fail: ${errorString}`)
+            }
+          }
+        }
+        // If we can't get more info, throw with the original message
+        throw new Error(`Market creation simulation failed: ${staticCallError.message}`)
+      }
 
       const tx = await contract.deployMarketPair(
         proposalId,
