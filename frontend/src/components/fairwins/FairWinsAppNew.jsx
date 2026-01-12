@@ -209,8 +209,22 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
       console.log('Transaction receipt:', receipt)
 
-      // Optionally refresh market data
-      await loadMarkets()
+      // Refresh market data and update selectedMarket with fresh data
+      // Note: We don't set loading=true here to keep the modal open during refresh
+      try {
+        const allMarkets = await getMarkets()
+        setMarkets(allMarkets)
+
+        // Update selectedMarket with the refreshed data if one is selected
+        if (selectedMarket) {
+          const updatedMarket = allMarkets.find(m => m.id === selectedMarket.id)
+          if (updatedMarket) {
+            setSelectedMarket(updatedMarket)
+          }
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing markets:', refreshError)
+      }
 
     } catch (error) {
       console.error('Trade error:', error)
