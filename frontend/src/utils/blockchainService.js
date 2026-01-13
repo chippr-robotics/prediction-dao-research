@@ -1061,7 +1061,9 @@ const ROLE_NAME_TO_HASH = {
   'Market Maker': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
   'ClearPath User': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
   'Token Mint': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
-  'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
+  'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
+  // Display names from ROLE_INFO (plural forms)
+  'Friend Markets': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
 }
 
 // Minimal ABI for role manager contract

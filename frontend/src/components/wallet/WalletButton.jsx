@@ -1008,19 +1008,6 @@ function WalletButton({ className = '', theme = 'dark' }) {
                 )}
               </div>
 
-              {/* My Markets Section */}
-              <div className="dropdown-section">
-                <span className="wallet-section-title">My Markets</span>
-                <button
-                  onClick={handleOpenMyMarkets}
-                  className="action-button my-markets-btn"
-                  role="menuitem"
-                >
-                  <span aria-hidden="true">&#128202;</span>
-                  <span>View My Markets</span>
-                </button>
-              </div>
-
               {/* Friend Markets Section */}
               <div className="dropdown-section">
                 <span className="wallet-section-title">Friend Markets</span>
@@ -1073,6 +1060,19 @@ function WalletButton({ className = '', theme = 'dark' }) {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* My Markets Section */}
+              <div className="dropdown-section">
+                <span className="wallet-section-title">My Markets</span>
+                <button
+                  onClick={handleOpenMyMarkets}
+                  className="action-button my-markets-btn"
+                  role="menuitem"
+                >
+                  <span aria-hidden="true">&#128202;</span>
+                  <span>View My Markets</span>
+                </button>
               </div>
 
               {/* Data Source Toggle */}
