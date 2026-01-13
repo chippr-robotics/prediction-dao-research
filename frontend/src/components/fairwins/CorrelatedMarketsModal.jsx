@@ -421,13 +421,28 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
     }
   }
 
-  // Generate mock historical data for timeline
+  // Generate historical data for timeline from real blockchain data or mock
   const generateTimelineData = (market, horizon) => {
     const now = Date.now()
     const dataPoints = TIME_HORIZONS[horizon]?.dataPoints || 7
     const dayMs = 24 * 60 * 60 * 1000
     const baseProb = parseFloat(market.passTokenPrice) * 100
-    
+
+    // Use real price history from blockchain if available
+    if (market.priceHistory && Array.isArray(market.priceHistory) && market.priceHistory.length > 0) {
+      const history = market.priceHistory
+      // Resample price history to match the requested data points
+      return Array.from({ length: dataPoints }, (_, i) => {
+        const sourceIndex = Math.floor((i / dataPoints) * history.length)
+        const probability = (history[sourceIndex] || baseProb / 100) * 100
+        return {
+          date: new Date(now - (dataPoints - i - 1) * dayMs),
+          probability: Math.max(0, Math.min(100, probability))
+        }
+      })
+    }
+
+    // Fallback: Generate mock data if no price history available
     return Array.from({ length: dataPoints }, (_, i) => ({
       date: new Date(now - (dataPoints - i - 1) * dayMs),
       probability: baseProb + (Math.random() - 0.5) * 15 // Mock variance

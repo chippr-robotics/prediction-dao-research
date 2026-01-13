@@ -111,24 +111,40 @@ const getRingColor = (probability, marketStatus) => {
 }
 
 // Generate sparkline data points
+// Uses real price history from blockchain if available, falls back to generated data
 const generateSparklineData = (market) => {
-  // Use market ID as seed for consistent pseudo-random data
+  // Use real price history if available from blockchain
+  if (market.priceHistory && Array.isArray(market.priceHistory) && market.priceHistory.length > 0) {
+    // Ensure we have exactly SPARKLINE_DATA_POINTS
+    if (market.priceHistory.length === SPARKLINE_DATA_POINTS) {
+      return market.priceHistory
+    }
+    // Resample if different length
+    const resampled = []
+    for (let i = 0; i < SPARKLINE_DATA_POINTS; i++) {
+      const sourceIndex = Math.floor((i / SPARKLINE_DATA_POINTS) * market.priceHistory.length)
+      resampled.push(market.priceHistory[sourceIndex])
+    }
+    return resampled
+  }
+
+  // Fallback: Generate pseudo-random data for markets without trade history
   const seed = market.id || 0
   const stableRandom = (s) => {
     const x = Math.sin(s) * 10000
     return x - Math.floor(x)
   }
-  
+
   const basePrice = parseFloat(market.passTokenPrice) || SPARKLINE_DEFAULT_PRICE
   const points = []
-  
+
   for (let i = 0; i < SPARKLINE_DATA_POINTS; i++) {
     const variation = (stableRandom(seed + i * SPARKLINE_SEED_MULTIPLIER) - 0.5) * SPARKLINE_VARIATION_RANGE
     const trendAdjustment = SPARKLINE_TREND_FACTOR * (SPARKLINE_DATA_POINTS - i) / SPARKLINE_DATA_POINTS
     const price = Math.max(SPARKLINE_MIN_PRICE, Math.min(SPARKLINE_MAX_PRICE, basePrice + variation - trendAdjustment))
     points.push(price)
   }
-  
+
   // Last point is current price
   points.push(basePrice)
   return points

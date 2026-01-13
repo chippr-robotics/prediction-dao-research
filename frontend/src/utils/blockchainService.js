@@ -229,6 +229,111 @@ async function tryGetMarketTradeStats(contract, marketId, collateralDecimals = 6
 }
 
 /**
+ * Fetch price history for a market from TokensPurchased events
+ * Returns an array of price points over time for sparkline visualization
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @param {number} currentPassPrice - Current pass token price (0-1)
+ * @param {number} numPoints - Number of data points to return (default 12)
+ * @returns {Promise<Array<number>>} Array of pass token prices (0-1)
+ */
+async function tryGetPriceHistory(contract, marketId, currentPassPrice = 0.5, numPoints = 12) {
+  try {
+    // Query TokensPurchased events for this market
+    const filter = contract.filters.TokensPurchased(marketId)
+    const events = await contract.queryFilter(filter, 0, 'latest')
+
+    if (events.length === 0) {
+      // No trades yet - return flat line at current price
+      return Array(numPoints).fill(currentPassPrice)
+    }
+
+    // Get provider for block timestamps
+    const provider = contract.runner?.provider || getProvider()
+
+    // Fetch block timestamps for all events (batch for performance)
+    const blockNumbers = [...new Set(events.map(e => e.blockNumber))]
+    const blockPromises = blockNumbers.map(bn => provider.getBlock(bn))
+    const blocks = await Promise.all(blockPromises)
+    const blockTimestamps = {}
+    blocks.forEach((block, i) => {
+      if (block) blockTimestamps[blockNumbers[i]] = block.timestamp
+    })
+
+    // Calculate implied price for each trade
+    // For LMSR markets, buying PASS tokens increases PASS price
+    // The trade price approximation: collateralAmount / tokenAmount
+    const tradeData = events.map(event => {
+      const buyPass = event.args.buyPass
+      const collateralAmount = parseFloat(ethers.formatUnits(event.args.collateralAmount, 6)) // Assuming 6 decimals
+      const tokenAmount = parseFloat(ethers.formatEther(event.args.tokenAmount))
+      const impliedPrice = tokenAmount > 0 ? collateralAmount / tokenAmount : 0.5
+      const timestamp = blockTimestamps[event.blockNumber] || 0
+
+      return {
+        timestamp,
+        buyPass,
+        impliedPrice: Math.max(0.01, Math.min(0.99, impliedPrice))
+      }
+    }).sort((a, b) => a.timestamp - b.timestamp)
+
+    // If we have very few trades, interpolate to fill numPoints
+    if (tradeData.length < numPoints) {
+      const prices = []
+      const startPrice = 0.5 // Markets start at 50/50
+
+      // Linear interpolation between trades
+      for (let i = 0; i < numPoints; i++) {
+        const tradeIndex = Math.floor((i / numPoints) * tradeData.length)
+        if (tradeIndex < tradeData.length) {
+          prices.push(tradeData[tradeIndex].impliedPrice)
+        } else {
+          prices.push(currentPassPrice)
+        }
+      }
+      // Ensure last point is current price
+      prices[prices.length - 1] = currentPassPrice
+      return prices
+    }
+
+    // Group trades into time buckets
+    const minTime = tradeData[0].timestamp
+    const maxTime = tradeData[tradeData.length - 1].timestamp
+    const timeRange = maxTime - minTime || 1
+
+    const buckets = Array(numPoints).fill(null).map(() => [])
+
+    for (const trade of tradeData) {
+      const bucketIndex = Math.min(
+        numPoints - 1,
+        Math.floor(((trade.timestamp - minTime) / timeRange) * numPoints)
+      )
+      buckets[bucketIndex].push(trade.impliedPrice)
+    }
+
+    // Calculate average price for each bucket, forward-fill empty buckets
+    const prices = []
+    let lastPrice = 0.5 // Start at 50/50
+
+    for (const bucket of buckets) {
+      if (bucket.length > 0) {
+        lastPrice = bucket.reduce((sum, p) => sum + p, 0) / bucket.length
+      }
+      prices.push(lastPrice)
+    }
+
+    // Ensure last point is current price
+    prices[prices.length - 1] = currentPassPrice
+
+    return prices
+  } catch (error) {
+    console.debug(`Could not get price history for market ${marketId}:`, error.message)
+    // Return flat line at current price on error
+    return Array(numPoints).fill(currentPassPrice)
+  }
+}
+
+/**
  * Fetch market creation event data (creator, creation time)
  * @param {ethers.Contract} contract - Market factory contract
  * @param {number} marketId - Market ID
@@ -279,8 +384,11 @@ async function fetchSingleMarket(contract, marketId) {
     // Get collateral token decimals for proper formatting
     const collateralDecimals = await getTokenDecimals(market.collateralToken)
 
-    // Fetch trade statistics (needs collateralDecimals for volume formatting)
-    const tradeStats = await tryGetMarketTradeStats(contract, marketId, collateralDecimals)
+    // Fetch trade statistics and price history (needs collateralDecimals for volume formatting)
+    const [tradeStats, priceHistory] = await Promise.all([
+      tryGetMarketTradeStats(contract, marketId, collateralDecimals),
+      tryGetPriceHistory(contract, marketId, parseFloat(prices.passPrice))
+    ])
 
     // Extract info from metadata or use defaults
     const category = extractCategory(metadata)
@@ -317,6 +425,8 @@ async function fetchSingleMarket(contract, marketId) {
       tradesCount: tradeStats.tradesCount,
       uniqueTraders: tradeStats.uniqueTraders,
       volume24h: tradeStats.totalVolume, // Using total volume as volume24h for now
+      // Price history for sparkline visualization
+      priceHistory: priceHistory,
       // Additional metadata fields
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
@@ -534,8 +644,11 @@ export async function fetchMarketByIdFromBlockchain(id) {
     // Get collateral token decimals for proper formatting
     const collateralDecimals = await getTokenDecimals(market.collateralToken)
 
-    // Fetch trade statistics (needs collateralDecimals for volume formatting)
-    const tradeStats = await tryGetMarketTradeStats(contract, id, collateralDecimals)
+    // Fetch trade statistics and price history (needs collateralDecimals for volume formatting)
+    const [tradeStats, priceHistory] = await Promise.all([
+      tryGetMarketTradeStats(contract, id, collateralDecimals),
+      tryGetPriceHistory(contract, id, parseFloat(prices.passPrice))
+    ])
 
     // Extract info from metadata or use defaults
     let category = extractCategory(metadata)
@@ -579,6 +692,8 @@ export async function fetchMarketByIdFromBlockchain(id) {
       tradesCount: tradeStats.tradesCount,
       uniqueTraders: tradeStats.uniqueTraders,
       volume24h: tradeStats.totalVolume,
+      // Price history for sparkline visualization
+      priceHistory: priceHistory,
       // Additional metadata fields
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
