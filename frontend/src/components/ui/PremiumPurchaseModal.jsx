@@ -1,10 +1,10 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithUSC, registerZKKey } from '../../utils/blockchainService'
+import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -170,6 +170,10 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
   const [purchaseResults, setPurchaseResults] = useState([])
   const [errors, setErrors] = useState({})
 
+  // Track user's current tier for each role (fetched from blockchain)
+  const [userCurrentTiers, setUserCurrentTiers] = useState({})
+  const [isLoadingTiers, setIsLoadingTiers] = useState(false)
+
   // Calculate pricing based on tier
   const pricing = useMemo(() => {
     const total = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[selectedTier]?.[role] || 0), 0)
@@ -181,6 +185,54 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
     }
   }, [selectedRoles, selectedTier])
 
+  // Fetch user's current tier for selected roles
+  const fetchUserTiers = useCallback(async () => {
+    if (!account || selectedRoles.length === 0) return
+
+    setIsLoadingTiers(true)
+    try {
+      const tiers = {}
+      for (const role of selectedRoles) {
+        const { tier, tierName } = await getUserTierOnChain(account, role)
+        tiers[role] = { tier, tierName }
+      }
+      setUserCurrentTiers(tiers)
+      console.log('[PremiumPurchaseModal] User current tiers:', tiers)
+
+      // Auto-select the minimum valid tier (current + 1, but at least BRONZE)
+      const maxCurrentTier = Math.max(...selectedRoles.map(r => tiers[r]?.tier || 0))
+      const minSelectableTier = maxCurrentTier + 1
+
+      if (minSelectableTier <= 4) {
+        const tierKeys = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
+        const defaultTier = tierKeys[minSelectableTier - 1] || 'BRONZE'
+        setSelectedTier(defaultTier)
+      }
+    } catch (error) {
+      console.error('[PremiumPurchaseModal] Error fetching user tiers:', error)
+    } finally {
+      setIsLoadingTiers(false)
+    }
+  }, [account, selectedRoles])
+
+  // Fetch tiers when moving to tier step
+  useEffect(() => {
+    if (currentStep === 1) {
+      fetchUserTiers()
+    }
+  }, [currentStep, fetchUserTiers])
+
+  // Calculate highest current tier across selected roles
+  const highestCurrentTier = useMemo(() => {
+    if (selectedRoles.length === 0) return 0
+    return Math.max(...selectedRoles.map(r => userCurrentTiers[r]?.tier || 0))
+  }, [selectedRoles, userCurrentTiers])
+
+  // Filter tiers to only show upgrades (tier > current)
+  const availableTiers = useMemo(() => {
+    return Object.entries(MEMBERSHIP_TIERS).filter(([_, tier]) => tier.id > highestCurrentTier)
+  }, [highestCurrentTier])
+
   // Reset form
   const resetForm = useCallback(() => {
     setCurrentStep(0)
@@ -190,6 +242,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
     setPurchaseResults([])
     setErrors({})
     setIsPurchasing(false)
+    setUserCurrentTiers({})
   }, [])
 
   // Handle role toggle
@@ -217,9 +270,21 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       }
     }
 
+    if (step === 1) {
+      // Check if user already has max tier
+      if (highestCurrentTier >= 4) {
+        newErrors.tier = 'You already have the maximum tier (Platinum)'
+      }
+      // Check if a valid tier is selected
+      const selectedTierInfo = MEMBERSHIP_TIERS[selectedTier]
+      if (!selectedTierInfo || selectedTierInfo.id <= highestCurrentTier) {
+        newErrors.tier = 'Please select a higher tier'
+      }
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [selectedRoles])
+  }, [selectedRoles, highestCurrentTier, selectedTier])
 
   // Navigation
   const handleNext = useCallback(() => {
@@ -509,70 +574,115 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                   </p>
                 </div>
 
-                <div className="ppm-tier-grid">
-                  {Object.entries(MEMBERSHIP_TIERS).map(([tierKey, tier]) => {
-                    const benefits = TIER_BENEFITS[tierKey]
-                    const tierTotal = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[tierKey]?.[role] || 0), 0)
-                    const isSelected = selectedTier === tierKey
+                {/* Show loading state while fetching tiers */}
+                {isLoadingTiers && (
+                  <div className="ppm-loading-tiers">
+                    <div className="ppm-spinner" aria-hidden="true"></div>
+                    <p>Checking your current membership tier...</p>
+                  </div>
+                )}
 
-                    return (
-                      <label
-                        key={tierKey}
-                        className={`ppm-tier-card ${isSelected ? 'selected' : ''}`}
-                        style={{ '--tier-color': tier.color }}
-                      >
-                        <input
-                          type="radio"
-                          name="tier"
-                          value={tierKey}
-                          checked={isSelected}
-                          onChange={() => setSelectedTier(tierKey)}
-                          disabled={isPurchasing}
-                          className="ppm-tier-radio"
-                        />
-                        <div className="ppm-tier-content">
-                          <div className="ppm-tier-header">
-                            <span
-                              className="ppm-tier-badge"
-                              style={{ backgroundColor: tier.color }}
-                            >
-                              {tier.name}
-                            </span>
-                            <span className="ppm-tier-price">${tierTotal} USC</span>
+                {/* Show current tier info if user has existing membership */}
+                {!isLoadingTiers && highestCurrentTier > 0 && (
+                  <div className="ppm-info-card ppm-current-tier-info">
+                    <span className="ppm-info-icon" aria-hidden="true">ℹ️</span>
+                    <div>
+                      <strong>Current Membership</strong>
+                      <p>
+                        You currently have{' '}
+                        <span
+                          className="ppm-tier-badge"
+                          style={{ backgroundColor: Object.values(MEMBERSHIP_TIERS)[highestCurrentTier - 1]?.color }}
+                        >
+                          {Object.values(MEMBERSHIP_TIERS)[highestCurrentTier - 1]?.name}
+                        </span>
+                        {' '}tier. You can only upgrade to a higher tier.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show max tier message if user already has Platinum */}
+                {!isLoadingTiers && highestCurrentTier >= 4 && (
+                  <div className="ppm-warning-card">
+                    <span className="ppm-warning-icon" aria-hidden="true">🎉</span>
+                    <div className="ppm-warning-content">
+                      <strong>Maximum Tier Reached</strong>
+                      <p>
+                        You already have Platinum tier - the highest membership level!
+                        There are no upgrades available for the selected role(s).
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tier selection grid - only show available tiers */}
+                {!isLoadingTiers && availableTiers.length > 0 && (
+                  <div className="ppm-tier-grid">
+                    {availableTiers.map(([tierKey, tier]) => {
+                      const benefits = TIER_BENEFITS[tierKey]
+                      const tierTotal = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[tierKey]?.[role] || 0), 0)
+                      const isSelected = selectedTier === tierKey
+
+                      return (
+                        <label
+                          key={tierKey}
+                          className={`ppm-tier-card ${isSelected ? 'selected' : ''}`}
+                          style={{ '--tier-color': tier.color }}
+                        >
+                          <input
+                            type="radio"
+                            name="tier"
+                            value={tierKey}
+                            checked={isSelected}
+                            onChange={() => setSelectedTier(tierKey)}
+                            disabled={isPurchasing}
+                            className="ppm-tier-radio"
+                          />
+                          <div className="ppm-tier-content">
+                            <div className="ppm-tier-header">
+                              <span
+                                className="ppm-tier-badge"
+                                style={{ backgroundColor: tier.color }}
+                              >
+                                {tier.name}
+                              </span>
+                              <span className="ppm-tier-price">${tierTotal} USC</span>
+                            </div>
+
+                            <div className="ppm-tier-limits">
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Daily Bets:</span>
+                                <span className="ppm-limit-value">{benefits.dailyBets}</span>
+                              </div>
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Monthly Markets:</span>
+                                <span className="ppm-limit-value">{benefits.monthlyMarkets}</span>
+                              </div>
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Max Position:</span>
+                                <span className="ppm-limit-value">{benefits.maxPosition}</span>
+                              </div>
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Duration:</span>
+                                <span className="ppm-limit-value">{benefits.duration}</span>
+                              </div>
+                            </div>
+
+                            <ul className="ppm-tier-features">
+                              {benefits.features.map((feature, idx) => (
+                                <li key={idx}>
+                                  <span className="ppm-feature-check" aria-hidden="true">✓</span>
+                                  {feature}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-
-                          <div className="ppm-tier-limits">
-                            <div className="ppm-limit-item">
-                              <span className="ppm-limit-label">Daily Bets:</span>
-                              <span className="ppm-limit-value">{benefits.dailyBets}</span>
-                            </div>
-                            <div className="ppm-limit-item">
-                              <span className="ppm-limit-label">Monthly Markets:</span>
-                              <span className="ppm-limit-value">{benefits.monthlyMarkets}</span>
-                            </div>
-                            <div className="ppm-limit-item">
-                              <span className="ppm-limit-label">Max Position:</span>
-                              <span className="ppm-limit-value">{benefits.maxPosition}</span>
-                            </div>
-                            <div className="ppm-limit-item">
-                              <span className="ppm-limit-label">Duration:</span>
-                              <span className="ppm-limit-value">{benefits.duration}</span>
-                            </div>
-                          </div>
-
-                          <ul className="ppm-tier-features">
-                            {benefits.features.map((feature, idx) => (
-                              <li key={idx}>
-                                <span className="ppm-feature-check" aria-hidden="true">✓</span>
-                                {feature}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
 
                 {/* ZK Key Registration for ClearPath (optional) */}
                 {requiresZkKey && (

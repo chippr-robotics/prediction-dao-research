@@ -1148,6 +1148,182 @@ export const TIER_NAMES = {
   4: 'Platinum'
 }
 
+// TierRegistry ABI for checking user tiers
+const TIER_REGISTRY_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" },
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" }
+    ],
+    "name": "getUserTier",
+    "outputs": [{ "internalType": "enum TierRegistry.MembershipTier", "name": "", "type": "uint8" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
+// TieredRoleManager ABI for checking role sync status
+const TIERED_ROLE_MANAGER_ABI = [
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "hasRole",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "u", "type": "address" },
+      { "internalType": "bytes32", "name": "r", "type": "bytes32" }
+    ],
+    "name": "getUserTier",
+    "outputs": [{ "internalType": "enum TieredRoleManager.MembershipTier", "name": "", "type": "uint8" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "u", "type": "address" },
+      { "internalType": "bytes32", "name": "r", "type": "bytes32" }
+    ],
+    "name": "isMembershipActive",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
+/**
+ * Check if user's role needs to be synced from TierRegistry to TieredRoleManager
+ *
+ * The modular RBAC system (TierRegistry + PaymentProcessor) and FriendGroupMarketFactory's
+ * TieredRoleManager are separate systems. This function detects when a user has a role
+ * in TierRegistry but NOT in TieredRoleManager, which prevents friend market creation.
+ *
+ * @param {string} userAddress - User's wallet address
+ * @param {string} roleName - Role name to check (e.g., 'Friend Market')
+ * @returns {Promise<{needsSync: boolean, tierRegistryTier: number, tieredRoleManagerTier: number, tierName: string}>}
+ */
+export async function checkRoleSyncNeeded(userAddress, roleName) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+  }
+
+  try {
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      console.warn(`Unknown role: ${roleName}`)
+      return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+    }
+
+    const provider = getProvider()
+    const tierRegistryAddress = getContractAddress('tierRegistry')
+    const tieredRoleManagerAddress = getContractAddress('tieredRoleManager')
+
+    let tierRegistryTier = 0
+    let tieredRoleManagerTier = 0
+    let tieredRoleManagerHasRole = false
+
+    // Check TierRegistry
+    if (tierRegistryAddress) {
+      try {
+        const tierRegistry = new ethers.Contract(tierRegistryAddress, TIER_REGISTRY_ABI, provider)
+        const tier = await tierRegistry.getUserTier(userAddress, roleHash)
+        tierRegistryTier = Number(tier)
+      } catch (e) {
+        console.debug('[checkRoleSyncNeeded] TierRegistry check failed:', e.message)
+      }
+    }
+
+    // Check TieredRoleManager
+    if (tieredRoleManagerAddress) {
+      try {
+        const tieredRoleManager = new ethers.Contract(tieredRoleManagerAddress, TIERED_ROLE_MANAGER_ABI, provider)
+        const [hasRole, tier] = await Promise.all([
+          tieredRoleManager.hasRole(roleHash, userAddress),
+          tieredRoleManager.getUserTier(userAddress, roleHash)
+        ])
+        tieredRoleManagerHasRole = hasRole
+        tieredRoleManagerTier = Number(tier)
+      } catch (e) {
+        console.debug('[checkRoleSyncNeeded] TieredRoleManager check failed:', e.message)
+      }
+    }
+
+    // Sync is needed if user has tier in TierRegistry but NOT in TieredRoleManager
+    const needsSync = tierRegistryTier > 0 && (!tieredRoleManagerHasRole || tieredRoleManagerTier === 0)
+    const tierName = tierRegistryTier > 0 ? (TIER_NAMES[tierRegistryTier] || 'Unknown') : 'None'
+
+    console.log(`[checkRoleSyncNeeded] ${roleName}:`, {
+      userAddress,
+      tierRegistryTier,
+      tieredRoleManagerTier,
+      tieredRoleManagerHasRole,
+      needsSync,
+      tierName
+    })
+
+    return {
+      needsSync,
+      tierRegistryTier,
+      tieredRoleManagerTier,
+      tierName
+    }
+  } catch (error) {
+    console.error('Error checking role sync status:', error)
+    return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+  }
+}
+
+/**
+ * Get user's current membership tier for a role from blockchain
+ * @param {string} userAddress - User's wallet address
+ * @param {string} roleName - Role name or constant
+ * @returns {Promise<{tier: number, tierName: string}>} Current tier (0=None, 1=Bronze, 2=Silver, 3=Gold, 4=Platinum)
+ */
+export async function getUserTierOnChain(userAddress, roleName) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return { tier: 0, tierName: 'None' }
+  }
+
+  try {
+    const tierRegistryAddress = getContractAddress('tierRegistry')
+    if (!tierRegistryAddress) {
+      console.warn('TierRegistry not deployed - cannot check user tier')
+      return { tier: 0, tierName: 'None' }
+    }
+
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      console.warn(`Unknown role: ${roleName}`)
+      return { tier: 0, tierName: 'None' }
+    }
+
+    const provider = getProvider()
+    const tierRegistry = new ethers.Contract(
+      tierRegistryAddress,
+      TIER_REGISTRY_ABI,
+      provider
+    )
+
+    const tier = await tierRegistry.getUserTier(userAddress, roleHash)
+    const tierNum = Number(tier)
+    const tierName = tierNum === 0 ? 'None' : (TIER_NAMES[tierNum] || 'Unknown')
+
+    console.log(`[getUserTierOnChain] ${roleName}: tier=${tierNum} (${tierName}) for ${userAddress}`)
+
+    return { tier: tierNum, tierName }
+  } catch (error) {
+    console.error('Error getting user tier:', error)
+    return { tier: 0, tierName: 'None' }
+  }
+}
+
 /**
  * Get the role hash for a given role name
  * @param {string} roleName - Human readable role name or constant
@@ -1159,6 +1335,7 @@ export function getRoleHash(roleName) {
 
 /**
  * Check if user has a role on-chain
+ * Checks both the TierRegistry (modular RBAC) and RoleManager (legacy)
  * @param {string} userAddress - User's wallet address
  * @param {string} roleName - Role name or constant
  * @returns {Promise<boolean>} True if user has the role on-chain
@@ -1168,14 +1345,8 @@ export async function hasRoleOnChain(userAddress, roleName) {
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return false
   }
-  
-  try {
-    const roleManagerAddress = getContractAddress('roleManager')
-    if (!roleManagerAddress) {
-      console.warn('Role manager not deployed - cannot check on-chain role')
-      return false
-    }
 
+  try {
     const roleHash = getRoleHash(roleName)
     if (!roleHash) {
       console.warn(`Unknown role: ${roleName}`)
@@ -1183,13 +1354,43 @@ export async function hasRoleOnChain(userAddress, roleName) {
     }
 
     const provider = getProvider()
+
+    // First check TierRegistry (modular RBAC system) - tier > 0 means user has the role
+    const tierRegistryAddress = getContractAddress('tierRegistry')
+    if (tierRegistryAddress) {
+      try {
+        const tierRegistry = new ethers.Contract(
+          tierRegistryAddress,
+          TIER_REGISTRY_ABI,
+          provider
+        )
+        const tier = await tierRegistry.getUserTier(userAddress, roleHash)
+        const tierNum = Number(tier)
+        if (tierNum > 0) {
+          console.log(`[hasRoleOnChain] ${roleName}: found in TierRegistry with tier ${tierNum}`)
+          return true
+        }
+      } catch (tierError) {
+        console.debug('[hasRoleOnChain] TierRegistry check failed:', tierError.message)
+      }
+    }
+
+    // Fall back to checking RoleManager (legacy/standalone system)
+    const roleManagerAddress = getContractAddress('roleManager')
+    if (!roleManagerAddress) {
+      console.warn('Role manager not deployed - cannot check on-chain role')
+      return false
+    }
+
     const roleManagerContract = new ethers.Contract(
       roleManagerAddress,
       ROLE_MANAGER_ABI,
       provider
     )
 
-    return await roleManagerContract.hasRole(roleHash, userAddress)
+    const hasRole = await roleManagerContract.hasRole(roleHash, userAddress)
+    console.log(`[hasRoleOnChain] ${roleName}: RoleManager.hasRole = ${hasRole}`)
+    return hasRole
   } catch (error) {
     console.error('Error checking on-chain role:', error)
     return false

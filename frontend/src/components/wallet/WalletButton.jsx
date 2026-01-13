@@ -10,11 +10,14 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
 import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
 import {
   isCorrelationRegistryDeployed,
   createCorrelationGroup,
-  addMarketToCorrelationGroup
+  addMarketToCorrelationGroup,
+  getUserTierOnChain,
+  checkRoleSyncNeeded
 } from '../../utils/blockchainService'
 import { uploadMarketMetadata } from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
@@ -270,206 +273,184 @@ function WalletButton({ className = '', theme = 'dark' }) {
     console.log('Friend market creation data:', data)
 
     try {
-      const marketFactoryAddress = getContractAddress('marketFactory')
-      if (!marketFactoryAddress) {
-        throw new Error('Market factory contract not deployed on this network')
+      // Use FriendGroupMarketFactory for friend markets (not ConditionalMarketFactory)
+      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+      if (!friendFactoryAddress) {
+        throw new Error('FriendGroupMarketFactory not deployed on this network')
       }
 
-      // Get collateral token address - use form data or default to USC stablecoin
-      const collateralTokenAddress = data.data?.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
-      if (!collateralTokenAddress) {
-        throw new Error('Collateral token not configured')
+      // Get stake token address - use form data or default to USC stablecoin
+      const stakeTokenAddress = data.data?.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
+      if (!stakeTokenAddress) {
+        throw new Error('Stake token not configured')
       }
 
       // Determine token decimals based on token address
-      const tokenDecimals = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+      const tokenDecimals = stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
         ? TOKENS.USC.decimals  // 6 decimals for USC
         : 18  // Default to 18 decimals for other tokens
 
-      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
-      const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
-
-      // Pre-flight checks: verify contract is properly configured
-      const [ctf1155Address, factoryRoleManager, ownerAddress] = await Promise.all([
-        contract.ctf1155(),
-        contract.roleManager(),
-        contract.owner()
-      ])
-
+      const friendFactory = new ethers.Contract(friendFactoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, activeSigner)
+      const stakeToken = new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
       const userAddress = await activeSigner.getAddress()
 
-      // Check CTF1155 is configured
-      if (ctf1155Address === ethers.ZeroAddress) {
-        throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
-      }
-
-      // Use the configured TieredRoleManager address (factory may have old address locked)
-      const configRoleManager = getContractAddress('tieredRoleManager')
-      let roleManagerAddress = factoryRoleManager
-
-      // If factory roleManager differs from config, use config (factory address is locked to old value)
-      if (configRoleManager && factoryRoleManager.toLowerCase() !== configRoleManager.toLowerCase()) {
-        console.warn('[Friend Market] Factory roleManager differs from config, using TieredRoleManager from config:', configRoleManager)
-        roleManagerAddress = configRoleManager
-      }
-
-      // Check if user can create markets (Friend Market uses same role as Market Maker)
-      const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
-      let hasMarketMakerRole = false
-
-      // Log role check details for debugging
-      console.log('Friend Market role check details:', {
-        userAddress,
-        ownerAddress,
-        isOwner,
-        roleManagerFromFactory: factoryRoleManager,
-        roleManagerUsed: roleManagerAddress,
-        configRoleManager
-      })
-
-      if (roleManagerAddress !== ethers.ZeroAddress) {
-        const roleManagerAbi = [
-          'function hasRole(bytes32 role, address account) view returns (bool)',
-          'function MARKET_MAKER_ROLE() view returns (bytes32)',
-          'function FRIEND_MARKET_ROLE() view returns (bytes32)',
-          'function isActiveMember(address user, bytes32 role) view returns (bool)',
-          'function isMembershipActive(address user, bytes32 role) view returns (bool)'
-        ]
-        const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
-        try {
-          // Try FRIEND_MARKET_ROLE first (for friend markets), fallback to MARKET_MAKER_ROLE
-          let roleToCheck
-          let roleName = 'FRIEND_MARKET_ROLE'
-          try {
-            roleToCheck = await roleManager.FRIEND_MARKET_ROLE()
-          } catch {
-            // Fallback to MARKET_MAKER_ROLE if FRIEND_MARKET_ROLE not available
-            roleToCheck = await roleManager.MARKET_MAKER_ROLE()
-            roleName = 'MARKET_MAKER_ROLE'
-          }
-          console.log(`${roleName} hash:`, roleToCheck)
-
-          hasMarketMakerRole = await roleManager.hasRole(roleToCheck, userAddress)
-          console.log('hasRole result:', hasMarketMakerRole)
-
-          // If hasRole fails, try isActiveMember or isMembershipActive (TieredRoleManager specific)
-          if (!hasMarketMakerRole) {
-            try {
-              // Try isMembershipActive first (newer TieredRoleManager function)
-              const isActive = await roleManager.isMembershipActive(userAddress, roleToCheck)
-              console.log('isMembershipActive result:', isActive)
-              hasMarketMakerRole = isActive
-            } catch {
-              try {
-                // Fallback to isActiveMember
-                const isActive = await roleManager.isActiveMember(userAddress, roleToCheck)
-                console.log('isActiveMember result:', isActive)
-                hasMarketMakerRole = isActive
-              } catch (activeMemberError) {
-                console.log('isActiveMember/isMembershipActive not available:', activeMemberError.message)
-              }
-            }
-          }
-        } catch (roleError) {
-          console.warn('Could not verify on-chain role:', roleError)
+      // Check if user has FRIEND_MARKET role via TierRegistry
+      let hasFriendMarketRole = false
+      try {
+        const friendMarketTier = await getUserTierOnChain(userAddress, 'FRIEND_MARKET')
+        console.log('TierRegistry FRIEND_MARKET tier:', friendMarketTier)
+        if (friendMarketTier.tier > 0) {
+          hasFriendMarketRole = true
+          console.log('User has FRIEND_MARKET role via TierRegistry (tier', friendMarketTier.tierName + ')')
         }
+      } catch (tierError) {
+        console.debug('TierRegistry check failed:', tierError.message)
       }
 
-      // Always check blockchain for roles - roles could expire
-      if (!isOwner && !hasMarketMakerRole) {
-        if (roleManagerAddress === ethers.ZeroAddress) {
-          throw new Error('Friend market creation requires contract owner privileges. Role manager not configured on factory.')
+      if (!hasFriendMarketRole) {
+        throw new Error('You do not have the Friend Market role. Please purchase Friend Markets access to create markets.')
+      }
+
+      // Check if role needs to be synced to TieredRoleManager
+      // FriendGroupMarketFactory checks TieredRoleManager, not TierRegistry
+      try {
+        const syncStatus = await checkRoleSyncNeeded(userAddress, 'FRIEND_MARKET')
+        console.log('Role sync status:', syncStatus)
+
+        if (syncStatus.needsSync) {
+          throw new Error(
+            `Your Friend Market role (${syncStatus.tierName}) needs to be activated in the system. ` +
+            `Please contact support or wait for the role to be synced. ` +
+            `Your purchase was successful but the role needs admin activation for friend market creation.`
+          )
         }
-        throw new Error('You do not have the Friend Market role on-chain. Your membership may have expired. Please purchase or renew your Friend Markets access.')
+      } catch (syncError) {
+        if (syncError.message.includes('needs to be activated')) {
+          throw syncError // Re-throw sync errors
+        }
+        console.debug('Role sync check failed (non-critical):', syncError.message)
       }
 
-      console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })
+      console.log('Friend Market role check passed')
 
-      // Calculate trading period in seconds (contract requires 7-21 days)
+      // Calculate trading period in seconds
       const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
-      const tradingPeriodSeconds = Math.max(
-        TradingPeriod.MIN,
-        Math.min(TradingPeriod.MAX, tradingPeriodDays * 24 * 60 * 60)
-      )
+      const tradingPeriodSeconds = tradingPeriodDays * 24 * 60 * 60
 
-      // Parse stake amount as liquidity using correct decimals for token
+      // Parse stake amount using correct decimals for token
       const stakeAmount = data.data.stakeAmount || '10'
-      const liquidityAmount = ethers.parseUnits(stakeAmount, tokenDecimals)
+      const stakeAmountWei = ethers.parseUnits(stakeAmount, tokenDecimals)
 
-      // Generate a unique proposal ID for the friend market
-      const proposalId = BigInt(Date.now())
+      // Calculate acceptance deadline
+      // The modal may pass: date string, milliseconds timestamp, seconds timestamp, or hours
+      let acceptanceDeadline
+      const rawDeadline = data.data.acceptanceDeadline
 
-      // Default liquidity parameter for LMSR (higher = more liquidity depth)
-      // Use same decimals as collateral token for consistency
-      const liquidityParameter = ethers.parseUnits('100', tokenDecimals)
-
-      // Use WinLose bet type for friend markets (1v1 style)
-      const betType = BetType.WinLose
-
-      // Check and approve collateral token if needed
-      const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
-      if (currentAllowance < liquidityAmount) {
-        console.log('Approving collateral token...')
-        const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
-        await approveTx.wait()
-        console.log('Collateral approved')
+      if (typeof rawDeadline === 'string' && rawDeadline.includes('-')) {
+        // Date string like '2026-01-15T15:44' - parse it
+        const parsedDate = new Date(rawDeadline)
+        if (!isNaN(parsedDate.getTime())) {
+          acceptanceDeadline = Math.floor(parsedDate.getTime() / 1000)
+        } else {
+          // Invalid date, use default 48 hours
+          acceptanceDeadline = Math.floor(Date.now() / 1000) + (48 * 60 * 60)
+        }
+      } else if (typeof rawDeadline === 'number' && rawDeadline > 1000000000000) {
+        // Milliseconds timestamp (13+ digits)
+        acceptanceDeadline = Math.floor(rawDeadline / 1000)
+      } else if (typeof rawDeadline === 'number' && rawDeadline > 1000000000) {
+        // Already in seconds timestamp (10 digits)
+        acceptanceDeadline = Math.floor(rawDeadline)
+      } else {
+        // Treat as hours from now (default 48 hours)
+        const hours = parseInt(rawDeadline) || 48
+        acceptanceDeadline = Math.floor(Date.now() / 1000) + (hours * 60 * 60)
       }
 
-      // Create the market on-chain using deployMarketPair
-      console.log('Deploying market pair...', {
-        proposalId: proposalId.toString(),
-        collateralToken: collateralTokenAddress,
-        liquidityAmount: liquidityAmount.toString(),
-        liquidityParameter: liquidityParameter.toString(),
-        tradingPeriodSeconds,
-        betType
+      console.log('Acceptance deadline calculation:', {
+        rawDeadline,
+        rawDeadlineType: typeof rawDeadline,
+        acceptanceDeadlineSeconds: acceptanceDeadline,
+        acceptanceDeadlineDate: new Date(acceptanceDeadline * 1000).toISOString()
       })
 
-      const tx = await contract.deployMarketPair(
-        proposalId,
-        collateralTokenAddress,
-        liquidityAmount,
-        liquidityParameter,
+      // Get opponent address for 1v1 markets
+      const opponent = data.data.opponent || data.data.participants?.[0]
+      if (!opponent || opponent === userAddress) {
+        throw new Error('Valid opponent address required for 1v1 market')
+      }
+
+      // Get arbitrator (optional - can be zero address for no arbitrator)
+      const arbitrator = data.data.arbitrator || ethers.ZeroAddress
+
+      // Approve stake token for FriendGroupMarketFactory
+      const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
+      if (currentAllowance < stakeAmountWei) {
+        console.log('Approving stake token for FriendGroupMarketFactory...')
+        const approveTx = await stakeToken.approve(friendFactoryAddress, stakeAmountWei)
+        await approveTx.wait()
+        console.log('Stake token approved')
+      }
+
+      // Create the 1v1 pending market
+      console.log('Creating 1v1 pending market...', {
+        opponent,
+        description: data.data.description,
         tradingPeriodSeconds,
-        betType
+        arbitrator,
+        acceptanceDeadline,
+        stakeAmountWei: stakeAmountWei.toString(),
+        stakeToken: stakeTokenAddress
+      })
+
+      const tx = await friendFactory.createOneVsOneMarketPending(
+        opponent,
+        data.data.description || 'Friend Market',
+        tradingPeriodSeconds,
+        arbitrator,
+        acceptanceDeadline,
+        stakeAmountWei,
+        stakeTokenAddress
       )
 
       console.log('Friend market transaction sent:', tx.hash)
       const receipt = await tx.wait()
       console.log('Friend market created:', receipt)
 
-      // Extract market ID from event logs
+      // Extract friendMarketId from event logs
+      let friendMarketId = null
       const marketCreatedEvent = receipt.logs.find(log => {
         try {
-          const parsed = contract.interface.parseLog(log)
-          return parsed?.name === 'MarketCreated'
+          const parsed = friendFactory.interface.parseLog(log)
+          return parsed?.name === 'MarketCreatedPending'
         } catch {
           return false
         }
       })
 
-      let marketId = null
       if (marketCreatedEvent) {
-        const parsed = contract.interface.parseLog(marketCreatedEvent)
-        marketId = parsed?.args?.marketId?.toString()
+        const parsed = friendFactory.interface.parseLog(marketCreatedEvent)
+        friendMarketId = parsed?.args?.friendMarketId?.toString()
       }
 
-      // Store the friend market for display in Activity tab
+      // Store the friend market for display
       const endDate = new Date(Date.now() + tradingPeriodDays * 24 * 60 * 60 * 1000)
 
       const newMarket = {
-        id: marketId || `friend-${Date.now()}`,
+        id: friendMarketId || `friend-${Date.now()}`,
         type: data.marketType || 'oneVsOne',
         description: data.data.description || 'Friend Market',
-        stakeAmount: data.data.stakeAmount || '10',
+        stakeAmount: stakeAmount,
         tradingPeriod: tradingPeriodDays.toString(),
-        participants: data.data.participants || [userAddress],
+        participants: [userAddress, opponent],
+        opponent: opponent,
+        arbitrator: arbitrator,
         creator: userAddress,
         createdAt: new Date().toISOString(),
+        acceptanceDeadline: new Date(acceptanceDeadline * 1000).toISOString(),
         endDate: endDate.toISOString(),
-        status: 'active',
-        txHash: receipt.hash,
-        proposalId: proposalId.toString()
+        status: 'pending', // Friend markets start as pending until opponent accepts
+        txHash: receipt.hash
       }
 
       // Update state and persist to localStorage
@@ -484,8 +465,9 @@ function WalletButton({ className = '', theme = 'dark' }) {
       setShowFriendMarketModal(false)
 
       return {
-        id: marketId || `friend-${Date.now()}`,
-        txHash: receipt.hash
+        id: friendMarketId || `friend-${Date.now()}`,
+        txHash: receipt.hash,
+        status: 'pending'
       }
     } catch (error) {
       console.error('Error creating friend market:', error)
