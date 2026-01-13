@@ -19,9 +19,12 @@ describe('contracts config', () => {
   })
 
   it('keeps role manager aliases in sync', () => {
+    // tieredRoleManager is the legacy RBAC contract (no checkMarketCreationLimitFor)
     expect(DEPLOYED_CONTRACTS.tieredRoleManager).toBeTruthy()
-    expect(DEPLOYED_CONTRACTS.roleManager).toEqual(DEPLOYED_CONTRACTS.tieredRoleManager)
-    expect(DEPLOYED_CONTRACTS.roleManagerCore).toEqual(DEPLOYED_CONTRACTS.tieredRoleManager)
+
+    // roleManager and roleManagerCore should point to the NEWER contract with full IRoleManager interface
+    expect(DEPLOYED_CONTRACTS.roleManager).toBeTruthy()
+    expect(DEPLOYED_CONTRACTS.roleManagerCore).toEqual(DEPLOYED_CONTRACTS.roleManager)
 
     expect(getContractAddress('roleManager')).toEqual(DEPLOYED_CONTRACTS.roleManager)
     expect(getContractAddress('roleManagerCore')).toEqual(DEPLOYED_CONTRACTS.roleManagerCore)
