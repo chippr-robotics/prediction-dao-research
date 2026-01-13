@@ -46,7 +46,7 @@ describe('generateMarketMetadata', () => {
     })
 
     expect(metadata.description).toContain('Base description')
-    expect(metadata.description).toContain('**Resolution Criteria:**')
+    expect(metadata.description).toContain('**Description:**')
     expect(metadata.description).toContain('Market resolves when price hits $100K')
   })
 

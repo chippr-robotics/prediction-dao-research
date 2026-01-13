@@ -25,9 +25,9 @@ import './MarketCreationModal.css'
  * - Collateral token
  *
  * Off-chain data (stored in IPFS):
- * - Market question/title
- * - Description
- * - Resolution criteria
+ * - Title (short, descriptive name displayed on cards)
+ * - Question (the specific prediction question)
+ * - Description (context, background, and resolution criteria)
  * - Category, tags, image
  */
 
@@ -242,23 +242,23 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         }
       } else {
         if (!metadataForm.question.trim()) {
-          newErrors.question = 'Market question is required'
+          newErrors.question = 'Market title is required'
         } else if (metadataForm.question.length < 10) {
-          newErrors.question = 'Question must be at least 10 characters'
+          newErrors.question = 'Title must be at least 10 characters'
         } else if (metadataForm.question.length > 200) {
-          newErrors.question = 'Question must be under 200 characters'
+          newErrors.question = 'Title must be under 200 characters'
         }
 
         if (!metadataForm.description.trim()) {
-          newErrors.description = 'Description is required'
+          newErrors.description = 'Market question is required'
         } else if (metadataForm.description.length < 30) {
-          newErrors.description = 'Description must be at least 30 characters'
+          newErrors.description = 'Question must be at least 30 characters'
         }
 
         if (!metadataForm.resolutionCriteria.trim()) {
-          newErrors.resolutionCriteria = 'Resolution criteria is required'
+          newErrors.resolutionCriteria = 'Market description is required'
         } else if (metadataForm.resolutionCriteria.length < 20) {
-          newErrors.resolutionCriteria = 'Resolution criteria must be at least 20 characters'
+          newErrors.resolutionCriteria = 'Description must be at least 20 characters'
         }
 
         if (!metadataForm.category) {
@@ -367,13 +367,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
     if (resolutionCriteria) {
       const descLower = description.toLowerCase()
-      const marker = 'resolution criteria'
-      const hasResolutionSection = descLower.includes(marker)
+      const marker = '**description:**'
+      const hasDescriptionSection = descLower.includes(marker)
 
-      if (!hasResolutionSection) {
+      if (!hasDescriptionSection) {
         description = description
-          ? `${description}\n\n**Resolution Criteria:**\n${resolutionCriteria}`
-          : `**Resolution Criteria:**\n${resolutionCriteria}`
+          ? `${description}\n\n**Description:**\n${resolutionCriteria}`
+          : `**Description:**\n${resolutionCriteria}`
       }
     }
 
@@ -661,18 +661,18 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                 <>
                   <section className="mcm-section">
                     <h3 className="mcm-section-title">
-                      <span aria-hidden="true">❓</span> Market Question
+                      <span aria-hidden="true">❓</span> Market Details
                     </h3>
                     <div className="mcm-field">
                       <label htmlFor="question">
-                        Question <span className="mcm-required">*</span>
+                        Title <span className="mcm-required">*</span>
                       </label>
                       <input
                         id="question"
                         type="text"
                         value={metadataForm.question}
                         onChange={e => handleMetadataChange('question', e.target.value)}
-                        placeholder="Will Bitcoin reach $100,000 by end of 2025?"
+                        placeholder="Short, descriptive title for the market"
                         disabled={submitting}
                         maxLength={200}
                         className={errors.question ? 'error' : ''}
@@ -685,13 +685,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                     <div className="mcm-field">
                       <label htmlFor="description">
-                        Description <span className="mcm-required">*</span>
+                        Question <span className="mcm-required">*</span>
                       </label>
                       <textarea
                         id="description"
                         value={metadataForm.description}
                         onChange={e => handleMetadataChange('description', e.target.value)}
-                        placeholder="Provide context and background for this prediction..."
+                        placeholder="The specific question this market is asking (e.g., Will Bitcoin reach $100,000 by end of 2025?)"
                         disabled={submitting}
                         rows={3}
                         className={errors.description ? 'error' : ''}
@@ -701,18 +701,18 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                     <div className="mcm-field">
                       <label htmlFor="resolutionCriteria">
-                        Resolution Criteria <span className="mcm-required">*</span>
+                        Description <span className="mcm-required">*</span>
                       </label>
                       <textarea
                         id="resolutionCriteria"
                         value={metadataForm.resolutionCriteria}
                         onChange={e => handleMetadataChange('resolutionCriteria', e.target.value)}
-                        placeholder="Define exactly how this market will be resolved..."
+                        placeholder="Provide context, background, and resolution criteria for this market..."
                         disabled={submitting}
                         rows={3}
                         className={errors.resolutionCriteria ? 'error' : ''}
                       />
-                      <div className="mcm-hint">Be specific about data sources, timing, and edge cases</div>
+                      <div className="mcm-hint">Include data sources, timing, edge cases, and how resolution will be determined</div>
                       {errors.resolutionCriteria && <div className="mcm-error">{errors.resolutionCriteria}</div>}
                     </div>
                   </section>
@@ -1296,9 +1296,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                   {!useCustomUri && (
                     <div className="mcm-review-body">
-                      <p className="mcm-review-desc">{metadataForm.description}</p>
                       <div className="mcm-review-section">
-                        <strong>Resolution Criteria:</strong>
+                        <strong>Question:</strong>
+                        <p>{metadataForm.description}</p>
+                      </div>
+                      <div className="mcm-review-section">
+                        <strong>Description:</strong>
                         <p>{metadataForm.resolutionCriteria}</p>
                       </div>
                     </div>

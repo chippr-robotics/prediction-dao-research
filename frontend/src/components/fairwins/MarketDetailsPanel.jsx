@@ -68,7 +68,7 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
         <table className="details-table">
           <tbody>
             <tr>
-              <td className="detail-label">Question</td>
+              <td className="detail-label">Title</td>
               <td className="detail-value detail-question">{market.proposalTitle}</td>
             </tr>
             <tr>
@@ -166,18 +166,18 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
         </div>
       )}
 
-      {/* Description */}
+      {/* Question */}
       {market.description && (
         <div className="criteria-section">
-          <div className="section-label">Description</div>
+          <div className="section-label">Question</div>
           <div className="criteria-content">{market.description}</div>
         </div>
       )}
 
-      {/* Resolution Criteria */}
+      {/* Description */}
       {market.resolutionCriteria && (
         <div className="criteria-section">
-          <div className="section-label">Resolution Criteria</div>
+          <div className="section-label">Description</div>
           <div className="criteria-content">{market.resolutionCriteria}</div>
         </div>
       )}
