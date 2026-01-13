@@ -21,7 +21,7 @@ import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
 import walletIcon from '../../assets/wallet_no_text.svg'
-import { FriendMarketsModal } from '../fairwins'
+import { FriendMarketsModal, MyMarketsModal } from '../fairwins'
 import './WalletButton.css'
 
 /**
@@ -60,6 +60,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
+  const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
   const [friendMarkets, setFriendMarkets] = useState(() => loadFriendMarketsFromStorage())
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
@@ -251,6 +252,11 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const handleOpenFriendMarket = () => {
     setIsOpen(false)
     setShowFriendMarketModal(true)
+  }
+
+  const handleOpenMyMarkets = () => {
+    setIsOpen(false)
+    setShowMyMarketsModal(true)
   }
 
   const handleFriendMarketCreation = async (data, modalSigner) => {
@@ -1002,6 +1008,19 @@ function WalletButton({ className = '', theme = 'dark' }) {
                 )}
               </div>
 
+              {/* My Markets Section */}
+              <div className="dropdown-section">
+                <span className="wallet-section-title">My Markets</span>
+                <button
+                  onClick={handleOpenMyMarkets}
+                  className="action-button my-markets-btn"
+                  role="menuitem"
+                >
+                  <span aria-hidden="true">&#128202;</span>
+                  <span>View My Markets</span>
+                </button>
+              </div>
+
               {/* Friend Markets Section */}
               <div className="dropdown-section">
                 <span className="wallet-section-title">Friend Markets</span>
@@ -1124,6 +1143,13 @@ function WalletButton({ className = '', theme = 'dark' }) {
           )}
         </>
       )}
+
+      {/* My Markets Modal */}
+      <MyMarketsModal
+        isOpen={showMyMarketsModal}
+        onClose={() => setShowMyMarketsModal(false)}
+        friendMarkets={friendMarkets}
+      />
 
       {/* Friend Market Creation Modal */}
       <FriendMarketsModal
