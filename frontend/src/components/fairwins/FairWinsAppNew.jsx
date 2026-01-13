@@ -8,7 +8,7 @@ import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import { getSubcategoriesForCategory } from '../../config/subcategories'
-import { buyMarketShares, estimateBuyGas } from '../../utils/blockchainService'
+import { buyMarketShares } from '../../utils/blockchainService'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -156,9 +156,21 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       return
     }
 
-    // Validate trade data
-    if (!tradeData.market?.id) {
-      showNotification('Invalid market data', 'error', 5000)
+    // Validate trade data - check for market object and valid id (including 0)
+    if (!tradeData?.market) {
+      showNotification('Invalid market data - market not found', 'error', 5000)
+      return
+    }
+
+    // Market ID can be 0, so check for undefined/null specifically
+    if (tradeData.market.id === undefined || tradeData.market.id === null) {
+      showNotification('Invalid market data - market ID is missing', 'error', 5000)
+      return
+    }
+
+    // Check if market has required fields for trading
+    if (!tradeData.market.passTokenPrice || !tradeData.market.failTokenPrice) {
+      showNotification('Market data is incomplete - cannot trade', 'error', 5000)
       return
     }
 
@@ -172,33 +184,58 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       const outcome = tradeData.type === 'PASS' // true for YES/PASS, false for NO/FAIL
       const amount = tradeData.amount.toString()
 
-      // Show notification that transaction is being prepared
-      showNotification('Preparing transaction...', 'info', 3000)
+      // Progress callback to show step-by-step notifications
+      const handleProgress = (step, message) => {
+        // Map steps to notification types
+        const notificationTypes = {
+          'checking': 'info',
+          'approval_needed': 'info',
+          'approval_pending': 'info',
+          'approval_confirmed': 'success',
+          'buy_pending': 'info',
+          'buy_confirmed': 'success'
+        }
 
-      // Estimate gas (optional, for better UX)
-      try {
-        const gasEstimate = await estimateBuyGas(signer, marketId, outcome, amount)
-        console.log('Estimated gas cost:', gasEstimate, 'ETC')
-      } catch (gasError) {
-        console.warn('Could not estimate gas:', gasError)
+        const type = notificationTypes[step] || 'info'
+        const duration = step.includes('pending') ? 10000 : 5000
+
+        showNotification(message, type, duration)
       }
 
-      // Execute the transaction
-      showNotification('Please confirm the transaction in your wallet', 'info', 5000)
+      // Show initial notification
+      showNotification('Preparing trade...', 'info', 3000)
 
-      const receipt = await buyMarketShares(signer, marketId, outcome, amount)
+      // Execute the transaction with progress updates
+      const receipt = await buyMarketShares(signer, marketId, outcome, amount, handleProgress)
 
-      // Show success notification with transaction hash
+      // Show final success notification
+      const txSummary = receipt.approvalRequired
+        ? `Trade complete! (2 transactions: approval + buy)`
+        : `Trade complete!`
       showNotification(
-        `Trade successful! ${tradeData.amount} ETC for ${tradeData.type} shares`,
+        `${txSummary} ${tradeData.amount} USC for ${tradeData.type} shares`,
         'success',
         7000
       )
 
       console.log('Transaction receipt:', receipt)
 
-      // Optionally refresh market data
-      await loadMarkets()
+      // Refresh market data and update selectedMarket with fresh data
+      // Note: We don't set loading=true here to keep the modal open during refresh
+      try {
+        const allMarkets = await getMarkets()
+        setMarkets(allMarkets)
+
+        // Update selectedMarket with the refreshed data if one is selected
+        if (selectedMarket) {
+          const updatedMarket = allMarkets.find(m => m.id === selectedMarket.id)
+          if (updatedMarket) {
+            setSelectedMarket(updatedMarket)
+          }
+        }
+      } catch (refreshError) {
+        console.error('Error refreshing markets:', refreshError)
+      }
 
     } catch (error) {
       console.error('Trade error:', error)
@@ -221,8 +258,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const handleOpenIndividualMarket = (market) => {
     // When opening an individual market from a correlated group,
     // we want to show the MarketModal instead of CorrelatedMarketsModal
-    // To do this, we create a copy of the market without the correlationGroupId
-    const individualMarket = { ...market, correlationGroupId: null }
+    // To do this, we create a copy of the market without the correlationGroup
+    const individualMarket = { ...market, correlationGroup: undefined }
     setShowHero(false) // Close current modal
     // Use setTimeout to ensure state updates before reopening
     setTimeout(() => {
@@ -468,20 +505,26 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
         <div className="unified-view">
           {/* Correlated Markets Modal - For correlation groups */}
           <CorrelatedMarketsModal
-            isOpen={showHero && selectedMarket && selectedMarket.correlationGroupId}
+            isOpen={showHero && selectedMarket && selectedMarket.correlationGroup?.groupId !== undefined}
             onClose={handleCloseHero}
             market={selectedMarket}
-            correlatedMarkets={selectedMarket?.correlationGroupId ? markets.filter(m => m.correlationGroupId === selectedMarket.correlationGroupId) : []}
+            correlatedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
+              ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
+              : []}
             onTrade={handleTrade}
             onOpenMarket={handleOpenIndividualMarket}
           />
 
           {/* Market Modal - For individual markets (non-correlated) */}
           <MarketModal
-            isOpen={showHero && selectedMarket && !selectedMarket.correlationGroupId}
+            isOpen={showHero && selectedMarket && selectedMarket.correlationGroup?.groupId === undefined}
             onClose={handleCloseHero}
             market={selectedMarket}
             onTrade={handleTrade}
+            linkedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
+              ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
+              : []
+            }
           />
 
           {/* Perpetual Futures Modal */}

@@ -10,6 +10,13 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
 import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
+import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+import {
+  isCorrelationRegistryDeployed,
+  createCorrelationGroup,
+  addMarketToCorrelationGroup
+} from '../../utils/blockchainService'
+import { uploadMarketMetadata } from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -262,11 +269,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory contract not deployed on this network')
       }
 
-      // Get collateral token address (USC/FairWins token)
-      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      // Get collateral token address - use form data or default to USC stablecoin
+      const collateralTokenAddress = data.data?.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
       if (!collateralTokenAddress) {
         throw new Error('Collateral token not configured')
       }
+
+      // Determine token decimals based on token address
+      const tokenDecimals = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+        ? TOKENS.USC.decimals  // 6 decimals for USC
+        : 18  // Default to 18 decimals for other tokens
 
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
@@ -344,15 +356,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
         Math.min(TradingPeriod.MAX, tradingPeriodDays * 24 * 60 * 60)
       )
 
-      // Parse stake amount as liquidity (in token units)
+      // Parse stake amount as liquidity using correct decimals for token
       const stakeAmount = data.data.stakeAmount || '10'
-      const liquidityAmount = ethers.parseEther(stakeAmount)
+      const liquidityAmount = ethers.parseUnits(stakeAmount, tokenDecimals)
 
       // Generate a unique proposal ID for the friend market
       const proposalId = BigInt(Date.now())
 
       // Default liquidity parameter for LMSR (higher = more liquidity depth)
-      const liquidityParameter = ethers.parseEther('100')
+      // Use same decimals as collateral token for consistency
+      const liquidityParameter = ethers.parseUnits('100', tokenDecimals)
 
       // Use WinLose bet type for friend markets (1v1 style)
       const betType = BetType.WinLose
@@ -452,16 +465,58 @@ function WalletButton({ className = '', theme = 'dark' }) {
   /**
    * Handle creation from the MarketCreationModal
    * Supports prediction markets with web3 transactions using CTF1155
+   *
+   * Transaction Flow:
+   * 1. Approve collateral token (if needed)
+   * 2. Create market on-chain
+   * 3. Create correlation group (if new group selected)
+   * 4. Add market to correlation group (if correlation enabled)
    */
-  const handleMarketCreation = async (submitData, modalSigner) => {
+  const handleMarketCreation = async (submitData, modalSigner, onProgress) => {
     const activeSigner = modalSigner || signer
+
+    // Helper to report progress
+    const reportProgress = (step, total, description, status = 'pending') => {
+      if (onProgress) {
+        onProgress({ step, total, description, status })
+      }
+      console.log(`[${step}/${total}] ${description} - ${status}`)
+    }
+
+    // Calculate total steps based on configuration
+    const hasCorrelation = submitData.correlationGroup && isCorrelationRegistryDeployed()
+    const isNewGroup = hasCorrelation && submitData.correlationGroup.createNew
+    const hasMetadata = submitData.metadata && !submitData.metadataUri
+    let totalSteps = 2 // Base: approve + create market
+    if (hasMetadata) totalSteps++ // + upload metadata to IPFS
+    if (isNewGroup) totalSteps++ // + create group
+    if (hasCorrelation) totalSteps++ // + add to group
 
     if (!activeSigner) {
       console.error('No signer available for market creation')
       throw new Error('Please connect your wallet to create a market')
     }
 
+    // Verify signer is authorized for the connected address
+    try {
+      const signerAddress = await activeSigner.getAddress()
+      console.log('Market creation - Signer address:', signerAddress)
+      console.log('Market creation - Connected address:', address)
+
+      if (address && signerAddress.toLowerCase() !== address.toLowerCase()) {
+        console.warn('Signer address does not match connected address, reconnecting...')
+        // Request accounts to ensure authorization
+        if (window.ethereum) {
+          await window.ethereum.request({ method: 'eth_requestAccounts' })
+        }
+      }
+    } catch (addressError) {
+      console.error('Error verifying signer address:', addressError)
+      throw new Error('Wallet authorization failed. Please reconnect your wallet.')
+    }
+
     console.log('Market creation data:', submitData)
+    console.log('Collateral token from form:', submitData.collateralToken)
 
     try {
       const marketFactoryAddress = getContractAddress('marketFactory')
@@ -469,11 +524,19 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory contract not deployed on this network')
       }
 
-      // Get collateral token address (USC/FairWins token)
-      const collateralTokenAddress = getContractAddress('fairWinsToken')
+      // Get collateral token address - use form data or default to USC stablecoin
+      const collateralTokenAddress = submitData.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
+      console.log('Using collateral token:', collateralTokenAddress)
+      console.log('USC stablecoin address:', ETCSWAP_ADDRESSES.USC_STABLECOIN)
+
       if (!collateralTokenAddress) {
         throw new Error('Collateral token not configured')
       }
+
+      // Determine token decimals based on token address
+      const tokenDecimals = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
+        ? TOKENS.USC.decimals  // 6 decimals for USC
+        : 18  // Default to 18 decimals for other tokens
 
       const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
@@ -510,7 +573,8 @@ function WalletButton({ className = '', theme = 'dark' }) {
         const roleManagerAbi = [
           'function hasRole(bytes32 role, address account) view returns (bool)',
           'function MARKET_MAKER_ROLE() view returns (bytes32)',
-          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+          'function isActiveMember(address user, bytes32 role) view returns (bool)',
+          'function checkMarketCreationLimitFor(address user, bytes32 role) returns (bool)'
         ]
         const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
         try {
@@ -529,6 +593,20 @@ function WalletButton({ className = '', theme = 'dark' }) {
               hasMarketMakerRole = isActive
             } catch (activeMemberError) {
               console.log('isActiveMember not available or failed:', activeMemberError.message)
+            }
+          }
+
+          // Pre-check market creation limit (this is what the contract will call)
+          if (hasMarketMakerRole) {
+            try {
+              const limitCheck = await roleManager.checkMarketCreationLimitFor.staticCall(userAddress, marketMakerRole)
+              console.log('checkMarketCreationLimitFor result:', limitCheck)
+              if (!limitCheck) {
+                throw new Error('Market creation limit exceeded. You may need to wait or upgrade your tier.')
+              }
+            } catch (limitError) {
+              console.warn('checkMarketCreationLimitFor check failed:', limitError.message)
+              // Don't fail here - the contract might handle this differently
             }
           }
         } catch (roleError) {
@@ -552,14 +630,15 @@ function WalletButton({ className = '', theme = 'dark' }) {
         Math.min(TradingPeriod.MAX, submitData.tradingPeriod || TradingPeriod.DEFAULT)
       )
 
-      // Parse initial liquidity as token amount
-      const liquidityAmount = ethers.parseEther(submitData.initialLiquidity.toString())
+      // Parse initial liquidity using correct decimals for token
+      const liquidityAmount = ethers.parseUnits(submitData.initialLiquidity.toString(), tokenDecimals)
 
       // Generate a unique proposal ID
       const proposalId = BigInt(Date.now())
 
       // Default liquidity parameter for LMSR
-      const liquidityParameter = ethers.parseEther('100')
+      // Use same decimals as collateral token for consistency
+      const liquidityParameter = ethers.parseUnits('100', tokenDecimals)
 
       // Determine bet type from metadata or default to YesNo
       let betType = BetType.YesNo
@@ -572,37 +651,102 @@ function WalletButton({ className = '', theme = 'dark' }) {
         }
       }
 
-      // Check and approve collateral token if needed (userAddress already retrieved during pre-flight)
+      // Step 1: Check and approve collateral token if needed
+      let currentStep = 1
       const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
       if (currentAllowance < liquidityAmount) {
-        console.log('Approving collateral token...')
+        reportProgress(currentStep, totalSteps, 'Approving collateral token...', 'signing')
         const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
+        reportProgress(currentStep, totalSteps, 'Waiting for approval confirmation...', 'confirming')
         await approveTx.wait()
-        console.log('Collateral approved')
+        reportProgress(currentStep, totalSteps, 'Collateral approved', 'completed')
+      } else {
+        reportProgress(currentStep, totalSteps, 'Collateral already approved', 'completed')
       }
 
-      // Create the market on-chain using deployMarketPair
-      console.log('Deploying market pair...', {
+      // Step 2 (if hasMetadata): Upload metadata to IPFS
+      let metadataUri = submitData.metadataUri || ''
+      if (hasMetadata) {
+        currentStep++
+        reportProgress(currentStep, totalSteps, 'Uploading metadata to IPFS...', 'pending')
+        try {
+          console.log('Uploading market metadata to IPFS:', submitData.metadata)
+          const uploadResult = await uploadMarketMetadata(submitData.metadata)
+          metadataUri = uploadResult.uri
+          console.log('Metadata uploaded to IPFS:', metadataUri)
+          reportProgress(currentStep, totalSteps, 'Metadata uploaded to IPFS', 'completed')
+        } catch (uploadError) {
+          console.error('Failed to upload metadata to IPFS:', uploadError)
+          throw new Error(`Failed to upload metadata: ${uploadError.message}`)
+        }
+      }
+
+      // Step 3: Create the market on-chain
+      currentStep++
+      reportProgress(currentStep, totalSteps, 'Creating market...', 'signing')
+      console.log('Deploying market pair with metadata...', {
         proposalId: proposalId.toString(),
         collateralToken: collateralTokenAddress,
         liquidityAmount: liquidityAmount.toString(),
         liquidityParameter: liquidityParameter.toString(),
         tradingPeriodSeconds,
-        betType
+        betType,
+        metadataUri
       })
 
-      const tx = await contract.deployMarketPair(
+      // First try a static call to get detailed error information if it would fail
+      try {
+        await contract.deployMarketPairWithMetadata.staticCall(
+          proposalId,
+          collateralTokenAddress,
+          liquidityAmount,
+          liquidityParameter,
+          tradingPeriodSeconds,
+          betType,
+          metadataUri
+        )
+        console.log('Static call simulation passed')
+      } catch (staticCallError) {
+        console.error('Static call simulation failed:', staticCallError)
+        // Try to extract more detailed error info
+        if (staticCallError.reason) {
+          throw new Error(`Market creation would fail: ${staticCallError.reason}`)
+        }
+        if (staticCallError.data && staticCallError.data !== '0x') {
+          // Try to decode error
+          try {
+            const decoded = contract.interface.parseError(staticCallError.data)
+            if (decoded) {
+              throw new Error(`Market creation would fail: ${decoded.name}(${decoded.args.join(', ')})`)
+            }
+          } catch (decodeErr) {
+            // Check for standard Error(string) revert
+            if (staticCallError.data.startsWith('0x08c379a0')) {
+              const abiCoder = new ethers.AbiCoder()
+              const errorString = abiCoder.decode(['string'], '0x' + staticCallError.data.slice(10))[0]
+              throw new Error(`Market creation would fail: ${errorString}`)
+            }
+          }
+        }
+        // If we can't get more info, throw with the original message
+        throw new Error(`Market creation simulation failed: ${staticCallError.message}`)
+      }
+
+      const tx = await contract.deployMarketPairWithMetadata(
         proposalId,
         collateralTokenAddress,
         liquidityAmount,
         liquidityParameter,
         tradingPeriodSeconds,
-        betType
+        betType,
+        metadataUri
       )
 
       console.log('Market creation transaction sent:', tx.hash)
+      reportProgress(currentStep, totalSteps, 'Waiting for market confirmation...', 'confirming')
       const receipt = await tx.wait()
       console.log('Market created:', receipt)
+      reportProgress(currentStep, totalSteps, 'Market created successfully', 'completed')
 
       // Extract market ID from event logs
       const marketCreatedEvent = receipt.logs.find(log => {
@@ -618,6 +762,52 @@ function WalletButton({ className = '', theme = 'dark' }) {
       if (marketCreatedEvent) {
         const parsed = contract.interface.parseLog(marketCreatedEvent)
         marketId = parsed?.args?.marketId?.toString()
+      }
+
+      // Handle correlation group if provided
+      if (hasCorrelation && marketId) {
+        console.log('Processing correlation group:', submitData.correlationGroup)
+
+        try {
+          let groupId = submitData.correlationGroup.existingGroupId
+
+          // Step 3 (optional): Create new group if needed
+          if (isNewGroup) {
+            currentStep++
+            reportProgress(currentStep, totalSteps, 'Creating correlation group...', 'signing')
+            console.log('Creating new correlation group...')
+            const groupResult = await createCorrelationGroup(
+              activeSigner,
+              submitData.correlationGroup.newGroupName,
+              submitData.correlationGroup.newGroupDescription || '',
+              submitData.correlationGroup.category
+            )
+            groupId = groupResult.groupId
+            console.log('New correlation group created:', groupId)
+            reportProgress(currentStep, totalSteps, 'Correlation group created', 'completed')
+          }
+
+          // Step 3 or 4: Add market to group
+          if (groupId !== null && groupId !== undefined) {
+            currentStep++
+            reportProgress(currentStep, totalSteps, 'Adding market to group...', 'signing')
+            console.log('Adding market to correlation group:', { groupId, marketId })
+            await addMarketToCorrelationGroup(activeSigner, groupId, parseInt(marketId))
+            console.log('Market added to correlation group successfully')
+            reportProgress(currentStep, totalSteps, 'Market added to group', 'completed')
+          }
+        } catch (correlationError) {
+          // Log the error and notify user, but don't fail - market was already created
+          console.error('Error handling correlation group:', correlationError)
+          console.warn('Market was created but correlation group operation failed')
+          reportProgress(currentStep, totalSteps, `Group operation failed: ${correlationError.message}`, 'failed')
+
+          // Show user-friendly error message
+          const errorMessage = correlationError.message || 'Unknown error'
+          if (errorMessage.includes('group creator')) {
+            console.warn('Permission error: Only the group creator or owner can add markets to this group')
+          }
+        }
       }
 
       setShowMarketCreationModal(false)

@@ -51,8 +51,8 @@ export function generateMarketMetadata(params) {
 
   const metadata = {
     name,
-    description: resolutionCriteria 
-      ? `${description}\n\n**Resolution Criteria:**\n${resolutionCriteria}`
+    description: resolutionCriteria
+      ? `${description}\n\n**Description:**\n${resolutionCriteria}`
       : description,
     external_url: `https://fairwins.app/market/${marketId}`,
     image: imageUrl,

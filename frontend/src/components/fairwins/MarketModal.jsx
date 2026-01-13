@@ -69,7 +69,7 @@ const QUICK_ACTION_AMOUNTS = [5, 25, 100, 500]
  * - Market and limit order types
  * - Dynamic price and reward calculations
  */
-function MarketModal({ isOpen, onClose, market, onTrade }) {
+function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
   const [selectedOutcome, setSelectedOutcome] = useState('YES')
   const [orderType, setOrderType] = useState('market') // 'market' or 'limit'
   const [amount, setAmount] = useState('1.00')
@@ -573,7 +573,7 @@ function MarketModal({ isOpen, onClose, market, onTrade }) {
 
             {/* Panel 1: Market Details */}
             <div className="carousel-panel">
-              <MarketDetailsPanel market={market} />
+              <MarketDetailsPanel market={market} linkedMarkets={linkedMarkets} />
             </div>
 
             {/* Panel 2: Share/QR */}

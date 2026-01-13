@@ -14,7 +14,9 @@ const { ethers } = require("hardhat");
 // Existing deployed contracts
 const DEPLOYED_CONTRACTS = {
   ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
-  roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
+  // Use the NEWER RoleManagerCore that has checkMarketCreationLimitFor function
+  // Old: '0x888332df7621EC341131d85e2228f00407777dD7' - does NOT have checkMarketCreationLimitFor
+  roleManagerCore: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5',
   // Old factory (for reference): '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac'
 };
 

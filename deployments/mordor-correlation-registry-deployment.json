@@ -1,0 +1,15 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "contracts": {
+    "marketCorrelationRegistry": "0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A"
+  },
+  "verification": {
+    "marketCorrelationRegistry": {
+      "status": "failed",
+      "error": "The contract verification failed."
+    }
+  },
+  "timestamp": "2026-01-12T00:02:24.964Z"
+}

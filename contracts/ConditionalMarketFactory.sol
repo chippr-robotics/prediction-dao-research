@@ -81,6 +81,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         bytes32 questionId;        // CTF question ID (if using CTF)
         uint256 passPositionId;    // CTF position ID for pass outcome
         uint256 failPositionId;    // CTF position ID for fail outcome
+        uint256 passQuantity;      // Cumulative collateral spent on PASS
+        uint256 failQuantity;      // Cumulative collateral spent on FAIL
     }
 
     enum MarketStatus {
@@ -98,10 +100,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     
     // Market status tracking for efficient querying
     mapping(MarketStatus => uint256[]) private marketsByStatus;
-    
+
     // Time-based indexing (day => market IDs)
     mapping(uint256 => uint256[]) private marketsByDay;
-    
+
+    // Market ID => Metadata URI (IPFS or HTTP URL)
+    mapping(uint256 => string) private marketMetadataUris;
+
     uint256 public marketCount;
     uint256 public constant DEFAULT_TRADING_PERIOD = 10 days;
     uint256 public constant MIN_TRADING_PERIOD = 7 days;
@@ -391,7 +396,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             conditionId: conditionId,
             questionId: questionId,
             passPositionId: passPositionId,
-            failPositionId: failPositionId
+            failPositionId: failPositionId,
+            passQuantity: liquidityParameter,  // Initialize equal for 50/50
+            failQuantity: liquidityParameter   // Initialize equal for 50/50
         });
 
         _proposalToMarketPlusOne[proposalId] = marketId + 1;
@@ -414,7 +421,102 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         
         emit CTFMarketCreated(marketId, conditionId, passPositionId, failPositionId);
     }
-    
+
+    /**
+     * @notice Deploy a market pair with metadata URI
+     * @param proposalId ID of the proposal
+     * @param collateralToken Address of collateral token (must be ERC20, not address(0))
+     * @param liquidityAmount Initial liquidity amount
+     * @param liquidityParameter Beta parameter for LMSR (higher = more liquidity)
+     * @param tradingPeriod Trading period in seconds
+     * @param betType Type of binary bet (YesNo, PassFail, AboveBelow, etc.)
+     * @param metadataUri IPFS or HTTP URI pointing to market metadata JSON
+     * @return marketId ID of the created market
+     */
+    function deployMarketPairWithMetadata(
+        uint256 proposalId,
+        address collateralToken,
+        uint256 liquidityAmount,
+        uint256 liquidityParameter,
+        uint256 tradingPeriod,
+        BetType betType,
+        string memory metadataUri
+    ) external checkMarketCreationLimit returns (uint256 marketId) {
+        // Allow either owner or market maker role
+        require(
+            msg.sender == owner() ||
+            (address(roleManager) != address(0) && roleManager.hasRole(roleManager.MARKET_MAKER_ROLE(), msg.sender)),
+            "Requires owner or MARKET_MAKER_ROLE"
+        );
+        require(_proposalToMarketPlusOne[proposalId] == 0, "Market already exists");
+        require(tradingPeriod >= MIN_TRADING_PERIOD && tradingPeriod <= MAX_TRADING_PERIOD, "Invalid trading period");
+        require(address(ctf1155) != address(0), "CTF1155 not set");
+        require(collateralToken != address(0), "CTF requires ERC20 collateral");
+
+        marketId = marketCount++;
+
+        // Generate unique question ID for this market
+        bytes32 questionId = keccak256(abi.encodePacked("market", marketId, proposalId, block.timestamp));
+
+        // Prepare condition with 2 outcomes (binary)
+        bytes32 conditionId = ctf1155.prepareCondition(address(this), questionId, 2);
+
+        // Calculate position IDs for pass (index 1) and fail (index 2) outcomes
+        bytes32 passCollectionId = ctf1155.getCollectionId(bytes32(0), conditionId, 1);
+        bytes32 failCollectionId = ctf1155.getCollectionId(bytes32(0), conditionId, 2);
+
+        uint256 passPositionId = ctf1155.getPositionId(IERC20(collateralToken), passCollectionId);
+        uint256 failPositionId = ctf1155.getPositionId(IERC20(collateralToken), failCollectionId);
+
+        // Store CTF1155 address in passToken and failToken for compatibility
+        address ctfAddress = address(ctf1155);
+
+        markets[marketId] = Market({
+            proposalId: proposalId,
+            passToken: ctfAddress,
+            failToken: ctfAddress,
+            collateralToken: collateralToken,
+            tradingEndTime: block.timestamp + tradingPeriod,
+            liquidityParameter: liquidityParameter,
+            totalLiquidity: liquidityAmount,
+            resolved: false,
+            passValue: 0,
+            failValue: 0,
+            status: MarketStatus.Active,
+            betType: betType,
+            useCTF: true,
+            conditionId: conditionId,
+            questionId: questionId,
+            passPositionId: passPositionId,
+            failPositionId: failPositionId,
+            passQuantity: liquidityParameter,  // Initialize equal for 50/50
+            failQuantity: liquidityParameter   // Initialize equal for 50/50
+        });
+
+        // Store metadata URI
+        marketMetadataUris[marketId] = metadataUri;
+
+        _proposalToMarketPlusOne[proposalId] = marketId + 1;
+
+        // Update indexes
+        _updateMarketIndex(marketId, MarketStatus.Active);
+
+        emit MarketCreated(
+            marketId,
+            proposalId,
+            collateralToken,
+            ctfAddress,
+            ctfAddress,
+            markets[marketId].tradingEndTime,
+            liquidityParameter,
+            block.timestamp,
+            msg.sender,
+            betType
+        );
+
+        emit CTFMarketCreated(marketId, conditionId, passPositionId, failPositionId);
+    }
+
     /**
      * @notice Batch deploy multiple market pairs for efficiency
      * @param params Array of market creation parameters
@@ -480,7 +582,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
                 conditionId: conditionId,
                 questionId: questionId,
                 passPositionId: passPositionId,
-                failPositionId: failPositionId
+                failPositionId: failPositionId,
+                passQuantity: params[i].liquidityParameter,  // Initialize equal for 50/50
+                failQuantity: params[i].liquidityParameter   // Initialize equal for 50/50
             });
             
             _proposalToMarketPlusOne[params[i].proposalId] = marketId + 1;
@@ -623,11 +727,16 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             
             // Store the other position tokens in this contract for later merging/redemption
             // (They stay in this contract's balance)
-            
-            // Update market liquidity
+
+            // Update market liquidity and quantities for LMSR pricing
             market.totalLiquidity += amount;
+            if (buyPass) {
+                market.passQuantity += amount;
+            } else {
+                market.failQuantity += amount;
+            }
         }
-        
+
         emit TokensPurchased(marketId, msg.sender, buyPass, amount, tokenAmount);
     }
     
@@ -737,15 +846,22 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             
             // Calculate collateral amount (1:1 for merge)
             collateralAmount = tokenAmount;
-            
+
             // Transfer collateral back to seller
             IERC20(market.collateralToken).safeTransfer(msg.sender, collateralAmount);
-            
-            // Update market liquidity
+
+            // Update market liquidity and quantities for LMSR pricing
             require(collateralAmount <= market.totalLiquidity, "Insufficient liquidity");
             market.totalLiquidity -= collateralAmount;
+            if (sellPass) {
+                require(collateralAmount <= market.passQuantity, "Insufficient pass quantity");
+                market.passQuantity -= collateralAmount;
+            } else {
+                require(collateralAmount <= market.failQuantity, "Insufficient fail quantity");
+                market.failQuantity -= collateralAmount;
+            }
         }
-        
+
         emit TokensSold(marketId, msg.sender, sellPass, tokenAmount, collateralAmount);
     }
 
@@ -945,6 +1061,77 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     function getMarket(uint256 marketId) external view returns (Market memory) {
         require(marketId < marketCount, "Invalid market ID");
         return markets[marketId];
+    }
+
+    /**
+     * @notice Get current prices for a market based on LMSR quantities
+     * @dev Uses simplified LMSR: price = quantity / total_quantity
+     *      Prices are returned in 18 decimal precision (1e18 = 1.0 = 100%)
+     * @param marketId ID of the market
+     * @return passPrice Price of PASS token (probability of pass outcome)
+     * @return failPrice Price of FAIL token (probability of fail outcome)
+     */
+    function getPrices(uint256 marketId) external view returns (uint256 passPrice, uint256 failPrice) {
+        require(marketId < marketCount, "Invalid market ID");
+        Market storage market = markets[marketId];
+
+        uint256 totalQuantity = market.passQuantity + market.failQuantity;
+
+        // Prevent division by zero - return 50/50 if no quantity
+        if (totalQuantity == 0) {
+            return (0.5e18, 0.5e18);
+        }
+
+        // Calculate prices in 18 decimal precision
+        // price = quantity * 1e18 / totalQuantity
+        passPrice = (market.passQuantity * 1e18) / totalQuantity;
+        failPrice = (market.failQuantity * 1e18) / totalQuantity;
+
+        return (passPrice, failPrice);
+    }
+
+    /**
+     * @notice Estimate how many tokens you'll receive for a given collateral amount
+     * @dev For CTF1155 markets, tokens are 1:1 with collateral (split operation)
+     * @param marketId ID of the market
+     * @param buyPass True to estimate PASS tokens, false for FAIL tokens
+     * @param collateralAmount Amount of collateral to spend
+     * @return tokenAmount Estimated tokens to receive
+     */
+    function getTokenAmount(
+        uint256 marketId,
+        bool buyPass,
+        uint256 collateralAmount
+    ) external view returns (uint256 tokenAmount) {
+        require(marketId < marketCount, "Invalid market ID");
+        Market storage market = markets[marketId];
+        require(market.status == MarketStatus.Active, "Market not active");
+
+        // For CTF1155 markets using split operation, tokens are 1:1 with collateral
+        // This is a simplified model - true LMSR would use the cost function
+        tokenAmount = collateralAmount;
+
+        return tokenAmount;
+    }
+
+    /**
+     * @notice Get metadata URI for a market
+     * @param marketId ID of the market
+     * @return uri The metadata URI (IPFS or HTTP)
+     */
+    function getMarketMetadataUri(uint256 marketId) external view returns (string memory uri) {
+        require(marketId < marketCount, "Invalid market ID");
+        return marketMetadataUris[marketId];
+    }
+
+    /**
+     * @notice Set metadata URI for a market (only owner)
+     * @param marketId ID of the market
+     * @param uri The metadata URI (IPFS or HTTP)
+     */
+    function setMarketMetadataUri(uint256 marketId, string memory uri) external onlyOwner {
+        require(marketId < marketCount, "Invalid market ID");
+        marketMetadataUris[marketId] = uri;
     }
 
     /**

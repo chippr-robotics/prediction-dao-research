@@ -101,9 +101,9 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
           {/* Branding Section */}
           <div className="brand-section">
             <div className="brand-logo">
-              <img 
-                src="/logo_fairwins.svg" 
-                alt="FairWins" 
+              <img
+                src="/assets/logo_fairwins.svg"
+                alt="FairWins"
                 className="logo-image"
                 width="48"
                 height="48"
@@ -126,7 +126,7 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
                   bgColor="transparent"
                   aria-label="QR code for market link"
                   imageSettings={{
-                    src: '/logo_fairwins.svg',
+                    src: '/assets/fairwins_no-text_logo.svg',
                     height: 48,
                     width: 48,
                     excavate: true,

@@ -13,7 +13,7 @@ describe('IPFS Constants', () => {
     it('has a default value', () => {
       expect(IPFS_GATEWAY).toBeDefined()
       expect(typeof IPFS_GATEWAY).toBe('string')
-      expect(IPFS_GATEWAY).toContain('ipfs.fairwins.app')
+      expect(IPFS_GATEWAY).toContain('gateway.pinata.cloud')
     })
   })
 
@@ -78,25 +78,25 @@ describe('IPFS Constants', () => {
   describe('getIpfsUrl', () => {
     it('handles ipfs:// protocol', () => {
       const url = getIpfsUrl('ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
-      expect(url).toContain('ipfs.fairwins.app')
+      expect(url).toContain('gateway.pinata.cloud')
       expect(url).toContain('/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     })
 
     it('handles paths with /ipfs/ prefix', () => {
       const url = getIpfsUrl('/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
-      expect(url).toContain('ipfs.fairwins.app')
+      expect(url).toContain('gateway.pinata.cloud')
       expect(url).toContain('/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     })
 
     it('handles regular paths', () => {
       const url = getIpfsUrl('/token/0x1234/metadata.json')
-      expect(url).toContain('ipfs.fairwins.app')
+      expect(url).toContain('gateway.pinata.cloud')
       expect(url).toContain('/token/0x1234/metadata.json')
     })
 
     it('handles CID without prefix', () => {
       const url = getIpfsUrl('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
-      expect(url).toContain('ipfs.fairwins.app')
+      expect(url).toContain('gateway.pinata.cloud')
       expect(url).toContain('/ipfs/QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
     })
   })

@@ -1,21 +1,42 @@
 /**
  * IPFS Configuration
  *
- * Configuration for accessing IPFS gateway hosted at ipfs.fairwins.app
+ * Configuration for accessing IPFS via Pinata gateway and API
  * Used for retrieving token metadata and market data
  */
 
 /**
- * IPFS Gateway Configuration
- * Default gateway is ipfs.fairwins.app, can be overridden via environment variable
+ * Pinata Configuration
+ * API keys and gateway URL for Pinata IPFS service
  */
-export const IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || 'https://ipfs.fairwins.app'
+export const PINATA_CONFIG = {
+  // Pinata API endpoint for pinning
+  API_URL: 'https://api.pinata.cloud',
+
+  // Pinata Gateway URL (use custom gateway if provided, otherwise public gateway)
+  GATEWAY: import.meta.env.VITE_PINATA_GATEWAY || 'https://gateway.pinata.cloud',
+
+  // Pinata JWT for authentication (required for uploads)
+  JWT: import.meta.env.VITE_PINATA_JWT || '',
+
+  // Pinata API Key (alternative auth method)
+  API_KEY: import.meta.env.VITE_PINATA_API_KEY || '',
+
+  // Pinata API Secret (alternative auth method)
+  API_SECRET: import.meta.env.VITE_PINATA_API_SECRET || '',
+}
+
+/**
+ * IPFS Gateway Configuration
+ * Use Pinata gateway by default, can be overridden via environment variable
+ */
+export const IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY || PINATA_CONFIG.GATEWAY
 
 /**
  * IPFS Upload API Configuration
- * Configurable upload endpoint for pinning content to IPFS
+ * Using Pinata's pinning API for uploads
  */
-export const IPFS_UPLOAD_API = import.meta.env.VITE_IPFS_UPLOAD_API || 'https://api.fairwins.app/ipfs'
+export const IPFS_UPLOAD_API = import.meta.env.VITE_IPFS_UPLOAD_API || `${PINATA_CONFIG.API_URL}/pinning`
 
 /**
  * IPFS API Configuration

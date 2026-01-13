@@ -12,7 +12,7 @@ export const DEPLOYED_CONTRACTS = {
   tieredRoleManager: '0x888332df7621EC341131d85e2228f00407777dD7', // RoleManagerCore (modular RBAC)
   welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
   proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0x08E5a4B716c06e92525E17495d0995A6F7102414', // ConditionalMarketFactory
+  marketFactory: '0x20eEb76C5B98Da5a9504A65169C4791d4787ECdA', // ConditionalMarketFactory (new with LMSR)
   privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
   oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
   ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
@@ -28,9 +28,10 @@ export const DEPLOYED_CONTRACTS = {
   ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
 
   // Back-compat aliases used throughout the frontend
-  // IMPORTANT: Must match tieredRoleManager above (the contract PaymentProcessor uses)
-  roleManager: '0x888332df7621EC341131d85e2228f00407777dD7', // alias for RoleManagerCore
-  roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
+  // IMPORTANT: Use the NEWER RoleManagerCore that has checkMarketCreationLimitFor function
+  // Old: '0x888332df7621EC341131d85e2228f00407777dD7' - does NOT have checkMarketCreationLimitFor
+  roleManager: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5', // NEWER RoleManagerCore with full IRoleManager interface
+  roleManagerCore: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5',
 
   // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
@@ -42,6 +43,10 @@ export const DEPLOYED_CONTRACTS = {
   // Perpetual Futures - Deployed via: npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
   fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
   perpFactory: '0xAEfd08EF350B7132BDbE8a9de96C6d24eAbd7988',
+
+  // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
+  // Used for grouping related markets (e.g., election candidates, tournament brackets)
+  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A', // TODO: Deploy and update address
 
 }
 

@@ -33,7 +33,9 @@ export const MARKET_FACTORY_ABI = [
       {"name": "conditionId", "type": "bytes32"},
       {"name": "questionId", "type": "bytes32"},
       {"name": "passPositionId", "type": "uint256"},
-      {"name": "failPositionId", "type": "uint256"}
+      {"name": "failPositionId", "type": "uint256"},
+      {"name": "passQuantity", "type": "uint256"},
+      {"name": "failQuantity", "type": "uint256"}
     ],
     "stateMutability": "view",
     "type": "function"
@@ -69,6 +71,61 @@ export const MARKET_FACTORY_ABI = [
     "stateMutability": "pure",
     "type": "function"
   },
+  // Trading functions
+  {
+    "inputs": [
+      {"name": "marketId", "type": "uint256"},
+      {"name": "buyPass", "type": "bool"},
+      {"name": "amount", "type": "uint256"}
+    ],
+    "name": "buyTokens",
+    "outputs": [{"name": "tokenAmount", "type": "uint256"}],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "marketId", "type": "uint256"},
+      {"name": "sellPass", "type": "bool"},
+      {"name": "tokenAmount", "type": "uint256"}
+    ],
+    "name": "sellTokens",
+    "outputs": [{"name": "collateralAmount", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "marketId", "type": "uint256"},
+      {"name": "buyPass", "type": "bool"},
+      {"name": "collateralAmount", "type": "uint256"}
+    ],
+    "name": "getTokenAmount",
+    "outputs": [{"name": "tokenAmount", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "marketId", "type": "uint256"}
+    ],
+    "name": "getPrices",
+    "outputs": [
+      {"name": "passPrice", "type": "uint256"},
+      {"name": "failPrice", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "marketId", "type": "uint256"}
+    ],
+    "name": "getMarketMetadataUri",
+    "outputs": [{"name": "uri", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
   // Write functions
   {
     "inputs": [
@@ -80,6 +137,21 @@ export const MARKET_FACTORY_ABI = [
       {"name": "betType", "type": "uint8"}
     ],
     "name": "deployMarketPair",
+    "outputs": [{"name": "marketId", "type": "uint256"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {"name": "proposalId", "type": "uint256"},
+      {"name": "collateralToken", "type": "address"},
+      {"name": "liquidityAmount", "type": "uint256"},
+      {"name": "liquidityParameter", "type": "uint256"},
+      {"name": "tradingPeriod", "type": "uint256"},
+      {"name": "betType", "type": "uint8"},
+      {"name": "metadataUri", "type": "string"}
+    ],
+    "name": "deployMarketPairWithMetadata",
     "outputs": [{"name": "marketId", "type": "uint256"}],
     "stateMutability": "nonpayable",
     "type": "function"
