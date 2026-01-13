@@ -14,6 +14,7 @@ import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 
 /**
  * Get a provider for reading from the blockchain
@@ -733,6 +734,144 @@ export async function fetchProposalsFromBlockchain() {
   } catch (error) {
     console.error('Error fetching proposals from blockchain:', error)
     throw error
+  }
+}
+
+/**
+ * Fetch friend markets for a user from the blockchain
+ * @param {string} userAddress - User's wallet address
+ * @returns {Promise<Array>} Array of friend market objects
+ */
+export async function fetchFriendMarketsForUser(userAddress) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return []
+  }
+
+  try {
+    if (!userAddress || !ethers.isAddress(userAddress)) {
+      return []
+    }
+
+    const provider = getProvider()
+    const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+
+    if (!friendFactoryAddress) {
+      console.warn('FriendGroupMarketFactory address not configured')
+      return []
+    }
+
+    const contract = new ethers.Contract(
+      friendFactoryAddress,
+      FRIEND_GROUP_MARKET_FACTORY_ABI,
+      provider
+    )
+
+    // Get market IDs for the user
+    const marketIds = await contract.getUserMarkets(userAddress)
+    console.log(`[fetchFriendMarketsForUser] Found ${marketIds.length} markets for ${userAddress}`)
+
+    if (marketIds.length === 0) {
+      return []
+    }
+
+    // Fetch details for each market
+    const markets = await Promise.all(
+      marketIds.map(async (marketId) => {
+        try {
+          const marketResult = await contract.getFriendMarketWithStatus(marketId)
+          const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
+
+          console.log(`[fetchFriendMarketsForUser] Market ${marketId} raw data:`, {
+            description: marketResult.description,
+            creator: marketResult.creator,
+            status: Number(marketResult.status),
+            members: marketResult.members,
+            acceptanceDeadline: marketResult.acceptanceDeadline?.toString(),
+            tradingEndTime: marketResult.tradingEndTime?.toString(),
+            stakePerParticipant: marketResult.stakePerParticipant?.toString()
+          })
+
+          // Map market type enum to string
+          const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
+          const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
+
+          // Fetch acceptances for participants
+          const acceptances = {}
+          const members = marketResult.members || []
+
+          for (const member of members) {
+            try {
+              const record = await contract.getParticipantAcceptance(marketId, member)
+              acceptances[member.toLowerCase()] = {
+                hasAccepted: record.hasAccepted,
+                stakedAmount: ethers.formatEther(record.stakedAmount),
+                isArbitrator: record.isArbitrator
+              }
+            } catch {
+              // Member not found, skip
+            }
+          }
+
+          const arbitrator = marketResult.arbitrator
+          const hasArbitrator = arbitrator && arbitrator !== ethers.ZeroAddress
+
+          // Safely parse timestamps - handle 0 or invalid values
+          const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
+          const tradingEndTimeMs = Number(marketResult.tradingEndTime) * 1000
+
+          // Create safe date strings - use fallbacks for invalid dates
+          const now = new Date()
+          const defaultEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+
+          let endDateStr
+          try {
+            if (tradingEndTimeMs > 0) {
+              const endDate = new Date(tradingEndTimeMs)
+              endDateStr = !isNaN(endDate.getTime()) ? endDate.toISOString() : defaultEndDate.toISOString()
+            } else {
+              endDateStr = defaultEndDate.toISOString()
+            }
+          } catch {
+            endDateStr = defaultEndDate.toISOString()
+          }
+
+          // Determine token decimals - USC has 6 decimals, most others have 18
+          const stakeToken = marketResult.stakeToken
+          const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
+          const tokenDecimals = isUSC ? 6 : 18
+          const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
+
+          return {
+            id: marketId.toString(),
+            description: marketResult.description,
+            creator: marketResult.creator,
+            participants: members,
+            arbitrator: hasArbitrator ? arbitrator : null,
+            type: marketTypes[Number(marketResult.marketType)] || 'oneVsOne',
+            status: statusNames[Number(marketResult.status)] || 'pending_acceptance',
+            acceptanceDeadline: acceptanceDeadlineMs > 0 ? acceptanceDeadlineMs : now.getTime() + 48 * 60 * 60 * 1000,
+            minAcceptanceThreshold: Number(marketResult.minThreshold) || 2,
+            stakeAmount: stakeAmountFormatted,
+            stakeTokenAddress: stakeToken,
+            stakeTokenSymbol: isUSC ? 'USC' : 'ETC',
+            acceptances,
+            acceptedCount: Number(acceptanceStatus.accepted),
+            endDate: endDateStr,
+            createdAt: now.toISOString() // Contract doesn't store creation time
+          }
+        } catch (err) {
+          console.error(`Error fetching market ${marketId}:`, err)
+          return null
+        }
+      })
+    )
+
+    // Filter out null results
+    return markets.filter(m => m !== null)
+  } catch (error) {
+    console.error('Error fetching friend markets from blockchain:', error)
+    return []
   }
 }
 

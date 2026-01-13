@@ -17,7 +17,8 @@ import {
   createCorrelationGroup,
   addMarketToCorrelationGroup,
   getUserTierOnChain,
-  checkRoleSyncNeeded
+  checkRoleSyncNeeded,
+  fetchFriendMarketsForUser
 } from '../../utils/blockchainService'
 import { uploadMarketMetadata } from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
@@ -81,6 +82,46 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const [connectorStatus, setConnectorStatus] = useState({})
   const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
   const [pendingConnector, setPendingConnector] = useState(null)
+
+  // Fetch friend markets from blockchain when user connects
+  useEffect(() => {
+    if (!address || !isConnected) return
+
+    const fetchBlockchainMarkets = async () => {
+      try {
+        console.log('[WalletButton] Fetching friend markets from blockchain for:', address)
+        const blockchainMarkets = await fetchFriendMarketsForUser(address)
+        console.log('[WalletButton] Fetched friend markets:', blockchainMarkets.length)
+
+        if (blockchainMarkets.length > 0) {
+          // Merge blockchain markets with local storage markets
+          setFriendMarkets(prevMarkets => {
+            const existingIds = new Set(prevMarkets.map(m => m.id))
+            const newMarkets = blockchainMarkets.filter(m => !existingIds.has(m.id))
+
+            if (newMarkets.length > 0) {
+              console.log('[WalletButton] Adding new markets from blockchain:', newMarkets.length)
+              const merged = [...prevMarkets, ...newMarkets]
+              saveFriendMarketsToStorage(merged)
+              return merged
+            }
+
+            // Update existing markets with fresh blockchain data
+            const updated = prevMarkets.map(m => {
+              const fresh = blockchainMarkets.find(bm => bm.id === m.id)
+              return fresh || m
+            })
+
+            return updated
+          })
+        }
+      } catch (error) {
+        console.error('[WalletButton] Error fetching friend markets from blockchain:', error)
+      }
+    }
+
+    fetchBlockchainMarkets()
+  }, [address, isConnected])
 
   // Filter friend markets into active and past based on end date and user
   const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {

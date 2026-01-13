@@ -1375,3 +1375,29 @@
   background: rgba(239, 68, 68, 0.1);
   border-color: #ef4444;
 }
+
+/* Accept button - prominent green button for accepting markets */
+.fm-btn-accept {
+  flex: 1;
+  padding: 0.5rem 0.875rem;
+  background: linear-gradient(135deg, #36B37E 0%, #2ECC71 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(54, 179, 126, 0.2);
+}
+
+.fm-btn-accept:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(54, 179, 126, 0.3);
+  opacity: 0.95;
+}
+
+.fm-btn-accept:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(54, 179, 126, 0.2);
+}

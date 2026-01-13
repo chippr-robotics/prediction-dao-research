@@ -1,7 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import './MarketAcceptanceModal.css'
+
+// Helper to format stake amount as USD (rounded to nearest cent)
+const formatUSD = (amount, symbol) => {
+  const num = parseFloat(amount) || 0
+  // Only show USD formatting for stablecoins
+  const isStablecoin = symbol === 'USC' || symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
+
+  if (isStablecoin) {
+    if (num === 0) return '$0.00'
+    if (num < 0.01) return '< $0.01'
+    return `$${num.toFixed(2)}`
+  }
+  // For non-stablecoins, show raw amount with symbol
+  return `${num} ${symbol || 'tokens'}`
+}
 
 /**
  * MarketAcceptanceModal Component
@@ -109,11 +125,23 @@ function MarketAcceptanceModal({
         // Arbitrators don't stake
         tx = await contract.acceptMarket(marketId)
       } else {
+        // Determine token decimals - USC has 6 decimals, most others have 18
+        const isUSC = marketData.stakeToken &&
+          marketData.stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
+        const tokenDecimals = isUSC ? 6 : 18
+
         // Participants stake
         const stakeAmount = ethers.parseUnits(
           marketData.stakePerParticipant || '0',
-          18 // Adjust decimals based on token
+          tokenDecimals
         )
+
+        console.log('Stake calculation:', {
+          stakePerParticipant: marketData.stakePerParticipant,
+          isUSC,
+          tokenDecimals,
+          stakeAmountWei: stakeAmount.toString()
+        })
 
         if (!marketData.stakeToken || marketData.stakeToken === ethers.ZeroAddress) {
           // Native token stake
@@ -122,11 +150,16 @@ function MarketAcceptanceModal({
           // ERC20 approval first
           const tokenContract = new ethers.Contract(
             marketData.stakeToken,
-            ['function approve(address,uint256) returns (bool)'],
+            ['function approve(address,uint256) returns (bool)', 'function allowance(address,address) view returns (uint256)'],
             signer
           )
-          const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
-          await approveTx.wait()
+
+          // Check if we already have enough allowance
+          const currentAllowance = await tokenContract.allowance(account, contractAddress)
+          if (currentAllowance < stakeAmount) {
+            const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
+            await approveTx.wait()
+          }
 
           tx = await contract.acceptMarket(marketId)
         }
@@ -221,7 +254,7 @@ function MarketAcceptanceModal({
                   <div className="ma-term ma-term-highlight">
                     <label>Your Stake</label>
                     <span className="ma-value">
-                      {marketData?.stakePerParticipant} {marketData?.stakeTokenSymbol || 'tokens'}
+                      {formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}
                     </span>
                   </div>
                 )}
@@ -308,15 +341,42 @@ function MarketAcceptanceModal({
           {step === 'confirm' && (
             <div className="ma-confirmation">
               <h3>Confirm Acceptance</h3>
+
+              {/* Safety Warning Section */}
+              <div className="ma-safety-warning">
+                <div className="ma-safety-header">
+                  <span className="ma-safety-icon">&#9888;</span>
+                  <strong>Important Safety Information</strong>
+                </div>
+                <ul className="ma-safety-list">
+                  <li>
+                    <span className="ma-check-icon">&#10004;</span>
+                    <span><strong>Only accept markets from people you know and trust.</strong> Never accept invitations from strangers.</span>
+                  </li>
+                  <li>
+                    <span className="ma-check-icon">&#10004;</span>
+                    <span><strong>This action is permanent and cannot be undone.</strong> Your stake will be locked until the market resolves.</span>
+                  </li>
+                  <li>
+                    <span className="ma-check-icon">&#10004;</span>
+                    <span><strong>Do not include personal information (PII)</strong> in any market descriptions or communications.</span>
+                  </li>
+                  <li>
+                    <span className="ma-check-icon">&#10004;</span>
+                    <span><strong>Verify the market terms carefully</strong> before accepting. You are agreeing to these exact terms.</span>
+                  </li>
+                </ul>
+              </div>
+
               {!isArbitrator && (
-                <p>
-                  You are about to stake <strong>{marketData?.stakePerParticipant} {marketData?.stakeTokenSymbol || 'tokens'}</strong> to join this market.
+                <p className="ma-stake-notice">
+                  You are about to stake <strong>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</strong> to join this market.
                 </p>
               )}
               {isArbitrator && (
-                <p>
+                <p className="ma-stake-notice">
                   You are accepting the role of arbitrator for this market.
-                  You will be responsible for resolving disputes.
+                  You will be responsible for resolving disputes fairly.
                 </p>
               )}
               <div className="ma-confirm-details">
@@ -324,10 +384,14 @@ function MarketAcceptanceModal({
                   <span>Market:</span>
                   <span>{marketData?.description?.slice(0, 50)}...</span>
                 </div>
+                <div className="ma-confirm-row">
+                  <span>Created By:</span>
+                  <span className="ma-address">{formatAddress(marketData?.creator)}</span>
+                </div>
                 {!isArbitrator && (
                   <div className="ma-confirm-row">
-                    <span>Stake:</span>
-                    <span>{marketData?.stakePerParticipant} {marketData?.stakeTokenSymbol}</span>
+                    <span>Your Stake:</span>
+                    <span>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</span>
                   </div>
                 )}
               </div>
@@ -336,7 +400,7 @@ function MarketAcceptanceModal({
                   Back
                 </button>
                 <button className="ma-btn-primary" onClick={handleAccept}>
-                  Confirm
+                  I Understand, Accept Market
                 </button>
               </div>
             </div>
