@@ -13,6 +13,14 @@ const STAKE_TOKEN_OPTIONS = [
   { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
 ]
 
+// Helper to get default end date (7 days from now)
+const getDefaultEndDateTime = () => {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  // Format as YYYY-MM-DDTHH:mm for datetime-local input
+  return date.toISOString().slice(0, 16)
+}
+
 /**
  * FriendMarketsModal Component
  *
@@ -47,7 +55,7 @@ function FriendMarketsModal({
     opponent: '',
     members: '',
     memberLimit: '5',
-    tradingPeriod: '7',
+    endDateTime: getDefaultEndDateTime(),
     stakeAmount: '10',
     stakeTokenId: 'USC', // Default to USC stablecoin
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
@@ -78,7 +86,7 @@ function FriendMarketsModal({
       opponent: '',
       members: '',
       memberLimit: '5',
-      tradingPeriod: '7',
+      endDateTime: getDefaultEndDateTime(),
       stakeAmount: '10',
       stakeTokenId: 'USC',
       customStakeTokenAddress: '',
@@ -327,10 +335,18 @@ function FriendMarketsModal({
       }
     }
 
-    if (!formData.tradingPeriod || parseInt(formData.tradingPeriod) < 1) {
-      newErrors.tradingPeriod = 'Trading period must be at least 1 day'
-    } else if (parseInt(formData.tradingPeriod) > 365) {
-      newErrors.tradingPeriod = 'Maximum trading period is 365 days'
+    // Validate end date/time
+    const endDate = new Date(formData.endDateTime)
+    const now = new Date()
+    const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day from now
+    const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year from now
+
+    if (!formData.endDateTime || isNaN(endDate.getTime())) {
+      newErrors.endDateTime = 'Please select a valid end date and time'
+    } else if (endDate < minDate) {
+      newErrors.endDateTime = 'End date must be at least 1 day from now'
+    } else if (endDate > maxDate) {
+      newErrors.endDateTime = 'End date must be within 1 year'
     }
 
     if (formData.arbitrator) {
@@ -396,6 +412,11 @@ function FriendMarketsModal({
       }
       const stakeToken = getStakeTokenInfo()
 
+      // Calculate trading period in days for display
+      const endDate = new Date(formData.endDateTime)
+      const now = new Date()
+      const tradingPeriodDays = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
       // Simulate created market for demo
       const newMarket = {
         id: result?.id || `friend-${Date.now()}`,
@@ -406,7 +427,9 @@ function FriendMarketsModal({
         stakeTokenSymbol: stakeToken.symbol,
         stakeTokenIcon: stakeToken.icon,
         stakeTokenAddress: stakeToken.address,
-        tradingPeriod: formData.tradingPeriod,
+        endDateTime: formData.endDateTime,
+        endDate: endDate.toISOString(),
+        tradingPeriod: tradingPeriodDays,
         participants: friendMarketType === 'oneVsOne'
           ? [account, formData.opponent]
           : formData.members.split(',').map(a => a.trim()),
@@ -808,21 +831,21 @@ function FriendMarketsModal({
                     )}
 
                     <div className="fm-form-group">
-                      <label htmlFor="fm-period">
-                        Duration (Days) <span className="fm-required">*</span>
+                      <label htmlFor="fm-end-date">
+                        End Date & Time <span className="fm-required">*</span>
                       </label>
                       <input
-                        id="fm-period"
-                        type="number"
-                        value={formData.tradingPeriod}
-                        onChange={(e) => handleFormChange('tradingPeriod', e.target.value)}
-                        placeholder="7"
-                        min="1"
-                        max="365"
+                        id="fm-end-date"
+                        type="datetime-local"
+                        value={formData.endDateTime}
+                        onChange={(e) => handleFormChange('endDateTime', e.target.value)}
+                        min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
                         disabled={submitting}
-                        className={errors.tradingPeriod ? 'error' : ''}
+                        className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
                       />
-                      {errors.tradingPeriod && <span className="fm-error">{errors.tradingPeriod}</span>}
+                      <span className="fm-hint">When does this market end? (min: 1 day, max: 1 year)</span>
+                      {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
                     </div>
 
                     <div className="fm-form-group fm-form-full">
@@ -1026,8 +1049,8 @@ function FriendMarketsModal({
                       </span>
                     </div>
                     <div className="fm-detail-row">
-                      <span>Duration</span>
-                      <span>{createdMarket.tradingPeriod} days</span>
+                      <span>Ends</span>
+                      <span>{createdMarket.endDateTime ? new Date(createdMarket.endDateTime).toLocaleString() : `${createdMarket.tradingPeriod} days`}</span>
                     </div>
                   </div>
 

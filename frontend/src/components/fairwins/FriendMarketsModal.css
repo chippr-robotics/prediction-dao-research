@@ -350,6 +350,27 @@
   padding-right: 2.5rem;
 }
 
+/* Datetime input styling */
+.fm-datetime-input {
+  width: 100%;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.fm-datetime-input::-webkit-calendar-picker-indicator {
+  background-color: transparent;
+  color: #36B37E;
+  cursor: pointer;
+  filter: invert(0.6) sepia(1) saturate(2) hue-rotate(100deg);
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.fm-datetime-input::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.5) sepia(1) saturate(3) hue-rotate(100deg);
+  background-color: rgba(54, 179, 126, 0.1);
+}
+
 .fm-form-group input::placeholder,
 .fm-form-group textarea::placeholder {
   color: var(--text-muted, #7A8590);
