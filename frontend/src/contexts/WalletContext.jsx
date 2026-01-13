@@ -142,12 +142,12 @@ export function WalletProvider({ children }) {
             hasChanges = true
           }
         } else if (hasLocally) {
-          // Role exists locally but not on-chain - it may have expired
-          // Note: Keep the local role if blockchain check failed - be conservative
-          console.log(`[RoleSync] ${roleName} not found on-chain but exists locally`)
-          // Don't remove immediately - only remove if we got a definitive "false" from blockchain
-          // For now, keep the local role to avoid false negatives from RPC issues
-          updatedRoles.push(roleName)
+          // Role exists locally but not on-chain - it has expired or was never purchased
+          // Blockchain is the source of truth - remove the stale local role
+          console.log(`[RoleSync] ${roleName} not found on-chain - removing stale local role`)
+          removeUserRole(walletAddress, roleName)
+          hasChanges = true
+          // Don't add to updatedRoles - role is no longer valid
         }
       } catch (roleError) {
         console.error(`[RoleSync] Error checking ${roleName}:`, roleError.message)

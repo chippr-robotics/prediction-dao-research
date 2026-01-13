@@ -20,26 +20,26 @@ const TIER_BENEFITS = {
   BRONZE: {
     dailyBets: 10,
     monthlyMarkets: 5,
-    maxPosition: '10 ETC',
+    maxPosition: '100 USC',
     features: ['Basic market access', 'Standard support']
   },
   SILVER: {
     dailyBets: 25,
     monthlyMarkets: 15,
-    maxPosition: '50 ETC',
-    features: ['Priority support', 'Advanced analytics', '10% fee discount']
+    maxPosition: '500 USC',
+    features: ['Priority support', 'Advanced analytics']
   },
   GOLD: {
     dailyBets: 50,
     monthlyMarkets: 30,
-    maxPosition: '200 ETC',
-    features: ['Premium support', 'Full analytics', '25% fee discount', 'Private markets']
+    maxPosition: '2,000 USC',
+    features: ['Premium support', 'Full analytics', 'Private markets']
   },
   PLATINUM: {
     dailyBets: 'Unlimited',
     monthlyMarkets: 'Unlimited',
     maxPosition: 'Unlimited',
-    features: ['Dedicated support', 'API access', '50% fee discount', 'Exclusive features']
+    features: ['Dedicated support', 'API access', 'Exclusive features']
   }
 }
 
