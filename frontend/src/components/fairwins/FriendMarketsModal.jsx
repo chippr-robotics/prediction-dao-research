@@ -21,6 +21,13 @@ const getDefaultEndDateTime = () => {
   return date.toISOString().slice(0, 16)
 }
 
+// Helper to get default acceptance deadline (48 hours from now)
+const getDefaultAcceptanceDeadline = () => {
+  const date = new Date()
+  date.setHours(date.getHours() + 48)
+  return date.toISOString().slice(0, 16)
+}
+
 /**
  * FriendMarketsModal Component
  *
@@ -60,7 +67,10 @@ function FriendMarketsModal({
     stakeTokenId: 'USC', // Default to USC stablecoin
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
-    peggedMarketId: ''
+    peggedMarketId: '',
+    // Multi-party acceptance fields
+    acceptanceDeadline: getDefaultAcceptanceDeadline(),
+    minAcceptanceThreshold: '2' // Minimum participants to activate (including creator)
   })
 
   // Selected market for detail view
@@ -91,7 +101,9 @@ function FriendMarketsModal({
       stakeTokenId: 'USC',
       customStakeTokenAddress: '',
       arbitrator: '',
-      peggedMarketId: ''
+      peggedMarketId: '',
+      acceptanceDeadline: getDefaultAcceptanceDeadline(),
+      minAcceptanceThreshold: '2'
     })
     setErrors({})
     setMarketLookupId('')
@@ -349,6 +361,32 @@ function FriendMarketsModal({
       newErrors.endDateTime = 'End date must be within 1 year'
     }
 
+    // Validate acceptance deadline
+    const acceptanceDeadline = new Date(formData.acceptanceDeadline)
+    const minAcceptanceDate = new Date(now.getTime() + 60 * 60 * 1000) // At least 1 hour from now
+    const maxAcceptanceDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // Max 30 days from now
+
+    if (!formData.acceptanceDeadline || isNaN(acceptanceDeadline.getTime())) {
+      newErrors.acceptanceDeadline = 'Please select a valid acceptance deadline'
+    } else if (acceptanceDeadline < minAcceptanceDate) {
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be at least 1 hour from now'
+    } else if (acceptanceDeadline > maxAcceptanceDate) {
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be within 30 days'
+    } else if (acceptanceDeadline >= endDate) {
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be before market end date'
+    }
+
+    // Validate minimum threshold for group markets
+    if (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') {
+      const threshold = parseInt(formData.minAcceptanceThreshold, 10)
+      const memberCount = formData.members.split(',').filter(m => m.trim()).length + 1 // +1 for creator
+      if (isNaN(threshold) || threshold < 2) {
+        newErrors.minAcceptanceThreshold = 'Minimum threshold must be at least 2'
+      } else if (threshold > memberCount) {
+        newErrors.minAcceptanceThreshold = `Threshold cannot exceed total participants (${memberCount})`
+      }
+    }
+
     if (formData.arbitrator) {
       if (!/^0x[a-fA-F0-9]{40}$/.test(formData.arbitrator.trim())) {
         newErrors.arbitrator = 'Invalid arbitrator address'
@@ -417,7 +455,13 @@ function FriendMarketsModal({
       const now = new Date()
       const tradingPeriodDays = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-      // Simulate created market for demo
+      // Calculate acceptance deadline info
+      const acceptanceDeadline = new Date(formData.acceptanceDeadline)
+      const minThreshold = friendMarketType === 'oneVsOne'
+        ? 2
+        : parseInt(formData.minAcceptanceThreshold, 10) || 2
+
+      // Created market with acceptance flow fields
       const newMarket = {
         id: result?.id || `friend-${Date.now()}`,
         type: friendMarketType,
@@ -432,9 +476,23 @@ function FriendMarketsModal({
         tradingPeriod: tradingPeriodDays,
         participants: friendMarketType === 'oneVsOne'
           ? [account, formData.opponent]
-          : formData.members.split(',').map(a => a.trim()),
+          : [account, ...formData.members.split(',').map(a => a.trim())],
+        creator: account,
+        arbitrator: formData.arbitrator || null,
         createdAt: new Date().toISOString(),
-        status: 'pending'
+        status: 'pending_acceptance',
+        // Acceptance flow fields
+        acceptanceDeadline: acceptanceDeadline.getTime(),
+        acceptanceDeadlineFormatted: acceptanceDeadline.toISOString(),
+        minAcceptanceThreshold: minThreshold,
+        acceptedCount: 1, // Creator has accepted
+        acceptances: {
+          [account.toLowerCase()]: {
+            hasAccepted: true,
+            stakedAmount: formData.stakeAmount,
+            isArbitrator: false
+          }
+        }
       }
 
       setCreatedMarket(newMarket)
@@ -462,9 +520,20 @@ function FriendMarketsModal({
     setSelectedMarket(null)
   }
 
-  // Generate market URL for QR code
+  // Generate market acceptance URL for QR code
   const getMarketUrl = (market) => {
-    return `${window.location.origin}/friend-market/${market?.id || 'preview'}`
+    if (!market?.id) return `${window.location.origin}/friend-market/preview`
+
+    // Build acceptance URL with parameters for offline preview
+    const params = new URLSearchParams({
+      marketId: market.id,
+      creator: market.creator || account || '',
+      stake: market.stakeAmount || '0',
+      token: market.stakeTokenSymbol || 'ETC',
+      deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
+    })
+
+    return `${window.location.origin}/friend-market/accept?${params.toString()}`
   }
 
   // Format date for display
@@ -521,8 +590,18 @@ function FriendMarketsModal({
   // Filter markets where user is participating
   const userActiveMarkets = useMemo(() => {
     return activeMarkets.filter(m =>
-      m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()
+      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
+      m.creator?.toLowerCase() === account?.toLowerCase()) &&
+      m.status !== 'pending_acceptance'
+    )
+  }, [activeMarkets, account])
+
+  // Filter pending markets awaiting acceptance
+  const userPendingMarkets = useMemo(() => {
+    return activeMarkets.filter(m =>
+      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
+      m.creator?.toLowerCase() === account?.toLowerCase()) &&
+      m.status === 'pending_acceptance'
     )
   }, [activeMarkets, account])
 
@@ -593,8 +672,8 @@ function FriendMarketsModal({
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
             <span>Active</span>
-            {userActiveMarkets.length > 0 && (
-              <span className="fm-tab-badge">{userActiveMarkets.length}</span>
+            {(userActiveMarkets.length + userPendingMarkets.length) > 0 && (
+              <span className="fm-tab-badge">{userActiveMarkets.length + userPendingMarkets.length}</span>
             )}
           </button>
           <button
@@ -848,6 +927,46 @@ function FriendMarketsModal({
                       {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
                     </div>
 
+                    {/* Acceptance Deadline - for multi-party acceptance flow */}
+                    <div className="fm-form-group">
+                      <label htmlFor="fm-acceptance-deadline">
+                        Acceptance Deadline <span className="fm-required">*</span>
+                      </label>
+                      <input
+                        id="fm-acceptance-deadline"
+                        type="datetime-local"
+                        value={formData.acceptanceDeadline}
+                        onChange={(e) => handleFormChange('acceptanceDeadline', e.target.value)}
+                        min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        disabled={submitting}
+                        className={`fm-datetime-input ${errors.acceptanceDeadline ? 'error' : ''}`}
+                      />
+                      <span className="fm-hint">How long do participants have to accept? (min: 1 hour, max: 30 days)</span>
+                      {errors.acceptanceDeadline && <span className="fm-error">{errors.acceptanceDeadline}</span>}
+                    </div>
+
+                    {/* Minimum Threshold - only for group markets */}
+                    {(friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') && (
+                      <div className="fm-form-group">
+                        <label htmlFor="fm-min-threshold">
+                          Minimum Participants to Activate
+                        </label>
+                        <input
+                          id="fm-min-threshold"
+                          type="number"
+                          value={formData.minAcceptanceThreshold}
+                          onChange={(e) => handleFormChange('minAcceptanceThreshold', e.target.value)}
+                          min="2"
+                          max={Math.max(2, formData.members.split(',').filter(m => m.trim()).length + 1)}
+                          disabled={submitting}
+                          className={errors.minAcceptanceThreshold ? 'error' : ''}
+                        />
+                        <span className="fm-hint">Market activates when this many participants accept (including you)</span>
+                        {errors.minAcceptanceThreshold && <span className="fm-error">{errors.minAcceptanceThreshold}</span>}
+                      </div>
+                    )}
+
                     <div className="fm-form-group fm-form-full">
                       <label htmlFor="fm-arbitrator">
                         Arbitrator (Optional)
@@ -1024,9 +1143,19 @@ function FriendMarketsModal({
                         }}
                       />
                     </div>
-                    <p className="fm-qr-hint">Scan to join market</p>
+                    <p className="fm-qr-hint">
+                      Share this QR code with participants to accept the market
+                    </p>
+                    <div className="fm-acceptance-info">
+                      <span className="fm-acceptance-status">&#9203; Waiting for acceptance</span>
+                      {createdMarket.acceptanceDeadline && (
+                        <span className="fm-acceptance-deadline">
+                          Deadline: {new Date(createdMarket.acceptanceDeadline).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                     <div className="fm-qr-url">
-                      <label htmlFor="fm-market-url">Shareable market link</label>
+                      <label htmlFor="fm-market-url">Acceptance link</label>
                       <input
                         id="fm-market-url"
                         type="text"
@@ -1039,19 +1168,35 @@ function FriendMarketsModal({
 
                   <div className="fm-success-details">
                     <div className="fm-detail-row">
+                      <span>Status</span>
+                      <span className="fm-status-pending">Pending Acceptance</span>
+                    </div>
+                    <div className="fm-detail-row">
                       <span>Type</span>
                       <span>{getTypeLabel(createdMarket.type)}</span>
                     </div>
                     <div className="fm-detail-row">
-                      <span>Stake</span>
+                      <span>Stake Required</span>
                       <span>
-                        {createdMarket.stakeTokenIcon} {createdMarket.stakeAmount} {createdMarket.stakeTokenSymbol || 'USC'}
+                        {createdMarket.stakeTokenIcon} {createdMarket.stakeAmount} {createdMarket.stakeTokenSymbol || 'ETC'}
                       </span>
                     </div>
+                    {createdMarket.acceptanceDeadline && (
+                      <div className="fm-detail-row">
+                        <span>Accept By</span>
+                        <span>{new Date(createdMarket.acceptanceDeadline).toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="fm-detail-row">
-                      <span>Ends</span>
+                      <span>Market Ends</span>
                       <span>{createdMarket.endDateTime ? new Date(createdMarket.endDateTime).toLocaleString() : `${createdMarket.tradingPeriod} days`}</span>
                     </div>
+                    {createdMarket.arbitrator && (
+                      <div className="fm-detail-row">
+                        <span>Arbitrator</span>
+                        <span>{formatAddress(createdMarket.arbitrator)}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="fm-success-actions">
@@ -1107,7 +1252,82 @@ function FriendMarketsModal({
                 />
               ) : (
                 <>
-                  {userActiveMarkets.length === 0 ? (
+                  {/* Pending Markets Section */}
+                  {userPendingMarkets.length > 0 && (
+                    <div className="fm-pending-section">
+                      <h4 className="fm-section-title">
+                        <span className="fm-pending-icon">&#9203;</span>
+                        Awaiting Acceptance ({userPendingMarkets.length})
+                      </h4>
+                      <div className="fm-pending-list">
+                        {userPendingMarkets.map((market) => (
+                          <div key={market.id} className="fm-pending-card">
+                            <div className="fm-pending-header">
+                              <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
+                              <span className="fm-pending-badge">Pending</span>
+                            </div>
+                            <p className="fm-pending-desc">{market.description}</p>
+                            <div className="fm-pending-progress">
+                              <div className="fm-progress-bar">
+                                <div
+                                  className="fm-progress-fill"
+                                  style={{
+                                    width: `${((market.acceptedCount || 0) / (market.minAcceptanceThreshold || 2)) * 100}%`
+                                  }}
+                                />
+                              </div>
+                              <span className="fm-progress-text">
+                                {market.acceptedCount || 0}/{market.minAcceptanceThreshold || 2} accepted
+                              </span>
+                            </div>
+                            <div className="fm-pending-info">
+                              <span className="fm-pending-stake">
+                                {market.stakeAmount} {market.stakeTokenSymbol || 'ETC'}
+                              </span>
+                              {market.acceptanceDeadline && (
+                                <span className="fm-pending-deadline">
+                                  Deadline: {new Date(market.acceptanceDeadline).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="fm-pending-actions">
+                              <button
+                                type="button"
+                                className="fm-btn-outline"
+                                onClick={() => {
+                                  const url = getMarketUrl(market)
+                                  if (navigator.clipboard?.writeText) {
+                                    navigator.clipboard.writeText(url)
+                                      .then(() => window.alert('Link copied!'))
+                                      .catch(() => window.alert('Failed to copy'))
+                                  }
+                                }}
+                              >
+                                &#128279; Copy Link
+                              </button>
+                              {market.creator?.toLowerCase() === account?.toLowerCase() && (
+                                <button
+                                  type="button"
+                                  className="fm-btn-danger-outline"
+                                  onClick={() => {
+                                    if (window.confirm('Cancel this market and refund all stakes?')) {
+                                      // TODO: Call cancelPendingMarket contract function
+                                      console.log('Cancel market:', market.id)
+                                    }
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Markets Section */}
+                  {userActiveMarkets.length === 0 && userPendingMarkets.length === 0 ? (
                     <div className="fm-empty-state">
                       <div className="fm-empty-icon">&#128200;</div>
                       <h3>No Active Markets</h3>
@@ -1120,17 +1340,25 @@ function FriendMarketsModal({
                         Create Your First Market
                       </button>
                     </div>
-                  ) : (
-                    <div className="fm-markets-list">
-                      <MarketsCompactTable
-                        markets={userActiveMarkets}
-                        onSelect={handleMarketSelect}
-                        formatDate={formatDate}
-                        formatAddress={formatAddress}
-                        getTypeLabel={getTypeLabel}
-                        getStatusClass={getStatusClass}
-                      />
-                    </div>
+                  ) : userActiveMarkets.length > 0 && (
+                    <>
+                      {userPendingMarkets.length > 0 && (
+                        <h4 className="fm-section-title fm-active-title">
+                          <span>&#128200;</span>
+                          Active Markets ({userActiveMarkets.length})
+                        </h4>
+                      )}
+                      <div className="fm-markets-list">
+                        <MarketsCompactTable
+                          markets={userActiveMarkets}
+                          onSelect={handleMarketSelect}
+                          formatDate={formatDate}
+                          formatAddress={formatAddress}
+                          getTypeLabel={getTypeLabel}
+                          getStatusClass={getStatusClass}
+                        />
+                      </div>
+                    </>
                   )}
                 </>
               )}

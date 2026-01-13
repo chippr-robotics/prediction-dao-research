@@ -23,6 +23,7 @@ import TokenMintPage from './pages/TokenMintPage'
 import MarketPage from './pages/MarketPage'
 import CorrelatedMarketsPage from './pages/CorrelatedMarketsPage'
 import WalletPage from './pages/WalletPage'
+import MarketAcceptancePage from './pages/MarketAcceptancePage'
 
 
 //admin
@@ -177,6 +178,7 @@ function AppContent() {
         <Route path="/markets/correlated/:groupId" element={<CorrelatedMarketsPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/tokenmint" element={<TokenMintPage />} />
+        <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
 
         {/* Admin routes - restricted to users with admin roles */}
         <Route path="/admin" element={<AdminPanel />} />

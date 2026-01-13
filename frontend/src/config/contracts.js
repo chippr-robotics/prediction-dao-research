@@ -46,7 +46,16 @@ export const DEPLOYED_CONTRACTS = {
 
   // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
   // Used for grouping related markets (e.g., election candidates, tournament brackets)
-  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A', // TODO: Deploy and update address
+  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A',
+
+  // Friend Group Market Factory - Deploy via: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
+  // For P2P friend markets with tiered membership
+  friendGroupMarketFactory: '', // TODO: Deploy and update address
+
+  // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
+  // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor
+  // Has checkMarketCreationLimitFor for tier-based limits
+  tieredRoleManagerFull: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
 
 }
 

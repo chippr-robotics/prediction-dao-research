@@ -1,0 +1,14 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "saltPrefix": "ClearPathDAO-TRM-v1.1-",
+  "contracts": {
+    "tieredRoleManager": "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF"
+  },
+  "roles": {
+    "FRIEND_MARKET_ROLE": "0xdb55b9a5e3db03c050b2061aa4630dce0551d72bfbab51ffb04a59ffd866d209",
+    "MARKET_MAKER_ROLE": "0x75e5bf8b7de9fd9f24c97951733c6410a040b7a07b543096cb36c6dda365aa8b"
+  },
+  "timestamp": "2026-01-13T04:56:41.120Z"
+}

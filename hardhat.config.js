@@ -50,7 +50,7 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 1,  // Optimize for deployment size over runtime gas
       },
       viaIR: true,
     },
