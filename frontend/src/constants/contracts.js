@@ -16,10 +16,12 @@ const ADDRESSES_BY_NETWORK = {
   // Mordor Testnet (Chain ID 63)
   63: {
     conditionalMarketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac',
-    friendGroupMarketFactory: '', // Deploy with: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
+    friendGroupMarketFactory: '0xD80d1F8EEbA6566615Ac973a040735AE482cc887',
     tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
     proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-    tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB'
+    tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
+    ragequitModule: '0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7',
+    membershipPaymentManager: '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28'
   }
 }
 

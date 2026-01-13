@@ -1131,13 +1131,21 @@ const ROLE_MANAGER_ABI = [
   }
 ]
 
-// Membership tier enum values
+// Membership tier enum values - matches TieredRoleManager contract
 const MembershipTier = {
   NONE: 0,
-  BASIC: 1,
-  STANDARD: 2,
-  PREMIUM: 3,
-  ENTERPRISE: 4
+  BRONZE: 1,
+  SILVER: 2,
+  GOLD: 3,
+  PLATINUM: 4
+}
+
+// Export tier names for UI display
+export const TIER_NAMES = {
+  1: 'Bronze',
+  2: 'Silver',
+  3: 'Gold',
+  4: 'Platinum'
 }
 
 /**
@@ -1260,7 +1268,7 @@ const PAYMENT_PROCESSOR_ABI = [
 ]
 
 /**
- * Purchase a role using USC stablecoin
+ * Purchase a role using USC stablecoin with tiered membership
  * This function calls the PaymentProcessor's purchaseTierWithToken function,
  * which handles both the payment and role granting in a single transaction.
  *
@@ -1269,9 +1277,10 @@ const PAYMENT_PROCESSOR_ABI = [
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
  * @param {number} priceUSD - Price in USD (will be converted to USC with 6 decimals)
+ * @param {number} tier - Membership tier (1=Bronze, 2=Silver, 3=Gold, 4=Platinum), defaults to Bronze
  * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
-export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
+export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = MembershipTier.BRONZE) {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
@@ -1370,18 +1379,23 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
       console.log('USC already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
     }
 
+    // Validate tier value
+    const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+    const tierName = TIER_NAMES[validTier] || 'Bronze'
+
     // Call purchaseTierWithToken on PaymentProcessor
     // This handles both payment and role granting in a single atomic transaction
     console.log('Purchasing role via PaymentProcessor...', {
       roleHash,
-      tier: MembershipTier.BASIC,
+      tier: validTier,
+      tierName,
       paymentToken: uscAddress,
       amount: amountWei.toString()
     })
 
     const purchaseTx = await paymentProcessor.purchaseTierWithToken(
       roleHash,
-      MembershipTier.BASIC,  // Use BASIC tier for standard purchases
+      validTier,
       uscAddress,
       amountWei
     )
@@ -1395,6 +1409,8 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
       status: receipt.status === 1 ? 'success' : 'failed',
       gasUsed: receipt.gasUsed.toString(),
       roleName: roleName,
+      tier: validTier,
+      tierName: tierName,
       amount: priceUSD,
       roleGrantedOnChain: receipt.status === 1,
       roleGrantTxHash: receipt.hash

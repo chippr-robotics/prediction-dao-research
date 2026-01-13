@@ -270,22 +270,24 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     );
     
     constructor(
-        address _marketFactory, 
-        address payable _ragequitModule, 
+        address _marketFactory,
+        address payable _ragequitModule,
         address _tieredRoleManager,
-        address _paymentManager
-    ) Ownable(msg.sender) {
+        address _paymentManager,
+        address _owner
+    ) Ownable(_owner) {
         if (_marketFactory == address(0)) revert InvalidAddress();
         if (_ragequitModule == address(0)) revert InvalidAddress();
         if (_tieredRoleManager == address(0)) revert InvalidAddress();
         if (_paymentManager == address(0)) revert InvalidAddress();
+        if (_owner == address(0)) revert InvalidAddress();
 
         marketFactory = ConditionalMarketFactory(_marketFactory);
         ragequitModule = RagequitModule(_ragequitModule);
         tieredRoleManager = TieredRoleManager(_tieredRoleManager);
         paymentManager = MembershipPaymentManager(_paymentManager);
-        manager = msg.sender; // Initially deployer, transferable
-        
+        manager = _owner; // Initially owner, transferable
+
         // Accept native ETC by default
         acceptedPaymentTokens[address(0)] = true;
     }

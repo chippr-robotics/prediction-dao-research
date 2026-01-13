@@ -290,7 +290,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
 
       // Pre-flight checks: verify contract is properly configured
-      const [ctf1155Address, roleManagerAddress, ownerAddress] = await Promise.all([
+      const [ctf1155Address, factoryRoleManager, ownerAddress] = await Promise.all([
         contract.ctf1155(),
         contract.roleManager(),
         contract.owner()
@@ -303,6 +303,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
         throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
       }
 
+      // Use the configured TieredRoleManager address (factory may have old address locked)
+      const configRoleManager = getContractAddress('tieredRoleManager')
+      let roleManagerAddress = factoryRoleManager
+
+      // If factory roleManager differs from config, use config (factory address is locked to old value)
+      if (configRoleManager && factoryRoleManager.toLowerCase() !== configRoleManager.toLowerCase()) {
+        console.warn('[Friend Market] Factory roleManager differs from config, using TieredRoleManager from config:', configRoleManager)
+        roleManagerAddress = configRoleManager
+      }
+
       // Check if user can create markets (Friend Market uses same role as Market Maker)
       const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
       let hasMarketMakerRole = false
@@ -312,32 +322,52 @@ function WalletButton({ className = '', theme = 'dark' }) {
         userAddress,
         ownerAddress,
         isOwner,
-        roleManagerFromFactory: roleManagerAddress,
-        expectedRoleManager: getContractAddress('roleManager')
+        roleManagerFromFactory: factoryRoleManager,
+        roleManagerUsed: roleManagerAddress,
+        configRoleManager
       })
 
       if (roleManagerAddress !== ethers.ZeroAddress) {
         const roleManagerAbi = [
           'function hasRole(bytes32 role, address account) view returns (bool)',
           'function MARKET_MAKER_ROLE() view returns (bytes32)',
-          'function isActiveMember(address user, bytes32 role) view returns (bool)'
+          'function FRIEND_MARKET_ROLE() view returns (bytes32)',
+          'function isActiveMember(address user, bytes32 role) view returns (bool)',
+          'function isMembershipActive(address user, bytes32 role) view returns (bool)'
         ]
         const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
         try {
-          const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
-          console.log('MARKET_MAKER_ROLE hash:', marketMakerRole)
+          // Try FRIEND_MARKET_ROLE first (for friend markets), fallback to MARKET_MAKER_ROLE
+          let roleToCheck
+          let roleName = 'FRIEND_MARKET_ROLE'
+          try {
+            roleToCheck = await roleManager.FRIEND_MARKET_ROLE()
+          } catch {
+            // Fallback to MARKET_MAKER_ROLE if FRIEND_MARKET_ROLE not available
+            roleToCheck = await roleManager.MARKET_MAKER_ROLE()
+            roleName = 'MARKET_MAKER_ROLE'
+          }
+          console.log(`${roleName} hash:`, roleToCheck)
 
-          hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
+          hasMarketMakerRole = await roleManager.hasRole(roleToCheck, userAddress)
           console.log('hasRole result:', hasMarketMakerRole)
 
-          // If hasRole fails, try isActiveMember (TieredRoleManager specific)
+          // If hasRole fails, try isActiveMember or isMembershipActive (TieredRoleManager specific)
           if (!hasMarketMakerRole) {
             try {
-              const isActive = await roleManager.isActiveMember(userAddress, marketMakerRole)
-              console.log('isActiveMember result:', isActive)
+              // Try isMembershipActive first (newer TieredRoleManager function)
+              const isActive = await roleManager.isMembershipActive(userAddress, roleToCheck)
+              console.log('isMembershipActive result:', isActive)
               hasMarketMakerRole = isActive
-            } catch (activeMemberError) {
-              console.log('isActiveMember not available or failed:', activeMemberError.message)
+            } catch {
+              try {
+                // Fallback to isActiveMember
+                const isActive = await roleManager.isActiveMember(userAddress, roleToCheck)
+                console.log('isActiveMember result:', isActive)
+                hasMarketMakerRole = isActive
+              } catch (activeMemberError) {
+                console.log('isActiveMember/isMembershipActive not available:', activeMemberError.message)
+              }
             }
           }
         } catch (roleError) {
@@ -350,7 +380,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
         if (roleManagerAddress === ethers.ZeroAddress) {
           throw new Error('Friend market creation requires contract owner privileges. Role manager not configured on factory.')
         }
-        throw new Error('You do not have the MARKET_MAKER role on-chain. Your role may have expired. Please purchase or renew your Market Maker access.')
+        throw new Error('You do not have the Friend Market role on-chain. Your membership may have expired. Please purchase or renew your Friend Markets access.')
       }
 
       console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })

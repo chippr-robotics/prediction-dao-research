@@ -27,7 +27,7 @@ const NETWORK_CONFIG = {
     marketFactory: "0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac",
     ragequitModule: "0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7",  // Checksummed
     tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",  // New optimized TieredRoleManager
-    paymentManager: "0xA61C3a81E25e8E5e7a6a7ECEbED7E1bF58533E28",
+    paymentManager: "0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28",
     collateralToken: "0xDE093684c796204224BC081f937aa059D903c52a"  // USC stablecoin
   },
   hardhat: {
@@ -171,15 +171,17 @@ async function main() {
   const saltPrefix = "ClearPathDAO-FGMF-v1.0-";
 
   // Deploy FriendGroupMarketFactory
+  // Note: Pass deployer.address as owner since CREATE2 factory would otherwise be msg.sender
   const friendGroupMarketFactory = await deployDeterministic(
     "FriendGroupMarketFactory",
     [
       config.marketFactory,
       config.ragequitModule,
       config.tieredRoleManager,
-      config.paymentManager
+      config.paymentManager,
+      deployer.address  // Explicit owner address for deterministic deployment
     ],
-    generateSalt(saltPrefix + "FriendGroupMarketFactory"),
+    generateSalt(saltPrefix + "FriendGroupMarketFactory-v2"),  // New salt for new constructor
     deployer
   );
 
