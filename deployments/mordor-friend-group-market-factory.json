@@ -3,7 +3,7 @@
   "chainId": 63,
   "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
   "contracts": {
-    "friendGroupMarketFactory": "0xD80d1F8EEbA6566615Ac973a040735AE482cc887"
+    "friendGroupMarketFactory": "0xE363e722039489a3Bb91B6b6420515C7aE1B91D3"
   },
   "dependencies": {
     "marketFactory": "0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac",
@@ -12,5 +12,5 @@
     "paymentManager": "0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28",
     "collateralToken": "0xDE093684c796204224BC081f937aa059D903c52a"
   },
-  "timestamp": "2026-01-13T12:46:17.635Z"
+  "timestamp": "2026-01-13T23:17:36.035Z"
 }

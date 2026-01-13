@@ -94,25 +94,17 @@ function WalletButton({ className = '', theme = 'dark' }) {
         console.log('[WalletButton] Fetched friend markets:', blockchainMarkets.length)
 
         if (blockchainMarkets.length > 0) {
-          // Merge blockchain markets with local storage markets
-          setFriendMarkets(prevMarkets => {
-            const existingIds = new Set(prevMarkets.map(m => m.id))
-            const newMarkets = blockchainMarkets.filter(m => !existingIds.has(m.id))
+          // Use blockchain as source of truth - deduplicate by id
+          // Add uniqueId combining contract address and id for stable React keys
+          const marketsWithUniqueIds = blockchainMarkets.map(m => ({
+            ...m,
+            uniqueId: `${m.contractAddress || 'unknown'}-${m.id}`
+          }))
 
-            if (newMarkets.length > 0) {
-              console.log('[WalletButton] Adding new markets from blockchain:', newMarkets.length)
-              const merged = [...prevMarkets, ...newMarkets]
-              saveFriendMarketsToStorage(merged)
-              return merged
-            }
-
-            // Update existing markets with fresh blockchain data
-            const updated = prevMarkets.map(m => {
-              const fresh = blockchainMarkets.find(bm => bm.id === m.id)
-              return fresh || m
-            })
-
-            return updated
+          setFriendMarkets(() => {
+            // Prefer blockchain data over localStorage
+            saveFriendMarketsToStorage(marketsWithUniqueIds)
+            return marketsWithUniqueIds
           })
         }
       } catch (error) {
@@ -321,18 +313,27 @@ function WalletButton({ className = '', theme = 'dark' }) {
       }
 
       // Get stake token address - use form data or default to USC stablecoin
-      const stakeTokenAddress = data.data?.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
-      if (!stakeTokenAddress) {
-        throw new Error('Stake token not configured')
-      }
+      // null/undefined means native ETC, which uses ZeroAddress in the contract
+      const rawCollateralToken = data.data?.collateralToken
+      const isNativeETC = rawCollateralToken === null || rawCollateralToken === undefined
+      const stakeTokenAddress = isNativeETC ? ethers.ZeroAddress : (rawCollateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN)
 
       // Determine token decimals based on token address
-      const tokenDecimals = stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
-        ? TOKENS.USC.decimals  // 6 decimals for USC
-        : 18  // Default to 18 decimals for other tokens
+      // USC has 6 decimals, native ETC and most others have 18
+      let tokenDecimals = 18
+      if (!isNativeETC && stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()) {
+        tokenDecimals = TOKENS.USC.decimals  // 6 decimals for USC
+      }
+
+      console.log('Stake token config:', {
+        rawCollateralToken,
+        isNativeETC,
+        stakeTokenAddress,
+        tokenDecimals
+      })
 
       const friendFactory = new ethers.Contract(friendFactoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, activeSigner)
-      const stakeToken = new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
+      const stakeToken = isNativeETC ? null : new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
       const userAddress = await activeSigner.getAddress()
 
       // Check if user has FRIEND_MARKET role via TierRegistry
@@ -424,13 +425,15 @@ function WalletButton({ className = '', theme = 'dark' }) {
       // Get arbitrator (optional - can be zero address for no arbitrator)
       const arbitrator = data.data.arbitrator || ethers.ZeroAddress
 
-      // Approve stake token for FriendGroupMarketFactory
-      const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
-      if (currentAllowance < stakeAmountWei) {
-        console.log('Approving stake token for FriendGroupMarketFactory...')
-        const approveTx = await stakeToken.approve(friendFactoryAddress, stakeAmountWei)
-        await approveTx.wait()
-        console.log('Stake token approved')
+      // Approve stake token for FriendGroupMarketFactory (only for ERC20 tokens, not native ETC)
+      if (!isNativeETC && stakeToken) {
+        const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
+        if (currentAllowance < stakeAmountWei) {
+          console.log('Approving stake token for FriendGroupMarketFactory...')
+          const approveTx = await stakeToken.approve(friendFactoryAddress, stakeAmountWei)
+          await approveTx.wait()
+          console.log('Stake token approved')
+        }
       }
 
       // Create the 1v1 pending market
@@ -441,18 +444,34 @@ function WalletButton({ className = '', theme = 'dark' }) {
         arbitrator,
         acceptanceDeadline,
         stakeAmountWei: stakeAmountWei.toString(),
-        stakeToken: stakeTokenAddress
+        stakeToken: stakeTokenAddress,
+        isNativeETC
       })
 
-      const tx = await friendFactory.createOneVsOneMarketPending(
-        opponent,
-        data.data.description || 'Friend Market',
-        tradingPeriodSeconds,
-        arbitrator,
-        acceptanceDeadline,
-        stakeAmountWei,
-        stakeTokenAddress
-      )
+      // For native ETC, send the stake as msg.value; for ERC20, no value needed
+      let tx
+      if (isNativeETC) {
+        tx = await friendFactory.createOneVsOneMarketPending(
+          opponent,
+          data.data.description || 'Friend Market',
+          tradingPeriodSeconds,
+          arbitrator,
+          acceptanceDeadline,
+          stakeAmountWei,
+          stakeTokenAddress,
+          { value: stakeAmountWei }
+        )
+      } else {
+        tx = await friendFactory.createOneVsOneMarketPending(
+          opponent,
+          data.data.description || 'Friend Market',
+          tradingPeriodSeconds,
+          arbitrator,
+          acceptanceDeadline,
+          stakeAmountWei,
+          stakeTokenAddress
+        )
+      }
 
       console.log('Friend market transaction sent:', tx.hash)
       const receipt = await tx.wait()

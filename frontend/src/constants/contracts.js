@@ -16,7 +16,7 @@ const ADDRESSES_BY_NETWORK = {
   // Mordor Testnet (Chain ID 63)
   63: {
     conditionalMarketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac',
-    friendGroupMarketFactory: '0xD80d1F8EEbA6566615Ac973a040735AE482cc887',
+    friendGroupMarketFactory: '0xE363e722039489a3Bb91B6b6420515C7aE1B91D3',
     tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
     proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
     tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',

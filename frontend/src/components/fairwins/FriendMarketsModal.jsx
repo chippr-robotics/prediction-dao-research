@@ -506,27 +506,34 @@ function FriendMarketsModal({
 
     setSubmitting(true)
     try {
-      const submitData = {
-        type: 'friend',
-        marketType: friendMarketType,
-        data: formData
-      }
-
-      const result = await onCreate(submitData, signer)
-
-      // Get the stake token info for display
+      // Get the stake token info for submission
       const getStakeTokenInfo = () => {
         if (formData.stakeTokenId === 'CUSTOM') {
           return {
             symbol: 'Custom',
             address: formData.customStakeTokenAddress,
-            icon: '🔧'
+            icon: '🔧',
+            decimals: 18 // Default to 18 for custom tokens
           }
         }
         const token = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
         return token || STAKE_TOKEN_OPTIONS[0] // Default to USC if not found
       }
       const stakeToken = getStakeTokenInfo()
+
+      // Build submit data with token address for WalletButton
+      const submitData = {
+        type: 'friend',
+        marketType: friendMarketType,
+        data: {
+          ...formData,
+          // Pass actual token address so WalletButton can use correct decimals
+          // 'native' means native ETC (no ERC20 address), pass null for this case
+          collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null)
+        }
+      }
+
+      const result = await onCreate(submitData, signer)
 
       // Calculate trading period in days for display
       const endDate = new Date(formData.endDateTime)
@@ -927,17 +934,30 @@ function FriendMarketsModal({
                       <label htmlFor="fm-stake">
                         Stake Amount <span className="fm-required">*</span>
                       </label>
-                      <input
-                        id="fm-stake"
-                        type="number"
-                        value={formData.stakeAmount}
-                        onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
-                        placeholder="10"
-                        min="0.1"
-                        step="0.1"
-                        disabled={submitting}
-                        className={errors.stakeAmount ? 'error' : ''}
-                      />
+                      <div className="fm-stake-input-wrapper">
+                        {(formData.stakeTokenId === 'USC' || formData.stakeTokenId === 'CUSTOM') && (
+                          <span className="fm-stake-prefix">$</span>
+                        )}
+                        <input
+                          id="fm-stake"
+                          type="number"
+                          value={formData.stakeAmount}
+                          onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
+                          placeholder={formData.stakeTokenId === 'USC' ? '10.00' : '10'}
+                          min="0.1"
+                          step="0.01"
+                          disabled={submitting}
+                          className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'USC' ? 'fm-stake-usd' : ''}`}
+                        />
+                        {formData.stakeTokenId !== 'USC' && formData.stakeTokenId !== 'CUSTOM' && (
+                          <span className="fm-stake-suffix">{selectedStakeToken?.symbol || 'ETC'}</span>
+                        )}
+                      </div>
+                      <span className="fm-hint">
+                        {formData.stakeTokenId === 'USC'
+                          ? 'Enter amount in USD (e.g., 10.00 for $10)'
+                          : `Enter amount in ${selectedStakeToken?.symbol || 'tokens'}`}
+                      </span>
                       {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
 
@@ -1338,8 +1358,8 @@ function FriendMarketsModal({
                         Awaiting Acceptance ({userPendingMarkets.length})
                       </h4>
                       <div className="fm-pending-list">
-                        {userPendingMarkets.map((market) => (
-                          <div key={market.id} className="fm-pending-card">
+                        {userPendingMarkets.map((market, index) => (
+                          <div key={`pending-${market.uniqueId || market.id || index}`} className="fm-pending-card">
                             <div className="fm-pending-header">
                               <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
                               <span className="fm-pending-badge">Pending</span>
@@ -1541,9 +1561,9 @@ function MarketsCompactTable({
         </tr>
       </thead>
       <tbody>
-        {markets.map((market) => (
+        {markets.map((market, index) => (
           <tr
-            key={market.id}
+            key={`market-${market.uniqueId || market.id || index}`}
             onClick={() => onSelect(market)}
             className="fm-table-row"
             role="button"

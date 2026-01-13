@@ -406,6 +406,59 @@
   color: #E5533D;
 }
 
+/* Stake Amount Input Wrapper - with $ prefix for USD */
+.fm-stake-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg-tertiary, #1A242D);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.fm-stake-input-wrapper:focus-within {
+  border-color: var(--accent-green, #36B37E);
+}
+
+.fm-stake-prefix,
+.fm-stake-suffix {
+  padding: 0 0.75rem;
+  color: var(--text-muted, #7A8590);
+  font-size: 1rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.02);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.fm-stake-suffix {
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fm-stake-input-wrapper input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  min-width: 80px;
+  color: var(--text-primary, #ffffff) !important;
+  font-size: 1rem;
+  padding: 0.75rem;
+}
+
+.fm-stake-input-wrapper input:focus {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.fm-stake-input-wrapper input.fm-stake-usd {
+  font-weight: 500;
+}
+
 /* Input with Action Button (QR Scan, Lookup) */
 .fm-input-with-action {
   display: flex;

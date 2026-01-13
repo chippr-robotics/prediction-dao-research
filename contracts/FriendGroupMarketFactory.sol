@@ -1049,7 +1049,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
                 if (!success) revert TransferFailed();
             }
         } else {
-            IERC20(token).safeTransferFrom(from, address(this), amount);
+            // Use direct transferFrom instead of SafeERC20 to debug proxy token issues
+            (bool success, bytes memory returnData) = token.call(
+                abi.encodeWithSelector(IERC20.transferFrom.selector, from, address(this), amount)
+            );
+            // Check if call succeeded
+            if (!success) revert TransferFailed();
+            // Check return value if present (some tokens don't return a value)
+            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
         }
     }
 
@@ -1080,7 +1087,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             (bool success, ) = payable(to).call{value: amount}("");
             if (!success) revert TransferFailed();
         } else {
-            IERC20(token).safeTransfer(to, amount);
+            // Use direct transfer instead of SafeERC20 for proxy token compatibility
+            (bool success, bytes memory returnData) = token.call(
+                abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+            );
+            if (!success) revert TransferFailed();
+            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
         }
     }
 
@@ -1115,6 +1127,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         // Deploy underlying market in ConditionalMarketFactory
         uint256 proposalId = friendMarketId + PROPOSAL_ID_OFFSET;
         address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : market.stakeToken;
+
+        // Approve collateral transfer to ConditionalMarketFactory
+        if (collateral != address(0)) {
+            IERC20(collateral).approve(address(marketFactory), totalStaked);
+        }
 
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,

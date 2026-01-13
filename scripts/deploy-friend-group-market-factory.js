@@ -181,7 +181,7 @@ async function main() {
       config.paymentManager,
       deployer.address  // Explicit owner address for deterministic deployment
     ],
-    generateSalt(saltPrefix + "FriendGroupMarketFactory-v2"),  // New salt for new constructor
+    generateSalt(saltPrefix + "FriendGroupMarketFactory-v3"),  // Fix: approve collateral before deployMarketPair
     deployer
   );
 
