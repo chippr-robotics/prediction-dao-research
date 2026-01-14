@@ -155,7 +155,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     uint256 public oneVsOneFee = 0.05 ether;       // Even lower for 1v1
     
     // Proposal ID offset to avoid collision with public markets
-    uint256 public constant PROPOSAL_ID_OFFSET = 1000000;
+    // Using 10 billion to allow for massive scale (10B public markets before collision)
+    uint256 public constant PROPOSAL_ID_OFFSET = 10_000_000_000;
     
     // Member limits (updateable by managers)
     uint256 public maxSmallGroupMembers = 10;

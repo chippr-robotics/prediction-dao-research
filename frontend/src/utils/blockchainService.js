@@ -575,11 +575,26 @@ export async function fetchMarketsFromBlockchain() {
     // Filter out null results (invalid markets)
     const transformedMarkets = results.filter(market => market !== null)
 
+    // Filter out friend markets from public grid
+    // Friend markets use a proposalId offset to avoid collision with public markets:
+    // - v5 contract (current): offset = 1,000,000
+    // - v6+ contracts (future): offset = 10,000,000,000
+    // Using 1M as minimum filter catches all friend markets from any version
+    // Friend markets are displayed separately in the FriendMarketsModal
+    const FRIEND_MARKET_PROPOSAL_OFFSET = 1_000_000
+    const publicMarkets = transformedMarkets.filter(market => {
+      const isFriendMarket = market.proposalId >= FRIEND_MARKET_PROPOSAL_OFFSET
+      if (isFriendMarket) {
+        console.debug(`Filtering out friend market ${market.id} (proposalId: ${market.proposalId})`)
+      }
+      return !isFriendMarket
+    })
+
     const fetchDuration = Date.now() - startTime
-    console.log(`Fetched ${transformedMarkets.length} valid markets in ${fetchDuration}ms`)
+    console.log(`Fetched ${publicMarkets.length} public markets (filtered ${transformedMarkets.length - publicMarkets.length} friend markets) in ${fetchDuration}ms`)
 
     // Enrich markets with correlation group data (provides categories)
-    const enrichedMarkets = await enrichMarketsWithCorrelationData(transformedMarkets)
+    const enrichedMarkets = await enrichMarketsWithCorrelationData(publicMarkets)
 
     const totalDuration = Date.now() - startTime
     console.log(`Total market fetch + enrichment: ${totalDuration}ms`)
