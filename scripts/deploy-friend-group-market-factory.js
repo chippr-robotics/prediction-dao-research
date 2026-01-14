@@ -181,7 +181,7 @@ async function main() {
       config.paymentManager,
       deployer.address  // Explicit owner address for deterministic deployment
     ],
-    generateSalt(saltPrefix + "FriendGroupMarketFactory-v3"),  // Fix: approve collateral before deployMarketPair
+    generateSalt(saltPrefix + "FriendGroupMarketFactory-v4"),  // Fix: _collectStake using direct transferFrom for USC proxy
     deployer
   );
 

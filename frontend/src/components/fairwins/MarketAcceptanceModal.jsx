@@ -144,21 +144,69 @@ function MarketAcceptanceModal({
         })
 
         if (!marketData.stakeToken || marketData.stakeToken === ethers.ZeroAddress) {
-          // Native token stake
+          // Native token stake - check balance first
+          const balance = await signer.provider.getBalance(account)
+          console.log('Native balance check:', {
+            balance: balance.toString(),
+            balanceFormatted: ethers.formatEther(balance),
+            required: stakeAmount.toString(),
+            requiredFormatted: ethers.formatUnits(stakeAmount, 18)
+          })
+          if (balance < stakeAmount) {
+            throw new Error(
+              `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${ethers.formatUnits(stakeAmount, 18)} ETC.`
+            )
+          }
           tx = await contract.acceptMarket(marketId, { value: stakeAmount })
         } else {
-          // ERC20 approval first
+          // ERC20 token - check balance and approval
           const tokenContract = new ethers.Contract(
             marketData.stakeToken,
-            ['function approve(address,uint256) returns (bool)', 'function allowance(address,address) view returns (uint256)'],
+            [
+              'function approve(address,uint256) returns (bool)',
+              'function allowance(address,address) view returns (uint256)',
+              'function balanceOf(address) view returns (uint256)',
+              'function symbol() view returns (string)'
+            ],
             signer
           )
 
+          // Check balance first
+          const balance = await tokenContract.balanceOf(account)
+          let tokenSymbol = marketData.stakeTokenSymbol || 'tokens'
+          try {
+            tokenSymbol = await tokenContract.symbol()
+          } catch {
+            // Use default from marketData
+          }
+
+          console.log('ERC20 balance check:', {
+            balance: balance.toString(),
+            balanceFormatted: ethers.formatUnits(balance, tokenDecimals),
+            required: stakeAmount.toString(),
+            requiredFormatted: ethers.formatUnits(stakeAmount, tokenDecimals),
+            tokenSymbol
+          })
+
+          if (balance < stakeAmount) {
+            throw new Error(
+              `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${ethers.formatUnits(stakeAmount, tokenDecimals)} ${tokenSymbol}.`
+            )
+          }
+
           // Check if we already have enough allowance
           const currentAllowance = await tokenContract.allowance(account, contractAddress)
+          console.log('Allowance check:', {
+            currentAllowance: currentAllowance.toString(),
+            required: stakeAmount.toString(),
+            sufficient: currentAllowance >= stakeAmount
+          })
+
           if (currentAllowance < stakeAmount) {
+            console.log('Approving token for contract...')
             const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
             await approveTx.wait()
+            console.log('Token approved')
           }
 
           tx = await contract.acceptMarket(marketId)
@@ -173,7 +221,43 @@ function MarketAcceptanceModal({
 
     } catch (err) {
       console.error('Error accepting market:', err)
-      setError(err.reason || err.message || 'Failed to accept market')
+
+      // Decode known FriendGroupMarketFactory error selectors
+      const errorSelectors = {
+        '0x06417a60': 'Invalid market ID - the market does not exist',
+        '0x7dc6505a': 'Market is not pending - it may have already been activated or cancelled',
+        '0x70f65caa': 'Acceptance deadline has passed - the market has expired',
+        '0x1aa8064c': 'Already accepted - you have already accepted this market',
+        '0x779a6f41': 'Not invited - you are not a participant in this market',
+        '0x90b8ec18': 'Transfer failed - check your token balance and approval',
+        '0xcd1c8867': 'Insufficient payment - not enough ETC/tokens sent'
+      }
+
+      let errorMessage = err.reason || err.message || 'Failed to accept market'
+
+      // Try to decode error data if available
+      if (err.data) {
+        const selector = typeof err.data === 'string' ? err.data.slice(0, 10) : null
+        if (selector && errorSelectors[selector]) {
+          errorMessage = errorSelectors[selector]
+        }
+      }
+
+      // Check for common error patterns in the message
+      if (errorMessage.includes('missing revert data') || errorMessage.includes('unknown custom error')) {
+        // Check if there's error data in the transaction info
+        const txData = err.transaction?.data || err.info?.error?.data
+        if (txData) {
+          const selector = typeof txData === 'string' ? txData.slice(0, 10) : null
+          if (selector && errorSelectors[selector]) {
+            errorMessage = errorSelectors[selector]
+          }
+        } else {
+          errorMessage = 'Transaction failed. Please check your balance and allowance, then try again.'
+        }
+      }
+
+      setError(errorMessage)
       setStep('error')
     }
   }

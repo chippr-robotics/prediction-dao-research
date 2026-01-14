@@ -383,6 +383,45 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const stakeAmount = data.data.stakeAmount || '10'
       const stakeAmountWei = ethers.parseUnits(stakeAmount, tokenDecimals)
 
+      // Validate stake amount and balance before proceeding
+      console.log('Stake amount validation:', {
+        stakeAmount,
+        stakeAmountWei: stakeAmountWei.toString(),
+        tokenDecimals,
+        isNativeETC
+      })
+
+      // Check user balance for ERC20 tokens
+      if (!isNativeETC && stakeToken) {
+        const balance = await stakeToken.balanceOf(userAddress)
+        const tokenSymbol = TOKENS.USC?.symbol || 'tokens'
+        console.log('Token balance check:', {
+          balance: balance.toString(),
+          balanceFormatted: ethers.formatUnits(balance, tokenDecimals),
+          required: stakeAmountWei.toString(),
+          requiredFormatted: stakeAmount
+        })
+        if (balance < stakeAmountWei) {
+          throw new Error(
+            `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${stakeAmount} ${tokenSymbol}.`
+          )
+        }
+      } else if (isNativeETC) {
+        // Check native ETC balance
+        const balance = await activeSigner.provider.getBalance(userAddress)
+        console.log('Native ETC balance check:', {
+          balance: balance.toString(),
+          balanceFormatted: ethers.formatEther(balance),
+          required: stakeAmountWei.toString(),
+          requiredFormatted: stakeAmount
+        })
+        if (balance < stakeAmountWei) {
+          throw new Error(
+            `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${stakeAmount} ETC.`
+          )
+        }
+      }
+
       // Calculate acceptance deadline
       // The modal may pass: date string, milliseconds timestamp, seconds timestamp, or hours
       let acceptanceDeadline

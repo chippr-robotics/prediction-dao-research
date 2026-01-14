@@ -47,7 +47,7 @@ export const DEPLOYED_CONTRACTS = {
 
   // Friend Group Market Factory - Deploy via: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
   // For P2P friend markets with tiered membership
-  friendGroupMarketFactory: '0xE363e722039489a3Bb91B6b6420515C7aE1B91D3',
+  friendGroupMarketFactory: '0xD9A26537947d99c6961C1013490f0B80d1DFE283',
 
   // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
   // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor

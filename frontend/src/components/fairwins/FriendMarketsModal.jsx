@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { TOKENS } from '../../constants/etcswap'
@@ -110,6 +111,9 @@ function FriendMarketsModal({
   // Market acceptance modal state
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false)
   const [marketToAccept, setMarketToAccept] = useState(null)
+
+  // Market cancellation state
+  const [cancellingMarketId, setCancellingMarketId] = useState(null)
 
   // Reset form function - memoized to prevent stale closures
   const resetForm = useCallback(() => {
@@ -328,6 +332,52 @@ function FriendMarketsModal({
     window.location.reload()
   }
 
+  // Cancel a pending market (creator only)
+  const handleCancelMarket = async (market) => {
+    if (!signer || !isCorrectNetwork) {
+      window.alert('Please connect your wallet and switch to the correct network')
+      return
+    }
+
+    const marketId = market.id
+    if (marketId === undefined || marketId === null) {
+      window.alert('Invalid market ID')
+      return
+    }
+
+    if (!window.confirm('Cancel this market and refund all stakes? This cannot be undone.')) {
+      return
+    }
+
+    setCancellingMarketId(marketId)
+    try {
+      const factoryAddress = CONTRACT_ADDRESSES.friendGroupMarketFactory
+      const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
+
+      console.log('Cancelling market:', marketId)
+      const tx = await factory.cancelPendingMarket(marketId)
+      console.log('Cancel transaction sent:', tx.hash)
+
+      await tx.wait()
+      console.log('Market cancelled successfully')
+
+      window.alert('Market cancelled. Stakes have been refunded.')
+      // Refresh to show updated state
+      window.location.reload()
+    } catch (error) {
+      console.error('Error cancelling market:', error)
+      let errorMessage = 'Failed to cancel market'
+      if (error.reason) {
+        errorMessage += `: ${error.reason}`
+      } else if (error.message) {
+        errorMessage += `: ${error.message}`
+      }
+      window.alert(errorMessage)
+    } finally {
+      setCancellingMarketId(null)
+    }
+  }
+
   // Check if user can accept a pending market (invited but hasn't accepted yet)
   const canUserAcceptMarket = useCallback((market) => {
     if (!account || market.status !== 'pending_acceptance') return false
@@ -414,6 +464,8 @@ function FriendMarketsModal({
       newErrors.stakeAmount = 'Valid stake amount is required'
     } else if (stake < 0.1) {
       newErrors.stakeAmount = `Minimum stake is 0.1 ${selectedToken?.symbol || 'tokens'}`
+    } else if (stake > 1000) {
+      newErrors.stakeAmount = `Maximum stake is 1000 ${selectedToken?.symbol || 'tokens'}`
     }
 
     // Validate custom stake token address if custom token is selected
@@ -945,6 +997,7 @@ function FriendMarketsModal({
                           onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
                           placeholder={formData.stakeTokenId === 'USC' ? '10.00' : '10'}
                           min="0.1"
+                          max="1000"
                           step="0.01"
                           disabled={submitting}
                           className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'USC' ? 'fm-stake-usd' : ''}`}
@@ -1359,7 +1412,7 @@ function FriendMarketsModal({
                       </h4>
                       <div className="fm-pending-list">
                         {userPendingMarkets.map((market, index) => (
-                          <div key={`pending-${market.uniqueId || market.id || index}`} className="fm-pending-card">
+                          <div key={`pending-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`} className="fm-pending-card">
                             <div className="fm-pending-header">
                               <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
                               <span className="fm-pending-badge">Pending</span>
@@ -1417,14 +1470,10 @@ function FriendMarketsModal({
                                 <button
                                   type="button"
                                   className="fm-btn-danger-outline"
-                                  onClick={() => {
-                                    if (window.confirm('Cancel this market and refund all stakes?')) {
-                                      // TODO: Call cancelPendingMarket contract function
-                                      console.log('Cancel market:', market.id)
-                                    }
-                                  }}
+                                  onClick={() => handleCancelMarket(market)}
+                                  disabled={cancellingMarketId === market.id}
                                 >
-                                  Cancel
+                                  {cancellingMarketId === market.id ? 'Cancelling...' : 'Cancel'}
                                 </button>
                               )}
                             </div>
@@ -1563,7 +1612,7 @@ function MarketsCompactTable({
       <tbody>
         {markets.map((market, index) => (
           <tr
-            key={`market-${market.uniqueId || market.id || index}`}
+            key={`market-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`}
             onClick={() => onSelect(market)}
             className="fm-table-row"
             role="button"

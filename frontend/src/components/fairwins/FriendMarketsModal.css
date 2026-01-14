@@ -445,18 +445,33 @@
   background: transparent !important;
   border-radius: 0 !important;
   min-width: 80px;
-  color: var(--text-primary, #ffffff) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
   font-size: 1rem;
   padding: 0.75rem;
+  caret-color: #ffffff;
+}
+
+.fm-stake-input-wrapper input::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.5) !important;
 }
 
 .fm-stake-input-wrapper input:focus {
   border: none !important;
   box-shadow: none !important;
+  outline: none !important;
 }
 
 .fm-stake-input-wrapper input.fm-stake-usd {
   font-weight: 500;
+}
+
+/* Number input spinner buttons */
+.fm-stake-input-wrapper input[type="number"]::-webkit-inner-spin-button,
+.fm-stake-input-wrapper input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  filter: invert(1);
 }
 
 /* Input with Action Button (QR Scan, Lookup) */
@@ -1427,6 +1442,11 @@
 .fm-btn-danger-outline:hover {
   background: rgba(239, 68, 68, 0.1);
   border-color: #ef4444;
+}
+
+.fm-btn-danger-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Accept button - prominent green button for accepting markets */
