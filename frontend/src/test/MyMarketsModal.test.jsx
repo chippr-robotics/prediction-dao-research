@@ -96,12 +96,10 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Modal Visibility', () => {
-    it('should not render when isOpen is false', async () => {
-      await act(async () => {
-        renderWithProviders(
-          <MyMarketsModal isOpen={false} onClose={mockOnClose} />
-        )
-      })
+    it('should not render when isOpen is false', () => {
+      renderWithProviders(
+        <MyMarketsModal isOpen={false} onClose={mockOnClose} />
+      )
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
@@ -113,9 +111,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument()
-      })
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('should have correct ARIA attributes', async () => {
@@ -125,11 +121,9 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      await waitFor(() => {
-        const dialog = screen.getByRole('dialog')
-        expect(dialog).toHaveAttribute('aria-modal', 'true')
-        expect(dialog).toHaveAttribute('aria-labelledby', 'my-markets-modal-title')
-      })
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      expect(dialog).toHaveAttribute('aria-labelledby', 'my-markets-modal-title')
     })
   })
 
@@ -141,9 +135,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      await waitFor(() => {
-        expect(screen.getByText('My Markets')).toBeInTheDocument()
-      })
+      expect(screen.getByText('My Markets')).toBeInTheDocument()
     })
 
     it('should display subtitle', async () => {
@@ -153,9 +145,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      await waitFor(() => {
-        expect(screen.getByText('Manage your prediction markets and positions')).toBeInTheDocument()
-      })
+      expect(screen.getByText('Manage your prediction markets and positions')).toBeInTheDocument()
     })
 
     it('should have close button', async () => {
@@ -165,9 +155,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /close modal/i })).toBeInTheDocument()
-      })
+      expect(screen.getByRole('button', { name: /close modal/i })).toBeInTheDocument()
     })
 
     it('should call onClose when close button is clicked', async () => {
@@ -176,10 +164,6 @@ describe('MyMarketsModal', () => {
         renderWithProviders(
           <MyMarketsModal isOpen={true} onClose={mockOnClose} />
         )
-      })
-
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /close modal/i })).toBeInTheDocument()
       })
 
       const closeBtn = screen.getByRole('button', { name: /close modal/i })

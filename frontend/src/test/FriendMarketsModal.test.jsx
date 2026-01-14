@@ -50,7 +50,7 @@ vi.mock('wagmi', () => ({
   useChainId: () => mockUseChainId(),
   useSwitchChain: () => mockUseSwitchChain(),
   useWalletClient: () => ({
-    data: null // Return null to trigger window.ethereum fallback in tests
+    data: null // Return null to prevent EIP-1193 provider errors and trigger window.ethereum fallback path in tests
   }),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
