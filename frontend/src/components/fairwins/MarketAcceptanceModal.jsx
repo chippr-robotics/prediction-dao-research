@@ -214,9 +214,10 @@ function MarketAcceptanceModal({
             console.log('Token approved')
           }
 
-          // Use fixed gas limit to bypass estimation issues with Mordor RPC
-          console.log('Calling acceptMarket with fixed gas limit...')
-          tx = await contract.acceptMarket(marketId, { gasLimit: 500000 })
+          // Use higher gas limit for acceptMarket + activation flow
+          // The full flow (stake collection + market activation + deployMarketPair) needs ~1M gas
+          console.log('Calling acceptMarket with gas limit 1200000...')
+          tx = await contract.acceptMarket(marketId, { gasLimit: 1200000 })
         }
       }
 
