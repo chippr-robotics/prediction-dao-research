@@ -477,7 +477,8 @@ describe("ConditionalMarketFactory", function () {
       roleManager = await TieredRoleManager.deploy();
       await roleManager.waitForDeployment();
       
-      // No need to initialize - constructor already grants DEFAULT_ADMIN_ROLE to deployer
+      // Initialize role metadata (required to set isPremium flags)
+      await roleManager.initializeRoleMetadata();
       
       // Set up Market Maker tier metadata (Bronze tier)
       const MARKET_MAKER_ROLE = ethers.id("MARKET_MAKER_ROLE");

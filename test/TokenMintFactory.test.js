@@ -15,7 +15,8 @@ describe("TokenMintFactory", function () {
     roleManager = await RoleManager.deploy();
     await roleManager.waitForDeployment();
 
-    // No need to initialize - constructor already grants DEFAULT_ADMIN_ROLE to deployer
+    // Initialize role metadata (required to set isPremium flags)
+    await roleManager.initializeRoleMetadata();
     
     // Set up TokenMint tier metadata (Bronze tier)
     await roleManager.setTierMetadata(
