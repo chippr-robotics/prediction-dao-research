@@ -334,7 +334,7 @@ describe("TokenMintFactory", function () {
 
       // Purchase role for user2
       const tierMetadata = await roleManager.tierMetadata(TOKENMINT_ROLE, 1); // Bronze = 1
-      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, {
+      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, 30, {
         value: tierMetadata.price
       });
 
@@ -419,7 +419,7 @@ describe("TokenMintFactory", function () {
 
       // Purchase role for user2
       const tierMetadata = await roleManager.tierMetadata(TOKENMINT_ROLE, 1); // Bronze = 1
-      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, {
+      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, 30, {
         value: tierMetadata.price
       });
 
