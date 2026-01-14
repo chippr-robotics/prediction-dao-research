@@ -32,7 +32,9 @@ vi.mock('wagmi', () => ({
 // Mock hooks
 vi.mock('../hooks', () => ({
   useWalletRoles: vi.fn(),
-  useWeb3: vi.fn(() => ({ signer: {} }))
+  useWeb3: vi.fn(() => ({ signer: {}, isCorrectNetwork: true, switchNetwork: vi.fn() })),
+  useWallet: vi.fn(() => ({ isConnected: true, account: '0x1234567890123456789012345678901234567890' })),
+  useDataFetcher: vi.fn(() => ({ getMarkets: vi.fn(() => Promise.resolve([])), getPositions: vi.fn(() => Promise.resolve([])) }))
 }))
 
 vi.mock('../hooks/useETCswap', () => ({
@@ -62,6 +64,15 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
 vi.mock('../components/fairwins/MarketCreationModal', () => ({
   default: ({ isOpen, onClose }) => isOpen ? (
     <div role="dialog" aria-label="Create Market Modal"><button onClick={onClose}>Close</button></div>
+  ) : null
+}))
+
+vi.mock('../components/fairwins/MyMarketsModal', () => ({
+  default: ({ isOpen, onClose }) => isOpen ? (
+    <div role="dialog" aria-label="My Markets Modal"><button onClick={onClose}>Close</button></div>
+  ) : null,
+  MyMarketsModal: ({ isOpen, onClose }) => isOpen ? (
+    <div role="dialog" aria-label="My Markets Modal"><button onClick={onClose}>Close</button></div>
   ) : null
 }))
 

@@ -470,7 +470,13 @@ function MyMarketsModal({
 
         {/* Content Area */}
         <div className="mm-content">
-          {loading ? (
+          {!isConnected ? (
+            <div className="mm-empty-state">
+              <div className="mm-empty-icon">&#128274;</div>
+              <h3>Connect Your Wallet</h3>
+              <p>Please connect your wallet to view your markets.</p>
+            </div>
+          ) : loading ? (
             <div className="mm-loading">
               <div className="mm-spinner"></div>
               <p>Loading your markets...</p>
@@ -482,12 +488,6 @@ function MyMarketsModal({
               <button className="mm-btn-primary" onClick={fetchMarketsData}>
                 Try Again
               </button>
-            </div>
-          ) : !isConnected ? (
-            <div className="mm-empty-state">
-              <div className="mm-empty-icon">&#128274;</div>
-              <h3>Connect Your Wallet</h3>
-              <p>Please connect your wallet to view your markets.</p>
             </div>
           ) : (
             <>
