@@ -350,6 +350,27 @@
   padding-right: 2.5rem;
 }
 
+/* Datetime input styling */
+.fm-datetime-input {
+  width: 100%;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.fm-datetime-input::-webkit-calendar-picker-indicator {
+  background-color: transparent;
+  color: #36B37E;
+  cursor: pointer;
+  filter: invert(0.6) sepia(1) saturate(2) hue-rotate(100deg);
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.fm-datetime-input::-webkit-calendar-picker-indicator:hover {
+  filter: invert(0.5) sepia(1) saturate(3) hue-rotate(100deg);
+  background-color: rgba(54, 179, 126, 0.1);
+}
+
 .fm-form-group input::placeholder,
 .fm-form-group textarea::placeholder {
   color: var(--text-muted, #7A8590);
@@ -383,6 +404,74 @@
 .fm-error {
   font-size: 0.75rem;
   color: #E5533D;
+}
+
+/* Stake Amount Input Wrapper - with $ prefix for USD */
+.fm-stake-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg-tertiary, #1A242D);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.fm-stake-input-wrapper:focus-within {
+  border-color: var(--accent-green, #36B37E);
+}
+
+.fm-stake-prefix,
+.fm-stake-suffix {
+  padding: 0 0.75rem;
+  color: var(--text-muted, #7A8590);
+  font-size: 1rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.02);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.fm-stake-suffix {
+  border-right: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fm-stake-input-wrapper input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  min-width: 80px;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-size: 1rem;
+  padding: 0.75rem;
+  caret-color: #ffffff;
+}
+
+.fm-stake-input-wrapper input::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.fm-stake-input-wrapper input:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.fm-stake-input-wrapper input.fm-stake-usd {
+  font-weight: 500;
+}
+
+/* Number input spinner buttons */
+.fm-stake-input-wrapper input[type="number"]::-webkit-inner-spin-button,
+.fm-stake-input-wrapper input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  filter: invert(1);
 }
 
 /* Input with Action Button (QR Scan, Lookup) */
@@ -699,6 +788,36 @@
   font-size: 0.75rem;
   color: var(--text-muted, #7A8590);
   margin: 0.75rem 0 0 0;
+  text-align: center;
+  max-width: 220px;
+  line-height: 1.4;
+}
+
+.fm-acceptance-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.75rem;
+  padding: 0.625rem 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  border-radius: 8px;
+}
+
+.fm-acceptance-status {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #ffc107;
+}
+
+.fm-acceptance-deadline {
+  font-size: 0.75rem;
+  color: var(--text-muted, #7A8590);
+}
+
+.fm-status-pending {
+  color: #ffc107 !important;
 }
 
 .fm-qr-url {
@@ -1166,4 +1285,192 @@
 
 .theme-light .fm-qr-container {
   box-shadow: 0 0 20px rgba(54, 179, 126, 0.15);
+}
+
+/* Pending Markets Section */
+.fm-pending-section {
+  margin-bottom: 1.5rem;
+}
+
+.fm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #E6EDF3);
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle, #21262D);
+}
+
+.fm-pending-icon {
+  font-size: 1rem;
+}
+
+.fm-active-title {
+  margin-top: 1.5rem;
+}
+
+.fm-pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.fm-pending-card {
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid rgba(255, 193, 7, 0.25);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.fm-pending-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.fm-pending-type {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #7A8590);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fm-pending-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1875rem 0.5rem;
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+  border-radius: 4px;
+}
+
+.fm-pending-desc {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-primary, #E6EDF3);
+  line-height: 1.4;
+}
+
+.fm-pending-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.fm-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary, #161B22);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fm-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffc107 0%, #36B37E 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.fm-progress-text {
+  font-size: 0.75rem;
+  color: var(--text-muted, #7A8590);
+  white-space: nowrap;
+}
+
+.fm-pending-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.fm-pending-stake {
+  font-weight: 600;
+  color: var(--color-success, #36B37E);
+}
+
+.fm-pending-deadline {
+  color: var(--text-muted, #7A8590);
+}
+
+.fm-pending-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.fm-btn-outline {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border-default, #30363D);
+  border-radius: 6px;
+  color: var(--text-primary, #E6EDF3);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fm-btn-outline:hover {
+  background: var(--bg-tertiary, #161B22);
+  border-color: var(--text-muted, #7A8590);
+}
+
+.fm-btn-danger-outline {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fm-btn-danger-outline:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+.fm-btn-danger-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Accept button - prominent green button for accepting markets */
+.fm-btn-accept {
+  flex: 1;
+  padding: 0.5rem 0.875rem;
+  background: linear-gradient(135deg, #36B37E 0%, #2ECC71 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(54, 179, 126, 0.2);
+}
+
+.fm-btn-accept:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(54, 179, 126, 0.3);
+  opacity: 0.95;
+}
+
+.fm-btn-accept:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(54, 179, 126, 0.2);
 }

@@ -4,11 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./TierRegistry.sol";
-
-interface IRoleManagerCore {
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function paused() external view returns (bool);
-}
+import "./interfaces/IRoleManagerCore.sol";
 
 /**
  * @title MembershipManager

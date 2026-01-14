@@ -10,6 +10,37 @@ import "./RagequitModule.sol";
 import "./TieredRoleManager.sol";
 import "./MembershipPaymentManager.sol";
 
+// Custom errors for gas-efficient reverts
+error InvalidAddress();
+error InvalidMarketId();
+error InvalidMember();
+error InvalidOpponent();
+error InvalidDescription();
+error InvalidDeadline();
+error InvalidStake();
+error InvalidLimit();
+error InvalidThreshold();
+error DuplicateMember();
+error NotAuthorized();
+error MembershipRequired();
+error MembershipExpired();
+error MarketLimitReached();
+error MemberLimitReached();
+error NotPending();
+error NotActive();
+error AlreadyAccepted();
+error AlreadyMember();
+error NotMember();
+error NotInvited();
+error DeadlinePassed();
+error DeadlineNotPassed();
+error AlreadyPegged();
+error NotPegged();
+error NotResolved();
+error TransferFailed();
+error InsufficientPayment();
+error TokenNotAccepted();
+
 /**
  * @title FriendGroupMarketFactory
  * @notice Factory for creating small-scale prediction markets between friends
@@ -40,6 +71,24 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         EventTracking,      // Tracking for competitive events/games
         PropBet             // General proposition bet
     }
+
+    // Market status for multi-party acceptance flow
+    enum FriendMarketStatus {
+        PendingAcceptance,  // Waiting for participants to accept
+        Active,             // All required parties accepted, market live
+        Resolved,           // Market has been resolved
+        Cancelled,          // Creator cancelled before activation
+        Refunded            // Stakes returned due to deadline expiration
+    }
+
+    // Acceptance record for each participant
+    struct AcceptanceRecord {
+        address participant;
+        uint256 stakedAmount;
+        uint256 acceptedAt;
+        bool hasAccepted;
+        bool isArbitrator;      // Arbitrators don't stake
+    }
     
     struct FriendMarket {
         uint256 marketId;              // ID in ConditionalMarketFactory
@@ -56,6 +105,13 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         bool autoPegged;               // Whether resolution is pegged to public market
         address paymentToken;          // ERC20 token used (address(0) = native ETC)
         uint256 liquidityAmount;       // Initial liquidity in payment token
+        // Multi-party acceptance flow fields
+        FriendMarketStatus status;     // Current market status
+        uint256 acceptanceDeadline;    // Unix timestamp for acceptance deadline
+        uint256 minAcceptanceThreshold; // Minimum participants needed to activate
+        uint256 stakePerParticipant;   // Stake amount required from each participant
+        address stakeToken;            // Token used for stakes (address(0) = native)
+        uint256 tradingPeriodSeconds;  // Trading period stored for later activation
     }
     
     // Friend market ID => FriendMarket
@@ -69,7 +125,16 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     
     // Track which public markets have pegged friend markets
     mapping(uint256 => uint256[]) public publicMarketToPeggedFriendMarkets;
-    
+
+    // Acceptance tracking for multi-party flow (friendMarketId => participant => AcceptanceRecord)
+    mapping(uint256 => mapping(address => AcceptanceRecord)) public marketAcceptances;
+
+    // Count of accepted participants per market
+    mapping(uint256 => uint256) public acceptedParticipantCount;
+
+    // Total staked amount per market (held until activation or refund)
+    mapping(uint256 => uint256) public marketTotalStaked;
+
     uint256 public friendMarketCount;
     
     // Reference to main market factory
@@ -90,7 +155,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     uint256 public oneVsOneFee = 0.05 ether;       // Even lower for 1v1
     
     // Proposal ID offset to avoid collision with public markets
-    uint256 public constant PROPOSAL_ID_OFFSET = 1000000;
+    // Using 10 billion to allow for massive scale (10B public markets before collision)
+    uint256 public constant PROPOSAL_ID_OFFSET = 10_000_000_000;
     
     // Member limits (updateable by managers)
     uint256 public maxSmallGroupMembers = 10;
@@ -152,24 +218,77 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 passValue,
         uint256 failValue
     );
+
+    // Multi-party acceptance flow events
+    event MarketCreatedPending(
+        uint256 indexed friendMarketId,
+        address indexed creator,
+        uint256 acceptanceDeadline,
+        uint256 stakePerParticipant,
+        address stakeToken,
+        address[] invitedParticipants,
+        address arbitrator
+    );
+
+    event ParticipantAccepted(
+        uint256 indexed friendMarketId,
+        address indexed participant,
+        uint256 stakedAmount,
+        uint256 acceptedAt
+    );
+
+    event ArbitratorAccepted(
+        uint256 indexed friendMarketId,
+        address indexed arbitrator,
+        uint256 acceptedAt
+    );
+
+    event MarketActivated(
+        uint256 indexed friendMarketId,
+        uint256 underlyingMarketId,
+        uint256 activatedAt,
+        uint256 totalStaked,
+        uint256 participantCount
+    );
+
+    event MarketCancelledByCreator(
+        uint256 indexed friendMarketId,
+        address indexed creator,
+        uint256 cancelledAt
+    );
+
+    event AcceptanceDeadlinePassed(
+        uint256 indexed friendMarketId,
+        uint256 deadline,
+        uint256 acceptedCount,
+        uint256 requiredCount
+    );
+
+    event StakeRefunded(
+        uint256 indexed friendMarketId,
+        address indexed participant,
+        uint256 amount
+    );
     
     constructor(
-        address _marketFactory, 
-        address payable _ragequitModule, 
+        address _marketFactory,
+        address payable _ragequitModule,
         address _tieredRoleManager,
-        address _paymentManager
-    ) Ownable(msg.sender) {
-        require(_marketFactory != address(0), "Invalid market factory");
-        require(_ragequitModule != address(0), "Invalid ragequit module");
-        require(_tieredRoleManager != address(0), "Invalid tiered role manager");
-        require(_paymentManager != address(0), "Invalid payment manager");
-        
+        address _paymentManager,
+        address _owner
+    ) Ownable(_owner) {
+        if (_marketFactory == address(0)) revert InvalidAddress();
+        if (_ragequitModule == address(0)) revert InvalidAddress();
+        if (_tieredRoleManager == address(0)) revert InvalidAddress();
+        if (_paymentManager == address(0)) revert InvalidAddress();
+        if (_owner == address(0)) revert InvalidAddress();
+
         marketFactory = ConditionalMarketFactory(_marketFactory);
         ragequitModule = RagequitModule(_ragequitModule);
         tieredRoleManager = TieredRoleManager(_tieredRoleManager);
         paymentManager = MembershipPaymentManager(_paymentManager);
-        manager = msg.sender; // Initially deployer, transferable
-        
+        manager = _owner; // Initially owner, transferable
+
         // Accept native ETC by default
         acceptedPaymentTokens[address(0)] = true;
     }
@@ -181,7 +300,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param newManager New manager address
      */
     function updateManager(address newManager) external onlyOwner {
-        require(newManager != address(0), "Invalid manager address");
+        if (newManager == address(0)) revert InvalidAddress();
         address oldManager = manager;
         manager = newManager;
         emit ManagerUpdated(oldManager, newManager);
@@ -192,21 +311,16 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param _collateralToken Address of ERC20 token to use as collateral
      */
     function setDefaultCollateralToken(address _collateralToken) external onlyOwner {
-        require(_collateralToken != address(0), "Invalid collateral token");
+        if (_collateralToken == address(0)) revert InvalidAddress();
         defaultCollateralToken = _collateralToken;
     }
-    
-    /**
-     * @notice Add or update accepted payment token
-     * @param token Token address (address(0) for native ETC)
-     * @param active Whether the token is accepted
-     */
+
     function addAcceptedPaymentToken(address token, bool active) external {
-        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
-        
+        if (msg.sender != manager && msg.sender != owner()) revert NotAuthorized();
+
         bool wasAccepted = acceptedPaymentTokens[token];
         acceptedPaymentTokens[token] = active;
-        
+
         if (active && !wasAccepted && token != address(0)) {
             acceptedTokenList.push(token);
             emit PaymentTokenAdded(token);
@@ -214,27 +328,17 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             emit PaymentTokenRemoved(token);
         }
     }
-    
-    /**
-     * @notice Remove accepted payment token
-     * @param token Token address to remove
-     */
+
     function removeAcceptedPaymentToken(address token) external {
-        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
-        require(token != address(0), "Cannot remove native ETC");
-        
+        if (msg.sender != manager && msg.sender != owner()) revert NotAuthorized();
+        if (token == address(0)) revert InvalidAddress();
+
         acceptedPaymentTokens[token] = false;
         emit PaymentTokenRemoved(token);
     }
-    
-    /**
-     * @notice Update fee structure (only manager)
-     * @param _publicFee New public market fee
-     * @param _friendFee New friend market fee
-     * @param _oneVsOneFee New 1v1 market fee
-     */
+
     function updateFees(uint256 _publicFee, uint256 _friendFee, uint256 _oneVsOneFee) external {
-        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
+        if (msg.sender != manager && msg.sender != owner()) revert NotAuthorized();
         publicMarketFee = _publicFee;
         friendMarketFee = _friendFee;
         oneVsOneFee = _oneVsOneFee;
@@ -254,16 +358,25 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 _minEventTracking,
         uint256 _maxEventTracking
     ) external {
-        require(msg.sender == manager || msg.sender == owner(), "Only manager or owner");
-        require(_maxOneVsOne == 2, "1v1 must have exactly 2 members");
-        require(_minEventTracking <= _maxEventTracking, "Invalid event tracking limits");
+        if (msg.sender != manager && msg.sender != owner()) revert NotAuthorized();
+        if (_maxOneVsOne != 2) revert InvalidLimit();
+        if (_minEventTracking > _maxEventTracking) revert InvalidLimit();
         maxSmallGroupMembers = _maxSmallGroup;
         maxOneVsOneMembers = _maxOneVsOne;
         minEventTrackingMembers = _minEventTracking;
         maxEventTrackingMembers = _maxEventTracking;
         emit MemberLimitsUpdated(_maxSmallGroup, _maxOneVsOne, _minEventTracking, _maxEventTracking);
     }
-    
+
+    /**
+     * @notice Update TieredRoleManager address (only owner)
+     * @param _tieredRoleManager New TieredRoleManager address
+     */
+    function setTieredRoleManager(address _tieredRoleManager) external onlyOwner {
+        if (_tieredRoleManager == address(0)) revert InvalidAddress();
+        tieredRoleManager = TieredRoleManager(_tieredRoleManager);
+    }
+
     /**
      * @notice Create a 1v1 friend market for direct betting
      * @param opponent Address of the other party
@@ -280,21 +393,17 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address arbitrator,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        // Check FRIEND_MARKET_ROLE membership
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
-        require(tieredRoleManager.hasRole(role, msg.sender), "Requires FRIEND_MARKET_ROLE membership");
-        require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
-        
-        // Check and record usage limit
-        require(tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role), "Monthly market limit reached");
-        
-        require(opponent != address(0), "Invalid opponent");
-        require(opponent != msg.sender, "Cannot bet against yourself");
-        require(bytes(description).length > 0, "Description required");
-        
-        // Validate pegged market if provided
+        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
+        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        if (opponent == address(0)) revert InvalidOpponent();
+        if (opponent == msg.sender) revert InvalidOpponent();
+        if (bytes(description).length == 0) revert InvalidDescription();
+
         if (peggedPublicMarketId > 0) {
-            require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
+            if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
         }
         
         // For members, creation fee is waived (gas only), but accept any payment for liquidity
@@ -334,19 +443,26 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             peggedPublicMarketId: peggedPublicMarketId,
             autoPegged: peggedPublicMarketId > 0,
             paymentToken: address(0),  // Native ETC by default
-            liquidityAmount: liquidityAmount
+            liquidityAmount: liquidityAmount,
+            // Legacy creation - immediately active
+            status: FriendMarketStatus.Active,
+            acceptanceDeadline: 0,
+            minAcceptanceThreshold: 2,
+            stakePerParticipant: 0,
+            stakeToken: address(0),
+            tradingPeriodSeconds: tradingPeriod
         });
-        
+
         memberCount[friendMarketId] = 2;
         userMarkets[msg.sender].push(friendMarketId);
         userMarkets[opponent].push(friendMarketId);
-        
+
         // Track pegging relationship
         if (peggedPublicMarketId > 0) {
             publicMarketToPeggedFriendMarkets[peggedPublicMarketId].push(friendMarketId);
             emit MarketPeggedToPublic(friendMarketId, peggedPublicMarketId);
         }
-        
+
         emit FriendMarketCreated(
             friendMarketId,
             underlyingMarketId,
@@ -356,10 +472,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             0, // No creation fee for members
             address(0)  // Native ETC
         );
-        
+
         emit MemberAdded(friendMarketId, msg.sender);
         emit MemberAdded(friendMarketId, opponent);
-        
+
         if (arbitrator != address(0)) {
             emit ArbitratorSet(friendMarketId, arbitrator);
         }
@@ -383,37 +499,28 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address arbitrator,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        // Check FRIEND_MARKET_ROLE membership
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
-        require(tieredRoleManager.hasRole(role, msg.sender), "Requires FRIEND_MARKET_ROLE membership");
-        require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
-        
-        // Check and record usage limit
-        require(tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role), "Monthly market limit reached");
-        
-        require(bytes(description).length > 0, "Description required");
-        require(memberLimit > 2 && memberLimit <= maxSmallGroupMembers, "Invalid member limit");
-        require(initialMembers.length > 0 && initialMembers.length <= memberLimit, "Invalid initial members");
-        
-        // Validate no duplicate members
+        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
+        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        if (bytes(description).length == 0) revert InvalidDescription();
+        if (memberLimit <= 2 || memberLimit > maxSmallGroupMembers) revert InvalidLimit();
+        if (initialMembers.length == 0 || initialMembers.length > memberLimit) revert InvalidLimit();
+
         for (uint256 i = 0; i < initialMembers.length; i++) {
-            require(initialMembers[i] != address(0), "Invalid member address");
+            if (initialMembers[i] == address(0)) revert InvalidMember();
             for (uint256 j = i + 1; j < initialMembers.length; j++) {
-                require(initialMembers[i] != initialMembers[j], "Duplicate member");
+                if (initialMembers[i] == initialMembers[j]) revert DuplicateMember();
             }
         }
-        
-        // Validate pegged market if provided
+
         if (peggedPublicMarketId > 0) {
-            require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
+            if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
         }
-        
-        // For members, creation fee is waived (gas only), but accept any payment for liquidity
+
         uint256 liquidityAmount = msg.value;
-        
-        // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
-        // Use default collateral token (required for CTF1155)
         address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
@@ -441,9 +548,16 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             peggedPublicMarketId: peggedPublicMarketId,
             autoPegged: peggedPublicMarketId > 0,
             paymentToken: address(0),  // Native ETC by default
-            liquidityAmount: liquidityAmount
+            liquidityAmount: liquidityAmount,
+            // Legacy creation - immediately active
+            status: FriendMarketStatus.Active,
+            acceptanceDeadline: 0,
+            minAcceptanceThreshold: initialMembers.length,
+            stakePerParticipant: 0,
+            stakeToken: address(0),
+            tradingPeriodSeconds: tradingPeriod
         });
-        
+
         memberCount[friendMarketId] = initialMembers.length;
         
         // Add members to user markets mapping
@@ -487,40 +601,27 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingPeriod,
         uint256 peggedPublicMarketId
     ) external payable nonReentrant returns (uint256 friendMarketId) {
-        // Check FRIEND_MARKET_ROLE membership
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
-        require(tieredRoleManager.hasRole(role, msg.sender), "Requires FRIEND_MARKET_ROLE membership");
-        require(tieredRoleManager.isMembershipActive(msg.sender, role), "Membership expired");
-        
-        // Check and record usage limit
-        require(tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role), "Monthly market limit reached");
-        
-        require(bytes(description).length > 0, "Description required");
-        require(
-            players.length >= minEventTrackingMembers && 
-            players.length <= maxEventTrackingMembers,
-            "Invalid number of players"
-        );
-        
-        // Validate no duplicate players
+        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
+        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        if (bytes(description).length == 0) revert InvalidDescription();
+        if (players.length < minEventTrackingMembers || players.length > maxEventTrackingMembers) revert InvalidLimit();
+
         for (uint256 i = 0; i < players.length; i++) {
-            require(players[i] != address(0), "Invalid player address");
+            if (players[i] == address(0)) revert InvalidMember();
             for (uint256 j = i + 1; j < players.length; j++) {
-                require(players[i] != players[j], "Duplicate player");
+                if (players[i] == players[j]) revert DuplicateMember();
             }
         }
-        
-        // Validate pegged market if provided
+
         if (peggedPublicMarketId > 0) {
-            require(peggedPublicMarketId < marketFactory.marketCount(), "Invalid public market ID");
+            if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
         }
-        
-        // For members, creation fee is waived (gas only), but accept any payment for liquidity
+
         uint256 liquidityAmount = msg.value;
-        
-        // Create underlying market
         uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
-        // Use default collateral token (required for CTF1155)
         address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
         uint256 underlyingMarketId = marketFactory.deployMarketPair(
             proposalId,
@@ -548,9 +649,16 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             peggedPublicMarketId: peggedPublicMarketId,
             autoPegged: peggedPublicMarketId > 0,
             paymentToken: address(0),  // Native ETC by default
-            liquidityAmount: liquidityAmount
+            liquidityAmount: liquidityAmount,
+            // Legacy creation - immediately active
+            status: FriendMarketStatus.Active,
+            acceptanceDeadline: 0,
+            minAcceptanceThreshold: players.length,
+            stakePerParticipant: 0,
+            stakeToken: address(0),
+            tradingPeriodSeconds: tradingPeriod
         });
-        
+
         memberCount[friendMarketId] = players.length;
         
         for (uint256 i = 0; i < players.length; i++) {
@@ -574,46 +682,246 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             address(0)  // Native ETC
         );
     }
-    
+
+    // ========== Multi-Party Acceptance Flow Functions ==========
+
+    /**
+     * @notice Create a 1v1 market with pending acceptance (creator stakes first)
+     * @param opponent Address of the counterparty
+     * @param description Market description
+     * @param tradingPeriod Duration after activation (7-21 days)
+     * @param arbitrator Optional third-party arbitrator
+     * @param acceptanceDeadline Unix timestamp for acceptance deadline
+     * @param stakeAmount Amount each party must stake
+     * @param stakeToken ERC20 token address for stakes (address(0) for native)
+     * @return friendMarketId ID of the pending friend market
+     */
+    function createOneVsOneMarketPending(
+        address opponent,
+        string memory description,
+        uint256 tradingPeriod,
+        address arbitrator,
+        uint256 acceptanceDeadline,
+        uint256 stakeAmount,
+        address stakeToken
+    ) external payable nonReentrant returns (uint256 friendMarketId) {
+        if (opponent == address(0) || opponent == msg.sender) revert InvalidOpponent();
+        if (bytes(description).length == 0) revert InvalidDescription();
+        if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
+        if (stakeAmount == 0) revert InvalidStake();
+
+        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
+        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
+        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        _collectStake(msg.sender, stakeToken, stakeAmount);
+
+        // Create pending market (no underlying market yet - created on activation)
+        friendMarketId = friendMarketCount++;
+
+        address[] memory participants = new address[](2);
+        participants[0] = msg.sender;
+        participants[1] = opponent;
+
+        friendMarkets[friendMarketId] = FriendMarket({
+            marketId: 0, // Not created until activated
+            marketType: MarketType.OneVsOne,
+            creator: msg.sender,
+            members: participants,
+            arbitrator: arbitrator,
+            memberLimit: maxOneVsOneMembers,
+            creationFee: 0,
+            createdAt: block.timestamp,
+            active: false, // Not active until accepted
+            description: description,
+            peggedPublicMarketId: 0,
+            autoPegged: false,
+            paymentToken: stakeToken,
+            liquidityAmount: 0,
+            status: FriendMarketStatus.PendingAcceptance,
+            acceptanceDeadline: acceptanceDeadline,
+            minAcceptanceThreshold: 2, // Both must accept for 1v1
+            stakePerParticipant: stakeAmount,
+            stakeToken: stakeToken,
+            tradingPeriodSeconds: tradingPeriod
+        });
+
+        // Record creator's acceptance
+        marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
+            participant: msg.sender,
+            stakedAmount: stakeAmount,
+            acceptedAt: block.timestamp,
+            hasAccepted: true,
+            isArbitrator: false
+        });
+
+        acceptedParticipantCount[friendMarketId] = 1;
+        marketTotalStaked[friendMarketId] = stakeAmount;
+
+        memberCount[friendMarketId] = 2;
+        userMarkets[msg.sender].push(friendMarketId);
+        userMarkets[opponent].push(friendMarketId);
+
+        emit MarketCreatedPending(
+            friendMarketId,
+            msg.sender,
+            acceptanceDeadline,
+            stakeAmount,
+            stakeToken,
+            participants,
+            arbitrator
+        );
+
+        if (arbitrator != address(0)) {
+            emit ArbitratorSet(friendMarketId, arbitrator);
+        }
+    }
+
+    /**
+     * @notice Create a small group market with pending acceptance
+     * @param description Market description
+     * @param invitedMembers Initial participant addresses (excluding creator)
+     * @param memberLimit Maximum concurrent members
+     * @param tradingPeriod Duration after activation
+     * @param arbitrator Optional third-party arbitrator
+     * @param acceptanceDeadline Unix timestamp for acceptance deadline
+     * @param minAcceptanceThreshold Minimum participants to activate (including creator)
+     * @param stakeAmount Amount each party must stake
+     * @param stakeToken ERC20 token address for stakes
+     * @return friendMarketId ID of the pending friend market
+     */
+    function createSmallGroupMarketPending(
+        string memory description,
+        address[] memory invitedMembers,
+        uint256 memberLimit,
+        uint256 tradingPeriod,
+        address arbitrator,
+        uint256 acceptanceDeadline,
+        uint256 minAcceptanceThreshold,
+        uint256 stakeAmount,
+        address stakeToken
+    ) external payable nonReentrant returns (uint256 friendMarketId) {
+        if (bytes(description).length == 0) revert InvalidDescription();
+        if (memberLimit <= 2 || memberLimit > maxSmallGroupMembers) revert InvalidLimit();
+        if (invitedMembers.length == 0 || invitedMembers.length >= memberLimit) revert InvalidLimit();
+        if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
+        if (stakeAmount == 0) revert InvalidStake();
+        if (minAcceptanceThreshold < 2) revert InvalidThreshold();
+        if (minAcceptanceThreshold > invitedMembers.length + 1) revert InvalidThreshold();
+
+        for (uint256 i = 0; i < invitedMembers.length; i++) {
+            if (invitedMembers[i] == address(0) || invitedMembers[i] == msg.sender) revert InvalidMember();
+            for (uint256 j = i + 1; j < invitedMembers.length; j++) {
+                if (invitedMembers[i] == invitedMembers[j]) revert DuplicateMember();
+            }
+        }
+
+        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
+        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
+        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        _collectStake(msg.sender, stakeToken, stakeAmount);
+
+        // Build full participant list (creator + invited)
+        address[] memory allParticipants = new address[](invitedMembers.length + 1);
+        allParticipants[0] = msg.sender;
+        for (uint256 i = 0; i < invitedMembers.length; i++) {
+            allParticipants[i + 1] = invitedMembers[i];
+        }
+
+        // Create pending market
+        friendMarketId = friendMarketCount++;
+
+        friendMarkets[friendMarketId] = FriendMarket({
+            marketId: 0,
+            marketType: MarketType.SmallGroup,
+            creator: msg.sender,
+            members: allParticipants,
+            arbitrator: arbitrator,
+            memberLimit: memberLimit,
+            creationFee: 0,
+            createdAt: block.timestamp,
+            active: false,
+            description: description,
+            peggedPublicMarketId: 0,
+            autoPegged: false,
+            paymentToken: stakeToken,
+            liquidityAmount: 0,
+            status: FriendMarketStatus.PendingAcceptance,
+            acceptanceDeadline: acceptanceDeadline,
+            minAcceptanceThreshold: minAcceptanceThreshold,
+            stakePerParticipant: stakeAmount,
+            stakeToken: stakeToken,
+            tradingPeriodSeconds: tradingPeriod
+        });
+
+        // Record creator's acceptance
+        marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
+            participant: msg.sender,
+            stakedAmount: stakeAmount,
+            acceptedAt: block.timestamp,
+            hasAccepted: true,
+            isArbitrator: false
+        });
+
+        acceptedParticipantCount[friendMarketId] = 1;
+        marketTotalStaked[friendMarketId] = stakeAmount;
+        memberCount[friendMarketId] = allParticipants.length;
+
+        // Add all participants to user markets
+        for (uint256 i = 0; i < allParticipants.length; i++) {
+            userMarkets[allParticipants[i]].push(friendMarketId);
+        }
+
+        emit MarketCreatedPending(
+            friendMarketId,
+            msg.sender,
+            acceptanceDeadline,
+            stakeAmount,
+            stakeToken,
+            allParticipants,
+            arbitrator
+        );
+
+        if (arbitrator != address(0)) {
+            emit ArbitratorSet(friendMarketId, arbitrator);
+        }
+    }
+
     /**
      * @notice Add a member to an existing small group market
      * @param friendMarketId ID of the friend market
      * @param newMember Address of new member
      */
     function addMember(uint256 friendMarketId, address newMember) external {
-        require(friendMarketId < friendMarketCount, "Invalid market ID");
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
-        require(market.active, "Market not active");
-        require(msg.sender == market.creator, "Only creator can add members");
-        require(newMember != address(0), "Invalid member address");
-        require(memberCount[friendMarketId] < market.memberLimit, "Member limit reached");
-        
-        // Check if already a member
+        if (!market.active) revert NotActive();
+        if (msg.sender != market.creator) revert NotAuthorized();
+        if (newMember == address(0)) revert InvalidMember();
+        if (memberCount[friendMarketId] >= market.memberLimit) revert MemberLimitReached();
+
         for (uint256 i = 0; i < market.members.length; i++) {
-            require(market.members[i] != newMember, "Already a member");
+            if (market.members[i] == newMember) revert AlreadyMember();
         }
-        
+
         market.members.push(newMember);
         memberCount[friendMarketId]++;
         userMarkets[newMember].push(friendMarketId);
-        
+
         emit MemberAdded(friendMarketId, newMember);
     }
-    
-    /**
-     * @notice Remove a member from a market (ragequit-like functionality)
-     * @param friendMarketId ID of the friend market
-     */
+
     function removeSelf(uint256 friendMarketId) external nonReentrant {
-        require(friendMarketId < friendMarketCount, "Invalid market ID");
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
-        require(market.active, "Market not active");
-        
-        // Find and remove member
+        if (!market.active) revert NotActive();
+
         bool found = false;
         for (uint256 i = 0; i < market.members.length; i++) {
             if (market.members[i] == msg.sender) {
-                // Swap with last element and pop
                 market.members[i] = market.members[market.members.length - 1];
                 market.members.pop();
                 memberCount[friendMarketId]--;
@@ -621,12 +929,328 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
                 break;
             }
         }
-        
-        require(found, "Not a member");
-        
+
+        if (!found) revert NotMember();
         emit MemberRemoved(friendMarketId, msg.sender);
     }
-    
+
+    function acceptMarket(uint256 friendMarketId) external payable nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        if (market.status != FriendMarketStatus.PendingAcceptance) revert NotPending();
+        if (block.timestamp >= market.acceptanceDeadline) revert DeadlinePassed();
+        if (marketAcceptances[friendMarketId][msg.sender].hasAccepted) revert AlreadyAccepted();
+
+        bool isInvited = false;
+        bool isArbitrator = market.arbitrator == msg.sender;
+
+        for (uint256 i = 0; i < market.members.length; i++) {
+            if (market.members[i] == msg.sender) {
+                isInvited = true;
+                break;
+            }
+        }
+
+        if (!isInvited && !isArbitrator) revert NotInvited();
+
+        if (isArbitrator) {
+            // Arbitrators don't stake
+            marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
+                participant: msg.sender,
+                stakedAmount: 0,
+                acceptedAt: block.timestamp,
+                hasAccepted: true,
+                isArbitrator: true
+            });
+
+            emit ArbitratorAccepted(friendMarketId, msg.sender, block.timestamp);
+        } else {
+            // Collect stake from participant
+            _collectStake(msg.sender, market.stakeToken, market.stakePerParticipant);
+
+            marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
+                participant: msg.sender,
+                stakedAmount: market.stakePerParticipant,
+                acceptedAt: block.timestamp,
+                hasAccepted: true,
+                isArbitrator: false
+            });
+
+            acceptedParticipantCount[friendMarketId]++;
+            marketTotalStaked[friendMarketId] += market.stakePerParticipant;
+
+            emit ParticipantAccepted(
+                friendMarketId,
+                msg.sender,
+                market.stakePerParticipant,
+                block.timestamp
+            );
+        }
+
+        // Check if market should activate
+        _checkAndActivateMarket(friendMarketId);
+    }
+
+    /**
+     * @notice Cancel a pending market (creator only, before activation)
+     * @param friendMarketId ID of the pending market
+     */
+    function cancelPendingMarket(uint256 friendMarketId) external nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        if (market.status != FriendMarketStatus.PendingAcceptance) revert NotPending();
+        if (msg.sender != market.creator) revert NotAuthorized();
+
+        market.status = FriendMarketStatus.Cancelled;
+        _refundAllStakes(friendMarketId);
+
+        emit MarketCancelledByCreator(friendMarketId, msg.sender, block.timestamp);
+    }
+
+    function processExpiredDeadline(uint256 friendMarketId) external nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        if (market.status != FriendMarketStatus.PendingAcceptance) revert NotPending();
+        if (block.timestamp < market.acceptanceDeadline) revert DeadlineNotPassed();
+
+        uint256 accepted = acceptedParticipantCount[friendMarketId];
+        uint256 required = market.minAcceptanceThreshold;
+
+        // Check if arbitrator acceptance is also required and met
+        bool arbitratorOk = true;
+        if (market.arbitrator != address(0)) {
+            arbitratorOk = marketAcceptances[friendMarketId][market.arbitrator].hasAccepted;
+        }
+
+        if (accepted >= required && arbitratorOk) {
+            // Threshold met - activate market
+            _activateMarket(friendMarketId);
+        } else {
+            // Threshold not met - refund all
+            market.status = FriendMarketStatus.Refunded;
+            _refundAllStakes(friendMarketId);
+
+            emit AcceptanceDeadlinePassed(friendMarketId, market.acceptanceDeadline, accepted, required);
+        }
+    }
+
+    // ========== Internal Helper Functions for Acceptance Flow ==========
+
+    /**
+     * @notice Collect stake from a participant
+     */
+    function _collectStake(address from, address token, uint256 amount) internal {
+        if (token == address(0)) {
+            if (msg.value < amount) revert InsufficientPayment();
+            if (msg.value > amount) {
+                (bool success, ) = payable(from).call{value: msg.value - amount}("");
+                if (!success) revert TransferFailed();
+            }
+        } else {
+            // Use SafeERC20 for proper proxy token handling
+            IERC20(token).safeTransferFrom(from, address(this), amount);
+        }
+    }
+
+    /**
+     * @notice Refund all stakes for a market
+     */
+    function _refundAllStakes(uint256 friendMarketId) internal {
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        for (uint256 i = 0; i < market.members.length; i++) {
+            address participant = market.members[i];
+            AcceptanceRecord storage record = marketAcceptances[friendMarketId][participant];
+
+            if (record.hasAccepted && record.stakedAmount > 0) {
+                _refundStake(participant, market.stakeToken, record.stakedAmount);
+                emit StakeRefunded(friendMarketId, participant, record.stakedAmount);
+            }
+        }
+
+        marketTotalStaked[friendMarketId] = 0;
+    }
+
+    /**
+     * @notice Refund stake to a single participant
+     */
+    function _refundStake(address to, address token, uint256 amount) internal {
+        if (token == address(0)) {
+            (bool success, ) = payable(to).call{value: amount}("");
+            if (!success) revert TransferFailed();
+        } else {
+            // Use direct transfer instead of SafeERC20 for proxy token compatibility
+            (bool success, bytes memory returnData) = token.call(
+                abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+            );
+            if (!success) revert TransferFailed();
+            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
+        }
+    }
+
+    /**
+     * @notice Check if market should activate and do so if conditions are met
+     */
+    function _checkAndActivateMarket(uint256 friendMarketId) internal {
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        uint256 accepted = acceptedParticipantCount[friendMarketId];
+        uint256 required = market.minAcceptanceThreshold;
+
+        // Check if arbitrator acceptance is required and met
+        bool arbitratorOk = true;
+        if (market.arbitrator != address(0)) {
+            arbitratorOk = marketAcceptances[friendMarketId][market.arbitrator].hasAccepted;
+        }
+
+        if (accepted >= required && arbitratorOk) {
+            _activateMarket(friendMarketId);
+        }
+    }
+
+    /**
+     * @notice Activate a pending market by deploying the underlying market
+     */
+    function _activateMarket(uint256 friendMarketId) internal {
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        uint256 totalStaked = marketTotalStaked[friendMarketId];
+
+        // Deploy underlying market in ConditionalMarketFactory
+        uint256 proposalId = friendMarketId + PROPOSAL_ID_OFFSET;
+        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : market.stakeToken;
+
+        // Approve collateral transfer to ConditionalMarketFactory
+        if (collateral != address(0)) {
+            IERC20(collateral).approve(address(marketFactory), totalStaked);
+        }
+
+        uint256 underlyingMarketId = marketFactory.deployMarketPair(
+            proposalId,
+            collateral,
+            totalStaked,
+            0.01 ether, // Liquidity parameter
+            market.tradingPeriodSeconds,
+            ConditionalMarketFactory.BetType.YesNo
+        );
+
+        market.marketId = underlyingMarketId;
+        market.status = FriendMarketStatus.Active;
+        market.active = true;
+        market.liquidityAmount = totalStaked;
+
+        emit MarketActivated(
+            friendMarketId,
+            underlyingMarketId,
+            block.timestamp,
+            totalStaked,
+            acceptedParticipantCount[friendMarketId]
+        );
+    }
+
+    // ========== Acceptance Flow View Functions ==========
+
+    /**
+     * @notice Get acceptance status for a market
+     */
+    function getAcceptanceStatus(uint256 friendMarketId) external view returns (
+        uint256 accepted,
+        uint256 required,
+        uint256 deadline,
+        bool arbitratorRequired,
+        bool arbitratorAccepted,
+        FriendMarketStatus status
+    ) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        return (
+            acceptedParticipantCount[friendMarketId],
+            market.minAcceptanceThreshold,
+            market.acceptanceDeadline,
+            market.arbitrator != address(0),
+            market.arbitrator != address(0) ?
+                marketAcceptances[friendMarketId][market.arbitrator].hasAccepted : true,
+            market.status
+        );
+    }
+
+    /**
+     * @notice Get participant's acceptance record
+     */
+    function getParticipantAcceptance(uint256 friendMarketId, address participant)
+        external view returns (AcceptanceRecord memory)
+    {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        return marketAcceptances[friendMarketId][participant];
+    }
+
+    /**
+     * @notice Get pending participants who haven't accepted yet
+     */
+    function getPendingParticipants(uint256 friendMarketId) external view returns (address[] memory) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Count pending
+        uint256 pendingCount = 0;
+        for (uint256 i = 0; i < market.members.length; i++) {
+            if (!marketAcceptances[friendMarketId][market.members[i]].hasAccepted) {
+                pendingCount++;
+            }
+        }
+
+        // Build array
+        address[] memory pending = new address[](pendingCount);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < market.members.length; i++) {
+            if (!marketAcceptances[friendMarketId][market.members[i]].hasAccepted) {
+                pending[idx++] = market.members[i];
+            }
+        }
+
+        return pending;
+    }
+
+    /**
+     * @notice Get friend market details with acceptance info
+     */
+    function getFriendMarketWithStatus(uint256 friendMarketId) external view returns (
+        uint256 marketId,
+        MarketType marketType,
+        address creator,
+        address[] memory members,
+        address arbitrator,
+        FriendMarketStatus status,
+        uint256 acceptanceDeadline,
+        uint256 stakePerParticipant,
+        address stakeToken,
+        uint256 acceptedCount,
+        uint256 minThreshold,
+        string memory description
+    ) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        return (
+            market.marketId,
+            market.marketType,
+            market.creator,
+            market.members,
+            market.arbitrator,
+            market.status,
+            market.acceptanceDeadline,
+            market.stakePerParticipant,
+            market.stakeToken,
+            acceptedParticipantCount[friendMarketId],
+            market.minAcceptanceThreshold,
+            market.description
+        );
+    }
+
     /**
      * @notice Get friend market details
      * @param friendMarketId ID of the friend market
@@ -647,7 +1271,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address paymentToken,
         uint256 liquidityAmount
     ) {
-        require(friendMarketId < friendMarketCount, "Invalid market ID");
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
         
         return (
@@ -682,7 +1306,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param user Address to check
      */
     function isMember(uint256 friendMarketId, address user) public view returns (bool) {
-        require(friendMarketId < friendMarketCount, "Invalid market ID");
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
         
         for (uint256 i = 0; i < market.members.length; i++) {
@@ -698,7 +1322,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param friendMarketId ID of the friend market
      */
     function getMemberCount(uint256 friendMarketId) external view returns (uint256) {
-        require(friendMarketId < friendMarketCount, "Invalid market ID");
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         return memberCount[friendMarketId];
     }
     
@@ -708,14 +1332,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param publicMarketId ID of the public market to peg to
      */
     function pegToPublicMarket(uint256 friendMarketId, uint256 publicMarketId) external {
-        require(friendMarketId < friendMarketCount, "Invalid friend market ID");
-        require(publicMarketId < marketFactory.marketCount(), "Invalid public market ID");
-        
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        if (publicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
+
         FriendMarket storage market = friendMarkets[friendMarketId];
-        require(market.active, "Market not active");
-        require(msg.sender == market.creator, "Only creator can peg market");
-        require(!market.autoPegged, "Already pegged");
-        
+        if (!market.active) revert NotActive();
+        if (msg.sender != market.creator) revert NotAuthorized();
+        if (market.autoPegged) revert AlreadyPegged();
+
         market.peggedPublicMarketId = publicMarketId;
         market.autoPegged = true;
         
@@ -728,16 +1352,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param friendMarketId ID of the friend market
      */
     function autoResolvePeggedMarket(uint256 friendMarketId) external nonReentrant {
-        require(friendMarketId < friendMarketCount, "Invalid friend market ID");
-        
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
         FriendMarket storage market = friendMarkets[friendMarketId];
-        require(market.active, "Market not active");
-        require(market.autoPegged, "Market not pegged");
-        require(market.peggedPublicMarketId > 0, "No pegged market");
-        
-        // Get the public market resolution
+        if (!market.active) revert NotActive();
+        if (!market.autoPegged) revert NotPegged();
+        if (market.peggedPublicMarketId == 0) revert NotPegged();
+
         ConditionalMarketFactory.Market memory publicMarket = marketFactory.getMarket(market.peggedPublicMarketId);
-        require(publicMarket.resolved, "Public market not resolved");
+        if (!publicMarket.resolved) revert NotResolved();
         
         // Resolve friend market based on public market outcome
         market.active = false;
@@ -759,11 +1382,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * @param publicMarketId ID of the resolved public market
      */
     function batchAutoResolvePeggedMarkets(uint256 publicMarketId) external nonReentrant {
-        require(publicMarketId < marketFactory.marketCount(), "Invalid public market ID");
-        
-        // Verify public market is resolved
+        if (publicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
+
         ConditionalMarketFactory.Market memory publicMarket = marketFactory.getMarket(publicMarketId);
-        require(publicMarket.resolved, "Public market not resolved");
+        if (!publicMarket.resolved) revert NotResolved();
         
         uint256[] storage peggedMarkets = publicMarketToPeggedFriendMarkets[publicMarketId];
         
@@ -797,16 +1419,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * token redemption based on the outcome.
      */
     function resolveFriendMarket(uint256 friendMarketId, bool outcome) external {
-        require(friendMarketId < friendMarketCount, "Invalid market ID");
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
-        require(market.active, "Market not active");
-        require(!market.autoPegged, "Cannot manually resolve pegged market");
-        
-        // Only arbitrator or creator can resolve
-        bool canResolve = msg.sender == market.creator || 
+        if (!market.active) revert NotActive();
+        if (market.autoPegged) revert AlreadyPegged();
+
+        bool canResolve = msg.sender == market.creator ||
                          (market.arbitrator != address(0) && msg.sender == market.arbitrator);
-        require(canResolve, "Not authorized to resolve");
-        
+        if (!canResolve) revert NotAuthorized();
+
         market.active = false;
         
         // Resolve underlying market
@@ -822,57 +1443,34 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function withdrawFees() external onlyOwner {
         uint256 balance = address(this).balance;
-        require(balance > 0, "No fees to withdraw");
-        
+        if (balance == 0) revert InsufficientPayment();
+
         (bool success, ) = payable(owner()).call{value: balance}("");
-        require(success, "Withdrawal failed");
+        if (!success) revert TransferFailed();
     }
-    
-    /**
-     * @notice Update market factory reference (owner only)
-     * @param _marketFactory New market factory address
-     */
+
     function updateMarketFactory(address _marketFactory) external onlyOwner {
-        require(_marketFactory != address(0), "Invalid address");
+        if (_marketFactory == address(0)) revert InvalidAddress();
         marketFactory = ConditionalMarketFactory(_marketFactory);
     }
-    
-    /**
-     * @notice Update ragequit module reference (owner only)
-     * @param _ragequitModule New ragequit module address
-     */
+
     function updateRagequitModule(address payable _ragequitModule) external onlyOwner {
-        require(_ragequitModule != address(0), "Invalid address");
+        if (_ragequitModule == address(0)) revert InvalidAddress();
         ragequitModule = RagequitModule(_ragequitModule);
     }
-    
-    /**
-     * @notice Get all friend markets pegged to a public market
-     * @param publicMarketId ID of the public market
-     * @return Array of pegged friend market IDs
-     */
+
     function getPeggedFriendMarkets(uint256 publicMarketId) external view returns (uint256[] memory) {
-        require(publicMarketId < marketFactory.marketCount(), "Invalid public market ID");
+        if (publicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
         return publicMarketToPeggedFriendMarkets[publicMarketId];
     }
-    
-    // ========== ERC20 Payment Helper Functions ==========
-    
-    /**
-     * @notice Handle ERC20 payment for market creation/liquidity
-     * @param paymentToken Token address (address(0) for native ETC)
-     * @param amount Amount to transfer
-     * @param purpose Description of payment purpose
-     */
-    function _handlePayment(address paymentToken, uint256 amount, string memory purpose) internal {
-        require(acceptedPaymentTokens[paymentToken], "Payment token not accepted");
-        
+
+    function _handlePayment(address paymentToken, uint256 amount, string memory) internal {
+        if (!acceptedPaymentTokens[paymentToken]) revert TokenNotAccepted();
+
         if (paymentToken == address(0)) {
-            // Native ETC payment
-            require(msg.value >= amount, "Insufficient native payment");
+            if (msg.value < amount) revert InsufficientPayment();
         } else {
-            // ERC20 payment
-            require(amount > 0, "Amount must be greater than 0");
+            if (amount == 0) revert InvalidStake();
             IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
         }
     }

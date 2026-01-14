@@ -1188,6 +1188,44 @@
 }
 
 /* ===========================
+   Loading Tiers
+   =========================== */
+
+.ppm-loading-tiers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  gap: 1rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.ppm-loading-tiers .ppm-spinner {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+  border-color: var(--border-color, #e2e8f0);
+  border-top-color: var(--brand-primary, #36b37e);
+}
+
+.ppm-loading-tiers p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.ppm-current-tier-info {
+  margin-bottom: 1rem;
+  background: var(--bg-info, #ebf4ff);
+  border-color: var(--border-info, #3b82f6);
+}
+
+.ppm-current-tier-info .ppm-tier-badge {
+  vertical-align: middle;
+  margin: 0 0.25rem;
+}
+
+/* ===========================
    Dark Theme
    =========================== */
 
@@ -1301,6 +1339,156 @@
 }
 
 /* ===========================
+   Tier Selection Step
+   =========================== */
+
+.ppm-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ppm-tier-card {
+  position: relative;
+  padding: 1.25rem;
+  background: var(--bg-primary, #f8fafc);
+  border: 2px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 12px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ppm-tier-card:hover {
+  border-color: var(--tier-color, var(--primary, #4299e1));
+  background: var(--bg-secondary, #ffffff);
+}
+
+.ppm-tier-card.selected {
+  border-color: var(--tier-color, var(--primary, #4299e1));
+  background: var(--bg-secondary, #ffffff);
+  box-shadow: 0 0 0 2px var(--tier-color, var(--primary, #4299e1));
+}
+
+.ppm-tier-radio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ppm-tier-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ppm-tier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ppm-tier-badge {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ppm-tier-price {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--primary, #4299e1);
+}
+
+.ppm-tier-limits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.ppm-limit-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.ppm-limit-label {
+  color: var(--text-secondary, #718096);
+}
+
+.ppm-limit-value {
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.ppm-tier-features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ppm-tier-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #718096);
+  margin-bottom: 0.25rem;
+}
+
+.ppm-tier-features li .ppm-feature-check {
+  color: var(--success, #48bb78);
+  font-size: 0.75rem;
+}
+
+/* Review Tier Badge */
+.ppm-review-tier {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.ppm-review-tier .ppm-tier-badge {
+  padding: 0.375rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* Tier Summary in Complete Step */
+.ppm-tier-summary {
+  background: var(--bg-primary, #f8fafc);
+  padding: 1.25rem;
+  border-radius: var(--radius-md, 12px);
+  margin-bottom: 1.5rem;
+}
+
+.ppm-tier-summary h4 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.ppm-tier-summary ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.ppm-tier-summary li {
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary, #718096);
+}
+
+/* ===========================
    Responsive Design
    =========================== */
 
@@ -1374,6 +1562,10 @@
   .ppm-btn-primary {
     flex: 1;
     justify-content: center;
+  }
+
+  .ppm-tier-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -7,15 +7,14 @@
 
 export const DEPLOYED_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-  // Source of truth: PaymentProcessor is configured to use this RoleManagerCore
-  // The modular RBAC system uses this address for granting roles via purchases
-  tieredRoleManager: '0x888332df7621EC341131d85e2228f00407777dD7', // RoleManagerCore (modular RBAC)
+  // Source of truth: TieredRoleManager used by FriendGroupMarketFactory
+  tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager (optimized, with tier limits)
   welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
   proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0x20eEb76C5B98Da5a9504A65169C4791d4787ECdA', // ConditionalMarketFactory (new with LMSR)
+  marketFactory: '0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a', // ConditionalMarketFactory v2 (used by FriendGroupMarketFactory)
   privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
   oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
-  ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
+  ragequitModule: '0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7', // RagequitModule (used by FriendGroupMarketFactory)
   futarchyGovernor: '0xD379002D90a38245dC99D9dd7BE430Ab9C0B3e54',
   fairWinsToken: '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB',
   treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772',
@@ -27,18 +26,16 @@ export const DEPLOYED_CONTRACTS = {
   // CTF1155 - Deployed via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
   ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
 
-  // Back-compat aliases used throughout the frontend
-  // IMPORTANT: Use the NEWER RoleManagerCore that has checkMarketCreationLimitFor function
-  // Old: '0x888332df7621EC341131d85e2228f00407777dD7' - does NOT have checkMarketCreationLimitFor
-  roleManager: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5', // NEWER RoleManagerCore with full IRoleManager interface
-  roleManagerCore: '0x4BBEB3695d513Be15881977E89104315Ee85b5e5',
+  // Back-compat aliases - point to TieredRoleManager for consistency
+  roleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager with full interface
+  roleManagerCore: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
 
   // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
   tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
   membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
-  // Deploy via: npx hardhat run scripts/configure-payment-manager.js --network mordor
-  membershipPaymentManager: '0x8b09cbC2275398C00D43854393e09D40334a1B81',  // MembershipPaymentManager for payment processing
+  // MembershipPaymentManager used by FriendGroupMarketFactory
+  membershipPaymentManager: '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28',
 
   // Perpetual Futures - Deployed via: npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
   fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
@@ -46,7 +43,16 @@ export const DEPLOYED_CONTRACTS = {
 
   // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
   // Used for grouping related markets (e.g., election candidates, tournament brackets)
-  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A', // TODO: Deploy and update address
+  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A',
+
+  // Friend Group Market Factory - Deploy via: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
+  // For P2P friend markets with tiered membership
+  friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
+
+  // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
+  // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor
+  // Has checkMarketCreationLimitFor for tier-based limits
+  tieredRoleManagerFull: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
 
 }
 

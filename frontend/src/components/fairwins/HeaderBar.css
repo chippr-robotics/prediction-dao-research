@@ -389,11 +389,24 @@
     gap: 0.5rem;
   }
 
-  /* Mobile wallet dropdown positioning */
+  /* Mobile wallet dropdown - bottom sheet pattern */
+  .header-bar .header-right .wallet-button-container {
+    position: static;
+  }
+
   .header-bar .header-right .wallet-dropdown {
-    right: -0.5rem;
-    min-width: 260px;
-    max-width: calc(100vw - 1rem);
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    min-width: unset;
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    border-radius: 20px 20px 0 0;
+    transform: none;
+    overflow-y: auto;
   }
 
   .wallet-info-compact {
@@ -461,12 +474,7 @@
     flex-shrink: 0;
   }
 
-  /* Extra small wallet dropdown positioning */
-  .header-bar .header-right .wallet-dropdown {
-    right: -0.25rem;
-    min-width: 240px;
-    max-width: calc(100vw - 1.5rem);
-  }
+  /* Extra small devices inherit the bottom sheet pattern from 768px breakpoint */
 
   .brand-text h1 {
     font-size: 1rem;

@@ -14,6 +14,7 @@ import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 
 /**
  * Get a provider for reading from the blockchain
@@ -574,11 +575,26 @@ export async function fetchMarketsFromBlockchain() {
     // Filter out null results (invalid markets)
     const transformedMarkets = results.filter(market => market !== null)
 
+    // Filter out friend markets from public grid
+    // Friend markets use a proposalId offset to avoid collision with public markets:
+    // - v5 contract (current): offset = 1,000,000
+    // - v6+ contracts (future): offset = 10,000,000,000
+    // Using 1M as minimum filter catches all friend markets from any version
+    // Friend markets are displayed separately in the FriendMarketsModal
+    const FRIEND_MARKET_PROPOSAL_OFFSET = 1_000_000
+    const publicMarkets = transformedMarkets.filter(market => {
+      const isFriendMarket = market.proposalId >= FRIEND_MARKET_PROPOSAL_OFFSET
+      if (isFriendMarket) {
+        console.debug(`Filtering out friend market ${market.id} (proposalId: ${market.proposalId})`)
+      }
+      return !isFriendMarket
+    })
+
     const fetchDuration = Date.now() - startTime
-    console.log(`Fetched ${transformedMarkets.length} valid markets in ${fetchDuration}ms`)
+    console.log(`Fetched ${publicMarkets.length} public markets (filtered ${transformedMarkets.length - publicMarkets.length} friend markets) in ${fetchDuration}ms`)
 
     // Enrich markets with correlation group data (provides categories)
-    const enrichedMarkets = await enrichMarketsWithCorrelationData(transformedMarkets)
+    const enrichedMarkets = await enrichMarketsWithCorrelationData(publicMarkets)
 
     const totalDuration = Date.now() - startTime
     console.log(`Total market fetch + enrichment: ${totalDuration}ms`)
@@ -733,6 +749,144 @@ export async function fetchProposalsFromBlockchain() {
   } catch (error) {
     console.error('Error fetching proposals from blockchain:', error)
     throw error
+  }
+}
+
+/**
+ * Fetch friend markets for a user from the blockchain
+ * @param {string} userAddress - User's wallet address
+ * @returns {Promise<Array>} Array of friend market objects
+ */
+export async function fetchFriendMarketsForUser(userAddress) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return []
+  }
+
+  try {
+    if (!userAddress || !ethers.isAddress(userAddress)) {
+      return []
+    }
+
+    const provider = getProvider()
+    const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+
+    if (!friendFactoryAddress) {
+      console.warn('FriendGroupMarketFactory address not configured')
+      return []
+    }
+
+    const contract = new ethers.Contract(
+      friendFactoryAddress,
+      FRIEND_GROUP_MARKET_FACTORY_ABI,
+      provider
+    )
+
+    // Get market IDs for the user
+    const marketIds = await contract.getUserMarkets(userAddress)
+    console.log(`[fetchFriendMarketsForUser] Found ${marketIds.length} markets for ${userAddress}`)
+
+    if (marketIds.length === 0) {
+      return []
+    }
+
+    // Fetch details for each market
+    const markets = await Promise.all(
+      marketIds.map(async (marketId) => {
+        try {
+          const marketResult = await contract.getFriendMarketWithStatus(marketId)
+          const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
+
+          console.log(`[fetchFriendMarketsForUser] Market ${marketId} raw data:`, {
+            description: marketResult.description,
+            creator: marketResult.creator,
+            status: Number(marketResult.status),
+            members: marketResult.members,
+            acceptanceDeadline: marketResult.acceptanceDeadline?.toString(),
+            tradingEndTime: marketResult.tradingEndTime?.toString(),
+            stakePerParticipant: marketResult.stakePerParticipant?.toString()
+          })
+
+          // Map market type enum to string
+          const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
+          const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
+
+          // Fetch acceptances for participants
+          const acceptances = {}
+          const members = marketResult.members || []
+
+          for (const member of members) {
+            try {
+              const record = await contract.getParticipantAcceptance(marketId, member)
+              acceptances[member.toLowerCase()] = {
+                hasAccepted: record.hasAccepted,
+                stakedAmount: ethers.formatEther(record.stakedAmount),
+                isArbitrator: record.isArbitrator
+              }
+            } catch {
+              // Member not found, skip
+            }
+          }
+
+          const arbitrator = marketResult.arbitrator
+          const hasArbitrator = arbitrator && arbitrator !== ethers.ZeroAddress
+
+          // Safely parse timestamps - handle 0 or invalid values
+          const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
+          const tradingEndTimeMs = Number(marketResult.tradingEndTime) * 1000
+
+          // Create safe date strings - use fallbacks for invalid dates
+          const now = new Date()
+          const defaultEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+
+          let endDateStr
+          try {
+            if (tradingEndTimeMs > 0) {
+              const endDate = new Date(tradingEndTimeMs)
+              endDateStr = !isNaN(endDate.getTime()) ? endDate.toISOString() : defaultEndDate.toISOString()
+            } else {
+              endDateStr = defaultEndDate.toISOString()
+            }
+          } catch {
+            endDateStr = defaultEndDate.toISOString()
+          }
+
+          // Determine token decimals - USC has 6 decimals, most others have 18
+          const stakeToken = marketResult.stakeToken
+          const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
+          const tokenDecimals = isUSC ? 6 : 18
+          const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
+
+          return {
+            id: marketId.toString(),
+            description: marketResult.description,
+            creator: marketResult.creator,
+            participants: members,
+            arbitrator: hasArbitrator ? arbitrator : null,
+            type: marketTypes[Number(marketResult.marketType)] || 'oneVsOne',
+            status: statusNames[Number(marketResult.status)] || 'pending_acceptance',
+            acceptanceDeadline: acceptanceDeadlineMs > 0 ? acceptanceDeadlineMs : now.getTime() + 48 * 60 * 60 * 1000,
+            minAcceptanceThreshold: Number(marketResult.minThreshold) || 2,
+            stakeAmount: stakeAmountFormatted,
+            stakeTokenAddress: stakeToken,
+            stakeTokenSymbol: isUSC ? 'USC' : 'ETC',
+            acceptances,
+            acceptedCount: Number(acceptanceStatus.accepted),
+            endDate: endDateStr,
+            createdAt: now.toISOString() // Contract doesn't store creation time
+          }
+        } catch (err) {
+          console.error(`Error fetching market ${marketId}:`, err)
+          return null
+        }
+      })
+    )
+
+    // Filter out null results
+    return markets.filter(m => m !== null)
+  } catch (error) {
+    console.error('Error fetching friend markets from blockchain:', error)
+    return []
   }
 }
 
@@ -1061,7 +1215,9 @@ const ROLE_NAME_TO_HASH = {
   'Market Maker': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
   'ClearPath User': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
   'Token Mint': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
-  'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
+  'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
+  // Display names from ROLE_INFO (plural forms)
+  'Friend Markets': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
 }
 
 // Minimal ABI for role manager contract
@@ -1129,13 +1285,197 @@ const ROLE_MANAGER_ABI = [
   }
 ]
 
-// Membership tier enum values
+// Membership tier enum values - matches TieredRoleManager contract
 const MembershipTier = {
   NONE: 0,
-  BASIC: 1,
-  STANDARD: 2,
-  PREMIUM: 3,
-  ENTERPRISE: 4
+  BRONZE: 1,
+  SILVER: 2,
+  GOLD: 3,
+  PLATINUM: 4
+}
+
+// Export tier names for UI display
+export const TIER_NAMES = {
+  1: 'Bronze',
+  2: 'Silver',
+  3: 'Gold',
+  4: 'Platinum'
+}
+
+// TierRegistry ABI for checking user tiers
+const TIER_REGISTRY_ABI = [
+  {
+    "inputs": [
+      { "internalType": "address", "name": "user", "type": "address" },
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" }
+    ],
+    "name": "getUserTier",
+    "outputs": [{ "internalType": "enum TierRegistry.MembershipTier", "name": "", "type": "uint8" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
+// TieredRoleManager ABI for checking role sync status
+const TIERED_ROLE_MANAGER_ABI = [
+  {
+    "inputs": [
+      { "internalType": "bytes32", "name": "role", "type": "bytes32" },
+      { "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "hasRole",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "u", "type": "address" },
+      { "internalType": "bytes32", "name": "r", "type": "bytes32" }
+    ],
+    "name": "getUserTier",
+    "outputs": [{ "internalType": "enum TieredRoleManager.MembershipTier", "name": "", "type": "uint8" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "u", "type": "address" },
+      { "internalType": "bytes32", "name": "r", "type": "bytes32" }
+    ],
+    "name": "isMembershipActive",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
+
+/**
+ * Check if user's role needs to be synced from TierRegistry to TieredRoleManager
+ *
+ * The modular RBAC system (TierRegistry + PaymentProcessor) and FriendGroupMarketFactory's
+ * TieredRoleManager are separate systems. This function detects when a user has a role
+ * in TierRegistry but NOT in TieredRoleManager, which prevents friend market creation.
+ *
+ * @param {string} userAddress - User's wallet address
+ * @param {string} roleName - Role name to check (e.g., 'Friend Market')
+ * @returns {Promise<{needsSync: boolean, tierRegistryTier: number, tieredRoleManagerTier: number, tierName: string}>}
+ */
+export async function checkRoleSyncNeeded(userAddress, roleName) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+  }
+
+  try {
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      console.warn(`Unknown role: ${roleName}`)
+      return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+    }
+
+    const provider = getProvider()
+    const tierRegistryAddress = getContractAddress('tierRegistry')
+    const tieredRoleManagerAddress = getContractAddress('tieredRoleManager')
+
+    let tierRegistryTier = 0
+    let tieredRoleManagerTier = 0
+    let tieredRoleManagerHasRole = false
+
+    // Check TierRegistry
+    if (tierRegistryAddress) {
+      try {
+        const tierRegistry = new ethers.Contract(tierRegistryAddress, TIER_REGISTRY_ABI, provider)
+        const tier = await tierRegistry.getUserTier(userAddress, roleHash)
+        tierRegistryTier = Number(tier)
+      } catch (e) {
+        console.debug('[checkRoleSyncNeeded] TierRegistry check failed:', e.message)
+      }
+    }
+
+    // Check TieredRoleManager
+    if (tieredRoleManagerAddress) {
+      try {
+        const tieredRoleManager = new ethers.Contract(tieredRoleManagerAddress, TIERED_ROLE_MANAGER_ABI, provider)
+        const [hasRole, tier] = await Promise.all([
+          tieredRoleManager.hasRole(roleHash, userAddress),
+          tieredRoleManager.getUserTier(userAddress, roleHash)
+        ])
+        tieredRoleManagerHasRole = hasRole
+        tieredRoleManagerTier = Number(tier)
+      } catch (e) {
+        console.debug('[checkRoleSyncNeeded] TieredRoleManager check failed:', e.message)
+      }
+    }
+
+    // Sync is needed if user has tier in TierRegistry but NOT in TieredRoleManager
+    const needsSync = tierRegistryTier > 0 && (!tieredRoleManagerHasRole || tieredRoleManagerTier === 0)
+    const tierName = tierRegistryTier > 0 ? (TIER_NAMES[tierRegistryTier] || 'Unknown') : 'None'
+
+    console.log(`[checkRoleSyncNeeded] ${roleName}:`, {
+      userAddress,
+      tierRegistryTier,
+      tieredRoleManagerTier,
+      tieredRoleManagerHasRole,
+      needsSync,
+      tierName
+    })
+
+    return {
+      needsSync,
+      tierRegistryTier,
+      tieredRoleManagerTier,
+      tierName
+    }
+  } catch (error) {
+    console.error('Error checking role sync status:', error)
+    return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+  }
+}
+
+/**
+ * Get user's current membership tier for a role from blockchain
+ * @param {string} userAddress - User's wallet address
+ * @param {string} roleName - Role name or constant
+ * @returns {Promise<{tier: number, tierName: string}>} Current tier (0=None, 1=Bronze, 2=Silver, 3=Gold, 4=Platinum)
+ */
+export async function getUserTierOnChain(userAddress, roleName) {
+  // Skip blockchain calls in test environment
+  if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+    return { tier: 0, tierName: 'None' }
+  }
+
+  try {
+    const tierRegistryAddress = getContractAddress('tierRegistry')
+    if (!tierRegistryAddress) {
+      console.warn('TierRegistry not deployed - cannot check user tier')
+      return { tier: 0, tierName: 'None' }
+    }
+
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) {
+      console.warn(`Unknown role: ${roleName}`)
+      return { tier: 0, tierName: 'None' }
+    }
+
+    const provider = getProvider()
+    const tierRegistry = new ethers.Contract(
+      tierRegistryAddress,
+      TIER_REGISTRY_ABI,
+      provider
+    )
+
+    const tier = await tierRegistry.getUserTier(userAddress, roleHash)
+    const tierNum = Number(tier)
+    const tierName = tierNum === 0 ? 'None' : (TIER_NAMES[tierNum] || 'Unknown')
+
+    console.log(`[getUserTierOnChain] ${roleName}: tier=${tierNum} (${tierName}) for ${userAddress}`)
+
+    return { tier: tierNum, tierName }
+  } catch (error) {
+    console.error('Error getting user tier:', error)
+    return { tier: 0, tierName: 'None' }
+  }
 }
 
 /**
@@ -1149,6 +1489,7 @@ export function getRoleHash(roleName) {
 
 /**
  * Check if user has a role on-chain
+ * Checks both the TierRegistry (modular RBAC) and RoleManager (legacy)
  * @param {string} userAddress - User's wallet address
  * @param {string} roleName - Role name or constant
  * @returns {Promise<boolean>} True if user has the role on-chain
@@ -1158,14 +1499,8 @@ export async function hasRoleOnChain(userAddress, roleName) {
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return false
   }
-  
-  try {
-    const roleManagerAddress = getContractAddress('roleManager')
-    if (!roleManagerAddress) {
-      console.warn('Role manager not deployed - cannot check on-chain role')
-      return false
-    }
 
+  try {
     const roleHash = getRoleHash(roleName)
     if (!roleHash) {
       console.warn(`Unknown role: ${roleName}`)
@@ -1173,13 +1508,43 @@ export async function hasRoleOnChain(userAddress, roleName) {
     }
 
     const provider = getProvider()
+
+    // First check TierRegistry (modular RBAC system) - tier > 0 means user has the role
+    const tierRegistryAddress = getContractAddress('tierRegistry')
+    if (tierRegistryAddress) {
+      try {
+        const tierRegistry = new ethers.Contract(
+          tierRegistryAddress,
+          TIER_REGISTRY_ABI,
+          provider
+        )
+        const tier = await tierRegistry.getUserTier(userAddress, roleHash)
+        const tierNum = Number(tier)
+        if (tierNum > 0) {
+          console.log(`[hasRoleOnChain] ${roleName}: found in TierRegistry with tier ${tierNum}`)
+          return true
+        }
+      } catch (tierError) {
+        console.debug('[hasRoleOnChain] TierRegistry check failed:', tierError.message)
+      }
+    }
+
+    // Fall back to checking RoleManager (legacy/standalone system)
+    const roleManagerAddress = getContractAddress('roleManager')
+    if (!roleManagerAddress) {
+      console.warn('Role manager not deployed - cannot check on-chain role')
+      return false
+    }
+
     const roleManagerContract = new ethers.Contract(
       roleManagerAddress,
       ROLE_MANAGER_ABI,
       provider
     )
 
-    return await roleManagerContract.hasRole(roleHash, userAddress)
+    const hasRole = await roleManagerContract.hasRole(roleHash, userAddress)
+    console.log(`[hasRoleOnChain] ${roleName}: RoleManager.hasRole = ${hasRole}`)
+    return hasRole
   } catch (error) {
     console.error('Error checking on-chain role:', error)
     return false
@@ -1258,7 +1623,7 @@ const PAYMENT_PROCESSOR_ABI = [
 ]
 
 /**
- * Purchase a role using USC stablecoin
+ * Purchase a role using USC stablecoin with tiered membership
  * This function calls the PaymentProcessor's purchaseTierWithToken function,
  * which handles both the payment and role granting in a single transaction.
  *
@@ -1267,9 +1632,10 @@ const PAYMENT_PROCESSOR_ABI = [
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
  * @param {number} priceUSD - Price in USD (will be converted to USC with 6 decimals)
+ * @param {number} tier - Membership tier (1=Bronze, 2=Silver, 3=Gold, 4=Platinum), defaults to Bronze
  * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
-export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
+export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = MembershipTier.BRONZE) {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
@@ -1368,18 +1734,23 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
       console.log('USC already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
     }
 
+    // Validate tier value
+    const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+    const tierName = TIER_NAMES[validTier] || 'Bronze'
+
     // Call purchaseTierWithToken on PaymentProcessor
     // This handles both payment and role granting in a single atomic transaction
     console.log('Purchasing role via PaymentProcessor...', {
       roleHash,
-      tier: MembershipTier.BASIC,
+      tier: validTier,
+      tierName,
       paymentToken: uscAddress,
       amount: amountWei.toString()
     })
 
     const purchaseTx = await paymentProcessor.purchaseTierWithToken(
       roleHash,
-      MembershipTier.BASIC,  // Use BASIC tier for standard purchases
+      validTier,
       uscAddress,
       amountWei
     )
@@ -1393,6 +1764,8 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD) {
       status: receipt.status === 1 ? 'success' : 'failed',
       gasUsed: receipt.gasUsed.toString(),
       roleName: roleName,
+      tier: validTier,
+      tierName: tierName,
       amount: priceUSD,
       roleGrantedOnChain: receipt.status === 1,
       roleGrantTxHash: receipt.hash

@@ -282,6 +282,21 @@
   }
 }
 
+/* My Markets Section */
+.my-markets-btn {
+  width: 100%;
+  justify-content: center;
+  background: linear-gradient(135deg, #4C9AFF 0%, #3A7FD5 100%);
+  border: none;
+  color: white;
+}
+
+.my-markets-btn:hover {
+  background: linear-gradient(135deg, #5CA9FF 0%, #4C9AFF 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(76, 154, 255, 0.3);
+}
+
 /* Friend Markets Section */
 .friend-market-btn {
   width: 100%;
@@ -550,11 +565,40 @@
     padding: 0.625rem;
   }
 
+  .wallet-button-container {
+    position: static;
+  }
+
   .wallet-dropdown {
-    min-width: 280px;
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    min-width: unset;
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+    animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: none;
+  }
+
+  .wallet-dropdown-extended {
+    min-width: unset;
+    width: 100%;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
