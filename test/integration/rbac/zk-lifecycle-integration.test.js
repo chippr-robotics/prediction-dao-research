@@ -78,7 +78,7 @@ describe("ZK Key Lifecycle - Integration Tests", function () {
       
       await expect(
         roleManager.connect(user1).registerZKKey(zkKey)
-      ).to.be.revertedWith("Must have ClearPath role");
+      ).to.be.revertedWithCustomError(roleManager, "RMNotActive");
     });
 
     it("Should maintain backward compatibility without ZKKeyManager", async function () {
@@ -164,7 +164,7 @@ describe("ZK Key Lifecycle - Integration Tests", function () {
       
       await expect(
         roleManager2.connect(user1).rotateZKKey("zkp_new_key_98765432109876543210987654321098")
-      ).to.be.revertedWith("ZK key manager not set");
+      ).to.be.revertedWithCustomError(roleManager2, "RMZKManagerNotSet");
     });
   });
 

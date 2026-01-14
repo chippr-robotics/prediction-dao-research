@@ -88,7 +88,8 @@ describe("FriendGroupMarketFactory", function () {
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
       await tieredRoleManager.getAddress(),
-      await paymentManager.getAddress()
+      await paymentManager.getAddress(),
+      owner.address
     );
     
     // Set collateral token for markets (required for CTF1155)
@@ -243,7 +244,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid opponent");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
     it("Should reject betting against yourself", async function () {
@@ -260,7 +261,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Cannot bet against yourself");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
     it("Should set arbitrator when provided", async function () {
@@ -341,7 +342,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid member limit");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should reject member limit too low", async function () {
@@ -361,7 +362,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid member limit");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should reject duplicate members", async function () {
@@ -381,7 +382,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Duplicate member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "DuplicateMember");
     });
 
     it("Should track user markets correctly", async function () {
@@ -444,7 +445,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid number of players");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should enforce maximum players for event tracking", async function () {
@@ -463,7 +464,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid number of players");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
   });
 
@@ -499,13 +500,13 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject adding member by non-creator", async function () {
       await expect(
         friendGroupFactory.connect(addr1).addMember(0, addr3.address)
-      ).to.be.revertedWith("Only creator can add members");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotAuthorized");
     });
 
     it("Should reject adding duplicate member", async function () {
       await expect(
         friendGroupFactory.addMember(0, addr1.address)
-      ).to.be.revertedWith("Already a member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "AlreadyMember");
     });
 
     it("Should enforce member limit when adding", async function () {
@@ -518,7 +519,7 @@ describe("FriendGroupMarketFactory", function () {
       const extraAddr = ethers.Wallet.createRandom().address;
       await expect(
         friendGroupFactory.addMember(0, extraAddr)
-      ).to.be.revertedWith("Member limit reached");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "MemberLimitReached");
     });
 
     it("Should allow members to remove themselves", async function () {
@@ -533,7 +534,7 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject removal by non-member", async function () {
       await expect(
         friendGroupFactory.connect(addr3).removeSelf(0)
-      ).to.be.revertedWith("Not a member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotMember");
     });
   });
 
@@ -577,7 +578,7 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject resolution by unauthorized party", async function () {
       await expect(
         friendGroupFactory.connect(addr3).resolveFriendMarket(0, true)
-      ).to.be.revertedWith("Not authorized to resolve");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotAuthorized");
     });
 
     it("Should reject resolution of already resolved market", async function () {
@@ -585,7 +586,7 @@ describe("FriendGroupMarketFactory", function () {
       
       await expect(
         friendGroupFactory.connect(addr1).resolveFriendMarket(0, true)
-      ).to.be.revertedWith("Market not active");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotActive");
     });
   });
 
@@ -703,11 +704,11 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject invalid addresses in updates", async function () {
       await expect(
         friendGroupFactory.updateMarketFactory(ethers.ZeroAddress)
-      ).to.be.revertedWith("Invalid address");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidAddress");
       
       await expect(
         friendGroupFactory.updateRagequitModule(ethers.ZeroAddress)
-      ).to.be.revertedWith("Invalid address");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidAddress");
     });
   });
 
