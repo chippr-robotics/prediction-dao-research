@@ -50,11 +50,7 @@ vi.mock('wagmi', () => ({
   useChainId: () => mockUseChainId(),
   useSwitchChain: () => mockUseSwitchChain(),
   useWalletClient: () => ({
-    data: {
-      account: { address: '0x1234567890123456789012345678901234567890' },
-      chain: { id: 61 },
-      transport: {}
-    }
+    data: null // Return null to prevent EIP-1193 provider errors and trigger window.ethereum fallback path in tests
   }),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
@@ -208,6 +204,10 @@ describe('FriendMarketsModal', () => {
     mockWalletState.isConnected = true
     mockWalletState.account = '0x1234567890123456789012345678901234567890'
     mockWeb3State.isCorrectNetwork = true
+    
+    // Mock window.ethereum to avoid provider creation errors
+    // This prevents the WalletContext from trying to create providers during tests
+    global.window.ethereum = undefined
   })
 
   describe('Modal Visibility', () => {

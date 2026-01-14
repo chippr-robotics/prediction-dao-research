@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
 import { WalletContext, ThemeContext, UIContext } from '../contexts'
@@ -78,6 +78,8 @@ describe('MyMarketsModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Mock window.ethereum to avoid provider creation errors
+    global.window.ethereum = undefined
     useWallet.mockReturnValue({
       isConnected: true,
       account: '0x1234567890123456789012345678901234567890'
@@ -102,18 +104,22 @@ describe('MyMarketsModal', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
-    it('should render when isOpen is true', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should render when isOpen is true', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('should have correct ARIA attributes', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should have correct ARIA attributes', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       const dialog = screen.getByRole('dialog')
       expect(dialog).toHaveAttribute('aria-modal', 'true')
@@ -122,35 +128,43 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Header', () => {
-    it('should display title', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should display title', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       expect(screen.getByText('My Markets')).toBeInTheDocument()
     })
 
-    it('should display subtitle', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should display subtitle', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       expect(screen.getByText('Manage your prediction markets and positions')).toBeInTheDocument()
     })
 
-    it('should have close button', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should have close button', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       expect(screen.getByRole('button', { name: /close modal/i })).toBeInTheDocument()
     })
 
     it('should call onClose when close button is clicked', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       const closeBtn = screen.getByRole('button', { name: /close modal/i })
       await user.click(closeBtn)
@@ -160,30 +174,44 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Tab Navigation', () => {
-    it('should display three tabs', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should display three tabs', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
-      expect(screen.getByRole('tab', { name: /participating/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /participating/i })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument()
+      })
     })
 
-    it('should have Participating tab selected by default', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should have Participating tab selected by default', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
-      const participatingTab = screen.getByRole('tab', { name: /participating/i })
-      expect(participatingTab).toHaveAttribute('aria-selected', 'true')
+      await waitFor(() => {
+        const participatingTab = screen.getByRole('tab', { name: /participating/i })
+        expect(participatingTab).toHaveAttribute('aria-selected', 'true')
+      })
     })
 
     it('should switch to Created tab when clicked', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
 
       const createdTab = screen.getByRole('tab', { name: /created/i })
       await user.click(createdTab)
@@ -193,9 +221,15 @@ describe('MyMarketsModal', () => {
 
     it('should switch to History tab when clicked', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument()
+      })
 
       const historyTab = screen.getByRole('tab', { name: /history/i })
       await user.click(historyTab)
@@ -205,30 +239,40 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Filter Bar', () => {
-    it('should display type filter dropdown', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should display type filter dropdown', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
-      const typeSelect = screen.getByText('Type:').nextElementSibling
-      expect(typeSelect).toBeInTheDocument()
-      expect(typeSelect.tagName).toBe('SELECT')
+      await waitFor(() => {
+        const typeSelect = screen.getByText('Type:').nextElementSibling
+        expect(typeSelect).toBeInTheDocument()
+        expect(typeSelect.tagName).toBe('SELECT')
+      })
     })
 
-    it('should display refresh button', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should display refresh button', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
-      expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /refresh/i })).toBeInTheDocument()
+      })
     })
   })
 
   describe('Empty States', () => {
     it('should show empty state for Participating tab with no positions', async () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       await waitFor(() => {
         expect(screen.getByText('No Active Positions')).toBeInTheDocument()
@@ -237,9 +281,15 @@ describe('MyMarketsModal', () => {
 
     it('should show empty state for Created tab with no markets', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
 
       const createdTab = screen.getByRole('tab', { name: /created/i })
       await user.click(createdTab)
@@ -251,9 +301,15 @@ describe('MyMarketsModal', () => {
 
     it('should show empty state for History tab with no resolved markets', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /history/i })).toBeInTheDocument()
+      })
 
       const historyTab = screen.getByRole('tab', { name: /history/i })
       await user.click(historyTab)
@@ -265,19 +321,23 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Wallet Not Connected', () => {
-    it('should show connect wallet message when not connected', () => {
+    it('should show connect wallet message when not connected', async () => {
       useWallet.mockReturnValue({
         isConnected: false,
         account: null
       })
 
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
-      // When not connected, should show the connect wallet message immediately (no loading)
-      expect(screen.getByText('Connect Your Wallet')).toBeInTheDocument()
-      expect(screen.queryByText('Loading your markets...')).not.toBeInTheDocument()
+      await waitFor(() => {
+        // When not connected, should show the connect wallet message immediately (no loading)
+        expect(screen.getByText('Connect Your Wallet')).toBeInTheDocument()
+        expect(screen.queryByText('Loading your markets...')).not.toBeInTheDocument()
+      })
     })
   })
 
@@ -322,9 +382,15 @@ describe('MyMarketsModal', () => {
 
     it('should display markets user has created in Created tab', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
 
       const createdTab = screen.getByRole('tab', { name: /created/i })
       await user.click(createdTab)
@@ -335,9 +401,11 @@ describe('MyMarketsModal', () => {
     })
 
     it('should display markets user is participating in', async () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       await waitFor(() => {
         expect(screen.getByText('Test Market 2')).toBeInTheDocument()
@@ -345,9 +413,11 @@ describe('MyMarketsModal', () => {
     })
 
     it('should show tab badges with counts', async () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       await waitFor(() => {
         const createdTab = screen.getByRole('tab', { name: /created/i })
@@ -359,9 +429,15 @@ describe('MyMarketsModal', () => {
   describe('Keyboard Navigation', () => {
     it('should close modal on Escape key', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+      })
 
       await user.keyboard('{Escape}')
 
@@ -372,9 +448,15 @@ describe('MyMarketsModal', () => {
   describe('Backdrop Click', () => {
     it('should close modal when backdrop is clicked', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+      })
 
       // The backdrop is the element with class 'my-markets-modal-backdrop'
       const backdrop = document.querySelector('.my-markets-modal-backdrop')
@@ -386,9 +468,15 @@ describe('MyMarketsModal', () => {
 
     it('should not close modal when modal content is clicked', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('My Markets')).toBeInTheDocument()
+      })
 
       const title = screen.getByText('My Markets')
       await user.click(title)
@@ -412,13 +500,19 @@ describe('MyMarketsModal', () => {
 
     it('should display friend markets in Created tab when user is creator', async () => {
       const user = userEvent.setup()
-      renderWithProviders(
-        <MyMarketsModal
-          isOpen={true}
-          onClose={mockOnClose}
-          friendMarkets={mockFriendMarkets}
-        />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal
+            isOpen={true}
+            onClose={mockOnClose}
+            friendMarkets={mockFriendMarkets}
+          />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
 
       const createdTab = screen.getByRole('tab', { name: /created/i })
       await user.click(createdTab)
@@ -430,22 +524,28 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Accessibility', () => {
-    it('should have proper tab roles', () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+    it('should have proper tab roles', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
-      const tablist = screen.getByRole('tablist')
-      expect(tablist).toBeInTheDocument()
+      await waitFor(() => {
+        const tablist = screen.getByRole('tablist')
+        expect(tablist).toBeInTheDocument()
 
-      const tabs = screen.getAllByRole('tab')
-      expect(tabs).toHaveLength(3)
+        const tabs = screen.getAllByRole('tab')
+        expect(tabs).toHaveLength(3)
+      })
     })
 
     it('should have proper tabpanel role after loading', async () => {
-      renderWithProviders(
-        <MyMarketsModal isOpen={true} onClose={mockOnClose} />
-      )
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
 
       // Wait for loading to complete
       await waitFor(() => {
