@@ -97,17 +97,17 @@ module.exports = {
     //     return getFloppyPrivateKeys({ count: 5 });
     //   },
     // },
-    // Example: Mordor testnet with floppy keystore
-    // "mordor-floppy": {
-    //   url: "https://rpc.mordor.etccooperative.org",
-    //   chainId: 63,
-    //   accounts: async () => {
-    //     if (!isFloppyMounted() || !keystoreExists()) {
-    //       throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
-    //     }
-    //     return getFloppyPrivateKeys({ count: 5 });
-    //   },
-    // },
+    // Mordor testnet with floppy keystore
+    "mordor-floppy": {
+      url: "https://rpc.mordor.etccooperative.org",
+      chainId: 63,
+      accounts: async () => {
+        if (!isFloppyMounted() || !keystoreExists()) {
+          throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
+        }
+        return getFloppyPrivateKeys({ count: 5 });
+      },
+    },
   },
   paths: {
     sources: "./contracts",
