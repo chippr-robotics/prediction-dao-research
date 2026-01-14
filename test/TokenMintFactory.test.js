@@ -15,12 +15,29 @@ describe("TokenMintFactory", function () {
     roleManager = await RoleManager.deploy();
     await roleManager.waitForDeployment();
 
-    // Initialize role metadata and all tiers
-    await roleManager.initializeRoleMetadata();
-    await roleManager.initializeMarketMakerTiers();
-    await roleManager.initializeClearPathTiers();
-    await roleManager.initializeTokenMintTiers();
-    await roleManager.initializeFriendMarketTiers();
+    // Initialize with admin
+    await roleManager.initialize(owner.address);
+    
+    // Set up TokenMint tier metadata (Bronze tier)
+    await roleManager.setTierMetadata(
+      TOKENMINT_ROLE,
+      1, // Bronze
+      "Token Mint Bronze",
+      "Basic token mint tier",
+      ethers.parseEther("150"),
+      {
+        dailyBetLimit: 10,
+        weeklyBetLimit: 50,
+        monthlyMarketCreation: 10,
+        maxPositionSize: ethers.parseEther("10"),
+        maxConcurrentMarkets: 5,
+        withdrawalLimit: ethers.parseEther("100"),
+        canCreatePrivateMarkets: false,
+        canUseAdvancedFeatures: false,
+        feeDiscount: 0
+      },
+      true // isActive
+    );
 
     // Deploy TokenMintFactory
     const TokenMintFactory = await ethers.getContractFactory("TokenMintFactory");
@@ -29,7 +46,7 @@ describe("TokenMintFactory", function () {
 
     // Purchase TOKENMINT_ROLE for user1 (Bronze tier)
     const tierMetadata = await roleManager.tierMetadata(TOKENMINT_ROLE, 1); // Bronze = 1
-    await roleManager.connect(user1).purchaseRoleWithTier(TOKENMINT_ROLE, 1, {
+    await roleManager.connect(user1).purchaseRoleWithTier(TOKENMINT_ROLE, 1, 30, {
       value: tierMetadata.price
     });
   });

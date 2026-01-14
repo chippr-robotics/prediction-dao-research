@@ -25,35 +25,117 @@ describe("TieredRoleManager - Unit Tests", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
-    // Initialize role metadata and all tiers
-    await tieredRoleManager.initializeRoleMetadata();
-    await tieredRoleManager.initializeMarketMakerTiers();
-    await tieredRoleManager.initializeClearPathTiers();
-    await tieredRoleManager.initializeTokenMintTiers();
-    await tieredRoleManager.initializeFriendMarketTiers();
+    // Initialize with admin
+    await tieredRoleManager.initialize(owner.address);
     
-    MARKET_MAKER_ROLE = await tieredRoleManager.MARKET_MAKER_ROLE();
-    CLEARPATH_USER_ROLE = await tieredRoleManager.CLEARPATH_USER_ROLE();
-    TOKENMINT_ROLE = await tieredRoleManager.TOKENMINT_ROLE();
+    // Get role constants
+    MARKET_MAKER_ROLE = ethers.id("MARKET_MAKER_ROLE");
+    CLEARPATH_USER_ROLE = ethers.id("CLEARPATH_USER_ROLE");
+    TOKENMINT_ROLE = ethers.id("TOKENMINT_ROLE");
+    
+    // Set up tier metadata for Market Maker role
+    const tiers = [
+      {
+        tier: Tier.BRONZE,
+        name: "Market Maker Bronze",
+        description: "Basic market maker tier",
+        price: ethers.parseEther("100"),
+        limits: {
+          dailyBetLimit: 10,
+          weeklyBetLimit: 50,
+          monthlyMarketCreation: 5,
+          maxPositionSize: ethers.parseEther("10"),
+          maxConcurrentMarkets: 3,
+          withdrawalLimit: ethers.parseEther("100"),
+          canCreatePrivateMarkets: false,
+          canUseAdvancedFeatures: false,
+          feeDiscount: 0
+        }
+      },
+      {
+        tier: Tier.SILVER,
+        name: "Market Maker Silver",
+        description: "Intermediate market maker tier",
+        price: ethers.parseEther("150"),
+        limits: {
+          dailyBetLimit: 50,
+          weeklyBetLimit: 250,
+          monthlyMarketCreation: 20,
+          maxPositionSize: ethers.parseEther("50"),
+          maxConcurrentMarkets: 10,
+          withdrawalLimit: ethers.parseEther("500"),
+          canCreatePrivateMarkets: true,
+          canUseAdvancedFeatures: false,
+          feeDiscount: 500
+        }
+      },
+      {
+        tier: Tier.GOLD,
+        name: "Market Maker Gold",
+        description: "Advanced market maker tier",
+        price: ethers.parseEther("250"),
+        limits: {
+          dailyBetLimit: 100,
+          weeklyBetLimit: 500,
+          monthlyMarketCreation: 50,
+          maxPositionSize: ethers.parseEther("100"),
+          maxConcurrentMarkets: 25,
+          withdrawalLimit: ethers.parseEther("1000"),
+          canCreatePrivateMarkets: true,
+          canUseAdvancedFeatures: true,
+          feeDiscount: 1000
+        }
+      },
+      {
+        tier: Tier.PLATINUM,
+        name: "Market Maker Platinum",
+        description: "Premium market maker tier",
+        price: ethers.parseEther("500"),
+        limits: {
+          dailyBetLimit: 500,
+          weeklyBetLimit: 2500,
+          monthlyMarketCreation: 200,
+          maxPositionSize: ethers.parseEther("1000"),
+          maxConcurrentMarkets: 100,
+          withdrawalLimit: ethers.parseEther("10000"),
+          canCreatePrivateMarkets: true,
+          canUseAdvancedFeatures: true,
+          feeDiscount: 2000
+        }
+      }
+    ];
+    
+    // Set tier metadata for each tier
+    for (const config of tiers) {
+      await tieredRoleManager.setTierMetadata(
+        MARKET_MAKER_ROLE,
+        config.tier,
+        config.name,
+        config.description,
+        config.price,
+        config.limits,
+        true // isActive
+      );
+    }
   });
 
   describe("Tier Initialization", function () {
     it("Should initialize all tiers for Market Maker", async function () {
-      const bronze = await tieredRoleManager.getTierMetadata(MARKET_MAKER_ROLE, Tier.BRONZE);
+      const bronze = await tieredRoleManager.tierMetadata(MARKET_MAKER_ROLE, Tier.BRONZE);
       expect(bronze.name).to.equal("Market Maker Bronze");
       expect(bronze.price).to.equal(ethers.parseEther("100"));
       
-      const platinum = await tieredRoleManager.getTierMetadata(MARKET_MAKER_ROLE, Tier.PLATINUM);
+      const platinum = await tieredRoleManager.tierMetadata(MARKET_MAKER_ROLE, Tier.PLATINUM);
       expect(platinum.name).to.equal("Market Maker Platinum");
       expect(platinum.price).to.equal(ethers.parseEther("500"));
     });
 
     it("Should initialize different limits for each tier", async function () {
-      const bronzeLimits = await tieredRoleManager.getTierLimits(MARKET_MAKER_ROLE, Tier.BRONZE);
+      const bronzeLimits = (await tieredRoleManager.tierMetadata(MARKET_MAKER_ROLE, Tier.BRONZE)).limits;
       expect(bronzeLimits.dailyBetLimit).to.equal(10);
       expect(bronzeLimits.monthlyMarketCreation).to.equal(5);
       
-      const goldLimits = await tieredRoleManager.getTierLimits(MARKET_MAKER_ROLE, Tier.GOLD);
+      const goldLimits = (await tieredRoleManager.tierMetadata(MARKET_MAKER_ROLE, Tier.GOLD)).limits;
       expect(goldLimits.dailyBetLimit).to.equal(100);
       expect(goldLimits.monthlyMarketCreation).to.equal(50);
     });
@@ -62,9 +144,10 @@ describe("TieredRoleManager - Unit Tests", function () {
   describe("Tier Purchase", function () {
     it("Should allow purchasing role at specific tier", async function () {
       const price = ethers.parseEther("100");
+      const durDays = 30; // 30 days
       
       await expect(
-        tieredRoleManager.connect(user1).purchaseRoleWithTier(MARKET_MAKER_ROLE, Tier.BRONZE, { value: price })
+        tieredRoleManager.connect(user1).purchaseRoleWithTier(MARKET_MAKER_ROLE, Tier.BRONZE, durDays, { value: price })
       ).to.emit(tieredRoleManager, "TierPurchased");
       
       expect(await tieredRoleManager.hasRole(MARKET_MAKER_ROLE, user1.address)).to.equal(true);
@@ -73,18 +156,20 @@ describe("TieredRoleManager - Unit Tests", function () {
 
     it("Should allow purchasing higher tier directly", async function () {
       const price = ethers.parseEther("250");
+      const durDays = 30;
       
-      await tieredRoleManager.connect(user1).purchaseRoleWithTier(MARKET_MAKER_ROLE, Tier.GOLD, { value: price });
+      await tieredRoleManager.connect(user1).purchaseRoleWithTier(MARKET_MAKER_ROLE, Tier.GOLD, durDays, { value: price });
       
       expect(await tieredRoleManager.getUserTier(user1.address, MARKET_MAKER_ROLE)).to.equal(Tier.GOLD);
     });
 
     it("Should reject insufficient payment", async function () {
       const insufficientPrice = ethers.parseEther("50");
+      const durDays = 30;
       
       await expect(
-        tieredRoleManager.connect(user1).purchaseRoleWithTier(MARKET_MAKER_ROLE, Tier.BRONZE, { value: insufficientPrice })
-      ).to.be.revertedWith("Insufficient payment");
+        tieredRoleManager.connect(user1).purchaseRoleWithTier(MARKET_MAKER_ROLE, Tier.BRONZE, durDays, { value: insufficientPrice })
+      ).to.be.revertedWithCustomError(tieredRoleManager, "TRMInsufficientPay");
     });
   });
 
@@ -94,6 +179,7 @@ describe("TieredRoleManager - Unit Tests", function () {
       await tieredRoleManager.connect(user1).purchaseRoleWithTier(
         MARKET_MAKER_ROLE, 
         Tier.BRONZE, 
+        30, // 30 days
         { value: ethers.parseEther("100") }
       );
     });
@@ -112,7 +198,7 @@ describe("TieredRoleManager - Unit Tests", function () {
     it("Should reject downgrade attempt", async function () {
       await expect(
         tieredRoleManager.connect(user1).upgradeTier(MARKET_MAKER_ROLE, Tier.NONE, { value: 0 })
-      ).to.be.revertedWith("Can only upgrade to higher tier");
+      ).to.be.revertedWithCustomError(tieredRoleManager, "TRMNeedHigherTier");
     });
 
     it("Should allow multiple upgrades", async function () {
@@ -135,6 +221,7 @@ describe("TieredRoleManager - Unit Tests", function () {
       await tieredRoleManager.connect(user1).purchaseRoleWithTier(
         MARKET_MAKER_ROLE,
         Tier.BRONZE,
+        30,
         { value: ethers.parseEther("100") }
       );
       
@@ -142,6 +229,7 @@ describe("TieredRoleManager - Unit Tests", function () {
       await tieredRoleManager.connect(user2).purchaseRoleWithTier(
         MARKET_MAKER_ROLE,
         Tier.GOLD,
+        30,
         { value: ethers.parseEther("250") }
       );
     });
