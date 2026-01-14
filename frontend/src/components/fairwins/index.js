@@ -15,7 +15,9 @@ export { default as MarketsTable } from './MarketsTable'
 
 // Modal Components
 export { default as TokenMintBuilderModal } from './TokenMintBuilderModal'
+export { default as TokenCreationModal } from './TokenCreationModal'
 export { default as MarketCreationModal } from './MarketCreationModal'
 export { default as TokenManagementModal } from './TokenManagementModal'
 export { default as MarketModal } from './MarketModal'
 export { default as FriendMarketsModal } from './FriendMarketsModal'
+export { default as MyMarketsModal } from './MyMarketsModal'

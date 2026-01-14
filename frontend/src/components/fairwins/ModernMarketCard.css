@@ -92,7 +92,7 @@
   object-position: center;
 }
 
-/* Dark overlay gradient for text readability - stronger for clear visibility */
+/* Dark overlay gradient for text readability - balanced for image visibility */
 .thumbnail-overlay {
   position: absolute;
   top: 0;
@@ -101,9 +101,9 @@
   bottom: 0;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.45) 0%,
-    rgba(0, 0, 0, 0.65) 50%,
-    rgba(0, 0, 0, 0.85) 100%
+    rgba(0, 0, 0, 0.15) 0%,
+    rgba(0, 0, 0, 0.35) 50%,
+    rgba(0, 0, 0, 0.6) 100%
   );
   display: flex;
   flex-direction: column;
@@ -111,13 +111,13 @@
   padding: 0;
 }
 
-/* Light mode overlay adjustment - even stronger */
+/* Light mode overlay adjustment */
 .theme-light .thumbnail-overlay {
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.5) 0%,
-    rgba(0, 0, 0, 0.7) 50%,
-    rgba(0, 0, 0, 0.9) 100%
+    rgba(0, 0, 0, 0.2) 0%,
+    rgba(0, 0, 0, 0.4) 50%,
+    rgba(0, 0, 0, 0.65) 100%
   );
 }
 
@@ -371,29 +371,52 @@
   font-weight: 500;
 }
 
-/* Stats row sits over the thumbnail in the bottom-right */
+/* Stats row sits over the thumbnail in the bottom-right - compact and transparent */
 .stats-row{
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  right: 8px;
+  bottom: 8px;
   z-index: 1;
   display:flex;
   flex-direction:row;
   flex-wrap:nowrap;
-  gap:12px;
+  gap:6px;
   align-items: center;
-  padding: 8px;
-  background: rgba(0,0,0,0.45);
-  border-radius: 12px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-  max-width: calc(100% - 24px);
+  padding: 4px 6px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  max-width: calc(100% - 16px);
   overflow: hidden;
 }
 
 .stats-row .stat-item{
-  min-width: 22px;
+  min-width: 18px;
   flex: 0 0 auto;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.stats-row .stat-item::before,
+.stats-row .stat-item::after {
+  display: none;
+}
+
+.stats-row .stat-label {
+  font-size: 0.5rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 2px;
+}
+
+.stats-row .stat-value {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
 /* --- GAMIFIED STAT CARD --- */

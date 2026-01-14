@@ -7,16 +7,53 @@
 
 export const DEPLOYED_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-  welfareRegistry: '0x8fE770a847C8BE899C51C16A21aDe6b6a2a5547D',
-  proposalRegistry: '0xf5cB8752a95afb0264ABd2E6a7a543B795Dd0fB1',
-  marketFactory: '0xd1B610a650EE14e42Fb29Ec65e21C53Ea8aDb203',
-  privacyCoordinator: '0x47d0D47686181B29b7BdF5E8D95ea7bA90C837b9',
-  oracleResolver: '0x19374Dd329fD61C5e404e0AE8397418E0f322Fba',
-  ragequitModule: '0x243c90c69Cd8f035D93DD5100dbc5b3753E8a593',
-  futarchyGovernor: '0xD37907b23d063F0839Ff2405179481822862C27A',
+  // Source of truth: TieredRoleManager used by FriendGroupMarketFactory
+  tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager (optimized, with tier limits)
+  welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
+  proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
+  marketFactory: '0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a', // ConditionalMarketFactory v2 (used by FriendGroupMarketFactory)
+  privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
+  oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
+  ragequitModule: '0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7', // RagequitModule (used by FriendGroupMarketFactory)
+  futarchyGovernor: '0xD379002D90a38245dC99D9dd7BE430Ab9C0B3e54',
   fairWinsToken: '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB',
-  treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772'
-  /** @todo Add zkKeyManager address when contract is deployed */
+  treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772',
+
+  // Token and DAO factories
+  tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
+  daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a',
+
+  // CTF1155 - Deployed via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
+  ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
+
+  // Back-compat aliases - point to TieredRoleManager for consistency
+  roleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager with full interface
+  roleManagerCore: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
+
+  // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
+  paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
+  tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
+  membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
+  // MembershipPaymentManager used by FriendGroupMarketFactory
+  membershipPaymentManager: '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28',
+
+  // Perpetual Futures - Deployed via: npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
+  fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
+  perpFactory: '0xAEfd08EF350B7132BDbE8a9de96C6d24eAbd7988',
+
+  // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
+  // Used for grouping related markets (e.g., election candidates, tournament brackets)
+  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A',
+
+  // Friend Group Market Factory - Deploy via: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
+  // For P2P friend markets with tiered membership
+  friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
+
+  // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
+  // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor
+  // Has checkMarketCreationLimitFor for tier-based limits
+  tieredRoleManagerFull: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
+
 }
 
 /**
@@ -26,11 +63,16 @@ export const DEPLOYED_CONTRACTS = {
  */
 export function getContractAddress(contractName) {
   // Check environment variables first (for custom deployments)
-  const envKey = `VITE_${contractName.toUpperCase()}_ADDRESS`
-  const envAddress = import.meta.env[envKey]
-  
-  if (envAddress) {
-    return envAddress
+  // Support both legacy style (VITE_ROLEMANAGER_ADDRESS) and snake-case style (VITE_ROLE_MANAGER_ADDRESS)
+  const upper = contractName.toUpperCase()
+  const snake = contractName
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toUpperCase()
+
+  const envKeys = [`VITE_${upper}_ADDRESS`, `VITE_${snake}_ADDRESS`]
+  for (const envKey of envKeys) {
+    const envAddress = import.meta.env[envKey]
+    if (envAddress) return envAddress
   }
   
   // Fall back to deployed contract addresses
@@ -44,5 +86,5 @@ export const NETWORK_CONFIG = {
   chainId: parseInt(import.meta.env.VITE_NETWORK_ID || '63', 10),
   name: 'Mordor Testnet',
   rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org',
-  blockExplorer: 'https://blockscout.com/etc/mordor'
+  blockExplorer: 'https://etc-mordor.blockscout.com'
 }

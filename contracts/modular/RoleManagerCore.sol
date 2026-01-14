@@ -205,6 +205,19 @@ contract RoleManagerCore is AccessControl, ReentrancyGuard, Pausable {
     function grantRoleFromExtension(bytes32 role, address account) external onlyExtension {
         _grantRole(role, account);
     }
-    
+
+    /**
+     * @notice Check if user is within market creation limits
+     * @dev Returns true if user has the role - actual limits can be enforced by TierRegistry
+     * @param user The user to check
+     * @param role The role to check limits for
+     * @return bool True if user has the role (limits handled by TierRegistry if needed)
+     */
+    function checkMarketCreationLimitFor(address user, bytes32 role) external returns (bool) {
+        // Basic check: user must have the role
+        // Actual limits (monthly market creation, etc.) are handled by TierRegistry
+        return hasRole(role, user);
+    }
+
     receive() external payable {}
 }

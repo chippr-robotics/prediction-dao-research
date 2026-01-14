@@ -12,6 +12,15 @@ function usePriceConversion() {
   const [lastUpdate, setLastUpdate] = useState(null)
 
   const fetchEtcPrice = useCallback(async () => {
+    // Skip price fetching in test environment
+    if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
+      // Set a mock price for tests
+      setEtcUsdRate(25.50)
+      setLoading(false)
+      setLastUpdate(new Date())
+      return
+    }
+    
     try {
       setLoading(true)
       setError(null)

@@ -15,12 +15,29 @@ describe("TokenMintFactory", function () {
     roleManager = await RoleManager.deploy();
     await roleManager.waitForDeployment();
 
-    // Initialize role metadata and all tiers
+    // Initialize role metadata (required to set isPremium flags)
     await roleManager.initializeRoleMetadata();
-    await roleManager.initializeMarketMakerTiers();
-    await roleManager.initializeClearPathTiers();
-    await roleManager.initializeTokenMintTiers();
-    await roleManager.initializeFriendMarketTiers();
+    
+    // Set up TokenMint tier metadata (Bronze tier)
+    await roleManager.setTierMetadata(
+      TOKENMINT_ROLE,
+      1, // Bronze
+      "Token Mint Bronze",
+      "Basic token mint tier",
+      ethers.parseEther("150"),
+      {
+        dailyBetLimit: 10,
+        weeklyBetLimit: 50,
+        monthlyMarketCreation: 10,
+        maxPositionSize: ethers.parseEther("10"),
+        maxConcurrentMarkets: 5,
+        withdrawalLimit: ethers.parseEther("100"),
+        canCreatePrivateMarkets: false,
+        canUseAdvancedFeatures: false,
+        feeDiscount: 0
+      },
+      true // isActive
+    );
 
     // Deploy TokenMintFactory
     const TokenMintFactory = await ethers.getContractFactory("TokenMintFactory");
@@ -29,7 +46,7 @@ describe("TokenMintFactory", function () {
 
     // Purchase TOKENMINT_ROLE for user1 (Bronze tier)
     const tierMetadata = await roleManager.tierMetadata(TOKENMINT_ROLE, 1); // Bronze = 1
-    await roleManager.connect(user1).purchaseRoleWithTier(TOKENMINT_ROLE, 1, {
+    await roleManager.connect(user1).purchaseRoleWithTier(TOKENMINT_ROLE, 1, 30, {
       value: tierMetadata.price
     });
   });
@@ -317,7 +334,7 @@ describe("TokenMintFactory", function () {
 
       // Purchase role for user2
       const tierMetadata = await roleManager.tierMetadata(TOKENMINT_ROLE, 1); // Bronze = 1
-      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, {
+      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, 30, {
         value: tierMetadata.price
       });
 
@@ -402,7 +419,7 @@ describe("TokenMintFactory", function () {
 
       // Purchase role for user2
       const tierMetadata = await roleManager.tierMetadata(TOKENMINT_ROLE, 1); // Bronze = 1
-      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, {
+      await roleManager.connect(user2).purchaseRoleWithTier(TOKENMINT_ROLE, 1, 30, {
         value: tierMetadata.price
       });
 
@@ -425,7 +442,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC20 = await ethers.getContractFactory("ERC20Basic");
+      const ERC20 = await ethers.getContractFactory("ERC20BasicImpl");
       const token = ERC20.attach(tokenInfo.tokenAddress);
 
       // Mint additional tokens
@@ -447,7 +464,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC20 = await ethers.getContractFactory("ERC20BurnableToken");
+      const ERC20 = await ethers.getContractFactory("ERC20BurnableImpl");
       const token = ERC20.attach(tokenInfo.tokenAddress);
 
       const initialBalance = await token.balanceOf(user1.address);
@@ -471,7 +488,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC20 = await ethers.getContractFactory("ERC20PausableToken");
+      const ERC20 = await ethers.getContractFactory("ERC20PausableImpl");
       const token = ERC20.attach(tokenInfo.tokenAddress);
 
       // Pause the token
@@ -500,7 +517,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC721 = await ethers.getContractFactory("ERC721Basic");
+      const ERC721 = await ethers.getContractFactory("ERC721BasicImpl");
       const nft = ERC721.attach(tokenInfo.tokenAddress);
 
       // Mint an NFT
@@ -522,7 +539,7 @@ describe("TokenMintFactory", function () {
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      const ERC721 = await ethers.getContractFactory("ERC721BurnableCollection");
+      const ERC721 = await ethers.getContractFactory("ERC721BurnableImpl");
       const nft = ERC721.attach(tokenInfo.tokenAddress);
 
       // Mint an NFT

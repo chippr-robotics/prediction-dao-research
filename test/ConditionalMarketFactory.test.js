@@ -475,22 +475,41 @@ describe("ConditionalMarketFactory", function () {
       // Deploy role manager
       const TieredRoleManager = await ethers.getContractFactory("TieredRoleManager");
       roleManager = await TieredRoleManager.deploy();
+      await roleManager.waitForDeployment();
       
-      // Initialize role metadata and all tiers
+      // Initialize role metadata (required to set isPremium flags)
       await roleManager.initializeRoleMetadata();
-      await roleManager.initializeMarketMakerTiers();
-      await roleManager.initializeClearPathTiers();
-      await roleManager.initializeTokenMintTiers();
-      await roleManager.initializeFriendMarketTiers();
+      
+      // Set up Market Maker tier metadata (Bronze tier)
+      const MARKET_MAKER_ROLE = ethers.id("MARKET_MAKER_ROLE");
+      await roleManager.setTierMetadata(
+        MARKET_MAKER_ROLE,
+        1, // Bronze
+        "Market Maker Bronze",
+        "Basic market maker tier",
+        ethers.parseEther("100"),
+        {
+          dailyBetLimit: 10,
+          weeklyBetLimit: 50,
+          monthlyMarketCreation: 5,
+          maxPositionSize: ethers.parseEther("10"),
+          maxConcurrentMarkets: 3,
+          withdrawalLimit: ethers.parseEther("100"),
+          canCreatePrivateMarkets: false,
+          canUseAdvancedFeatures: false,
+          feeDiscount: 0
+        },
+        true // isActive
+      );
       
       // Set role manager in market factory
-      await marketFactory.setRoleManager(roleManager.target);
+      await marketFactory.setRoleManager(await roleManager.getAddress());
       
       // Grant MARKET_MAKER_ROLE to marketMaker
-      const MARKET_MAKER_ROLE = await roleManager.MARKET_MAKER_ROLE();
       await roleManager.connect(marketMaker).purchaseRoleWithTier(
         MARKET_MAKER_ROLE,
         1, // Bronze tier
+        30, // 30 days
         { value: ethers.parseEther("100") }
       );
     });

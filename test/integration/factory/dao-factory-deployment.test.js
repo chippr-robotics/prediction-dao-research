@@ -27,9 +27,46 @@ describe("Integration: DAO Factory Deployment", function () {
       nonAuthorized
     ] = await ethers.getSigners();
 
+    // Deploy DAO component implementations (used as EIP-1167 clone targets)
+    const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
+    const welfareRegistryImpl = await WelfareMetricRegistry.deploy();
+    await welfareRegistryImpl.waitForDeployment();
+
+    const ProposalRegistry = await ethers.getContractFactory("ProposalRegistry");
+    const proposalRegistryImpl = await ProposalRegistry.deploy();
+    await proposalRegistryImpl.waitForDeployment();
+
+    const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
+    const marketFactoryImpl = await ConditionalMarketFactory.deploy();
+    await marketFactoryImpl.waitForDeployment();
+
+    const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
+    const privacyCoordinatorImpl = await PrivacyCoordinator.deploy();
+    await privacyCoordinatorImpl.waitForDeployment();
+
+    const OracleResolver = await ethers.getContractFactory("OracleResolver");
+    const oracleResolverImpl = await OracleResolver.deploy();
+    await oracleResolverImpl.waitForDeployment();
+
+    const RagequitModule = await ethers.getContractFactory("RagequitModule");
+    const ragequitModuleImpl = await RagequitModule.deploy();
+    await ragequitModuleImpl.waitForDeployment();
+
+    const FutarchyGovernor = await ethers.getContractFactory("FutarchyGovernor");
+    const futarchyGovernorImpl = await FutarchyGovernor.deploy();
+    await futarchyGovernorImpl.waitForDeployment();
+
     // Deploy DAOFactory
     const DAOFactory = await ethers.getContractFactory("DAOFactory");
-    const daoFactory = await DAOFactory.deploy();
+    const daoFactory = await DAOFactory.deploy(
+      await welfareRegistryImpl.getAddress(),
+      await proposalRegistryImpl.getAddress(),
+      await marketFactoryImpl.getAddress(),
+      await privacyCoordinatorImpl.getAddress(),
+      await oracleResolverImpl.getAddress(),
+      await ragequitModuleImpl.getAddress(),
+      await futarchyGovernorImpl.getAddress()
+    );
     await daoFactory.waitForDeployment();
 
     // Setup additional platform roles

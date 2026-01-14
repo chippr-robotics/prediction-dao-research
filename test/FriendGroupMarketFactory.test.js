@@ -44,12 +44,38 @@ describe("FriendGroupMarketFactory", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
-    // Initialize role metadata and all tiers
+    // Initialize role metadata (required to set isPremium flags)
     await tieredRoleManager.initializeRoleMetadata();
-    await tieredRoleManager.initializeMarketMakerTiers();
-    await tieredRoleManager.initializeClearPathTiers();
-    await tieredRoleManager.initializeTokenMintTiers();
-    await tieredRoleManager.initializeFriendMarketTiers();
+    
+    // Setup FRIEND_MARKET_ROLE
+    const FRIEND_MARKET_ROLE = ethers.id("FRIEND_MARKET_ROLE");
+    // Match Solidity enum: NONE = 0, BRONZE = 1, SILVER = 2, GOLD = 3, PLATINUM = 4
+    const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
+    
+    // Set up Friend Market tier metadata (Bronze tier)
+    await tieredRoleManager.setTierMetadata(
+      FRIEND_MARKET_ROLE,
+      MembershipTier.BRONZE,
+      "Friend Market Bronze",
+      "Basic friend market tier",
+      ethers.parseEther("0.1"),
+      {
+        dailyBetLimit: 10,
+        weeklyBetLimit: 50,
+        monthlyMarketCreation: 5,
+        maxPositionSize: ethers.parseEther("10"),
+        maxConcurrentMarkets: 3,
+        withdrawalLimit: ethers.parseEther("100"),
+        canCreatePrivateMarkets: false,
+        canUseAdvancedFeatures: false,
+        feeDiscount: 0
+      },
+      true // isActive
+    );
+    
+    // Get Bronze tier price
+    const tierMeta = await tieredRoleManager.tierMetadata(FRIEND_MARKET_ROLE, MembershipTier.BRONZE);
+    const price = tierMeta.price;
     
     // Deploy MembershipPaymentManager
     const MembershipPaymentManager = await ethers.getContractFactory("MembershipPaymentManager");
@@ -62,52 +88,43 @@ describe("FriendGroupMarketFactory", function () {
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
       await tieredRoleManager.getAddress(),
-      await paymentManager.getAddress()
+      await paymentManager.getAddress(),
+      owner.address
     );
     
     // Set collateral token for markets (required for CTF1155)
     await friendGroupFactory.setDefaultCollateralToken(await collateralToken.getAddress());
     
-    // Purchase FRIEND_MARKET_ROLE with ENTERPRISE duration (never expires) to avoid expiration issues
-    const FRIEND_MARKET_ROLE = await tieredRoleManager.FRIEND_MARKET_ROLE();
-    // Match Solidity enum: NONE = 0, BRONZE = 1, SILVER = 2, GOLD = 3, PLATINUM = 4
-    const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
-    const MembershipDuration = { ONE_MONTH: 0, THREE_MONTHS: 1, SIX_MONTHS: 2, TWELVE_MONTHS: 3, ENTERPRISE: 4 };
-    
-    // Get Bronze tier price (cheapest option)
-    const tierMeta = await tieredRoleManager.tierMetadata(FRIEND_MARKET_ROLE, MembershipTier.BRONZE);
-    const price = tierMeta.price;
-    
-    // Purchase ENTERPRISE memberships for test users (never expires, avoids test failures)
-    // ENTERPRISE duration = 100 years, so membership won't expire during tests
-    await tieredRoleManager.connect(owner).purchaseRoleWithTierAndDuration(
+    // Purchase memberships for test users (100 years = never expires during tests)
+    const durDays = 36500; // 100 years
+    await tieredRoleManager.connect(owner).purchaseRoleWithTier(
       FRIEND_MARKET_ROLE,
       MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
+      durDays,
       { value: price }
     );
-    await tieredRoleManager.connect(addr1).purchaseRoleWithTierAndDuration(
+    await tieredRoleManager.connect(addr1).purchaseRoleWithTier(
       FRIEND_MARKET_ROLE,
       MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
+      durDays,
       { value: price }
     );
-    await tieredRoleManager.connect(addr2).purchaseRoleWithTierAndDuration(
+    await tieredRoleManager.connect(addr2).purchaseRoleWithTier(
       FRIEND_MARKET_ROLE,
       MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
+      durDays,
       { value: price }
     );
-    await tieredRoleManager.connect(addr3).purchaseRoleWithTierAndDuration(
+    await tieredRoleManager.connect(addr3).purchaseRoleWithTier(
       FRIEND_MARKET_ROLE,
       MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
+      durDays,
       { value: price }
     );
-    await tieredRoleManager.connect(addr4).purchaseRoleWithTierAndDuration(
+    await tieredRoleManager.connect(addr4).purchaseRoleWithTier(
       FRIEND_MARKET_ROLE,
       MembershipTier.BRONZE,
-      MembershipDuration.ENTERPRISE,
+      durDays,
       { value: price }
     );
     
@@ -227,7 +244,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid opponent");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
     it("Should reject betting against yourself", async function () {
@@ -244,7 +261,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Cannot bet against yourself");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
     it("Should set arbitrator when provided", async function () {
@@ -325,7 +342,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid member limit");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should reject member limit too low", async function () {
@@ -345,7 +362,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid member limit");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should reject duplicate members", async function () {
@@ -365,7 +382,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Duplicate member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "DuplicateMember");
     });
 
     it("Should track user markets correctly", async function () {
@@ -428,7 +445,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid number of players");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should enforce maximum players for event tracking", async function () {
@@ -447,7 +464,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid number of players");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
   });
 
@@ -483,13 +500,13 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject adding member by non-creator", async function () {
       await expect(
         friendGroupFactory.connect(addr1).addMember(0, addr3.address)
-      ).to.be.revertedWith("Only creator can add members");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotAuthorized");
     });
 
     it("Should reject adding duplicate member", async function () {
       await expect(
         friendGroupFactory.addMember(0, addr1.address)
-      ).to.be.revertedWith("Already a member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "AlreadyMember");
     });
 
     it("Should enforce member limit when adding", async function () {
@@ -502,7 +519,7 @@ describe("FriendGroupMarketFactory", function () {
       const extraAddr = ethers.Wallet.createRandom().address;
       await expect(
         friendGroupFactory.addMember(0, extraAddr)
-      ).to.be.revertedWith("Member limit reached");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "MemberLimitReached");
     });
 
     it("Should allow members to remove themselves", async function () {
@@ -517,7 +534,7 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject removal by non-member", async function () {
       await expect(
         friendGroupFactory.connect(addr3).removeSelf(0)
-      ).to.be.revertedWith("Not a member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotMember");
     });
   });
 
@@ -561,7 +578,7 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject resolution by unauthorized party", async function () {
       await expect(
         friendGroupFactory.connect(addr3).resolveFriendMarket(0, true)
-      ).to.be.revertedWith("Not authorized to resolve");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotAuthorized");
     });
 
     it("Should reject resolution of already resolved market", async function () {
@@ -569,7 +586,7 @@ describe("FriendGroupMarketFactory", function () {
       
       await expect(
         friendGroupFactory.connect(addr1).resolveFriendMarket(0, true)
-      ).to.be.revertedWith("Market not active");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotActive");
     });
   });
 
@@ -687,11 +704,11 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject invalid addresses in updates", async function () {
       await expect(
         friendGroupFactory.updateMarketFactory(ethers.ZeroAddress)
-      ).to.be.revertedWith("Invalid address");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidAddress");
       
       await expect(
         friendGroupFactory.updateRagequitModule(ethers.ZeroAddress)
-      ).to.be.revertedWith("Invalid address");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidAddress");
     });
   });
 

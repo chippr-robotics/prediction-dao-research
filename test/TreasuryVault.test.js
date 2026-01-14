@@ -659,7 +659,11 @@ describe("TreasuryVault - Unit Tests", function () {
       const n = ethers.toBeHex(BigInt("0x" + "ff".repeat(256)), 256);
       const g = ethers.toBeHex(BigInt(3), 256);
       const initialAcc = ethers.toBeHex(BigInt(3), 256);
-      await nullifierRegistry.initializeRSAParams(n, g, initialAcc);
+      await nullifierRegistry.initializeParams(n, g, initialAcc);
+
+      // Grant NULLIFIER_ADMIN_ROLE to owner for testing
+      const NULLIFIER_ADMIN_ROLE = await nullifierRegistry.NULLIFIER_ADMIN_ROLE();
+      await nullifierRegistry.grantRole(NULLIFIER_ADMIN_ROLE, owner.address);
 
       // Fund the vault
       await treasuryVault.depositETH({ value: ethers.parseEther("10.0") });
@@ -737,7 +741,7 @@ describe("TreasuryVault - Unit Tests", function () {
 
       it("Should block withdrawal to nullified address", async function () {
         // Nullify the user
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         const withdrawAmount = ethers.parseEther("1.0");
 
@@ -746,21 +750,20 @@ describe("TreasuryVault - Unit Tests", function () {
         ).to.be.revertedWith("Recipient address is nullified");
       });
 
-      it("Should emit WithdrawalBlockedByNullification event when blocked", async function () {
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+      it("Should revert with message when withdrawal blocked by nullification", async function () {
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         const withdrawAmount = ethers.parseEther("1.0");
 
         await expect(
           treasuryVault.withdrawETH(nullifiedUser.address, withdrawAmount)
-        ).to.emit(treasuryVault, "WithdrawalBlockedByNullification")
-          .withArgs(nullifiedUser.address, ethers.ZeroAddress, withdrawAmount);
+        ).to.be.revertedWith("Recipient address is nullified");
       });
 
       it("Should allow withdrawal after address is reinstated", async function () {
         // Nullify and then reinstate
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
-        await nullifierRegistry.reinstateAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+        await nullifierRegistry.reinstateAddress(nullifiedUser.address, "test reinstatement");
 
         const withdrawAmount = ethers.parseEther("1.0");
 
@@ -771,7 +774,7 @@ describe("TreasuryVault - Unit Tests", function () {
 
       it("Should allow withdrawal to nullified address when enforcement is disabled", async function () {
         // Nullify the address
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         // Disable enforcement
         await treasuryVault.setNullificationEnforcement(false);
@@ -803,7 +806,7 @@ describe("TreasuryVault - Unit Tests", function () {
 
       it("Should block token withdrawal to nullified address", async function () {
         // Nullify the user
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         const withdrawAmount = ethers.parseEther("100");
 
@@ -812,21 +815,20 @@ describe("TreasuryVault - Unit Tests", function () {
         ).to.be.revertedWith("Recipient address is nullified");
       });
 
-      it("Should emit WithdrawalBlockedByNullification for blocked token withdrawal", async function () {
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+      it("Should revert with message for blocked token withdrawal", async function () {
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         const withdrawAmount = ethers.parseEther("100");
         const tokenAddress = await mockToken.getAddress();
 
         await expect(
           treasuryVault.withdrawERC20(tokenAddress, nullifiedUser.address, withdrawAmount)
-        ).to.emit(treasuryVault, "WithdrawalBlockedByNullification")
-          .withArgs(nullifiedUser.address, tokenAddress, withdrawAmount);
+        ).to.be.revertedWith("Recipient address is nullified");
       });
 
       it("Should allow token withdrawal to nullified address when enforcement is disabled", async function () {
         // Nullify the address
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         // Disable enforcement
         await treasuryVault.setNullificationEnforcement(false);
@@ -853,15 +855,15 @@ describe("TreasuryVault - Unit Tests", function () {
 
       it("Should return true for nullified address", async function () {
         await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
 
         expect(await treasuryVault.isRecipientNullified(nullifiedUser.address)).to.equal(true);
       });
 
       it("Should return false after address is reinstated", async function () {
         await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
-        await nullifierRegistry.reinstateAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+        await nullifierRegistry.reinstateAddress(nullifiedUser.address, "test reinstatement");
 
         expect(await treasuryVault.isRecipientNullified(nullifiedUser.address)).to.equal(false);
       });
@@ -882,7 +884,7 @@ describe("TreasuryVault - Unit Tests", function () {
 
       it("Should work with registry configured but enforcement disabled", async function () {
         await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
         // enforcement is false by default
 
         const withdrawAmount = ethers.parseEther("1.0");
@@ -904,7 +906,7 @@ describe("TreasuryVault - Unit Tests", function () {
         ).to.be.revertedWith("Exceeds transaction limit");
 
         // Should fail for nullified address
-        await nullifierRegistry.nullifyAddress(nullifiedUser.address);
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
         await expect(
           treasuryVault.withdrawETH(nullifiedUser.address, ethers.parseEther("1.0"))
         ).to.be.revertedWith("Recipient address is nullified");

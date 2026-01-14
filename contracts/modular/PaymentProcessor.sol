@@ -7,12 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../access/MembershipPaymentManager.sol";
 import "./TierRegistry.sol";
-
-interface IRoleManagerCore {
-    function grantRoleFromExtension(bytes32 role, address account) external;
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function paused() external view returns (bool);
-}
+import "./interfaces/IRoleManagerCore.sol";
 
 interface IMembershipManager {
     function setMembershipExpiration(address user, bytes32 role, uint256 expiration) external;
@@ -32,7 +27,7 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
     bool private _initialized;
     
     // ========== References ==========
-    
+
     IRoleManagerCore public roleManagerCore;
     TierRegistry public tierRegistry;
     IMembershipManager public membershipManager;
@@ -88,7 +83,7 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         paymentManager = MembershipPaymentManager(_paymentManager);
         emit PaymentManagerUpdated(old, _paymentManager);
     }
-    
+
     function configureAll(
         address _roleManagerCore,
         address _tierRegistry,
@@ -131,12 +126,12 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         
         // Update tier
         tierRegistry.setUserTier(msg.sender, role, tier);
-        
+
         // Grant role if not already granted
         if (!roleManagerCore.hasRole(role, msg.sender)) {
             roleManagerCore.grantRoleFromExtension(role, msg.sender);
         }
-        
+
         // Set default membership duration (30 days) if membership manager is configured
         if (address(membershipManager) != address(0)) {
             uint256 currentExpiration = membershipManager.getMembershipExpiration(msg.sender, role);
@@ -144,13 +139,13 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
                 membershipManager.setMembershipExpiration(msg.sender, role, block.timestamp + 30 days);
             }
         }
-        
+
         emit TierPurchased(msg.sender, role, tier, msg.value, address(0));
-        
+
         if (currentTier != TierRegistry.MembershipTier.NONE) {
             emit TierUpgraded(msg.sender, role, currentTier, tier);
         }
-        
+
         // Refund excess
         if (msg.value > price) {
             uint256 refund = msg.value - price;
@@ -192,12 +187,12 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         
         // Update tier
         tierRegistry.setUserTier(msg.sender, role, tier);
-        
+
         // Grant role if not already granted
         if (!roleManagerCore.hasRole(role, msg.sender)) {
             roleManagerCore.grantRoleFromExtension(role, msg.sender);
         }
-        
+
         // Set default membership duration
         if (address(membershipManager) != address(0)) {
             uint256 currentExpiration = membershipManager.getMembershipExpiration(msg.sender, role);
@@ -205,14 +200,14 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
                 membershipManager.setMembershipExpiration(msg.sender, role, block.timestamp + 30 days);
             }
         }
-        
+
         emit TierPurchased(msg.sender, role, tier, amount, paymentToken);
-        
+
         if (currentTier != TierRegistry.MembershipTier.NONE) {
             emit TierUpgraded(msg.sender, role, currentTier, tier);
         }
     }
-    
+
     /**
      * @notice Admin grant tier (free)
      */
@@ -223,11 +218,11 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         uint256 durationDays
     ) external onlyOwner {
         tierRegistry.setUserTier(user, role, tier);
-        
+
         if (!roleManagerCore.hasRole(role, user)) {
             roleManagerCore.grantRoleFromExtension(role, user);
         }
-        
+
         if (address(membershipManager) != address(0) && durationDays > 0) {
             membershipManager.setMembershipExpiration(
                 user,

@@ -4,11 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./TierRegistry.sol";
-
-interface IRoleManagerCore {
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function paused() external view returns (bool);
-}
+import "./interfaces/IRoleManagerCore.sol";
 
 /**
  * @title MembershipManager
@@ -22,9 +18,12 @@ contract MembershipManager is Ownable, ReentrancyGuard {
     bool private _initialized;
     
     // ========== References ==========
-    
+
     IRoleManagerCore public roleManagerCore;
     TierRegistry public tierRegistry;
+
+    // Authorized extensions (e.g., PaymentProcessor)
+    mapping(address => bool) public authorizedExtensions;
     
     // ========== Membership Duration ==========
     
@@ -56,6 +55,7 @@ contract MembershipManager is Ownable, ReentrancyGuard {
     event MembershipExpired(address indexed user, bytes32 indexed role);
     event MembershipSet(address indexed user, bytes32 indexed role, uint256 expiration);
     event DurationDiscountUpdated(MembershipDuration duration, uint256 discount);
+    event AuthorizedExtensionSet(address indexed extension, bool authorized);
     
     // ========== Constructor ==========
     
@@ -100,6 +100,11 @@ contract MembershipManager is Ownable, ReentrancyGuard {
         durationDiscounts[duration] = discount;
         emit DurationDiscountUpdated(duration, discount);
     }
+
+    function setAuthorizedExtension(address extension, bool authorized) external onlyOwner {
+        authorizedExtensions[extension] = authorized;
+        emit AuthorizedExtensionSet(extension, authorized);
+    }
     
     // ========== Modifiers ==========
     
@@ -111,7 +116,8 @@ contract MembershipManager is Ownable, ReentrancyGuard {
     modifier onlyAuthorized() {
         require(
             msg.sender == owner() ||
-            msg.sender == address(tierRegistry),
+            msg.sender == address(tierRegistry) ||
+            authorizedExtensions[msg.sender],
             "Not authorized"
         );
         _;

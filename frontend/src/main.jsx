@@ -6,14 +6,12 @@ import './index.css'
 import App from './App.jsx'
 import { config } from './wagmi'
 import {
-  Web3Provider,
   WalletProvider,
   UIProvider,
   ThemeProvider,
   PriceProvider,
   ETCswapProvider,
-  UserPreferencesProvider,
-  RoleProvider
+  UserPreferencesProvider
 } from './contexts'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import { validateTheme } from './utils/validateTheme'
@@ -26,25 +24,20 @@ createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
-          <Web3Provider>
-            <ThemeProvider>
-              {/* WalletProvider is the primary wallet management - wraps everything */}
-              <WalletProvider>
-                <UserPreferencesProvider>
-                  {/* RoleProvider kept for backwards compatibility, roles now in WalletProvider */}
-                  <RoleProvider>
-                    <ETCswapProvider>
-                      <UIProvider>
-                        <PriceProvider>
-                          <App />
-                        </PriceProvider>
-                      </UIProvider>
-                    </ETCswapProvider>
-                  </RoleProvider>
-                </UserPreferencesProvider>
-              </WalletProvider>
-            </ThemeProvider>
-          </Web3Provider>
+          <ThemeProvider>
+            {/* WalletProvider is the unified blockchain context - single source of truth */}
+            <WalletProvider>
+              <UserPreferencesProvider>
+                <ETCswapProvider>
+                  <UIProvider>
+                    <PriceProvider>
+                      <App />
+                    </PriceProvider>
+                  </UIProvider>
+                </ETCswapProvider>
+              </UserPreferencesProvider>
+            </WalletProvider>
+          </ThemeProvider>
         </QueryClientProvider>
       </WagmiProvider>
     </ErrorBoundary>

@@ -6,18 +6,21 @@ import {
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'
+import { hasRoleOnChain } from '../utils/blockchainService'
 import { RoleContext, ROLES, ROLE_INFO, ADMIN_ROLES, isAdminRole } from './RoleContext'
 
 /**
  * RoleProvider manages user roles tied to wallet address
  * - Automatically loads roles when wallet connects
- * - Persists roles to local storage
+ * - Syncs with blockchain for on-chain roles
+ * - Persists roles to local storage as fallback
  * - Provides utilities for checking and managing roles
  */
 export function RoleProvider({ children }) {
   const { account, isConnected } = useWeb3()
   const [roles, setRoles] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [blockchainSynced, setBlockchainSynced] = useState(false)
 
   // Load roles when wallet connects
   useEffect(() => {
@@ -26,19 +29,66 @@ export function RoleProvider({ children }) {
     } else {
       // Reset to empty when disconnected
       setRoles([])
+      setBlockchainSynced(false)
     }
   }, [account, isConnected])
 
-  const loadRoles = useCallback((walletAddress) => {
+  /**
+   * Load roles from both localStorage and blockchain
+   * Blockchain is the source of truth - local storage is synced to match
+   */
+  const loadRoles = useCallback(async (walletAddress) => {
     setIsLoading(true)
     try {
-      const userRoles = getUserRoles(walletAddress)
-      setRoles(userRoles)
+      // First load from local storage (immediate response)
+      const localRoles = getUserRoles(walletAddress)
+      setRoles(localRoles)
+
+      // Then sync with blockchain (authoritative source)
+      const onChainRoles = await syncRolesWithBlockchain(walletAddress, localRoles)
+      if (onChainRoles) {
+        setRoles(onChainRoles)
+        setBlockchainSynced(true)
+      }
     } catch (error) {
       console.error('Error loading user roles:', error)
-      setRoles([])
+      // Keep local roles on error
     } finally {
       setIsLoading(false)
+    }
+  }, [])
+
+  /**
+   * Sync local roles with blockchain state
+   * If a role exists on-chain but not locally, add it
+   * If a role exists locally but not on-chain, keep it (may be pending)
+   */
+  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
+    try {
+      const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+      const updatedRoles = [...localRoles]
+      let hasChanges = false
+
+      // Check each premium role on-chain
+      for (const roleName of premiumRoles) {
+        const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
+        const hasLocally = localRoles.includes(roleName)
+
+        if (hasOnChain && !hasLocally) {
+          // Role exists on-chain but not locally - add it
+          console.log(`Syncing role ${roleName} from blockchain to local storage`)
+          updatedRoles.push(roleName)
+          addUserRole(walletAddress, roleName)
+          hasChanges = true
+        }
+        // Note: We don't remove local roles that aren't on-chain
+        // because the role manager might not be deployed yet
+      }
+
+      return hasChanges ? updatedRoles : localRoles
+    } catch (error) {
+      console.error('Error syncing roles with blockchain:', error)
+      return null
     }
   }, [])
 
@@ -130,6 +180,7 @@ export function RoleProvider({ children }) {
   const value = {
     roles,
     isLoading,
+    blockchainSynced,
     hasRole,
     hasAnyRole,
     hasAllRoles,
@@ -139,6 +190,7 @@ export function RoleProvider({ children }) {
     revokeRoleFromUser,
     getRoleInfo,
     isAdminRole,
+    loadRoles,
     ROLES,
     ROLE_INFO,
     ADMIN_ROLES

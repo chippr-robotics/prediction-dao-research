@@ -226,18 +226,71 @@ async function main() {
     console.warn("  ⚠️  MembershipManager may already be configured");
   }
 
-  // Wire PaymentProcessor
+  // ========== 6. Deploy MembershipPaymentManager ==========
+  // Treasury address - using deployer for now (update for production)
+  const treasuryAddress = process.env.TREASURY_ADDRESS || deployer.address;
+  console.log(`\n  Using treasury address: ${treasuryAddress}`);
+
+  const membershipPaymentManager = await deployDeterministic(
+    "MembershipPaymentManager",
+    [treasuryAddress],
+    generateSalt(saltPrefix + "MembershipPaymentManager"),
+    deployer
+  );
+  deployments.membershipPaymentManager = membershipPaymentManager.address;
+
+  // Wire PaymentProcessor with MembershipPaymentManager
   try {
     const tx = await paymentProcessor.contract.configureAll(
       roleManagerCore.address,
       tierRegistry.address,
       membershipManager.address,
-      ethers.ZeroAddress // No PaymentManager yet - set later if needed
+      membershipPaymentManager.address
     );
     await tx.wait();
-    console.log("  ✓ PaymentProcessor configured");
+    console.log("  ✓ PaymentProcessor configured with MembershipPaymentManager");
   } catch (error) {
     console.warn("  ⚠️  PaymentProcessor may already be configured");
+  }
+
+  // ========== Configure MembershipPaymentManager ==========
+  console.log("\nConfiguring MembershipPaymentManager...");
+
+  // USC stablecoin on Mordor (from ETCSwap)
+  const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+
+  // Add USC as payment token
+  try {
+    const tx = await membershipPaymentManager.contract.addPaymentToken(
+      USC_ADDRESS,
+      "USC",
+      6  // USC has 6 decimals
+    );
+    await tx.wait();
+    console.log("  ✓ USC added as payment token");
+  } catch (error) {
+    console.warn("  ⚠️  USC may already be configured as payment token");
+  }
+
+  // Get role hashes from RoleManagerCore
+  const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
+  const FRIEND_MARKET_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE"));
+
+  // Set role prices (in USC with 6 decimals)
+  const rolePrices = [
+    { role: MARKET_MAKER_ROLE, name: "MARKET_MAKER_ROLE", price: "100" },    // 100 USC
+    { role: FRIEND_MARKET_ROLE, name: "FRIEND_MARKET_ROLE", price: "50" }     // 50 USC
+  ];
+
+  for (const { role, name, price } of rolePrices) {
+    try {
+      const priceWei = ethers.parseUnits(price, 6);
+      const tx = await membershipPaymentManager.contract.setRolePrice(role, USC_ADDRESS, priceWei);
+      await tx.wait();
+      console.log(`  ✓ ${name} price set to ${price} USC`);
+    } catch (error) {
+      console.warn(`  ⚠️  ${name} price may already be set`);
+    }
   }
 
   // ========== Summary ==========
@@ -245,17 +298,41 @@ async function main() {
   console.log("Network:", network.name, `(Chain ID: ${network.chainId})`);
   console.log("\nDeployed Contracts:");
   console.log("==================");
-  console.log("RoleManagerCore:    ", deployments.roleManagerCore);
-  console.log("TierRegistry:       ", deployments.tierRegistry);
-  console.log("UsageTracker:       ", deployments.usageTracker);
-  console.log("MembershipManager:  ", deployments.membershipManager);
-  console.log("PaymentProcessor:   ", deployments.paymentProcessor);
+  console.log("RoleManagerCore:           ", deployments.roleManagerCore);
+  console.log("TierRegistry:              ", deployments.tierRegistry);
+  console.log("UsageTracker:              ", deployments.usageTracker);
+  console.log("MembershipManager:         ", deployments.membershipManager);
+  console.log("PaymentProcessor:          ", deployments.paymentProcessor);
+  console.log("MembershipPaymentManager:  ", deployments.membershipPaymentManager);
 
   console.log("\n✓ Modular deployment completed!");
+  console.log("\nFrontend Integration:");
+  console.log("  - Use PaymentProcessor address for role purchases");
+  console.log("  - Call purchaseTierWithToken(role, tier, uscAddress, amount)");
+  console.log("  - RoleManagerCore address is used for hasRole checks");
   console.log("\nNext steps:");
-  console.log("  1. Configure tier metadata via TierRegistry.setTierMetadata()");
-  console.log("  2. Set PaymentManager address in PaymentProcessor if needed");
+  console.log("  1. Update frontend/src/config/contracts.js with PaymentProcessor address");
+  console.log("  2. Configure tier metadata via TierRegistry.setTierMetadata()");
   console.log("  3. Use RoleManagerCore address as the 'roleManager' for other contracts");
+
+  // Save deployment JSON
+  const fs = require("fs");
+  const path = require("path");
+  const deploymentsDir = path.join(process.cwd(), "deployments");
+  if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
+
+  const deploymentInfo = {
+    network: network.name,
+    chainId: Number(network.chainId),
+    deployer: deployer.address,
+    saltPrefix,
+    contracts: deployments,
+    timestamp: new Date().toISOString()
+  };
+
+  const outPath = path.join(deploymentsDir, `${network.name}-modular-rbac-deployment.json`);
+  fs.writeFileSync(outPath, JSON.stringify(deploymentInfo, null, 2));
+  console.log(`\nDeployment JSON saved to: ${outPath}`);
 
   return deployments;
 }

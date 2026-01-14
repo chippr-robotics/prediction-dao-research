@@ -1,0 +1,10 @@
+{
+  "network": "mordor",
+  "chainId": "63",
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "newMarketFactory": "0x20eEb76C5B98Da5a9504A65169C4791d4787ECdA",
+  "ctf1155": "0xE56d9034591C6A6A5C023883354FAeB435E3b441",
+  "roleManagerCore": "0x888332df7621EC341131d85e2228f00407777dD7",
+  "oldMarketFactory": "0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac",
+  "timestamp": "2026-01-10T23:55:32.055Z"
+}

@@ -156,11 +156,11 @@ This would:
 
       <form onSubmit={handleSubmit} className="creation-form" noValidate>
         <div className="form-section">
-          <h3>Market Question</h3>
-          
+          <h3>Market Title</h3>
+
           <div className="form-group">
             <label htmlFor="question">
-              Question
+              Title
               <span className="required" aria-label="required">*</span>
             </label>
             <input
@@ -169,7 +169,7 @@ This would:
               type="text"
               value={formData.question}
               onChange={(e) => handleChange('question', e.target.value)}
-              placeholder="e.g., Will Bitcoin reach $100,000 by end of 2025?"
+              placeholder="e.g., Bitcoin price prediction for 2025"
               required
               aria-required="true"
               aria-invalid={errors.question ? "true" : "false"}
@@ -177,7 +177,7 @@ This would:
               maxLength={200}
             />
             <small id="question-help" className="helper-text">
-              Be specific and clear about what you're predicting (10-200 characters)
+              A short, descriptive title for the market (10-200 characters)
             </small>
             {errors.question && (
               <span 
@@ -193,14 +193,14 @@ This would:
 
           <div className="form-group">
             <label htmlFor="description">
-              Description
+              Question
               <span className="required" aria-label="required">*</span>
             </label>
             <textarea
               id="description"
               value={formData.description}
               onChange={(e) => handleChange('description', e.target.value)}
-              placeholder="Provide detailed context about the prediction, data sources, and any relevant background information..."
+              placeholder="The actual market question, e.g., 'Will Bitcoin reach $100,000 by December 31, 2025?'"
               rows="5"
               required
               aria-required="true"
@@ -208,7 +208,7 @@ This would:
               aria-describedby={errors.description ? "description-error" : "description-help"}
             />
             <small id="description-help" className="helper-text">
-              Provide context and background (minimum 50 characters)
+              The full market question (minimum 50 characters)
             </small>
             {errors.description && (
               <span 
@@ -328,14 +328,14 @@ This would:
 
           <div className="form-group">
             <label htmlFor="resolutionCriteria">
-              Resolution Criteria
+              Description
               <span className="required" aria-label="required">*</span>
             </label>
             <textarea
               id="resolutionCriteria"
               value={formData.resolutionCriteria}
               onChange={(e) => handleChange('resolutionCriteria', e.target.value)}
-              placeholder="Specify exactly how the market will be resolved. Include data sources and clear conditions..."
+              placeholder="Provide context, background information, and resolution criteria for the market..."
               rows="4"
               required
               aria-required="true"
@@ -343,7 +343,7 @@ This would:
               aria-describedby={errors.resolutionCriteria ? "resolutionCriteria-error" : "resolutionCriteria-help"}
             />
             <small id="resolutionCriteria-help" className="helper-text">
-              Clear, verifiable criteria for determining the outcome (minimum 20 characters)
+              Background context and resolution criteria for the market (minimum 20 characters)
             </small>
             {errors.resolutionCriteria && (
               <span 

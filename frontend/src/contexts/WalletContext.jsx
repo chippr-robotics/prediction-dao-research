@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
-import { 
-  getUserRoles, 
+import {
+  getUserRoles,
   hasRole as checkRole,
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'
+import { hasRoleOnChain } from '../utils/blockchainService'
 import { WalletContext } from './WalletContext'
 
 export function WalletProvider({ children }) {
@@ -17,7 +18,8 @@ export function WalletProvider({ children }) {
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
-  
+  const { data: walletClient } = useWalletClient()
+
   // Provider and signer for transactions
   const [provider, setProvider] = useState(null)
   const [signer, setSigner] = useState(null)
@@ -36,16 +38,55 @@ export function WalletProvider({ children }) {
   // RVAC roles integrated with wallet
   const [roles, setRoles] = useState([])
   const [rolesLoading, setRolesLoading] = useState(false)
+  const [blockchainSynced, setBlockchainSynced] = useState(false)
 
   // Update provider and signer when connection changes
+  // Use wagmi's walletClient for proper authorization
   useEffect(() => {
     const updateProviderAndSigner = async () => {
-      if (isConnected && window.ethereum) {
+      if (isConnected && walletClient) {
+        try {
+          // Create provider from walletClient's transport for proper authorization
+          // This ensures the signer is authorized for the connected account
+          const ethersProvider = new ethers.BrowserProvider(walletClient.transport, {
+            chainId: walletClient.chain?.id,
+            name: walletClient.chain?.name || 'Unknown'
+          })
+
+          // Get signer for the specific account that wagmi has authorized
+          const ethersSigner = await ethersProvider.getSigner(walletClient.account.address)
+          setProvider(ethersProvider)
+          setSigner(ethersSigner)
+          console.log('[WalletContext] Signer created for:', walletClient.account.address)
+        } catch (error) {
+          console.error('Error creating provider/signer from walletClient:', error)
+
+          // Fallback to window.ethereum if walletClient approach fails
+          if (window.ethereum) {
+            try {
+              const fallbackProvider = new ethers.BrowserProvider(window.ethereum)
+              const fallbackSigner = await fallbackProvider.getSigner()
+              setProvider(fallbackProvider)
+              setSigner(fallbackSigner)
+              console.log('[WalletContext] Using fallback signer')
+            } catch (fallbackError) {
+              console.error('Fallback signer creation also failed:', fallbackError)
+              setProvider(null)
+              setSigner(null)
+            }
+          } else {
+            setProvider(null)
+            setSigner(null)
+          }
+        }
+      } else if (isConnected && window.ethereum) {
+        // If walletClient is not available yet, try window.ethereum directly
         try {
           const ethersProvider = new ethers.BrowserProvider(window.ethereum)
           const ethersSigner = await ethersProvider.getSigner()
           setProvider(ethersProvider)
           setSigner(ethersSigner)
+          console.log('[WalletContext] Signer created from window.ethereum')
         } catch (error) {
           console.error('Error creating provider/signer:', error)
           setProvider(null)
@@ -56,9 +97,9 @@ export function WalletProvider({ children }) {
         setSigner(null)
       }
     }
-    
+
     updateProviderAndSigner()
-  }, [isConnected, address])
+  }, [isConnected, address, walletClient])
 
   // Check network compatibility
   useEffect(() => {
@@ -70,19 +111,101 @@ export function WalletProvider({ children }) {
     }
   }, [chainId, isConnected])
 
-  // Load user roles from storage
-  const loadRoles = useCallback((walletAddress) => {
+  /**
+   * Sync local roles with blockchain state
+   * If a role exists on-chain but not locally, add it
+   * If a role exists locally but not on-chain, remove it (expired)
+   */
+  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
+    const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+    const updatedRoles = []
+    let hasChanges = false
+    let syncErrors = []
+
+    console.log('[RoleSync] Starting blockchain sync for:', walletAddress)
+    console.log('[RoleSync] Local roles:', localRoles)
+
+    // Check each premium role on-chain
+    for (const roleName of premiumRoles) {
+      try {
+        const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
+        const hasLocally = localRoles.includes(roleName)
+
+        console.log(`[RoleSync] ${roleName}: onChain=${hasOnChain}, local=${hasLocally}`)
+
+        if (hasOnChain) {
+          // Role exists on-chain - keep it
+          updatedRoles.push(roleName)
+          if (!hasLocally) {
+            console.log(`[RoleSync] Adding ${roleName} from blockchain to local storage`)
+            addUserRole(walletAddress, roleName)
+            hasChanges = true
+          }
+        } else if (hasLocally) {
+          // Role exists locally but not on-chain - it has expired or was never purchased
+          // Blockchain is the source of truth - remove the stale local role
+          console.log(`[RoleSync] ${roleName} not found on-chain - removing stale local role`)
+          removeUserRole(walletAddress, roleName)
+          hasChanges = true
+          // Don't add to updatedRoles - role is no longer valid
+        }
+      } catch (roleError) {
+        console.error(`[RoleSync] Error checking ${roleName}:`, roleError.message)
+        syncErrors.push({ role: roleName, error: roleError.message })
+        // Keep local role if blockchain check fails - be conservative
+        if (localRoles.includes(roleName)) {
+          updatedRoles.push(roleName)
+        }
+      }
+    }
+
+    // Keep non-premium roles (like ADMIN) that are stored locally
+    for (const role of localRoles) {
+      if (!premiumRoles.includes(role) && !updatedRoles.includes(role)) {
+        updatedRoles.push(role)
+      }
+    }
+
+    console.log('[RoleSync] Final roles:', updatedRoles)
+    if (syncErrors.length > 0) {
+      console.warn('[RoleSync] Sync completed with errors:', syncErrors)
+    }
+
+    return { roles: updatedRoles, hasChanges, errors: syncErrors }
+  }, [])
+
+  /**
+   * Load roles from both localStorage and blockchain
+   * Blockchain is the source of truth for premium roles
+   */
+  const loadRoles = useCallback(async (walletAddress) => {
     setRolesLoading(true)
+    setBlockchainSynced(false)
     try {
-      const userRoles = getUserRoles(walletAddress)
-      setRoles(userRoles)
+      // First load from local storage (immediate response)
+      const localRoles = getUserRoles(walletAddress)
+      setRoles(localRoles)
+
+      // Then sync with blockchain (authoritative source)
+      const { roles: syncedRoles } = await syncRolesWithBlockchain(walletAddress, localRoles)
+      setRoles(syncedRoles)
+      setBlockchainSynced(true)
     } catch (error) {
       console.error('Error loading user roles:', error)
       setRoles([])
     } finally {
       setRolesLoading(false)
     }
-  }, [])
+  }, [syncRolesWithBlockchain])
+
+  /**
+   * Manually refresh roles from blockchain
+   * Call this to get fresh role data from the chain
+   */
+  const refreshRoles = useCallback(async () => {
+    if (!address) return
+    await loadRoles(address)
+  }, [address, loadRoles])
 
   // Fetch wallet balances
   const fetchBalances = useCallback(async (walletAddress) => {
@@ -256,20 +379,23 @@ export function WalletProvider({ children }) {
   }, [signer])
 
   // RVAC Role management
+  // Use the synced `roles` state as source of truth (blockchain is authoritative)
   const hasRole = useCallback((role) => {
     if (!address) return false
-    return checkRole(address, role)
-  }, [address])
+    // Check the synced roles state instead of localStorage
+    // This ensures we reflect the actual on-chain state
+    return roles.includes(role)
+  }, [address, roles])
 
   const hasAnyRole = useCallback((rolesToCheck) => {
     if (!address || !Array.isArray(rolesToCheck)) return false
-    return rolesToCheck.some(role => checkRole(address, role))
-  }, [address])
+    return rolesToCheck.some(role => roles.includes(role))
+  }, [address, roles])
 
   const hasAllRoles = useCallback((rolesToCheck) => {
     if (!address || !Array.isArray(rolesToCheck)) return false
-    return rolesToCheck.every(role => checkRole(address, role))
-  }, [address])
+    return rolesToCheck.every(role => roles.includes(role))
+  }, [address, roles])
 
   const grantRole = useCallback((role) => {
     if (!address) {
@@ -334,7 +460,9 @@ export function WalletProvider({ children }) {
     // RVAC roles
     roles,
     rolesLoading,
-    
+    blockchainSynced,
+    refreshRoles,
+
     // Wallet actions
     connectWallet,
     disconnectWallet,

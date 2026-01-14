@@ -7,12 +7,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import FriendMarketsModal from '../components/fairwins/FriendMarketsModal'
 import {
   WalletProvider,
-  Web3Provider,
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
   ETCswapProvider,
-  RoleProvider,
   PriceProvider
 } from '../contexts'
 
@@ -51,6 +49,9 @@ vi.mock('wagmi', () => ({
   useDisconnect: () => mockUseDisconnect(),
   useChainId: () => mockUseChainId(),
   useSwitchChain: () => mockUseSwitchChain(),
+  useWalletClient: () => ({
+    data: null // Return null to prevent EIP-1193 provider errors and trigger window.ethereum fallback path in tests
+  }),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
   http: vi.fn(() => ({})),
@@ -78,6 +79,9 @@ const mockActiveMarkets = [
     type: 'oneVsOne',
     description: 'Patriots will win the Super Bowl',
     stakeAmount: '10',
+    stakeTokenId: 'USC',
+    stakeTokenSymbol: 'USC',
+    stakeTokenIcon: '💵',
     tradingPeriod: '7',
     participants: ['0x1234567890123456789012345678901234567890', '0xabcdef1234567890123456789012345678901234'],
     creator: '0x1234567890123456789012345678901234567890',
@@ -90,6 +94,9 @@ const mockActiveMarkets = [
     type: 'smallGroup',
     description: 'BTC will reach $100k by EOY',
     stakeAmount: '25',
+    stakeTokenId: 'USC',
+    stakeTokenSymbol: 'USC',
+    stakeTokenIcon: '💵',
     tradingPeriod: '30',
     participants: [
       '0x1234567890123456789012345678901234567890',
@@ -109,6 +116,9 @@ const mockPastMarkets = [
     type: 'eventTracking',
     description: 'World Cup Final Winner',
     stakeAmount: '50',
+    stakeTokenId: 'USC',
+    stakeTokenSymbol: 'USC',
+    stakeTokenIcon: '💵',
     tradingPeriod: '14',
     participants: [
       '0x1234567890123456789012345678901234567890',
@@ -160,19 +170,15 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <WalletProvider>
-            <Web3Provider>
-              <UserPreferencesProvider>
-                <RoleProvider>
-                  <ETCswapProvider>
-                    <UIProvider>
-                      <PriceProvider>
-                        {ui}
-                      </PriceProvider>
-                    </UIProvider>
-                  </ETCswapProvider>
-                </RoleProvider>
-              </UserPreferencesProvider>
-            </Web3Provider>
+            <UserPreferencesProvider>
+              <ETCswapProvider>
+                <UIProvider>
+                  <PriceProvider>
+                    {ui}
+                  </PriceProvider>
+                </UIProvider>
+              </ETCswapProvider>
+            </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>
       </QueryClientProvider>
@@ -198,6 +204,10 @@ describe('FriendMarketsModal', () => {
     mockWalletState.isConnected = true
     mockWalletState.account = '0x1234567890123456789012345678901234567890'
     mockWeb3State.isCorrectNetwork = true
+    
+    // Mock window.ethereum to avoid provider creation errors
+    // This prevents the WalletContext from trying to create providers during tests
+    global.window.ethereum = undefined
   })
 
   describe('Modal Visibility', () => {
@@ -400,7 +410,8 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
       await userEvent.click(screen.getByText('1 vs 1'))
-      const stakeInput = screen.getByLabelText(/stake/i)
+      // Use more specific label to avoid matching "Stake Token" dropdown
+      const stakeInput = screen.getByLabelText(/stake amount/i)
       // Default stake value should be 10
       expect(stakeInput).toHaveValue(10)
       // Stake input should have min attribute for validation
@@ -472,7 +483,7 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Market Created!')).toBeInTheDocument()
         expect(screen.getByTestId('qr-code')).toBeInTheDocument()
-        expect(screen.getByText('Scan to join market')).toBeInTheDocument()
+        expect(screen.getByText('Share this QR code with participants to accept the market')).toBeInTheDocument()
       })
     })
 
@@ -551,13 +562,17 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByText('Group')).toBeInTheDocument()
     })
 
-    it('should display stake amounts', async () => {
+    it('should display stake amounts with token symbol', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
       await userEvent.click(screen.getByRole('tab', { name: /active/i }))
 
-      expect(screen.getByText('10 ETC')).toBeInTheDocument()
-      expect(screen.getByText('25 ETC')).toBeInTheDocument()
+      // Stakes now display with USD formatting for stablecoins (formatUSD function)
+      // Use getAllByText since multiple elements may contain the stake text
+      const stakeElements10 = screen.getAllByText((_, node) => node?.textContent?.includes('$10.00'))
+      const stakeElements25 = screen.getAllByText((_, node) => node?.textContent?.includes('$25.00'))
+      expect(stakeElements10.length).toBeGreaterThan(0)
+      expect(stakeElements25.length).toBeGreaterThan(0)
     })
 
     it('should display empty state when no active markets', async () => {
@@ -627,7 +642,10 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         // Check for detail view elements
         expect(screen.getByText('Back to list')).toBeInTheDocument()
-        expect(screen.getByText('10 ETC')).toBeInTheDocument()
+        // Stake now displays with USD formatting for stablecoins (formatUSD function)
+        // Use getAllByText since stake appears in multiple places (stake + total pool)
+        const stakeElements = screen.getAllByText((_, node) => node?.textContent?.includes('$10.00'))
+        expect(stakeElements.length).toBeGreaterThan(0)
         expect(screen.getByText('Share this market')).toBeInTheDocument()
       })
     })

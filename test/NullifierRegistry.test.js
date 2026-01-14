@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 
 describe("NullifierRegistry", function () {
   let nullifierRegistry;
@@ -116,7 +117,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).nullifyMarket(testMarketHash, 1, "Test reason")
       )
         .to.emit(nullifierRegistry, "MarketNullified")
-        .withArgs(testMarketHash, 1, nullifierAdmin.address, expect.anything, "Test reason");
+        .withArgs(testMarketHash, 1, nullifierAdmin.address, anyValue, "Test reason");
 
       expect(await nullifierRegistry.isMarketNullified(testMarketHash)).to.equal(true);
       expect(await nullifierRegistry.nullifiedMarketCount()).to.equal(1);
@@ -163,7 +164,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).reinstateMarket(testMarketHash, 1, "Reinstate reason")
       )
         .to.emit(nullifierRegistry, "MarketReinstated")
-        .withArgs(testMarketHash, 1, nullifierAdmin.address, expect.anything, "Reinstate reason");
+        .withArgs(testMarketHash, 1, nullifierAdmin.address, anyValue, "Reinstate reason");
 
       expect(await nullifierRegistry.isMarketNullified(testMarketHash)).to.equal(false);
       expect(await nullifierRegistry.nullifiedMarketCount()).to.equal(0);
@@ -199,7 +200,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).nullifyAddress(user1.address, "Bad actor")
       )
         .to.emit(nullifierRegistry, "AddressNullified")
-        .withArgs(user1.address, nullifierAdmin.address, expect.anything, "Bad actor");
+        .withArgs(user1.address, nullifierAdmin.address, anyValue, "Bad actor");
 
       expect(await nullifierRegistry.isAddressNullified(user1.address)).to.equal(true);
       expect(await nullifierRegistry.nullifiedAddressCount()).to.equal(1);
@@ -235,7 +236,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).reinstateAddress(user1.address, "Appeal approved")
       )
         .to.emit(nullifierRegistry, "AddressReinstated")
-        .withArgs(user1.address, nullifierAdmin.address, expect.anything, "Appeal approved");
+        .withArgs(user1.address, nullifierAdmin.address, anyValue, "Appeal approved");
 
       expect(await nullifierRegistry.isAddressNullified(user1.address)).to.equal(false);
       expect(await nullifierRegistry.nullifiedAddressCount()).to.equal(0);
@@ -264,7 +265,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).batchNullifyMarkets(hashes, ids, "Batch action")
       )
         .to.emit(nullifierRegistry, "BatchMarketsNullified")
-        .withArgs(hashes, nullifierAdmin.address, expect.anything);
+        .withArgs(hashes, nullifierAdmin.address, anyValue);
 
       expect(await nullifierRegistry.isMarketNullified(testMarketHash)).to.equal(true);
       expect(await nullifierRegistry.isMarketNullified(testMarketHash2)).to.equal(true);
@@ -278,7 +279,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).batchNullifyAddresses(addrs, "Batch action")
       )
         .to.emit(nullifierRegistry, "BatchAddressesNullified")
-        .withArgs(addrs, nullifierAdmin.address, expect.anything);
+        .withArgs(addrs, nullifierAdmin.address, anyValue);
 
       expect(await nullifierRegistry.isAddressNullified(user1.address)).to.equal(true);
       expect(await nullifierRegistry.isAddressNullified(user2.address)).to.equal(true);
@@ -319,7 +320,7 @@ describe("NullifierRegistry", function () {
         nullifierRegistry.connect(nullifierAdmin).updateAccumulator(newAcc)
       )
         .to.emit(nullifierRegistry, "AccumulatorUpdated")
-        .withArgs(newAcc, expect.anything, nullifierAdmin.address);
+        .withArgs(newAcc, anyValue, nullifierAdmin.address);
 
       const storedAcc = await nullifierRegistry.getAccumulator();
       expect(storedAcc.toLowerCase()).to.equal(newAcc.toLowerCase());

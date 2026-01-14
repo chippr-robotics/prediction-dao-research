@@ -15,7 +15,7 @@ const ethereumClassic = {
     public: { http: ['https://etc.rivet.link'] },
   },
   blockExplorers: {
-    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mainnet' },
+    default: { name: 'Blockscout', url: 'https://etc.blockscout.com' },
   },
   testnet: false,
 }
@@ -34,7 +34,7 @@ const mordor = {
     public: { http: ['https://rpc.mordor.etccooperative.org'] },
   },
   blockExplorers: {
-    default: { name: 'BlockScout', url: 'https://blockscout.com/etc/mordor' },
+    default: { name: 'Blockscout', url: 'https://etc-mordor.blockscout.com' },
   },
   testnet: true,
 }

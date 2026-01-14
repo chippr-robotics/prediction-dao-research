@@ -80,7 +80,7 @@ describe("RoleManager - Unit Tests", function () {
       
       await expect(
         roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: insufficientPrice })
-      ).to.be.revertedWith("Insufficient payment");
+      ).to.be.revertedWithCustomError(roleManager, "RMInsufficientPayment");
     });
 
     it("Should refund excess payment", async function () {
@@ -106,7 +106,7 @@ describe("RoleManager - Unit Tests", function () {
       
       await expect(
         roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: price })
-      ).to.be.revertedWith("Already has role");
+      ).to.be.revertedWithCustomError(roleManager, "RMAlreadyApproved");
     });
 
     it("Should track purchased roles per user", async function () {
@@ -125,7 +125,7 @@ describe("RoleManager - Unit Tests", function () {
     it("Should reject purchase for non-premium roles", async function () {
       await expect(
         roleManager.connect(user1).purchaseRole(CORE_SYSTEM_ADMIN_ROLE, { value: ethers.parseEther("1") })
-      ).to.be.revertedWith("Role is not purchasable");
+      ).to.be.revertedWithCustomError(roleManager, "RMNotPurchasable");
     });
 
     it("Should update role member count on purchase", async function () {
@@ -158,13 +158,13 @@ describe("RoleManager - Unit Tests", function () {
     it("Should reject ZK key registration without ClearPath role", async function () {
       await expect(
         roleManager.connect(user2).registerZKKey("zkp_key")
-      ).to.be.revertedWith("Must have ClearPath role");
+      ).to.be.revertedWithCustomError(roleManager, "RMNotActive");
     });
 
     it("Should reject empty ZK key", async function () {
       await expect(
         roleManager.connect(user1).registerZKKey("")
-      ).to.be.revertedWith("Invalid ZK key");
+      ).to.be.revertedWithCustomError(roleManager, "RMInvalidZKKey");
     });
   });
 
@@ -229,7 +229,7 @@ describe("RoleManager - Unit Tests", function () {
       // Should fail with only 1 approval (proposer) - OPERATIONS_ADMIN needs 2
       await expect(
         roleManager.connect(coreAdmin).executeRoleAction(actionId)
-      ).to.be.revertedWith("Insufficient approvals");
+      ).to.be.revertedWithCustomError(roleManager, "RMInsufficientApprovals");
       
       // Add second approval from user2
       await roleManager.connect(user2).approveRoleAction(actionId);
@@ -262,7 +262,7 @@ describe("RoleManager - Unit Tests", function () {
       // Try to execute immediately (should fail)
       await expect(
         roleManager.connect(opsAdmin).executeRoleAction(actionId)
-      ).to.be.revertedWith("Timelock not expired");
+      ).to.be.revertedWithCustomError(roleManager, "RMTimelockNotExpired");
       
       // Advance time by 1 hour (emergency guardian has 1 hour timelock)
       await time.increase(60 * 60 + 1);
@@ -307,7 +307,7 @@ describe("RoleManager - Unit Tests", function () {
       // Execution should fail for cancelled action
       await expect(
         roleManager.connect(opsAdmin).executeRoleAction(actionId)
-      ).to.be.revertedWith("Action cancelled");
+      ).to.be.revertedWithCustomError(roleManager, "RMActionCancelled");
     });
 
     it("Should prevent duplicate approvals", async function () {
@@ -333,7 +333,7 @@ describe("RoleManager - Unit Tests", function () {
       // Try to approve again as proposer
       await expect(
         roleManager.connect(opsAdmin).approveRoleAction(actionId)
-      ).to.be.revertedWith("Already approved");
+      ).to.be.revertedWithCustomError(roleManager, "RMAlreadyApproved");
     });
   });
 
@@ -412,7 +412,7 @@ describe("RoleManager - Unit Tests", function () {
     it("Should reject price setting for non-premium roles", async function () {
       await expect(
         roleManager.connect(opsAdmin).setRolePrice(CORE_SYSTEM_ADMIN_ROLE, ethers.parseEther("100"))
-      ).to.be.revertedWith("Role is not premium");
+      ).to.be.revertedWithCustomError(roleManager, "RMNotPremium");
     });
 
     it("Should allow operations admin to toggle role active status", async function () {
@@ -424,7 +424,7 @@ describe("RoleManager - Unit Tests", function () {
       // Should reject purchase of inactive role
       await expect(
         roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: ethers.parseEther("100") })
-      ).to.be.revertedWith("Role is not active");
+      ).to.be.revertedWithCustomError(roleManager, "RMNotActive");
     });
 
     it("Should allow operations admin to withdraw funds", async function () {

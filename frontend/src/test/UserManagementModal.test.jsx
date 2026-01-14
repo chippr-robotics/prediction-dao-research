@@ -6,12 +6,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import UserManagementModal from '../components/ui/UserManagementModal'
 import {
   WalletProvider,
-  Web3Provider,
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
   ETCswapProvider,
-  RoleProvider,
   PriceProvider
 } from '../contexts'
 
@@ -28,6 +26,13 @@ vi.mock('wagmi', () => ({
   useDisconnect: () => mockUseDisconnect(),
   useChainId: () => mockUseChainId(),
   useSwitchChain: () => mockUseSwitchChain(),
+  useWalletClient: () => ({
+    data: {
+      account: { address: '0x1234567890123456789012345678901234567890' },
+      chain: { id: 61 },
+      transport: {}
+    }
+  }),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
   http: vi.fn(() => ({})),
@@ -70,19 +75,15 @@ const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <WalletProvider>
-            <Web3Provider>
-              <UserPreferencesProvider>
-                <RoleProvider>
-                  <ETCswapProvider>
-                    <UIProvider>
-                      <PriceProvider>
-                        {ui}
-                      </PriceProvider>
-                    </UIProvider>
-                  </ETCswapProvider>
-                </RoleProvider>
-              </UserPreferencesProvider>
-            </Web3Provider>
+            <UserPreferencesProvider>
+              <ETCswapProvider>
+                <UIProvider>
+                  <PriceProvider>
+                    {ui}
+                  </PriceProvider>
+                </UIProvider>
+              </ETCswapProvider>
+            </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>
       </QueryClientProvider>
@@ -132,26 +133,6 @@ describe('UserManagementModal', () => {
       expect(fullAddresses.length).toBeGreaterThanOrEqual(1)
       // Shortened address appears in header
       expect(screen.getByText(/0x1234...7890/i)).toBeInTheDocument()
-    })
-
-    it('should display ClearPath status section', () => {
-      renderWithProviders(<UserManagementModal />)
-      
-      expect(screen.getByText(/ClearPath Status/i)).toBeInTheDocument()
-      expect(screen.getByText(/Inactive/i)).toBeInTheDocument()
-    })
-
-    it('should allow toggling ClearPath status', async () => {
-      renderWithProviders(<UserManagementModal />)
-      
-      const toggleButton = screen.getByText(/Activate ClearPath/i)
-      expect(toggleButton).toBeInTheDocument()
-      
-      fireEvent.click(toggleButton)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Active/i)).toBeInTheDocument()
-      })
     })
 
     it('should show disconnect wallet button', () => {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
+import { useEnsResolution } from '../hooks/useEnsResolution'
 import { getAllUsersWithRoles } from '../utils/roleStorage'
 import { isValidEthereumAddress } from '../utils/validation'
 import './RoleManagementAdmin.css'
@@ -18,6 +19,14 @@ function RoleManagementAdmin() {
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [confirmRevoke, setConfirmRevoke] = useState(null)
+
+  // ENS resolution for the new user address input
+  const {
+    resolvedAddress: resolvedNewUserAddress,
+    isLoading: isResolvingAddress,
+    error: addressResolutionError,
+    isEns: isEnsInput
+  } = useEnsResolution(newUserAddress)
 
   // Check if user has admin role
   const isAdmin = hasRole(ROLES.ADMIN)
@@ -40,16 +49,33 @@ function RoleManagementAdmin() {
       return
     }
 
-    // Validate Ethereum address
-    if (!isValidEthereumAddress(newUserAddress)) {
-      setErrorMessage('Invalid Ethereum address format')
-      showNotification('Invalid Ethereum address format', 'error')
+    // Check if still resolving ENS
+    if (isResolvingAddress) {
+      setErrorMessage('Please wait for ENS name to resolve')
+      showNotification('Please wait for ENS name to resolve', 'error')
       return
     }
 
-    const success = grantRoleToUser(newUserAddress.toLowerCase(), selectedRole)
+    // Check for resolution errors
+    if (addressResolutionError) {
+      setErrorMessage(addressResolutionError)
+      showNotification(addressResolutionError, 'error')
+      return
+    }
+
+    // Validate resolved address
+    if (!resolvedNewUserAddress || !isValidEthereumAddress(resolvedNewUserAddress)) {
+      setErrorMessage('Invalid Ethereum address or ENS name')
+      showNotification('Invalid Ethereum address or ENS name', 'error')
+      return
+    }
+
+    const success = grantRoleToUser(resolvedNewUserAddress.toLowerCase(), selectedRole)
     if (success) {
-      const message = `Successfully granted ${ROLE_INFO[selectedRole].name} to ${shortenAddress(newUserAddress)}`
+      const displayTarget = isEnsInput
+        ? `${newUserAddress} (${shortenAddress(resolvedNewUserAddress)})`
+        : shortenAddress(resolvedNewUserAddress)
+      const message = `Successfully granted ${ROLE_INFO[selectedRole].name} to ${displayTarget}`
       setSuccessMessage(message)
       showNotification(message, 'success')
       setNewUserAddress('')
@@ -252,15 +278,37 @@ function RoleManagementAdmin() {
             <div className="grant-form">
               <h3>Grant Role to User</h3>
               <div className="form-group">
-                <label htmlFor="userAddress">Wallet Address</label>
-                <input
-                  id="userAddress"
-                  type="text"
-                  placeholder="0x..."
-                  value={newUserAddress}
-                  onChange={(e) => setNewUserAddress(e.target.value)}
-                  className="admin-input"
-                />
+                <label htmlFor="userAddress">Wallet Address or ENS Name</label>
+                <div className="address-input-wrapper">
+                  <input
+                    id="userAddress"
+                    type="text"
+                    placeholder="0x... or vitalik.eth"
+                    value={newUserAddress}
+                    onChange={(e) => setNewUserAddress(e.target.value)}
+                    className={`admin-input ${addressResolutionError ? 'input-error' : ''} ${resolvedNewUserAddress && !addressResolutionError ? 'input-success' : ''}`}
+                  />
+                  {isResolvingAddress && (
+                    <span className="address-status resolving" aria-label="Resolving ENS name">
+                      <span className="spinner-small"></span>
+                    </span>
+                  )}
+                  {resolvedNewUserAddress && !isResolvingAddress && !addressResolutionError && (
+                    <span className="address-status success" aria-label="Valid address">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                {isEnsInput && resolvedNewUserAddress && !isResolvingAddress && !addressResolutionError && (
+                  <div className="resolved-address-hint">
+                    Resolves to: <code>{shortenAddress(resolvedNewUserAddress)}</code>
+                  </div>
+                )}
+                {addressResolutionError && (
+                  <div className="input-error-message">{addressResolutionError}</div>
+                )}
               </div>
 
               <div className="form-group">

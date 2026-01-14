@@ -1,8 +1,51 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
+import { TOKENS } from '../../constants/etcswap'
+import { CONTRACT_ADDRESSES } from '../../constants/contracts'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
+import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './FriendMarketsModal.css'
+
+// Stake token options derived from ETCswap tokens
+const STAKE_TOKEN_OPTIONS = [
+  { id: 'USC', ...TOKENS.USC, isDefault: true },
+  { id: 'WETC', ...TOKENS.WETC },
+  { id: 'ETC', ...TOKENS.ETC },
+  { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
+]
+
+// Helper to get default end date (7 days from now)
+const getDefaultEndDateTime = () => {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  // Format as YYYY-MM-DDTHH:mm for datetime-local input
+  return date.toISOString().slice(0, 16)
+}
+
+// Helper to get default acceptance deadline (48 hours from now)
+const getDefaultAcceptanceDeadline = () => {
+  const date = new Date()
+  date.setHours(date.getHours() + 48)
+  return date.toISOString().slice(0, 16)
+}
+
+// Helper to format stake amount as USD (rounded to nearest cent)
+const formatUSD = (amount, symbol) => {
+  const num = parseFloat(amount) || 0
+  // Only show USD formatting for stablecoins
+  const isStablecoin = symbol === 'USC' || symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
+
+  if (isStablecoin) {
+    if (num === 0) return '$0.00'
+    if (num < 0.01) return '< $0.01'
+    return `$${num.toFixed(2)}`
+  }
+  // For non-stablecoins, show raw amount with symbol
+  return `${num} ${symbol || 'tokens'}`
+}
 
 /**
  * FriendMarketsModal Component
@@ -38,10 +81,15 @@ function FriendMarketsModal({
     opponent: '',
     members: '',
     memberLimit: '5',
-    tradingPeriod: '7',
+    endDateTime: getDefaultEndDateTime(),
     stakeAmount: '10',
+    stakeTokenId: 'USC', // Default to USC stablecoin
+    customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
-    peggedMarketId: ''
+    peggedMarketId: '',
+    // Multi-party acceptance fields
+    acceptanceDeadline: getDefaultAcceptanceDeadline(),
+    minAcceptanceThreshold: '2' // Minimum participants to activate (including creator)
   })
 
   // Selected market for detail view
@@ -60,6 +108,13 @@ function FriendMarketsModal({
   const [marketLookupResult, setMarketLookupResult] = useState(null)
   const [marketLookupError, setMarketLookupError] = useState(null)
 
+  // Market acceptance modal state
+  const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false)
+  const [marketToAccept, setMarketToAccept] = useState(null)
+
+  // Market cancellation state
+  const [cancellingMarketId, setCancellingMarketId] = useState(null)
+
   // Reset form function - memoized to prevent stale closures
   const resetForm = useCallback(() => {
     setFormData({
@@ -67,10 +122,14 @@ function FriendMarketsModal({
       opponent: '',
       members: '',
       memberLimit: '5',
-      tradingPeriod: '7',
+      endDateTime: getDefaultEndDateTime(),
       stakeAmount: '10',
+      stakeTokenId: 'USC',
+      customStakeTokenAddress: '',
       arbitrator: '',
-      peggedMarketId: ''
+      peggedMarketId: '',
+      acceptanceDeadline: getDefaultAcceptanceDeadline(),
+      minAcceptanceThreshold: '2'
     })
     setErrors({})
     setMarketLookupId('')
@@ -235,6 +294,108 @@ function FriendMarketsModal({
     handleFormChange('peggedMarketId', '')
   }
 
+  // Market acceptance handlers
+  const handleOpenAcceptanceModal = (market) => {
+    // Transform market data to match what MarketAcceptanceModal expects
+    const marketData = {
+      id: market.id,
+      description: market.description,
+      creator: market.creator,
+      participants: market.participants || [],
+      arbitrator: market.arbitrator || null,
+      marketType: market.type || 'oneVsOne',
+      status: market.status,
+      acceptanceDeadline: typeof market.acceptanceDeadline === 'number'
+        ? market.acceptanceDeadline
+        : new Date(market.acceptanceDeadline).getTime(),
+      minAcceptanceThreshold: market.minAcceptanceThreshold || 2,
+      stakePerParticipant: market.stakeAmount,
+      stakeToken: market.stakeTokenAddress || null,
+      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
+      acceptances: market.acceptances || {},
+      acceptedCount: market.acceptedCount || 0
+    }
+
+    setMarketToAccept(marketData)
+    setAcceptanceModalOpen(true)
+  }
+
+  const handleCloseAcceptanceModal = () => {
+    setAcceptanceModalOpen(false)
+    setMarketToAccept(null)
+  }
+
+  const handleMarketAccepted = (marketId) => {
+    // Refresh data after acceptance - you may want to trigger a parent refresh
+    handleCloseAcceptanceModal()
+    // Force a refresh by closing and reopening the modal or triggering a data refresh
+    window.location.reload()
+  }
+
+  // Cancel a pending market (creator only)
+  const handleCancelMarket = async (market) => {
+    if (!signer || !isCorrectNetwork) {
+      window.alert('Please connect your wallet and switch to the correct network')
+      return
+    }
+
+    const marketId = market.id
+    if (marketId === undefined || marketId === null) {
+      window.alert('Invalid market ID')
+      return
+    }
+
+    if (!window.confirm('Cancel this market and refund all stakes? This cannot be undone.')) {
+      return
+    }
+
+    setCancellingMarketId(marketId)
+    try {
+      const factoryAddress = CONTRACT_ADDRESSES.friendGroupMarketFactory
+      const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
+
+      console.log('Cancelling market:', marketId)
+      const tx = await factory.cancelPendingMarket(marketId)
+      console.log('Cancel transaction sent:', tx.hash)
+
+      await tx.wait()
+      console.log('Market cancelled successfully')
+
+      window.alert('Market cancelled. Stakes have been refunded.')
+      // Refresh to show updated state
+      window.location.reload()
+    } catch (error) {
+      console.error('Error cancelling market:', error)
+      let errorMessage = 'Failed to cancel market'
+      if (error.reason) {
+        errorMessage += `: ${error.reason}`
+      } else if (error.message) {
+        errorMessage += `: ${error.message}`
+      }
+      window.alert(errorMessage)
+    } finally {
+      setCancellingMarketId(null)
+    }
+  }
+
+  // Check if user can accept a pending market (invited but hasn't accepted yet)
+  const canUserAcceptMarket = useCallback((market) => {
+    if (!account || market.status !== 'pending_acceptance') return false
+
+    // User must be in participants list
+    const isInvited = market.participants?.some(
+      p => p.toLowerCase() === account.toLowerCase()
+    )
+
+    // User must NOT be the creator (creator has already accepted by creating)
+    const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
+
+    // User must not have already accepted
+    const hasAccepted = market.acceptances?.[account.toLowerCase()]?.hasAccepted
+
+    return isInvited && !isCreator && !hasAccepted
+  }, [account])
+
   const validateForm = useCallback(() => {
     const newErrors = {}
 
@@ -298,16 +459,62 @@ function FriendMarketsModal({
     }
 
     const stake = parseFloat(formData.stakeAmount)
+    const selectedToken = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
     if (!formData.stakeAmount || stake <= 0) {
       newErrors.stakeAmount = 'Valid stake amount is required'
     } else if (stake < 0.1) {
-      newErrors.stakeAmount = 'Minimum stake is 0.1 ETC'
+      newErrors.stakeAmount = `Minimum stake is 0.1 ${selectedToken?.symbol || 'tokens'}`
+    } else if (stake > 1000) {
+      newErrors.stakeAmount = `Maximum stake is 1000 ${selectedToken?.symbol || 'tokens'}`
     }
 
-    if (!formData.tradingPeriod || parseInt(formData.tradingPeriod) < 1) {
-      newErrors.tradingPeriod = 'Trading period must be at least 1 day'
-    } else if (parseInt(formData.tradingPeriod) > 365) {
-      newErrors.tradingPeriod = 'Maximum trading period is 365 days'
+    // Validate custom stake token address if custom token is selected
+    if (formData.stakeTokenId === 'CUSTOM') {
+      if (!formData.customStakeTokenAddress) {
+        newErrors.customStakeTokenAddress = 'Custom token address is required'
+      } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.customStakeTokenAddress)) {
+        newErrors.customStakeTokenAddress = 'Invalid token address format'
+      }
+    }
+
+    // Validate end date/time
+    const endDate = new Date(formData.endDateTime)
+    const now = new Date()
+    const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day from now
+    const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year from now
+
+    if (!formData.endDateTime || isNaN(endDate.getTime())) {
+      newErrors.endDateTime = 'Please select a valid end date and time'
+    } else if (endDate < minDate) {
+      newErrors.endDateTime = 'End date must be at least 1 day from now'
+    } else if (endDate > maxDate) {
+      newErrors.endDateTime = 'End date must be within 1 year'
+    }
+
+    // Validate acceptance deadline
+    const acceptanceDeadline = new Date(formData.acceptanceDeadline)
+    const minAcceptanceDate = new Date(now.getTime() + 60 * 60 * 1000) // At least 1 hour from now
+    const maxAcceptanceDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // Max 30 days from now
+
+    if (!formData.acceptanceDeadline || isNaN(acceptanceDeadline.getTime())) {
+      newErrors.acceptanceDeadline = 'Please select a valid acceptance deadline'
+    } else if (acceptanceDeadline < minAcceptanceDate) {
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be at least 1 hour from now'
+    } else if (acceptanceDeadline > maxAcceptanceDate) {
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be within 30 days'
+    } else if (acceptanceDeadline >= endDate) {
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be before market end date'
+    }
+
+    // Validate minimum threshold for group markets
+    if (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') {
+      const threshold = parseInt(formData.minAcceptanceThreshold, 10)
+      const memberCount = formData.members.split(',').filter(m => m.trim()).length + 1 // +1 for creator
+      if (isNaN(threshold) || threshold < 2) {
+        newErrors.minAcceptanceThreshold = 'Minimum threshold must be at least 2'
+      } else if (threshold > memberCount) {
+        newErrors.minAcceptanceThreshold = `Threshold cannot exceed total participants (${memberCount})`
+      }
     }
 
     if (formData.arbitrator) {
@@ -351,26 +558,78 @@ function FriendMarketsModal({
 
     setSubmitting(true)
     try {
+      // Get the stake token info for submission
+      const getStakeTokenInfo = () => {
+        if (formData.stakeTokenId === 'CUSTOM') {
+          return {
+            symbol: 'Custom',
+            address: formData.customStakeTokenAddress,
+            icon: '🔧',
+            decimals: 18 // Default to 18 for custom tokens
+          }
+        }
+        const token = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
+        return token || STAKE_TOKEN_OPTIONS[0] // Default to USC if not found
+      }
+      const stakeToken = getStakeTokenInfo()
+
+      // Build submit data with token address for WalletButton
       const submitData = {
         type: 'friend',
         marketType: friendMarketType,
-        data: formData
+        data: {
+          ...formData,
+          // Pass actual token address so WalletButton can use correct decimals
+          // 'native' means native ETC (no ERC20 address), pass null for this case
+          collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null)
+        }
       }
 
       const result = await onCreate(submitData, signer)
 
-      // Simulate created market for demo
+      // Calculate trading period in days for display
+      const endDate = new Date(formData.endDateTime)
+      const now = new Date()
+      const tradingPeriodDays = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+      // Calculate acceptance deadline info
+      const acceptanceDeadline = new Date(formData.acceptanceDeadline)
+      const minThreshold = friendMarketType === 'oneVsOne'
+        ? 2
+        : parseInt(formData.minAcceptanceThreshold, 10) || 2
+
+      // Created market with acceptance flow fields
       const newMarket = {
         id: result?.id || `friend-${Date.now()}`,
         type: friendMarketType,
         description: formData.description,
         stakeAmount: formData.stakeAmount,
-        tradingPeriod: formData.tradingPeriod,
+        stakeTokenId: formData.stakeTokenId,
+        stakeTokenSymbol: stakeToken.symbol,
+        stakeTokenIcon: stakeToken.icon,
+        stakeTokenAddress: stakeToken.address,
+        endDateTime: formData.endDateTime,
+        endDate: endDate.toISOString(),
+        tradingPeriod: tradingPeriodDays,
         participants: friendMarketType === 'oneVsOne'
           ? [account, formData.opponent]
-          : formData.members.split(',').map(a => a.trim()),
+          : [account, ...formData.members.split(',').map(a => a.trim())],
+        creator: account,
+        arbitrator: formData.arbitrator || null,
         createdAt: new Date().toISOString(),
-        status: 'pending'
+        status: 'pending_acceptance',
+        // Acceptance flow fields
+        acceptanceDeadline: acceptanceDeadline.getTime(),
+        acceptanceDeadlineFormatted: acceptanceDeadline.toISOString(),
+        minAcceptanceThreshold: minThreshold,
+        acceptedCount: 1, // Creator has accepted
+        acceptances: {
+          [account.toLowerCase()]: {
+            hasAccepted: true,
+            stakedAmount: formData.stakeAmount,
+            isArbitrator: false
+          }
+        }
       }
 
       setCreatedMarket(newMarket)
@@ -398,9 +657,20 @@ function FriendMarketsModal({
     setSelectedMarket(null)
   }
 
-  // Generate market URL for QR code
+  // Generate market acceptance URL for QR code
   const getMarketUrl = (market) => {
-    return `${window.location.origin}/friend-market/${market?.id || 'preview'}`
+    if (!market?.id) return `${window.location.origin}/friend-market/preview`
+
+    // Build acceptance URL with parameters for offline preview
+    const params = new URLSearchParams({
+      marketId: market.id,
+      creator: market.creator || account || '',
+      stake: market.stakeAmount || '0',
+      token: market.stakeTokenSymbol || 'ETC',
+      deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
+    })
+
+    return `${window.location.origin}/friend-market/accept?${params.toString()}`
   }
 
   // Format date for display
@@ -442,11 +712,33 @@ function FriendMarketsModal({
     }
   }
 
+  // Get selected stake token info for display
+  const selectedStakeToken = useMemo(() => {
+    const token = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
+    if (formData.stakeTokenId === 'CUSTOM' && formData.customStakeTokenAddress) {
+      return {
+        ...token,
+        displayAddress: formData.customStakeTokenAddress
+      }
+    }
+    return token
+  }, [formData.stakeTokenId, formData.customStakeTokenAddress])
+
   // Filter markets where user is participating
   const userActiveMarkets = useMemo(() => {
     return activeMarkets.filter(m =>
-      m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()
+      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
+      m.creator?.toLowerCase() === account?.toLowerCase()) &&
+      m.status !== 'pending_acceptance'
+    )
+  }, [activeMarkets, account])
+
+  // Filter pending markets awaiting acceptance
+  const userPendingMarkets = useMemo(() => {
+    return activeMarkets.filter(m =>
+      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
+      m.creator?.toLowerCase() === account?.toLowerCase()) &&
+      m.status === 'pending_acceptance'
     )
   }, [activeMarkets, account])
 
@@ -517,8 +809,8 @@ function FriendMarketsModal({
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
             <span>Active</span>
-            {userActiveMarkets.length > 0 && (
-              <span className="fm-tab-badge">{userActiveMarkets.length}</span>
+            {(userActiveMarkets.length + userPendingMarkets.length) > 0 && (
+              <span className="fm-tab-badge">{userActiveMarkets.length + userPendingMarkets.length}</span>
             )}
           </button>
           <button
@@ -692,39 +984,139 @@ function FriendMarketsModal({
 
                     <div className="fm-form-group">
                       <label htmlFor="fm-stake">
-                        Stake (ETC) <span className="fm-required">*</span>
+                        Stake Amount <span className="fm-required">*</span>
                       </label>
-                      <input
-                        id="fm-stake"
-                        type="number"
-                        value={formData.stakeAmount}
-                        onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
-                        placeholder="10"
-                        min="0.1"
-                        step="0.1"
-                        disabled={submitting}
-                        className={errors.stakeAmount ? 'error' : ''}
-                      />
+                      <div className="fm-stake-input-wrapper">
+                        {(formData.stakeTokenId === 'USC' || formData.stakeTokenId === 'CUSTOM') && (
+                          <span className="fm-stake-prefix">$</span>
+                        )}
+                        <input
+                          id="fm-stake"
+                          type="number"
+                          value={formData.stakeAmount}
+                          onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
+                          placeholder={formData.stakeTokenId === 'USC' ? '10.00' : '10'}
+                          min="0.1"
+                          max="1000"
+                          step="0.01"
+                          disabled={submitting}
+                          className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'USC' ? 'fm-stake-usd' : ''}`}
+                        />
+                        {formData.stakeTokenId !== 'USC' && formData.stakeTokenId !== 'CUSTOM' && (
+                          <span className="fm-stake-suffix">{selectedStakeToken?.symbol || 'ETC'}</span>
+                        )}
+                      </div>
+                      <span className="fm-hint">
+                        {formData.stakeTokenId === 'USC'
+                          ? 'Enter amount in USD (e.g., 10.00 for $10)'
+                          : `Enter amount in ${selectedStakeToken?.symbol || 'tokens'}`}
+                      </span>
                       {errors.stakeAmount && <span className="fm-error">{errors.stakeAmount}</span>}
                     </div>
 
                     <div className="fm-form-group">
-                      <label htmlFor="fm-period">
-                        Duration (Days) <span className="fm-required">*</span>
+                      <label htmlFor="fm-stake-token">
+                        Stake Token
+                      </label>
+                      <select
+                        id="fm-stake-token"
+                        value={formData.stakeTokenId}
+                        onChange={(e) => handleFormChange('stakeTokenId', e.target.value)}
+                        disabled={submitting}
+                        className="fm-token-select"
+                      >
+                        {STAKE_TOKEN_OPTIONS.map(token => (
+                          <option key={token.id} value={token.id}>
+                            {token.icon} {token.symbol} - {token.name}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="fm-hint">
+                        {formData.stakeTokenId === 'ETC'
+                          ? 'Native ETC will be used for stakes'
+                          : formData.stakeTokenId === 'CUSTOM'
+                          ? 'Enter custom token address below'
+                          : `${selectedStakeToken?.name} from ETCswap`}
+                      </span>
+                    </div>
+
+                    {/* Custom token address input - only shown when CUSTOM is selected */}
+                    {formData.stakeTokenId === 'CUSTOM' && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-custom-token">
+                          Custom Token Address <span className="fm-required">*</span>
+                        </label>
+                        <input
+                          id="fm-custom-token"
+                          type="text"
+                          value={formData.customStakeTokenAddress}
+                          onChange={(e) => handleFormChange('customStakeTokenAddress', e.target.value)}
+                          placeholder="0x..."
+                          disabled={submitting}
+                          className={errors.customStakeTokenAddress ? 'error' : ''}
+                        />
+                        <span className="fm-hint">Enter a valid ERC-20 token address</span>
+                        {errors.customStakeTokenAddress && <span className="fm-error">{errors.customStakeTokenAddress}</span>}
+                      </div>
+                    )}
+
+                    <div className="fm-form-group">
+                      <label htmlFor="fm-end-date">
+                        End Date & Time <span className="fm-required">*</span>
                       </label>
                       <input
-                        id="fm-period"
-                        type="number"
-                        value={formData.tradingPeriod}
-                        onChange={(e) => handleFormChange('tradingPeriod', e.target.value)}
-                        placeholder="7"
-                        min="1"
-                        max="365"
+                        id="fm-end-date"
+                        type="datetime-local"
+                        value={formData.endDateTime}
+                        onChange={(e) => handleFormChange('endDateTime', e.target.value)}
+                        min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
                         disabled={submitting}
-                        className={errors.tradingPeriod ? 'error' : ''}
+                        className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
                       />
-                      {errors.tradingPeriod && <span className="fm-error">{errors.tradingPeriod}</span>}
+                      <span className="fm-hint">When does this market end? (min: 1 day, max: 1 year)</span>
+                      {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
                     </div>
+
+                    {/* Acceptance Deadline - for multi-party acceptance flow */}
+                    <div className="fm-form-group">
+                      <label htmlFor="fm-acceptance-deadline">
+                        Acceptance Deadline <span className="fm-required">*</span>
+                      </label>
+                      <input
+                        id="fm-acceptance-deadline"
+                        type="datetime-local"
+                        value={formData.acceptanceDeadline}
+                        onChange={(e) => handleFormChange('acceptanceDeadline', e.target.value)}
+                        min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        disabled={submitting}
+                        className={`fm-datetime-input ${errors.acceptanceDeadline ? 'error' : ''}`}
+                      />
+                      <span className="fm-hint">How long do participants have to accept? (min: 1 hour, max: 30 days)</span>
+                      {errors.acceptanceDeadline && <span className="fm-error">{errors.acceptanceDeadline}</span>}
+                    </div>
+
+                    {/* Minimum Threshold - only for group markets */}
+                    {(friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') && (
+                      <div className="fm-form-group">
+                        <label htmlFor="fm-min-threshold">
+                          Minimum Participants to Activate
+                        </label>
+                        <input
+                          id="fm-min-threshold"
+                          type="number"
+                          value={formData.minAcceptanceThreshold}
+                          onChange={(e) => handleFormChange('minAcceptanceThreshold', e.target.value)}
+                          min="2"
+                          max={Math.max(2, formData.members.split(',').filter(m => m.trim()).length + 1)}
+                          disabled={submitting}
+                          className={errors.minAcceptanceThreshold ? 'error' : ''}
+                        />
+                        <span className="fm-hint">Market activates when this many participants accept (including you)</span>
+                        {errors.minAcceptanceThreshold && <span className="fm-error">{errors.minAcceptanceThreshold}</span>}
+                      </div>
+                    )}
 
                     <div className="fm-form-group fm-form-full">
                       <label htmlFor="fm-arbitrator">
@@ -902,9 +1294,19 @@ function FriendMarketsModal({
                         }}
                       />
                     </div>
-                    <p className="fm-qr-hint">Scan to join market</p>
+                    <p className="fm-qr-hint">
+                      Share this QR code with participants to accept the market
+                    </p>
+                    <div className="fm-acceptance-info">
+                      <span className="fm-acceptance-status">&#9203; Waiting for acceptance</span>
+                      {createdMarket.acceptanceDeadline && (
+                        <span className="fm-acceptance-deadline">
+                          Deadline: {new Date(createdMarket.acceptanceDeadline).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
                     <div className="fm-qr-url">
-                      <label htmlFor="fm-market-url">Shareable market link</label>
+                      <label htmlFor="fm-market-url">Acceptance link</label>
                       <input
                         id="fm-market-url"
                         type="text"
@@ -917,17 +1319,35 @@ function FriendMarketsModal({
 
                   <div className="fm-success-details">
                     <div className="fm-detail-row">
+                      <span>Status</span>
+                      <span className="fm-status-pending">Pending Acceptance</span>
+                    </div>
+                    <div className="fm-detail-row">
                       <span>Type</span>
                       <span>{getTypeLabel(createdMarket.type)}</span>
                     </div>
                     <div className="fm-detail-row">
-                      <span>Stake</span>
-                      <span>{createdMarket.stakeAmount} ETC</span>
+                      <span>Stake Required</span>
+                      <span>
+                        {createdMarket.stakeTokenIcon} {formatUSD(createdMarket.stakeAmount, createdMarket.stakeTokenSymbol)}
+                      </span>
                     </div>
+                    {createdMarket.acceptanceDeadline && (
+                      <div className="fm-detail-row">
+                        <span>Accept By</span>
+                        <span>{new Date(createdMarket.acceptanceDeadline).toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="fm-detail-row">
-                      <span>Duration</span>
-                      <span>{createdMarket.tradingPeriod} days</span>
+                      <span>Market Ends</span>
+                      <span>{createdMarket.endDateTime ? new Date(createdMarket.endDateTime).toLocaleString() : `${createdMarket.tradingPeriod} days`}</span>
                     </div>
+                    {createdMarket.arbitrator && (
+                      <div className="fm-detail-row">
+                        <span>Arbitrator</span>
+                        <span>{formatAddress(createdMarket.arbitrator)}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="fm-success-actions">
@@ -983,7 +1403,88 @@ function FriendMarketsModal({
                 />
               ) : (
                 <>
-                  {userActiveMarkets.length === 0 ? (
+                  {/* Pending Markets Section */}
+                  {userPendingMarkets.length > 0 && (
+                    <div className="fm-pending-section">
+                      <h4 className="fm-section-title">
+                        <span className="fm-pending-icon">&#9203;</span>
+                        Awaiting Acceptance ({userPendingMarkets.length})
+                      </h4>
+                      <div className="fm-pending-list">
+                        {userPendingMarkets.map((market, index) => (
+                          <div key={`pending-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`} className="fm-pending-card">
+                            <div className="fm-pending-header">
+                              <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
+                              <span className="fm-pending-badge">Pending</span>
+                            </div>
+                            <p className="fm-pending-desc">{market.description}</p>
+                            <div className="fm-pending-progress">
+                              <div className="fm-progress-bar">
+                                <div
+                                  className="fm-progress-fill"
+                                  style={{
+                                    width: `${((market.acceptedCount || 0) / (market.minAcceptanceThreshold || 2)) * 100}%`
+                                  }}
+                                />
+                              </div>
+                              <span className="fm-progress-text">
+                                {market.acceptedCount || 0}/{market.minAcceptanceThreshold || 2} accepted
+                              </span>
+                            </div>
+                            <div className="fm-pending-info">
+                              <span className="fm-pending-stake">
+                                {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
+                              </span>
+                              {market.acceptanceDeadline && (
+                                <span className="fm-pending-deadline">
+                                  Deadline: {new Date(market.acceptanceDeadline).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="fm-pending-actions">
+                              {/* Accept button for invited participants */}
+                              {canUserAcceptMarket(market) && (
+                                <button
+                                  type="button"
+                                  className="fm-btn-accept"
+                                  onClick={() => handleOpenAcceptanceModal(market)}
+                                >
+                                  Accept & Stake
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="fm-btn-outline"
+                                onClick={() => {
+                                  const url = getMarketUrl(market)
+                                  if (navigator.clipboard?.writeText) {
+                                    navigator.clipboard.writeText(url)
+                                      .then(() => window.alert('Link copied!'))
+                                      .catch(() => window.alert('Failed to copy'))
+                                  }
+                                }}
+                              >
+                                &#128279; Copy Link
+                              </button>
+                              {market.creator?.toLowerCase() === account?.toLowerCase() && (
+                                <button
+                                  type="button"
+                                  className="fm-btn-danger-outline"
+                                  onClick={() => handleCancelMarket(market)}
+                                  disabled={cancellingMarketId === market.id}
+                                >
+                                  {cancellingMarketId === market.id ? 'Cancelling...' : 'Cancel'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Markets Section */}
+                  {userActiveMarkets.length === 0 && userPendingMarkets.length === 0 ? (
                     <div className="fm-empty-state">
                       <div className="fm-empty-icon">&#128200;</div>
                       <h3>No Active Markets</h3>
@@ -996,17 +1497,25 @@ function FriendMarketsModal({
                         Create Your First Market
                       </button>
                     </div>
-                  ) : (
-                    <div className="fm-markets-list">
-                      <MarketsCompactTable
-                        markets={userActiveMarkets}
-                        onSelect={handleMarketSelect}
-                        formatDate={formatDate}
-                        formatAddress={formatAddress}
-                        getTypeLabel={getTypeLabel}
-                        getStatusClass={getStatusClass}
-                      />
-                    </div>
+                  ) : userActiveMarkets.length > 0 && (
+                    <>
+                      {userPendingMarkets.length > 0 && (
+                        <h4 className="fm-section-title fm-active-title">
+                          <span>&#128200;</span>
+                          Active Markets ({userActiveMarkets.length})
+                        </h4>
+                      )}
+                      <div className="fm-markets-list">
+                        <MarketsCompactTable
+                          markets={userActiveMarkets}
+                          onSelect={handleMarketSelect}
+                          formatDate={formatDate}
+                          formatAddress={formatAddress}
+                          getTypeLabel={getTypeLabel}
+                          getStatusClass={getStatusClass}
+                        />
+                      </div>
+                    </>
                   )}
                 </>
               )}
@@ -1060,6 +1569,19 @@ function FriendMarketsModal({
         onClose={handleQrScannerClose}
         onScanSuccess={handleQrScanSuccess}
       />
+
+      {/* Market Acceptance Modal */}
+      {acceptanceModalOpen && marketToAccept && (
+        <MarketAcceptanceModal
+          isOpen={acceptanceModalOpen}
+          onClose={handleCloseAcceptanceModal}
+          marketId={marketToAccept.id}
+          marketData={marketToAccept}
+          onAccepted={handleMarketAccepted}
+          contractAddress={CONTRACT_ADDRESSES.friendGroupMarketFactory}
+          contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
+        />
+      )}
     </div>
   )
 }
@@ -1088,9 +1610,9 @@ function MarketsCompactTable({
         </tr>
       </thead>
       <tbody>
-        {markets.map((market) => (
+        {markets.map((market, index) => (
           <tr
-            key={market.id}
+            key={`market-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`}
             onClick={() => onSelect(market)}
             className="fm-table-row"
             role="button"
@@ -1103,7 +1625,9 @@ function MarketsCompactTable({
             <td>
               <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
             </td>
-            <td className="fm-table-stake">{market.stakeAmount} ETC</td>
+            <td className="fm-table-stake">
+              {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
+            </td>
             <td className="fm-table-date">
               {isPast
                 ? (market.outcome || 'Resolved')
@@ -1160,12 +1684,14 @@ function MarketDetailView({
         </div>
         <div className="fm-detail-item">
           <span className="fm-detail-label">Stake</span>
-          <span className="fm-detail-value">{market.stakeAmount} ETC</span>
+          <span className="fm-detail-value">
+            {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
+          </span>
         </div>
         <div className="fm-detail-item">
           <span className="fm-detail-label">Total Pool</span>
           <span className="fm-detail-value">
-            {(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2)).toFixed(2)} ETC
+            {market.stakeTokenIcon || '💵'} {formatUSD(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2), market.stakeTokenSymbol)}
           </span>
         </div>
         <div className="fm-detail-item">

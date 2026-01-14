@@ -6,10 +6,17 @@ function CompactMarketView({ markets = [], onMarketClick, loading = false, selec
   const { formatPrice } = usePrice()
   const [sortField, setSortField] = useState('tradingEndTime')
   const [sortDirection, setSortDirection] = useState('asc')
-  
+
   // Determine if we're in a single category view (not dashboard, trending, or all-table)
-  const isSingleCategoryView = selectedCategory && 
+  const isSingleCategoryView = selectedCategory &&
     !['dashboard', 'trending', 'all-table'].includes(selectedCategory)
+
+  // Format probability as percentage (0-100%)
+  const formatProbability = (price) => {
+    const prob = parseFloat(price) || 0
+    // Token prices are 0-1, convert to percentage
+    return `${Math.round(prob * 100)}%`
+  }
 
   const calculateTimeRemaining = (endTime) => {
     const now = new Date()
@@ -64,8 +71,8 @@ function CompactMarketView({ markets = [], onMarketClick, loading = false, selec
             : bVal.localeCompare(aVal)
         
         case 'correlationGroupName':
-          aVal = a.correlationGroupName || ''
-          bVal = b.correlationGroupName || ''
+          aVal = a.correlationGroup?.groupName || ''
+          bVal = b.correlationGroup?.groupName || ''
           return sortDirection === 'asc'
             ? aVal.localeCompare(bVal)
             : bVal.localeCompare(aVal)
@@ -234,9 +241,9 @@ function CompactMarketView({ markets = [], onMarketClick, loading = false, selec
               aria-label={`View market: ${market.proposalTitle}`}
             >
               <td className="correlation-cell">
-                {market.correlationGroupId ? (
-                  <span className="correlation-tag" title={market.correlationGroupName}>
-                    {market.correlationGroupName}
+                {market.correlationGroup?.groupId !== undefined ? (
+                  <span className="correlation-tag" title={market.correlationGroup.groupName}>
+                    {market.correlationGroup.groupName}
                   </span>
                 ) : (
                   <span className="no-correlation">—</span>
@@ -252,12 +259,12 @@ function CompactMarketView({ markets = [], onMarketClick, loading = false, selec
               </td>
               <td className="price-cell">
                 <div className="price-pair">
-                  <span className="pass-price" title="Pass Token Price">
-                    {formatPrice(market.passTokenPrice)}
+                  <span className="pass-price" title="Pass Probability">
+                    {formatProbability(market.passTokenPrice)}
                   </span>
                   <span className="price-separator">/</span>
-                  <span className="fail-price" title="Fail Token Price">
-                    {formatPrice(market.failTokenPrice)}
+                  <span className="fail-price" title="Fail Probability">
+                    {formatProbability(market.failTokenPrice)}
                   </span>
                 </div>
               </td>

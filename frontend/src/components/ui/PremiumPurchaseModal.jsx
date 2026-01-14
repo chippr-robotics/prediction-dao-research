@@ -1,100 +1,155 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithUSC, registerZKKey } from '../../utils/blockchainService'
+import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
 /**
  * PremiumPurchaseModal Component
  *
- * Modern, minimalist modal for purchasing premium access roles.
+ * Modern, minimalist modal for purchasing premium access roles with tiered membership.
  * Features:
  * - Multi-product selection with checkboxes
- * - Option to purchase for self or gift to another address
+ * - Tiered membership (Bronze, Silver, Gold, Platinum)
  * - Clear blockchain transaction warnings
  * - Detailed role information with features and fund destination
  * - Step-based wizard flow
  */
 
 const STEPS = [
-  { id: 'select', label: 'Select', icon: '1' },
-  { id: 'review', label: 'Review', icon: '2' },
-  { id: 'complete', label: 'Complete', icon: '3' }
+  { id: 'select', label: 'Select Role', icon: '1' },
+  { id: 'tier', label: 'Choose Tier', icon: '2' },
+  { id: 'review', label: 'Review', icon: '3' },
+  { id: 'complete', label: 'Complete', icon: '4' }
 ]
 
-// Extended role information with features, duration, and fund destination
+// Membership tiers matching TieredRoleManager contract
+const MEMBERSHIP_TIERS = {
+  BRONZE: { id: 1, name: 'Bronze', color: '#cd7f32' },
+  SILVER: { id: 2, name: 'Silver', color: '#c0c0c0' },
+  GOLD: { id: 3, name: 'Gold', color: '#ffd700' },
+  PLATINUM: { id: 4, name: 'Platinum', color: '#e5e4e2' }
+}
+
+// Tier benefits for display
+const TIER_BENEFITS = {
+  BRONZE: {
+    dailyBets: 10,
+    monthlyMarkets: 5,
+    maxPosition: '100 USC',
+    duration: '30 days',
+    features: ['Basic market access', 'Standard support']
+  },
+  SILVER: {
+    dailyBets: 25,
+    monthlyMarkets: 15,
+    maxPosition: '500 USC',
+    duration: '30 days',
+    features: ['Priority support', 'Advanced analytics']
+  },
+  GOLD: {
+    dailyBets: 50,
+    monthlyMarkets: 30,
+    maxPosition: '2,000 USC',
+    duration: '30 days',
+    features: ['Premium support', 'Full analytics', 'Private markets']
+  },
+  PLATINUM: {
+    dailyBets: 'Unlimited',
+    monthlyMarkets: 'Unlimited',
+    maxPosition: 'Unlimited',
+    duration: '30 days',
+    features: ['Dedicated support', 'API access', 'Exclusive features']
+  }
+}
+
+// Extended role information with features and fund destination
 const ROLE_DETAILS = {
   MARKET_MAKER: {
     icon: '📊',
     tagline: 'Create prediction markets',
-    duration: 'Lifetime access',
     features: [
-      'Create unlimited prediction markets',
-      'Set custom market parameters and liquidity',
-      'Earn fees from market trading activity',
-      'Access to market analytics dashboard'
+      'Create prediction markets',
+      'Set custom market parameters',
+      'Earn fees from trading activity',
+      'Access analytics dashboard'
     ],
     fundsDestination: 'DAO Treasury',
-    fundsUsage: 'Funds support protocol development and liquidity incentives'
+    fundsUsage: 'Funds support protocol development and liquidity'
   },
   CLEARPATH_USER: {
     icon: '🔐',
     tagline: 'DAO governance access',
-    duration: 'Lifetime access',
     features: [
       'Full DAO governance participation',
-      'Vote on proposals with prediction market insights',
-      'Access ZK-protected governance features',
-      'View organizational analytics and reports'
+      'Vote on proposals',
+      'Access ZK-protected features',
+      'View organizational reports'
     ],
     fundsDestination: 'DAO Treasury',
-    fundsUsage: 'Funds support governance infrastructure and security audits'
+    fundsUsage: 'Funds support governance infrastructure'
   },
   TOKENMINT: {
     icon: '🪙',
     tagline: 'Token creation tools',
-    duration: 'Lifetime access',
     features: [
       'Mint custom ERC20 tokens',
-      'Create and manage NFT collections',
-      'Integrate with ETC swap contracts',
-      'Access token analytics and management'
+      'Create NFT collections',
+      'Integrate with ETC swap',
+      'Token management tools'
     ],
     fundsDestination: 'DAO Treasury',
-    fundsUsage: 'Funds support smart contract maintenance and upgrades'
+    fundsUsage: 'Funds support smart contract maintenance'
   },
   FRIEND_MARKET: {
     icon: '👥',
     tagline: 'Private markets with friends',
-    duration: 'Lifetime access',
     features: [
-      'Create private 1v1 prediction markets',
-      'Organize small group competitions',
-      'Share markets via QR codes',
-      'Set custom arbitrators and rules'
+      'Create private 1v1 markets',
+      'Small group competitions',
+      'Share via QR codes',
+      'Custom arbitrators'
     ],
     fundsDestination: 'DAO Treasury',
-    fundsUsage: 'Funds support social features and infrastructure'
+    fundsUsage: 'Funds support social features'
   }
 }
 
-// Role prices in USC stablecoin
-const ROLE_PRICES = {
-  MARKET_MAKER: 100,
-  CLEARPATH_USER: 250,
-  TOKENMINT: 150,
-  FRIEND_MARKET: 50
+// Role prices in USC stablecoin by tier
+const TIER_PRICES = {
+  BRONZE: {
+    MARKET_MAKER: 100,
+    CLEARPATH_USER: 250,
+    TOKENMINT: 150,
+    FRIEND_MARKET: 50
+  },
+  SILVER: {
+    MARKET_MAKER: 200,
+    CLEARPATH_USER: 400,
+    TOKENMINT: 300,
+    FRIEND_MARKET: 100
+  },
+  GOLD: {
+    MARKET_MAKER: 350,
+    CLEARPATH_USER: 650,
+    TOKENMINT: 500,
+    FRIEND_MARKET: 175
+  },
+  PLATINUM: {
+    MARKET_MAKER: 600,
+    CLEARPATH_USER: 1000,
+    TOKENMINT: 800,
+    FRIEND_MARKET: 300
+  }
 }
 
-// Note: Bundle discounts are not currently supported by the contract
-// Each role purchase is a separate transaction at individual price
-
 function PremiumPurchaseModal({ isOpen = true, onClose }) {
-  const { ROLE_INFO, grantRole, hasRole } = useRoles()
-  const { account, isConnected, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { ROLE_INFO, grantRole, hasRole, loadRoles } = useRoles()
+  const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
 
@@ -104,6 +159,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
   // Selected roles (multi-select)
   const [selectedRoles, setSelectedRoles] = useState([])
 
+  // Selected tier
+  const [selectedTier, setSelectedTier] = useState('BRONZE')
+
   // ZK key for ClearPath (optional)
   const [zkPublicKey, setZkPublicKey] = useState('')
 
@@ -112,25 +170,79 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
   const [purchaseResults, setPurchaseResults] = useState([])
   const [errors, setErrors] = useState({})
 
-  // Calculate pricing (no bundle discounts - each role is separate transaction)
+  // Track user's current tier for each role (fetched from blockchain)
+  const [userCurrentTiers, setUserCurrentTiers] = useState({})
+  const [isLoadingTiers, setIsLoadingTiers] = useState(false)
+
+  // Calculate pricing based on tier
   const pricing = useMemo(() => {
-    const total = selectedRoles.reduce((sum, role) => sum + ROLE_PRICES[role], 0)
+    const total = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[selectedTier]?.[role] || 0), 0)
     const roleCount = selectedRoles.length
 
     return {
       total,
       roleCount
     }
-  }, [selectedRoles])
+  }, [selectedRoles, selectedTier])
+
+  // Fetch user's current tier for selected roles
+  const fetchUserTiers = useCallback(async () => {
+    if (!account || selectedRoles.length === 0) return
+
+    setIsLoadingTiers(true)
+    try {
+      const tiers = {}
+      for (const role of selectedRoles) {
+        const { tier, tierName } = await getUserTierOnChain(account, role)
+        tiers[role] = { tier, tierName }
+      }
+      setUserCurrentTiers(tiers)
+      console.log('[PremiumPurchaseModal] User current tiers:', tiers)
+
+      // Auto-select the minimum valid tier (current + 1, but at least BRONZE)
+      const maxCurrentTier = Math.max(...selectedRoles.map(r => tiers[r]?.tier || 0))
+      const minSelectableTier = maxCurrentTier + 1
+
+      if (minSelectableTier <= 4) {
+        const tierKeys = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
+        const defaultTier = tierKeys[minSelectableTier - 1] || 'BRONZE'
+        setSelectedTier(defaultTier)
+      }
+    } catch (error) {
+      console.error('[PremiumPurchaseModal] Error fetching user tiers:', error)
+    } finally {
+      setIsLoadingTiers(false)
+    }
+  }, [account, selectedRoles])
+
+  // Fetch tiers when moving to tier step
+  useEffect(() => {
+    if (currentStep === 1) {
+      fetchUserTiers()
+    }
+  }, [currentStep, fetchUserTiers])
+
+  // Calculate highest current tier across selected roles
+  const highestCurrentTier = useMemo(() => {
+    if (selectedRoles.length === 0) return 0
+    return Math.max(...selectedRoles.map(r => userCurrentTiers[r]?.tier || 0))
+  }, [selectedRoles, userCurrentTiers])
+
+  // Filter tiers to only show upgrades (tier > current)
+  const availableTiers = useMemo(() => {
+    return Object.entries(MEMBERSHIP_TIERS).filter(([_, tier]) => tier.id > highestCurrentTier)
+  }, [highestCurrentTier])
 
   // Reset form
   const resetForm = useCallback(() => {
     setCurrentStep(0)
     setSelectedRoles([])
+    setSelectedTier('BRONZE')
     setZkPublicKey('')
     setPurchaseResults([])
     setErrors({})
     setIsPurchasing(false)
+    setUserCurrentTiers({})
   }, [])
 
   // Handle role toggle
@@ -141,7 +253,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       }
       return [...prev, roleKey]
     })
-    // Clear related errors
     setErrors(prev => {
       const newErrors = { ...prev }
       delete newErrors.roles
@@ -159,9 +270,21 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       }
     }
 
+    if (step === 1) {
+      // Check if user already has max tier
+      if (highestCurrentTier >= 4) {
+        newErrors.tier = 'You already have the maximum tier (Platinum)'
+      }
+      // Check if a valid tier is selected
+      const selectedTierInfo = MEMBERSHIP_TIERS[selectedTier]
+      if (!selectedTierInfo || selectedTierInfo.id <= highestCurrentTier) {
+        newErrors.tier = 'Please select a higher tier'
+      }
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [selectedRoles])
+  }, [selectedRoles, highestCurrentTier, selectedTier])
 
   // Navigation
   const handleNext = useCallback(() => {
@@ -201,25 +324,26 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
 
     setIsPurchasing(true)
     const results = []
+    const tierValue = MEMBERSHIP_TIERS[selectedTier].id
+    const tierName = MEMBERSHIP_TIERS[selectedTier].name
 
     try {
-      // Show notification about multiple transactions
       const transactionCount = selectedRoles.length
       const notificationMessage =
         transactionCount > 1
-          ? `You will need to confirm ${transactionCount} separate transactions in your wallet (one per role, total ${pricing.total} USC). Each role purchase is a separate blockchain transaction.`
-          : `Please confirm the transaction in your wallet (${pricing.total} USC)`
+          ? `You will need to confirm ${transactionCount} separate transactions (${tierName} tier, total ${pricing.total} USC).`
+          : `Please confirm the transaction in your wallet (${tierName} tier, ${pricing.total} USC)`
 
       showNotification(notificationMessage, 'info', 10000)
 
-      // Process each role purchase (each is a separate transaction)
+      // Process each role purchase
       for (const roleKey of selectedRoles) {
         const roleName = ROLE_INFO[roleKey].name
-        const price = ROLE_PRICES[roleKey]
+        const price = TIER_PRICES[selectedTier][roleKey]
 
         try {
-          // Execute blockchain transaction
-          const receipt = await purchaseRoleWithUSC(signer, roleName, price)
+          // Execute blockchain transaction with tier
+          const receipt = await purchaseRoleWithUSC(signer, roleName, price, tierValue)
 
           // Grant the role to the current user
           grantRole(roleKey)
@@ -228,6 +352,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
           recordRolePurchase(account, roleKey, {
             price: price,
             currency: 'USC',
+            tier: selectedTier,
+            tierValue: tierValue,
             txHash: receipt.hash,
             purchasedBy: account
           })
@@ -235,6 +361,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
           results.push({
             role: roleKey,
             roleName,
+            tier: tierName,
             success: true,
             txHash: receipt.hash
           })
@@ -243,20 +370,20 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
           results.push({
             role: roleKey,
             roleName,
+            tier: tierName,
             success: false,
             error: error.message
           })
         }
       }
 
-      // Handle ZK key registration for ClearPath (optional, only if key provided)
+      // Handle ZK key registration for ClearPath (optional)
       if (zkPublicKey.trim() && selectedRoles.includes('CLEARPATH_USER')) {
         try {
           await registerZKKey(signer, zkPublicKey.trim())
           showNotification('ZK key registered successfully', 'success', 5000)
         } catch (zkError) {
           console.error('ZK key registration failed:', zkError)
-          // Don't fail the entire purchase if ZK key registration fails
           showNotification(
             'Role purchased successfully, but ZK key registration failed. You can register your key later.',
             'warning',
@@ -268,20 +395,29 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       setPurchaseResults(results)
 
       const successCount = results.filter(r => r.success).length
+
+      if (successCount > 0) {
+        try {
+          await loadRoles()
+        } catch (refreshError) {
+          console.warn('Failed to refresh roles from blockchain:', refreshError)
+        }
+      }
+
       if (successCount === selectedRoles.length) {
         showNotification(
-          `Successfully purchased ${successCount} role${successCount > 1 ? 's' : ''}!`,
+          `Successfully purchased ${successCount} role${successCount > 1 ? 's' : ''} (${tierName})!`,
           'success',
           7000
         )
-        setCurrentStep(2) // Move to complete step (now step index 2)
+        setCurrentStep(3) // Complete step
       } else if (successCount > 0) {
         showNotification(
-          `Partially completed: ${successCount}/${selectedRoles.length} roles purchased. Successful purchases have been applied.`,
+          `Partially completed: ${successCount}/${selectedRoles.length} roles purchased.`,
           'warning',
           10000
         )
-        setCurrentStep(2)
+        setCurrentStep(3)
       } else {
         showNotification('All purchases failed. Please try again.', 'error', 7000)
       }
@@ -304,6 +440,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
   if (!isOpen) return null
 
   const requiresZkKey = selectedRoles.includes('CLEARPATH_USER')
+  const tierInfo = MEMBERSHIP_TIERS[selectedTier]
+  const tierBenefits = TIER_BENEFITS[selectedTier]
 
   return (
     <div
@@ -318,7 +456,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
         <header className="ppm-header">
           <div className="ppm-header-content">
             <h2 id="ppm-title">Purchase Premium Access</h2>
-            <p className="ppm-subtitle">Unlock powerful features for your account</p>
+            <p className="ppm-subtitle">Unlock powerful features with tiered membership</p>
           </div>
           <button
             className="ppm-close-btn"
@@ -359,17 +497,18 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                     <span aria-hidden="true">🎯</span> Select Premium Roles
                   </h3>
                   <p className="ppm-section-desc">
-                    Choose one or more roles to unlock. Each role is a separate transaction.
+                    Choose one or more roles to unlock. You'll select your membership tier next.
                   </p>
                 </div>
 
                 <div className="ppm-roles-grid">
                   {Object.entries(ROLE_INFO)
-                    .filter(([roleKey]) => ROLE_PRICES[roleKey])
+                    .filter(([roleKey]) => TIER_PRICES.BRONZE[roleKey])
                     .map(([roleKey, roleInfo]) => {
                       const details = ROLE_DETAILS[roleKey]
                       const isSelected = selectedRoles.includes(roleKey)
                       const isOwned = hasRole && hasRole(roleKey)
+                      const bronzePrice = TIER_PRICES.BRONZE[roleKey]
 
                       return (
                         <div
@@ -393,31 +532,17 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                                   <span className="ppm-role-name">{roleInfo.name}</span>
                                   <span className="ppm-role-tagline">{details?.tagline}</span>
                                 </div>
-                                <span className="ppm-role-price">${ROLE_PRICES[roleKey]} USC</span>
+                                <span className="ppm-role-price">from ${bronzePrice} USC</span>
                               </div>
 
-                              <div className="ppm-role-details">
-                                <div className="ppm-role-duration">
-                                  <span className="ppm-duration-badge">
-                                    {details?.duration || 'Lifetime access'}
-                                  </span>
-                                </div>
-
-                                <ul className="ppm-role-features">
-                                  {details?.features.map((feature, idx) => (
-                                    <li key={idx}>
-                                      <span className="ppm-feature-check" aria-hidden="true">✓</span>
-                                      {feature}
-                                    </li>
-                                  ))}
-                                </ul>
-
-                                <div className="ppm-role-funds">
-                                  <span className="ppm-funds-label">Funds go to:</span>
-                                  <span className="ppm-funds-destination">{details?.fundsDestination}</span>
-                                  <p className="ppm-funds-usage">{details?.fundsUsage}</p>
-                                </div>
-                              </div>
+                              <ul className="ppm-role-features">
+                                {details?.features.map((feature, idx) => (
+                                  <li key={idx}>
+                                    <span className="ppm-feature-check" aria-hidden="true">✓</span>
+                                    {feature}
+                                  </li>
+                                ))}
+                              </ul>
 
                               {isOwned && (
                                 <div className="ppm-owned-badge">
@@ -432,23 +557,130 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                 </div>
 
                 {errors.roles && <div className="ppm-error">{errors.roles}</div>}
+              </section>
+            </div>
+          )}
 
-                {/* Pricing Summary */}
-                {selectedRoles.length > 0 && (
-                  <div className="ppm-pricing-summary">
-                    <div className="ppm-pricing-row">
-                      <span>Selected ({pricing.roleCount} role{pricing.roleCount > 1 ? 's' : ''})</span>
-                      <span>${pricing.total.toFixed(2)} USC</span>
+          {/* Step 2: Choose Tier */}
+          {currentStep === 1 && (
+            <div className="ppm-panel" role="tabpanel">
+              <section className="ppm-section">
+                <div className="ppm-section-header">
+                  <h3 className="ppm-section-title">
+                    <span aria-hidden="true">🏆</span> Choose Membership Tier
+                  </h3>
+                  <p className="ppm-section-desc">
+                    Higher tiers unlock more features and higher limits.
+                  </p>
+                </div>
+
+                {/* Show loading state while fetching tiers */}
+                {isLoadingTiers && (
+                  <div className="ppm-loading-tiers">
+                    <div className="ppm-spinner" aria-hidden="true"></div>
+                    <p>Checking your current membership tier...</p>
+                  </div>
+                )}
+
+                {/* Show current tier info if user has existing membership */}
+                {!isLoadingTiers && highestCurrentTier > 0 && (
+                  <div className="ppm-info-card ppm-current-tier-info">
+                    <span className="ppm-info-icon" aria-hidden="true">ℹ️</span>
+                    <div>
+                      <strong>Current Membership</strong>
+                      <p>
+                        You currently have{' '}
+                        <span
+                          className="ppm-tier-badge"
+                          style={{ backgroundColor: Object.values(MEMBERSHIP_TIERS)[highestCurrentTier - 1]?.color }}
+                        >
+                          {Object.values(MEMBERSHIP_TIERS)[highestCurrentTier - 1]?.name}
+                        </span>
+                        {' '}tier. You can only upgrade to a higher tier.
+                      </p>
                     </div>
-                    <div className="ppm-pricing-row ppm-total">
-                      <span>Total</span>
-                      <span>${pricing.total.toFixed(2)} USC</span>
+                  </div>
+                )}
+
+                {/* Show max tier message if user already has Platinum */}
+                {!isLoadingTiers && highestCurrentTier >= 4 && (
+                  <div className="ppm-warning-card">
+                    <span className="ppm-warning-icon" aria-hidden="true">🎉</span>
+                    <div className="ppm-warning-content">
+                      <strong>Maximum Tier Reached</strong>
+                      <p>
+                        You already have Platinum tier - the highest membership level!
+                        There are no upgrades available for the selected role(s).
+                      </p>
                     </div>
-                    {pricing.roleCount > 1 && (
-                      <div className="ppm-pricing-note">
-                        <small>Note: Each role requires a separate transaction</small>
-                      </div>
-                    )}
+                  </div>
+                )}
+
+                {/* Tier selection grid - only show available tiers */}
+                {!isLoadingTiers && availableTiers.length > 0 && (
+                  <div className="ppm-tier-grid">
+                    {availableTiers.map(([tierKey, tier]) => {
+                      const benefits = TIER_BENEFITS[tierKey]
+                      const tierTotal = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[tierKey]?.[role] || 0), 0)
+                      const isSelected = selectedTier === tierKey
+
+                      return (
+                        <label
+                          key={tierKey}
+                          className={`ppm-tier-card ${isSelected ? 'selected' : ''}`}
+                          style={{ '--tier-color': tier.color }}
+                        >
+                          <input
+                            type="radio"
+                            name="tier"
+                            value={tierKey}
+                            checked={isSelected}
+                            onChange={() => setSelectedTier(tierKey)}
+                            disabled={isPurchasing}
+                            className="ppm-tier-radio"
+                          />
+                          <div className="ppm-tier-content">
+                            <div className="ppm-tier-header">
+                              <span
+                                className="ppm-tier-badge"
+                                style={{ backgroundColor: tier.color }}
+                              >
+                                {tier.name}
+                              </span>
+                              <span className="ppm-tier-price">${tierTotal} USC</span>
+                            </div>
+
+                            <div className="ppm-tier-limits">
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Daily Bets:</span>
+                                <span className="ppm-limit-value">{benefits.dailyBets}</span>
+                              </div>
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Monthly Markets:</span>
+                                <span className="ppm-limit-value">{benefits.monthlyMarkets}</span>
+                              </div>
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Max Position:</span>
+                                <span className="ppm-limit-value">{benefits.maxPosition}</span>
+                              </div>
+                              <div className="ppm-limit-item">
+                                <span className="ppm-limit-label">Duration:</span>
+                                <span className="ppm-limit-value">{benefits.duration}</span>
+                              </div>
+                            </div>
+
+                            <ul className="ppm-tier-features">
+                              {benefits.features.map((feature, idx) => (
+                                <li key={idx}>
+                                  <span className="ppm-feature-check" aria-hidden="true">✓</span>
+                                  {feature}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </label>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -476,9 +708,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                         rows={3}
                         disabled={isPurchasing}
                       />
-                      <div className="ppm-hint">
-                        This key enables private voting and governance actions
-                      </div>
                     </div>
                   </div>
                 )}
@@ -486,8 +715,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
             </div>
           )}
 
-          {/* Step 2: Review & Confirm (formerly step 3) */}
-          {currentStep === 1 && (
+          {/* Step 3: Review & Confirm */}
+          {currentStep === 2 && (
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section">
                 <h3 className="ppm-section-title">
@@ -502,8 +731,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                     <ul>
                       <li>This is a <strong>non-refundable</strong> blockchain transaction</li>
                       <li>Once confirmed, the transaction cannot be reversed</li>
-                      <li>Funds will be transferred to the DAO Treasury</li>
-                      <li>Please verify all details before proceeding</li>
+                      <li>Membership is valid for <strong>{tierBenefits?.duration}</strong></li>
                     </ul>
                   </div>
                 </div>
@@ -520,12 +748,23 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                     </span>
                   </div>
 
+                  <div className="ppm-review-tier">
+                    <span className="ppm-review-label">Membership Tier</span>
+                    <span
+                      className="ppm-tier-badge"
+                      style={{ backgroundColor: tierInfo?.color }}
+                    >
+                      {tierInfo?.name}
+                    </span>
+                  </div>
+
                   <div className="ppm-review-roles">
                     <span className="ppm-review-label">Selected Roles</span>
                     <div className="ppm-review-roles-list">
                       {selectedRoles.map(roleKey => {
                         const roleInfo = ROLE_INFO[roleKey]
                         const details = ROLE_DETAILS[roleKey]
+                        const rolePrice = TIER_PRICES[selectedTier][roleKey]
                         return (
                           <div key={roleKey} className="ppm-review-role-item">
                             <div className="ppm-review-role-info">
@@ -534,10 +773,10 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                               </span>
                               <div>
                                 <span className="ppm-review-role-name">{roleInfo.name}</span>
-                                <span className="ppm-review-role-duration">{details?.duration}</span>
+                                <span className="ppm-review-role-duration">{tierBenefits?.duration}</span>
                               </div>
                             </div>
-                            <span className="ppm-review-role-price">${ROLE_PRICES[roleKey]} USC</span>
+                            <span className="ppm-review-role-price">${rolePrice} USC</span>
                           </div>
                         )
                       })}
@@ -555,8 +794,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                     <span className="ppm-funds-icon" aria-hidden="true">💰</span>
                     <p>
                       <strong>Where do the funds go?</strong> 100% of your payment goes to the
-                      DAO Treasury to support protocol development, security audits, and
-                      community initiatives.
+                      DAO Treasury to support protocol development and community initiatives.
                     </p>
                   </div>
                 </div>
@@ -589,8 +827,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
             </div>
           )}
 
-          {/* Step 3: Complete (formerly step 4) */}
-          {currentStep === 2 && (
+          {/* Step 4: Complete */}
+          {currentStep === 3 && (
             <div className="ppm-panel" role="tabpanel">
               <section className="ppm-section ppm-complete-section">
                 <div className="ppm-success-icon" aria-hidden="true">
@@ -604,7 +842,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                 </h3>
 
                 <p className="ppm-complete-desc">
-                  Your premium access has been activated.
+                  Your <strong style={{ color: tierInfo?.color }}>{tierInfo?.name}</strong> membership has been activated.
                 </p>
 
                 <div className="ppm-purchase-results">
@@ -619,14 +857,16 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                       <div className="ppm-result-info">
                         <span className="ppm-result-name">{result.roleName}</span>
                         {result.success ? (
-                          <span className="ppm-result-status">Activated</span>
+                          <span className="ppm-result-status">
+                            {result.tier} - Activated
+                          </span>
                         ) : (
                           <span className="ppm-result-error">{result.error}</span>
                         )}
                       </div>
                       {result.txHash && (
                         <a
-                          href={`https://blockscout.com/etc/mainnet/tx/${result.txHash}`}
+                          href={getTransactionUrl(chainId || 63, result.txHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ppm-tx-link"
@@ -636,6 +876,19 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                       )}
                     </div>
                   ))}
+                </div>
+
+                {/* Tier Benefits */}
+                <div className="ppm-tier-summary">
+                  <h4>Your {tierInfo?.name} Benefits</h4>
+                  <ul>
+                    <li>Daily Bets: {tierBenefits?.dailyBets}</li>
+                    <li>Monthly Markets: {tierBenefits?.monthlyMarkets}</li>
+                    <li>Max Position: {tierBenefits?.maxPosition}</li>
+                    {tierBenefits?.features.map((feature, idx) => (
+                      <li key={idx}>{feature}</li>
+                    ))}
+                  </ul>
                 </div>
 
                 {/* What's Next */}
@@ -663,7 +916,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                     {selectedRoles.includes('FRIEND_MARKET') && (
                       <li>
                         <span aria-hidden="true">👥</span>
-                        Invite friends to your first private market
+                        Create your first friend market
                       </li>
                     )}
                   </ul>
@@ -676,7 +929,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
         {/* Footer Actions */}
         <footer className="ppm-footer">
           <div className="ppm-footer-left">
-            {currentStep > 0 && currentStep < 2 && (
+            {currentStep > 0 && currentStep < 3 && (
               <button
                 type="button"
                 className="ppm-btn-secondary"
@@ -688,7 +941,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
             )}
           </div>
           <div className="ppm-footer-right">
-            {currentStep < 2 && (
+            {currentStep < 3 && (
               <button
                 type="button"
                 className="ppm-btn-secondary"
@@ -698,7 +951,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                 Cancel
               </button>
             )}
-            {currentStep < 1 && (
+            {currentStep < 2 && (
               <button
                 type="button"
                 className="ppm-btn-primary"
@@ -708,7 +961,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                 Continue
               </button>
             )}
-            {currentStep === 1 && (
+            {currentStep === 2 && (
               <button
                 type="button"
                 className="ppm-btn-primary ppm-btn-purchase"
@@ -727,7 +980,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                 )}
               </button>
             )}
-            {currentStep === 2 && (
+            {currentStep === 3 && (
               <button
                 type="button"
                 className="ppm-btn-primary"

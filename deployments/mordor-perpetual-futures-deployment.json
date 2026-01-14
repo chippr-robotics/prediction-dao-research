@@ -1,0 +1,59 @@
+{
+  "network": "mordor",
+  "chainId": "63",
+  "timestamp": "2026-01-11T16:23:13.280Z",
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "contracts": {
+    "fundingRateEngine": "0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc",
+    "perpFactory": "0xAEfd08EF350B7132BDbE8a9de96C6d24eAbd7988"
+  },
+  "markets": [
+    {
+      "id": 0,
+      "name": "BTC-PERP",
+      "fullName": "Bitcoin Perpetual",
+      "address": "0xF76710cFc5D512cf2452B31b83ceFFbF04D067B4",
+      "underlyingAsset": "BTC"
+    },
+    {
+      "id": 1,
+      "name": "ETH-PERP",
+      "fullName": "Ethereum Perpetual",
+      "address": "0x4d1d47B6A242Db5317c5e1F4Db6b213880bb06a1",
+      "underlyingAsset": "ETH"
+    },
+    {
+      "id": 2,
+      "name": "ETC-PERP",
+      "fullName": "Ethereum Classic Perpetual",
+      "address": "0x168f84B2a6Dd181086bF4100DeeE28bC8b0ABA09",
+      "underlyingAsset": "ETC"
+    }
+  ],
+  "tokens": {
+    "USC": "0xDE093684c796204224BC081f937aa059D903c52a",
+    "WETC": "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a"
+  },
+  "verificationResults": {
+    "fundingRateEngine": {
+      "status": "failed",
+      "error": "The contract verification failed."
+    },
+    "perpFactory": {
+      "status": "failed",
+      "error": "The contract verification failed."
+    },
+    "market_0": {
+      "status": "failed",
+      "error": "The contract verification failed."
+    },
+    "market_1": {
+      "status": "failed",
+      "error": "The contract verification failed."
+    },
+    "market_2": {
+      "status": "failed",
+      "error": "The contract verification failed."
+    }
+  }
+}

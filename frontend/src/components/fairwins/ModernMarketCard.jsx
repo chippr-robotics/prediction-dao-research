@@ -26,6 +26,36 @@ const getCategoryThumbnail = (category) => {
   return thumbnails[category] || financeImg
 }
 
+/**
+ * Get the image URL for a market
+ * Uses custom IPFS image if available, falls back to category thumbnail
+ * @param {Object} market - Market data
+ * @returns {string} Image URL
+ */
+const getMarketImage = (market) => {
+  // Check for custom image from IPFS metadata
+  if (market.image) {
+    // Handle ipfs:// URIs
+    if (market.image.startsWith('ipfs://')) {
+      const cid = market.image.replace('ipfs://', '')
+      // Use Pinata gateway or fallback
+      const gateway = import.meta.env.VITE_PINATA_GATEWAY || 'https://gateway.pinata.cloud'
+      return `${gateway}/ipfs/${cid}`
+    }
+    // Handle https:// URLs directly
+    if (market.image.startsWith('https://')) {
+      return market.image
+    }
+    // Handle raw CIDs
+    if (market.image.startsWith('Qm') || market.image.startsWith('b')) {
+      const gateway = import.meta.env.VITE_PINATA_GATEWAY || 'https://gateway.pinata.cloud'
+      return `${gateway}/ipfs/${market.image}`
+    }
+  }
+  // Fall back to category thumbnail
+  return getCategoryThumbnail(market.category)
+}
+
 // Get subcategory display name
 const getSubcategoryName = (subcategoryId) => {
   const subcategory = findSubcategoryById(subcategoryId)
@@ -81,24 +111,40 @@ const getRingColor = (probability, marketStatus) => {
 }
 
 // Generate sparkline data points
+// Uses real price history from blockchain if available, falls back to generated data
 const generateSparklineData = (market) => {
-  // Use market ID as seed for consistent pseudo-random data
+  // Use real price history if available from blockchain
+  if (market.priceHistory && Array.isArray(market.priceHistory) && market.priceHistory.length > 0) {
+    // Ensure we have exactly SPARKLINE_DATA_POINTS
+    if (market.priceHistory.length === SPARKLINE_DATA_POINTS) {
+      return market.priceHistory
+    }
+    // Resample if different length
+    const resampled = []
+    for (let i = 0; i < SPARKLINE_DATA_POINTS; i++) {
+      const sourceIndex = Math.floor((i / SPARKLINE_DATA_POINTS) * market.priceHistory.length)
+      resampled.push(market.priceHistory[sourceIndex])
+    }
+    return resampled
+  }
+
+  // Fallback: Generate pseudo-random data for markets without trade history
   const seed = market.id || 0
   const stableRandom = (s) => {
     const x = Math.sin(s) * 10000
     return x - Math.floor(x)
   }
-  
+
   const basePrice = parseFloat(market.passTokenPrice) || SPARKLINE_DEFAULT_PRICE
   const points = []
-  
+
   for (let i = 0; i < SPARKLINE_DATA_POINTS; i++) {
     const variation = (stableRandom(seed + i * SPARKLINE_SEED_MULTIPLIER) - 0.5) * SPARKLINE_VARIATION_RANGE
     const trendAdjustment = SPARKLINE_TREND_FACTOR * (SPARKLINE_DATA_POINTS - i) / SPARKLINE_DATA_POINTS
     const price = Math.max(SPARKLINE_MIN_PRICE, Math.min(SPARKLINE_MAX_PRICE, basePrice + variation - trendAdjustment))
     points.push(price)
   }
-  
+
   // Last point is current price
   points.push(basePrice)
   return points
@@ -145,14 +191,18 @@ const formatTimeRemaining = (endTime) => {
   return `${hours}h`
 }
 
-function ModernMarketCard({ 
-  market, 
-  onClick, 
-  onTrade, 
+function ModernMarketCard({
+  market,
+  onClick,
+  onTrade,
   isActive = false,
-  isFirstRow = false 
+  isFirstRow = false
 }) {
   const [isExpanded, setIsExpanded] = useState(isFirstRow)
+
+  // Get bet type labels from market or default to Yes/No
+  const passLabel = market.betTypeLabels?.passLabel || 'Yes'
+  const failLabel = market.betTypeLabels?.failLabel || 'No'
 
   const yesProb = useMemo(() => (parseFloat(market.passTokenPrice) * 100).toFixed(0), [market.passTokenPrice])
   const noProb = useMemo(() => (100 - parseFloat(yesProb)).toFixed(0), [yesProb])
@@ -269,16 +319,20 @@ function ModernMarketCard({
       aria-pressed={isActive}
     >
       {/* Correlation group indicator */}
-      {market.correlationGroupId && (
-        <div className="correlation-indicator" title={market.correlationGroupName} />
+      {market.correlationGroup?.groupId !== undefined && (
+        <div className="correlation-indicator" title={market.correlationGroup.groupName} />
       )}
 
       {/* Background thumbnail with question text overlay */}
       <div className="card-thumbnail">
-        <img 
-          src={getCategoryThumbnail(market.category)} 
-          alt={`${market.category} category`}
+        <img
+          src={getMarketImage(market)}
+          alt={market.proposalTitle || `${market.category} category`}
           className="thumbnail-image"
+          onError={(e) => {
+            // Fall back to category thumbnail if custom image fails to load
+            e.target.src = getCategoryThumbnail(market.category)
+          }}
         />
 
       {/* Stats row */}
@@ -318,9 +372,9 @@ function ModernMarketCard({
                 </span>
               )}
               {/* Show correlation group name instead of "Group" */}
-              {market.correlationGroupName && (
-                <span className="correlation-group-pill" title={market.correlationGroupName}>
-                  {market.correlationGroupName}
+              {market.correlationGroup?.groupName && (
+                <span className="correlation-group-pill" title={market.correlationGroup.groupName}>
+                  {market.correlationGroup.groupName}
                 </span>
               )}
             </div>
@@ -407,23 +461,23 @@ function ModernMarketCard({
       </div>
 
 
-      {/* Binary action buttons: Yes/No */}
+      {/* Binary action buttons using bet type labels */}
       { isExpanded && (
       <div className="action-buttons">
-        <button 
+        <button
           className="action-btn yes-btn"
           onClick={handleYesClick}
-          aria-label={`Buy Yes on ${market.proposalTitle}`}
+          aria-label={`Buy ${passLabel} on ${market.proposalTitle}`}
         >
-          <span className="btn-label">Yes</span>
+          <span className="btn-label">{passLabel}</span>
           <span className="btn-price">{yesProb}¢</span>
         </button>
-        <button 
+        <button
           className="action-btn no-btn"
           onClick={handleNoClick}
-          aria-label={`Buy No on ${market.proposalTitle}`}
+          aria-label={`Buy ${failLabel} on ${market.proposalTitle}`}
         >
-          <span className="btn-label">No</span>
+          <span className="btn-label">{failLabel}</span>
           <span className="btn-price">{noProb}¢</span>
         </button>
       </div>

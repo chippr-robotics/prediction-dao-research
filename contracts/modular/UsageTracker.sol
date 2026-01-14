@@ -3,12 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./TierRegistry.sol";
-
-interface IRoleManagerCore {
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function OPERATIONS_ADMIN_ROLE() external view returns (bytes32);
-    function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
-}
+import "./interfaces/IRoleManagerCore.sol";
 
 /**
  * @title UsageTracker
@@ -22,9 +17,12 @@ contract UsageTracker is Ownable {
     bool private _initialized;
     
     // ========== References ==========
-    
+
     IRoleManagerCore public roleManagerCore;
     TierRegistry public tierRegistry;
+
+    // Authorized extensions (e.g., TierRegistryAdapter)
+    mapping(address => bool) public authorizedExtensions;
     
     // ========== Usage Stats ==========
     
@@ -48,6 +46,7 @@ contract UsageTracker is Ownable {
     event UsageLimitExceeded(address indexed user, bytes32 indexed role, string limitType, uint256 current, uint256 max);
     event UsageReset(address indexed user, bytes32 indexed role, string resetType);
     event ActiveMarketsUpdated(address indexed user, bytes32 indexed role, uint256 count);
+    event AuthorizedExtensionSet(address indexed extension, bool authorized);
     
     // ========== Constructor ==========
     
@@ -85,11 +84,17 @@ contract UsageTracker is Ownable {
     modifier onlyAuthorized() {
         require(
             msg.sender == owner() ||
+            authorizedExtensions[msg.sender] ||
             roleManagerCore.hasRole(roleManagerCore.DEFAULT_ADMIN_ROLE(), msg.sender) ||
             roleManagerCore.hasRole(roleManagerCore.OPERATIONS_ADMIN_ROLE(), msg.sender),
             "Not authorized"
         );
         _;
+    }
+
+    function setAuthorizedExtension(address extension, bool authorized) external onlyOwner {
+        authorizedExtensions[extension] = authorized;
+        emit AuthorizedExtensionSet(extension, authorized);
     }
     
     // ========== Usage Recording ==========
@@ -318,5 +323,69 @@ contract UsageTracker is Ownable {
     function resetUsageStats(address user, bytes32 role) external onlyOwner {
         delete usageStats[user][role];
         emit UsageReset(user, role, "full");
+    }
+
+    // ========== FriendGroupMarketFactory Compatibility ==========
+
+    /**
+     * @notice Check market creation limit and increment counters if within limits
+     * @dev Matches TieredRoleManager.checkMarketCreationLimitFor() behavior exactly:
+     *      - Resets counters if time periods have passed
+     *      - Checks both monthly creation limit AND concurrent markets limit
+     *      - Only increments counters if BOTH checks pass
+     * @param user Address to check
+     * @param role Role to check limits for
+     * @return withinLimit True if user can create a market, false otherwise
+     */
+    function checkMarketCreationLimitFor(
+        address user,
+        bytes32 role
+    ) external onlyAuthorized returns (bool withinLimit) {
+        UsageStats storage stats = usageStats[user][role];
+
+        // Reset counters if needed (matches TieredRoleManager._reset)
+        _resetCountersIfNeeded(stats);
+
+        // Get user's tier
+        TierRegistry.MembershipTier tier = tierRegistry.getUserTier(user, role);
+        if (tier == TierRegistry.MembershipTier.NONE) {
+            return false;
+        }
+
+        // Get tier limits
+        TierRegistry.TierLimits memory limits = tierRegistry.getTierLimits(role, tier);
+
+        // Check BOTH limits before incrementing (atomic check)
+        if (stats.monthlyMarketsCreated >= limits.monthlyMarketCreation) {
+            emit UsageLimitExceeded(user, role, "monthlyMarket", stats.monthlyMarketsCreated, limits.monthlyMarketCreation);
+            return false;
+        }
+        if (stats.activeMarketsCount >= limits.maxConcurrentMarkets) {
+            emit UsageLimitExceeded(user, role, "activeMarkets", stats.activeMarketsCount, limits.maxConcurrentMarkets);
+            return false;
+        }
+
+        // Both checks passed - increment both counters
+        stats.monthlyMarketsCreated++;
+        stats.activeMarketsCount++;
+
+        emit UsageRecorded(user, role, "marketCreation", stats.monthlyMarketsCreated);
+        emit ActiveMarketsUpdated(user, role, stats.activeMarketsCount);
+
+        return true;
+    }
+
+    /**
+     * @notice Record market closure (decrement active markets count)
+     * @dev Matches TieredRoleManager.recordMarketClosure() behavior
+     * @param user Address that closed the market
+     * @param role Role the market was created under
+     */
+    function recordMarketClosure(address user, bytes32 role) external onlyAuthorized {
+        UsageStats storage stats = usageStats[user][role];
+        if (stats.activeMarketsCount > 0) {
+            stats.activeMarketsCount--;
+            emit ActiveMarketsUpdated(user, role, stats.activeMarketsCount);
+        }
     }
 }

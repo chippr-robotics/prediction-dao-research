@@ -1,0 +1,8 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "newConditionalMarketFactory": "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
+  "tieredRoleManager": "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
+  "friendGroupMarketFactory": "0x8cFE477e267bB36925047df8A6E30348f82b0085",
+  "timestamp": "2026-01-14T01:57:07.710Z"
+}

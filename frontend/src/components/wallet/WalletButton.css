@@ -1,6 +1,7 @@
 /* Wallet Button Container */
 .wallet-button-container {
   position: relative;
+  min-width: fit-content;
   display: inline-block;
 }
 
@@ -8,12 +9,12 @@
 .wallet-connect-button {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
+  gap: 0.25rem;
+  padding: 0.625rem 1.5rem;
   background: var(--surface-color, #1a1a1a);
   color: var(--text-primary, #ffffff);
   border: 1px solid var(--border-color, #333);
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -33,13 +34,14 @@
 
 .wallet-connect-button:focus-visible {
   outline: 2px solid var(--primary-color, #4a9eff);
-  outline-offset: 2px;
+  outline-offset: 0px;
 }
 
 .wallet-icon {
   width: 24px;
   height: 24px;
   flex-shrink: 0;
+  left: 0;
 }
 
 .connect-text {
@@ -50,12 +52,13 @@
 .wallet-account-button {
   display: flex;
   align-items: center;
+  left: 0;
   gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.375rem 1.5rem;
   background: var(--surface-color, #1a1a1a);
   color: var(--text-primary, #ffffff);
   border: 1px solid var(--border-color, #333);
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -69,20 +72,20 @@
 
 .wallet-account-button:focus-visible {
   outline: 2px solid var(--primary-color, #4a9eff);
-  outline-offset: 2px;
-}
+  outline-offset: 0px;
+  }
 
 .account-address {
   font-family: 'Courier New', monospace;
-  font-size: 0.875rem;
+  font-size: 1rem;
 }
 
 /* Dropdown Menu */
 .wallet-dropdown {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + .5rem);
   right: 0;
-  min-width: 320px;
+  min-width: 520px;
   background: var(--surface-color, #1a1a1a);
   border: 1px solid var(--border-color, #333);
   border-radius: 16px;
@@ -95,7 +98,7 @@
 @keyframes dropdownFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-5px);
   }
   to {
     opacity: 1;
@@ -105,13 +108,13 @@
 
 /* Dropdown Header */
 .dropdown-header {
-  padding: 1.25rem;
+  padding: .25rem;
   border-bottom: 1px solid var(--border-color, #333);
 }
 
 .dropdown-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-primary, #ffffff);
 }
@@ -120,19 +123,19 @@
 .account-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem ;
 }
 
 .account-details {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0rem 0rem;
 }
 
 .account-address-full {
   font-family: 'Courier New', monospace;
-  font-size: 0.875rem;
-  color: var(--text-primary, #ffffff);
+  font-size: 0.75rem;
+  color: var( --text-primary, #ffffff);
   font-weight: 500;
 }
 
@@ -156,7 +159,7 @@
 
 .network-info {
   font-size: 0.75rem;
-  color: var(--text-secondary, #888);
+  color: var(--text-primary, #ffffff);
 }
 
 /* Extended Dropdown */
@@ -223,6 +226,77 @@
   justify-content: center;
 }
 
+/* Roles Header with Refresh Button */
+.roles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+}
+
+.roles-header .wallet-section-title {
+  margin: 0;
+}
+
+.roles-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.roles-refresh-btn:hover:not(:disabled) {
+  background: var(--surface-hover, #2a2a2a);
+  border-color: var(--primary-color, #4a9eff);
+  color: var(--primary-color, #4a9eff);
+}
+
+.roles-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.refresh-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* My Markets Section */
+.my-markets-btn {
+  width: 100%;
+  justify-content: center;
+  background: linear-gradient(135deg, #4C9AFF 0%, #3A7FD5 100%);
+  border: none;
+  color: white;
+}
+
+.my-markets-btn:hover {
+  background: linear-gradient(135deg, #5CA9FF 0%, #4C9AFF 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(76, 154, 255, 0.3);
+}
+
 /* Friend Markets Section */
 .friend-market-btn {
   width: 100%;
@@ -236,7 +310,8 @@
   border-color: var(--primary-hover, #3a8eef);
 }
 
-.friend-market-promo {
+.friend-market-promo,
+.create-market-promo {
   text-align: center;
 }
 
@@ -244,6 +319,19 @@
   font-size: 0.75rem;
   color: var(--text-secondary, #888);
   margin: 0 0 0.5rem 0;
+}
+
+/* Create Market Button */
+.create-market-btn {
+  width: 100%;
+  justify-content: center;
+  background: var(--success-color, #4caf50);
+  border-color: var(--success-color, #4caf50);
+}
+
+.create-market-btn:hover {
+  background: #3d8b40;
+  border-color: #3d8b40;
 }
 
 .purchase-access-btn {
@@ -477,11 +565,40 @@
     padding: 0.625rem;
   }
 
+  .wallet-button-container {
+    position: static;
+  }
+
   .wallet-dropdown {
-    min-width: 280px;
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    min-width: unset;
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+    animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: none;
+  }
+
+  .wallet-dropdown-extended {
+    min-width: unset;
+    width: 100%;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -87,6 +87,14 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
         require(groupId < groupCount, "Group does not exist");
         _;
     }
+
+    modifier onlyGroupCreatorOrOwner(uint256 groupId) {
+        require(
+            msg.sender == correlationGroups[groupId].creator || msg.sender == owner(),
+            "Not group creator or owner"
+        );
+        _;
+    }
     
     constructor() Ownable(msg.sender) {
         // For direct deployments, prevent initialize() from being called.
@@ -155,33 +163,40 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
     
     /**
      * @notice Add a market to a correlation group
+     * @dev Can be called by the group creator or contract owner
      * @param groupId ID of the correlation group
      * @param marketId ID of the market to add
      */
     function addMarketToGroup(
         uint256 groupId,
         uint256 marketId
-    ) external onlyOwner groupExists(groupId) {
+    ) external groupExists(groupId) onlyGroupCreatorOrOwner(groupId) {
         require(correlationGroups[groupId].active, "Group is not active");
         require(_marketToGroupPlusOne[marketId] == 0, "Market already in a group");
-        
+
         correlationGroups[groupId].marketIds.push(marketId);
         _marketToGroupPlusOne[marketId] = groupId + 1;
-        
+
         emit MarketAddedToGroup(groupId, marketId, block.timestamp);
     }
     
     /**
      * @notice Remove a market from its correlation group
+     * @dev Can be called by the group creator or contract owner
      * @param marketId ID of the market to remove
      */
-    function removeMarketFromGroup(uint256 marketId) external onlyOwner {
+    function removeMarketFromGroup(uint256 marketId) external {
         uint256 groupIdPlusOne = _marketToGroupPlusOne[marketId];
         require(groupIdPlusOne > 0, "Market not in any group");
-        
+
         uint256 groupId = groupIdPlusOne - 1;
+        require(
+            msg.sender == correlationGroups[groupId].creator || msg.sender == owner(),
+            "Not group creator or owner"
+        );
+
         CorrelationGroup storage group = correlationGroups[groupId];
-        
+
         // Find and remove market from array
         uint256[] storage marketIds = group.marketIds;
         for (uint256 i = 0; i < marketIds.length; i++) {
@@ -191,9 +206,9 @@ contract MarketCorrelationRegistry is Ownable, ReentrancyGuard {
                 break;
             }
         }
-        
+
         delete _marketToGroupPlusOne[marketId];
-        
+
         emit MarketRemovedFromGroup(groupId, marketId, block.timestamp);
     }
     

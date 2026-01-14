@@ -9,6 +9,26 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./MembershipPaymentManager.sol";
 import "../privacy/ZKKeyManager.sol";
 
+// Custom errors for gas efficiency
+error RMInvalidAddress();
+error RMInvalidZKKey();
+error RMNotPurchasable();
+error RMNotPremium();
+error RMNotActive();
+error RMAtCapacity();
+error RMAlreadyInitialized();
+error RMInsufficientPayment();
+error RMPaymentManagerNotSet();
+error RMZKManagerNotSet();
+error RMNoBalance();
+error RMActionNotFound();
+error RMAlreadyApproved();
+error RMTimelockNotExpired();
+error RMInsufficientApprovals();
+error RMAlreadyExecuted();
+error RMAlreadyCancelled();
+error RMActionCancelled();
+
 /**
  * @title RoleManager
  * @notice Comprehensive role-based access control system with hierarchy, timelocks, and multisig support
@@ -143,7 +163,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @dev Can only be called once by an admin. Should be called after deployment.
      */
     function initializeRoleMetadata() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(!_roleMetadataInitialized, "Role metadata already initialized");
+        if (_roleMetadataInitialized) revert RMAlreadyInitialized();
         _roleMetadataInitialized = true;
         _initializeRoleMetadata();
     }
@@ -265,11 +285,11 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     function purchaseRole(bytes32 role) external payable nonReentrant whenNotPaused {
         RoleMetadata storage metadata = roleMetadata[role];
         
-        require(metadata.isActive, "Role is not active");
-        require(metadata.isPremium, "Role is not purchasable");
-        require(msg.value >= metadata.price, "Insufficient payment");
-        require(!hasRole(role, msg.sender), "Already has role");
-        require(metadata.maxMembers == 0 || metadata.currentMembers < metadata.maxMembers, "Role at max capacity");
+        if (!metadata.isActive) revert RMNotActive();
+        if (!metadata.isPremium) revert RMNotPurchasable();
+        if (msg.value < metadata.price) revert RMInsufficientPayment();
+        if (hasRole(role, msg.sender)) revert RMAlreadyApproved();
+        if (metadata.maxMembers != 0 && metadata.currentMembers >= metadata.maxMembers) revert RMAtCapacity();
         
         // Record purchase
         purchases[msg.sender][role] = RolePurchase({
@@ -305,14 +325,14 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         address paymentToken,
         uint256 amount
     ) external nonReentrant whenNotPaused {
-        require(address(paymentManager) != address(0), "Payment manager not set");
+        if (address(paymentManager) == address(0)) revert RMPaymentManagerNotSet();
         
         RoleMetadata storage metadata = roleMetadata[role];
         
-        require(metadata.isActive, "Role is not active");
-        require(metadata.isPremium, "Role is not purchasable");
-        require(!hasRole(role, msg.sender), "Already has role");
-        require(metadata.maxMembers == 0 || metadata.currentMembers < metadata.maxMembers, "Role at max capacity");
+        if (!metadata.isActive) revert RMNotActive();
+        if (!metadata.isPremium) revert RMNotPurchasable();
+        if (hasRole(role, msg.sender)) revert RMAlreadyApproved();
+        if (metadata.maxMembers != 0 && metadata.currentMembers >= metadata.maxMembers) revert RMAtCapacity();
         
         // Transfer tokens from buyer to this contract
         IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
@@ -353,8 +373,8 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @param zkPublicKey The zero-knowledge public key
      */
     function registerZKKey(string memory zkPublicKey) external whenNotPaused {
-        require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
-        require(bytes(zkPublicKey).length > 0, "Invalid ZK key");
+        if (!hasRole(CLEARPATH_USER_ROLE, msg.sender)) revert RMNotActive();
+        if (bytes(zkPublicKey).length == 0) revert RMInvalidZKKey();
         
         // If ZKKeyManager is set, use production key management
         if (address(zkKeyManager) != address(0)) {
@@ -373,9 +393,9 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @param newZKPublicKey The new zero-knowledge public key
      */
     function rotateZKKey(string memory newZKPublicKey) external whenNotPaused {
-        require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
-        require(bytes(newZKPublicKey).length > 0, "Invalid ZK key");
-        require(address(zkKeyManager) != address(0), "ZK key manager not set");
+        if (!hasRole(CLEARPATH_USER_ROLE, msg.sender)) revert RMNotActive();
+        if (bytes(newZKPublicKey).length == 0) revert RMInvalidZKKey();
+        if (address(zkKeyManager) == address(0)) revert RMZKManagerNotSet();
         
         // Rotate key using ZKKeyManager
         zkKeyManager.rotateKeyFor(msg.sender, newZKPublicKey);
@@ -390,8 +410,8 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @notice Revoke ZK public key
      */
     function revokeZKKey() external whenNotPaused {
-        require(hasRole(CLEARPATH_USER_ROLE, msg.sender), "Must have ClearPath role");
-        require(address(zkKeyManager) != address(0), "ZK key manager not set");
+        if (!hasRole(CLEARPATH_USER_ROLE, msg.sender)) revert RMNotActive();
+        if (address(zkKeyManager) == address(0)) revert RMZKManagerNotSet();
         
         // Revoke key using ZKKeyManager - pass msg.sender as the user
         // Note: This works because ZKKeyManager allows key owner to revoke their own key
@@ -414,10 +434,10 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
         address target,
         bool isGrant
     ) external onlyRole(getRoleAdmin(role)) whenNotPaused returns (bytes32) {
-        require(target != address(0), "Invalid target address");
+        if (target == address(0)) revert RMInvalidAddress();
         
         RoleMetadata storage metadata = roleMetadata[role];
-        require(metadata.isActive, "Role is not active");
+        if (!metadata.isActive) revert RMNotActive();
         
         // Skip timelock for non-premium roles with no timelock delay
         if (!metadata.isPremium && metadata.timelockDelay == 0) {
@@ -458,11 +478,11 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     function approveRoleAction(bytes32 actionId) external whenNotPaused {
         PendingAction storage action = pendingActions[actionId];
         
-        require(action.actionId != bytes32(0), "Action does not exist");
-        require(!action.executed, "Action already executed");
-        require(!action.cancelled, "Action cancelled");
-        require(!action.approvals[msg.sender], "Already approved");
-        require(hasRole(getRoleAdmin(action.role), msg.sender), "Not authorized to approve");
+        if (action.actionId == bytes32(0)) revert RMActionNotFound();
+        if (action.executed) revert RMAlreadyExecuted();
+        if (action.cancelled) revert RMActionCancelled();
+        if (action.approvals[msg.sender]) revert RMAlreadyApproved();
+        if (!hasRole(getRoleAdmin(action.role), msg.sender)) revert RMNotActive();
         
         action.approvals[msg.sender] = true;
         action.approvalCount++;
@@ -477,13 +497,13 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     function executeRoleAction(bytes32 actionId) external nonReentrant whenNotPaused {
         PendingAction storage action = pendingActions[actionId];
         
-        require(action.actionId != bytes32(0), "Action does not exist");
-        require(!action.executed, "Action already executed");
-        require(!action.cancelled, "Action cancelled");
-        require(block.timestamp >= action.executeAfter, "Timelock not expired");
+        if (action.actionId == bytes32(0)) revert RMActionNotFound();
+        if (action.executed) revert RMAlreadyExecuted();
+        if (action.cancelled) revert RMActionCancelled();
+        if (block.timestamp < action.executeAfter) revert RMTimelockNotExpired();
         
         RoleMetadata storage metadata = roleMetadata[action.role];
-        require(action.approvalCount >= metadata.minApprovals, "Insufficient approvals");
+        if (action.approvalCount < metadata.minApprovals) revert RMInsufficientApprovals();
         
         action.executed = true;
         
@@ -505,9 +525,9 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
     function cancelRoleAction(bytes32 actionId) external onlyRole(EMERGENCY_GUARDIAN_ROLE) {
         PendingAction storage action = pendingActions[actionId];
         
-        require(action.actionId != bytes32(0), "Action does not exist");
-        require(!action.executed, "Action already executed");
-        require(!action.cancelled, "Action already cancelled");
+        if (action.actionId == bytes32(0)) revert RMActionNotFound();
+        if (action.executed) revert RMAlreadyExecuted();
+        if (action.cancelled) revert RMAlreadyCancelled();
         
         action.cancelled = true;
         
@@ -539,7 +559,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @param _paymentManager Address of MembershipPaymentManager contract
      */
     function setPaymentManager(address _paymentManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_paymentManager != address(0), "Invalid payment manager address");
+        if (_paymentManager == address(0)) revert RMInvalidAddress();
         address oldManager = address(paymentManager);
         paymentManager = MembershipPaymentManager(_paymentManager);
         emit PaymentManagerUpdated(oldManager, _paymentManager);
@@ -550,7 +570,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @param _zkKeyManager Address of ZKKeyManager contract
      */
     function setZKKeyManager(address _zkKeyManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_zkKeyManager != address(0), "Invalid ZK key manager address");
+        if (_zkKeyManager == address(0)) revert RMInvalidAddress();
         address oldManager = address(zkKeyManager);
         zkKeyManager = ZKKeyManager(_zkKeyManager);
         emit ZKKeyManagerUpdated(oldManager, _zkKeyManager);
@@ -582,7 +602,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      * @notice Set role price (Operations Admin only)
      */
     function setRolePrice(bytes32 role, uint256 price) external onlyRole(OPERATIONS_ADMIN_ROLE) {
-        require(roleMetadata[role].isPremium, "Role is not premium");
+        if (!roleMetadata[role].isPremium) revert RMNotPremium();
         roleMetadata[role].price = price;
     }
     
@@ -598,7 +618,7 @@ contract RoleManager is AccessControl, ReentrancyGuard, Pausable {
      */
     function withdraw() external onlyRole(OPERATIONS_ADMIN_ROLE) nonReentrant {
         uint256 balance = address(this).balance;
-        require(balance > 0, "No balance to withdraw");
+        if (balance == 0) revert RMNoBalance();
         payable(msg.sender).transfer(balance);
     }
     

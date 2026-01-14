@@ -1,0 +1,9 @@
+{
+  "network": "mordor",
+  "chainId": "63",
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "newRoleManagerCore": "0x4BBEB3695d513Be15881977E89104315Ee85b5e5",
+  "factory": "0x08E5a4B716c06e92525E17495d0995A6F7102414",
+  "userWithRole": "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E",
+  "timestamp": "2026-01-11T00:05:01.846Z"
+}

@@ -12,9 +12,45 @@ describe("DAOFactory", function () {
 
   beforeEach(async function () {
     [owner, addr1, addr2, addr3] = await ethers.getSigners();
-    
+
+    const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
+    const welfareRegistryImpl = await WelfareMetricRegistry.deploy();
+    await welfareRegistryImpl.waitForDeployment();
+
+    const ProposalRegistry = await ethers.getContractFactory("ProposalRegistry");
+    const proposalRegistryImpl = await ProposalRegistry.deploy();
+    await proposalRegistryImpl.waitForDeployment();
+
+    const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
+    const marketFactoryImpl = await ConditionalMarketFactory.deploy();
+    await marketFactoryImpl.waitForDeployment();
+
+    const PrivacyCoordinator = await ethers.getContractFactory("PrivacyCoordinator");
+    const privacyCoordinatorImpl = await PrivacyCoordinator.deploy();
+    await privacyCoordinatorImpl.waitForDeployment();
+
+    const OracleResolver = await ethers.getContractFactory("OracleResolver");
+    const oracleResolverImpl = await OracleResolver.deploy();
+    await oracleResolverImpl.waitForDeployment();
+
+    const RagequitModule = await ethers.getContractFactory("RagequitModule");
+    const ragequitModuleImpl = await RagequitModule.deploy();
+    await ragequitModuleImpl.waitForDeployment();
+
+    const FutarchyGovernor = await ethers.getContractFactory("FutarchyGovernor");
+    const futarchyGovernorImpl = await FutarchyGovernor.deploy();
+    await futarchyGovernorImpl.waitForDeployment();
+
     const DAOFactory = await ethers.getContractFactory("DAOFactory");
-    daoFactory = await DAOFactory.deploy();
+    daoFactory = await DAOFactory.deploy(
+      await welfareRegistryImpl.getAddress(),
+      await proposalRegistryImpl.getAddress(),
+      await marketFactoryImpl.getAddress(),
+      await privacyCoordinatorImpl.getAddress(),
+      await oracleResolverImpl.getAddress(),
+      await ragequitModuleImpl.getAddress(),
+      await futarchyGovernorImpl.getAddress()
+    );
     await daoFactory.waitForDeployment();
   });
 

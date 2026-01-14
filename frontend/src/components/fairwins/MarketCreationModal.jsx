@@ -1,6 +1,14 @@
-import { useState, useCallback, useMemo } from 'react'
-import { useWallet, useWeb3 } from '../../hooks'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
+import { TOKENS } from '../../constants/etcswap'
+import { isValidEthereumAddress } from '../../utils/validation'
+import {
+  isCorrelationRegistryDeployed,
+  fetchCorrelationGroups,
+  fetchCorrelationGroupsByCategory
+} from '../../utils/blockchainService'
+import H3MapSelector from './H3MapSelector'
 import './MarketCreationModal.css'
 
 /**
@@ -17,9 +25,9 @@ import './MarketCreationModal.css'
  * - Collateral token
  *
  * Off-chain data (stored in IPFS):
- * - Market question/title
- * - Description
- * - Resolution criteria
+ * - Title (short, descriptive name displayed on cards)
+ * - Question (the specific prediction question)
+ * - Description (context, background, and resolution criteria)
  * - Category, tags, image
  */
 
@@ -38,7 +46,15 @@ const BET_TYPES = [
 
 const CATEGORIES = [
   'Crypto', 'Politics', 'Sports', 'Entertainment', 'Science',
-  'Technology', 'Business', 'Finance', 'Culture', 'Other'
+  'Technology', 'Business', 'Finance', 'Culture', 'Weather', 'Other'
+]
+
+// Collateral token options derived from ETCswap tokens
+const COLLATERAL_TOKEN_OPTIONS = [
+  { id: 'USC', ...TOKENS.USC, isDefault: true },
+  { id: 'WETC', ...TOKENS.WETC },
+  { id: 'ETC', ...TOKENS.ETC },
+  { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token Address', address: '', icon: '🔧' }
 ]
 
 const STEPS = [
@@ -55,6 +71,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   // Step navigation
   const [currentStep, setCurrentStep] = useState(0)
 
+  // Note: ENS resolution hook is placed after state declarations below
+
   // Metadata source toggle
   const [useCustomUri, setUseCustomUri] = useState(false)
 
@@ -66,22 +84,58 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     category: '',
     tags: '',
     imageUri: '',
-    sourceUrl: ''
+    sourceUrl: '',
+    h3Index: null, // H3 hexagon index for weather markets
+    h3Resolution: 5 // H3 resolution for weather markets
   })
 
   // Custom URI input
   const [customUri, setCustomUri] = useState('')
 
+  // Helper to get default resolution date (14 days from now)
+  const getDefaultResolutionDate = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 14)
+    // Format as YYYY-MM-DDTHH:mm for datetime-local input
+    return date.toISOString().slice(0, 16)
+  }
+
   // Form data for on-chain parameters
   const [paramsForm, setParamsForm] = useState({
-    tradingPeriodDays: '14',
+    resolutionDateTime: getDefaultResolutionDate(),
     initialLiquidity: '',
     betType: 1, // Default to Pass/Fail (more appropriate for governance-style predictions)
-    collateralToken: '' // Empty means use native token
+    collateralTokenId: 'USC', // Default to USC stablecoin
+    customCollateralAddress: '' // Used when collateralTokenId is 'CUSTOM'
   })
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+  // Transaction progress tracking
+  const [transactionProgress, setTransactionProgress] = useState(null)
+
+  // Correlation group state
+  const [correlationGroups, setCorrelationGroups] = useState([])
+  const [correlationGroupsLoading, setCorrelationGroupsLoading] = useState(false)
+  const [selectedCorrelationGroup, setSelectedCorrelationGroup] = useState(null)
+  const [createNewGroup, setCreateNewGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupDescription, setNewGroupDescription] = useState('')
+  const [correlationEnabled, setCorrelationEnabled] = useState(false)
+
+  // ENS resolution for collateral token address
+  const {
+    resolvedAddress: resolvedCollateralAddress,
+    isLoading: isResolvingCollateral,
+    error: collateralResolutionError,
+    isEns: isCollateralEns
+  } = useEnsResolution(paramsForm.collateralToken || '')
+
+  // Helper to shorten address for display
+  const shortenAddressForHint = (addr) => {
+    if (!addr || addr.length < 10) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
+  }
 
   // Reset form when modal opens/closes
   const resetForm = useCallback(() => {
@@ -94,18 +148,66 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       category: '',
       tags: '',
       imageUri: '',
-      sourceUrl: ''
+      sourceUrl: '',
+      h3Index: null,
+      h3Resolution: 5
     })
     setCustomUri('')
     setParamsForm({
-      tradingPeriodDays: '14',
+      resolutionDateTime: getDefaultResolutionDate(),
       initialLiquidity: '',
       betType: 1,
-      collateralToken: ''
+      collateralTokenId: 'USC',
+      customCollateralAddress: ''
     })
     setErrors({})
     setSubmitting(false)
+    setTransactionProgress(null)
+    // Reset correlation group state
+    setSelectedCorrelationGroup(null)
+    setCreateNewGroup(false)
+    setNewGroupName('')
+    setNewGroupDescription('')
+    setCorrelationEnabled(false)
   }, [])
+
+  // Reset form state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      resetForm()
+    }
+  }, [isOpen, resetForm])
+
+  // Fetch correlation groups when modal opens or category changes
+  useEffect(() => {
+    const loadCorrelationGroups = async () => {
+      if (!isOpen) return
+      if (!isCorrelationRegistryDeployed()) {
+        setCorrelationGroups([])
+        return
+      }
+
+      setCorrelationGroupsLoading(true)
+      try {
+        let groups
+        if (metadataForm.category) {
+          // Fetch groups for the selected category
+          groups = await fetchCorrelationGroupsByCategory(metadataForm.category)
+        } else {
+          // Fetch all groups if no category selected
+          groups = await fetchCorrelationGroups()
+        }
+        setCorrelationGroups(groups)
+      } catch (error) {
+        console.error('Error loading correlation groups:', error)
+        setCorrelationGroups([])
+      } finally {
+        setCorrelationGroupsLoading(false)
+      }
+    }
+
+    loadCorrelationGroups()
+  }, [isOpen, metadataForm.category])
 
   // Handle form changes
   const handleMetadataChange = useCallback((field, value) => {
@@ -140,27 +242,32 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         }
       } else {
         if (!metadataForm.question.trim()) {
-          newErrors.question = 'Market question is required'
+          newErrors.question = 'Market title is required'
         } else if (metadataForm.question.length < 10) {
-          newErrors.question = 'Question must be at least 10 characters'
+          newErrors.question = 'Title must be at least 10 characters'
         } else if (metadataForm.question.length > 200) {
-          newErrors.question = 'Question must be under 200 characters'
+          newErrors.question = 'Title must be under 200 characters'
         }
 
         if (!metadataForm.description.trim()) {
-          newErrors.description = 'Description is required'
+          newErrors.description = 'Market question is required'
         } else if (metadataForm.description.length < 30) {
-          newErrors.description = 'Description must be at least 30 characters'
+          newErrors.description = 'Question must be at least 30 characters'
         }
 
         if (!metadataForm.resolutionCriteria.trim()) {
-          newErrors.resolutionCriteria = 'Resolution criteria is required'
+          newErrors.resolutionCriteria = 'Market description is required'
         } else if (metadataForm.resolutionCriteria.length < 20) {
-          newErrors.resolutionCriteria = 'Resolution criteria must be at least 20 characters'
+          newErrors.resolutionCriteria = 'Description must be at least 20 characters'
         }
 
         if (!metadataForm.category) {
           newErrors.category = 'Please select a category'
+        }
+
+        // Validate H3 location for Weather category
+        if (metadataForm.category === 'Weather' && !metadataForm.h3Index) {
+          newErrors.h3Index = 'Please select a location on the map for weather markets'
         }
 
         // Validate optional URI fields if provided
@@ -191,10 +298,18 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     // Step 1 is educational, no validation needed
 
     if (step === 2) {
-      // Parameters validation
-      const days = parseInt(paramsForm.tradingPeriodDays)
-      if (isNaN(days) || days < 7 || days > 21) {
-        newErrors.tradingPeriodDays = 'Trading period must be 7-21 days'
+      // Parameters validation - resolution date/time
+      const resolutionDate = new Date(paramsForm.resolutionDateTime)
+      const now = new Date()
+      const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day from now
+      const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year from now
+
+      if (!paramsForm.resolutionDateTime || isNaN(resolutionDate.getTime())) {
+        newErrors.resolutionDateTime = 'Please select a valid resolution date and time'
+      } else if (resolutionDate < minDate) {
+        newErrors.resolutionDateTime = 'Resolution must be at least 1 day from now'
+      } else if (resolutionDate > maxDate) {
+        newErrors.resolutionDateTime = 'Resolution must be within 1 year'
       }
 
       const liquidity = parseFloat(paramsForm.initialLiquidity)
@@ -204,8 +319,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
         newErrors.initialLiquidity = 'Maximum liquidity is 1,000,000 ETC'
       }
 
-      if (paramsForm.collateralToken && !/^0x[a-fA-F0-9]{40}$/.test(paramsForm.collateralToken)) {
-        newErrors.collateralToken = 'Invalid token address format (should be checksummed)'
+      // Validate custom collateral address if custom token is selected
+      if (paramsForm.collateralTokenId === 'CUSTOM') {
+        if (!paramsForm.customCollateralAddress) {
+          newErrors.customCollateralAddress = 'Custom token address is required'
+        } else if (!/^0x[a-fA-F0-9]{40}$/.test(paramsForm.customCollateralAddress)) {
+          newErrors.customCollateralAddress = 'Invalid token address format (should be checksummed)'
+        }
       }
     }
 
@@ -247,13 +367,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
     if (resolutionCriteria) {
       const descLower = description.toLowerCase()
-      const marker = 'resolution criteria'
-      const hasResolutionSection = descLower.includes(marker)
+      const marker = '**description:**'
+      const hasDescriptionSection = descLower.includes(marker)
 
-      if (!hasResolutionSection) {
+      if (!hasDescriptionSection) {
         description = description
-          ? `${description}\n\n**Resolution Criteria:**\n${resolutionCriteria}`
-          : `**Resolution Criteria:**\n${resolutionCriteria}`
+          ? `${description}\n\n**Description:**\n${resolutionCriteria}`
+          : `**Description:**\n${resolutionCriteria}`
       }
     }
 
@@ -270,14 +390,19 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       attributes: [
         { trait_type: 'Category', value: metadataForm.category },
         { trait_type: 'Bet Type', value: betType?.name || 'Pass / Fail' },
-        { trait_type: 'Trading Period', value: `${paramsForm.tradingPeriodDays} days`, display_type: 'string' },
+        { trait_type: 'Resolution Date', value: paramsForm.resolutionDateTime, display_type: 'date' },
         { trait_type: 'Initial Liquidity', value: isValidLiquidity ? liquidityNum : 0, display_type: 'number' }
       ],
       properties: {
         creator: address,
         created_at: new Date().toISOString(),
         tags: tags.length > 0 ? tags : undefined,
-        resolution_criteria: metadataForm.resolutionCriteria
+        resolution_criteria: metadataForm.resolutionCriteria,
+        // H3 location data for weather markets
+        ...(metadataForm.category === 'Weather' && metadataForm.h3Index ? {
+          h3_index: metadataForm.h3Index,
+          h3_resolution: metadataForm.h3Resolution
+        } : {})
       }
     }
   }, [metadataForm, paramsForm, address])
@@ -311,24 +436,57 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     setSubmitting(true)
 
     try {
+      // Get the actual collateral token address based on selection
+      const getCollateralTokenAddress = () => {
+        if (paramsForm.collateralTokenId === 'CUSTOM') {
+          return paramsForm.customCollateralAddress || null
+        }
+        const token = COLLATERAL_TOKEN_OPTIONS.find(t => t.id === paramsForm.collateralTokenId)
+        if (!token || token.address === 'native') {
+          return null // Native ETC
+        }
+        return token.address
+      }
+
+      // Calculate trading period in seconds from resolution date
+      const resolutionDate = new Date(paramsForm.resolutionDateTime)
+      const now = new Date()
+      const tradingPeriodSeconds = Math.floor((resolutionDate.getTime() - now.getTime()) / 1000)
+
       const submitData = {
         // On-chain parameters
-        // Trading period converted to seconds (7-21 days * 86400 seconds/day)
-        // Contract accepts values in this range as validated above
-        tradingPeriod: parseInt(paramsForm.tradingPeriodDays) * 24 * 60 * 60,
+        // Trading period calculated from the difference between resolution date and now
+        tradingPeriod: tradingPeriodSeconds,
         initialLiquidity: paramsForm.initialLiquidity,
         betType: paramsForm.betType,
-        collateralToken: paramsForm.collateralToken || null,
+        collateralToken: getCollateralTokenAddress(),
+        // Correlation group data
+        correlationGroup: correlationEnabled ? {
+          existingGroupId: createNewGroup ? null : selectedCorrelationGroup?.id,
+          createNew: createNewGroup,
+          newGroupName: createNewGroup ? newGroupName : null,
+          newGroupDescription: createNewGroup ? newGroupDescription : null,
+          category: metadataForm.category
+        } : null,
         // Metadata
         metadataUri: getFinalUri(),
         metadata: useCustomUri ? null : buildMetadataJson()
       }
 
-      await onCreate(submitData, signer)
+      // Progress callback to update UI
+      const handleProgress = (progress) => {
+        setTransactionProgress(progress)
+      }
+
+      await onCreate(submitData, signer, handleProgress)
+      setTransactionProgress({ step: 0, total: 0, description: 'Complete!', status: 'completed' })
+      // Brief delay to show completion before closing
+      await new Promise(resolve => setTimeout(resolve, 1000))
       resetForm()
       onClose()
     } catch (error) {
       console.error('Error creating market:', error)
+      setTransactionProgress(null)
       setErrors({ submit: error.message || 'Failed to create market. Please try again.' })
     } finally {
       setSubmitting(false)
@@ -347,6 +505,54 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     BET_TYPES.find(b => b.id === paramsForm.betType),
     [paramsForm.betType]
   )
+
+  // Get selected collateral token info
+  const selectedCollateralToken = useMemo(() => {
+    const token = COLLATERAL_TOKEN_OPTIONS.find(t => t.id === paramsForm.collateralTokenId)
+    if (paramsForm.collateralTokenId === 'CUSTOM' && paramsForm.customCollateralAddress) {
+      return {
+        ...token,
+        displayAddress: paramsForm.customCollateralAddress
+      }
+    }
+    return token
+  }, [paramsForm.collateralTokenId, paramsForm.customCollateralAddress])
+
+  // Check if current step is valid WITHOUT triggering re-render (no setErrors)
+  // This is used in render for disabled state calculations
+  const isCurrentStepValid = useMemo(() => {
+    if (currentStep === 0) {
+      if (useCustomUri) {
+        return customUri.trim() && isValidUri(customUri.trim())
+      }
+      return (
+        metadataForm.question.trim().length >= 10 &&
+        metadataForm.question.length <= 200 &&
+        metadataForm.description.trim().length >= 30 &&
+        metadataForm.resolutionCriteria.trim().length >= 20 &&
+        metadataForm.category
+      )
+    }
+    if (currentStep === 1) {
+      return true // Education step, always valid
+    }
+    if (currentStep === 2) {
+      const resolutionDate = new Date(paramsForm.resolutionDateTime)
+      const now = new Date()
+      const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day
+      const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year
+      const liquidity = parseFloat(paramsForm.initialLiquidity)
+      const isValidResolutionDate = paramsForm.resolutionDateTime &&
+        !isNaN(resolutionDate.getTime()) &&
+        resolutionDate >= minDate &&
+        resolutionDate <= maxDate
+      return (
+        isValidResolutionDate &&
+        paramsForm.initialLiquidity && !isNaN(liquidity) && liquidity >= 100 && liquidity <= 1000000
+      )
+    }
+    return false
+  }, [currentStep, useCustomUri, customUri, metadataForm, paramsForm])
 
   if (!isOpen) return null
 
@@ -379,7 +585,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
               key={step.id}
               className={`mcm-step ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
               onClick={() => handleStepClick(index)}
-              disabled={submitting || (index > currentStep && (index !== currentStep + 1 || !validateStep(currentStep)))}
+              disabled={submitting || (index > currentStep && (index !== currentStep + 1 || !isCurrentStepValid))}
               aria-current={index === currentStep ? 'step' : undefined}
             >
               <span className="mcm-step-icon" aria-hidden="true">
@@ -455,18 +661,18 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                 <>
                   <section className="mcm-section">
                     <h3 className="mcm-section-title">
-                      <span aria-hidden="true">❓</span> Market Question
+                      <span aria-hidden="true">❓</span> Market Details
                     </h3>
                     <div className="mcm-field">
                       <label htmlFor="question">
-                        Question <span className="mcm-required">*</span>
+                        Title <span className="mcm-required">*</span>
                       </label>
                       <input
                         id="question"
                         type="text"
                         value={metadataForm.question}
                         onChange={e => handleMetadataChange('question', e.target.value)}
-                        placeholder="Will Bitcoin reach $100,000 by end of 2025?"
+                        placeholder="Short, descriptive title for the market"
                         disabled={submitting}
                         maxLength={200}
                         className={errors.question ? 'error' : ''}
@@ -479,13 +685,13 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                     <div className="mcm-field">
                       <label htmlFor="description">
-                        Description <span className="mcm-required">*</span>
+                        Question <span className="mcm-required">*</span>
                       </label>
                       <textarea
                         id="description"
                         value={metadataForm.description}
                         onChange={e => handleMetadataChange('description', e.target.value)}
-                        placeholder="Provide context and background for this prediction..."
+                        placeholder="The specific question this market is asking (e.g., Will Bitcoin reach $100,000 by end of 2025?)"
                         disabled={submitting}
                         rows={3}
                         className={errors.description ? 'error' : ''}
@@ -495,18 +701,18 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                     <div className="mcm-field">
                       <label htmlFor="resolutionCriteria">
-                        Resolution Criteria <span className="mcm-required">*</span>
+                        Description <span className="mcm-required">*</span>
                       </label>
                       <textarea
                         id="resolutionCriteria"
                         value={metadataForm.resolutionCriteria}
                         onChange={e => handleMetadataChange('resolutionCriteria', e.target.value)}
-                        placeholder="Define exactly how this market will be resolved..."
+                        placeholder="Provide context, background, and resolution criteria for this market..."
                         disabled={submitting}
                         rows={3}
                         className={errors.resolutionCriteria ? 'error' : ''}
                       />
-                      <div className="mcm-hint">Be specific about data sources, timing, and edge cases</div>
+                      <div className="mcm-hint">Include data sources, timing, edge cases, and how resolution will be determined</div>
                       {errors.resolutionCriteria && <div className="mcm-error">{errors.resolutionCriteria}</div>}
                     </div>
                   </section>
@@ -535,6 +741,27 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                       </div>
                       {errors.category && <div className="mcm-error">{errors.category}</div>}
                     </div>
+
+                    {/* H3 Location Selector for Weather Markets */}
+                    {metadataForm.category === 'Weather' && (
+                      <div className="mcm-field">
+                        <label>
+                          Location <span className="mcm-required">*</span>
+                        </label>
+                        <div className="mcm-hint" style={{ marginBottom: '0.5rem' }}>
+                          Select the geographic area for this weather prediction market
+                        </div>
+                        <H3MapSelector
+                          selectedH3={metadataForm.h3Index}
+                          onH3Select={(h3Index) => handleMetadataChange('h3Index', h3Index)}
+                          resolution={metadataForm.h3Resolution}
+                          onResolutionChange={(resolution) => handleMetadataChange('h3Resolution', resolution)}
+                          disabled={submitting}
+                          height="350px"
+                        />
+                        {errors.h3Index && <div className="mcm-error">{errors.h3Index}</div>}
+                      </div>
+                    )}
 
                     <div className="mcm-field">
                       <label htmlFor="tags">Tags</label>
@@ -796,31 +1023,26 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
               <section className="mcm-section">
                 <h3 className="mcm-section-title">
-                  <span aria-hidden="true">⏱️</span> Trading Period
+                  <span aria-hidden="true">📅</span> Resolution Date & Time
                 </h3>
                 <div className="mcm-field">
-                  <label htmlFor="tradingPeriod">
-                    Duration (Days) <span className="mcm-required">*</span>
+                  <label htmlFor="resolutionDateTime">
+                    When will this market resolve? <span className="mcm-required">*</span>
                   </label>
-                  <div className="mcm-range-input">
-                    <input
-                      id="tradingPeriod"
-                      type="range"
-                      min="7"
-                      max="21"
-                      value={paramsForm.tradingPeriodDays}
-                      onChange={e => handleParamsChange('tradingPeriodDays', e.target.value)}
-                      disabled={submitting}
-                      className="mcm-slider"
-                      aria-valuemin="7"
-                      aria-valuemax="21"
-                      aria-valuenow={paramsForm.tradingPeriodDays}
-                      aria-valuetext={`${paramsForm.tradingPeriodDays} days`}
-                    />
-                    <span className="mcm-range-value">{paramsForm.tradingPeriodDays} days</span>
+                  <input
+                    id="resolutionDateTime"
+                    type="datetime-local"
+                    value={paramsForm.resolutionDateTime}
+                    onChange={e => handleParamsChange('resolutionDateTime', e.target.value)}
+                    disabled={submitting}
+                    className={`mcm-datetime-input ${errors.resolutionDateTime ? 'error' : ''}`}
+                    min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                  />
+                  <div className="mcm-hint">
+                    Select the exact date and time when trading ends and the market resolves (min: 1 day, max: 1 year from now)
                   </div>
-                  <div className="mcm-hint">Trading period: 7-21 days</div>
-                  {errors.tradingPeriodDays && <div className="mcm-error">{errors.tradingPeriodDays}</div>}
+                  {errors.resolutionDateTime && <div className="mcm-error">{errors.resolutionDateTime}</div>}
                 </div>
               </section>
 
@@ -850,20 +1072,201 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                 <div className="mcm-field">
                   <label htmlFor="collateralToken">
-                    Collateral Token (Optional)
+                    Collateral Token
                   </label>
-                  <input
+                  <select
                     id="collateralToken"
-                    type="text"
-                    value={paramsForm.collateralToken}
-                    onChange={e => handleParamsChange('collateralToken', e.target.value)}
-                    placeholder="0x... (leave empty for native ETC)"
+                    value={paramsForm.collateralTokenId}
+                    onChange={e => handleParamsChange('collateralTokenId', e.target.value)}
                     disabled={submitting}
-                    className={errors.collateralToken ? 'error' : ''}
-                  />
-                  <div className="mcm-hint">ERC-20 token address or leave empty for native ETC</div>
-                  {errors.collateralToken && <div className="mcm-error">{errors.collateralToken}</div>}
+                    className="mcm-token-select"
+                  >
+                    {COLLATERAL_TOKEN_OPTIONS.map(token => (
+                      <option key={token.id} value={token.id}>
+                        {token.icon} {token.symbol} - {token.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mcm-hint">
+                    {paramsForm.collateralTokenId === 'ETC'
+                      ? 'Native ETC will be used as collateral'
+                      : paramsForm.collateralTokenId === 'CUSTOM'
+                      ? 'Enter a custom ERC-20 token address below'
+                      : `${selectedCollateralToken?.name} from ETCswap`}
+                  </div>
                 </div>
+
+                {/* Custom token address input - only shown when CUSTOM is selected */}
+                {paramsForm.collateralTokenId === 'CUSTOM' && (
+                  <div className="mcm-field">
+                    <label htmlFor="customCollateralAddress">
+                      Custom Token Address <span className="mcm-required">*</span>
+                    </label>
+                    <input
+                      id="customCollateralAddress"
+                      type="text"
+                      value={paramsForm.customCollateralAddress}
+                      onChange={e => handleParamsChange('customCollateralAddress', e.target.value)}
+                      placeholder="0x..."
+                      disabled={submitting}
+                      className={errors.customCollateralAddress ? 'error' : ''}
+                    />
+                    <div className="mcm-hint">Enter a valid ERC-20 token address</div>
+                    {errors.customCollateralAddress && <div className="mcm-error">{errors.customCollateralAddress}</div>}
+                  </div>
+                )}
+              </section>
+
+              {/* Correlation Group Section */}
+              <section className="mcm-section">
+                <h3 className="mcm-section-title">
+                  <span aria-hidden="true">🔗</span> Market Correlation
+                </h3>
+
+                {/* Enable/disable correlation toggle */}
+                <div className="mcm-toggle-row">
+                  <div className="mcm-toggle-info">
+                    <strong>Link to Correlation Group</strong>
+                    <p>Group related markets together (e.g., election candidates, tournament brackets)</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="mcm-toggle-btn"
+                    onClick={() => setCorrelationEnabled(!correlationEnabled)}
+                    aria-pressed={correlationEnabled}
+                    disabled={submitting || !isCorrelationRegistryDeployed()}
+                  >
+                    <span className="mcm-toggle-track">
+                      <span className={`mcm-toggle-thumb ${correlationEnabled ? 'active' : ''}`} />
+                    </span>
+                    <span className="mcm-toggle-label">{correlationEnabled ? 'Enabled' : 'Disabled'}</span>
+                  </button>
+                </div>
+
+                {!isCorrelationRegistryDeployed() && (
+                  <div className="mcm-info-card" style={{ marginTop: '1rem' }}>
+                    <span className="mcm-info-icon" aria-hidden="true">💡</span>
+                    <div>
+                      <strong>Coming Soon</strong>
+                      <p>Correlation groups will be available after the MarketCorrelationRegistry contract is deployed.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Correlation group options - only shown when enabled */}
+                {correlationEnabled && isCorrelationRegistryDeployed() && (
+                  <>
+                    {/* Choose between existing group or create new */}
+                    <div className="mcm-field" style={{ marginTop: '1rem' }}>
+                      <div className="mcm-radio-group">
+                        <label className="mcm-radio-label">
+                          <input
+                            type="radio"
+                            name="correlationMode"
+                            checked={!createNewGroup}
+                            onChange={() => setCreateNewGroup(false)}
+                            disabled={submitting}
+                          />
+                          <span>Join Existing Group</span>
+                        </label>
+                        <label className="mcm-radio-label">
+                          <input
+                            type="radio"
+                            name="correlationMode"
+                            checked={createNewGroup}
+                            onChange={() => setCreateNewGroup(true)}
+                            disabled={submitting}
+                          />
+                          <span>Create New Group</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Existing group selection */}
+                    {!createNewGroup && (
+                      <div className="mcm-field">
+                        <label htmlFor="correlationGroup">Select Correlation Group</label>
+                        {correlationGroupsLoading ? (
+                          <div className="mcm-hint">Loading groups...</div>
+                        ) : correlationGroups.length === 0 ? (
+                          <div className="mcm-info-card">
+                            <span className="mcm-info-icon" aria-hidden="true">💡</span>
+                            <div>
+                              <strong>No Groups Available</strong>
+                              <p>
+                                {metadataForm.category
+                                  ? `No correlation groups found for "${metadataForm.category}". Create a new one!`
+                                  : 'Select a category first to see available groups, or create a new one.'}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <select
+                            id="correlationGroup"
+                            value={selectedCorrelationGroup?.id ?? ''}
+                            onChange={(e) => {
+                              const groupId = e.target.value
+                              const group = correlationGroups.find(g => g.id === parseInt(groupId))
+                              setSelectedCorrelationGroup(group || null)
+                            }}
+                            disabled={submitting}
+                            className="mcm-token-select"
+                          >
+                            <option value="">-- Select a group --</option>
+                            {correlationGroups.map(group => (
+                              <option key={group.id} value={group.id}>
+                                {group.name} ({group.marketCount} markets)
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {selectedCorrelationGroup && (
+                          <div className="mcm-hint">
+                            {selectedCorrelationGroup.description || 'No description available'}
+                          </div>
+                        )}
+                        {errors.correlationGroup && <div className="mcm-error">{errors.correlationGroup}</div>}
+                      </div>
+                    )}
+
+                    {/* New group creation */}
+                    {createNewGroup && (
+                      <>
+                        <div className="mcm-field">
+                          <label htmlFor="newGroupName">
+                            Group Name <span className="mcm-required">*</span>
+                          </label>
+                          <input
+                            id="newGroupName"
+                            type="text"
+                            value={newGroupName}
+                            onChange={e => setNewGroupName(e.target.value)}
+                            placeholder="e.g., 2025 Presidential Election"
+                            disabled={submitting}
+                            maxLength={100}
+                            className={errors.newGroupName ? 'error' : ''}
+                          />
+                          {errors.newGroupName && <div className="mcm-error">{errors.newGroupName}</div>}
+                        </div>
+
+                        <div className="mcm-field">
+                          <label htmlFor="newGroupDescription">Group Description</label>
+                          <textarea
+                            id="newGroupDescription"
+                            value={newGroupDescription}
+                            onChange={e => setNewGroupDescription(e.target.value)}
+                            placeholder="Describe what markets in this group have in common..."
+                            disabled={submitting}
+                            rows={2}
+                          />
+                          <div className="mcm-hint">
+                            Category: {metadataForm.category || 'Select category in Content step'}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </section>
             </div>
           )}
@@ -893,9 +1296,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
                   {!useCustomUri && (
                     <div className="mcm-review-body">
-                      <p className="mcm-review-desc">{metadataForm.description}</p>
                       <div className="mcm-review-section">
-                        <strong>Resolution Criteria:</strong>
+                        <strong>Question:</strong>
+                        <p>{metadataForm.description}</p>
+                      </div>
+                      <div className="mcm-review-section">
+                        <strong>Description:</strong>
                         <p>{metadataForm.resolutionCriteria}</p>
                       </div>
                     </div>
@@ -916,8 +1322,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                     </span>
                   </div>
                   <div className="mcm-review-item">
-                    <span className="mcm-review-label">Trading Period</span>
-                    <span className="mcm-review-value">{paramsForm.tradingPeriodDays} days</span>
+                    <span className="mcm-review-label">Resolution Date</span>
+                    <span className="mcm-review-value">
+                      {paramsForm.resolutionDateTime
+                        ? new Date(paramsForm.resolutionDateTime).toLocaleString()
+                        : 'Not set'}
+                    </span>
                   </div>
                   <div className="mcm-review-item">
                     <span className="mcm-review-label">Initial Liquidity</span>
@@ -926,11 +1336,29 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                   <div className="mcm-review-item">
                     <span className="mcm-review-label">Collateral</span>
                     <span className="mcm-review-value">
-                      {paramsForm.collateralToken
-                        ? `${paramsForm.collateralToken.slice(0, 6)}...${paramsForm.collateralToken.slice(-4)}`
-                        : 'Native ETC'}
+                      {selectedCollateralToken && (
+                        <>
+                          <span aria-hidden="true">{selectedCollateralToken.icon}</span>{' '}
+                          {paramsForm.collateralTokenId === 'CUSTOM' && paramsForm.customCollateralAddress
+                            ? `Custom (${paramsForm.customCollateralAddress.slice(0, 6)}...${paramsForm.customCollateralAddress.slice(-4)})`
+                            : selectedCollateralToken.symbol}
+                        </>
+                      )}
                     </span>
                   </div>
+                  {correlationEnabled && (
+                    <div className="mcm-review-item">
+                      <span className="mcm-review-label">Correlation Group</span>
+                      <span className="mcm-review-value">
+                        <span aria-hidden="true">🔗</span>{' '}
+                        {createNewGroup
+                          ? `New: ${newGroupName || '(unnamed)'}`
+                          : selectedCorrelationGroup
+                            ? selectedCorrelationGroup.name
+                            : '(none selected)'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -995,15 +1423,41 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                 Continue
               </button>
             ) : (
-              <button
-                type="button"
-                className="mcm-btn-primary mcm-btn-create"
-                onClick={handleSubmit}
-                disabled={submitting || !isConnected || !isCorrectNetwork}
-              >
-                {submitting && <span className="mcm-spinner" aria-hidden="true" />}
-                {submitting ? 'Creating...' : 'Create Market'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="mcm-btn-primary mcm-btn-create"
+                  onClick={handleSubmit}
+                  disabled={submitting || !isConnected || !isCorrectNetwork}
+                >
+                  {submitting && <span className="mcm-spinner" aria-hidden="true" />}
+                  {submitting ? 'Creating...' : 'Create Market'}
+                </button>
+                {/* Transaction Progress Indicator */}
+                {submitting && transactionProgress && (
+                  <div className="mcm-tx-progress" role="status" aria-live="polite">
+                    <div className="mcm-tx-progress-header">
+                      <span className="mcm-tx-step">
+                        Step {transactionProgress.step} of {transactionProgress.total}
+                      </span>
+                      <span className={`mcm-tx-status mcm-tx-status-${transactionProgress.status}`}>
+                        {transactionProgress.status === 'signing' && '🔐 Awaiting signature...'}
+                        {transactionProgress.status === 'confirming' && '⏳ Confirming...'}
+                        {transactionProgress.status === 'completed' && '✓'}
+                        {transactionProgress.status === 'failed' && '⚠️'}
+                        {transactionProgress.status === 'pending' && '...'}
+                      </span>
+                    </div>
+                    <div className="mcm-tx-description">{transactionProgress.description}</div>
+                    <div className="mcm-tx-progress-bar">
+                      <div
+                        className="mcm-tx-progress-fill"
+                        style={{ width: `${(transactionProgress.step / transactionProgress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </footer>
