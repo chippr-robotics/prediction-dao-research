@@ -11,7 +11,7 @@ export const DEPLOYED_CONTRACTS = {
   tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager (optimized, with tier limits)
   welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
   proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac', // ConditionalMarketFactory (used by FriendGroupMarketFactory)
+  marketFactory: '0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a', // ConditionalMarketFactory v2 (used by FriendGroupMarketFactory)
   privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
   oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
   ragequitModule: '0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7', // RagequitModule (used by FriendGroupMarketFactory)
@@ -47,7 +47,7 @@ export const DEPLOYED_CONTRACTS = {
 
   // Friend Group Market Factory - Deploy via: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
   // For P2P friend markets with tiered membership
-  friendGroupMarketFactory: '0xD9A26537947d99c6961C1013490f0B80d1DFE283',
+  friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
 
   // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
   // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor

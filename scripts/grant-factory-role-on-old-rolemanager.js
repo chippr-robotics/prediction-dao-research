@@ -15,7 +15,7 @@ const { ethers } = require("hardhat");
 const CONTRACTS = {
   // This is the roleManager that ConditionalMarketFactory uses
   oldRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
-  friendGroupMarketFactory: '0xD9A26537947d99c6961C1013490f0B80d1DFE283',
+  friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
 };
 
 async function main() {

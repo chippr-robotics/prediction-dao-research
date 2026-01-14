@@ -114,6 +114,11 @@ function MarketAcceptanceModal({
     setError(null)
 
     try {
+      // Check deadline hasn't passed BEFORE calling contract
+      if (marketData?.acceptanceDeadline && Date.now() >= marketData.acceptanceDeadline) {
+        throw new Error('The acceptance deadline has passed. This market can no longer be accepted.')
+      }
+
       const contract = new ethers.Contract(
         contractAddress,
         contractABI,
@@ -209,7 +214,9 @@ function MarketAcceptanceModal({
             console.log('Token approved')
           }
 
-          tx = await contract.acceptMarket(marketId)
+          // Use fixed gas limit to bypass estimation issues with Mordor RPC
+          console.log('Calling acceptMarket with fixed gas limit...')
+          tx = await contract.acceptMarket(marketId, { gasLimit: 500000 })
         }
       }
 

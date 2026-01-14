@@ -181,7 +181,7 @@ async function main() {
       config.paymentManager,
       deployer.address  // Explicit owner address for deterministic deployment
     ],
-    generateSalt(saltPrefix + "FriendGroupMarketFactory-v4"),  // Fix: _collectStake using direct transferFrom for USC proxy
+    generateSalt(saltPrefix + "FriendGroupMarketFactory-v5"),  // Revert to SafeERC20 - low-level call had issues
     deployer
   );
 

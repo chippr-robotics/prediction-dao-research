@@ -1049,14 +1049,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
                 if (!success) revert TransferFailed();
             }
         } else {
-            // Use direct transferFrom instead of SafeERC20 to debug proxy token issues
-            (bool success, bytes memory returnData) = token.call(
-                abi.encodeWithSelector(IERC20.transferFrom.selector, from, address(this), amount)
-            );
-            // Check if call succeeded
-            if (!success) revert TransferFailed();
-            // Check return value if present (some tokens don't return a value)
-            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
+            // Use SafeERC20 for proper proxy token handling
+            IERC20(token).safeTransferFrom(from, address(this), amount);
         }
     }
 
