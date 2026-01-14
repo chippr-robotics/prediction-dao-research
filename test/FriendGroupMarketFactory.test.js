@@ -244,7 +244,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid opponent");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
     it("Should reject betting against yourself", async function () {
@@ -261,7 +261,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Cannot bet against yourself");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
     it("Should set arbitrator when provided", async function () {
@@ -342,7 +342,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid member limit");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should reject member limit too low", async function () {
@@ -362,7 +362,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid member limit");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should reject duplicate members", async function () {
@@ -382,7 +382,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Duplicate member");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "DuplicateMember");
     });
 
     it("Should track user markets correctly", async function () {
@@ -445,7 +445,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid number of players");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
 
     it("Should enforce maximum players for event tracking", async function () {
@@ -464,7 +464,7 @@ describe("FriendGroupMarketFactory", function () {
           0,
           { value: fee }
         )
-      ).to.be.revertedWith("Invalid number of players");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidLimit");
     });
   });
 
