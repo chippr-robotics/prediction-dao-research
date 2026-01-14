@@ -483,7 +483,7 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Market Created!')).toBeInTheDocument()
         expect(screen.getByTestId('qr-code')).toBeInTheDocument()
-        expect(screen.getByText('Scan to join market')).toBeInTheDocument()
+        expect(screen.getByText('Share this QR code with participants to accept the market')).toBeInTheDocument()
       })
     })
 
@@ -567,10 +567,10 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByRole('tab', { name: /active/i }))
 
-      // Stakes now display with token symbol (USC is default)
+      // Stakes now display with USD formatting for stablecoins (formatUSD function)
       // Use getAllByText since multiple elements may contain the stake text
-      const stakeElements10 = screen.getAllByText((_, node) => node?.textContent?.includes('10 USC'))
-      const stakeElements25 = screen.getAllByText((_, node) => node?.textContent?.includes('25 USC'))
+      const stakeElements10 = screen.getAllByText((_, node) => node?.textContent?.includes('$10.00'))
+      const stakeElements25 = screen.getAllByText((_, node) => node?.textContent?.includes('$25.00'))
       expect(stakeElements10.length).toBeGreaterThan(0)
       expect(stakeElements25.length).toBeGreaterThan(0)
     })
@@ -642,9 +642,9 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         // Check for detail view elements
         expect(screen.getByText('Back to list')).toBeInTheDocument()
-        // Stake now displays with token symbol (USC is default)
+        // Stake now displays with USD formatting for stablecoins (formatUSD function)
         // Use getAllByText since stake appears in multiple places (stake + total pool)
-        const stakeElements = screen.getAllByText((_, node) => node?.textContent?.includes('10 USC'))
+        const stakeElements = screen.getAllByText((_, node) => node?.textContent?.includes('$10.00'))
         expect(stakeElements.length).toBeGreaterThan(0)
         expect(screen.getByText('Share this market')).toBeInTheDocument()
       })
