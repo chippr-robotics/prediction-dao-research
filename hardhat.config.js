@@ -98,16 +98,13 @@ module.exports = {
     //   },
     // },
     // Mordor testnet with floppy keystore
-    "mordor-floppy": {
-      url: "https://rpc.mordor.etccooperative.org",
-      chainId: 63,
-      accounts: async () => {
-        if (!isFloppyMounted() || !keystoreExists()) {
-          throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
-        }
-        return getFloppyPrivateKeys({ count: 5 });
-      },
-    },
+    // Note: Use `mordor` network for regular testing, or set PRIVATE_KEY env var
+    // "mordor-floppy": {
+    //   url: "https://rpc.mordor.etccooperative.org",
+    //   chainId: 63,
+    //   // accounts must be synchronous or use lazyFunction helper
+    //   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+    // },
   },
   paths: {
     sources: "./contracts",
