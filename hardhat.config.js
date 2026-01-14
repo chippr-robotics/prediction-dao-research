@@ -1,6 +1,15 @@
 require("@nomicfoundation/hardhat-toolbox");
 
 const { subtask } = require("hardhat/config");
+
+// Floppy keystore loader for secure mnemonic storage
+// Usage: npm run floppy:mount && npm run floppy:create (one-time setup)
+// Then uncomment the mainnet-floppy network config below
+const {
+  getFloppyPrivateKeys,
+  isFloppyMounted,
+  keystoreExists
+} = require('./scripts/floppy-key/loader');
 const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require("hardhat/builtin-tasks/task-names");
 
 subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async (args, hre, runSuper) => {
@@ -76,6 +85,29 @@ module.exports = {
       chainId: 63,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
+    // Example: Mainnet with floppy keystore (uncomment when ready to use)
+    // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)
+    // "mainnet-floppy": {
+    //   url: process.env.MAINNET_RPC_URL || "https://eth.llamarpc.com",
+    //   chainId: 1,
+    //   accounts: async () => {
+    //     if (!isFloppyMounted() || !keystoreExists()) {
+    //       throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
+    //     }
+    //     return getFloppyPrivateKeys({ count: 5 });
+    //   },
+    // },
+    // Example: Mordor testnet with floppy keystore
+    // "mordor-floppy": {
+    //   url: "https://rpc.mordor.etccooperative.org",
+    //   chainId: 63,
+    //   accounts: async () => {
+    //     if (!isFloppyMounted() || !keystoreExists()) {
+    //       throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
+    //     }
+    //     return getFloppyPrivateKeys({ count: 5 });
+    //   },
+    // },
   },
   paths: {
     sources: "./contracts",

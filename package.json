@@ -24,7 +24,12 @@
     "seed:local": "hardhat run scripts/seed-testnet.js --network localhost",
     "node": "hardhat node",
     "clean": "hardhat clean",
-    "frontend": "cd frontend && npm run dev"
+    "frontend": "cd frontend && npm run dev",
+    "floppy:mount": "bash ./scripts/floppy-key/mount.sh",
+    "floppy:unmount": "bash ./scripts/floppy-key/unmount.sh",
+    "floppy:create": "node ./scripts/floppy-key/index.js create",
+    "floppy:test": "node ./scripts/floppy-key/index.js test",
+    "floppy:info": "node ./scripts/floppy-key/index.js info"
   },
   "keywords": [
     "futarchy",
@@ -55,6 +60,7 @@
     "@types/chai": "^4.3.20",
     "@types/mocha": "^10.0.10",
     "chai": "^4.5.0",
+    "ethereum-cryptography": "^2.2.1",
     "ethers": "^6.16.0",
     "hardhat": "^2.28.2",
     "hardhat-deploy": "^1.0.4",
