@@ -44,10 +44,9 @@ describe("FriendGroupMarketFactory", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
-    // Initialize with admin
-    await tieredRoleManager.initialize(owner.address);
+    // No need to initialize - constructor already grants DEFAULT_ADMIN_ROLE to deployer
     
-    // Purchase FRIEND_MARKET_ROLE with ENTERPRISE duration (never expires) to avoid expiration issues
+    // Purchase FRIEND_MARKET_ROLE with long duration (100 years = never expires) to avoid expiration issues
     const FRIEND_MARKET_ROLE = ethers.id("FRIEND_MARKET_ROLE");
     // Match Solidity enum: NONE = 0, BRONZE = 1, SILVER = 2, GOLD = 3, PLATINUM = 4
     const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };

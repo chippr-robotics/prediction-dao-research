@@ -25,8 +25,7 @@ describe("TieredRoleManager - Unit Tests", function () {
     tieredRoleManager = await TieredRoleManager.deploy();
     await tieredRoleManager.waitForDeployment();
     
-    // Initialize with admin
-    await tieredRoleManager.initialize(owner.address);
+    // No need to initialize - constructor already grants DEFAULT_ADMIN_ROLE to deployer
     
     // Get role constants
     MARKET_MAKER_ROLE = ethers.id("MARKET_MAKER_ROLE");

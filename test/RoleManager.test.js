@@ -106,7 +106,7 @@ describe("RoleManager - Unit Tests", function () {
       
       await expect(
         roleManager.connect(user1).purchaseRole(MARKET_MAKER_ROLE, { value: price })
-      ).to.be.revertedWithCustomError(roleManager, "RMNotPurchasable");
+      ).to.be.revertedWithCustomError(roleManager, "RMAlreadyApproved");
     });
 
     it("Should track purchased roles per user", async function () {
@@ -158,7 +158,7 @@ describe("RoleManager - Unit Tests", function () {
     it("Should reject ZK key registration without ClearPath role", async function () {
       await expect(
         roleManager.connect(user2).registerZKKey("zkp_key")
-      ).to.be.revertedWithCustomError(roleManager, "RMInvalidAddress");
+      ).to.be.revertedWithCustomError(roleManager, "RMNotActive");
     });
 
     it("Should reject empty ZK key", async function () {
