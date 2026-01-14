@@ -124,6 +124,15 @@ contract TierRegistryAdapter is Ownable {
     }
 
     /**
+     * @notice Get the MARKET_MAKER_ROLE constant
+     * @dev Delegates to RoleManagerCore - needed for ConditionalMarketFactory
+     * @return The bytes32 role identifier
+     */
+    function MARKET_MAKER_ROLE() external view returns (bytes32) {
+        return roleManagerCore.MARKET_MAKER_ROLE();
+    }
+
+    /**
      * @notice Check if an account has a specific role
      * @dev Delegates to RoleManagerCore
      * @param role The role to check

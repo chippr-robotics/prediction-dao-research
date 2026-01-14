@@ -576,14 +576,18 @@ export async function fetchMarketsFromBlockchain() {
     const transformedMarkets = results.filter(market => market !== null)
 
     // Filter out friend markets from public grid
-    // Friend markets use a proposalId offset to avoid collision with public markets:
-    // - v5 contract (current): offset = 1,000,000
-    // - v6+ contracts (future): offset = 10,000,000,000
-    // Using 1M as minimum filter catches all friend markets from any version
+    // Friend markets use sequential proposalIds starting from an offset:
+    // - v5 contract: offset = 1,000,000 (proposalIds: 1000000, 1000001, ...)
+    // - v6+ contracts: offset = 10,000,000,000
+    // Public markets created directly use either small IDs or hash-based large IDs
     // Friend markets are displayed separately in the FriendMarketsModal
-    const FRIEND_MARKET_PROPOSAL_OFFSET = 1_000_000
+    const FRIEND_MARKET_PROPOSAL_MIN = 1_000_000
+    const FRIEND_MARKET_PROPOSAL_MAX = 10_000_000_000 // 10 billion - friend markets stay below this
     const publicMarkets = transformedMarkets.filter(market => {
-      const isFriendMarket = market.proposalId >= FRIEND_MARKET_PROPOSAL_OFFSET
+      // Friend markets use proposalIds in the range [1M, 10B)
+      // Public markets use IDs outside this range (either < 1M or >= 10B for hash-based IDs)
+      const isFriendMarket = market.proposalId >= FRIEND_MARKET_PROPOSAL_MIN &&
+                             market.proposalId < FRIEND_MARKET_PROPOSAL_MAX
       if (isFriendMarket) {
         console.debug(`Filtering out friend market ${market.id} (proposalId: ${market.proposalId})`)
       }
