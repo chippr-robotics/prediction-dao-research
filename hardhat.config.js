@@ -2,14 +2,90 @@ require("@nomicfoundation/hardhat-toolbox");
 
 const { subtask } = require("hardhat/config");
 
-// Floppy keystore loader for secure mnemonic storage
+// Floppy keystore loader for secure key storage
 // Usage: npm run floppy:mount && npm run floppy:create (one-time setup)
-// Then uncomment the mainnet-floppy network config below
 const {
   getFloppyPrivateKeys,
   isFloppyMounted,
-  keystoreExists
-} = require('./scripts/floppy-key/loader');
+  keystoreExists,
+  adminKeystoreExists,
+  CONFIG: FLOPPY_CONFIG
+} = require('./scripts/operations/floppy-key/loader');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+/**
+ * Synchronously load admin key from floppy keystore
+ * Returns null if floppy not mounted, keystore not found, or password not set
+ */
+function loadAdminKeySync() {
+  if (!isFloppyMounted() || !adminKeystoreExists()) {
+    return null;
+  }
+
+  const password = process.env.FLOPPY_KEYSTORE_PASSWORD;
+  if (!password) {
+    return null;
+  }
+
+  try {
+    const keystorePath = path.join(
+      FLOPPY_CONFIG.MOUNT_POINT,
+      FLOPPY_CONFIG.KEYSTORE_DIR,
+      'admin-keystore.json'
+    );
+    const keystoreJson = fs.readFileSync(keystorePath, 'utf8');
+    const keystore = JSON.parse(keystoreJson);
+    const { crypto: cryptoParams } = keystore;
+
+    const salt = Buffer.from(cryptoParams.kdfparams.salt, 'hex');
+    const iv = Buffer.from(cryptoParams.cipherparams.iv, 'hex');
+    const ciphertext = Buffer.from(cryptoParams.ciphertext, 'hex');
+    const storedMac = Buffer.from(cryptoParams.mac, 'hex');
+
+    // Derive key synchronously
+    const derivedKey = crypto.scryptSync(
+      password,
+      salt,
+      cryptoParams.kdfparams.dklen,
+      {
+        N: cryptoParams.kdfparams.n,
+        r: cryptoParams.kdfparams.r,
+        p: cryptoParams.kdfparams.p
+      }
+    );
+
+    // Verify MAC
+    const mac = crypto.createHmac('sha256', derivedKey.slice(16, 32))
+      .update(ciphertext)
+      .digest();
+
+    if (!mac.equals(storedMac)) {
+      console.warn('Warning: Invalid floppy keystore password');
+      return null;
+    }
+
+    // Decrypt
+    const decipher = crypto.createDecipheriv(
+      cryptoParams.cipher,
+      derivedKey.slice(0, 16),
+      iv
+    );
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final()
+    ]);
+
+    return '0x' + decrypted.toString('hex');
+  } catch (err) {
+    console.warn('Warning: Could not load admin key from floppy:', err.message);
+    return null;
+  }
+}
+
+// Load admin key at config time (synchronous)
+const adminKey = loadAdminKeySync();
 const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require("hardhat/builtin-tasks/task-names");
 
 subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async (args, hre, runSuper) => {
@@ -83,7 +159,8 @@ module.exports = {
     mordor: {
       url: "https://rpc.mordor.etccooperative.org",
       chainId: 63,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      // Priority: 1) Admin key from floppy (loaded at config time), 2) PRIVATE_KEY env var
+      accounts: adminKey ? [adminKey] : (process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []),
     },
     // Example: Mainnet with floppy keystore (uncomment when ready to use)
     // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)

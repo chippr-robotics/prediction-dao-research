@@ -7,12 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../MembershipPaymentManager.sol";
 import "./TierRegistry.sol";
-
-interface IRoleManagerCore {
-    function grantRoleFromExtension(bytes32 role, address account) external;
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function paused() external view returns (bool);
-}
+import "./interfaces/IRoleManagerCore.sol";
 
 interface IMembershipManager {
     function setMembershipExpiration(address user, bytes32 role, uint256 expiration) external;

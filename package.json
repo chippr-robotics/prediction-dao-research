@@ -30,7 +30,9 @@
     "floppy:create": "node ./scripts/operations/floppy-key/index.js create",
     "floppy:test": "node ./scripts/operations/floppy-key/index.js test",
     "floppy:info": "node ./scripts/operations/floppy-key/index.js info",
-    "purchase:friend-market": "node ./scripts/operations/purchase-friend-market-membership.js"
+    "floppy:store-admin": "node ./scripts/operations/floppy-key/store-admin-key.js",
+    "purchase:friend-market": "npx hardhat run ./scripts/operations/purchase-friend-market-membership.js --network mordor",
+    "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor"
   },
   "keywords": [
     "futarchy",

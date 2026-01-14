@@ -204,12 +204,129 @@ process.on('SIGTERM', () => {
   process.exit();
 });
 
+// ========== Admin Key Loading ==========
+
+const ADMIN_KEYSTORE_FILENAME = 'admin-keystore.json';
+const ADMIN_KEYSTORE_PATH = path.join(
+  CONFIG.MOUNT_POINT,
+  CONFIG.KEYSTORE_DIR,
+  ADMIN_KEYSTORE_FILENAME
+);
+
+let cachedAdminKey = null;
+
+/**
+ * Check if admin keystore exists
+ */
+function adminKeystoreExists() {
+  return fs.existsSync(ADMIN_KEYSTORE_PATH);
+}
+
+/**
+ * Load admin private key from floppy keystore
+ * @returns {Promise<string>} The decrypted private key (with 0x prefix)
+ */
+async function loadAdminKeyFromFloppy() {
+  if (cachedAdminKey) {
+    return cachedAdminKey;
+  }
+
+  if (!isFloppyMounted()) {
+    throw new Error(
+      `Floppy not mounted at ${CONFIG.MOUNT_POINT}. Run: npm run floppy:mount`
+    );
+  }
+
+  if (!adminKeystoreExists()) {
+    throw new Error(
+      `Admin keystore not found at ${ADMIN_KEYSTORE_PATH}. ` +
+      'Run: npm run floppy:store-admin'
+    );
+  }
+
+  const keystoreJson = fs.readFileSync(ADMIN_KEYSTORE_PATH, 'utf8');
+  const keystore = JSON.parse(keystoreJson);
+
+  let password = process.env.FLOPPY_KEYSTORE_PASSWORD;
+  if (!password) {
+    console.log('\n[Floppy Keystore] Password required for admin key');
+    password = await promptPasswordSync('Enter floppy keystore password: ');
+  }
+
+  // Decrypt the admin key
+  const crypto = require('crypto');
+  const { crypto: cryptoParams } = keystore;
+
+  const salt = Buffer.from(cryptoParams.kdfparams.salt, 'hex');
+  const iv = Buffer.from(cryptoParams.cipherparams.iv, 'hex');
+  const ciphertext = Buffer.from(cryptoParams.ciphertext, 'hex');
+  const storedMac = Buffer.from(cryptoParams.mac, 'hex');
+
+  // Derive key
+  const derivedKey = crypto.scryptSync(
+    password,
+    salt,
+    cryptoParams.kdfparams.dklen,
+    {
+      N: cryptoParams.kdfparams.n,
+      r: cryptoParams.kdfparams.r,
+      p: cryptoParams.kdfparams.p
+    }
+  );
+
+  // Verify MAC
+  const mac = crypto.createHmac('sha256', derivedKey.slice(16, 32))
+    .update(ciphertext)
+    .digest();
+
+  if (!mac.equals(storedMac)) {
+    throw new Error('Invalid password - MAC verification failed');
+  }
+
+  // Decrypt
+  const decipher = crypto.createDecipheriv(
+    cryptoParams.cipher,
+    derivedKey.slice(0, 16),
+    iv
+  );
+  const decrypted = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final()
+  ]);
+
+  cachedAdminKey = '0x' + decrypted.toString('hex');
+  password = '';
+
+  return cachedAdminKey;
+}
+
+/**
+ * Get admin private key for hardhat config
+ * Returns array with single private key
+ */
+async function getAdminPrivateKey() {
+  const key = await loadAdminKeyFromFloppy();
+  return [key];
+}
+
+// Update clear cache to also clear admin key
+const originalClearCache = clearCache;
+function clearCacheAll() {
+  cachedMnemonic = null;
+  cachedAdminKey = null;
+}
+
 module.exports = {
   loadMnemonicFromFloppy,
   getFloppyAccounts,
   getFloppyPrivateKeys,
   isFloppyMounted,
   keystoreExists,
-  clearCache,
-  CONFIG
+  clearCache: clearCacheAll,
+  CONFIG,
+  // Admin key exports
+  loadAdminKeyFromFloppy,
+  adminKeystoreExists,
+  getAdminPrivateKey,
+  ADMIN_KEYSTORE_PATH
 };
