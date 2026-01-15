@@ -16,6 +16,95 @@ import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 
+// Constants for friend market detection
+const FRIEND_MARKET_PROPOSAL_MIN = 1_000_000
+const FRIEND_MARKET_PROPOSAL_MAX = 10_000_000_000 // 10 billion
+
+/**
+ * Check if a market is a private friend market
+ * Uses multiple detection methods for backward compatibility:
+ * 1. Encrypted metadata (new method)
+ * 2. Market Source attribute in metadata
+ * 3. ProposalId range fallback (legacy)
+ *
+ * @param {Object} market - Market object with metadata
+ * @returns {boolean} True if this is a friend/private market
+ */
+export function isMarketPrivateOrFriend(market) {
+  const metadata = market.metadata
+
+  // Method 1: Check for encrypted metadata
+  if (metadata?.encrypted === true) {
+    return true
+  }
+
+  // Method 2: Check Market Source attribute
+  const marketSourceAttr = metadata?.attributes?.find(
+    attr => attr.trait_type === 'Market Source'
+  )
+  if (marketSourceAttr?.value === 'friend') {
+    return true
+  }
+
+  // Method 3: Fallback to proposalId range (legacy markets)
+  if (market.proposalId >= FRIEND_MARKET_PROPOSAL_MIN &&
+      market.proposalId < FRIEND_MARKET_PROPOSAL_MAX) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Get a human-readable reason why a market is considered private/friend
+ * Useful for debugging
+ *
+ * @param {Object} market - Market object
+ * @returns {string} Description of why market is private
+ */
+export function getMarketPrivacyReason(market) {
+  const metadata = market.metadata
+
+  if (metadata?.encrypted === true) {
+    return 'encrypted metadata'
+  }
+
+  const marketSourceAttr = metadata?.attributes?.find(
+    attr => attr.trait_type === 'Market Source'
+  )
+  if (marketSourceAttr?.value === 'friend') {
+    return 'Market Source: friend'
+  }
+
+  if (market.proposalId >= FRIEND_MARKET_PROPOSAL_MIN &&
+      market.proposalId < FRIEND_MARKET_PROPOSAL_MAX) {
+    return `proposalId in friend range (${market.proposalId})`
+  }
+
+  return 'unknown'
+}
+
+/**
+ * Check if the current user can view a market
+ * For encrypted markets, checks if user is in participants list
+ *
+ * @param {Object} market - Market object with metadata
+ * @param {string} userAddress - Current user's address (lowercase)
+ * @returns {boolean} True if user can view the market
+ */
+export function canUserViewMarket(market, userAddress) {
+  const metadata = market.metadata
+
+  // Not encrypted - anyone can view
+  if (!metadata?.encrypted) {
+    return true
+  }
+
+  // Encrypted - check if user is a participant
+  const normalizedAddress = userAddress?.toLowerCase()
+  return metadata.participants?.includes(normalizedAddress) || false
+}
+
 /**
  * Get a provider for reading from the blockchain
  * @returns {ethers.JsonRpcProvider}
@@ -576,20 +665,14 @@ export async function fetchMarketsFromBlockchain() {
     const transformedMarkets = results.filter(market => market !== null)
 
     // Filter out friend markets from public grid
-    // Friend markets use sequential proposalIds starting from an offset:
-    // - v5 contract: offset = 1,000,000 (proposalIds: 1000000, 1000001, ...)
-    // - v6+ contracts: offset = 10,000,000,000
-    // Public markets created directly use either small IDs or hash-based large IDs
-    // Friend markets are displayed separately in the FriendMarketsModal
-    const FRIEND_MARKET_PROPOSAL_MIN = 1_000_000
-    const FRIEND_MARKET_PROPOSAL_MAX = 10_000_000_000 // 10 billion - friend markets stay below this
+    // Friend markets are identified by:
+    // 1. Encrypted metadata (new method) - metadata.encrypted === true
+    // 2. Market Source attribute - { trait_type: 'Market Source', value: 'friend' }
+    // 3. Fallback: proposalId range [1M, 10B) (legacy method)
     const publicMarkets = transformedMarkets.filter(market => {
-      // Friend markets use proposalIds in the range [1M, 10B)
-      // Public markets use IDs outside this range (either < 1M or >= 10B for hash-based IDs)
-      const isFriendMarket = market.proposalId >= FRIEND_MARKET_PROPOSAL_MIN &&
-                             market.proposalId < FRIEND_MARKET_PROPOSAL_MAX
+      const isFriendMarket = isMarketPrivateOrFriend(market)
       if (isFriendMarket) {
-        console.debug(`Filtering out friend market ${market.id} (proposalId: ${market.proposalId})`)
+        console.debug(`Filtering out friend market ${market.id} (${getMarketPrivacyReason(market)})`)
       }
       return !isFriendMarket
     })

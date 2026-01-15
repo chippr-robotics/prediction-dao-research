@@ -5,6 +5,7 @@ import { ethers } from 'ethers'
 import { useETCswap } from '../../hooks/useETCswap'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
+import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
@@ -24,9 +25,11 @@ import { uploadMarketMetadata } from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
+import { RoleDetailsSection } from './RoleDetailsCard'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import { FriendMarketsModal, MyMarketsModal } from '../fairwins'
 import './WalletButton.css'
+import './RoleDetailsCard.css'
 
 /**
  * WalletButton Component
@@ -75,6 +78,14 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const { balances, loading: balanceLoading } = useETCswap()
   const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole, rolesLoading, refreshRoles } = useWalletRoles()
+  const {
+    roleDetails,
+    loading: roleDetailsLoading,
+    refresh: refreshRoleDetails,
+    getActiveRoles,
+    getExpiringSoonRoles,
+    getRolesAtLimit
+  } = useRoleDetails()
   const { signer } = useWeb3()
   const { mode, toggleMode, isDark } = useTheme()
   const dropdownRef = useRef(null)
@@ -276,13 +287,32 @@ function WalletButton({ className = '', theme = 'dark' }) {
     setDemoMode(!preferences.demoMode)
   }
 
-  const handleOpenPurchaseModal = () => {
+  const handleOpenPurchaseModal = (preselectedRole = null, action = 'purchase') => {
     setIsOpen(false)
-    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
-      title: '',
-      size: 'large',
-      closable: false
-    })
+    showModal(
+      <PremiumPurchaseModal
+        onClose={() => showModal(null)}
+        preselectedRole={preselectedRole}
+        action={action}
+      />,
+      {
+        title: '',
+        size: 'large',
+        closable: false
+      }
+    )
+  }
+
+  const handleUpgradeRole = (roleName) => {
+    handleOpenPurchaseModal(roleName, 'upgrade')
+  }
+
+  const handleExtendRole = (roleName) => {
+    handleOpenPurchaseModal(roleName, 'extend')
+  }
+
+  const handleRefreshRoles = async () => {
+    await Promise.all([refreshRoles(), refreshRoleDetails()])
   }
 
   const handleOpenFriendMarket = () => {
@@ -374,6 +404,60 @@ function WalletButton({ className = '', theme = 'dark' }) {
       }
 
       console.log('Friend Market role check passed')
+
+      // Check membership active and market creation limit on TieredRoleManager
+      // These are the exact checks the FriendGroupMarketFactory does before allowing market creation
+      try {
+        // Get the TieredRoleManager address that the FriendGroupMarketFactory is actually using
+        const factoryTRMAddress = await friendFactory.tieredRoleManager()
+        console.log('FriendGroupMarketFactory tieredRoleManager address:', factoryTRMAddress)
+
+        if (!factoryTRMAddress || factoryTRMAddress === ethers.ZeroAddress) {
+          console.warn('FriendGroupMarketFactory has no TieredRoleManager configured')
+        } else {
+          // Use the TieredRoleManager that the factory is actually using
+          const tieredRoleManagerABI = [
+            'function FRIEND_MARKET_ROLE() view returns (bytes32)',
+            'function isMembershipActive(address user, bytes32 role) view returns (bool)',
+            'function checkMarketCreationLimitFor(address user, bytes32 role) returns (bool)',
+            'function hasRole(bytes32 role, address account) view returns (bool)'
+          ]
+          const tieredRoleManager = new ethers.Contract(factoryTRMAddress, tieredRoleManagerABI, activeSigner)
+
+          const friendMarketRole = await tieredRoleManager.FRIEND_MARKET_ROLE()
+          console.log('FRIEND_MARKET_ROLE:', friendMarketRole)
+
+          // Check hasRole first
+          const hasRole = await tieredRoleManager.hasRole(friendMarketRole, userAddress)
+          console.log('hasRole check:', hasRole)
+          if (!hasRole) {
+            throw new Error('You do not have the Friend Market role in TieredRoleManager. Role may need to be synced.')
+          }
+
+          // Check if membership is active (not expired)
+          const isActive = await tieredRoleManager.isMembershipActive(userAddress, friendMarketRole)
+          console.log('isMembershipActive check:', isActive)
+          if (!isActive) {
+            throw new Error('Your Friend Market membership has expired. Please renew your membership to create markets.')
+          }
+
+          // Check market creation limit (uses staticCall since it modifies state)
+          const canCreateMarket = await tieredRoleManager.checkMarketCreationLimitFor.staticCall(userAddress, friendMarketRole)
+          console.log('checkMarketCreationLimitFor check:', canCreateMarket)
+          if (!canCreateMarket) {
+            throw new Error('You have reached your market creation limit for this period. Please wait or upgrade your tier for higher limits.')
+          }
+
+          console.log('All TieredRoleManager checks passed')
+        }
+      } catch (membershipError) {
+        if (membershipError.message.includes('expired') ||
+            membershipError.message.includes('limit') ||
+            membershipError.message.includes('do not have')) {
+          throw membershipError
+        }
+        console.warn('Membership check failed (will try transaction anyway):', membershipError.message)
+      }
 
       // Calculate trading period in seconds
       const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
@@ -488,6 +572,8 @@ function WalletButton({ className = '', theme = 'dark' }) {
       })
 
       // For native ETC, send the stake as msg.value; for ERC20, no value needed
+      // Use manual gasLimit to bypass gas estimation issues on some networks
+      const gasLimit = 1000000n // 1M gas should be plenty for market creation
       let tx
       if (isNativeETC) {
         tx = await friendFactory.createOneVsOneMarketPending(
@@ -498,7 +584,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
           acceptanceDeadline,
           stakeAmountWei,
           stakeTokenAddress,
-          { value: stakeAmountWei }
+          { value: stakeAmountWei, gasLimit }
         )
       } else {
         tx = await friendFactory.createOneVsOneMarketPending(
@@ -508,7 +594,8 @@ function WalletButton({ className = '', theme = 'dark' }) {
           arbitrator,
           acceptanceDeadline,
           stakeAmountWei,
-          stakeTokenAddress
+          stakeTokenAddress,
+          { gasLimit }
         )
       }
 
@@ -1081,42 +1168,16 @@ function WalletButton({ className = '', theme = 'dark' }) {
                 </div>
               </div>
 
-              {/* Roles Section */}
+              {/* Roles Section - Enhanced with details */}
               <div className="dropdown-section">
-                <div className="roles-header">
-                  <span className="wallet-section-title">Your Roles</span>
-                  <button
-                    onClick={refreshRoles}
-                    className="roles-refresh-btn"
-                    disabled={rolesLoading}
-                    aria-label="Refresh roles from blockchain"
-                    title="Refresh roles from blockchain"
-                  >
-                    <span className={`refresh-icon ${rolesLoading ? 'spinning' : ''}`}>&#8635;</span>
-                  </button>
-                </div>
-                {roles.length > 0 ? (
-                  <div className="roles-list">
-                    {roles.map(role => {
-                      const roleInfo = ROLE_INFO[role]
-                      return (
-                        <div key={role} className="role-item">
-                          <span className="role-badge">{roleInfo?.name || role}</span>
-                          {roleInfo?.premium && <span className="premium-indicator">★</span>}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <button 
-                    onClick={handleOpenPurchaseModal}
-                    className="action-button get-roles-btn"
-                    role="menuitem"
-                  >
-                    <span aria-hidden="true">🎫</span>
-                    <span>Get Premium Access</span>
-                  </button>
-                )}
+                <RoleDetailsSection
+                  roleDetails={roleDetails}
+                  loading={roleDetailsLoading || rolesLoading}
+                  onUpgrade={handleUpgradeRole}
+                  onExtend={handleExtendRole}
+                  onPurchase={() => handleOpenPurchaseModal()}
+                  onRefresh={handleRefreshRoles}
+                />
               </div>
 
               {/* Friend Markets Section */}

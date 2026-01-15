@@ -22,6 +22,9 @@
     "test:e2e:open": "start-server-and-test dev http://localhost:5173 cypress"
   },
   "dependencies": {
+    "@noble/ciphers": "^1.0.0",
+    "@noble/curves": "^1.6.0",
+    "@noble/hashes": "^1.5.0",
     "@tanstack/react-query": "^5.90.12",
     "@walletconnect/ethereum-provider": "^2.21.10",
     "@walletconnect/modal": "^2.7.0",
@@ -41,6 +44,8 @@
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.11.0",
     "socket.io-client": "^4.8.3",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
     "viem": "^2.43.2",
     "wagmi": "^3.1.0"
   },

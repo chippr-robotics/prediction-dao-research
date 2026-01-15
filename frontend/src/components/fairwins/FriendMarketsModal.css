@@ -1474,3 +1474,253 @@
   transform: translateY(0);
   box-shadow: 0 2px 4px rgba(54, 179, 126, 0.2);
 }
+
+/* ==================== Encryption / Privacy Styles ==================== */
+
+/* Encryption Toggle */
+.fm-encryption-toggle {
+  padding: 1rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 10px;
+}
+
+.fm-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fm-toggle-label input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.fm-toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--bg-tertiary, #1A242D);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.fm-toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--text-muted, #7A8590);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.fm-toggle-label input:checked + .fm-toggle-switch {
+  background: linear-gradient(135deg, #36B37E 0%, #2ECC71 100%);
+}
+
+.fm-toggle-label input:checked + .fm-toggle-switch::after {
+  transform: translateX(20px);
+  background: white;
+}
+
+.fm-toggle-label input:disabled + .fm-toggle-switch {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fm-toggle-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary, #E6EDF3);
+}
+
+.fm-toggle-text svg {
+  color: var(--text-muted, #7A8590);
+}
+
+.fm-toggle-label input:checked ~ .fm-toggle-text svg {
+  color: #36B37E;
+}
+
+.fm-encryption-toggle .fm-hint {
+  margin-top: 0.5rem;
+  display: block;
+}
+
+.fm-encryption-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  background: rgba(76, 154, 255, 0.1);
+  border: 1px solid rgba(76, 154, 255, 0.25);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #4C9AFF;
+}
+
+.fm-encryption-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  background: rgba(54, 179, 126, 0.1);
+  border: 1px solid rgba(54, 179, 126, 0.25);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #36B37E;
+}
+
+/* Privacy Badge */
+.fm-privacy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.fm-privacy-badge.fm-private {
+  background: rgba(54, 179, 126, 0.15);
+  color: #36B37E;
+}
+
+.fm-privacy-badge.fm-public {
+  background: rgba(170, 182, 194, 0.15);
+  color: #AAB6C2;
+}
+
+/* Privacy Icon in Tables & Lists */
+.fm-privacy-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.375rem;
+  color: #36B37E;
+  flex-shrink: 0;
+}
+
+.fm-table-desc-text {
+  display: flex;
+  align-items: center;
+}
+
+/* Detail Header with Privacy Icon */
+.fm-detail-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fm-detail-header .fm-privacy-icon {
+  margin-right: 0;
+}
+
+/* Pending Card Privacy Indicator */
+.fm-pending-card.fm-encrypted {
+  border-color: rgba(54, 179, 126, 0.35);
+}
+
+.fm-pending-privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: #36B37E;
+}
+
+.fm-pending-privacy svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Decrypting Overlay */
+.fm-decrypting-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  background: var(--bg-primary, #0E141B);
+  border-radius: 10px;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.875rem;
+}
+
+/* Encryption Key Exchange Section */
+.fm-key-exchange {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(76, 154, 255, 0.08);
+  border: 1px dashed rgba(76, 154, 255, 0.3);
+  border-radius: 8px;
+}
+
+.fm-key-exchange-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4C9AFF;
+  margin-bottom: 0.5rem;
+}
+
+.fm-key-exchange-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #AAB6C2);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.fm-signature-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted, #7A8590);
+  overflow: hidden;
+}
+
+.fm-signature-display code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.fm-copy-signature {
+  flex-shrink: 0;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 4px;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fm-copy-signature:hover {
+  border-color: #36B37E;
+  color: #36B37E;
+}

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useEncryption, useDecryptedMarkets } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
 import { CONTRACT_ADDRESSES } from '../../constants/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
@@ -67,6 +68,24 @@ function FriendMarketsModal({
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
 
+  // Encryption hook for friend market privacy
+  const {
+    isInitialized: encryptionInitialized,
+    isInitializing: encryptionInitializing,
+    signature: myEncryptionSignature,
+    publicKey: myEncryptionPublicKey,
+    initializeKeys: initEncryption,
+    createEncrypted,
+    addParticipant,
+    canUserDecrypt,
+    isEncrypted,
+    getPublicKeyFromSignature
+  } = useEncryption()
+
+  // Decrypt markets for display
+  const { markets: decryptedActiveMarkets, isDecrypting: decryptingActive } = useDecryptedMarkets(activeMarkets)
+  const { markets: decryptedPastMarkets, isDecrypting: decryptingPast } = useDecryptedMarkets(pastMarkets)
+
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
 
@@ -115,6 +134,11 @@ function FriendMarketsModal({
   // Market cancellation state
   const [cancellingMarketId, setCancellingMarketId] = useState(null)
 
+  // Encryption state
+  const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
+  const [opponentSignature, setOpponentSignature] = useState('') // For 1v1 key exchange
+  const [participantSignatures, setParticipantSignatures] = useState({}) // For group key exchange
+
   // Reset form function - memoized to prevent stale closures
   const resetForm = useCallback(() => {
     setFormData({
@@ -135,6 +159,9 @@ function FriendMarketsModal({
     setMarketLookupId('')
     setMarketLookupResult(null)
     setMarketLookupError(null)
+    setOpponentSignature('')
+    setParticipantSignatures({})
+    setEnableEncryption(true)
   }, [])
 
   // Reset modal state when opened
@@ -573,6 +600,40 @@ function FriendMarketsModal({
       }
       const stakeToken = getStakeTokenInfo()
 
+      // Prepare market metadata for encryption
+      const marketMetadata = {
+        name: formData.description,
+        description: formData.description,
+        marketType: friendMarketType,
+        stakeAmount: formData.stakeAmount,
+        stakeToken: stakeToken.symbol,
+        endDateTime: formData.endDateTime,
+        arbitrator: formData.arbitrator || null,
+        createdAt: new Date().toISOString(),
+        attributes: [
+          { trait_type: 'Market Source', value: 'friend' },
+          { trait_type: 'Market Type', value: friendMarketType }
+        ]
+      }
+
+      // Handle encryption if enabled
+      let finalMetadata = marketMetadata
+      let creatorSignatureForSharing = null
+
+      if (enableEncryption && friendMarketType === 'oneVsOne') {
+        // For 1v1 markets, create encrypted envelope
+        // Creator's envelope - participants will be added when they accept
+        const { envelope, creatorSignature } = await createEncrypted(marketMetadata)
+        finalMetadata = envelope
+        creatorSignatureForSharing = creatorSignature
+      } else if (enableEncryption && (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking')) {
+        // For group markets, start with creator as only recipient
+        // Other participants will be added as they accept and provide signatures
+        const { envelope, creatorSignature } = await createEncrypted(marketMetadata)
+        finalMetadata = envelope
+        creatorSignatureForSharing = creatorSignature
+      }
+
       // Build submit data with token address for WalletButton
       const submitData = {
         type: 'friend',
@@ -581,7 +642,11 @@ function FriendMarketsModal({
           ...formData,
           // Pass actual token address so WalletButton can use correct decimals
           // 'native' means native ETC (no ERC20 address), pass null for this case
-          collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null)
+          collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null),
+          // Include encrypted metadata and creator's signature for participant key exchange
+          encryptedMetadata: enableEncryption ? finalMetadata : null,
+          creatorSignature: creatorSignatureForSharing,
+          isEncrypted: enableEncryption
         }
       }
 
@@ -629,7 +694,10 @@ function FriendMarketsModal({
             stakedAmount: formData.stakeAmount,
             isArbitrator: false
           }
-        }
+        },
+        // Encryption fields
+        isEncrypted: enableEncryption,
+        creatorSignature: creatorSignatureForSharing
       }
 
       setCreatedMarket(newMarket)
@@ -724,30 +792,33 @@ function FriendMarketsModal({
     return token
   }, [formData.stakeTokenId, formData.customStakeTokenAddress])
 
-  // Filter markets where user is participating
+  // Filter markets where user is participating (using decrypted markets for proper filtering)
   const userActiveMarkets = useMemo(() => {
-    return activeMarkets.filter(m =>
+    return decryptedActiveMarkets.filter(m =>
+      m.canView !== false && // Only include viewable markets
       (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
       m.creator?.toLowerCase() === account?.toLowerCase()) &&
       m.status !== 'pending_acceptance'
     )
-  }, [activeMarkets, account])
+  }, [decryptedActiveMarkets, account])
 
   // Filter pending markets awaiting acceptance
   const userPendingMarkets = useMemo(() => {
-    return activeMarkets.filter(m =>
+    return decryptedActiveMarkets.filter(m =>
+      m.canView !== false && // Only include viewable markets
       (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
       m.creator?.toLowerCase() === account?.toLowerCase()) &&
       m.status === 'pending_acceptance'
     )
-  }, [activeMarkets, account])
+  }, [decryptedActiveMarkets, account])
 
   const userPastMarkets = useMemo(() => {
-    return pastMarkets.filter(m =>
-      m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()
+    return decryptedPastMarkets.filter(m =>
+      m.canView !== false && // Only include viewable markets
+      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
+      m.creator?.toLowerCase() === account?.toLowerCase())
     )
-  }, [pastMarkets, account])
+  }, [decryptedPastMarkets, account])
 
   if (!isOpen) return null
 
@@ -1152,6 +1223,48 @@ function FriendMarketsModal({
                       {errors.arbitrator && <span className="fm-error">{errors.arbitrator}</span>}
                     </div>
 
+                    {/* Privacy / Encryption Toggle */}
+                    <div className="fm-form-group fm-form-full">
+                      <div className="fm-encryption-toggle">
+                        <label className="fm-toggle-label">
+                          <input
+                            type="checkbox"
+                            checked={enableEncryption}
+                            onChange={(e) => setEnableEncryption(e.target.checked)}
+                            disabled={submitting}
+                          />
+                          <span className="fm-toggle-switch"></span>
+                          <span className="fm-toggle-text">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                              <path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                            Encrypt Market Details
+                          </span>
+                        </label>
+                        <span className="fm-hint">
+                          {enableEncryption
+                            ? 'Only participants can view market details. Recommended for private bets.'
+                            : 'Market details will be publicly visible on IPFS.'}
+                        </span>
+                        {enableEncryption && !encryptionInitialized && !encryptionInitializing && (
+                          <div className="fm-encryption-warning">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            <span>You&apos;ll be asked to sign a message to enable encryption</span>
+                          </div>
+                        )}
+                        {encryptionInitializing && (
+                          <div className="fm-encryption-status">
+                            <span className="fm-spinner-small"></span>
+                            <span>Initializing encryption...</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Market Lookup for Event Tracking */}
                     {friendMarketType === 'eventTracking' && (
                       <div className="fm-form-group fm-form-full">
@@ -1321,6 +1434,20 @@ function FriendMarketsModal({
                     <div className="fm-detail-row">
                       <span>Status</span>
                       <span className="fm-status-pending">Pending Acceptance</span>
+                    </div>
+                    <div className="fm-detail-row">
+                      <span>Privacy</span>
+                      <span className={`fm-privacy-badge ${createdMarket.isEncrypted ? 'fm-private' : 'fm-public'}`}>
+                        {createdMarket.isEncrypted ? (
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                              <path d="M7 11V7a5 5 0 0110 0v4"/>
+                            </svg>
+                            Encrypted
+                          </>
+                        ) : 'Public'}
+                      </span>
                     </div>
                     <div className="fm-detail-row">
                       <span>Type</span>
@@ -1620,7 +1747,24 @@ function MarketsCompactTable({
             onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
           >
             <td className="fm-table-desc">
-              <span className="fm-table-desc-text">{market.description}</span>
+              <span className="fm-table-desc-text">
+                {market.isPrivate && (
+                  <svg
+                    className="fm-privacy-icon"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    title="Encrypted market"
+                  >
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                  </svg>
+                )}
+                {market.metadata?.name || market.description}
+              </span>
             </td>
             <td>
               <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
@@ -1671,13 +1815,42 @@ function MarketDetailView({
       </button>
 
       <div className="fm-detail-header">
-        <h3>{market.description}</h3>
+        <h3>
+          {market.isPrivate && (
+            <svg
+              className="fm-privacy-icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              title="Encrypted market"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+          )}
+          {market.metadata?.name || market.description}
+        </h3>
         <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
           {market.status}
         </span>
       </div>
 
       <div className="fm-detail-grid">
+        {market.isPrivate && (
+          <div className="fm-detail-item">
+            <span className="fm-detail-label">Privacy</span>
+            <span className="fm-detail-value fm-privacy-badge fm-private">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+              Encrypted
+            </span>
+          </div>
+        )}
         <div className="fm-detail-item">
           <span className="fm-detail-label">Type</span>
           <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
