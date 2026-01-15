@@ -15,9 +15,10 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { NULLIFIER_REGISTRY_ABI } from '../abis/NullifierRegistry'
 import { getMarketNullificationData, getAddressNullificationData } from '../utils/primeMapping'
+import { getContractAddress } from '../config/contracts'
 
-// Contract address - should come from config/environment
-const NULLIFIER_REGISTRY_ADDRESS = import.meta.env.VITE_NULLIFIER_REGISTRY_ADDRESS || null
+// Contract address - from contracts.js config (with env override)
+const NULLIFIER_REGISTRY_ADDRESS = getContractAddress('nullifierRegistry') || null
 
 // Role hash for NULLIFIER_ADMIN_ROLE
 const NULLIFIER_ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes('NULLIFIER_ADMIN_ROLE'))

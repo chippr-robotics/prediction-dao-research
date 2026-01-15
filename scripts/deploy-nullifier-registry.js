@@ -14,7 +14,7 @@ const CONTRACTS = {
 };
 
 // Initial admin to grant NULLIFIER_ADMIN_ROLE
-const NULLIFIER_ADMIN = '0xb8596659FD9212dB17752DB6EB53ACA97f044967';
+const NULLIFIER_ADMIN = '0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E';
 
 async function main() {
   console.log("=".repeat(60));

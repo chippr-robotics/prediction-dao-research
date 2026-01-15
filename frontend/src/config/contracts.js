@@ -49,6 +49,10 @@ export const DEPLOYED_CONTRACTS = {
   // For P2P friend markets with tiered membership
   friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
 
+  // NullifierRegistry - Deploy via: npx hardhat run scripts/deploy-nullifier-registry.js --network mordor
+  // Anti-money-laundering protection for markets and addresses
+  nullifierRegistry: '0x239C06E7AD066b5087Ed84686475f04f364ACBb7',
+
   // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
   // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor
   // Has checkMarketCreationLimitFor for tier-based limits
