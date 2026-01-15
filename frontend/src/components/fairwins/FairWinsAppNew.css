@@ -277,6 +277,31 @@
   outline-offset: 2px;
 }
 
+/* Map toggle button for weather section */
+.map-toggle-btn {
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-left: 0.75rem;
+}
+
+.map-toggle-btn:hover {
+  border-color: var(--brand-primary);
+  background: rgba(var(--brand-primary-rgb, 54, 179, 126), 0.1);
+}
+
+.map-toggle-btn:focus {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
 /* Collapsible filters section */
 .grid-filters-collapsible {
   padding: 0 1rem 1rem 1rem;
