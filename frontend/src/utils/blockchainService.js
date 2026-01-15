@@ -1495,8 +1495,14 @@ export async function checkRoleSyncNeeded(userAddress, roleName) {
       }
     }
 
-    // Sync is needed if user has tier in TierRegistry but NOT in TieredRoleManager
-    const needsSync = tierRegistryTier > 0 && (!tieredRoleManagerHasRole || tieredRoleManagerTier === 0)
+    // Sync is needed if:
+    // 1. User has tier in TierRegistry but NOT in TieredRoleManager, OR
+    // 2. Tiers don't match between the two systems (e.g., upgraded in TierRegistry but TieredRoleManager still has old tier)
+    const needsSync = tierRegistryTier > 0 && (
+      !tieredRoleManagerHasRole ||
+      tieredRoleManagerTier === 0 ||
+      tierRegistryTier !== tieredRoleManagerTier
+    )
     const tierName = tierRegistryTier > 0 ? (TIER_NAMES[tierRegistryTier] || 'Unknown') : 'None'
 
     console.log(`[checkRoleSyncNeeded] ${roleName}:`, {
