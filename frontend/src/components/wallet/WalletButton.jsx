@@ -562,19 +562,22 @@ function WalletButton({ className = '', theme = 'dark' }) {
       // Determine description: use encrypted envelope if encryption enabled, otherwise plaintext
       // When encrypted, the envelope is a JSON object that needs to be stringified
       let marketDescription
+      let isEncryptedMarket = false
       if (data.data.isEncrypted && data.data.encryptedMetadata) {
         // Stringify the encrypted envelope for on-chain storage
         marketDescription = JSON.stringify(data.data.encryptedMetadata)
-        console.log('Using encrypted metadata for description')
+        isEncryptedMarket = true
+        console.log('Using encrypted metadata for description, length:', marketDescription.length, 'chars')
       } else {
         marketDescription = data.data.description || 'Friend Market'
-        console.log('Using plaintext description')
+        console.log('Using plaintext description, length:', marketDescription.length, 'chars')
       }
 
       // Create the 1v1 pending market
       console.log('Creating 1v1 pending market...', {
         opponent,
         description: marketDescription.substring(0, 100) + (marketDescription.length > 100 ? '...' : ''),
+        descriptionLength: marketDescription.length,
         isEncrypted: data.data.isEncrypted,
         tradingPeriodSeconds,
         arbitrator,
@@ -585,8 +588,9 @@ function WalletButton({ className = '', theme = 'dark' }) {
       })
 
       // For native ETC, send the stake as msg.value; for ERC20, no value needed
-      // Use manual gasLimit to bypass gas estimation issues on some networks
-      const gasLimit = 1000000n // 1M gas should be plenty for market creation
+      // Use manual gasLimit - encrypted markets need more gas due to larger string storage
+      // Each 32-byte word costs ~20,000 gas for storage, encrypted envelopes can be 1000+ chars
+      const gasLimit = isEncryptedMarket ? 3000000n : 1000000n
       let tx
       if (isNativeETC) {
         tx = await friendFactory.createOneVsOneMarketPending(

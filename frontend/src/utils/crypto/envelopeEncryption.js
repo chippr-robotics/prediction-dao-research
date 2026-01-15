@@ -60,6 +60,25 @@ export function publicKeyFromSignature(signature) {
 }
 
 /**
+ * Derive full keypair from a cached signature (no wallet interaction)
+ * Use this when you have a cached signature and need both public and private keys
+ *
+ * @param {string} signature - Cached signature of KEY_DERIVATION_MESSAGE
+ * @returns {{publicKey: Uint8Array, privateKey: Uint8Array, signature: string}}
+ */
+export function deriveKeyPairFromSignature(signature) {
+  const hash = keccak256(toUtf8Bytes(signature))
+  const privateKey = getBytes(hash)
+  const publicKey = x25519.getPublicKey(privateKey)
+
+  return {
+    publicKey,
+    privateKey,
+    signature
+  }
+}
+
+/**
  * Encrypt data for multiple recipients using envelope encryption
  *
  * @param {Object|string} data - Data to encrypt
@@ -303,11 +322,19 @@ export function encryptMarketMetadata(metadata, participants) {
  *
  * @param {Object} envelope - Encrypted envelope from IPFS
  * @param {string} myAddress - Our address
- * @param {Object} signer - Ethers signer to derive our key
+ * @param {Object|Uint8Array} signerOrPrivateKey - Ethers signer OR cached private key
  * @returns {Promise<Object>} - Decrypted metadata
  */
-export async function decryptMarketMetadata(envelope, myAddress, signer) {
-  const { privateKey } = await deriveKeyPair(signer)
+export async function decryptMarketMetadata(envelope, myAddress, signerOrPrivateKey) {
+  // If it's already a Uint8Array (cached private key), use it directly
+  let privateKey
+  if (signerOrPrivateKey instanceof Uint8Array) {
+    privateKey = signerOrPrivateKey
+  } else {
+    // It's a signer - derive the key (requires wallet popup)
+    const result = await deriveKeyPair(signerOrPrivateKey)
+    privateKey = result.privateKey
+  }
   return decryptEnvelope(envelope, myAddress, privateKey)
 }
 
@@ -338,13 +365,22 @@ export async function createEncryptedMarket(metadata, signer, creatorAddress) {
  *
  * @param {Object} envelope - Existing envelope
  * @param {string} existingAddress - An existing recipient's address
- * @param {Object} existingSigner - Existing recipient's signer
+ * @param {Object|Uint8Array} existingSignerOrPrivateKey - Existing recipient's signer OR cached private key
  * @param {string} newAddress - New participant's address
  * @param {string} newSignature - New participant's key derivation signature
  * @returns {Promise<Object>} - Updated envelope
  */
-export async function addParticipantToMarket(envelope, existingAddress, existingSigner, newAddress, newSignature) {
-  const { privateKey } = await deriveKeyPair(existingSigner)
+export async function addParticipantToMarket(envelope, existingAddress, existingSignerOrPrivateKey, newAddress, newSignature) {
+  // If it's already a Uint8Array (cached private key), use it directly
+  let privateKey
+  if (existingSignerOrPrivateKey instanceof Uint8Array) {
+    privateKey = existingSignerOrPrivateKey
+  } else {
+    // It's a signer - derive the key (requires wallet popup)
+    const result = await deriveKeyPair(existingSignerOrPrivateKey)
+    privateKey = result.privateKey
+  }
+
   const newPublicKey = publicKeyFromSignature(newSignature)
 
   return addRecipient(envelope, existingAddress, privateKey, {

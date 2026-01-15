@@ -944,9 +944,33 @@ export async function fetchFriendMarketsForUser(userAddress) {
           const tokenDecimals = isUSC ? 6 : 18
           const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
 
+          // Check if description is an encrypted envelope (JSON with version, algorithm, content, keys)
+          let description = marketResult.description
+          let metadata = null
+          let isEncryptedMarket = false
+
+          try {
+            const parsed = JSON.parse(description)
+            // Check if it matches encrypted envelope format
+            if (parsed?.version === '1.0' &&
+                parsed?.algorithm?.startsWith('x25519-') &&
+                parsed?.content?.ciphertext &&
+                Array.isArray(parsed?.keys)) {
+              // This is an encrypted envelope - store in metadata for decryption hook
+              metadata = parsed
+              isEncryptedMarket = true
+              description = 'Encrypted Market' // Placeholder until decrypted
+              console.log(`[fetchFriendMarketsForUser] Market ${marketId} has encrypted metadata`)
+            }
+          } catch {
+            // Not JSON, keep as plain description
+          }
+
           return {
             id: marketId.toString(),
-            description: marketResult.description,
+            description: description,
+            metadata: metadata,
+            isEncrypted: isEncryptedMarket,
             creator: marketResult.creator,
             participants: members,
             arbitrator: hasArbitrator ? arbitrator : null,
@@ -1497,11 +1521,12 @@ export async function checkRoleSyncNeeded(userAddress, roleName) {
 
     // Sync is needed if:
     // 1. User has tier in TierRegistry but NOT in TieredRoleManager, OR
-    // 2. Tiers don't match between the two systems (e.g., upgraded in TierRegistry but TieredRoleManager still has old tier)
+    // 2. TieredRoleManager has a LOWER tier than TierRegistry (upgraded in TierRegistry but not synced)
+    // Note: If TieredRoleManager tier is HIGHER, that's fine - user has more access than minimum required
     const needsSync = tierRegistryTier > 0 && (
       !tieredRoleManagerHasRole ||
       tieredRoleManagerTier === 0 ||
-      tierRegistryTier !== tieredRoleManagerTier
+      tieredRoleManagerTier < tierRegistryTier  // Only flag if TieredRoleManager has LOWER tier
     )
     const tierName = tierRegistryTier > 0 ? (TIER_NAMES[tierRegistryTier] || 'Unknown') : 'None'
 

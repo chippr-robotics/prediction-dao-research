@@ -48,6 +48,17 @@ const formatUSD = (amount, symbol) => {
   return `${num} ${symbol || 'tokens'}`
 }
 
+// Helper to get display description from a market (handles encrypted/decrypted metadata)
+const getMarketDescription = (market) => {
+  // If market has decrypted metadata, use it
+  if (market.metadata && market.canView !== false) {
+    // Decrypted metadata may have name, description, or question field
+    return market.metadata.name || market.metadata.description || market.metadata.question || market.description
+  }
+  // Fall back to raw description
+  return market.description
+}
+
 /**
  * FriendMarketsModal Component
  *
@@ -1544,7 +1555,7 @@ function FriendMarketsModal({
                               <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
                               <span className="fm-pending-badge">Pending</span>
                             </div>
-                            <p className="fm-pending-desc">{market.description}</p>
+                            <p className="fm-pending-desc">{getMarketDescription(market)}</p>
                             <div className="fm-pending-progress">
                               <div className="fm-progress-bar">
                                 <div
@@ -1763,7 +1774,7 @@ function MarketsCompactTable({
                     <path d="M7 11V7a5 5 0 0110 0v4"/>
                   </svg>
                 )}
-                {market.metadata?.name || market.description}
+                {getMarketDescription(market)}
               </span>
             </td>
             <td>
@@ -1831,7 +1842,7 @@ function MarketDetailView({
               <path d="M7 11V7a5 5 0 0110 0v4"/>
             </svg>
           )}
-          {market.metadata?.name || market.description}
+          {getMarketDescription(market)}
         </h3>
         <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
           {market.status}
