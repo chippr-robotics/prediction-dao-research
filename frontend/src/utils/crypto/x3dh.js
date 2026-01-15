@@ -23,6 +23,7 @@
  * 5. Bob computes same SK using his private keys
  */
 
+import { x25519 } from '@noble/curves/ed25519'
 import {
   generateKeyPair,
   computeSharedSecret,
@@ -33,7 +34,6 @@ import {
   hexToBytes,
   randomBytes
 } from './primitives.js'
-import { x25519 } from '@noble/curves/ed25519'
 
 // Protocol info string for HKDF
 const X3DH_INFO = 'FairWins_X3DH_v1'

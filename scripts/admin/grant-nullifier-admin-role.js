@@ -29,10 +29,7 @@ async function main() {
     console.error("\nERROR: NullifierRegistry address not set!");
     console.error("Please set CONTRACTS.nullifierRegistry to the deployed address.");
     console.error("Example: const CONTRACTS = { nullifierRegistry: '0x...' };");
-    process.exit(1);
-  }
-    console.log("Please update CONTRACTS.nullifierRegistry with the deployed address.");
-    console.log("Deploy with: npx hardhat run scripts/deploy-nullifier-registry.js --network mordor");
+    console.error("Deploy with: npx hardhat run scripts/deploy-nullifier-registry.js --network mordor");
     process.exit(1);
   }
 
