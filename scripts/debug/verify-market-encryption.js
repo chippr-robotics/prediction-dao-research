@@ -1,4 +1,3 @@
-const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
 /**
@@ -87,9 +86,9 @@ async function main() {
       marketType,
       creator,
       members,
-      arbitrator,
+      , // arbitrator (unused)
       status,
-      acceptanceDeadline,
+      , // acceptanceDeadline (unused)
       stakePerParticipant,
       stakeToken,
       acceptedCount,

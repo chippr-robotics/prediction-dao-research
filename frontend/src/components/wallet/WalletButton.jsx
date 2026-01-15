@@ -81,10 +81,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const {
     roleDetails,
     loading: roleDetailsLoading,
-    refresh: refreshRoleDetails,
-    getActiveRoles,
-    getExpiringSoonRoles,
-    getRolesAtLimit
+    refresh: refreshRoleDetails
   } = useRoleDetails()
   const { signer } = useWeb3()
   const { mode, toggleMode, isDark } = useTheme()

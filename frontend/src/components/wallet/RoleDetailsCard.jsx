@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TIER_COLORS, TIER_NAMES } from '../../hooks/useRoleDetails'
+import { TIER_NAMES } from '../../hooks/useRoleDetails'
 import './RoleDetailsCard.css'
 
 /**
@@ -47,7 +47,6 @@ export function RoleDetailsCard({ role, onUpgrade, onExtend, compact = false }) 
     tier,
     tierName,
     tierColor,
-    isActive,
     isExpired,
     daysRemaining,
     expirationDate,

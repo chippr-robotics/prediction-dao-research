@@ -15,7 +15,7 @@
  * @module rsaAccumulator
  */
 
-import { keccak256, toUtf8Bytes, solidityPacked } from 'ethers'
+import { keccak256, solidityPacked } from 'ethers'
 
 // ============================================================================
 // Constants
@@ -23,15 +23,14 @@ import { keccak256, toUtf8Bytes, solidityPacked } from 'ethers'
 
 // Default RSA parameters (2048-bit) - Replace with production parameters from contract
 // These are EXAMPLE values for development. Real deployment requires trusted setup.
+// NOTE: The default values are set to null to force loading from the contract.
+// Using hardcoded values could break cryptographic security if not properly generated.
 export const DEFAULT_RSA_PARAMS = {
-  // Example 2048-bit modulus (in production, use parameters from contract)
-  n: BigInt('0x' + 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'.repeat(8)),
+  // Must be loaded from contract - no default to prevent security issues
+  n: null,
   // Generator (typically 2 or a quadratic residue)
   g: BigInt(2)
 }
-
-// Number of Miller-Rabin rounds for primality testing (256-bit numbers)
-const PRIMALITY_ROUNDS = 20
 
 // Miller-Rabin deterministic witnesses for numbers up to 2^64
 const SMALL_WITNESSES = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n, 23n, 29n, 31n, 37n]
