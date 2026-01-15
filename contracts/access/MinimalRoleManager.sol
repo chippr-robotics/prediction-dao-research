@@ -163,7 +163,10 @@ contract MinimalRoleManager is AccessControl, ReentrancyGuard, Pausable {
     
     /**
      * @notice Check if user is within market creation limits for a role
-     * @dev For MinimalRoleManager, simply checks if user has the role (no usage tracking)
+     * @dev For MinimalRoleManager, simply checks if user has the role (no usage tracking).
+     *      This implementation does not modify state, but matches the IRoleManager interface
+     *      which requires non-view because TieredRoleManager tracks usage counters.
+     *      For minimal deployments, unlimited market creation is allowed if user has the role.
      * @param user The user to check
      * @param role The role to check limits for
      * @return bool True if user has the role
