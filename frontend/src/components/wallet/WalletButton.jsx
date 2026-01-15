@@ -559,10 +559,23 @@ function WalletButton({ className = '', theme = 'dark' }) {
         }
       }
 
+      // Determine description: use encrypted envelope if encryption enabled, otherwise plaintext
+      // When encrypted, the envelope is a JSON object that needs to be stringified
+      let marketDescription
+      if (data.data.isEncrypted && data.data.encryptedMetadata) {
+        // Stringify the encrypted envelope for on-chain storage
+        marketDescription = JSON.stringify(data.data.encryptedMetadata)
+        console.log('Using encrypted metadata for description')
+      } else {
+        marketDescription = data.data.description || 'Friend Market'
+        console.log('Using plaintext description')
+      }
+
       // Create the 1v1 pending market
       console.log('Creating 1v1 pending market...', {
         opponent,
-        description: data.data.description,
+        description: marketDescription.substring(0, 100) + (marketDescription.length > 100 ? '...' : ''),
+        isEncrypted: data.data.isEncrypted,
         tradingPeriodSeconds,
         arbitrator,
         acceptanceDeadline,
@@ -578,7 +591,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
       if (isNativeETC) {
         tx = await friendFactory.createOneVsOneMarketPending(
           opponent,
-          data.data.description || 'Friend Market',
+          marketDescription,
           tradingPeriodSeconds,
           arbitrator,
           acceptanceDeadline,
@@ -589,7 +602,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
       } else {
         tx = await friendFactory.createOneVsOneMarketPending(
           opponent,
-          data.data.description || 'Friend Market',
+          marketDescription,
           tradingPeriodSeconds,
           arbitrator,
           acceptanceDeadline,
@@ -625,7 +638,9 @@ function WalletButton({ className = '', theme = 'dark' }) {
       const newMarket = {
         id: friendMarketId || `friend-${Date.now()}`,
         type: data.marketType || 'oneVsOne',
-        description: data.data.description || 'Friend Market',
+        description: data.data.description || 'Friend Market', // Always store plaintext for local display
+        isEncrypted: data.data.isEncrypted || false,
+        encryptedMetadata: data.data.encryptedMetadata || null, // Store envelope for verification
         stakeAmount: stakeAmount,
         tradingPeriod: tradingPeriodDays.toString(),
         participants: [userAddress, opponent],

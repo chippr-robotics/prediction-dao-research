@@ -17,7 +17,7 @@ const { ethers } = require("hardhat");
 
 const CONTRACTS = {
   tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
-  friendGroupMarketFactory: '0xD9A26537947d99c6961C1013490f0B80d1DFE283',
+  friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
 };
 
 // Tier values
