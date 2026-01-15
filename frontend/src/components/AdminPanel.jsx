@@ -4,9 +4,11 @@ import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
 import { useEnsResolution } from '../hooks/useEnsResolution'
 import { useAdminContracts, CONTRACT_STATE_REFRESH_INTERVAL } from '../hooks/useAdminContracts'
+import { useTreasuryVault } from '../hooks/useTreasuryVault'
 import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
+import NullifierTab from './admin/NullifierTab'
 import './AdminPanel.css'
 
 // Minimum withdrawal amount to prevent gas waste on dust transactions
@@ -29,7 +31,7 @@ const MAX_TIER_DURATION_DAYS = 3650 // ~10 years
  */
 function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
-  const { account } = useWeb3()
+  const { account, signer, provider } = useWeb3()
   const { showNotification } = useNotification()
   const {
     isLoading,
@@ -39,9 +41,28 @@ function AdminPanel() {
     emergencyUnpause,
     configureTier,
     grantTier,
+    grantRoleOnChain,
     withdraw,
+    withdrawFromFriendMarketFactory,
     fetchContractState
   } = useAdminContracts()
+
+  // Treasury Vault hook for proper treasury management
+  const {
+    treasuryState,
+    isTreasuryAvailable,
+    canWithdraw: canWithdrawFromVault,
+    isOwner: isTreasuryOwner,
+    isGuardian: isTreasuryGuardian,
+    withdrawETH: withdrawFromTreasuryETH,
+    withdrawERC20: withdrawFromTreasuryERC20,
+    pauseVault,
+    unpauseVault,
+    setTransactionLimit,
+    setRateLimit,
+    fetchTreasuryState,
+    fairWinsTokenAddress
+  } = useTreasuryVault({ signer, provider, account })
 
   const [activeTab, setActiveTab] = useState('overview')
   const [confirmAction, setConfirmAction] = useState(null)
@@ -65,6 +86,7 @@ function AdminPanel() {
   const canConfigureTiers = isAdmin
   const canGrantRoles = isAdmin || isOperationsAdmin
   const canWithdraw = isAdmin
+  const canManageNullifier = isAdmin || isOperationsAdmin
 
   // Tier Configuration State
   const [tierConfig, setTierConfig] = useState({
@@ -85,7 +107,9 @@ function AdminPanel() {
   // Withdrawal State
   const [withdrawalData, setWithdrawalData] = useState({
     toAddress: '',
-    amount: ''
+    amount: '',
+    tokenType: 'ETC', // 'ETC' or 'FAIRWINS'
+    source: 'ROLEMANAGER' // 'ROLEMANAGER' or 'TREASURY'
   })
 
   // ENS resolution for role grant user address
@@ -302,25 +326,58 @@ function AdminPanel() {
       return
     }
 
-    // Check if amount exceeds contract balance
-    const contractBalanceNum = parseFloat(contractState.contractBalance)
-    if (amountNum > contractBalanceNum) {
-      showNotification(`Withdrawal amount exceeds contract balance (${contractState.contractBalance} ETC)`, 'error')
+    // Check balance based on source and token type
+    const isFromTreasury = withdrawalData.source === 'TREASURY'
+    const isTokenWithdrawal = withdrawalData.tokenType === 'FAIRWINS'
+
+    let availableBalance
+    if (isFromTreasury) {
+      availableBalance = isTokenWithdrawal
+        ? parseFloat(treasuryState.fairWinsBalance || '0')
+        : parseFloat(treasuryState.ethBalance || '0')
+    } else {
+      // RoleManager only has ETC
+      if (isTokenWithdrawal) {
+        showNotification('RoleManager only holds ETC. Select Treasury Vault for token withdrawals.', 'error')
+        return
+      }
+      availableBalance = parseFloat(contractState.contractBalance || '0')
+    }
+
+    if (amountNum > availableBalance) {
+      const unit = isTokenWithdrawal ? 'FWN' : 'ETC'
+      const source = isFromTreasury ? 'Treasury Vault' : 'RoleManager'
+      showNotification(`Withdrawal amount exceeds ${source} balance (${availableBalance} ${unit})`, 'error')
       return
     }
 
     setPendingTx(true)
     try {
-      await withdraw(resolvedWithdrawalAddress, rawAmount)
+      if (isFromTreasury) {
+        // Withdraw from TreasuryVault
+        if (!isTreasuryAvailable) {
+          showNotification('Treasury Vault is not available', 'error')
+          setPendingTx(false)
+          return
+        }
+        if (isTokenWithdrawal && fairWinsTokenAddress) {
+          await withdrawFromTreasuryERC20(fairWinsTokenAddress, resolvedWithdrawalAddress, rawAmount)
+        } else {
+          await withdrawFromTreasuryETH(resolvedWithdrawalAddress, rawAmount)
+        }
+      } else {
+        // Withdraw from RoleManager (tier revenue)
+        await withdraw(resolvedWithdrawalAddress, rawAmount)
+      }
       showNotification('Withdrawal successful', 'success')
-      setWithdrawalData({ toAddress: '', amount: '' })
+      setWithdrawalData({ toAddress: '', amount: '', tokenType: 'ETC', source: 'ROLEMANAGER' })
       setConfirmAction(null)
     } catch (err) {
       showNotification(err.message, 'error')
     } finally {
       setPendingTx(false)
     }
-  }, [withdrawalData, contractState.contractBalance, withdraw, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError])
+  }, [withdrawalData, contractState.contractBalance, treasuryState, withdraw, withdrawFromTreasuryETH, withdrawFromTreasuryERC20, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError, isTreasuryAvailable, canWithdrawFromVault, isTreasuryOwner, fairWinsTokenAddress])
 
   const shortenAddress = (address) => {
     if (!address) return ''
@@ -522,6 +579,23 @@ function AdminPanel() {
               </svg>
             </span>
             Treasury
+          </button>
+        )}
+
+        {canManageNullifier && (
+          <button
+            role="tab"
+            aria-selected={activeTab === 'nullifier'}
+            className={`admin-panel-tab ${activeTab === 'nullifier' ? 'active' : ''}`}
+            onClick={() => setActiveTab('nullifier')}
+          >
+            <span className="tab-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+              </svg>
+            </span>
+            Nullifier
           </button>
         )}
       </nav>
@@ -968,20 +1042,162 @@ function AdminPanel() {
         {activeTab === 'treasury' && canWithdraw && (
           <div className="admin-tab-content" role="tabpanel">
             <div className="treasury-section">
+              {/* Tier Revenue (RoleManager Balance) */}
               <div className="admin-card">
                 <div className="admin-card-header">
-                  <h3>Treasury Balance</h3>
+                  <h3>Tier Revenue</h3>
+                  <span className="status-badge active">RoleManager</span>
                 </div>
-                <div className="balance-display">
-                  <span className="balance-value">{contractState.contractBalance}</span>
-                  <span className="balance-unit">ETC</span>
+                <div className="balance-grid">
+                  <div className="balance-item">
+                    <div className="balance-display">
+                      <span className="balance-value">{contractState.contractBalance}</span>
+                      <span className="balance-unit">ETC</span>
+                    </div>
+                    <span className="balance-label">From Tier Purchases</span>
+                  </div>
                 </div>
                 <p className="card-info">
-                  Funds collected from tier purchases are held in the contract.
-                  Withdrawals require administrator privileges.
+                  Funds collected from tier purchases are held in the RoleManager contract.
+                  Use the withdraw form below to transfer funds to another address.
                 </p>
               </div>
 
+              {/* Market Stake Revenue (FriendGroupMarketFactory Balance) */}
+              {contractState.friendMarketFactoryDeployed && (
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h3>Market Stake Revenue</h3>
+                    <span className="status-badge active">FriendGroupMarketFactory</span>
+                  </div>
+                  <div className="balance-grid">
+                    <div className="balance-item">
+                      <div className="balance-display">
+                        <span className="balance-value">{contractState.friendMarketBalance}</span>
+                        <span className="balance-unit">ETC</span>
+                      </div>
+                      <span className="balance-label">From Market Stakes</span>
+                    </div>
+                  </div>
+                  <p className="card-info">
+                    Funds from friend market stakes (forfeitures, unclaimed amounts) accumulate here.
+                    Withdraw sends all collected fees to the contract owner.
+                  </p>
+                  {parseFloat(contractState.friendMarketBalance) > 0 && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        try {
+                          setPendingTx(true)
+                          const result = await withdrawFromFriendMarketFactory()
+                          showNotification(`Successfully withdrew ${contractState.friendMarketBalance} ETC`, 'success')
+                        } catch (err) {
+                          showNotification(err.message, 'error')
+                        } finally {
+                          setPendingTx(false)
+                        }
+                      }}
+                      disabled={pendingTx || isLoading}
+                    >
+                      {pendingTx ? 'Withdrawing...' : `Withdraw ${contractState.friendMarketBalance} ETC`}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* TreasuryVault Balances (if available) */}
+              {isTreasuryAvailable && (
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h3>Treasury Vault</h3>
+                    <span className="status-badge active">TreasuryVault</span>
+                  </div>
+                  <div className="balance-grid">
+                    <div className="balance-item">
+                      <div className="balance-display">
+                        <span className="balance-value">{treasuryState.ethBalance}</span>
+                        <span className="balance-unit">ETC</span>
+                      </div>
+                      <span className="balance-label">Native Currency</span>
+                    </div>
+                    {fairWinsTokenAddress && (
+                      <div className="balance-item">
+                        <div className="balance-display">
+                          <span className="balance-value">{treasuryState.fairWinsBalance}</span>
+                          <span className="balance-unit">FWN</span>
+                        </div>
+                        <span className="balance-label">FairWins Token</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="card-info">
+                    TreasuryVault provides spending limits and rate controls for secure fund management.
+                  </p>
+                </div>
+              )}
+
+              {/* Spending Limits Info */}
+              {isTreasuryAvailable && (
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h3>Spending Controls</h3>
+                    {treasuryState.isPaused && (
+                      <span className="status-badge paused">Vault Paused</span>
+                    )}
+                  </div>
+                  <div className="spending-limits-grid">
+                    <div className="limit-item">
+                      <span className="limit-label">ETC Transaction Limit</span>
+                      <span className="limit-value">
+                        {parseFloat(treasuryState.ethTransactionLimit) > 0
+                          ? `${treasuryState.ethTransactionLimit} ETC`
+                          : 'Unlimited'}
+                      </span>
+                    </div>
+                    <div className="limit-item">
+                      <span className="limit-label">ETC Period Allowance</span>
+                      <span className="limit-value">
+                        {treasuryState.ethRateLimitPeriod > 0
+                          ? `${treasuryState.ethRemainingAllowance} / ${treasuryState.ethPeriodLimit} ETC`
+                          : 'Unlimited'}
+                      </span>
+                    </div>
+                    {fairWinsTokenAddress && (
+                      <>
+                        <div className="limit-item">
+                          <span className="limit-label">FWN Transaction Limit</span>
+                          <span className="limit-value">
+                            {parseFloat(treasuryState.fairWinsTransactionLimit) > 0
+                              ? `${treasuryState.fairWinsTransactionLimit} FWN`
+                              : 'Unlimited'}
+                          </span>
+                        </div>
+                        <div className="limit-item">
+                          <span className="limit-label">FWN Period Allowance</span>
+                          <span className="limit-value">
+                            {treasuryState.fairWinsRateLimitPeriod > 0
+                              ? `${treasuryState.fairWinsRemainingAllowance} / ${treasuryState.fairWinsPeriodLimit} FWN`
+                              : 'Unlimited'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="security-info">
+                    <p className="card-info">
+                      <strong>Authorization Status:</strong> {canWithdrawFromVault || isTreasuryOwner ? 'Authorized Spender' : 'Not Authorized'}
+                    </p>
+                    {!treasuryState.ethRateLimitPeriod && !parseFloat(treasuryState.ethTransactionLimit) && (
+                      <p className="card-info warning-text">
+                        <span className="warning-icon">!</span>
+                        No spending limits configured. Consider setting transaction limits for production use.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Withdraw Form */}
               <div className="admin-card">
                 <div className="admin-card-header">
                   <h3>Withdraw Funds</h3>
@@ -992,6 +1208,43 @@ function AdminPanel() {
                 </p>
 
                 <div className="withdraw-form">
+                  {/* Source Selector */}
+                  <div className="form-group">
+                    <label htmlFor="withdraw-source">Withdraw From</label>
+                    <select
+                      id="withdraw-source"
+                      value={withdrawalData.source}
+                      onChange={(e) => setWithdrawalData(prev => ({
+                        ...prev,
+                        source: e.target.value,
+                        tokenType: 'ETC', // Reset to ETC when changing source
+                        amount: ''
+                      }))}
+                      className="admin-select"
+                    >
+                      <option value="ROLEMANAGER">Tier Revenue (RoleManager) - {contractState.contractBalance} ETC</option>
+                      {isTreasuryAvailable && (
+                        <option value="TREASURY">Treasury Vault - {treasuryState.ethBalance} ETC</option>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Token Type Selector - only for Treasury */}
+                  {withdrawalData.source === 'TREASURY' && isTreasuryAvailable && fairWinsTokenAddress && (
+                    <div className="form-group">
+                      <label htmlFor="withdraw-token-type">Token Type</label>
+                      <select
+                        id="withdraw-token-type"
+                        value={withdrawalData.tokenType}
+                        onChange={(e) => setWithdrawalData(prev => ({ ...prev, tokenType: e.target.value, amount: '' }))}
+                        className="admin-select"
+                      >
+                        <option value="ETC">ETC (Native Currency)</option>
+                        <option value="FAIRWINS">FWN (FairWins Token) - {treasuryState.fairWinsBalance} FWN</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div className="form-group">
                     <label htmlFor="withdraw-address">Recipient Address or ENS Name</label>
                     <div className="address-input-wrapper">
@@ -1027,14 +1280,20 @@ function AdminPanel() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="withdraw-amount">Amount (ETC)</label>
+                    <label htmlFor="withdraw-amount">
+                      Amount ({withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : 'ETC'})
+                    </label>
                     <div className="input-with-action">
                       <input
                         id="withdraw-amount"
                         type="number"
                         step="0.01"
                         min="0"
-                        max={contractState.contractBalance}
+                        max={
+                          withdrawalData.source === 'TREASURY'
+                            ? (withdrawalData.tokenType === 'FAIRWINS' ? treasuryState.fairWinsBalance : treasuryState.ethBalance)
+                            : contractState.contractBalance
+                        }
                         value={withdrawalData.amount}
                         onChange={(e) => setWithdrawalData(prev => ({ ...prev, amount: e.target.value }))}
                         className="admin-input"
@@ -1043,7 +1302,17 @@ function AdminPanel() {
                       <button
                         type="button"
                         className="max-btn"
-                        onClick={() => setWithdrawalData(prev => ({ ...prev, amount: contractState.contractBalance }))}
+                        onClick={() => {
+                          let maxAmount
+                          if (withdrawalData.source === 'TREASURY') {
+                            maxAmount = withdrawalData.tokenType === 'FAIRWINS'
+                              ? treasuryState.fairWinsBalance
+                              : treasuryState.ethBalance
+                          } else {
+                            maxAmount = contractState.contractBalance
+                          }
+                          setWithdrawalData(prev => ({ ...prev, amount: maxAmount }))
+                        }}
                       >
                         MAX
                       </button>
@@ -1051,21 +1320,26 @@ function AdminPanel() {
                   </div>
 
                   <button
-                    onClick={() => setConfirmAction({
-                      title: 'Confirm Withdrawal',
-                      message: `You are about to withdraw ${withdrawalData.amount} ETC to ${isWithdrawalEns ? `${withdrawalData.toAddress} (${shortenAddress(resolvedWithdrawalAddress)})` : shortenAddress(resolvedWithdrawalAddress || withdrawalData.toAddress)}.`,
-                      warning: 'This action cannot be undone. Please verify the recipient address is correct.',
-                      confirmText: 'Confirm Withdrawal',
-                      danger: true,
-                      onConfirm: handleWithdraw
-                    })}
+                    onClick={() => {
+                      const sourceLabel = withdrawalData.source === 'TREASURY' ? 'Treasury Vault' : 'RoleManager (Tier Revenue)'
+                      const tokenLabel = withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : 'ETC'
+                      setConfirmAction({
+                        title: 'Confirm Withdrawal',
+                        message: `You are about to withdraw ${withdrawalData.amount} ${tokenLabel} from ${sourceLabel} to ${isWithdrawalEns ? `${withdrawalData.toAddress} (${shortenAddress(resolvedWithdrawalAddress)})` : shortenAddress(resolvedWithdrawalAddress || withdrawalData.toAddress)}.`,
+                        warning: 'This action cannot be undone. Please verify the recipient address is correct.',
+                        confirmText: 'Confirm Withdrawal',
+                        danger: true,
+                        onConfirm: handleWithdraw
+                      })
+                    }}
                     className="admin-btn primary"
                     disabled={
                       pendingTx ||
                       isLoading ||
                       !withdrawalData.toAddress ||
                       !withdrawalData.amount ||
-                      parseFloat(withdrawalData.amount) <= 0
+                      parseFloat(withdrawalData.amount) <= 0 ||
+                      (withdrawalData.source === 'TREASURY' && isTreasuryAvailable && treasuryState.isPaused)
                     }
                   >
                     {pendingTx ? 'Processing...' : 'Withdraw'}
@@ -1074,6 +1348,16 @@ function AdminPanel() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Nullifier Tab */}
+        {activeTab === 'nullifier' && canManageNullifier && (
+          <NullifierTab
+            provider={provider}
+            signer={signer}
+            account={account}
+            marketFactoryAddress={DEPLOYED_CONTRACTS.marketFactory}
+          />
         )}
       </main>
     </div>

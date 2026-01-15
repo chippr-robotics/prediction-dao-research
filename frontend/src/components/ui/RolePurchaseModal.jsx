@@ -3,6 +3,7 @@ import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
+import { useTierPrices } from '../../hooks/useTierPrices'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithUSC } from '../../utils/blockchainService'
 import './RolePurchaseModal.css'
@@ -54,32 +55,19 @@ function RolePurchaseModal({ onClose }) {
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseStep, setPurchaseStep] = useState('select') // select, tier, payment, register, complete
 
-  // Prices in USC stablecoin by role and tier
-  const TIER_PRICES = {
-    BRONZE: {
-      [ROLES.MARKET_MAKER]: 100,
-      [ROLES.CLEARPATH_USER]: 250,
-      [ROLES.TOKENMINT]: 150,
-      [ROLES.FRIEND_MARKET]: 50,
-    },
-    SILVER: {
-      [ROLES.MARKET_MAKER]: 200,
-      [ROLES.CLEARPATH_USER]: 400,
-      [ROLES.TOKENMINT]: 300,
-      [ROLES.FRIEND_MARKET]: 100,
-    },
-    GOLD: {
-      [ROLES.MARKET_MAKER]: 350,
-      [ROLES.CLEARPATH_USER]: 650,
-      [ROLES.TOKENMINT]: 500,
-      [ROLES.FRIEND_MARKET]: 175,
-    },
-    PLATINUM: {
-      [ROLES.MARKET_MAKER]: 600,
-      [ROLES.CLEARPATH_USER]: 1000,
-      [ROLES.TOKENMINT]: 800,
-      [ROLES.FRIEND_MARKET]: 300,
+  // Fetch tier prices from contract (replaces hardcoded prices)
+  const { getPrice, isLoading: isPricesLoading } = useTierPrices()
+
+  // Helper to get price for a role by role constant
+  const getRolePrice = (roleKey, tierName) => {
+    // Map ROLES constants to role keys used in useTierPrices
+    const roleKeyMap = {
+      [ROLES.MARKET_MAKER]: 'MARKET_MAKER',
+      [ROLES.CLEARPATH_USER]: 'CLEARPATH_USER',
+      [ROLES.TOKENMINT]: 'TOKENMINT',
+      [ROLES.FRIEND_MARKET]: 'FRIEND_MARKET',
     }
+    return getPrice(roleKeyMap[roleKey], tierName)
   }
 
   const handlePurchase = async () => {
@@ -97,7 +85,7 @@ function RolePurchaseModal({ onClose }) {
     setPurchaseStep('payment')
 
     try {
-      const price = TIER_PRICES[selectedTier][selectedRole]
+      const price = getRolePrice(selectedRole, selectedTier)
       const roleName = ROLE_INFO[selectedRole].name
       const tierValue = MEMBERSHIP_TIERS[selectedTier].id
 
@@ -176,7 +164,7 @@ function RolePurchaseModal({ onClose }) {
   }
 
   const selectedRoleInfo = ROLE_INFO[selectedRole]
-  const price = TIER_PRICES[selectedTier]?.[selectedRole] || 0
+  const price = getRolePrice(selectedRole, selectedTier)
   const tierInfo = MEMBERSHIP_TIERS[selectedTier]
   const tierBenefits = TIER_BENEFITS[selectedTier]
 
@@ -198,7 +186,7 @@ function RolePurchaseModal({ onClose }) {
 
             <div className="role-options">
               {Object.entries(ROLE_INFO)
-                .filter(([roleKey]) => TIER_PRICES.BRONZE[roleKey])
+                .filter(([roleKey]) => getRolePrice(roleKey, 'BRONZE') > 0)
                 .map(([roleKey, roleInfo]) => {
                   const isOwned = hasRole && hasRole(roleKey)
                   return (
@@ -218,7 +206,7 @@ function RolePurchaseModal({ onClose }) {
                           {isOwned ? (
                             <span className="role-option-owned-badge">Already Owned</span>
                           ) : (
-                            <span className="role-option-price">from ${TIER_PRICES.BRONZE[roleKey]} USC</span>
+                            <span className="role-option-price">from {getRolePrice(roleKey, 'BRONZE')} USC</span>
                           )}
                         </div>
                         <p className="role-option-description">{roleInfo.description}</p>
@@ -251,7 +239,7 @@ function RolePurchaseModal({ onClose }) {
 
             <div className="tier-options">
               {Object.entries(MEMBERSHIP_TIERS).map(([tierKey, tier]) => {
-                const tierPrice = TIER_PRICES[tierKey][selectedRole]
+                const tierPrice = getRolePrice(selectedRole, tierKey)
                 const benefits = TIER_BENEFITS[tierKey]
                 return (
                   <label

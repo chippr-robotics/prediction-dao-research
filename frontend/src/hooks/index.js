@@ -57,6 +57,13 @@ export {
 
 // Role hooks
 export { useRoles } from './useRoles'
+export {
+  useRoleDetails,
+  MembershipTier,
+  TIER_NAMES,
+  TIER_COLORS,
+  ROLE_BYTES32
+} from './useRoleDetails'
 
 // Admin hooks
 export { useAdminContracts } from './useAdminContracts'
@@ -82,3 +89,9 @@ export {
   MarketCategory,
   MarketStatus
 } from './usePerpetualsContract'
+
+// Encryption hooks (for friend market privacy)
+export {
+  useEncryption,
+  useDecryptedMarkets
+} from './useEncryption'

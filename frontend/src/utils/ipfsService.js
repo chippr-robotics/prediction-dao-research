@@ -301,10 +301,26 @@ const getPinataAuthHeaders = () => {
 }
 
 /**
+ * Generate a unique timestamped filename for Pinata
+ * Format: prefix-YYYYMMDD-HHMMSSmmm.json (UTC)
+ * @param {string} prefix - Filename prefix (e.g., 'market-metadata', 'token-metadata')
+ * @returns {string} Unique filename
+ */
+const generateTimestampedFilename = (prefix = 'metadata') => {
+  const now = new Date()
+  const timestamp = now.toISOString()
+    .replace(/[-:T]/g, '')
+    .replace(/\.\d{3}Z$/, '')
+  const ms = now.getMilliseconds().toString().padStart(3, '0')
+  return `${prefix}-${timestamp}${ms}.json`
+}
+
+/**
  * Upload JSON data to IPFS via Pinata
  * @param {Object} data - JSON data to upload
  * @param {Object} options - Upload options
- * @param {string} options.name - Optional name for the content
+ * @param {string} options.name - Optional name for the content (auto-generated with timestamp if not provided)
+ * @param {string} options.namePrefix - Optional prefix for auto-generated timestamped name (default: 'metadata')
  * @returns {Promise<{cid: string, uri: string}>} Upload result with CID and URI
  * @throws {Error} If upload fails
  */
@@ -320,6 +336,9 @@ export const uploadJson = async (data, options = {}) => {
   } catch (error) {
     throw new Error(`Cannot stringify data: ${error.message}`)
   }
+
+  // Generate unique timestamped filename for auditing if name not explicitly provided
+  const filename = options.name || generateTimestampedFilename(options.namePrefix || 'metadata')
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), IPFS_CONFIG.UPLOAD_TIMEOUT)
@@ -338,7 +357,7 @@ export const uploadJson = async (data, options = {}) => {
       body: JSON.stringify({
         pinataContent: data,
         pinataMetadata: {
-          name: options.name || 'metadata.json',
+          name: filename,
         },
         pinataOptions: {
           cidVersion: 1, // Use CIDv1 for better compatibility
@@ -375,7 +394,7 @@ export const uploadJson = async (data, options = {}) => {
 
     console.log('Successfully pinned to Pinata:', {
       cid,
-      name: options.name,
+      name: filename,
       size: result.PinSize,
       timestamp: result.Timestamp,
     })
@@ -436,7 +455,7 @@ export const uploadMarketMetadata = async (metadata) => {
     },
   }
 
-  return uploadJson(formattedMetadata, { name: 'market-metadata.json' })
+  return uploadJson(formattedMetadata, { namePrefix: 'market-metadata' })
 }
 
 /**

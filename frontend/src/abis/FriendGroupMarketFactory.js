@@ -114,6 +114,29 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
     stateMutability: 'view',
     type: 'function'
   },
+  {
+    inputs: [],
+    name: 'tieredRoleManager',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+
+  // Admin functions
+  {
+    inputs: [{ name: '_tieredRoleManager', type: 'address' }],
+    name: 'setTieredRoleManager',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
 
   // Create market functions
   {

@@ -790,9 +790,9 @@
 
 .treasury-section {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
-  max-width: 900px;
+  max-width: 1000px;
 }
 
 .balance-display {
@@ -812,6 +812,90 @@
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+.balance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.balance-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.balance-item .balance-display {
+  margin-bottom: 0;
+}
+
+.balance-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Spending Limits Grid */
+.spending-limits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.limit-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.limit-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.limit-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.security-info {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.security-info p {
+  margin: 0.5rem 0;
+}
+
+/* Status badges */
+.status-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success-color);
+}
+
+.status-badge.paused {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
 }
 
 /* ===================================

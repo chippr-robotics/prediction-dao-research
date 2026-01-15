@@ -100,6 +100,11 @@ function loadFloppyKeysSync() {
   const password = process.env.FLOPPY_KEYSTORE_PASSWORD;
   if (!password) {
     console.warn('[Floppy] FLOPPY_KEYSTORE_PASSWORD not set');
+    // Fallback to PRIVATE_KEY for development/admin convenience
+    if (process.env.PRIVATE_KEY) {
+      console.log('[Floppy] Using PRIVATE_KEY env var fallback');
+      return [process.env.PRIVATE_KEY];
+    }
     return [];
   }
 

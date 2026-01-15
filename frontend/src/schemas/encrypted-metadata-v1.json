@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fairwins.app/schemas/encrypted-metadata-v1.json",
+  "title": "Encrypted Market Metadata Schema v1.0",
+  "description": "Schema for encrypted friend market metadata. The inner metadata follows market-metadata-v1.json when decrypted.",
+  "type": "object",
+  "required": ["encrypted", "version", "algorithm", "nonce", "ciphertext", "participants", "signatures"],
+  "properties": {
+    "encrypted": {
+      "type": "boolean",
+      "const": true,
+      "description": "Flag indicating this is encrypted metadata"
+    },
+    "version": {
+      "type": "string",
+      "description": "Encryption schema version",
+      "enum": ["1.0"]
+    },
+    "algorithm": {
+      "type": "string",
+      "description": "Encryption algorithm identifier",
+      "enum": ["x25519-xsalsa20-poly1305"],
+      "default": "x25519-xsalsa20-poly1305"
+    },
+    "nonce": {
+      "type": "string",
+      "description": "Base64-encoded random nonce (24 bytes for XSalsa20)",
+      "pattern": "^[A-Za-z0-9+/]+=*$"
+    },
+    "ciphertext": {
+      "type": "string",
+      "description": "Base64-encoded encrypted metadata + authentication tag",
+      "pattern": "^[A-Za-z0-9+/]+=*$"
+    },
+    "participants": {
+      "type": "array",
+      "description": "Ethereum addresses of participants who can decrypt (lowercase)",
+      "items": {
+        "type": "string",
+        "pattern": "^0x[a-f0-9]{40}$"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "signatures": {
+      "type": "object",
+      "description": "Key derivation signatures for each participant (address -> signature)",
+      "additionalProperties": {
+        "type": "string",
+        "description": "Signature of 'FairWins Encryption Key v1' message",
+        "pattern": "^0x[a-fA-F0-9]+$"
+      },
+      "minProperties": 2,
+      "maxProperties": 2
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "encrypted": true,
+      "version": "1.0",
+      "algorithm": "x25519-xsalsa20-poly1305",
+      "nonce": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4",
+      "ciphertext": "c29tZSBlbmNyeXB0ZWQgZGF0YSBoZXJl...",
+      "participants": [
+        "0x1234567890abcdef1234567890abcdef12345678",
+        "0xabcdef1234567890abcdef1234567890abcdef12"
+      ],
+      "signatures": {
+        "0x1234567890abcdef1234567890abcdef12345678": "0x...(signature)...",
+        "0xabcdef1234567890abcdef1234567890abcdef12": "0x...(signature)..."
+      }
+    }
+  ]
+}

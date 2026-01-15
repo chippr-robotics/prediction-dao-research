@@ -642,4 +642,286 @@ describe("TreasuryVault - Unit Tests", function () {
       await treasuryVault.withdrawETH(user1.address, ethers.parseEther("1.0"));
     });
   });
+
+  describe("Nullification Restriction", function () {
+    let nullifierRegistry;
+    let nullifiedUser;
+
+    beforeEach(async function () {
+      nullifiedUser = user2;
+
+      // Deploy NullifierRegistry
+      const NullifierRegistry = await ethers.getContractFactory("NullifierRegistry");
+      nullifierRegistry = await NullifierRegistry.deploy();
+      await nullifierRegistry.waitForDeployment();
+
+      // Initialize RSA params (use simple test values)
+      const n = ethers.toBeHex(BigInt("0x" + "ff".repeat(256)), 256);
+      const g = ethers.toBeHex(BigInt(3), 256);
+      const initialAcc = ethers.toBeHex(BigInt(3), 256);
+      await nullifierRegistry.initializeParams(n, g, initialAcc);
+
+      // Grant NULLIFIER_ADMIN_ROLE to owner for testing
+      const NULLIFIER_ADMIN_ROLE = await nullifierRegistry.NULLIFIER_ADMIN_ROLE();
+      await nullifierRegistry.grantRole(NULLIFIER_ADMIN_ROLE, owner.address);
+
+      // Fund the vault
+      await treasuryVault.depositETH({ value: ethers.parseEther("10.0") });
+
+      // Fund with tokens
+      const depositAmount = ethers.parseEther("1000");
+      await mockToken.connect(user1).approve(await treasuryVault.getAddress(), depositAmount);
+      await treasuryVault.connect(user1).depositERC20(await mockToken.getAddress(), depositAmount);
+    });
+
+    describe("Configuration", function () {
+      it("Should allow owner to set nullifier registry", async function () {
+        await expect(
+          treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress())
+        ).to.emit(treasuryVault, "NullifierRegistryUpdated")
+          .withArgs(await nullifierRegistry.getAddress());
+
+        expect(await treasuryVault.nullifierRegistry()).to.equal(await nullifierRegistry.getAddress());
+      });
+
+      it("Should reject zero address for nullifier registry", async function () {
+        await expect(
+          treasuryVault.setNullifierRegistry(ethers.ZeroAddress)
+        ).to.be.revertedWith("Invalid nullifier registry address");
+      });
+
+      it("Should not allow non-owner to set nullifier registry", async function () {
+        await expect(
+          treasuryVault.connect(user1).setNullifierRegistry(await nullifierRegistry.getAddress())
+        ).to.be.reverted;
+      });
+
+      it("Should allow owner to enable nullification enforcement", async function () {
+        await expect(
+          treasuryVault.setNullificationEnforcement(true)
+        ).to.emit(treasuryVault, "NullificationEnforcementUpdated")
+          .withArgs(true);
+
+        expect(await treasuryVault.enforceNullificationOnWithdrawals()).to.equal(true);
+      });
+
+      it("Should allow owner to disable nullification enforcement", async function () {
+        await treasuryVault.setNullificationEnforcement(true);
+
+        await expect(
+          treasuryVault.setNullificationEnforcement(false)
+        ).to.emit(treasuryVault, "NullificationEnforcementUpdated")
+          .withArgs(false);
+
+        expect(await treasuryVault.enforceNullificationOnWithdrawals()).to.equal(false);
+      });
+
+      it("Should not allow non-owner to set enforcement", async function () {
+        await expect(
+          treasuryVault.connect(user1).setNullificationEnforcement(true)
+        ).to.be.reverted;
+      });
+    });
+
+    describe("ETH Withdrawal Restrictions", function () {
+      beforeEach(async function () {
+        // Configure nullifier registry and enable enforcement
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await treasuryVault.setNullificationEnforcement(true);
+      });
+
+      it("Should allow withdrawal to non-nullified address", async function () {
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        await expect(
+          treasuryVault.withdrawETH(user1.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal")
+          .withArgs(ethers.ZeroAddress, user1.address, withdrawAmount, owner.address);
+      });
+
+      it("Should block withdrawal to nullified address", async function () {
+        // Nullify the user
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        await expect(
+          treasuryVault.withdrawETH(nullifiedUser.address, withdrawAmount)
+        ).to.be.revertedWith("Recipient address is nullified");
+      });
+
+      it("Should revert with message when withdrawal blocked by nullification", async function () {
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        await expect(
+          treasuryVault.withdrawETH(nullifiedUser.address, withdrawAmount)
+        ).to.be.revertedWith("Recipient address is nullified");
+      });
+
+      it("Should allow withdrawal after address is reinstated", async function () {
+        // Nullify and then reinstate
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+        await nullifierRegistry.reinstateAddress(nullifiedUser.address, "test reinstatement");
+
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        await expect(
+          treasuryVault.withdrawETH(nullifiedUser.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal");
+      });
+
+      it("Should allow withdrawal to nullified address when enforcement is disabled", async function () {
+        // Nullify the address
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        // Disable enforcement
+        await treasuryVault.setNullificationEnforcement(false);
+
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        // Should succeed even though address is nullified
+        await expect(
+          treasuryVault.withdrawETH(nullifiedUser.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal");
+      });
+    });
+
+    describe("ERC20 Withdrawal Restrictions", function () {
+      beforeEach(async function () {
+        // Configure nullifier registry and enable enforcement
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await treasuryVault.setNullificationEnforcement(true);
+      });
+
+      it("Should allow token withdrawal to non-nullified address", async function () {
+        const withdrawAmount = ethers.parseEther("100");
+
+        await expect(
+          treasuryVault.withdrawERC20(await mockToken.getAddress(), user1.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal")
+          .withArgs(await mockToken.getAddress(), user1.address, withdrawAmount, owner.address);
+      });
+
+      it("Should block token withdrawal to nullified address", async function () {
+        // Nullify the user
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        const withdrawAmount = ethers.parseEther("100");
+
+        await expect(
+          treasuryVault.withdrawERC20(await mockToken.getAddress(), nullifiedUser.address, withdrawAmount)
+        ).to.be.revertedWith("Recipient address is nullified");
+      });
+
+      it("Should revert with message for blocked token withdrawal", async function () {
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        const withdrawAmount = ethers.parseEther("100");
+        const tokenAddress = await mockToken.getAddress();
+
+        await expect(
+          treasuryVault.withdrawERC20(tokenAddress, nullifiedUser.address, withdrawAmount)
+        ).to.be.revertedWith("Recipient address is nullified");
+      });
+
+      it("Should allow token withdrawal to nullified address when enforcement is disabled", async function () {
+        // Nullify the address
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        // Disable enforcement
+        await treasuryVault.setNullificationEnforcement(false);
+
+        const withdrawAmount = ethers.parseEther("100");
+
+        // Should succeed
+        await expect(
+          treasuryVault.withdrawERC20(await mockToken.getAddress(), nullifiedUser.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal");
+      });
+    });
+
+    describe("isRecipientNullified View Function", function () {
+      it("Should return false when no registry is configured", async function () {
+        expect(await treasuryVault.isRecipientNullified(nullifiedUser.address)).to.equal(false);
+      });
+
+      it("Should return false for non-nullified address", async function () {
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+
+        expect(await treasuryVault.isRecipientNullified(user1.address)).to.equal(false);
+      });
+
+      it("Should return true for nullified address", async function () {
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+
+        expect(await treasuryVault.isRecipientNullified(nullifiedUser.address)).to.equal(true);
+      });
+
+      it("Should return false after address is reinstated", async function () {
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+        await nullifierRegistry.reinstateAddress(nullifiedUser.address, "test reinstatement");
+
+        expect(await treasuryVault.isRecipientNullified(nullifiedUser.address)).to.equal(false);
+      });
+    });
+
+    describe("Edge Cases", function () {
+      it("Should work without registry configured (no enforcement)", async function () {
+        // Enable enforcement but don't configure registry
+        await treasuryVault.setNullificationEnforcement(true);
+
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        // Should still work because registry is not configured
+        await expect(
+          treasuryVault.withdrawETH(user1.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal");
+      });
+
+      it("Should work with registry configured but enforcement disabled", async function () {
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+        // enforcement is false by default
+
+        const withdrawAmount = ethers.parseEther("1.0");
+
+        // Should work because enforcement is disabled
+        await expect(
+          treasuryVault.withdrawETH(nullifiedUser.address, withdrawAmount)
+        ).to.emit(treasuryVault, "Withdrawal");
+      });
+
+      it("Should combine nullification check with spending limits", async function () {
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await treasuryVault.setNullificationEnforcement(true);
+        await treasuryVault.setTransactionLimit(ethers.ZeroAddress, ethers.parseEther("2.0"));
+
+        // Should fail for exceeding limit (before nullification check)
+        await expect(
+          treasuryVault.withdrawETH(user1.address, ethers.parseEther("3.0"))
+        ).to.be.revertedWith("Exceeds transaction limit");
+
+        // Should fail for nullified address
+        await nullifierRegistry.nullifyAddress(nullifiedUser.address, "test nullification");
+        await expect(
+          treasuryVault.withdrawETH(nullifiedUser.address, ethers.parseEther("1.0"))
+        ).to.be.revertedWith("Recipient address is nullified");
+      });
+
+      it("Should combine nullification check with pause", async function () {
+        await treasuryVault.setNullifierRegistry(await nullifierRegistry.getAddress());
+        await treasuryVault.setNullificationEnforcement(true);
+        await treasuryVault.pause();
+
+        // Should fail for pause (before nullification check)
+        await expect(
+          treasuryVault.withdrawETH(user1.address, ethers.parseEther("1.0"))
+        ).to.be.revertedWith("Vault is paused");
+      });
+    });
+  });
 });

@@ -3,7 +3,11 @@ const { ethers } = require("hardhat");
 /**
  * Fix FriendGroupMarketFactory's tieredRoleManager
  *
- * Update to use the new TierRegistryAdapter that has MARKET_MAKER_ROLE support
+ * Update to use the correct TieredRoleManager (0xA6F794...) that supports
+ * isMembershipActive, checkMarketCreationLimitFor, and other required functions.
+ *
+ * The old adapter (0x8aba...) doesn't properly implement these functions,
+ * causing friend market creation to fail.
  *
  * Run with admin floppy:
  *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/fix-fgmf-role-manager.js --network mordor
@@ -11,8 +15,10 @@ const { ethers } = require("hardhat");
 
 const CONTRACTS = {
   friendGroupMarketFactory: "0x8cFE477e267bB36925047df8A6E30348f82b0085",
-  newAdapter: "0x8aba782765b458Bf2d8DB8eD266D0c785D9F82AD",
-  oldAdapter: "0x8e3A4C65a6C22d88515FD356cB00732adac4f4d7",
+  // Correct TieredRoleManager with full support for isMembershipActive
+  newTieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
+  // Old/broken adapter that doesn't support isMembershipActive properly
+  oldAdapter: "0x8aba782765b458Bf2d8DB8eD266D0c785D9F82AD",
 };
 
 async function main() {
@@ -35,15 +41,15 @@ async function main() {
 
   const currentRM = await fgmf.tieredRoleManager();
   console.log("\nCurrent tieredRoleManager:", currentRM);
-  console.log("New adapter:", CONTRACTS.newAdapter);
+  console.log("New TieredRoleManager:", CONTRACTS.newTieredRoleManager);
 
-  if (currentRM.toLowerCase() === CONTRACTS.newAdapter.toLowerCase()) {
-    console.log("\nAlready using new adapter!");
+  if (currentRM.toLowerCase() === CONTRACTS.newTieredRoleManager.toLowerCase()) {
+    console.log("\nAlready using correct TieredRoleManager!");
     return;
   }
 
-  console.log("\nUpdating tieredRoleManager...");
-  const tx = await fgmf.updateTieredRoleManager(CONTRACTS.newAdapter);
+  console.log("\nUpdating tieredRoleManager via setTieredRoleManager...");
+  const tx = await fgmf.setTieredRoleManager(CONTRACTS.newTieredRoleManager);
   console.log("Tx:", tx.hash);
   await tx.wait();
   console.log("Updated!");

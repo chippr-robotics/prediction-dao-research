@@ -3,6 +3,7 @@ import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
+import { useTierPrices } from '../../hooks/useTierPrices'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -25,6 +26,13 @@ const STEPS = [
   { id: 'tier', label: 'Choose Tier', icon: '2' },
   { id: 'review', label: 'Review', icon: '3' },
   { id: 'complete', label: 'Complete', icon: '4' }
+]
+
+// Shortened steps for upgrade/extend flow
+const SHORTENED_STEPS = [
+  { id: 'tier', label: 'Choose Tier', icon: '1' },
+  { id: 'review', label: 'Review', icon: '2' },
+  { id: 'complete', label: 'Complete', icon: '3' }
 ]
 
 // Membership tiers matching TieredRoleManager contract
@@ -119,45 +127,43 @@ const ROLE_DETAILS = {
   }
 }
 
-// Role prices in USC stablecoin by tier
-const TIER_PRICES = {
-  BRONZE: {
-    MARKET_MAKER: 100,
-    CLEARPATH_USER: 250,
-    TOKENMINT: 150,
-    FRIEND_MARKET: 50
-  },
-  SILVER: {
-    MARKET_MAKER: 200,
-    CLEARPATH_USER: 400,
-    TOKENMINT: 300,
-    FRIEND_MARKET: 100
-  },
-  GOLD: {
-    MARKET_MAKER: 350,
-    CLEARPATH_USER: 650,
-    TOKENMINT: 500,
-    FRIEND_MARKET: 175
-  },
-  PLATINUM: {
-    MARKET_MAKER: 600,
-    CLEARPATH_USER: 1000,
-    TOKENMINT: 800,
-    FRIEND_MARKET: 300
-  }
+// Note: Tier prices are now fetched from TierRegistry contract via useTierPrices hook
+// All prices are in USC (stablecoin) - ETC is only used for gas
+// Fallback prices in USC for when contract is unavailable
+const FALLBACK_TIER_PRICES = {
+  BRONZE: { MARKET_MAKER: 100, CLEARPATH_USER: 100, TOKENMINT: 100, FRIEND_MARKET: 50 },
+  SILVER: { MARKET_MAKER: 100, CLEARPATH_USER: 150, TOKENMINT: 150, FRIEND_MARKET: 100 },
+  GOLD: { MARKET_MAKER: 250, CLEARPATH_USER: 300, TOKENMINT: 300, FRIEND_MARKET: 250 },
+  PLATINUM: { MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500, FRIEND_MARKET: 500 }
 }
 
-function PremiumPurchaseModal({ isOpen = true, onClose }) {
+/**
+ * PremiumPurchaseModal Component
+ *
+ * @param {boolean} isOpen - Whether the modal is open
+ * @param {function} onClose - Close handler
+ * @param {string} preselectedRole - Role to pre-select (e.g., 'FRIEND_MARKET')
+ * @param {string} action - Action type: 'purchase', 'upgrade', or 'extend'
+ */
+function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, action = 'purchase' }) {
   const { ROLE_INFO, grantRole, hasRole, loadRoles } = useRoles()
   const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
 
-  // Step navigation
-  const [currentStep, setCurrentStep] = useState(0)
+  // Determine if this is an upgrade/extend flow
+  const isUpgradeFlow = action === 'upgrade'
+  const isExtendFlow = action === 'extend'
 
-  // Selected roles (multi-select)
-  const [selectedRoles, setSelectedRoles] = useState([])
+  // Step navigation - skip role selection if preselected for upgrade/extend
+  const [currentStep, setCurrentStep] = useState(
+    preselectedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0
+  )
+
+  // Selected roles (multi-select) - pre-select if provided
+  const [selectedRoles, setSelectedRoles] = useState(
+    preselectedRole ? [preselectedRole] : []
+  )
 
   // Selected tier
   const [selectedTier, setSelectedTier] = useState('BRONZE')
@@ -174,16 +180,19 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
   const [userCurrentTiers, setUserCurrentTiers] = useState({})
   const [isLoadingTiers, setIsLoadingTiers] = useState(false)
 
-  // Calculate pricing based on tier
+  // Fetch tier prices from contract
+  const { tierPrices, isLoading: isPricesLoading, getPrice, getTotalPrice } = useTierPrices()
+
+  // Calculate pricing based on tier (uses prices from contract)
   const pricing = useMemo(() => {
-    const total = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[selectedTier]?.[role] || 0), 0)
+    const total = getTotalPrice(selectedRoles, selectedTier)
     const roleCount = selectedRoles.length
 
     return {
       total,
       roleCount
     }
-  }, [selectedRoles, selectedTier])
+  }, [selectedRoles, selectedTier, getTotalPrice])
 
   // Fetch user's current tier for selected roles
   const fetchUserTiers = useCallback(async () => {
@@ -228,22 +237,27 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
     return Math.max(...selectedRoles.map(r => userCurrentTiers[r]?.tier || 0))
   }, [selectedRoles, userCurrentTiers])
 
-  // Filter tiers to only show upgrades (tier > current)
+  // Filter tiers to only show upgrades (tier > current) or same tier for extend
   const availableTiers = useMemo(() => {
+    if (isExtendFlow) {
+      // For extend, show current tier and higher tiers
+      return Object.entries(MEMBERSHIP_TIERS).filter(([_, tier]) => tier.id >= highestCurrentTier)
+    }
+    // For upgrade/purchase, show only higher tiers
     return Object.entries(MEMBERSHIP_TIERS).filter(([_, tier]) => tier.id > highestCurrentTier)
-  }, [highestCurrentTier])
+  }, [highestCurrentTier, isExtendFlow])
 
   // Reset form
   const resetForm = useCallback(() => {
-    setCurrentStep(0)
-    setSelectedRoles([])
+    setCurrentStep(preselectedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0)
+    setSelectedRoles(preselectedRole ? [preselectedRole] : [])
     setSelectedTier('BRONZE')
     setZkPublicKey('')
     setPurchaseResults([])
     setErrors({})
     setIsPurchasing(false)
     setUserCurrentTiers({})
-  }, [])
+  }, [preselectedRole, isUpgradeFlow, isExtendFlow])
 
   // Handle role toggle
   const handleRoleToggle = useCallback((roleKey) => {
@@ -305,15 +319,54 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
     }
   }, [currentStep, validateStep])
 
+  // Get a verified signer that is authorized for the connected account
+  const getVerifiedSigner = async () => {
+    let activeSigner = signer
+
+    // Verify the signer is authorized for the connected address
+    if (activeSigner) {
+      try {
+        const signerAddress = await activeSigner.getAddress()
+        console.log('[PremiumPurchaseModal] Signer address:', signerAddress)
+        console.log('[PremiumPurchaseModal] Connected address:', account)
+
+        if (account && signerAddress.toLowerCase() !== account.toLowerCase()) {
+          console.warn('[PremiumPurchaseModal] Signer address mismatch, requesting fresh authorization...')
+          activeSigner = null // Force refresh
+        }
+      } catch (addressError) {
+        console.warn('[PremiumPurchaseModal] Error verifying signer:', addressError)
+        activeSigner = null // Force refresh
+      }
+    }
+
+    // If signer is stale or not available, get a fresh one
+    if (!activeSigner && window.ethereum) {
+      try {
+        // Request accounts to ensure authorization
+        await window.ethereum.request({ method: 'eth_requestAccounts' })
+        // Create fresh provider and signer
+        const { ethers } = await import('ethers')
+        const freshProvider = new ethers.BrowserProvider(window.ethereum)
+        activeSigner = await freshProvider.getSigner()
+        console.log('[PremiumPurchaseModal] Fresh signer obtained')
+      } catch (refreshError) {
+        console.error('[PremiumPurchaseModal] Failed to get fresh signer:', refreshError)
+        throw new Error('Wallet authorization failed. Please reconnect your wallet.')
+      }
+    }
+
+    if (!activeSigner) {
+      throw new Error('No signer available. Please reconnect your wallet.')
+    }
+
+    return activeSigner
+  }
+
   // Purchase handler
   const handlePurchase = async () => {
     if (!isConnected || !account) {
       showNotification('Please connect your wallet first', 'error')
-      return
-    }
-
-    if (!signer) {
-      showNotification('Wallet signer not available', 'error')
       return
     }
 
@@ -328,6 +381,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
     const tierName = MEMBERSHIP_TIERS[selectedTier].name
 
     try {
+      // Get a verified signer before starting transactions
+      const verifiedSigner = await getVerifiedSigner()
+
       const transactionCount = selectedRoles.length
       const notificationMessage =
         transactionCount > 1
@@ -339,11 +395,11 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       // Process each role purchase
       for (const roleKey of selectedRoles) {
         const roleName = ROLE_INFO[roleKey].name
-        const price = TIER_PRICES[selectedTier][roleKey]
+        const price = getPrice(roleKey, selectedTier)
 
         try {
-          // Execute blockchain transaction with tier
-          const receipt = await purchaseRoleWithUSC(signer, roleName, price, tierValue)
+          // Execute blockchain transaction with verified signer
+          const receipt = await purchaseRoleWithUSC(verifiedSigner, roleName, price, tierValue)
 
           // Grant the role to the current user
           grantRole(roleKey)
@@ -380,7 +436,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
       // Handle ZK key registration for ClearPath (optional)
       if (zkPublicKey.trim() && selectedRoles.includes('CLEARPATH_USER')) {
         try {
-          await registerZKKey(signer, zkPublicKey.trim())
+          await registerZKKey(verifiedSigner, zkPublicKey.trim())
           showNotification('ZK key registered successfully', 'success', 5000)
         } catch (zkError) {
           console.error('ZK key registration failed:', zkError)
@@ -455,8 +511,16 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
         {/* Header */}
         <header className="ppm-header">
           <div className="ppm-header-content">
-            <h2 id="ppm-title">Purchase Premium Access</h2>
-            <p className="ppm-subtitle">Unlock powerful features with tiered membership</p>
+            <h2 id="ppm-title">
+              {isUpgradeFlow ? 'Upgrade Membership' : isExtendFlow ? 'Extend Membership' : 'Purchase Premium Access'}
+            </h2>
+            <p className="ppm-subtitle">
+              {isUpgradeFlow
+                ? 'Upgrade to a higher tier for increased limits'
+                : isExtendFlow
+                ? 'Extend your membership before it expires'
+                : 'Unlock powerful features with tiered membership'}
+            </p>
           </div>
           <button
             className="ppm-close-btn"
@@ -470,20 +534,27 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
 
         {/* Step Indicator */}
         <nav className="ppm-steps" aria-label="Purchase steps">
-          {STEPS.map((step, index) => (
-            <button
-              key={step.id}
-              className={`ppm-step ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
-              onClick={() => handleStepClick(index)}
-              disabled={isPurchasing || index > currentStep}
-              aria-current={index === currentStep ? 'step' : undefined}
-            >
-              <span className="ppm-step-icon" aria-hidden="true">
-                {index < currentStep ? '✓' : step.icon}
-              </span>
-              <span className="ppm-step-label">{step.label}</span>
-            </button>
-          ))}
+          {(preselectedRole && (isUpgradeFlow || isExtendFlow) ? SHORTENED_STEPS : STEPS).map((step, index) => {
+            // Map display index to actual step index
+            const actualIndex = preselectedRole && (isUpgradeFlow || isExtendFlow) ? index + 1 : index
+            const isActive = actualIndex === currentStep
+            const isCompleted = actualIndex < currentStep
+
+            return (
+              <button
+                key={step.id}
+                className={`ppm-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                onClick={() => handleStepClick(actualIndex)}
+                disabled={isPurchasing || actualIndex > currentStep}
+                aria-current={isActive ? 'step' : undefined}
+              >
+                <span className="ppm-step-icon" aria-hidden="true">
+                  {isCompleted ? '✓' : step.icon}
+                </span>
+                <span className="ppm-step-label">{step.label}</span>
+              </button>
+            )
+          })}
         </nav>
 
         {/* Content */}
@@ -503,12 +574,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
 
                 <div className="ppm-roles-grid">
                   {Object.entries(ROLE_INFO)
-                    .filter(([roleKey]) => TIER_PRICES.BRONZE[roleKey])
+                    .filter(([roleKey]) => getPrice(roleKey, 'BRONZE'))
                     .map(([roleKey, roleInfo]) => {
                       const details = ROLE_DETAILS[roleKey]
                       const isSelected = selectedRoles.includes(roleKey)
                       const isOwned = hasRole && hasRole(roleKey)
-                      const bronzePrice = TIER_PRICES.BRONZE[roleKey]
+                      const bronzePrice = getPrice(roleKey, 'BRONZE')
 
                       return (
                         <div
@@ -567,12 +638,28 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
               <section className="ppm-section">
                 <div className="ppm-section-header">
                   <h3 className="ppm-section-title">
-                    <span aria-hidden="true">🏆</span> Choose Membership Tier
+                    <span aria-hidden="true">🏆</span>
+                    {isExtendFlow ? 'Extend or Upgrade Membership' : 'Choose Membership Tier'}
                   </h3>
                   <p className="ppm-section-desc">
-                    Higher tiers unlock more features and higher limits.
+                    {isExtendFlow
+                      ? 'Renew at your current tier or upgrade for higher limits.'
+                      : 'Higher tiers unlock more features and higher limits.'}
                   </p>
                 </div>
+
+                {/* Show selected role when in upgrade/extend mode */}
+                {preselectedRole && (isUpgradeFlow || isExtendFlow) && (
+                  <div className="ppm-info-card ppm-selected-role-info">
+                    <span className="ppm-info-icon" aria-hidden="true">
+                      {ROLE_DETAILS[preselectedRole]?.icon || '⭐'}
+                    </span>
+                    <div>
+                      <strong>{isExtendFlow ? 'Extending' : 'Upgrading'}: {ROLE_INFO[preselectedRole]?.name}</strong>
+                      <p>{ROLE_DETAILS[preselectedRole]?.tagline}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Show loading state while fetching tiers */}
                 {isLoadingTiers && (
@@ -621,7 +708,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                   <div className="ppm-tier-grid">
                     {availableTiers.map(([tierKey, tier]) => {
                       const benefits = TIER_BENEFITS[tierKey]
-                      const tierTotal = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[tierKey]?.[role] || 0), 0)
+                      const tierTotal = selectedRoles.reduce((sum, role) => sum + getPrice(role, tierKey), 0)
                       const isSelected = selectedTier === tierKey
 
                       return (
@@ -764,7 +851,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose }) {
                       {selectedRoles.map(roleKey => {
                         const roleInfo = ROLE_INFO[roleKey]
                         const details = ROLE_DETAILS[roleKey]
-                        const rolePrice = TIER_PRICES[selectedTier][roleKey]
+                        const rolePrice = getPrice(roleKey, selectedTier)
                         return (
                           <div key={roleKey} className="ppm-review-role-item">
                             <div className="ppm-review-role-info">

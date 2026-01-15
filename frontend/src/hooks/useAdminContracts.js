@@ -32,6 +32,15 @@ function getRoleManagerAddress() {
 
 const ROLE_MANAGER_ADDRESS = getRoleManagerAddress()
 
+// FriendGroupMarketFactory address for market stake revenue
+const FRIEND_GROUP_MARKET_FACTORY_ADDRESS = DEPLOYED_CONTRACTS.friendGroupMarketFactory || null
+
+// Minimal ABI for FriendGroupMarketFactory withdraw function
+const FRIEND_GROUP_MARKET_FACTORY_ABI = [
+  'function withdrawCollectedFees() external',
+  'function owner() external view returns (address)'
+]
+
 /**
  * Hook for interacting with admin contract functions
  * Provides methods for emergency controls, tier configuration, and role management
@@ -43,9 +52,11 @@ export function useAdminContracts() {
   const [contractState, setContractState] = useState({
     isPaused: false,
     contractBalance: '0',
+    friendMarketBalance: '0',
     roleHashes: {},
     supportsTiers: false,
-    isDeployed: !!ROLE_MANAGER_ADDRESS
+    isDeployed: !!ROLE_MANAGER_ADDRESS,
+    friendMarketFactoryDeployed: !!FRIEND_GROUP_MARKET_FACTORY_ADDRESS
   })
   
   // Track if a fetch is in progress to prevent redundant calls
@@ -77,11 +88,24 @@ export function useAdminContracts() {
   const fetchContractState = useCallback(async () => {
     // Role manager not deployed
     if (!ROLE_MANAGER_ADDRESS) {
+      // Still try to fetch FriendGroupMarketFactory balance if available
+      let friendMarketBalance = '0'
+      if (FRIEND_GROUP_MARKET_FACTORY_ADDRESS) {
+        try {
+          friendMarketBalance = ethers.formatEther(
+            await readProvider.getBalance(FRIEND_GROUP_MARKET_FACTORY_ADDRESS)
+          )
+        } catch (e) {
+          console.warn('Error fetching FriendGroupMarketFactory balance:', e)
+        }
+      }
       setContractState({
         isPaused: false,
         contractBalance: '0',
+        friendMarketBalance,
         roleHashes: {},
-        isDeployed: false
+        isDeployed: false,
+        friendMarketFactoryDeployed: !!FRIEND_GROUP_MARKET_FACTORY_ADDRESS
       })
       return null
     }
@@ -98,10 +122,13 @@ export function useAdminContracts() {
         return null
       }
 
-      // Fetch paused state and balance in parallel
-      const [isPaused, balance] = await Promise.all([
+      // Fetch paused state and balances in parallel
+      const [isPaused, balance, friendMarketBalanceWei] = await Promise.all([
         contract.paused().catch(() => false),
-        readProvider.getBalance(ROLE_MANAGER_ADDRESS).catch(() => 0n)
+        readProvider.getBalance(ROLE_MANAGER_ADDRESS).catch(() => 0n),
+        FRIEND_GROUP_MARKET_FACTORY_ADDRESS
+          ? readProvider.getBalance(FRIEND_GROUP_MARKET_FACTORY_ADDRESS).catch(() => 0n)
+          : Promise.resolve(0n)
       ])
 
       // Fetch role hashes
@@ -141,12 +168,22 @@ export function useAdminContracts() {
       setContractState({
         isPaused,
         contractBalance: ethers.formatEther(balance),
+        friendMarketBalance: ethers.formatEther(friendMarketBalanceWei),
         roleHashes,
         supportsTiers,
-        isDeployed: true
+        isDeployed: true,
+        friendMarketFactoryDeployed: !!FRIEND_GROUP_MARKET_FACTORY_ADDRESS
       })
 
-      return { isPaused, contractBalance: ethers.formatEther(balance), roleHashes, supportsTiers, isDeployed: true }
+      return {
+        isPaused,
+        contractBalance: ethers.formatEther(balance),
+        friendMarketBalance: ethers.formatEther(friendMarketBalanceWei),
+        roleHashes,
+        supportsTiers,
+        isDeployed: true,
+        friendMarketFactoryDeployed: !!FRIEND_GROUP_MARKET_FACTORY_ADDRESS
+      }
     } catch (err) {
       console.error('Error fetching contract state:', err)
       setError(err.message)
@@ -422,6 +459,48 @@ export function useAdminContracts() {
   }, [signer, isConnected, getRoleManagerContract, fetchContractState])
 
   /**
+   * Withdraw collected fees from FriendGroupMarketFactory
+   * Sends all accumulated market stake fees to the owner
+   */
+  const withdrawFromFriendMarketFactory = useCallback(async () => {
+    if (!signer || !isConnected) {
+      throw new Error('Wallet not connected')
+    }
+
+    if (!FRIEND_GROUP_MARKET_FACTORY_ADDRESS) {
+      throw new Error('FriendGroupMarketFactory not deployed')
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const contract = new ethers.Contract(
+        FRIEND_GROUP_MARKET_FACTORY_ADDRESS,
+        FRIEND_GROUP_MARKET_FACTORY_ABI,
+        signer
+      )
+
+      const tx = await contract.withdrawCollectedFees()
+      const receipt = await tx.wait()
+
+      await fetchContractState()
+
+      return {
+        success: true,
+        hash: receipt.hash,
+        blockNumber: receipt.blockNumber
+      }
+    } catch (err) {
+      const message = parseContractError(err)
+      setError(message)
+      throw new Error(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [signer, isConnected, fetchContractState])
+
+  /**
    * Get tier information for a role
    */
   const getTierInfo = useCallback(async (roleHash, tier) => {
@@ -495,12 +574,14 @@ export function useAdminContracts() {
     revokeRoleOnChain,
     hasRoleOnChain,
     withdraw,
+    withdrawFromFriendMarketFactory,
     fetchContractState,
     getTierInfo,
     getUserMembership,
 
-    // Contract address for reference
-    roleManagerAddress: ROLE_MANAGER_ADDRESS
+    // Contract addresses for reference
+    roleManagerAddress: ROLE_MANAGER_ADDRESS,
+    friendMarketFactoryAddress: FRIEND_GROUP_MARKET_FACTORY_ADDRESS
   }
 }
 
