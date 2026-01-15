@@ -43,6 +43,7 @@ function AdminPanel() {
     grantTier,
     grantRoleOnChain,
     withdraw,
+    withdrawFromFriendMarketFactory,
     fetchContractState
   } = useAdminContracts()
 
@@ -1061,6 +1062,48 @@ function AdminPanel() {
                   Use the withdraw form below to transfer funds to another address.
                 </p>
               </div>
+
+              {/* Market Stake Revenue (FriendGroupMarketFactory Balance) */}
+              {contractState.friendMarketFactoryDeployed && (
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <h3>Market Stake Revenue</h3>
+                    <span className="status-badge active">FriendGroupMarketFactory</span>
+                  </div>
+                  <div className="balance-grid">
+                    <div className="balance-item">
+                      <div className="balance-display">
+                        <span className="balance-value">{contractState.friendMarketBalance}</span>
+                        <span className="balance-unit">ETC</span>
+                      </div>
+                      <span className="balance-label">From Market Stakes</span>
+                    </div>
+                  </div>
+                  <p className="card-info">
+                    Funds from friend market stakes (forfeitures, unclaimed amounts) accumulate here.
+                    Withdraw sends all collected fees to the contract owner.
+                  </p>
+                  {parseFloat(contractState.friendMarketBalance) > 0 && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        try {
+                          setPendingTx(true)
+                          const result = await withdrawFromFriendMarketFactory()
+                          showNotification(`Successfully withdrew ${contractState.friendMarketBalance} ETC`, 'success')
+                        } catch (err) {
+                          showNotification(err.message, 'error')
+                        } finally {
+                          setPendingTx(false)
+                        }
+                      }}
+                      disabled={pendingTx || isLoading}
+                    >
+                      {pendingTx ? 'Withdrawing...' : `Withdraw ${contractState.friendMarketBalance} ETC`}
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* TreasuryVault Balances (if available) */}
               {isTreasuryAvailable && (

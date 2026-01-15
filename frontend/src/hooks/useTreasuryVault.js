@@ -102,7 +102,7 @@ export function useTreasuryVault({ signer, provider, account } = {}) {
     setError(null)
 
     try {
-      // Batch all read calls
+      // Batch core read calls (these should always exist)
       const [
         ethBalance,
         isPaused,
@@ -111,9 +111,7 @@ export function useTreasuryVault({ signer, provider, account } = {}) {
         ethTxLimit,
         ethRatePeriod,
         ethPeriodLimitVal,
-        ethRemaining,
-        nullifierReg,
-        enforceNull
+        ethRemaining
       ] = await Promise.all([
         readContract.getETHBalance(),
         readContract.paused(),
@@ -122,10 +120,20 @@ export function useTreasuryVault({ signer, provider, account } = {}) {
         readContract.transactionLimit(ETH_ADDRESS),
         readContract.rateLimitPeriod(ETH_ADDRESS),
         readContract.periodLimit(ETH_ADDRESS),
-        readContract.getRemainingPeriodAllowance(ETH_ADDRESS),
-        readContract.nullifierRegistry(),
-        readContract.enforceNullificationOnWithdrawals()
+        readContract.getRemainingPeriodAllowance(ETH_ADDRESS)
       ])
+
+      // Fetch nullifier state separately (may not exist in older contract versions)
+      let nullifierReg = ethers.ZeroAddress
+      let enforceNull = false
+      try {
+        [nullifierReg, enforceNull] = await Promise.all([
+          readContract.nullifierRegistry(),
+          readContract.enforceNullificationOnWithdrawals()
+        ])
+      } catch (nullifierErr) {
+        console.warn('Nullifier functions not available (may be older contract version):', nullifierErr.message)
+      }
 
       // Fetch FairWins token balance and limits if token exists
       let fairWinsBalance = 0n

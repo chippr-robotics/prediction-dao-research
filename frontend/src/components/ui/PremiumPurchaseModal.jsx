@@ -3,6 +3,7 @@ import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
+import { useTierPrices } from '../../hooks/useTierPrices'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -126,32 +127,13 @@ const ROLE_DETAILS = {
   }
 }
 
-// Role prices in USC stablecoin by tier
-const TIER_PRICES = {
-  BRONZE: {
-    MARKET_MAKER: 100,
-    CLEARPATH_USER: 250,
-    TOKENMINT: 150,
-    FRIEND_MARKET: 50
-  },
-  SILVER: {
-    MARKET_MAKER: 200,
-    CLEARPATH_USER: 400,
-    TOKENMINT: 300,
-    FRIEND_MARKET: 100
-  },
-  GOLD: {
-    MARKET_MAKER: 350,
-    CLEARPATH_USER: 650,
-    TOKENMINT: 500,
-    FRIEND_MARKET: 175
-  },
-  PLATINUM: {
-    MARKET_MAKER: 600,
-    CLEARPATH_USER: 1000,
-    TOKENMINT: 800,
-    FRIEND_MARKET: 300
-  }
+// Note: TIER_PRICES are now fetched from contract via useTierPrices hook
+// Fallback prices in ETC for when contract is unavailable
+const FALLBACK_TIER_PRICES = {
+  BRONZE: { MARKET_MAKER: 0.05, CLEARPATH_USER: 0.05, TOKENMINT: 0.05, FRIEND_MARKET: 0.05 },
+  SILVER: { MARKET_MAKER: 0.1, CLEARPATH_USER: 0.1, TOKENMINT: 0.1, FRIEND_MARKET: 0.1 },
+  GOLD: { MARKET_MAKER: 0.25, CLEARPATH_USER: 0.25, TOKENMINT: 0.25, FRIEND_MARKET: 0.25 },
+  PLATINUM: { MARKET_MAKER: 0.5, CLEARPATH_USER: 0.5, TOKENMINT: 0.5, FRIEND_MARKET: 0.5 }
 }
 
 /**
@@ -197,16 +179,19 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   const [userCurrentTiers, setUserCurrentTiers] = useState({})
   const [isLoadingTiers, setIsLoadingTiers] = useState(false)
 
-  // Calculate pricing based on tier
+  // Fetch tier prices from contract
+  const { tierPrices, isLoading: isPricesLoading, getPrice, getTotalPrice } = useTierPrices()
+
+  // Calculate pricing based on tier (uses prices from contract)
   const pricing = useMemo(() => {
-    const total = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[selectedTier]?.[role] || 0), 0)
+    const total = getTotalPrice(selectedRoles, selectedTier)
     const roleCount = selectedRoles.length
 
     return {
       total,
       roleCount
     }
-  }, [selectedRoles, selectedTier])
+  }, [selectedRoles, selectedTier, getTotalPrice])
 
   // Fetch user's current tier for selected roles
   const fetchUserTiers = useCallback(async () => {
@@ -409,7 +394,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
       // Process each role purchase
       for (const roleKey of selectedRoles) {
         const roleName = ROLE_INFO[roleKey].name
-        const price = TIER_PRICES[selectedTier][roleKey]
+        const price = getPrice(roleKey, selectedTier)
 
         try {
           // Execute blockchain transaction with verified signer
@@ -588,12 +573,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
                 <div className="ppm-roles-grid">
                   {Object.entries(ROLE_INFO)
-                    .filter(([roleKey]) => TIER_PRICES.BRONZE[roleKey])
+                    .filter(([roleKey]) => getPrice(roleKey, 'BRONZE'))
                     .map(([roleKey, roleInfo]) => {
                       const details = ROLE_DETAILS[roleKey]
                       const isSelected = selectedRoles.includes(roleKey)
                       const isOwned = hasRole && hasRole(roleKey)
-                      const bronzePrice = TIER_PRICES.BRONZE[roleKey]
+                      const bronzePrice = getPrice(roleKey, 'BRONZE')
 
                       return (
                         <div
@@ -722,7 +707,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                   <div className="ppm-tier-grid">
                     {availableTiers.map(([tierKey, tier]) => {
                       const benefits = TIER_BENEFITS[tierKey]
-                      const tierTotal = selectedRoles.reduce((sum, role) => sum + (TIER_PRICES[tierKey]?.[role] || 0), 0)
+                      const tierTotal = selectedRoles.reduce((sum, role) => sum + getPrice(role, tierKey), 0)
                       const isSelected = selectedTier === tierKey
 
                       return (
@@ -865,7 +850,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                       {selectedRoles.map(roleKey => {
                         const roleInfo = ROLE_INFO[roleKey]
                         const details = ROLE_DETAILS[roleKey]
-                        const rolePrice = TIER_PRICES[selectedTier][roleKey]
+                        const rolePrice = getPrice(roleKey, selectedTier)
                         return (
                           <div key={roleKey} className="ppm-review-role-item">
                             <div className="ppm-review-role-info">

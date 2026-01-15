@@ -152,14 +152,14 @@ async function main() {
   const newFwnPeriodLimit = await treasury.periodLimit(FAIRWINS_TOKEN_ADDRESS);
 
   console.log('\nNew ETH Limits:');
-  console.log('  Transaction Limit:', newEthTxLimit > 0 ? ethers.formatEther(newEthTxLimit) + ' ETC' : 'Unlimited');
-  console.log('  Rate Period:', newEthRatePeriod > 0 ? `${newEthRatePeriod}s (${newEthRatePeriod / 3600} hours)` : 'None');
-  console.log('  Period Limit:', newEthPeriodLimit > 0 ? ethers.formatEther(newEthPeriodLimit) + ' ETC' : 'Unlimited');
+  console.log('  Transaction Limit:', newEthTxLimit > 0n ? ethers.formatEther(newEthTxLimit) + ' ETC' : 'Unlimited');
+  console.log('  Rate Period:', newEthRatePeriod > 0n ? `${newEthRatePeriod}s (${Number(newEthRatePeriod) / 3600} hours)` : 'None');
+  console.log('  Period Limit:', newEthPeriodLimit > 0n ? ethers.formatEther(newEthPeriodLimit) + ' ETC' : 'Unlimited');
 
   console.log('\nNew FWN Limits:');
-  console.log('  Transaction Limit:', newFwnTxLimit > 0 ? ethers.formatEther(newFwnTxLimit) + ' FWN' : 'Unlimited');
-  console.log('  Rate Period:', newFwnRatePeriod > 0 ? `${newFwnRatePeriod}s (${newFwnRatePeriod / 3600} hours)` : 'None');
-  console.log('  Period Limit:', newFwnPeriodLimit > 0 ? ethers.formatEther(newFwnPeriodLimit) + ' FWN' : 'Unlimited');
+  console.log('  Transaction Limit:', newFwnTxLimit > 0n ? ethers.formatEther(newFwnTxLimit) + ' FWN' : 'Unlimited');
+  console.log('  Rate Period:', newFwnRatePeriod > 0n ? `${newFwnRatePeriod}s (${Number(newFwnRatePeriod) / 3600} hours)` : 'None');
+  console.log('  Period Limit:', newFwnPeriodLimit > 0n ? ethers.formatEther(newFwnPeriodLimit) + ' FWN' : 'Unlimited');
 
   console.log('\n' + '='.repeat(60));
   console.log('TREASURY CONFIGURATION COMPLETE');
