@@ -52,6 +52,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [showTokenBuilder, setShowTokenBuilder] = useState(false) // Token builder state
   const [showFilters, setShowFilters] = useState(false) // Collapsible filters state
   const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
+  const [showWeatherMap, setShowWeatherMap] = useState(true) // Collapsible weather map state
   const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
@@ -603,6 +604,14 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                       <span className="market-count">
                         ({searchFilteredMarkets.length} markets)
                       </span>
+                      <button
+                        className="map-toggle-btn"
+                        onClick={() => setShowWeatherMap(!showWeatherMap)}
+                        aria-label={showWeatherMap ? 'Hide map' : 'Show map'}
+                        aria-expanded={showWeatherMap}
+                      >
+                        {showWeatherMap ? 'Hide Map' : 'Show Map'}
+                      </button>
                     </div>
                     <ViewToggle
                       currentView={viewMode}
@@ -610,14 +619,16 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                     />
                   </div>
 
-                  {/* Weather Market Map */}
-                  <WeatherMarketMap
-                    markets={searchFilteredMarkets}
-                    onMarketClick={handleMarketClick}
-                    selectedMarket={selectedMarket}
-                    loading={loading}
-                    height="450px"
-                  />
+                  {/* Weather Market Map - Collapsible */}
+                  {showWeatherMap && (
+                    <WeatherMarketMap
+                      markets={searchFilteredMarkets}
+                      onMarketClick={handleMarketClick}
+                      selectedMarket={selectedMarket}
+                      loading={loading}
+                      height="450px"
+                    />
+                  )}
 
                   {/* Also show grid/compact view below the map */}
                   <div className="weather-markets-list">
