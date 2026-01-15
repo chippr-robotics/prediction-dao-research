@@ -42,21 +42,6 @@ vi.mock('../hooks', () => {
       signer: mockSigner,
       isCorrectNetwork: mockWeb3State.isCorrectNetwork,
       switchNetwork: vi.fn()
-    }),
-    useEncryption: () => ({
-      createEncrypted: vi.fn().mockResolvedValue({
-        encrypted: true,
-        metadata: { name: 'test' }
-      }),
-      decryptMetadata: vi.fn().mockResolvedValue({ name: 'test' }),
-      addParticipant: vi.fn().mockResolvedValue({}),
-      canUserDecrypt: vi.fn().mockReturnValue(true),
-      isEncrypted: vi.fn().mockReturnValue(false),
-      getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey')
-    }),
-    useDecryptedMarkets: (markets) => ({
-      markets,
-      isDecrypting: false
     })
   }
 })
