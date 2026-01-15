@@ -50,7 +50,7 @@ describe("Nullifier Integration Tests", function () {
 
     // Deploy CTF1155
     const CTF1155 = await ethers.getContractFactory("CTF1155");
-    ctf1155 = await CTF1155.deploy("https://example.com/metadata/");
+    ctf1155 = await CTF1155.deploy();
     await ctf1155.waitForDeployment();
 
     // Deploy NullifierRegistry

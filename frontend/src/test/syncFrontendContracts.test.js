@@ -45,7 +45,7 @@ describe('sync-frontend-contracts script', () => {
       )
     )
 
-    const scriptPath = path.resolve(process.cwd(), '../scripts/sync-frontend-contracts.js')
+    const scriptPath = path.resolve(process.cwd(), '../scripts/utils/sync-frontend-contracts.js')
 
     execFileSync('node', [
       scriptPath,
