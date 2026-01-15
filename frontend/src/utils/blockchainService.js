@@ -1319,10 +1319,18 @@ export async function sellMarketShares(signer, marketId, outcome, shares) {
 
 // Role name to on-chain role hash mapping
 const ROLE_NAME_TO_HASH = {
+  // Premium user roles
   'MARKET_MAKER': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
   'CLEARPATH_USER': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
   'TOKENMINT': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
   'FRIEND_MARKET': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
+  // Admin roles
+  'ADMIN': '0x0000000000000000000000000000000000000000000000000000000000000000', // DEFAULT_ADMIN_ROLE
+  'OPERATIONS_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('OPERATIONS_ADMIN_ROLE')),
+  'EMERGENCY_GUARDIAN': ethers.keccak256(ethers.toUtf8Bytes('EMERGENCY_GUARDIAN_ROLE')),
+  'CORE_SYSTEM_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('CORE_SYSTEM_ADMIN_ROLE')),
+  'OVERSIGHT_COMMITTEE': ethers.keccak256(ethers.toUtf8Bytes('OVERSIGHT_COMMITTEE_ROLE')),
+  // Display name aliases
   'Market Maker': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
   'ClearPath User': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
   'Token Mint': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),

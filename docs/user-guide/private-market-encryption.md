@@ -67,6 +67,44 @@ The signature itself is not your private key - it's used to mathematically deriv
 
 **Compromised wallets**: If someone's wallet private key is compromised, the attacker can derive their encryption key and access any private markets they're part of.
 
+## Anti-Money-Laundering Protections
+
+While private markets protect your content, they are not exempt from platform safety measures. The nullifier system prevents misuse of private markets for money laundering or other illicit activities.
+
+### How It Works
+
+The platform maintains a registry of nullified (blocked) addresses. These are addresses that have been flagged for suspicious activity, regulatory concerns, or terms of service violations.
+
+When you create or join a private market, the system checks:
+- Is the creator's address nullified?
+- Are any invited participants nullified?
+- Is the person accepting an invitation nullified?
+
+If any participant is nullified, the operation is blocked with an "AddressNullified" error.
+
+### Why This Matters
+
+Private markets could theoretically be misused for money laundering:
+1. Bad actor A creates a private market with accomplice B
+2. Both stake funds
+3. A intentionally loses to B
+4. Funds transfer from A to B without going through normal market mechanisms
+
+The nullifier integration prevents this by blocking known bad actors from participating in private markets entirely.
+
+### What This Means for Users
+
+For legitimate users, this protection is invisible. You'll never encounter it unless you're attempting to create a market with a nullified address.
+
+If you receive an "AddressNullified" error:
+- You or one of your invited participants has been flagged
+- Contact platform support if you believe this is an error
+- Nullified addresses can be reinstated after review
+
+### Privacy Balance
+
+The nullifier system doesn't reveal why an address is nullified or expose a list of blocked addresses. It simply returns yes/no when queried about a specific address. This protects privacy while still enabling platform safety.
+
 ## The Participant Experience
 
 ### Creating a Private Market

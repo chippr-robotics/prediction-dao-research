@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ConditionalMarketFactory.sol";
 import "../security/RagequitModule.sol";
+import "../security/NullifierRegistry.sol";
 import "../access/TieredRoleManager.sol";
 import "../access/MembershipPaymentManager.sol";
 
@@ -40,6 +41,8 @@ error NotResolved();
 error TransferFailed();
 error InsufficientPayment();
 error TokenNotAccepted();
+error AddressNullified();
+error NullifierEnforcementEnabled();
 
 /**
  * @title FriendGroupMarketFactory
@@ -145,6 +148,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     
     // Reference to tiered role manager for membership checks
     TieredRoleManager public tieredRoleManager;
+
+    // Reference to nullifier registry for anti-money-laundering protection
+    NullifierRegistry public nullifierRegistry;
+
+    // Whether to enforce nullification checks (can be disabled if nullifier not deployed)
+    bool public enforceNullification;
     
     // Default collateral token for markets (ERC20, required for CTF)
     address public defaultCollateralToken;
@@ -195,6 +204,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     event ManagerUpdated(address indexed oldManager, address indexed newManager);
     event PaymentTokenAdded(address indexed token);
     event PaymentTokenRemoved(address indexed token);
+    event NullifierRegistryUpdated(address indexed nullifierRegistry);
+    event NullificationEnforcementUpdated(bool enforce);
     
     event ArbitratorSet(
         uint256 indexed friendMarketId,
@@ -378,6 +389,67 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Set the NullifierRegistry contract (only owner)
+     * @param _nullifierRegistry Address of NullifierRegistry contract
+     */
+    function setNullifierRegistry(address _nullifierRegistry) external onlyOwner {
+        if (_nullifierRegistry == address(0)) revert InvalidAddress();
+        nullifierRegistry = NullifierRegistry(_nullifierRegistry);
+        emit NullifierRegistryUpdated(_nullifierRegistry);
+    }
+
+    /**
+     * @notice Enable or disable nullification enforcement (only owner)
+     * @param _enforce Whether to enforce nullification checks
+     */
+    function setNullificationEnforcement(bool _enforce) external onlyOwner {
+        // Can only enable if registry is set
+        if (_enforce && address(nullifierRegistry) == address(0)) revert InvalidAddress();
+        enforceNullification = _enforce;
+        emit NullificationEnforcementUpdated(_enforce);
+    }
+
+    /**
+     * @notice Check if an address is nullified (blocked)
+     * @param addr Address to check
+     * @return True if address is nullified
+     */
+    function isAddressNullified(address addr) public view returns (bool) {
+        if (!enforceNullification || address(nullifierRegistry) == address(0)) {
+            return false;
+        }
+        return nullifierRegistry.isAddressNullified(addr);
+    }
+
+    /**
+     * @notice Internal function to check nullification for multiple addresses
+     * @dev Reverts if any address is nullified and enforcement is enabled
+     */
+    function _checkNullification(address[] memory addresses) internal view {
+        if (!enforceNullification || address(nullifierRegistry) == address(0)) {
+            return;
+        }
+        for (uint256 i = 0; i < addresses.length; i++) {
+            if (nullifierRegistry.isAddressNullified(addresses[i])) {
+                revert AddressNullified();
+            }
+        }
+    }
+
+    /**
+     * @notice Internal function to check nullification for a single address
+     * @dev Reverts if address is nullified and enforcement is enabled
+     */
+    function _checkSingleNullification(address addr) internal view {
+        if (!enforceNullification || address(nullifierRegistry) == address(0)) {
+            return;
+        }
+        if (nullifierRegistry.isAddressNullified(addr)) {
+            revert AddressNullified();
+        }
+    }
+
+    /**
      * @notice Create a 1v1 friend market for direct betting
      * @param opponent Address of the other party
      * @param description Description of the bet
@@ -397,6 +469,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        // Anti-money-laundering: Check if creator or opponent is nullified
+        _checkSingleNullification(msg.sender);
+        _checkSingleNullification(opponent);
 
         if (opponent == address(0)) revert InvalidOpponent();
         if (opponent == msg.sender) revert InvalidOpponent();
@@ -504,6 +580,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
+        // Anti-money-laundering: Check if creator or any member is nullified
+        _checkSingleNullification(msg.sender);
+        _checkNullification(initialMembers);
+
         if (bytes(description).length == 0) revert InvalidDescription();
         if (memberLimit <= 2 || memberLimit > maxSmallGroupMembers) revert InvalidLimit();
         if (initialMembers.length == 0 || initialMembers.length > memberLimit) revert InvalidLimit();
@@ -605,6 +685,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
+
+        // Anti-money-laundering: Check if creator or any player is nullified
+        _checkSingleNullification(msg.sender);
+        _checkNullification(players);
 
         if (bytes(description).length == 0) revert InvalidDescription();
         if (players.length < minEventTrackingMembers || players.length > maxEventTrackingMembers) revert InvalidLimit();
@@ -715,6 +799,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
+        // Anti-money-laundering: Check if creator or opponent is nullified
+        _checkSingleNullification(msg.sender);
+        _checkSingleNullification(opponent);
+
         _collectStake(msg.sender, stakeToken, stakeAmount);
 
         // Create pending market (no underlying market yet - created on activation)
@@ -822,6 +910,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
+        // Anti-money-laundering: Check if creator or any invited member is nullified
+        _checkSingleNullification(msg.sender);
+        _checkNullification(invitedMembers);
+
         _collectStake(msg.sender, stakeToken, stakeAmount);
 
         // Build full participant list (creator + invited)
@@ -903,6 +995,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (newMember == address(0)) revert InvalidMember();
         if (memberCount[friendMarketId] >= market.memberLimit) revert MemberLimitReached();
 
+        // Anti-money-laundering: Check if new member is nullified
+        _checkSingleNullification(newMember);
+
         for (uint256 i = 0; i < market.members.length; i++) {
             if (market.members[i] == newMember) revert AlreadyMember();
         }
@@ -941,6 +1036,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (market.status != FriendMarketStatus.PendingAcceptance) revert NotPending();
         if (block.timestamp >= market.acceptanceDeadline) revert DeadlinePassed();
         if (marketAcceptances[friendMarketId][msg.sender].hasAccepted) revert AlreadyAccepted();
+
+        // Anti-money-laundering: Check if accepting participant is nullified
+        _checkSingleNullification(msg.sender);
 
         bool isInvited = false;
         bool isArbitrator = market.arbitrator == msg.sender;

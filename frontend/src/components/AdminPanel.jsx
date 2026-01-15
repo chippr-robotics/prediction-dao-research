@@ -40,6 +40,7 @@ function AdminPanel() {
     emergencyUnpause,
     configureTier,
     grantTier,
+    grantRoleOnChain,
     withdraw,
     fetchContractState
   } = useAdminContracts()
