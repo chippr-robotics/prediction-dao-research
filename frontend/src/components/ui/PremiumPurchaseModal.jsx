@@ -127,13 +127,14 @@ const ROLE_DETAILS = {
   }
 }
 
-// Note: TIER_PRICES are now fetched from contract via useTierPrices hook
-// Fallback prices in ETC for when contract is unavailable
+// Note: Tier prices are now fetched from TierRegistry contract via useTierPrices hook
+// All prices are in USC (stablecoin) - ETC is only used for gas
+// Fallback prices in USC for when contract is unavailable
 const FALLBACK_TIER_PRICES = {
-  BRONZE: { MARKET_MAKER: 0.05, CLEARPATH_USER: 0.05, TOKENMINT: 0.05, FRIEND_MARKET: 0.05 },
-  SILVER: { MARKET_MAKER: 0.1, CLEARPATH_USER: 0.1, TOKENMINT: 0.1, FRIEND_MARKET: 0.1 },
-  GOLD: { MARKET_MAKER: 0.25, CLEARPATH_USER: 0.25, TOKENMINT: 0.25, FRIEND_MARKET: 0.25 },
-  PLATINUM: { MARKET_MAKER: 0.5, CLEARPATH_USER: 0.5, TOKENMINT: 0.5, FRIEND_MARKET: 0.5 }
+  BRONZE: { MARKET_MAKER: 100, CLEARPATH_USER: 100, TOKENMINT: 100, FRIEND_MARKET: 50 },
+  SILVER: { MARKET_MAKER: 100, CLEARPATH_USER: 150, TOKENMINT: 150, FRIEND_MARKET: 100 },
+  GOLD: { MARKET_MAKER: 250, CLEARPATH_USER: 300, TOKENMINT: 300, FRIEND_MARKET: 250 },
+  PLATINUM: { MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500, FRIEND_MARKET: 500 }
 }
 
 /**

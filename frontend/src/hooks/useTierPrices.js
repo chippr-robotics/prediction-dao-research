@@ -3,29 +3,30 @@ import { ethers } from 'ethers'
 import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
 
 /**
- * Hook to fetch tier prices from TieredRoleManager contract
+ * Hook to fetch tier prices from TierRegistry contract
  *
- * Fetches prices for all roles and tiers from the blockchain,
- * eliminating the need for hardcoded prices in the frontend.
+ * Fetches prices for all roles and tiers from the blockchain in USC (stablecoin).
+ * USC is the primary currency for all payments - ETC is only used for gas.
  */
 
-const TIERED_ROLE_MANAGER_ADDRESS = DEPLOYED_CONTRACTS.tieredRoleManager
+const TIER_REGISTRY_ADDRESS = DEPLOYED_CONTRACTS.tierRegistry
 
-// Minimal ABI for reading tier metadata
-const TIERED_ROLE_MANAGER_ABI = [
-  'function tierMetadata(bytes32 role, uint8 tier) external view returns (string name, string description, uint256 price, tuple(uint256 dailyBetLimit, uint256 weeklyBetLimit, uint256 monthlyMarketCreation, uint256 maxPositionSize, uint256 maxConcurrentMarkets, uint256 withdrawalLimit, bool canCreatePrivateMarkets, bool canUseAdvancedFeatures, uint256 feeDiscount) limits, bool isActive)',
-  'function FRIEND_MARKET_ROLE() external view returns (bytes32)',
-  'function MARKET_MAKER_ROLE() external view returns (bytes32)',
-  'function CLEARPATH_USER_ROLE() external view returns (bytes32)',
-  'function TOKENMINT_ROLE() external view returns (bytes32)'
+// Minimal ABI for reading tier prices from TierRegistry
+const TIER_REGISTRY_ABI = [
+  'function getTierPrice(bytes32 role, uint8 tier) external view returns (uint256)',
+  'function isTierActive(bytes32 role, uint8 tier) external view returns (bool)',
+  'function getTierLimits(bytes32 role, uint8 tier) external view returns (tuple(uint256 dailyBetLimit, uint256 weeklyBetLimit, uint256 monthlyMarketCreation, uint256 maxPositionSize, uint256 maxConcurrentMarkets, uint256 withdrawalLimit, bool canCreatePrivateMarkets, bool canUseAdvancedFeatures, uint256 feeDiscount))'
 ]
 
-// Role key to contract function mapping
-const ROLE_FUNCTIONS = {
-  FRIEND_MARKET: 'FRIEND_MARKET_ROLE',
-  MARKET_MAKER: 'MARKET_MAKER_ROLE',
-  CLEARPATH_USER: 'CLEARPATH_USER_ROLE',
-  TOKENMINT: 'TOKENMINT_ROLE'
+// USC has 6 decimals
+const USC_DECIMALS = 6
+
+// Role hashes (computed from role names)
+const ROLE_HASHES = {
+  FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
+  MARKET_MAKER: ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
+  CLEARPATH_USER: ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
+  TOKENMINT: ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE'))
 }
 
 // Tier IDs matching MembershipTier enum
@@ -36,12 +37,13 @@ const TIER_IDS = {
   PLATINUM: 4
 }
 
-// Fallback prices in case contract fetch fails (ETC)
+// Fallback prices in USC (stablecoin with 6 decimals)
+// These match the TierRegistry configuration on Mordor testnet
 const FALLBACK_PRICES = {
-  BRONZE: { FRIEND_MARKET: 0.05, MARKET_MAKER: 0.05, CLEARPATH_USER: 0.05, TOKENMINT: 0.05 },
-  SILVER: { FRIEND_MARKET: 0.1, MARKET_MAKER: 0.1, CLEARPATH_USER: 0.1, TOKENMINT: 0.1 },
-  GOLD: { FRIEND_MARKET: 0.25, MARKET_MAKER: 0.25, CLEARPATH_USER: 0.25, TOKENMINT: 0.25 },
-  PLATINUM: { FRIEND_MARKET: 0.5, MARKET_MAKER: 0.5, CLEARPATH_USER: 0.5, TOKENMINT: 0.5 }
+  BRONZE: { FRIEND_MARKET: 50, MARKET_MAKER: 100, CLEARPATH_USER: 100, TOKENMINT: 100 },
+  SILVER: { FRIEND_MARKET: 100, MARKET_MAKER: 100, CLEARPATH_USER: 150, TOKENMINT: 150 },
+  GOLD: { FRIEND_MARKET: 250, MARKET_MAKER: 250, CLEARPATH_USER: 300, TOKENMINT: 300 },
+  PLATINUM: { FRIEND_MARKET: 500, MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500 }
 }
 
 export function useTierPrices() {
@@ -58,14 +60,14 @@ export function useTierPrices() {
 
   // Create contract instance
   const contract = useMemo(() => {
-    if (!TIERED_ROLE_MANAGER_ADDRESS) return null
-    return new ethers.Contract(TIERED_ROLE_MANAGER_ADDRESS, TIERED_ROLE_MANAGER_ABI, provider)
+    if (!TIER_REGISTRY_ADDRESS) return null
+    return new ethers.Contract(TIER_REGISTRY_ADDRESS, TIER_REGISTRY_ABI, provider)
   }, [provider])
 
   // Fetch prices from contract
   const fetchPrices = useCallback(async () => {
     if (!contract) {
-      setError('TieredRoleManager not deployed')
+      setError('TierRegistry not deployed')
       setIsLoading(false)
       return
     }
@@ -74,41 +76,38 @@ export function useTierPrices() {
     setError(null)
 
     try {
-      // First, get role hashes
-      const roleHashes = {}
-      for (const [roleKey, functionName] of Object.entries(ROLE_FUNCTIONS)) {
-        try {
-          roleHashes[roleKey] = await contract[functionName]()
-        } catch (e) {
-          // Role might not exist, use computed hash
-          roleHashes[roleKey] = ethers.keccak256(ethers.toUtf8Bytes(functionName))
-        }
-      }
-
-      // Fetch tier metadata for each role and tier
+      // Fetch tier prices for each role and tier from TierRegistry
       const prices = { BRONZE: {}, SILVER: {}, GOLD: {}, PLATINUM: {} }
       const limits = { BRONZE: {}, SILVER: {}, GOLD: {}, PLATINUM: {} }
 
-      for (const [roleKey, roleHash] of Object.entries(roleHashes)) {
+      for (const [roleKey, roleHash] of Object.entries(ROLE_HASHES)) {
         for (const [tierName, tierId] of Object.entries(TIER_IDS)) {
           try {
-            const metadata = await contract.tierMetadata(roleHash, tierId)
+            // Get price from TierRegistry (in USC with 6 decimals)
+            const priceRaw = await contract.getTierPrice(roleHash, tierId)
+            const isActive = await contract.isTierActive(roleHash, tierId)
 
-            // Price is in wei, convert to ETC
-            prices[tierName][roleKey] = parseFloat(ethers.formatEther(metadata.price))
+            // Convert from 6 decimals to human-readable USC amount
+            prices[tierName][roleKey] = parseFloat(ethers.formatUnits(priceRaw, USC_DECIMALS))
 
-            // Store limits
-            limits[tierName][roleKey] = {
-              dailyBetLimit: ethers.formatEther(metadata.limits.dailyBetLimit),
-              weeklyBetLimit: ethers.formatEther(metadata.limits.weeklyBetLimit),
-              monthlyMarketCreation: Number(metadata.limits.monthlyMarketCreation),
-              maxPositionSize: ethers.formatEther(metadata.limits.maxPositionSize),
-              maxConcurrentMarkets: Number(metadata.limits.maxConcurrentMarkets),
-              withdrawalLimit: ethers.formatEther(metadata.limits.withdrawalLimit),
-              canCreatePrivateMarkets: metadata.limits.canCreatePrivateMarkets,
-              canUseAdvancedFeatures: metadata.limits.canUseAdvancedFeatures,
-              feeDiscount: Number(metadata.limits.feeDiscount),
-              isActive: metadata.isActive
+            // Try to get limits (may not be available for all tiers)
+            try {
+              const tierLimits = await contract.getTierLimits(roleHash, tierId)
+              limits[tierName][roleKey] = {
+                dailyBetLimit: ethers.formatUnits(tierLimits.dailyBetLimit, USC_DECIMALS),
+                weeklyBetLimit: ethers.formatUnits(tierLimits.weeklyBetLimit, USC_DECIMALS),
+                monthlyMarketCreation: Number(tierLimits.monthlyMarketCreation),
+                maxPositionSize: ethers.formatUnits(tierLimits.maxPositionSize, USC_DECIMALS),
+                maxConcurrentMarkets: Number(tierLimits.maxConcurrentMarkets),
+                withdrawalLimit: ethers.formatUnits(tierLimits.withdrawalLimit, USC_DECIMALS),
+                canCreatePrivateMarkets: tierLimits.canCreatePrivateMarkets,
+                canUseAdvancedFeatures: tierLimits.canUseAdvancedFeatures,
+                feeDiscount: Number(tierLimits.feeDiscount),
+                isActive
+              }
+            } catch (limitsErr) {
+              // Limits not available, just store isActive
+              limits[tierName][roleKey] = { isActive }
             }
           } catch (e) {
             // Use fallback if fetch fails for this tier
