@@ -24,15 +24,59 @@ let mockWeb3State = {
 }
 
 // Mock the hooks module directly
-vi.mock('../hooks', () => ({
-  useWallet: () => ({
-    isConnected: mockWalletState.isConnected,
-    account: mockWalletState.account
+vi.mock('../hooks', () => {
+  // Create mock signer inside the factory function
+  const mockSigner = {
+    signMessage: vi.fn().mockResolvedValue('0xmocksignature123456789'),
+    getAddress: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890')
+  }
+  
+  // Access the outer scope variables
+  return {
+    useWallet: () => ({
+      isConnected: mockWalletState.isConnected,
+      account: mockWalletState.account,
+      signer: mockSigner
+    }),
+    useWeb3: () => ({
+      signer: mockSigner,
+      isCorrectNetwork: mockWeb3State.isCorrectNetwork,
+      switchNetwork: vi.fn()
+    }),
+    useEncryption: () => ({
+      createEncrypted: vi.fn().mockResolvedValue({
+        encrypted: true,
+        metadata: { name: 'test' }
+      }),
+      decryptMetadata: vi.fn().mockResolvedValue({ name: 'test' }),
+      addParticipant: vi.fn().mockResolvedValue({}),
+      canUserDecrypt: vi.fn().mockReturnValue(true),
+      isEncrypted: vi.fn().mockReturnValue(false),
+      getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey')
+    }),
+    useDecryptedMarkets: (markets) => ({
+      markets,
+      isDecrypting: false
+    })
+  }
+})
+
+// Mock useEncryption separately since it's imported from a different path
+vi.mock('../hooks/useEncryption', () => ({
+  useEncryption: () => ({
+    createEncrypted: vi.fn().mockResolvedValue({
+      encrypted: true,
+      metadata: { name: 'test' }
+    }),
+    decryptMetadata: vi.fn().mockResolvedValue({ name: 'test' }),
+    addParticipant: vi.fn().mockResolvedValue({}),
+    canUserDecrypt: vi.fn().mockReturnValue(true),
+    isEncrypted: vi.fn().mockReturnValue(false),
+    getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey')
   }),
-  useWeb3: () => ({
-    signer: {},
-    isCorrectNetwork: mockWeb3State.isCorrectNetwork,
-    switchNetwork: vi.fn()
+  useDecryptedMarkets: (markets) => ({
+    markets,
+    isDecrypting: false
   })
 }))
 
