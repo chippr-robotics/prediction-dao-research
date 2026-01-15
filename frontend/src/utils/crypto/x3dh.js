@@ -23,12 +23,12 @@
  * 5. Bob computes same SK using his private keys
  */
 
+import { x25519 } from '@noble/curves/ed25519'
 import {
   generateKeyPair,
   computeSharedSecret,
   deriveKey,
   hmacSha256,
-  hash,
   concat,
   bytesToHex,
   hexToBytes,
@@ -108,7 +108,6 @@ export function generateKeyBundle(identityPrivateKey) {
  */
 function computePublicKey(privateKey) {
   // X25519 public key derivation
-  const { x25519 } = require('@noble/curves/ed25519')
   return x25519.getPublicKey(privateKey)
 }
 

@@ -22,19 +22,13 @@ import {
   hmacSha256,
   encrypt,
   decrypt,
-  encryptJson,
-  decryptJson,
   concat,
   bytesToHex,
-  hexToBytes,
-  numberToBytes,
-  bytesToNumber
+  hexToBytes
 } from './primitives.js'
 
 // KDF info strings
 const ROOT_KDF_INFO = 'FairWins_RootRatchet_v1'
-const CHAIN_KDF_INFO = 'FairWins_ChainRatchet_v1'
-const MESSAGE_KDF_INFO = 'FairWins_MessageKey_v1'
 
 // Maximum number of skipped message keys to store
 const MAX_SKIP = 100

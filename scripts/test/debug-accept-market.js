@@ -1,4 +1,3 @@
-const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
 async function main() {
@@ -11,7 +10,7 @@ async function main() {
   // Use getFriendMarketWithStatus which has all the info we need
   const [
     _marketId,
-    marketType,
+    , // marketType (unused)
     creator,
     members,
     arbitrator,
@@ -89,7 +88,7 @@ async function main() {
 
     // Try to simulate the transferFrom
     console.log("\nSimulating transferFrom...");
-    const tokenWithSigner = await ethers.getContractAt([
+    await ethers.getContractAt([
       "function transferFrom(address,address,uint256) returns (bool)"
     ], stakeToken);
 

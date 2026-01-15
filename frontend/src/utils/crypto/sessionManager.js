@@ -16,14 +16,12 @@ import { keccak256, toUtf8Bytes, getBytes } from 'ethers'
 import {
   generateKeyPair,
   bytesToHex,
-  hexToBytes,
-  randomBytes
+  hexToBytes
 } from './primitives.js'
 import {
   generateKeyBundle,
   initiateX3DH,
-  completeX3DH,
-  simpleKeyAgreement
+  completeX3DH
 } from './x3dh.js'
 import {
   initializeSessionAsInitiator,

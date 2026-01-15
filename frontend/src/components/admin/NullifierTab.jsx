@@ -18,7 +18,6 @@ function NullifierTab({ provider, signer, account, marketFactoryAddress }) {
   const { showNotification } = useNotification()
   const {
     isLoading,
-    error,
     nullifierState,
     nullifiedMarkets,
     nullifiedAddresses,

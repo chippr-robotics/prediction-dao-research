@@ -129,13 +129,6 @@ const ROLE_DETAILS = {
 
 // Note: Tier prices are now fetched from TierRegistry contract via useTierPrices hook
 // All prices are in USC (stablecoin) - ETC is only used for gas
-// Fallback prices in USC for when contract is unavailable
-const FALLBACK_TIER_PRICES = {
-  BRONZE: { MARKET_MAKER: 100, CLEARPATH_USER: 100, TOKENMINT: 100, FRIEND_MARKET: 50 },
-  SILVER: { MARKET_MAKER: 100, CLEARPATH_USER: 150, TOKENMINT: 150, FRIEND_MARKET: 100 },
-  GOLD: { MARKET_MAKER: 250, CLEARPATH_USER: 300, TOKENMINT: 300, FRIEND_MARKET: 250 },
-  PLATINUM: { MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500, FRIEND_MARKET: 500 }
-}
 
 /**
  * PremiumPurchaseModal Component
@@ -181,7 +174,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   const [isLoadingTiers, setIsLoadingTiers] = useState(false)
 
   // Fetch tier prices from contract
-  const { tierPrices, isLoading: isPricesLoading, getPrice, getTotalPrice } = useTierPrices()
+  const { getPrice, getTotalPrice } = useTierPrices()
 
   // Calculate pricing based on tier (uses prices from contract)
   const pricing = useMemo(() => {
