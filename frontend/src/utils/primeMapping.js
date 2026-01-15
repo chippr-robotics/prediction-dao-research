@@ -7,7 +7,7 @@
  * @module primeMapping
  */
 
-import { keccak256, solidityPacked, isAddress } from 'ethers'
+import { isAddress } from 'ethers'
 import {
   hashToPrime,
   computeMarketHash,

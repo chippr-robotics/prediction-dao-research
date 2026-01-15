@@ -15,15 +15,11 @@ import { useNullifierContracts } from './useNullifierContracts'
 import {
   getMarketNullificationData,
   getAddressNullificationData,
-  createNullificationSet,
-  isMarketInNullificationSet,
-  isAddressInNullificationSet,
-  filterNullifiedMarkets,
   cacheNullificationData,
   loadCachedNullificationData,
   clearNullificationCache
 } from '../utils/primeMapping'
-import { RSAAccumulator, bytesToBigint } from '../utils/rsaAccumulator'
+import { RSAAccumulator } from '../utils/rsaAccumulator'
 
 /**
  * Hook for checking market nullification status and filtering markets

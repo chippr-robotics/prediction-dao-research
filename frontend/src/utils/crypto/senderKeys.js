@@ -16,7 +16,6 @@
  */
 
 import {
-  generateKeyPair,
   deriveKey,
   hmacSha256,
   encrypt,
@@ -28,7 +27,6 @@ import {
 } from './primitives.js'
 
 // KDF info strings
-const SENDER_KEY_INFO = 'FairWins_SenderKey_v1'
 const CHAIN_KDF_INFO = 'FairWins_SenderChain_v1'
 
 /**

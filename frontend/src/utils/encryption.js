@@ -1,4 +1,13 @@
 /**
+ * DEPRECATED: This file is kept for reference only.
+ * 
+ * This implementation has been superseded by crypto/envelopeEncryption.js
+ * which uses the more modern @noble/curves library and envelope encryption pattern.
+ * 
+ * DO NOT USE this file for new code. Import from crypto/envelopeEncryption.js instead.
+ * 
+ * ---
+ * 
  * ECDH Encryption Utilities for Friend Market Privacy
  *
  * Uses X25519-XSalsa20-Poly1305 (NaCl box) for authenticated encryption.
@@ -53,9 +62,9 @@ export async function deriveEncryptionKeyPair(signer) {
  * @returns {Uint8Array} - X25519 public key
  */
 export function derivePublicKeyFromSignature(signature) {
-  // Recover the Ethereum public key from the signature
+  // Recover the Ethereum public key from the signature (not used but validates signature)
   const messageHash = hashMessage(KEY_DERIVATION_MESSAGE)
-  const recoveredPubKey = recoverPublicKey(messageHash, signature)
+  recoverPublicKey(messageHash, signature)
 
   // Hash the recovered public key to get encryption seed
   const hash = keccak256(toUtf8Bytes(signature))

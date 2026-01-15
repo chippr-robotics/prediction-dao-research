@@ -85,24 +85,29 @@ function decryptKeystoreSync(keystorePath, password) {
 
 /**
  * Load keys from floppy keystore (admin key or mnemonic)
- * SECURITY: This is the ONLY way to load keys for mordor network
- * No PRIVATE_KEY environment variable fallback - keys must be on floppy disk
+ * SECURITY: This is the ONLY way to load keys for production networks
+ * PRIVATE_KEY fallback only works for localhost/hardhat networks
  *
+ * @param {boolean} allowFallback - Whether to allow PRIVATE_KEY fallback (development only)
  * @returns {string[]} Array of private keys, or empty array if not available
  */
-function loadFloppyKeysSync() {
+function loadFloppyKeysSync(allowFallback = false) {
   if (!isFloppyMounted()) {
     console.warn('[Floppy] Disk not mounted at', FLOPPY_CONFIG.MOUNT_POINT);
     console.warn('[Floppy] Run: npm run floppy:mount');
+    if (allowFallback && process.env.PRIVATE_KEY) {
+      console.log('[Floppy] Development mode: Using PRIVATE_KEY env var fallback');
+      return [process.env.PRIVATE_KEY];
+    }
     return [];
   }
 
   const password = process.env.FLOPPY_KEYSTORE_PASSWORD;
   if (!password) {
     console.warn('[Floppy] FLOPPY_KEYSTORE_PASSWORD not set');
-    // Fallback to PRIVATE_KEY for development/admin convenience
-    if (process.env.PRIVATE_KEY) {
-      console.log('[Floppy] Using PRIVATE_KEY env var fallback');
+    // Only allow fallback in development mode (hardhat/localhost networks)
+    if (allowFallback && process.env.PRIVATE_KEY) {
+      console.log('[Floppy] Development mode: Using PRIVATE_KEY env var fallback');
       return [process.env.PRIVATE_KEY];
     }
     return [];
@@ -152,7 +157,8 @@ function loadFloppyKeysSync() {
 
 // Load keys from floppy at config time (synchronous)
 // SECURITY: No PRIVATE_KEY env var fallback - floppy disk required
-const floppyKeys = loadFloppyKeysSync();
+// Load floppy keys WITHOUT fallback for production network (mordor)
+const floppyKeys = loadFloppyKeysSync(false);
 const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require("hardhat/builtin-tasks/task-names");
 
 subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async (args, hre, runSuper) => {

@@ -14,7 +14,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { NULLIFIER_REGISTRY_ABI } from '../abis/NullifierRegistry'
-import { getMarketNullificationData, getAddressNullificationData } from '../utils/primeMapping'
+import { getMarketNullificationData } from '../utils/primeMapping'
 import { getContractAddress } from '../config/contracts'
 
 // Contract address - from contracts.js config (with env override)

@@ -1531,10 +1531,11 @@ export async function checkRoleSyncNeeded(userAddress, roleName) {
     // 1. User has tier in TierRegistry but NOT in TieredRoleManager, OR
     // 2. TieredRoleManager has a LOWER tier than TierRegistry (upgraded in TierRegistry but not synced)
     // Note: If TieredRoleManager tier is HIGHER, that's fine - user has more access than minimum required
+    // Note: Tier 0 means no tier/inactive, so it's considered "lower" than any active tier
     const needsSync = tierRegistryTier > 0 && (
       !tieredRoleManagerHasRole ||
-      tieredRoleManagerTier === 0 ||
-      tieredRoleManagerTier < tierRegistryTier  // Only flag if TieredRoleManager has LOWER tier
+      tieredRoleManagerTier === 0 ||  // Tier 0 = no tier = needs sync
+      tieredRoleManagerTier < tierRegistryTier  // Flag if TieredRoleManager has LOWER tier
     )
     const tierName = tierRegistryTier > 0 ? (TIER_NAMES[tierRegistryTier] || 'Unknown') : 'None'
 

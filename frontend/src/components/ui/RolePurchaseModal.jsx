@@ -56,7 +56,7 @@ function RolePurchaseModal({ onClose }) {
   const [purchaseStep, setPurchaseStep] = useState('select') // select, tier, payment, register, complete
 
   // Fetch tier prices from contract (replaces hardcoded prices)
-  const { getPrice, isLoading: isPricesLoading } = useTierPrices()
+  const { getPrice } = useTierPrices()
 
   // Helper to get price for a role by role constant
   const getRolePrice = (roleKey, tierName) => {

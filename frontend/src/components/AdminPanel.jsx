@@ -53,14 +53,8 @@ function AdminPanel() {
     isTreasuryAvailable,
     canWithdraw: canWithdrawFromVault,
     isOwner: isTreasuryOwner,
-    isGuardian: isTreasuryGuardian,
     withdrawETH: withdrawFromTreasuryETH,
     withdrawERC20: withdrawFromTreasuryERC20,
-    pauseVault,
-    unpauseVault,
-    setTransactionLimit,
-    setRateLimit,
-    fetchTreasuryState,
     fairWinsTokenAddress
   } = useTreasuryVault({ signer, provider, account })
 
@@ -1089,7 +1083,7 @@ function AdminPanel() {
                       onClick={async () => {
                         try {
                           setPendingTx(true)
-                          const result = await withdrawFromFriendMarketFactory()
+                          await withdrawFromFriendMarketFactory()
                           showNotification(`Successfully withdrew ${contractState.friendMarketBalance} ETC`, 'success')
                         } catch (err) {
                           showNotification(err.message, 'error')

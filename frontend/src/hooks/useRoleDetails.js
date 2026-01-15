@@ -78,7 +78,7 @@ const MEMBERSHIP_MANAGER_ABI = [
  */
 export function useRoleDetails() {
   const { address, isConnected } = useAccount()
-  const { provider, signer } = useWeb3()
+  const { provider } = useWeb3()
   const [roleDetails, setRoleDetails] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)

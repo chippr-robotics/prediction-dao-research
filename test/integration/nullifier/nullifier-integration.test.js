@@ -90,7 +90,7 @@ describe("Nullifier Integration Tests", function () {
 
     beforeEach(async function () {
       // Create a market
-      const tx = await marketFactory.connect(marketMaker).deployMarketPair(
+      await marketFactory.connect(marketMaker).deployMarketPair(
         1, // proposalId
         await collateralToken.getAddress(),
         ethers.parseEther("100"),
@@ -371,7 +371,6 @@ describe("Nullifier Integration Tests", function () {
       await bareFactory.setRoleManager(await roleManager.getAddress());
 
       // Create market
-      const MARKET_MAKER_ROLE = await roleManager.MARKET_MAKER_ROLE();
       await bareFactory.connect(marketMaker).deployMarketPair(
         1,
         await collateralToken.getAddress(),

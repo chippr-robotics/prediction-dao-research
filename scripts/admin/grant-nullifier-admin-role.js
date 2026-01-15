@@ -1,4 +1,3 @@
-const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
 /**
@@ -15,7 +14,7 @@ const { ethers } = require("hardhat");
 
 // Update this with the deployed NullifierRegistry address
 const CONTRACTS = {
-  nullifierRegistry: '', // Will be set after deployment
+  nullifierRegistry: null, // Must be set to deployed address before running
 };
 
 // User to grant NULLIFIER_ADMIN_ROLE to
@@ -28,6 +27,10 @@ async function main() {
 
   if (!CONTRACTS.nullifierRegistry) {
     console.error("\nERROR: NullifierRegistry address not set!");
+    console.error("Please set CONTRACTS.nullifierRegistry to the deployed address.");
+    console.error("Example: const CONTRACTS = { nullifierRegistry: '0x...' };");
+    process.exit(1);
+  }
     console.log("Please update CONTRACTS.nullifierRegistry with the deployed address.");
     console.log("Deploy with: npx hardhat run scripts/deploy-nullifier-registry.js --network mordor");
     process.exit(1);

@@ -83,19 +83,12 @@ function FriendMarketsModal({
   const {
     isInitialized: encryptionInitialized,
     isInitializing: encryptionInitializing,
-    signature: myEncryptionSignature,
-    publicKey: myEncryptionPublicKey,
-    initializeKeys: initEncryption,
-    createEncrypted,
-    addParticipant,
-    canUserDecrypt,
-    isEncrypted,
-    getPublicKeyFromSignature
+    createEncrypted
   } = useEncryption()
 
   // Decrypt markets for display
-  const { markets: decryptedActiveMarkets, isDecrypting: decryptingActive } = useDecryptedMarkets(activeMarkets)
-  const { markets: decryptedPastMarkets, isDecrypting: decryptingPast } = useDecryptedMarkets(pastMarkets)
+  const { markets: decryptedActiveMarkets } = useDecryptedMarkets(activeMarkets)
+  const { markets: decryptedPastMarkets } = useDecryptedMarkets(pastMarkets)
 
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
@@ -147,8 +140,6 @@ function FriendMarketsModal({
 
   // Encryption state
   const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
-  const [opponentSignature, setOpponentSignature] = useState('') // For 1v1 key exchange
-  const [participantSignatures, setParticipantSignatures] = useState({}) // For group key exchange
 
   // Reset form function - memoized to prevent stale closures
   const resetForm = useCallback(() => {
@@ -170,8 +161,6 @@ function FriendMarketsModal({
     setMarketLookupId('')
     setMarketLookupResult(null)
     setMarketLookupError(null)
-    setOpponentSignature('')
-    setParticipantSignatures({})
     setEnableEncryption(true)
   }, [])
 

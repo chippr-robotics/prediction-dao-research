@@ -28,12 +28,12 @@ import {
   computeSharedSecret,
   deriveKey,
   hmacSha256,
-  hash,
   concat,
   bytesToHex,
   hexToBytes,
   randomBytes
 } from './primitives.js'
+import { x25519 } from '@noble/curves/ed25519'
 
 // Protocol info string for HKDF
 const X3DH_INFO = 'FairWins_X3DH_v1'
@@ -108,7 +108,6 @@ export function generateKeyBundle(identityPrivateKey) {
  */
 function computePublicKey(privateKey) {
   // X25519 public key derivation
-  const { x25519 } = require('@noble/curves/ed25519')
   return x25519.getPublicKey(privateKey)
 }
 
