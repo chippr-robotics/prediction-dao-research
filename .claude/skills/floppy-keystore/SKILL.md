@@ -407,6 +407,56 @@ node cli.js did show
 node cli.js did add-service --type=AgentService --endpoint=https://agent.example.com
 ```
 
+### AT Protocol (Bluesky) DID Support
+
+Create DID documents compatible with the AT Protocol (Bluesky, etc.):
+
+```bash
+# Create AT Protocol DID (did:web)
+node cli.js did atproto --domain=agent.example.com --handle=agent.bsky.social --pds=https://bsky.social
+
+# Set signing key from keystore
+node cli.js did setkey
+
+# Validate for AT Protocol
+node cli.js did validate
+
+# Export for web hosting
+node cli.js did export --file=did.json
+# Host at: https://agent.example.com/.well-known/did.json
+
+# Update handle
+node cli.js did handle --handle=newhandle.bsky.social
+```
+
+**AT Protocol DID Requirements:**
+- `did:web` or `did:plc` method
+- `alsoKnownAs` with `at://` handle URI
+- `Multikey` verification method with secp256k1 key
+- `AtprotoPersonalDataServer` service endpoint
+
+```javascript
+// Programmatic usage
+const identity = require('./scripts/identity');
+
+// Create AT Protocol DID
+const doc = identity.createATProtoDIDDocument({
+  domain: 'agent.example.com',
+  handle: 'agent.bsky.social',
+  pdsUrl: 'https://bsky.social'
+});
+
+// Set public key from Ethereum-derived key
+identity.setATProtoPublicKey(publicKeyHex);
+
+// Validate
+const result = identity.validateATProtoDID();
+if (result.valid) {
+  const json = identity.exportDIDForWeb();
+  // Host json at /.well-known/did.json
+}
+```
+
 ### Agent Profile
 
 Store agent identity information:

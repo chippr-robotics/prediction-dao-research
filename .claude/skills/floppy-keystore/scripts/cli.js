@@ -605,6 +605,131 @@ async function manageDID(subcommand, options) {
       console.log('Services:', doc.service.length);
       break;
     }
+
+    case 'atproto': {
+      // Create AT Protocol compatible DID
+      if (!options.domain || !options.handle || !options.pds) {
+        console.error('Usage: did atproto --domain=DOMAIN --handle=HANDLE --pds=PDS_URL');
+        console.error('');
+        console.error('Example:');
+        console.error('  did atproto --domain=agent.example.com --handle=agent.bsky.social --pds=https://bsky.social');
+        process.exit(1);
+      }
+
+      const existing = identity.getDIDDocument();
+      if (existing && !options.force) {
+        console.error('DID document already exists. Use --force to overwrite.');
+        console.log('Current DID:', existing.id);
+        process.exit(1);
+      }
+
+      const doc = identity.createATProtoDIDDocument({
+        domain: options.domain,
+        handle: options.handle,
+        pdsUrl: options.pds
+      });
+
+      console.log('\n=== AT Protocol DID Created ===\n');
+      console.log('DID:', doc.id);
+      console.log('Handle:', doc.alsoKnownAs[0]);
+      console.log('PDS:', doc.service.find(s => s.type === 'AtprotoPersonalDataServer')?.serviceEndpoint);
+      console.log('\nNote: Run "did setkey" to set the public key from your keystore.');
+      console.log('      Then run "did export" to get the document for web hosting.');
+      break;
+    }
+
+    case 'setkey': {
+      // Set the public key from the floppy keystore
+      const doc = identity.getDIDDocument();
+      if (!doc) {
+        console.error('No DID document found. Create one first.');
+        process.exit(1);
+      }
+
+      const password = options.password || process.env.FLOPPY_KEYSTORE_PASSWORD ||
+        await promptPassword('Keystore password: ');
+
+      const { loadMnemonicFromFloppyWithPassword, deriveChainKeys } = require('./loader');
+
+      try {
+        // Load keystore and derive first key
+        const keystoreFile = path.join(CONFIG.MOUNT_POINT, CONFIG.KEYSTORE_DIR, CONFIG.KEYSTORE_FILENAME);
+        const keystore = JSON.parse(fs.readFileSync(keystoreFile, 'utf8'));
+        const mnemonic = await decryptMnemonic(keystore, password);
+
+        // Derive Ethereum key (secp256k1 - compatible with AT Protocol)
+        const keys = await deriveKeys(mnemonic, 'ethereum', { count: 1 });
+        const publicKey = keys[0].publicKey;
+
+        // Set in DID document
+        const updated = identity.setATProtoPublicKey(publicKey);
+
+        console.log('\n=== Public Key Set ===\n');
+        console.log('Key ID:', updated.verificationMethod[0].id);
+        console.log('Type:', updated.verificationMethod[0].type);
+        console.log('Public Key (multibase):', updated.verificationMethod[0].publicKeyMultibase?.substring(0, 40) + '...');
+      } catch (err) {
+        console.error('Error setting public key:', err.message);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'validate': {
+      // Validate DID for AT Protocol
+      const result = identity.validateATProtoDID();
+
+      console.log('\n=== AT Protocol DID Validation ===\n');
+      console.log('Valid:', result.valid ? 'Yes' : 'No');
+
+      if (result.errors.length > 0) {
+        console.log('\nErrors:');
+        result.errors.forEach(e => console.log('  - ' + e));
+      }
+
+      if (result.warnings.length > 0) {
+        console.log('\nWarnings:');
+        result.warnings.forEach(w => console.log('  - ' + w));
+      }
+
+      if (result.valid) {
+        console.log('\nDID document is valid for AT Protocol.');
+        console.log('Host at: https://<domain>/.well-known/did.json');
+      }
+      break;
+    }
+
+    case 'export': {
+      // Export DID for web hosting
+      try {
+        const json = identity.exportDIDForWeb();
+        console.log(json);
+
+        if (options.file) {
+          fs.writeFileSync(options.file, json);
+          console.error(`\nExported to: ${options.file}`);
+        } else {
+          console.error('\nTo save to file: did export --file=did.json');
+          console.error('Host at: https://<domain>/.well-known/did.json');
+        }
+      } catch (err) {
+        console.error('Error exporting:', err.message);
+        process.exit(1);
+      }
+      break;
+    }
+
+    case 'handle': {
+      // Update AT Protocol handle
+      if (!options.handle) {
+        console.error('Usage: did handle --handle=NEW_HANDLE');
+        process.exit(1);
+      }
+
+      const doc = identity.updateATProtoHandle(options.handle);
+      console.log('Handle updated to:', doc.alsoKnownAs[0]);
+      break;
+    }
   }
 }
 

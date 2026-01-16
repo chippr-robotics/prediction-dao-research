@@ -168,6 +168,279 @@ function addDIDService(service) {
   return updateDIDDocument({ service: doc.service });
 }
 
+/**
+ * Create an AT Protocol compatible DID document (did:web)
+ *
+ * AT Protocol requires specific fields:
+ * - alsoKnownAs: Handle URI (at://handle.domain)
+ * - verificationMethod: Multikey type with secp256k1 or P-256
+ * - service: AtprotoPersonalDataServer endpoint
+ *
+ * @param {object} options - AT Protocol DID options
+ * @param {string} options.domain - Web domain for did:web (e.g., 'example.com')
+ * @param {string} options.handle - AT Protocol handle (e.g., 'alice.bsky.social')
+ * @param {string} options.pdsUrl - Personal Data Server URL
+ * @param {string} options.publicKeyMultibase - Multibase-encoded public key (optional)
+ * @param {object[]} options.additionalServices - Additional service endpoints
+ * @returns {object} AT Protocol compatible DID document
+ */
+function createATProtoDIDDocument(options = {}) {
+  ensureIdentityDir();
+
+  const {
+    domain,
+    handle,
+    pdsUrl,
+    publicKeyMultibase = null,
+    additionalServices = []
+  } = options;
+
+  if (!domain) {
+    throw new Error('domain is required for did:web');
+  }
+
+  if (!handle) {
+    throw new Error('handle is required for AT Protocol DID');
+  }
+
+  if (!pdsUrl) {
+    throw new Error('pdsUrl is required for AT Protocol DID');
+  }
+
+  const did = `did:web:${domain}`;
+
+  // Build alsoKnownAs with AT Protocol handle
+  const alsoKnownAs = [`at://${handle}`];
+
+  // Build verification method
+  const verificationMethod = [];
+  if (publicKeyMultibase) {
+    verificationMethod.push({
+      id: `${did}#atproto`,
+      type: 'Multikey',
+      controller: did,
+      publicKeyMultibase: publicKeyMultibase
+    });
+  } else {
+    // Placeholder - key will be derived from floppy keystore
+    verificationMethod.push({
+      id: `${did}#atproto`,
+      type: 'Multikey',
+      controller: did,
+      publicKeyMultibase: null // To be populated with actual key
+    });
+  }
+
+  // Build services
+  const services = [
+    {
+      id: '#atproto_pds',
+      type: 'AtprotoPersonalDataServer',
+      serviceEndpoint: pdsUrl
+    },
+    ...additionalServices
+  ];
+
+  const didDocument = {
+    '@context': ['https://www.w3.org/ns/did/v1'],
+    id: did,
+    alsoKnownAs: alsoKnownAs,
+    verificationMethod: verificationMethod,
+    service: services
+  };
+
+  // Store metadata about the DID
+  const metadata = {
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    protocol: 'atproto',
+    handle: handle,
+    domain: domain
+  };
+
+  // Save DID document
+  fs.writeFileSync(DID_FILE, JSON.stringify(didDocument, null, 2), { mode: 0o600 });
+
+  // Save metadata separately
+  const metadataPath = path.join(IDENTITY_DIR, 'did-metadata.json');
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+
+  syncDisk();
+
+  return didDocument;
+}
+
+/**
+ * Get AT Protocol DID metadata
+ * @returns {object|null}
+ */
+function getATProtoMetadata() {
+  const metadataPath = path.join(IDENTITY_DIR, 'did-metadata.json');
+  if (!fs.existsSync(metadataPath)) {
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+}
+
+/**
+ * Update handle in AT Protocol DID document
+ * @param {string} newHandle - New AT Protocol handle
+ * @returns {object} Updated DID document
+ */
+function updateATProtoHandle(newHandle) {
+  const doc = getDIDDocument();
+  if (!doc) {
+    throw new Error('DID document not found');
+  }
+
+  // Update alsoKnownAs
+  doc.alsoKnownAs = [`at://${newHandle}`];
+
+  fs.writeFileSync(DID_FILE, JSON.stringify(doc, null, 2), { mode: 0o600 });
+
+  // Update metadata
+  const metadataPath = path.join(IDENTITY_DIR, 'did-metadata.json');
+  if (fs.existsSync(metadataPath)) {
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+    metadata.handle = newHandle;
+    metadata.updated = new Date().toISOString();
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+  }
+
+  syncDisk();
+  return doc;
+}
+
+/**
+ * Set the public key in the DID document for AT Protocol
+ *
+ * This derives the public key from the floppy keystore and encodes it
+ * as multibase for AT Protocol compatibility.
+ *
+ * @param {string} publicKeyHex - Public key in hex format (from Ethereum derivation)
+ * @returns {object} Updated DID document
+ */
+function setATProtoPublicKey(publicKeyHex) {
+  const doc = getDIDDocument();
+  if (!doc) {
+    throw new Error('DID document not found');
+  }
+
+  // Convert hex public key to multibase format (base58btc with 'z' prefix)
+  // AT Protocol uses compressed secp256k1 keys
+  const keyBytes = Buffer.from(publicKeyHex.replace('0x', ''), 'hex');
+
+  // Multicodec prefix for secp256k1-pub is 0xe7 0x01
+  const multicodecPrefix = Buffer.from([0xe7, 0x01]);
+  const multicodecKey = Buffer.concat([multicodecPrefix, keyBytes]);
+
+  // Encode as base58btc with 'z' prefix (multibase)
+  const bs58 = require('bs58') || { encode: (b) => b.toString('base64') };
+  let publicKeyMultibase;
+  try {
+    publicKeyMultibase = 'z' + bs58.encode(multicodecKey);
+  } catch {
+    // Fallback if bs58 not available
+    publicKeyMultibase = 'z' + multicodecKey.toString('base64');
+  }
+
+  // Update verification method
+  if (doc.verificationMethod && doc.verificationMethod.length > 0) {
+    doc.verificationMethod[0].publicKeyMultibase = publicKeyMultibase;
+  }
+
+  fs.writeFileSync(DID_FILE, JSON.stringify(doc, null, 2), { mode: 0o600 });
+  syncDisk();
+
+  return doc;
+}
+
+/**
+ * Validate DID document for AT Protocol compatibility
+ *
+ * @param {object} doc - DID document to validate
+ * @returns {object} Validation result { valid: boolean, errors: string[], warnings: string[] }
+ */
+function validateATProtoDID(doc = null) {
+  const didDoc = doc || getDIDDocument();
+  const errors = [];
+  const warnings = [];
+
+  if (!didDoc) {
+    return { valid: false, errors: ['No DID document found'], warnings: [] };
+  }
+
+  // Check required fields
+  if (!didDoc.id) {
+    errors.push('Missing required field: id');
+  } else if (!didDoc.id.startsWith('did:web:') && !didDoc.id.startsWith('did:plc:')) {
+    errors.push('AT Protocol requires did:web or did:plc method');
+  }
+
+  if (!didDoc.alsoKnownAs || didDoc.alsoKnownAs.length === 0) {
+    errors.push('Missing required field: alsoKnownAs (must contain at:// handle)');
+  } else {
+    const hasAtHandle = didDoc.alsoKnownAs.some(aka => aka.startsWith('at://'));
+    if (!hasAtHandle) {
+      errors.push('alsoKnownAs must contain at least one at:// handle URI');
+    }
+  }
+
+  if (!didDoc.verificationMethod || didDoc.verificationMethod.length === 0) {
+    errors.push('Missing required field: verificationMethod');
+  } else {
+    const atprotoKey = didDoc.verificationMethod.find(vm =>
+      vm.id.includes('#atproto') || vm.type === 'Multikey'
+    );
+    if (!atprotoKey) {
+      warnings.push('No verification method with #atproto id or Multikey type found');
+    } else if (!atprotoKey.publicKeyMultibase) {
+      warnings.push('Verification method missing publicKeyMultibase');
+    }
+  }
+
+  if (!didDoc.service || didDoc.service.length === 0) {
+    errors.push('Missing required field: service');
+  } else {
+    const pdsService = didDoc.service.find(s => s.type === 'AtprotoPersonalDataServer');
+    if (!pdsService) {
+      errors.push('Missing AtprotoPersonalDataServer service endpoint');
+    }
+  }
+
+  // Check context
+  if (!didDoc['@context'] || !didDoc['@context'].includes('https://www.w3.org/ns/did/v1')) {
+    warnings.push('Missing or invalid @context');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings
+  };
+}
+
+/**
+ * Export DID document for web hosting (did:web)
+ *
+ * Returns the document formatted for hosting at /.well-known/did.json
+ *
+ * @returns {string} JSON string ready for web hosting
+ */
+function exportDIDForWeb() {
+  const doc = getDIDDocument();
+  if (!doc) {
+    throw new Error('No DID document found');
+  }
+
+  // Remove any internal metadata fields
+  const exportDoc = { ...doc };
+  delete exportDoc.created;
+  delete exportDoc.updated;
+
+  return JSON.stringify(exportDoc, null, 2);
+}
+
 // ============================================================================
 // Agent Profile
 // ============================================================================
@@ -642,6 +915,14 @@ module.exports = {
   getDIDDocument,
   updateDIDDocument,
   addDIDService,
+
+  // AT Protocol DID
+  createATProtoDIDDocument,
+  getATProtoMetadata,
+  updateATProtoHandle,
+  setATProtoPublicKey,
+  validateATProtoDID,
+  exportDIDForWeb,
 
   // Profile
   setProfile,
