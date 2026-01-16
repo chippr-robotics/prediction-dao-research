@@ -1,9 +1,9 @@
 /**
- * Hardhat configuration loader for floppy keystore
+ * Multi-chain key loader for floppy keystore
  *
  * This module provides functions for loading cryptographic keys from
- * an encrypted keystore stored on a floppy disk. It supports both
- * mnemonic-based HD wallets and single admin private keys.
+ * an encrypted keystore stored on a floppy disk. It supports multiple
+ * blockchain networks including Ethereum, Bitcoin, Zcash, Monero, and Solana.
  *
  * Usage in hardhat.config.js:
  *   const { loadFloppyKeysSync, isFloppyMounted } = require('./loader');
@@ -12,12 +12,20 @@
  *       mainnet: { accounts: loadFloppyKeysSync() }
  *     }
  *   };
+ *
+ * Multi-chain usage:
+ *   const { deriveChainKeys } = require('./loader');
+ *   const btcKeys = await deriveChainKeys('bitcoin', { count: 5 });
+ *   const solKeys = await deriveChainKeys('solana', { count: 3 });
+ *
+ * @module loader
  */
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const crypto = require('crypto');
 const { decryptMnemonic } = require('./keystore');
+const { deriveKeys, getChainSummary } = require('./chains');
 const CONFIG = require('./config');
 
 const KEYSTORE_PATH = path.join(
@@ -35,6 +43,7 @@ const ADMIN_KEYSTORE_PATH = path.join(
 // Cache for session to avoid repeated password prompts
 let cachedMnemonic = null;
 let cachedAdminKey = null;
+let cachedChainKeys = {};
 
 /**
  * Check if floppy is mounted
@@ -151,7 +160,43 @@ async function loadMnemonicFromFloppy() {
 }
 
 /**
- * Derive private keys from the mnemonic on floppy disk
+ * Derive keys for a specific blockchain from the mnemonic on floppy disk
+ *
+ * @param {string} chainId - Chain identifier (e.g., 'ethereum', 'bitcoin', 'solana')
+ * @param {object} options - Derivation options
+ * @param {number} options.count - Number of accounts (default: 1)
+ * @param {number} options.startIndex - Starting index (default: 0)
+ * @param {string} options.addressType - For Bitcoin: 'legacy', 'segwit', 'nativeSegwit', 'taproot'
+ * @param {boolean} options.cache - Cache results (default: true)
+ * @returns {Promise<Array>} Array of derived key objects
+ */
+async function deriveChainKeys(chainId, options = {}) {
+  const {
+    count = 1,
+    startIndex = 0,
+    addressType = null,
+    cache = true
+  } = options;
+
+  // Check cache
+  const cacheKey = `${chainId}:${startIndex}:${count}:${addressType || 'default'}`;
+  if (cache && cachedChainKeys[cacheKey]) {
+    return cachedChainKeys[cacheKey];
+  }
+
+  const mnemonic = await loadMnemonicFromFloppy();
+  const keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+
+  // Cache results
+  if (cache) {
+    cachedChainKeys[cacheKey] = keys;
+  }
+
+  return keys;
+}
+
+/**
+ * Derive private keys for Ethereum (backwards compatible)
  *
  * @param {object} options - Options
  * @param {number} options.count - Number of accounts (default: 10)
@@ -176,6 +221,30 @@ async function getFloppyPrivateKeys(options = {}) {
   }
 
   return keys;
+}
+
+/**
+ * Get private keys for a specific chain
+ *
+ * @param {string} chainId - Chain identifier
+ * @param {object} options - Options
+ * @returns {Promise<string[]>} Array of private keys (format depends on chain)
+ */
+async function getChainPrivateKeys(chainId, options = {}) {
+  const keys = await deriveChainKeys(chainId, options);
+  return keys.map(k => k.privateKey);
+}
+
+/**
+ * Get addresses for a specific chain
+ *
+ * @param {string} chainId - Chain identifier
+ * @param {object} options - Options
+ * @returns {Promise<string[]>} Array of addresses
+ */
+async function getChainAddresses(chainId, options = {}) {
+  const keys = await deriveChainKeys(chainId, options);
+  return keys.map(k => k.address);
 }
 
 /**
@@ -329,9 +398,10 @@ function decryptKeystoreSync(keystorePath, password) {
  * Load keys from floppy keystore synchronously (for Hardhat config)
  *
  * @param {boolean} allowFallback - Allow PRIVATE_KEY env var fallback
+ * @param {string} chainId - Chain to derive keys for (default: 'ethereum')
  * @returns {string[]} Array of private keys
  */
-function loadFloppyKeysSync(allowFallback = false) {
+function loadFloppyKeysSync(allowFallback = false, chainId = 'ethereum') {
   if (!isFloppyMounted()) {
     console.warn('[Floppy] Disk not mounted at', CONFIG.MOUNT_POINT);
     if (allowFallback && process.env.PRIVATE_KEY) {
@@ -373,9 +443,16 @@ function loadFloppyKeysSync(allowFallback = false) {
     if (decrypted) {
       try {
         const mnemonic = decrypted.toString('utf8');
+        const chain = CONFIG.getChainConfig(chainId);
+
+        if (!chain) {
+          console.warn(`[Floppy] Unknown chain: ${chainId}, using ethereum`);
+        }
+
+        const derivationPath = chain ? chain.derivationPath : "m/44'/60'/0'/0";
         const { HDNodeWallet } = require('ethers');
-        const wallet = HDNodeWallet.fromPhrase(mnemonic, undefined, "m/44'/60'/0'/0/0");
-        console.log('[Floppy] Loaded mnemonic wallet:', wallet.address);
+        const wallet = HDNodeWallet.fromPhrase(mnemonic, undefined, `${derivationPath}/0`);
+        console.log(`[Floppy] Loaded ${chain?.symbol || 'ETH'} wallet:`, wallet.address);
         return [wallet.privateKey];
       } catch (err) {
         console.warn('[Floppy] Failed to derive keys from mnemonic:', err.message);
@@ -397,6 +474,7 @@ function loadFloppyKeysSync(allowFallback = false) {
 function clearCache() {
   cachedMnemonic = null;
   cachedAdminKey = null;
+  cachedChainKeys = {};
 }
 
 // Clear cache on process exit
@@ -411,11 +489,16 @@ process.on('SIGTERM', () => {
 });
 
 module.exports = {
-  // Async functions
+  // Async functions - Ethereum (backwards compatible)
   loadMnemonicFromFloppy,
   getFloppyPrivateKeys,
   loadAdminKeyFromFloppy,
   getAdminPrivateKey,
+
+  // Multi-chain async functions
+  deriveChainKeys,
+  getChainPrivateKeys,
+  getChainAddresses,
 
   // Sync functions (for Hardhat config)
   loadFloppyKeysSync,
@@ -425,6 +508,9 @@ module.exports = {
   isFloppyMounted,
   keystoreExists,
   adminKeystoreExists,
+
+  // Chain information
+  getChainSummary,
 
   // Utility
   clearCache,

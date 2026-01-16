@@ -2,19 +2,25 @@
 /**
  * Floppy Disk Keystore Manager CLI
  *
+ * Multi-chain key management from encrypted floppy disk storage.
+ *
  * Commands:
- *   mount     - Mount the floppy disk securely
- *   unmount   - Sync and unmount the floppy disk
- *   create    - Create a new encrypted mnemonic keystore
- *   test      - Test keystore decryption
- *   info      - Show keystore information
- *   help      - Show this help message
+ *   mount           - Mount the floppy disk securely
+ *   unmount         - Sync and unmount the floppy disk
+ *   create          - Create a new encrypted mnemonic keystore
+ *   test            - Test keystore decryption
+ *   info            - Show keystore information
+ *   chains          - List supported blockchain chains
+ *   derive <chain>  - Derive keys for a specific chain
+ *   address <chain> - Show addresses for a specific chain
+ *   help            - Show this help message
  */
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { execSync } = require('child_process');
 const { encryptMnemonic, decryptMnemonic } = require('./keystore');
+const { deriveKeys, getChainSummary } = require('./chains');
 const CONFIG = require('./config');
 
 const KEYSTORE_PATH = path.join(
@@ -124,6 +130,13 @@ async function createKeystore() {
   }
 
   console.log('\n=== Create Encrypted Mnemonic Keystore ===\n');
+  console.log('This mnemonic will be used to derive keys for ALL supported chains:');
+  console.log('  - Ethereum (ETH) and EVM chains');
+  console.log('  - Bitcoin (BTC) - Legacy, SegWit, Taproot');
+  console.log('  - Zcash (ZEC) - Transparent addresses');
+  console.log('  - Monero (XMR) - Derived from BIP-39');
+  console.log('  - Solana (SOL)');
+  console.log('');
   console.log('Enter your BIP-39 mnemonic phrase (12 or 24 words):');
 
   const mnemonic = await promptInput('> ');
@@ -167,6 +180,9 @@ async function createKeystore() {
     console.log('Location:', KEYSTORE_PATH);
     console.log('Word count:', keystore.wordCount);
     console.log('ID:', keystore.id);
+    console.log('\nYou can now derive keys for any supported chain.');
+    console.log('Run: node cli.js chains  - to see supported chains');
+    console.log('Run: node cli.js derive ethereum  - to derive Ethereum keys');
     console.log('\nRemember to unmount the floppy when done.');
 
   } catch (error) {
@@ -206,7 +222,6 @@ async function testKeystore() {
 
     console.log('\nDecryption successful!');
     console.log('Word count verified:', mnemonic.split(' ').length);
-    // Don't print the actual mnemonic for security
 
   } catch (error) {
     console.error('\nDecryption failed:', error.message);
@@ -230,12 +245,12 @@ function showInfo() {
 
   // Check mnemonic keystore
   if (!fs.existsSync(KEYSTORE_PATH)) {
-    console.log('Mnemonic keystore: NOT FOUND');
+    console.log('\nMnemonic keystore: NOT FOUND');
   } else {
     const keystoreJson = fs.readFileSync(KEYSTORE_PATH, 'utf8');
     const keystore = JSON.parse(keystoreJson);
 
-    console.log('Mnemonic keystore: FOUND');
+    console.log('\nMnemonic keystore: FOUND');
     console.log('  ID:', keystore.id);
     console.log('  Type:', keystore.type);
     console.log('  Word count:', keystore.wordCount);
@@ -261,6 +276,170 @@ function showInfo() {
     console.log('  Address:', keystore.address);
     console.log('  Created:', keystore.meta?.createdAt || 'unknown');
   }
+
+  console.log('\n=== Supported Chains ===\n');
+  const chains = getChainSummary();
+  chains.forEach(chain => {
+    console.log(`  ${chain.symbol.padEnd(5)} - ${chain.name} (${chain.curve})`);
+  });
+}
+
+/**
+ * List supported chains
+ */
+function listChains() {
+  console.log('\n=== Supported Blockchain Chains ===\n');
+
+  const chains = getChainSummary();
+
+  chains.forEach(chain => {
+    console.log(`${chain.name} (${chain.symbol})`);
+    console.log(`  ID:         ${chain.id}`);
+    console.log(`  Curve:      ${chain.curve}`);
+    console.log(`  Path:       ${chain.derivationPath}`);
+    console.log(`  Networks:   ${chain.networks.join(', ')}`);
+    if (chain.addressTypes) {
+      console.log(`  Addr Types: ${chain.addressTypes.join(', ')}`);
+    }
+    console.log('');
+  });
+
+  console.log('Aliases:');
+  Object.entries(CONFIG.CHAIN_ALIASES).forEach(([alias, chain]) => {
+    console.log(`  ${alias} -> ${chain}`);
+  });
+}
+
+/**
+ * Derive keys for a specific chain
+ */
+async function deriveChainKeys(chainId, options = {}) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(KEYSTORE_PATH)) {
+    console.error('Error: Keystore not found');
+    process.exit(1);
+  }
+
+  const chain = CONFIG.getChainConfig(chainId);
+  if (!chain) {
+    console.error(`Error: Unknown chain '${chainId}'`);
+    console.error('Run: node cli.js chains  - to see supported chains');
+    process.exit(1);
+  }
+
+  console.log(`\n=== Derive ${chain.name} (${chain.symbol}) Keys ===\n`);
+
+  // Get password
+  let password = process.env.FLOPPY_KEYSTORE_PASSWORD;
+  if (!password) {
+    password = await promptPassword('Enter keystore password: ');
+  }
+
+  // Decrypt mnemonic
+  const keystoreJson = fs.readFileSync(KEYSTORE_PATH, 'utf8');
+  const keystore = JSON.parse(keystoreJson);
+
+  console.log('\nDecrypting mnemonic...');
+  const mnemonic = await decryptMnemonic(keystore, password);
+
+  // Parse options
+  const count = parseInt(options.count) || 1;
+  const startIndex = parseInt(options.start) || 0;
+  const addressType = options.type || null;
+
+  console.log(`\nDeriving ${count} key(s) starting at index ${startIndex}...`);
+  if (addressType) {
+    console.log(`Address type: ${addressType}`);
+  }
+
+  try {
+    const keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+
+    console.log('\n--- Derived Keys ---\n');
+
+    keys.forEach((key, i) => {
+      console.log(`Account ${key.index}:`);
+      console.log(`  Path:    ${key.path}`);
+      console.log(`  Address: ${key.address}`);
+
+      // For Monero, show both keys
+      if (key.privateSpendKey) {
+        console.log(`  Spend Key: ${key.privateSpendKey.slice(0, 16)}...`);
+        console.log(`  View Key:  ${key.privateViewKey.slice(0, 16)}...`);
+      } else {
+        console.log(`  Private: ${key.privateKey.slice(0, 16)}...`);
+      }
+
+      if (key.addressType) {
+        console.log(`  Type:    ${key.addressType}`);
+      }
+      if (key.note) {
+        console.log(`  Note:    ${key.note}`);
+      }
+      console.log('');
+    });
+
+  } catch (error) {
+    console.error('Error deriving keys:', error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Show addresses for a chain (without showing private keys)
+ */
+async function showAddresses(chainId, options = {}) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(KEYSTORE_PATH)) {
+    console.error('Error: Keystore not found');
+    process.exit(1);
+  }
+
+  const chain = CONFIG.getChainConfig(chainId);
+  if (!chain) {
+    console.error(`Error: Unknown chain '${chainId}'`);
+    process.exit(1);
+  }
+
+  console.log(`\n=== ${chain.name} (${chain.symbol}) Addresses ===\n`);
+
+  let password = process.env.FLOPPY_KEYSTORE_PASSWORD;
+  if (!password) {
+    password = await promptPassword('Enter keystore password: ');
+  }
+
+  const keystoreJson = fs.readFileSync(KEYSTORE_PATH, 'utf8');
+  const keystore = JSON.parse(keystoreJson);
+
+  console.log('\nDecrypting...');
+  const mnemonic = await decryptMnemonic(keystore, password);
+
+  const count = parseInt(options.count) || 5;
+  const startIndex = parseInt(options.start) || 0;
+  const addressType = options.type || null;
+
+  try {
+    const keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+
+    console.log('');
+    keys.forEach(key => {
+      const typeStr = key.addressType ? ` (${key.addressType})` : '';
+      console.log(`[${key.index}] ${key.address}${typeStr}`);
+    });
+    console.log('');
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
 }
 
 /**
@@ -268,52 +447,120 @@ function showInfo() {
  */
 function showHelp() {
   console.log(`
-Floppy Disk Keystore Manager
+Floppy Disk Keystore Manager - Multi-Chain Support
 
 Commands:
-  mount     - Mount the floppy disk securely
-  unmount   - Sync and unmount the floppy disk
-  create    - Create a new encrypted mnemonic keystore
-  test      - Test decryption of the keystore
-  info      - Show keystore information
-  help      - Show this help message
+  mount              - Mount the floppy disk securely
+  unmount            - Sync and unmount the floppy disk
+  create             - Create a new encrypted mnemonic keystore
+  test               - Test keystore decryption
+  info               - Show keystore information and supported chains
+  chains             - List all supported blockchain chains
+  derive <chain>     - Derive keys for a specific chain
+  address <chain>    - Show addresses for a chain (no private keys)
+  help               - Show this help message
 
-Environment variables:
-  FLOPPY_DEVICE - Device path (default: /dev/sde)
-  FLOPPY_MOUNT  - Mount point (default: /mnt/floppy)
+Derive Options:
+  --count=N          - Number of accounts to derive (default: 1)
+  --start=N          - Starting index (default: 0)
+  --type=TYPE        - Address type (for Bitcoin: legacy, segwit, nativeSegwit, taproot)
 
-Security notes:
+Examples:
+  node cli.js derive ethereum --count=5
+  node cli.js derive bitcoin --type=nativeSegwit --count=3
+  node cli.js derive solana --count=2
+  node cli.js address monero --count=10
+
+Supported Chains:
+  ethereum (eth)     - Ethereum and EVM chains
+  bitcoin (btc)      - Bitcoin (multiple address types)
+  zcash (zec)        - Zcash transparent addresses
+  monero (xmr)       - Monero (derived from BIP-39)
+  solana (sol)       - Solana
+  ethereumClassic    - Ethereum Classic
+
+Environment Variables:
+  FLOPPY_DEVICE              - Device path (default: /dev/sde)
+  FLOPPY_MOUNT               - Mount point (default: /mnt/floppy)
+  FLOPPY_KEYSTORE_PASSWORD   - Keystore password (for non-interactive use)
+
+Security Notes:
   - Store floppy in secure location when not in use
   - Use strong password (16+ characters recommended)
   - Never share your mnemonic phrase
   - Unmount floppy immediately after use
+  - The same mnemonic derives keys for ALL chains
 `);
 }
 
+/**
+ * Parse command line options
+ */
+function parseOptions(args) {
+  const options = {};
+  args.forEach(arg => {
+    if (arg.startsWith('--')) {
+      const [key, value] = arg.slice(2).split('=');
+      options[key] = value || true;
+    }
+  });
+  return options;
+}
+
 // Main CLI handler
-const command = process.argv[2];
+const args = process.argv.slice(2);
+const command = args[0];
+const subcommand = args[1];
+const options = parseOptions(args.slice(2));
 
 switch (command) {
   case 'mount':
     mountFloppy();
     break;
+
   case 'unmount':
     unmountFloppy();
     break;
+
   case 'create':
     createKeystore().catch(console.error);
     break;
+
   case 'test':
     testKeystore().catch(console.error);
     break;
+
   case 'info':
     showInfo();
     break;
+
+  case 'chains':
+    listChains();
+    break;
+
+  case 'derive':
+    if (!subcommand) {
+      console.error('Error: Please specify a chain (e.g., derive ethereum)');
+      process.exit(1);
+    }
+    deriveChainKeys(subcommand, options).catch(console.error);
+    break;
+
+  case 'address':
+  case 'addresses':
+    if (!subcommand) {
+      console.error('Error: Please specify a chain (e.g., address bitcoin)');
+      process.exit(1);
+    }
+    showAddresses(subcommand, options).catch(console.error);
+    break;
+
   case 'help':
   case '--help':
   case '-h':
     showHelp();
     break;
+
   default:
     showHelp();
 }
