@@ -25,7 +25,14 @@ jobs:
       - name: Build and push to Artifact Registry
         run: |
           gcloud auth configure-docker us-central1-docker.pkg.dev
-          docker build -t us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }} .
+          docker build \
+            --build-arg VITE_WALLETCONNECT_PROJECT_ID="${{ secrets.VITE_WALLETCONNECT_PROJECT_ID || 'c30d7d7a8d575fe3dcc72ed55e5b287e' }}" \
+            --build-arg VITE_APP_URL="${{ vars.VITE_APP_URL || 'https://fairwins.app' }}" \
+            --build-arg VITE_NETWORK_ID="${{ vars.VITE_NETWORK_ID || '63' }}" \
+            --build-arg VITE_RPC_URL="${{ vars.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org' }}" \
+            --build-arg VITE_IPFS_GATEWAY="${{ vars.VITE_IPFS_GATEWAY || 'https://ipfs.fairwins.app' }}" \
+            --build-arg VITE_PINATA_JWT="${{ vars.VITE_PINATA_JWT || '' }}" \
+            -t us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }} .
           docker push us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }}
 
       - name: Deploy to Cloud Run
@@ -33,4 +40,10 @@ jobs:
           gcloud run deploy prediction-dao-research \
             --image us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }} \
             --region us-central1 \
-            --platform managed
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 512Mi \
+            --cpu 1 \
+            --timeout 60 \
+            --max-instances 10 \
+            --port 8080
