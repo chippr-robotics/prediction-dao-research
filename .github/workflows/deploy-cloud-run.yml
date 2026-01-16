@@ -35,7 +35,14 @@ jobs:
             --build-arg VITE_PINATA_JWT="${{ secrets.VITE_PINATA_JWT || '' }}" \
             -t us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }} .
           docker push us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }}
-
+      - name: Debug secrets
+        run: |
+          if [ -n "${{ secrets.VITE_PINATA_JWT }}" ]; then
+            echo "✅ VITE_PINATA_JWT is set (length: ${#VITE_PINATA_JWT})"
+          else
+            echo "❌ VITE_PINATA_JWT is empty or not set"
+          fi
+    
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy prediction-dao-research \
