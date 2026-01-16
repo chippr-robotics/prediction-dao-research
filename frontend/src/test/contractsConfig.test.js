@@ -18,13 +18,18 @@ describe('contracts config', () => {
     expect(getContractAddress('daoFactory')).toEqual(DEPLOYED_CONTRACTS.daoFactory)
   })
 
-  it('keeps role manager aliases in sync', () => {
-    // tieredRoleManager is the legacy RBAC contract (no checkMarketCreationLimitFor)
+  it('exposes role manager contracts', () => {
+    // tieredRoleManager - TieredRoleManager with tier-based membership limits
     expect(DEPLOYED_CONTRACTS.tieredRoleManager).toBeTruthy()
 
-    // roleManager and roleManagerCore should point to the NEWER contract with full IRoleManager interface
+    // roleManager - alias for TieredRoleManager (tier checks, market limits)
     expect(DEPLOYED_CONTRACTS.roleManager).toBeTruthy()
-    expect(DEPLOYED_CONTRACTS.roleManagerCore).toEqual(DEPLOYED_CONTRACTS.roleManager)
+    expect(DEPLOYED_CONTRACTS.roleManager).toEqual(DEPLOYED_CONTRACTS.tieredRoleManager)
+
+    // roleManagerCore - modular RoleManagerCore (used by PaymentProcessor for role grants)
+    // This is intentionally different from roleManager
+    expect(DEPLOYED_CONTRACTS.roleManagerCore).toBeTruthy()
+    expect(DEPLOYED_CONTRACTS.roleManagerCore).not.toEqual(DEPLOYED_CONTRACTS.roleManager)
 
     expect(getContractAddress('roleManager')).toEqual(DEPLOYED_CONTRACTS.roleManager)
     expect(getContractAddress('roleManagerCore')).toEqual(DEPLOYED_CONTRACTS.roleManagerCore)
