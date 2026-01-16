@@ -34,8 +34,8 @@ export const DEPLOYED_CONTRACTS = {
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
   tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
   membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
-  // MembershipPaymentManager used by FriendGroupMarketFactory
-  membershipPaymentManager: '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28',
+  // MembershipPaymentManager used by PaymentProcessor (verified on-chain)
+  membershipPaymentManager: '0x8b09cbC2275398C00D43854393e09D40334a1B81',
 
   // Perpetual Futures - Deployed via: npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
   fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
