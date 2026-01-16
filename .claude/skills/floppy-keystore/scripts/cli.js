@@ -21,6 +21,7 @@ const readline = require('readline');
 const { execSync } = require('child_process');
 const { encryptMnemonic, decryptMnemonic } = require('./keystore');
 const { deriveKeys, getChainSummary } = require('./chains');
+const identity = require('./identity');
 const CONFIG = require('./config');
 
 const KEYSTORE_PATH = path.join(
@@ -449,7 +450,7 @@ function showHelp() {
   console.log(`
 Floppy Disk Keystore Manager - Multi-Chain Support
 
-Commands:
+=== Key Management ===
   mount              - Mount the floppy disk securely
   unmount            - Sync and unmount the floppy disk
   create             - Create a new encrypted mnemonic keystore
@@ -458,6 +459,15 @@ Commands:
   chains             - List all supported blockchain chains
   derive <chain>     - Derive keys for a specific chain
   address <chain>    - Show addresses for a chain (no private keys)
+
+=== Identity & Memory ===
+  storage            - Show disk space usage
+  did <cmd>          - Manage DID document (create, show, add-service)
+  profile <cmd>      - Manage agent profile (set, show)
+  memory <cmd>       - Manage persistent memory (add, list, search, delete, clear)
+  metadata <cmd>     - Key-value metadata store (set, get, list, delete)
+
+=== Help ===
   help               - Show this help message
 
 Derive Options:
@@ -465,11 +475,29 @@ Derive Options:
   --start=N          - Starting index (default: 0)
   --type=TYPE        - Address type (for Bitcoin: legacy, segwit, nativeSegwit, taproot)
 
+Memory Options:
+  --type=TYPE        - Entry type (note, context, fact, etc.)
+  --tags=a,b,c       - Comma-separated tags
+  --importance=N     - Importance 1-10 (default: 5)
+  --content=TEXT     - Memory content
+
 Examples:
+  # Key derivation
   node cli.js derive ethereum --count=5
   node cli.js derive bitcoin --type=nativeSegwit --count=3
-  node cli.js derive solana --count=2
-  node cli.js address monero --count=10
+
+  # DID management
+  node cli.js did create --method=key
+  node cli.js did add-service --type=AgentService --endpoint=https://...
+
+  # Memory management
+  node cli.js memory add --content="User prefers dark mode" --tags=preference --importance=7
+  node cli.js memory list --type=note
+  node cli.js memory search --text="dark mode"
+
+  # Metadata
+  node cli.js metadata set --key=lastSync --value="2025-01-15"
+  node cli.js metadata get --key=lastSync
 
 Supported Chains:
   ethereum (eth)     - Ethereum and EVM chains
@@ -484,13 +512,339 @@ Environment Variables:
   FLOPPY_MOUNT               - Mount point (default: /mnt/floppy)
   FLOPPY_KEYSTORE_PASSWORD   - Keystore password (for non-interactive use)
 
-Security Notes:
-  - Store floppy in secure location when not in use
-  - Use strong password (16+ characters recommended)
-  - Never share your mnemonic phrase
-  - Unmount floppy immediately after use
-  - The same mnemonic derives keys for ALL chains
+Storage Capacity:
+  ~1.4 MB available for identity, memory, and metadata after keystores
 `);
+}
+
+// ============================================================================
+// Identity & Memory Commands
+// ============================================================================
+
+/**
+ * Show storage stats
+ */
+function showStorage() {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  console.log('\n=== Floppy Disk Storage ===\n');
+
+  const stats = identity.getStorageStats();
+
+  console.log(`Capacity:  ${stats.capacityFormatted}`);
+  console.log(`Used:      ${stats.usedFormatted} (${stats.usedPercent}%)`);
+  console.log(`Available: ${stats.availableFormatted}`);
+
+  console.log('\nFiles:');
+  Object.entries(stats.files).forEach(([file, size]) => {
+    console.log(`  ${file.padEnd(35)} ${identity.getStorageStats().usedFormatted ? (size + ' B').padStart(10) : ''}`);
+  });
+}
+
+/**
+ * Create or show DID document
+ */
+async function manageDID(subcommand, options) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  switch (subcommand) {
+    case 'create': {
+      const existing = identity.getDIDDocument();
+      if (existing && !options.force) {
+        console.error('DID document already exists. Use --force to overwrite.');
+        console.log('Current DID:', existing.id);
+        process.exit(1);
+      }
+
+      const method = options.method || 'key';
+      const doc = identity.createDIDDocument({ method });
+
+      console.log('\n=== DID Document Created ===\n');
+      console.log('DID:', doc.id);
+      console.log('Controller:', doc.controller);
+      console.log('Created:', doc.created);
+      console.log('\nVerification Methods:');
+      doc.verificationMethod.forEach(vm => {
+        console.log(`  - ${vm.id} (${vm.type})`);
+      });
+      break;
+    }
+
+    case 'show':
+    default: {
+      const doc = identity.getDIDDocument();
+      if (!doc) {
+        console.log('No DID document found. Create one with: did create');
+        return;
+      }
+
+      console.log('\n=== DID Document ===\n');
+      console.log(JSON.stringify(doc, null, 2));
+      break;
+    }
+
+    case 'add-service': {
+      if (!options.type || !options.endpoint) {
+        console.error('Usage: did add-service --type=TYPE --endpoint=URL [--id=ID]');
+        process.exit(1);
+      }
+
+      const doc = identity.addDIDService({
+        id: options.id,
+        type: options.type,
+        endpoint: options.endpoint
+      });
+
+      console.log('Service added to DID document');
+      console.log('Services:', doc.service.length);
+      break;
+    }
+  }
+}
+
+/**
+ * Manage agent profile
+ */
+async function manageProfile(subcommand, options) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  switch (subcommand) {
+    case 'set': {
+      const profile = {};
+
+      if (options.name) profile.name = options.name;
+      if (options.description) profile.description = options.description;
+      if (options.version) profile.version = options.version;
+
+      if (Object.keys(profile).length === 0) {
+        // Interactive mode
+        profile.name = await promptInput('Agent name: ');
+        profile.description = await promptInput('Description: ');
+        profile.version = await promptInput('Version (e.g., 1.0.0): ');
+      }
+
+      const result = identity.setProfile(profile);
+      console.log('\nProfile updated:');
+      console.log(JSON.stringify(result, null, 2));
+      break;
+    }
+
+    case 'show':
+    default: {
+      const profile = identity.getProfile();
+      if (!profile) {
+        console.log('No profile found. Create one with: profile set');
+        return;
+      }
+
+      console.log('\n=== Agent Profile ===\n');
+      console.log(JSON.stringify(profile, null, 2));
+      break;
+    }
+  }
+}
+
+/**
+ * Manage memory entries
+ */
+async function manageMemory(subcommand, options) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  switch (subcommand) {
+    case 'add': {
+      let content = options.content;
+      if (!content) {
+        content = await promptInput('Memory content: ');
+      }
+
+      const entry = identity.addMemory({
+        type: options.type || 'note',
+        content,
+        tags: options.tags ? options.tags.split(',') : [],
+        importance: parseInt(options.importance) || 5
+      });
+
+      console.log('\nMemory added:');
+      console.log(`  ID: ${entry.id}`);
+      console.log(`  Type: ${entry.type}`);
+      console.log(`  Importance: ${entry.importance}/10`);
+      break;
+    }
+
+    case 'list': {
+      const entries = identity.searchMemory({
+        type: options.type,
+        tags: options.tags ? options.tags.split(',') : null,
+        minImportance: options.importance ? parseInt(options.importance) : null,
+        limit: options.limit ? parseInt(options.limit) : 20
+      });
+
+      console.log(`\n=== Memory Entries (${entries.length}) ===\n`);
+
+      if (entries.length === 0) {
+        console.log('No entries found.');
+        return;
+      }
+
+      entries.forEach(entry => {
+        const preview = entry.content.length > 60
+          ? entry.content.slice(0, 60) + '...'
+          : entry.content;
+        console.log(`[${entry.id}] (${entry.type}, imp:${entry.importance}) ${preview}`);
+        if (entry.tags.length > 0) {
+          console.log(`         Tags: ${entry.tags.join(', ')}`);
+        }
+      });
+      break;
+    }
+
+    case 'show': {
+      const id = options.id || args[2];
+      if (!id) {
+        console.error('Usage: memory show --id=ID');
+        process.exit(1);
+      }
+
+      const entries = identity.getMemory();
+      const entry = entries.find(e => e.id === id);
+
+      if (!entry) {
+        console.error('Entry not found:', id);
+        process.exit(1);
+      }
+
+      console.log('\n=== Memory Entry ===\n');
+      console.log(JSON.stringify(entry, null, 2));
+      break;
+    }
+
+    case 'search': {
+      const text = options.text || args[2];
+      if (!text) {
+        console.error('Usage: memory search --text=QUERY');
+        process.exit(1);
+      }
+
+      const entries = identity.searchMemory({ text, limit: 10 });
+
+      console.log(`\n=== Search Results (${entries.length}) ===\n`);
+      entries.forEach(entry => {
+        console.log(`[${entry.id}] ${entry.content.slice(0, 80)}...`);
+      });
+      break;
+    }
+
+    case 'delete': {
+      const id = options.id || args[2];
+      if (!id) {
+        console.error('Usage: memory delete --id=ID');
+        process.exit(1);
+      }
+
+      if (identity.deleteMemory(id)) {
+        console.log('Deleted:', id);
+      } else {
+        console.error('Entry not found:', id);
+      }
+      break;
+    }
+
+    case 'clear': {
+      const confirm = await promptInput('Clear ALL memory? Type "yes" to confirm: ');
+      if (confirm === 'yes') {
+        identity.clearMemory();
+        console.log('Memory cleared.');
+      } else {
+        console.log('Cancelled.');
+      }
+      break;
+    }
+
+    default:
+      console.log('Usage: memory <add|list|show|search|delete|clear>');
+  }
+}
+
+/**
+ * Manage metadata key-value store
+ */
+function manageMetadata(subcommand, options) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  switch (subcommand) {
+    case 'set': {
+      const key = options.key || args[2];
+      const value = options.value || args[3];
+
+      if (!key || value === undefined) {
+        console.error('Usage: metadata set --key=KEY --value=VALUE');
+        process.exit(1);
+      }
+
+      // Try to parse as JSON
+      let parsedValue = value;
+      try {
+        parsedValue = JSON.parse(value);
+      } catch {
+        // Keep as string
+      }
+
+      identity.setMetadataValue(key, parsedValue);
+      console.log(`Set ${key} = ${JSON.stringify(parsedValue)}`);
+      break;
+    }
+
+    case 'get': {
+      const key = options.key || args[2];
+      if (!key) {
+        console.error('Usage: metadata get --key=KEY');
+        process.exit(1);
+      }
+
+      const value = identity.getMetadataValue(key);
+      if (value === null) {
+        console.log(`Key '${key}' not found`);
+      } else {
+        console.log(JSON.stringify(value, null, 2));
+      }
+      break;
+    }
+
+    case 'list':
+    default: {
+      const metadata = identity.getMetadata();
+      console.log('\n=== Metadata ===\n');
+      console.log(JSON.stringify(metadata, null, 2));
+      break;
+    }
+
+    case 'delete': {
+      const key = options.key || args[2];
+      if (!key) {
+        console.error('Usage: metadata delete --key=KEY');
+        process.exit(1);
+      }
+
+      identity.deleteMetadataValue(key);
+      console.log(`Deleted: ${key}`);
+      break;
+    }
+  }
 }
 
 /**
@@ -553,6 +907,26 @@ switch (command) {
       process.exit(1);
     }
     showAddresses(subcommand, options).catch(console.error);
+    break;
+
+  case 'storage':
+    showStorage();
+    break;
+
+  case 'did':
+    manageDID(subcommand, options).catch(console.error);
+    break;
+
+  case 'profile':
+    manageProfile(subcommand, options).catch(console.error);
+    break;
+
+  case 'memory':
+    manageMemory(subcommand, options).catch(console.error);
+    break;
+
+  case 'metadata':
+    manageMetadata(subcommand, options);
     break;
 
   case 'help':

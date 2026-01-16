@@ -264,6 +264,109 @@ npm install @solana/web3.js ed25519-hd-key       # Solana
 - [REFERENCE.md](REFERENCE.md) - Full API documentation
 - [HARDHAT-INTEGRATION.md](HARDHAT-INTEGRATION.md) - Hardhat configuration guide
 
+## Agent Identity & Persistent Memory
+
+The floppy disk has ~1.4 MB available after keystores for storing agent identity and memory.
+
+### Storage Capacity
+
+```bash
+node cli.js storage
+# Capacity:  1.4 MB
+# Used:      1.2 KB (0.1%)
+# Available: 1.43 MB
+```
+
+### DID Document
+
+Create and manage a W3C DID document for your agent:
+
+```bash
+# Create DID
+node cli.js did create --method=key
+
+# View DID document
+node cli.js did show
+
+# Add service endpoint
+node cli.js did add-service --type=AgentService --endpoint=https://agent.example.com
+```
+
+### Agent Profile
+
+Store agent identity information:
+
+```bash
+# Set profile (interactive)
+node cli.js profile set
+
+# Set profile with options
+node cli.js profile set --name="TradingAgent" --version="1.0.0"
+
+# View profile
+node cli.js profile show
+```
+
+### Persistent Memory
+
+Store notes, facts, and context that persist across sessions:
+
+```bash
+# Add memory
+node cli.js memory add --content="User prefers BTC over ETH" --tags=preference --importance=8
+
+# List memories
+node cli.js memory list
+
+# Search
+node cli.js memory search --text="preference"
+
+# Filter by importance
+node cli.js memory list --importance=7
+
+# Delete
+node cli.js memory delete --id=abc123
+```
+
+### Key-Value Metadata
+
+Simple key-value store for configuration:
+
+```bash
+# Set value
+node cli.js metadata set --key=lastSync --value="2025-01-15T10:00:00Z"
+
+# Get value
+node cli.js metadata get --key=lastSync
+
+# List all
+node cli.js metadata list
+```
+
+### Programmatic Usage
+
+```javascript
+const identity = require('./scripts/identity');
+
+// DID Document
+const did = identity.createDIDDocument({ method: 'key' });
+console.log(did.id);  // did:key:abc123...
+
+// Memory
+identity.addMemory({
+  type: 'fact',
+  content: 'User wallet is 0x123...',
+  tags: ['user', 'wallet'],
+  importance: 9
+});
+
+const memories = identity.searchMemory({ tags: ['user'], limit: 5 });
+
+// Metadata
+identity.setMetadataValue('config.theme', 'dark');
+const theme = identity.getMetadataValue('config.theme');
+```
+
 ## Security Best Practices
 
 1. **Physical security** - Store floppy in secure location
