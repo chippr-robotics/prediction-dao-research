@@ -89,6 +89,6 @@ requirements.txt
 blockscout
 
 # Package lock files (not needed in image)
-package-lock.json
+# Note: frontend/package-lock.json is kept for reproducible builds
 yarn.lock
 pnpm-lock.yaml
