@@ -3,6 +3,7 @@ name: Deploy to Cloud Run
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -47,3 +48,25 @@ jobs:
             --timeout 60 \
             --max-instances 10 \
             --port 8080
+
+      - name: Get service URL
+        id: get-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe prediction-dao-research \
+            --region us-central1 \
+            --format 'value(status.url)')
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $SERVICE_URL"
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for service to stabilize..."
+          sleep 15
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" ${{ steps.get-url.outputs.url }})
+          if [ $HTTP_CODE -eq 200 ]; then
+            echo "✅ Deployment verification successful (HTTP $HTTP_CODE)"
+            echo "Service is live at: ${{ steps.get-url.outputs.url }}"
+          else
+            echo "⚠️  Deployment verification returned HTTP $HTTP_CODE"
+            echo "Service URL: ${{ steps.get-url.outputs.url }}"
+          fi
