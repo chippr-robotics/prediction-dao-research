@@ -441,6 +441,124 @@ function exportDIDForWeb() {
   return JSON.stringify(exportDoc, null, 2);
 }
 
+/**
+ * Create an ENS-based DID document (did:ens)
+ *
+ * Note: did:ens is NOT supported by AT Protocol (Bluesky).
+ * Use this for general DID purposes with Ethereum ecosystem.
+ *
+ * The DID document should be stored in ENS text records:
+ * - Key: "did" or "vnd.did"
+ * - Value: JSON DID document
+ *
+ * @param {object} options - ENS DID options
+ * @param {string} options.ensName - ENS name (e.g., 'chipprbots.eth')
+ * @param {string} options.chainId - Ethereum chain ID (default: '1' for mainnet)
+ * @param {object[]} options.services - Service endpoints
+ * @returns {object} ENS DID document
+ */
+function createENSDIDDocument(options = {}) {
+  ensureIdentityDir();
+
+  const {
+    ensName,
+    chainId = '1',
+    services = []
+  } = options;
+
+  if (!ensName) {
+    throw new Error('ensName is required for did:ens');
+  }
+
+  if (!ensName.endsWith('.eth')) {
+    throw new Error('ensName must end with .eth');
+  }
+
+  const did = `did:ens:${ensName}`;
+
+  // Build verification method
+  const verificationMethod = [{
+    id: `${did}#controller`,
+    type: 'EcdsaSecp256k1RecoveryMethod2020',
+    controller: did,
+    // The ENS owner address will be the controller
+    blockchainAccountId: `eip155:${chainId}:ENS_OWNER_ADDRESS`
+  }];
+
+  const didDocument = {
+    '@context': [
+      'https://www.w3.org/ns/did/v1',
+      'https://w3id.org/security/suites/secp256k1recovery-2020/v2'
+    ],
+    id: did,
+    controller: did,
+    verificationMethod: verificationMethod,
+    authentication: [`${did}#controller`],
+    assertionMethod: [`${did}#controller`],
+    service: services
+  };
+
+  // Store metadata
+  const metadata = {
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    protocol: 'ens',
+    ensName: ensName,
+    chainId: chainId
+  };
+
+  fs.writeFileSync(DID_FILE, JSON.stringify(didDocument, null, 2), { mode: 0o600 });
+
+  const metadataPath = path.join(IDENTITY_DIR, 'did-metadata.json');
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+
+  syncDisk();
+
+  return didDocument;
+}
+
+/**
+ * Export DID document for ENS text record storage
+ *
+ * Returns a compact JSON string suitable for ENS text records.
+ * Note: ENS text records have practical size limits (~10KB recommended).
+ *
+ * @returns {object} { textRecord: string, size: number, instructions: string }
+ */
+function exportDIDForENS() {
+  const doc = getDIDDocument();
+  if (!doc) {
+    throw new Error('No DID document found');
+  }
+
+  // Create minimal document for ENS storage
+  const exportDoc = { ...doc };
+  delete exportDoc.created;
+  delete exportDoc.updated;
+
+  const json = JSON.stringify(exportDoc);
+  const size = Buffer.byteLength(json, 'utf8');
+
+  return {
+    textRecord: json,
+    size: size,
+    sizeFormatted: `${(size / 1024).toFixed(2)} KB`,
+    instructions: `
+To store this DID in ENS:
+1. Go to app.ens.domains
+2. Select your domain
+3. Add text record with key: "did"
+4. Paste the textRecord value as the value
+5. Save the transaction
+
+The DID will be resolvable as: did:ens:${doc.id.replace('did:ens:', '')}
+
+Note: did:ens is NOT supported by AT Protocol (Bluesky).
+For Bluesky, use did:web with a traditional web domain.
+    `.trim()
+  };
+}
+
 // ============================================================================
 // Agent Profile
 // ============================================================================
@@ -923,6 +1041,10 @@ module.exports = {
   setATProtoPublicKey,
   validateATProtoDID,
   exportDIDForWeb,
+
+  // ENS DID
+  createENSDIDDocument,
+  exportDIDForENS,
 
   // Profile
   setProfile,

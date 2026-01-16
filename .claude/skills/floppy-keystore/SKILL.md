@@ -457,6 +457,43 @@ if (result.valid) {
 }
 ```
 
+### ENS DID Support (did:ens)
+
+For Ethereum ecosystem identity using ENS domains:
+
+```bash
+# Create ENS-based DID
+node cli.js did ens --name=chipprbots.eth
+
+# Export for ENS text record
+node cli.js did export-ens
+# Copy the output and add as "did" text record in ENS app
+```
+
+**Important:** `did:ens` is **NOT supported** by AT Protocol (Bluesky). Use `did:web` for Bluesky compatibility.
+
+```javascript
+// Programmatic usage
+const doc = identity.createENSDIDDocument({
+  ensName: 'chipprbots.eth',
+  chainId: '1'  // Ethereum mainnet
+});
+
+// Export for ENS storage
+const { textRecord, instructions } = identity.exportDIDForENS();
+// Store textRecord in ENS "did" text record
+```
+
+**ENS vs AT Protocol DIDs:**
+
+| Feature | did:ens | did:web (AT Protocol) |
+|---------|---------|----------------------|
+| Storage | ENS text records | Web server /.well-known/did.json |
+| Bluesky/AT Protocol | Not supported | Supported |
+| Ethereum ecosystem | Native | Separate |
+| Resolution | ENS resolvers | HTTP |
+| Cost | Gas fees for updates | Web hosting |
+
 ### Agent Profile
 
 Store agent identity information:

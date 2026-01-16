@@ -730,6 +730,58 @@ async function manageDID(subcommand, options) {
       console.log('Handle updated to:', doc.alsoKnownAs[0]);
       break;
     }
+
+    case 'ens': {
+      // Create ENS-based DID
+      if (!options.name) {
+        console.error('Usage: did ens --name=NAME.eth [--chain=1]');
+        console.error('');
+        console.error('Example:');
+        console.error('  did ens --name=chipprbots.eth');
+        console.error('');
+        console.error('Note: did:ens is NOT supported by AT Protocol (Bluesky).');
+        console.error('      Use "did atproto" for Bluesky compatibility.');
+        process.exit(1);
+      }
+
+      const existing = identity.getDIDDocument();
+      if (existing && !options.force) {
+        console.error('DID document already exists. Use --force to overwrite.');
+        console.log('Current DID:', existing.id);
+        process.exit(1);
+      }
+
+      const doc = identity.createENSDIDDocument({
+        ensName: options.name,
+        chainId: options.chain || '1'
+      });
+
+      console.log('\n=== ENS DID Created ===\n');
+      console.log('DID:', doc.id);
+      console.log('Chain ID:', options.chain || '1');
+      console.log('\nTo publish this DID:');
+      console.log('1. Run: did export-ens');
+      console.log('2. Add the text record to your ENS domain');
+      console.log('\nNote: This DID is NOT compatible with AT Protocol (Bluesky).');
+      break;
+    }
+
+    case 'export-ens': {
+      // Export DID for ENS text record
+      try {
+        const result = identity.exportDIDForENS();
+
+        console.log('\n=== ENS DID Export ===\n');
+        console.log('Size:', result.sizeFormatted);
+        console.log('\nText Record Value:');
+        console.log(result.textRecord);
+        console.log('\n' + result.instructions);
+      } catch (err) {
+        console.error('Error exporting:', err.message);
+        process.exit(1);
+      }
+      break;
+    }
   }
 }
 
