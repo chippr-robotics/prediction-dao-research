@@ -64,7 +64,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   useEffect(() => {
     const categoryParam = searchParams.get('category')
     if (categoryParam && categoryParam !== selectedCategory) {
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
       setSelectedCategory(categoryParam)
     }
   }, [searchParams, selectedCategory])
@@ -82,7 +82,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   }, [getMarkets])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     loadMarkets()
   }, [loadMarkets])
 
@@ -346,7 +346,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
   // Load user tokens when account changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     loadUserTokens()
   }, [loadUserTokens])
 

@@ -169,13 +169,12 @@ Cypress.Commands.add('navigateAndVerify', (path, urlPattern) => {
 /**
  * Custom command for accessibility checks
  */
-Cypress.Commands.add('checkA11y', (context = null, options = {}) => {
+Cypress.Commands.add('checkA11y', () => {
   const defaultOptions = {
     rules: {
       // Disable color-contrast for now as it can be inconsistent in CI
       'color-contrast': { enabled: false }
-    },
-    ...options
+    }
   }
   
   cy.get('body').should('be.visible')

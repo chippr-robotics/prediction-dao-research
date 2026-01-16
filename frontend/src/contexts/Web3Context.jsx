@@ -40,7 +40,7 @@ export function Web3Provider({ children }) {
   useEffect(() => {
     if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
       const expectedChain = getExpectedChain()
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
       setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
     } else {
       setNetworkError(null)

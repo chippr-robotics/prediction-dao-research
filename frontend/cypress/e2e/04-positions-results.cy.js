@@ -230,7 +230,7 @@ describe('Position Management and Results Flow', () => {
     cy.wait(3000)
     
     // Get initial balance if displayed
-    cy.get('body').invoke('text').then((initialText) => {
+    cy.get('body').invoke('text').then(() => {
       cy.log('Initial state captured')
       
       // Interact with trade interface if available
