@@ -259,6 +259,121 @@ npm install bitcoinjs-lib tiny-secp256k1 ecpair  # Bitcoin
 npm install @solana/web3.js ed25519-hd-key       # Solana
 ```
 
+## x402 Protocol Support
+
+The floppy keystore fully supports the [x402 payment protocol](https://www.x402.org/) for HTTP-native payments.
+
+### Supported x402 Networks
+
+| Network | Chain | USDC Contract |
+|---------|-------|---------------|
+| `eip155:8453` | Base Mainnet | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+| `eip155:84532` | Base Sepolia | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` | Solana Mainnet | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
+| `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` | Solana Devnet | `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` |
+
+### Making x402 Payments
+
+```javascript
+const { preparePayment } = require('./scripts/x402');
+const { loadMnemonicFromFloppy } = require('./scripts/loader');
+
+// Load mnemonic from floppy
+const mnemonic = await loadMnemonicFromFloppy();
+
+// Prepare payment for Base network
+const payment = await preparePayment({
+  network: 'eip155:8453',
+  payTo: '0x1234...recipient',
+  amount: '0.50',  // 0.50 USDC
+  resource: 'https://api.example.com/data',
+  mnemonic
+});
+
+// Use in HTTP request
+const response = await fetch('https://api.example.com/data', {
+  headers: {
+    'X-PAYMENT': payment.header
+  }
+});
+```
+
+### EIP-3009 Signing (EVM/Base)
+
+For EVM networks, x402 uses EIP-3009 `transferWithAuthorization`:
+
+```javascript
+const { createEVMPaymentPayload, encodePaymentHeader } = require('./scripts/x402');
+const { deriveChainKeys } = require('./scripts/loader');
+
+// Get Ethereum keys from floppy
+const keys = await deriveChainKeys('ethereum', { count: 1 });
+const wallet = keys[0];
+
+// Create payment payload
+const payload = await createEVMPaymentPayload({
+  network: 'eip155:8453',  // Base mainnet
+  payTo: '0x1234...merchant',
+  amount: '1.00',
+  privateKey: wallet.privateKey,
+  fromAddress: wallet.address
+});
+
+// Encode for header
+const header = encodePaymentHeader(payload);
+```
+
+### Solana Payments
+
+```javascript
+const { createSolanaPaymentPayload } = require('./scripts/x402');
+const { deriveChainKeys } = require('./scripts/loader');
+
+// Get Solana keys from floppy
+const keys = await deriveChainKeys('solana', { count: 1 });
+
+const payload = await createSolanaPaymentPayload({
+  network: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+  payTo: 'Merchant...base58',
+  amount: '2.00',
+  privateKey: keys[0].privateKey,
+  fromAddress: keys[0].address
+});
+```
+
+### Payment Tracking
+
+Payments are automatically tracked in persistent memory:
+
+```javascript
+const { getPaymentHistory, trackPayment } = require('./scripts/x402');
+
+// Get payment history
+const history = getPaymentHistory({ network: 'eip155:8453', limit: 10 });
+
+// Manual tracking
+trackPayment({
+  network: 'eip155:8453',
+  amount: '1.00',
+  to: '0x...',
+  resource: 'https://api.example.com',
+  status: 'completed'
+});
+```
+
+### x402 Protocol Flow
+
+```
+1. Client requests protected resource
+2. Server responds: 402 Payment Required + PAYMENT-REQUIRED header
+3. Client decodes payment requirements
+4. Client creates payment payload (EIP-3009 or SPL transfer)
+5. Client signs with floppy keystore keys
+6. Client retries with X-PAYMENT header
+7. Facilitator verifies and settles payment
+8. Server returns resource
+```
+
 ## Additional Documentation
 
 - [REFERENCE.md](REFERENCE.md) - Full API documentation
