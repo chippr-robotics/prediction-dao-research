@@ -72,7 +72,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const loadMarkets = useCallback(async () => {
     try {
       setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 500))
       const allMarkets = await getMarkets()
       setMarkets(allMarkets)
       setLoading(false)

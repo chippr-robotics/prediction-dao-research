@@ -16,7 +16,8 @@ import {
   fetchPositions,
   fetchWelfareMetrics,
   fetchCategories,
-  fetchMarketsByCorrelationGroup
+  fetchMarketsByCorrelationGroup,
+  clearMarketCache
 } from '../utils/dataFetcher'
 
 /**
@@ -28,10 +29,16 @@ export function useDataFetcher() {
   const demoMode = preferences.demoMode
 
   // Memoize individual functions to ensure stable references
+  // getMarkets now accepts options for caching control
   const getMarkets = useCallback(
-    (contracts = null) => fetchMarkets(demoMode, contracts),
+    (contracts = null, options = {}) => fetchMarkets(demoMode, contracts, options),
     [demoMode]
   )
+
+  // Clear all market caches (useful after trading actions)
+  const clearCache = useCallback(() => {
+    clearMarketCache()
+  }, [])
 
   const getMarketsByCategory = useCallback(
     (category, contracts = null) => fetchMarketsByCategory(demoMode, category, contracts),
@@ -80,7 +87,8 @@ export function useDataFetcher() {
       getPositions,
       getWelfareMetrics,
       getCategories,
-      getMarketsByCorrelationGroup
+      getMarketsByCorrelationGroup,
+      clearCache
     }),
     [
       demoMode,
@@ -91,7 +99,8 @@ export function useDataFetcher() {
       getPositions,
       getWelfareMetrics,
       getCategories,
-      getMarketsByCorrelationGroup
+      getMarketsByCorrelationGroup,
+      clearCache
     ]
   )
 }
