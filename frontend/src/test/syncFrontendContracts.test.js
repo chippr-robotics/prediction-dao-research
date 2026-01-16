@@ -63,10 +63,57 @@ describe('sync-frontend-contracts script', () => {
     // Inserted keys
     expect(updated).toContain("tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
     expect(updated).toContain("roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
+    // roleManagerCore defaults to tieredRoleManager when not explicitly set
     expect(updated).toContain("roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
 
     // Factory contracts
     expect(updated).toContain("tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB'")
     expect(updated).toContain("daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a'")
+  })
+
+  it('uses separate roleManagerCore when explicitly set in deployment', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdao-sync-rmc-'))
+
+    const contractsFile = path.join(tmpDir, 'contracts.js')
+    const deploymentFile = path.join(tmpDir, 'deployment.json')
+
+    fs.writeFileSync(
+      contractsFile,
+      `export const DEPLOYED_CONTRACTS = {\n  deployer: '0x0000000000000000000000000000000000000001',\n  roleManagerCore: '0x0000000000000000000000000000000000000002',\n}\n\n/** sentinel */\nexport function getContractAddress(contractName) {\n  return DEPLOYED_CONTRACTS[contractName]\n}\n`
+    )
+
+    fs.writeFileSync(
+      deploymentFile,
+      JSON.stringify(
+        {
+          network: 'mordor',
+          chainId: 63,
+          deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+          contracts: {
+            tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
+            roleManagerCore: '0x147284A99d4857fCb610eA7B11aF0483FE590cE0',
+          }
+        },
+        null,
+        2
+      )
+    )
+
+    const scriptPath = path.resolve(process.cwd(), '../scripts/utils/sync-frontend-contracts.js')
+
+    execFileSync('node', [
+      scriptPath,
+      '--deploymentFile',
+      deploymentFile,
+      '--contractsFile',
+      contractsFile
+    ])
+
+    const updated = read(contractsFile)
+
+    // roleManager should be tieredRoleManager
+    expect(updated).toContain("tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8'")
+    // roleManagerCore should be the separate address
+    expect(updated).toContain("roleManagerCore: '0x147284A99d4857fCb610eA7B11aF0483FE590cE0'")
   })
 })

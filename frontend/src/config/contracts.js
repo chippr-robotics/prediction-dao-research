@@ -26,9 +26,9 @@ export const DEPLOYED_CONTRACTS = {
   // CTF1155 - Deployed via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
   ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
 
-  // Back-compat aliases - point to TieredRoleManager for consistency
+  // Back-compat aliases
   roleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager with full interface
-  roleManagerCore: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
+  roleManagerCore: '0x147284A99d4857fCb610eA7B11aF0483FE590cE0', // RoleManagerCore (modular) - used by PaymentProcessor for role grants
 
   // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',

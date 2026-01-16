@@ -111,9 +111,12 @@ function main() {
     tokenMintFactory: deployed.tokenMintFactory,
     daoFactory: deployed.daoFactory,
 
-    // Aliases (same address)
+    // Role manager contracts
+    // roleManager points to TieredRoleManager (for tier-based checks)
     roleManager: deployed.tieredRoleManager,
-    roleManagerCore: deployed.tieredRoleManager,
+    // roleManagerCore can be separate (modular RoleManagerCore for PaymentProcessor)
+    // If not explicitly set in deployment, falls back to tieredRoleManager
+    roleManagerCore: deployed.roleManagerCore || deployed.tieredRoleManager,
   }
 
   for (const [key, value] of Object.entries(mapping)) {

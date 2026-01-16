@@ -31,6 +31,9 @@ contract TieredRoleManager is RoleManager {
     mapping(address => mapping(bytes32 => uint256)) public membershipExpiration;
     mapping(address => mapping(bytes32 => UsageStats)) public usageStats;
 
+    // Authorized extensions that can grant roles (e.g., PaymentProcessor)
+    mapping(address => bool) public authorizedExtensions;
+
     event TierPurchased(address indexed user, bytes32 indexed role, MembershipTier tier, uint256 price);
     event TierUpgraded(address indexed user, bytes32 indexed role, MembershipTier from, MembershipTier to);
     event MembershipExtended(address indexed user, bytes32 indexed role, uint256 exp);
@@ -51,6 +54,19 @@ contract TieredRoleManager is RoleManager {
     }
 
     function setTierActive(bytes32 r, MembershipTier t, bool a) external onlyRole(DEFAULT_ADMIN_ROLE) { tierMetadata[r][t].isActive = a; }
+
+    function setAuthorizedExtension(address ext, bool authorized) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        authorizedExtensions[ext] = authorized;
+    }
+
+    // Called by PaymentProcessor to grant roles after payment
+    function grantRoleFromExtension(bytes32 role, address account) external {
+        require(authorizedExtensions[msg.sender], "Not authorized extension");
+        if (!hasRole(role, account)) {
+            _grantRole(role, account);
+            roleMetadata[role].currentMembers++;
+        }
+    }
 
     // Purchase
     function purchaseRoleWithTier(bytes32 role, MembershipTier tier, uint256 durDays) external payable nonReentrant whenNotPaused {
