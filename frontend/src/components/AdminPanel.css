@@ -1162,3 +1162,307 @@
     font-size: 2rem;
   }
 }
+
+/* ===================================
+   Perpetuals Admin Styles
+   =================================== */
+
+/* Markets Table */
+.perp-markets-table {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.perp-markets-table table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.perp-markets-table th,
+.perp-markets-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.perp-markets-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+}
+
+.perp-markets-table tbody tr:hover {
+  background: var(--bg-primary);
+}
+
+.market-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.market-name {
+  font-weight: 500;
+}
+
+/* Market Status Badges */
+.market-status {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.market-status.active {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success-color, #22c55e);
+}
+
+.market-status.paused {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning-color, #f59e0b);
+}
+
+.market-status.settled {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-muted);
+}
+
+/* Category Badges */
+.market-category {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.market-category.crypto { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+.market-category.prediction { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+.market-category.commodity { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.market-category.index { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+.market-category.custom { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+
+/* Funding Rate Colors */
+.funding-positive { color: var(--success-color, #22c55e); }
+.funding-negative { color: var(--danger-color, #ef4444); }
+
+/* Health Indicator */
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.health-dot.healthy { background: var(--success-color, #22c55e); }
+.health-dot.warning { background: var(--warning-color, #f59e0b); }
+.health-dot.critical { background: var(--danger-color, #ef4444); }
+.health-dot.unknown { background: var(--text-muted); }
+
+/* Metrics Grid */
+.perp-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.metric-card {
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color);
+}
+
+.metric-card .metric-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-card .metric-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 0.25rem;
+}
+
+/* Config Grid */
+.perp-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.config-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.config-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+/* Market Creation Form */
+.perp-market-creation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.perp-market-creation-form .form-section {
+  padding: 1.25rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-color);
+}
+
+.perp-market-creation-form .form-section h4 {
+  margin: 0 0 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.perp-market-creation-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.perp-market-creation-form .form-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Market Details Modal */
+.perp-market-details-modal {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg, 12px);
+  max-width: 700px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.perp-market-details-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.perp-market-details-modal .modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.perp-market-details-modal .close-btn {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm, 4px);
+  transition: background 0.15s ease;
+}
+
+.perp-market-details-modal .close-btn:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.perp-market-details-modal .modal-content {
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.perp-market-details-modal .detail-section {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.perp-market-details-modal .detail-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.perp-market-details-modal .detail-section h4 {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.perp-market-details-modal .detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.perp-market-details-modal .detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+}
+
+.perp-market-details-modal .detail-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.perp-market-details-modal .detail-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+/* Modal Backdrop */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}

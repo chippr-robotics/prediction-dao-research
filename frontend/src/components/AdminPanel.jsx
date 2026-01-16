@@ -9,6 +9,7 @@ import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
 import NullifierTab from './admin/NullifierTab'
+import PerpetualsTab from './admin/PerpetualsTab'
 import './AdminPanel.css'
 
 // Minimum withdrawal amount to prevent gas waste on dust transactions
@@ -81,6 +82,7 @@ function AdminPanel() {
   const canGrantRoles = isAdmin || isOperationsAdmin
   const canWithdraw = isAdmin
   const canManageNullifier = isAdmin || isOperationsAdmin
+  const canManagePerps = isAdmin || isOperationsAdmin
 
   // Tier Configuration State
   const [tierConfig, setTierConfig] = useState({
@@ -590,6 +592,25 @@ function AdminPanel() {
               </svg>
             </span>
             Nullifier
+          </button>
+        )}
+
+        {canManagePerps && (
+          <button
+            role="tab"
+            aria-selected={activeTab === 'perpetuals'}
+            className={`admin-panel-tab ${activeTab === 'perpetuals' ? 'active' : ''}`}
+            onClick={() => setActiveTab('perpetuals')}
+          >
+            <span className="tab-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 3v18h18"/>
+                <path d="M18 17V9"/>
+                <path d="M13 17V5"/>
+                <path d="M8 17v-3"/>
+              </svg>
+            </span>
+            Perpetuals
           </button>
         )}
       </nav>
@@ -1351,6 +1372,15 @@ function AdminPanel() {
             signer={signer}
             account={account}
             marketFactoryAddress={DEPLOYED_CONTRACTS.marketFactory}
+          />
+        )}
+
+        {/* Perpetuals Tab */}
+        {activeTab === 'perpetuals' && canManagePerps && (
+          <PerpetualsTab
+            provider={provider}
+            signer={signer}
+            account={account}
           />
         )}
       </main>
