@@ -55,7 +55,6 @@ const LoadingScreen = ({
       
       return () => clearTimeout(timer)
     } else {
-       
       setAnimated(false)
     }
   }, [visible, onAnimationComplete])

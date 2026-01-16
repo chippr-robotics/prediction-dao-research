@@ -40,7 +40,6 @@ export function Web3Provider({ children }) {
   useEffect(() => {
     if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
       const expectedChain = getExpectedChain()
-       
       setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
     } else {
       setNetworkError(null)
