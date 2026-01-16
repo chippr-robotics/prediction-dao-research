@@ -3,6 +3,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useDataFetcher } from '../../hooks/useDataFetcher'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import LoadingScreen from '../ui/LoadingScreen'
+import CategoryTreemap from './CategoryTreemap'
 import * as d3 from 'd3'
 import './Dashboard.css'
 
@@ -999,7 +1000,8 @@ function Dashboard() {
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true
   const [markets, setMarkets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const categories = useMemo(() => [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -1007,21 +1009,27 @@ function Dashboard() {
     { id: 'finance', name: 'Finance', icon: '💰' },
     { id: 'tech', name: 'Tech', icon: '💻' },
     { id: 'crypto', name: 'Crypto', icon: '₿' },
-    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' }
+    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
+    { id: 'weather', name: 'Weather', icon: '🌤️' }
   ], [])
 
-  // Load markets - reloads when demoMode changes
+  // Load markets with caching support - reloads when demoMode changes
   useEffect(() => {
     const loadMarkets = async () => {
       try {
-        setLoading(true)
-        await new Promise(resolve => setTimeout(resolve, 300))
-        const allMarkets = await getMarkets()
+        // Fetch with background refresh callback for stale-while-revalidate
+        const allMarkets = await getMarkets(null, {
+          onBackgroundRefresh: (freshMarkets) => {
+            console.log('Dashboard: Background refresh complete')
+            setMarkets(freshMarkets)
+            setIsRefreshing(false)
+          }
+        })
         setMarkets(allMarkets)
       } catch (error) {
         console.error('Error loading markets:', error)
       } finally {
-        setLoading(false)
+        setIsInitialLoad(false)
       }
     }
     loadMarkets()
@@ -1051,15 +1059,56 @@ function Dashboard() {
     console.log('Navigate to market:', market.id)
   }, [])
 
-  if (loading) {
+  // Show skeleton during initial load
+  if (isInitialLoad && markets.length === 0) {
     return (
-      <div className="dashboard-container">
-        <LoadingScreen 
-          visible={true} 
-          text={demoMode ? 'Loading demo data' : 'Fetching blockchain data'}
-          inline
-          size="large"
-        />
+      <div className="dashboard-container" aria-busy="true" aria-label="Loading dashboard">
+        {/* Skeleton Header */}
+        <header className="dashboard-header">
+          <div className="header-content">
+            <div className="header-title-row">
+              <div className="skeleton-text skeleton-title" />
+            </div>
+            <div className="skeleton-text skeleton-subtitle" />
+          </div>
+        </header>
+
+        {/* Skeleton Charts */}
+        <section className="charts-section">
+          <div className="charts-row">
+            <div className="chart-card wide">
+              <div className="chart-header">
+                <div className="skeleton-text skeleton-heading" />
+              </div>
+              <div className="skeleton-chart" />
+            </div>
+            <div className="chart-card">
+              <div className="chart-header">
+                <div className="skeleton-text skeleton-heading" />
+              </div>
+              <div className="skeleton-chart" />
+            </div>
+          </div>
+
+          <div className="bottom-grid">
+            <div className="bottom-card">
+              <div className="skeleton-text skeleton-heading" style={{ marginBottom: '1rem' }} />
+              <div className="skeleton-list">
+                <div className="skeleton-list-item" />
+                <div className="skeleton-list-item" />
+                <div className="skeleton-list-item" />
+              </div>
+            </div>
+            <div className="bottom-card">
+              <div className="skeleton-text skeleton-heading" style={{ marginBottom: '1rem' }} />
+              <div className="skeleton-list">
+                <div className="skeleton-list-item" />
+                <div className="skeleton-list-item" />
+                <div className="skeleton-list-item" />
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     )
   }
@@ -1125,13 +1174,13 @@ function Dashboard() {
             <CategoryDonutChart markets={markets} categories={categories} />
           </div>
 
-          {/* Market Health */}
+          {/* Market Categories Treemap */}
           <div className="chart-card">
             <div className="chart-header">
-              <h3 className="chart-title">Platform Health</h3>
-              <span className="chart-subtitle">Overall market health score</span>
+              <h3 className="chart-title">Market Categories</h3>
+              <span className="chart-subtitle">Distribution by category and time status</span>
             </div>
-            <MarketHealthGauge markets={markets} />
+            <CategoryTreemap markets={markets} categories={categories} />
           </div>
         </div>
 

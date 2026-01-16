@@ -15,8 +15,8 @@
  * ```
  */
 
-import { 
-  getMockMarkets, 
+import {
+  getMockMarkets,
   getMockMarketsByCategory,
   getMockMarketById,
   getMockProposals,
@@ -36,26 +36,69 @@ import {
   fetchCategoriesFromBlockchain
 } from './blockchainService'
 
+import {
+  cacheMarkets,
+  loadCachedMarkets,
+  clearMarketCache
+} from './marketCache'
+
 /**
- * Fetch markets based on demo mode
+ * Fetch markets based on demo mode with caching support
+ * Uses stale-while-revalidate pattern for blockchain data:
+ * - Returns cached data immediately if available
+ * - Refreshes in background if cache is stale
+ *
  * @param {boolean} demoMode - Whether to use mock data
  * @param {Object} contracts - Contract instances for live data fetching (optional)
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceRefresh - Skip cache and fetch fresh data
+ * @param {Function} options.onBackgroundRefresh - Callback when background refresh completes
  * @returns {Promise<Array>} Array of market objects
  */
-export async function fetchMarkets(demoMode, contracts = null) {
-  console.log('fetchMarkets called with demoMode:', demoMode)
-  
+export async function fetchMarkets(demoMode, contracts = null, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+  console.log('fetchMarkets called with demoMode:', demoMode, 'forceRefresh:', forceRefresh)
+
   if (demoMode) {
-    // Return mock data
+    // Return mock data (no caching needed)
     console.log('Using demo mode - returning mock markets')
     return getMockMarkets()
   }
-  
+
+  // Try to load from cache first (unless forcing refresh)
+  if (!forceRefresh) {
+    const cached = loadCachedMarkets()
+    if (cached) {
+      console.log(`Cache hit: ${cached.markets.length} markets, age: ${Math.round(cached.age / 1000)}s, stale: ${cached.isStale}`)
+
+      // If cache is stale, trigger background refresh
+      if (cached.isStale && onBackgroundRefresh) {
+        console.log('Cache is stale, triggering background refresh')
+        fetchMarketsFromBlockchain()
+          .then(freshMarkets => {
+            console.log('Background refresh complete:', freshMarkets.length, 'markets')
+            cacheMarkets(freshMarkets)
+            onBackgroundRefresh(freshMarkets)
+          })
+          .catch(error => {
+            console.warn('Background refresh failed:', error.message)
+          })
+      }
+
+      // Return cached data immediately
+      return cached.markets
+    }
+  }
+
   try {
     // Fetch from Mordor testnet
-    console.log('Live mode - fetching from blockchain')
+    console.log('Live mode - fetching from blockchain (cache miss or refresh)')
     const markets = await fetchMarketsFromBlockchain()
     console.log('Fetched', markets.length, 'markets from blockchain')
+
+    // Cache the results
+    cacheMarkets(markets)
+
     return markets
   } catch (error) {
     console.error('Failed to fetch markets from blockchain:', error)
@@ -65,6 +108,12 @@ export async function fetchMarkets(demoMode, contracts = null) {
     return []
   }
 }
+
+/**
+ * Clear all market caches
+ * Useful when user performs an action that changes market data
+ */
+export { clearMarketCache }
 
 /**
  * Fetch markets by category based on demo mode

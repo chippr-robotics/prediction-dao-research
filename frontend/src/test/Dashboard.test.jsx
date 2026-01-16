@@ -64,6 +64,27 @@ vi.mock('d3', () => {
     return scale
   }
 
+  const mockHierarchy = (data) => {
+    const node = {
+      data,
+      sum: vi.fn(function() { return this }),
+      sort: vi.fn(function() { return this }),
+      descendants: vi.fn(() => []),
+      leaves: vi.fn(() => [])
+    }
+    return node
+  }
+
+  const mockTreemap = () => {
+    const fn = vi.fn((root) => root)
+    fn.size = vi.fn(() => fn)
+    fn.paddingOuter = vi.fn(() => fn)
+    fn.paddingTop = vi.fn(() => fn)
+    fn.paddingInner = vi.fn(() => fn)
+    fn.round = vi.fn(() => fn)
+    return fn
+  }
+
   return {
     select: vi.fn(() => createChainableMock()),
   scaleOrdinal: vi.fn(mockScale),
@@ -120,7 +141,9 @@ vi.mock('d3', () => {
   interpolateRgbBasis: vi.fn(() => vi.fn()),
   stackOffsetWiggle: vi.fn(),
   curveBasis: vi.fn(),
-  curveMonotoneX: vi.fn()
+  curveMonotoneX: vi.fn(),
+  hierarchy: vi.fn(mockHierarchy),
+  treemap: vi.fn(mockTreemap)
   }
 })
 
@@ -256,11 +279,11 @@ describe('Dashboard Component', () => {
       })
     })
 
-    it('should render platform health section', async () => {
+    it('should render market categories section', async () => {
       renderWithProviders(<Dashboard />)
       
       await waitFor(() => {
-        expect(screen.getByText('Platform Health')).toBeInTheDocument()
+        expect(screen.getByText('Market Categories')).toBeInTheDocument()
       })
     })
 
@@ -417,7 +440,7 @@ describe('Dashboard Component', () => {
       
       await waitFor(() => {
         expect(screen.getByText('Market Distribution by Category')).toBeInTheDocument()
-        expect(screen.getByText('Platform Health')).toBeInTheDocument()
+        expect(screen.getByText('Market Categories')).toBeInTheDocument()
         expect(screen.getByText('Category Performance')).toBeInTheDocument()
       })
     })
