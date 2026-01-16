@@ -20,7 +20,7 @@ import './commands'
 // require('./commands')
 
 // Disable uncaught exception failures for Web3 errors
-Cypress.on('uncaught:exception', (err, runnable) => {
+Cypress.on('uncaught:exception', (err) => {
   // Log errors for debugging
   console.error('Uncaught exception:', err.message)
   
@@ -44,7 +44,7 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 
 // Add beforeEach hook to check for console errors (optional)
 beforeEach(() => {
-  cy.window().then((win) => {
+  cy.window().then(() => {
     // Optionally stub console.error to catch app errors
     // Commented out by default to avoid false positives
     // cy.stub(win.console, 'error').as('consoleError')

@@ -169,15 +169,7 @@ Cypress.Commands.add('navigateAndVerify', (path, urlPattern) => {
 /**
  * Custom command for accessibility checks
  */
-Cypress.Commands.add('checkA11y', (context = null, options = {}) => {
-  const defaultOptions = {
-    rules: {
-      // Disable color-contrast for now as it can be inconsistent in CI
-      'color-contrast': { enabled: false }
-    },
-    ...options
-  }
-  
+Cypress.Commands.add('checkA11y', () => {
   cy.get('body').should('be.visible')
   // Note: axe-core integration would be added here if we install cypress-axe
   // For now, we'll do basic checks
