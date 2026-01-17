@@ -47,7 +47,7 @@ export const ROLE_BYTES32 = {
 const TIERED_ROLE_MANAGER_ABI = [
   'function getUserTier(address user, bytes32 role) view returns (uint8)',
   'function membershipExpiration(address user, bytes32 role) view returns (uint256)',
-  'function marketsCreated(address user, bytes32 role) view returns (uint256)',
+  'function usageStats(address user, bytes32 role) view returns (uint256 dailyBetsCount, uint256 weeklyBetsCount, uint256 monthlyMarketsCreated, uint256 dailyWithdrawals, uint256 activeMarketsCount, uint256 lastDailyReset, uint256 lastWeeklyReset, uint256 lastMonthlyReset)',
   'function isMembershipActive(address user, bytes32 role) view returns (bool)',
   'function hasRole(bytes32 role, address account) view returns (bool)',
   'function MARKET_MAKER_ROLE() view returns (bytes32)',
@@ -144,12 +144,12 @@ export function useRoleDetails() {
               console.debug('Could not fetch expiration:', e.message)
             }
 
-            // Get markets created
+            // Get markets created from usageStats
             try {
-              const created = await trm.marketsCreated(address, roleBytes)
-              details.marketsCreated = Number(created)
+              const stats = await trm.usageStats(address, roleBytes)
+              details.marketsCreated = Number(stats.monthlyMarketsCreated)
             } catch (e) {
-              console.debug('Could not fetch marketsCreated:', e.message)
+              console.debug('Could not fetch usageStats:', e.message)
             }
 
             // Check if membership is active

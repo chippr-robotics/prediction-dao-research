@@ -65,7 +65,7 @@ const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperativ
 
 // Get WalletConnect project ID from environment
 // Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
-const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'a01e2fef66f2abc4ca480cb13a6d8db7'
+const walletConnectProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || 'e7a122e5963ecec9bb2ab09e08bca54f'
 
 // Warn if using fallback project ID (only in development)
 if (!import.meta.env.VITE_WALLETCONNECT_PROJECT_ID && import.meta.env.DEV) {

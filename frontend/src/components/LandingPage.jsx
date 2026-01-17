@@ -38,7 +38,7 @@ function LandingPage() {
                   <div className="platform-card-header-compact">
                  {!logoErrors.fairwins ? (
                     <img 
-                      src="/logo_fairwins.svg" 
+                      src="/assets/logo_fairwins.svg" 
                       alt="FairWins" 
                       className="platform-logo-compact"
                       width="48"
