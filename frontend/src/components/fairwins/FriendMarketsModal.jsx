@@ -1400,7 +1400,7 @@ function FriendMarketsModal({
                         bgColor="transparent"
                         aria-label="QR code to share this market"
                         imageSettings={{
-                          src: '/logo_fairwins.svg',
+                          src: '/assets/logo_fairwins.svg',
                           height: 32,
                           width: 32,
                           excavate: true,
