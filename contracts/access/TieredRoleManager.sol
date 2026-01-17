@@ -68,6 +68,50 @@ contract TieredRoleManager is RoleManager {
         }
     }
 
+    // Called by PaymentProcessor to grant role with tier after payment
+    function grantTierFromExtension(
+        bytes32 role,
+        address account,
+        uint8 tier,
+        uint256 durationDays
+    ) external {
+        require(authorizedExtensions[msg.sender], "Not authorized extension");
+        require(tier > 0 && tier <= 4, "Invalid tier");
+
+        MembershipTier membershipTier = MembershipTier(tier);
+        MembershipTier currentTier = userTiers[account][role];
+
+        // Set tier
+        userTiers[account][role] = membershipTier;
+        tierPurchases[account][role] = block.timestamp;
+
+        // For new members, initialize membership expiration and usage stats
+        // For existing members (upgrades), preserve usage stats and extend from current expiration
+        if (currentTier == MembershipTier.NONE) {
+            membershipExpiration[account][role] = block.timestamp + durationDays * 1 days;
+            usageStats[account][role] = UsageStats(0, 0, 0, 0, 0, block.timestamp, block.timestamp, block.timestamp);
+        } else {
+            // Upgrade: extend from current expiration if still active, otherwise from now
+            uint256 start = membershipExpiration[account][role] > block.timestamp
+                ? membershipExpiration[account][role]
+                : block.timestamp;
+            membershipExpiration[account][role] = start + durationDays * 1 days;
+            // Keep existing usage stats for upgrades
+        }
+
+        // Grant role if not already granted
+        if (!hasRole(role, account)) {
+            _grantRole(role, account);
+            roleMetadata[role].currentMembers++;
+        }
+
+        if (currentTier == MembershipTier.NONE) {
+            emit TierPurchased(account, role, membershipTier, 0);
+        } else {
+            emit TierUpgraded(account, role, currentTier, membershipTier);
+        }
+    }
+
     // Purchase
     function purchaseRoleWithTier(bytes32 role, MembershipTier tier, uint256 durDays) external payable nonReentrant whenNotPaused {
         if (tier == MembershipTier.NONE) revert TRMInvalidTier();

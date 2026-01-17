@@ -8,6 +8,7 @@ pragma solidity ^0.8.24;
 interface IRoleManagerCore {
     function hasRole(bytes32 role, address account) external view returns (bool);
     function grantRoleFromExtension(bytes32 role, address account) external;
+    function grantTierFromExtension(bytes32 role, address account, uint8 tier, uint256 durationDays) external;
     function paused() external view returns (bool);
     function OPERATIONS_ADMIN_ROLE() external view returns (bytes32);
     function DEFAULT_ADMIN_ROLE() external view returns (bytes32);

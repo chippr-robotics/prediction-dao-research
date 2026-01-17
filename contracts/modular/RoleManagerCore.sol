@@ -207,6 +207,54 @@ contract RoleManagerCore is AccessControl, ReentrancyGuard, Pausable {
     }
 
     /**
+     * @notice Allow extensions to grant roles with tier (for PaymentProcessor compatibility)
+     * @dev Delegates to TierRegistry and MembershipManager for the modular architecture
+     * @param role The role to grant
+     * @param account The user address
+     * @param tier The membership tier (1=Bronze, 2=Silver, 3=Gold, 4=Platinum)
+     * @param durationDays Membership duration in days
+     */
+    function grantTierFromExtension(
+        bytes32 role,
+        address account,
+        uint8 tier,
+        uint256 durationDays
+    ) external onlyExtension {
+        // Grant the role
+        _grantRole(role, account);
+
+        // If TierRegistry is configured, set the tier
+        if (tierRegistry != address(0)) {
+            // Call TierRegistry to set the user's tier
+            (bool success, ) = tierRegistry.call(
+                abi.encodeWithSignature(
+                    "setUserTier(address,bytes32,uint8)",
+                    account,
+                    role,
+                    tier
+                )
+            );
+            // Silently continue even if TierRegistry call fails
+            success;
+        }
+
+        // If MembershipManager is configured, set the expiration
+        if (membershipManager != address(0)) {
+            uint256 expiration = block.timestamp + (durationDays * 1 days);
+            (bool success, ) = membershipManager.call(
+                abi.encodeWithSignature(
+                    "setMembershipExpiration(address,bytes32,uint256)",
+                    account,
+                    role,
+                    expiration
+                )
+            );
+            // Silently continue even if MembershipManager call fails
+            success;
+        }
+    }
+
+    /**
      * @notice Check if user is within market creation limits
      * @dev Returns true if user has the role - actual limits can be enforced by TierRegistry
      * @param user The user to check

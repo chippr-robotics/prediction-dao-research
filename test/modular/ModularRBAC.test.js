@@ -67,11 +67,15 @@ describe("Modular RBAC System Tests", function () {
     // Configure TierRegistry
     await tierRegistry.setRoleManagerCore(await roleManagerCore.getAddress());
     await tierRegistry.setAuthorizedExtension(await paymentProcessor.getAddress(), true);
+    // RoleManagerCore also needs to be authorized since it delegates calls from PaymentProcessor
+    await tierRegistry.setAuthorizedExtension(await roleManagerCore.getAddress(), true);
 
     // Configure MembershipManager
     await membershipManager.setRoleManagerCore(await roleManagerCore.getAddress());
     await membershipManager.setTierRegistry(await tierRegistry.getAddress());
     await membershipManager.setAuthorizedExtension(await paymentProcessor.getAddress(), true);
+    // RoleManagerCore also needs to be authorized since it delegates calls from PaymentProcessor
+    await membershipManager.setAuthorizedExtension(await roleManagerCore.getAddress(), true);
 
     // Configure PaymentProcessor
     await paymentProcessor.configureAll(
