@@ -19,8 +19,8 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { execSync } = require('child_process');
-const { encryptMnemonic, decryptMnemonic } = require('./keystore');
-const { deriveKeys, getChainSummary } = require('./chains');
+const { encryptMnemonic, decryptMnemonic, decryptXprv, getKeystoreType } = require('./keystore');
+const { deriveKeys, deriveKeysFromXprv, getChainSummary } = require('./chains');
 const identity = require('./identity');
 const integrity = require('./integrity');
 const cloneModule = require('./clone');
@@ -52,7 +52,9 @@ function resolvePassword() {
       const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
       const diskName = metadata['disk.name'];
       if (diskName) {
-        const envKey = `FLOPPY_${diskName.toUpperCase()}_PASSWORD`;
+        // Normalize disk name for env var: uppercase, replace hyphens/spaces with underscores
+        const normalizedName = diskName.toUpperCase().replace(/[-\s]/g, '_');
+        const envKey = `FLOPPY_${normalizedName}_PASSWORD`;
         if (process.env[envKey]) {
           return process.env[envKey];
         }
@@ -375,25 +377,40 @@ async function deriveChainKeys(chainId, options = {}) {
     password = await promptPassword('Enter keystore password: ');
   }
 
-  // Decrypt mnemonic
+  // Decrypt keystore
   const keystoreJson = fs.readFileSync(KEYSTORE_PATH, 'utf8');
   const keystore = JSON.parse(keystoreJson);
-
-  console.log('\nDecrypting mnemonic...');
-  const mnemonic = await decryptMnemonic(keystore, password);
+  const keystoreType = getKeystoreType(keystore);
 
   // Parse options
   const count = parseInt(options.count) || 1;
   const startIndex = parseInt(options.start) || 0;
   const addressType = options.type || null;
 
-  console.log(`\nDeriving ${count} key(s) starting at index ${startIndex}...`);
-  if (addressType) {
-    console.log(`Address type: ${addressType}`);
-  }
+  let keys;
 
   try {
-    const keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+    if (keystoreType === 'xprv') {
+      // Clone disk - derive from xprv
+      console.log('\nDecrypting xprv (clone disk)...');
+      const xprv = await decryptXprv(keystore, password);
+
+      console.log(`\nDeriving ${count} key(s) starting at index ${startIndex}...`);
+      console.log('(Derivation limited to this clone\'s account branch)');
+
+      keys = await deriveKeysFromXprv(xprv, chainId, { count, startIndex });
+    } else {
+      // Mother disk - derive from mnemonic
+      console.log('\nDecrypting mnemonic...');
+      const mnemonic = await decryptMnemonic(keystore, password);
+
+      console.log(`\nDeriving ${count} key(s) starting at index ${startIndex}...`);
+      if (addressType) {
+        console.log(`Address type: ${addressType}`);
+      }
+
+      keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+    }
 
     console.log('\n--- Derived Keys ---\n');
 
@@ -454,16 +471,27 @@ async function showAddresses(chainId, options = {}) {
 
   const keystoreJson = fs.readFileSync(KEYSTORE_PATH, 'utf8');
   const keystore = JSON.parse(keystoreJson);
+  const keystoreType = getKeystoreType(keystore);
 
   console.log('\nDecrypting...');
-  const mnemonic = await decryptMnemonic(keystore, password);
 
   const count = parseInt(options.count) || 5;
   const startIndex = parseInt(options.start) || 0;
   const addressType = options.type || null;
 
   try {
-    const keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+    let keys;
+
+    if (keystoreType === 'xprv') {
+      // Clone disk - derive from xprv
+      console.log('(Clone disk - deriving from xprv)');
+      const xprv = await decryptXprv(keystore, password);
+      keys = await deriveKeysFromXprv(xprv, chainId, { count, startIndex });
+    } else {
+      // Mother disk - derive from mnemonic
+      const mnemonic = await decryptMnemonic(keystore, password);
+      keys = await deriveKeys(mnemonic, chainId, { count, startIndex, addressType });
+    }
 
     console.log('');
     keys.forEach(key => {
@@ -508,13 +536,20 @@ Floppy Disk Keystore Manager - Multi-Chain Support
   clone              - Clone disk to backup floppy
   diff <path>        - Compare current disk with another manifest
 
-=== Mother/Clone Branching ===
+=== Mother/Clone Branching (xprv Isolation) ===
   init-mother        - Initialize this disk as a mother
-  fork               - Create a new clone (on mother disk)
-  status             - Show disk role and status
+  fork               - Create a new clone with xprv isolation (cryptographically isolated)
+  fork-write         - Write fork data to clone disk (after disk swap)
+  status             - Show disk role, TTL, and status
   log                - Show clone registry (mother) or sync history
   push               - Export clone changes for mother import
   pull               - Import mother changes to clone
+  verify-cert        - Verify clone's birth certificate
+
+=== Compromise Management ===
+  mark-compromised   - Mark a clone as compromised (on mother disk)
+  clear-compromised  - Clear compromised status from a clone
+  list-compromised   - List all compromised clones
 
 === Help ===
   help               - Show this help message
@@ -554,13 +589,20 @@ Examples:
   node cli.js clone                     # Clone to backup disk
   node cli.js diff /path/to/manifest.json  # Compare with another disk
 
-  # Mother/Clone branching
+  # Mother/Clone branching (xprv isolation)
   node cli.js init-mother --id=mordor   # Make this disk a mother
-  node cli.js fork --id=agent-1 --name="Agent Alpha"  # Fork a new clone
-  node cli.js status                    # Show current disk role
+  node cli.js fork --id=agent-1 --name="Agent Alpha" --ttl=30  # Fork a clone
+  node cli.js fork-write                # Write clone to new floppy (after swap)
+  node cli.js status                    # Show current disk role and TTL
+  node cli.js verify-cert               # Verify clone's birth certificate
   node cli.js log                       # Show clone registry or history
   node cli.js push                      # Export clone changes (run on clone)
   node cli.js pull                      # Import mother changes (after disk swap)
+
+  # Compromise management (on mother)
+  node cli.js mark-compromised --id=agent-1 --reason="Lost"
+  node cli.js list-compromised
+  node cli.js clear-compromised --id=agent-1
 
 Supported Chains:
   ethereum (eth)     - Ethereum and EVM chains
@@ -1352,7 +1394,7 @@ function initMother(options) {
 }
 
 /**
- * Fork a new clone
+ * Fork a new clone with xprv isolation
  */
 async function forkClone(options) {
   if (!isMounted()) {
@@ -1363,19 +1405,41 @@ async function forkClone(options) {
   const cloneId = options.id;
   if (!cloneId) {
     console.error('Error: Clone ID required');
-    console.error('Usage: node cli.js fork --id=<clone-id> [--name=<name>] [--purpose=<purpose>]');
+    console.error('Usage: node cli.js fork --id=<clone-id> [--name=<name>] [--purpose=<purpose>] [--ttl=30]');
+    console.error('');
+    console.error('Options:');
+    console.error('  --id=ID       Clone identifier (required)');
+    console.error('  --name=NAME   Human-readable name');
+    console.error('  --purpose=TXT Purpose description');
+    console.error('  --ttl=DAYS    Time-to-live in days (default: 30)');
     process.exit(1);
   }
 
   try {
-    // Prepare fork data
-    console.log('\n=== Fork New Clone ===\n');
-    console.log('Preparing fork data on mother disk...');
+    console.log('\n=== Fork New Clone (xprv Isolation) ===\n');
+    console.log('This creates a cryptographically isolated clone:');
+    console.log('  - Clone receives extended private key (xprv) for its account only');
+    console.log('  - Clone CANNOT access other accounts or derive the mnemonic');
+    console.log('  - Clone has its own unique password');
+    console.log('  - Clone has a time-to-live (TTL) requiring periodic reconciliation');
+    console.log('');
 
-    const forkData = cloneModule.prepareFork({
+    // Get mother password (required for xprv derivation)
+    let motherPassword = resolvePassword();
+    if (!motherPassword) {
+      motherPassword = await promptPassword('Enter mother keystore password: ');
+    }
+
+    const ttlDays = parseInt(options.ttl) || 30;
+
+    console.log('\nPreparing fork data on mother disk...');
+
+    const forkData = await cloneModule.prepareFork({
       cloneId,
       cloneName: options.name || cloneId,
-      purpose: options.purpose || ''
+      purpose: options.purpose || '',
+      motherPassword,
+      ttlDays
     });
 
     console.log(`\nClone registered:`);
@@ -1383,12 +1447,16 @@ async function forkClone(options) {
     console.log(`  Derivation Index: ${forkData.cloneRecord.derivationIndex}`);
     console.log(`  Derivation Path: ${forkData.cloneRecord.derivationPath}`);
     console.log(`  Fork Sequence: ${forkData.forkSequence}`);
-    console.log(`  Files to copy: ${Object.keys(forkData.files).length}`);
+    console.log(`  TTL: ${forkData._ttlDays} days`);
+    console.log(`  Expires: ${forkData._expiresAt}`);
+    console.log(`  Mother Address: ${forkData.motherAddress}`);
+    console.log(`  Isolation: xprv (no mnemonic shared)`);
 
     // Save fork data to temp file
     const tempPath = '/tmp/fork-data.json';
     const exportData = {
       ...forkData,
+      // Store xprv data for write step (will be encrypted with clone password)
       files: Object.fromEntries(
         Object.entries(forkData.files).map(([k, v]) => [k, v.toString('base64')])
       )
@@ -1400,6 +1468,7 @@ async function forkClone(options) {
     console.log('1. Swap to blank floppy disk');
     console.log('2. Remount: sudo umount /mnt/floppy && sudo mount -o umask=000 /dev/sde /mnt/floppy');
     console.log('3. Run: node cli.js fork-write');
+    console.log('   (You will be prompted to set a NEW password for the clone)');
 
   } catch (error) {
     console.error('Error:', error.message);
@@ -1409,8 +1478,9 @@ async function forkClone(options) {
 
 /**
  * Write fork data to disk (after disk swap)
+ * Creates xprv-based keystore with clone's unique password
  */
-function forkWrite() {
+async function forkWrite() {
   if (!isMounted()) {
     console.error('Error: Floppy not mounted');
     process.exit(1);
@@ -1432,18 +1502,49 @@ function forkWrite() {
       )
     };
 
+    console.log('\n=== Write Clone to Disk (xprv Isolation) ===\n');
+    console.log(`Clone ID: ${forkData.cloneId}`);
+    console.log(`Mother: ${forkData.motherId}`);
+    console.log(`Derivation Index: ${forkData.cloneRecord.derivationIndex}`);
+    console.log(`Expires: ${forkData._expiresAt}`);
+    console.log('');
+
+    // Get clone password from env or prompt
+    let clonePassword = process.env.FLOPPY_CLONE_PASSWORD;
+
+    if (!clonePassword) {
+      console.log('Set a UNIQUE password for this clone.');
+      console.log('This password is independent from the mother - it encrypts only this clone\'s xprv.');
+      console.log('(Or set FLOPPY_CLONE_PASSWORD env var)');
+      console.log('');
+      clonePassword = await promptPassword('Enter NEW password for this clone: ');
+
+      if (clonePassword.length < 8) {
+        console.error('Error: Password must be at least 8 characters');
+        process.exit(1);
+      }
+
+      const confirmPassword = await promptPassword('Confirm new password: ');
+      if (clonePassword !== confirmPassword) {
+        console.error('Error: Passwords do not match');
+        process.exit(1);
+      }
+    } else {
+      console.log('Using clone password from FLOPPY_CLONE_PASSWORD env var');
+      if (clonePassword.length < 8) {
+        console.error('Error: Password must be at least 8 characters');
+        process.exit(1);
+      }
+    }
+
     // Write to disk
-    cloneModule.writeForkToDisk(forkData);
+    await cloneModule.writeForkToDisk(forkData, { clonePassword });
 
     // Clean up temp file
     fs.unlinkSync(tempPath);
 
-    console.log('\n=== Clone Created ===');
-    console.log(`  Clone ID: ${forkData.cloneId}`);
-    console.log(`  Mother: ${forkData.motherId}`);
-    console.log(`  Derivation Index: ${forkData.cloneRecord.derivationIndex}`);
-    console.log(`  Derivation Path: ${forkData.cloneRecord.derivationPath}`);
     console.log('\nRun "node cli.js status" to verify.');
+    console.log('Run "node cli.js verify-cert" to verify birth certificate.');
 
   } catch (error) {
     console.error('Error:', error.message);
@@ -1462,6 +1563,7 @@ function showStatus() {
 
   try {
     const status = cloneModule.getStatus();
+    const manifest = integrity.getManifest();
 
     console.log('\n=== Disk Status ===\n');
     console.log(`Role: ${status.role.toUpperCase()}`);
@@ -1481,10 +1583,37 @@ function showStatus() {
     } else if (status.role === 'clone') {
       console.log('\n--- Clone Info ---');
       console.log(`Mother ID: ${status.motherId}`);
+      console.log(`Mother Address: ${manifest?.motherAddress || 'Unknown'}`);
       console.log(`Derivation Index: ${status.derivationIndex}`);
       console.log(`Derivation Path: ${status.derivationPath}`);
       console.log(`Fork Sequence: ${status.forkSequence}`);
       console.log(`Forked At: ${status.forkedAt}`);
+
+      // Check keystore type
+      const keystorePath = path.join(CONFIG.MOUNT_POINT, CONFIG.KEYSTORE_DIR, CONFIG.KEYSTORE_FILENAME);
+      if (fs.existsSync(keystorePath)) {
+        const keystore = JSON.parse(fs.readFileSync(keystorePath, 'utf8'));
+        console.log(`Keystore Type: ${keystore.type === 'xprv' ? 'xprv (isolated)' : 'mnemonic (shared)'}`);
+      }
+
+      // Show TTL/expiration info
+      if (manifest?.expiresAt) {
+        const now = new Date();
+        const expiresAt = new Date(manifest.expiresAt);
+        const daysRemaining = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
+
+        console.log('\n--- TTL Status ---');
+        console.log(`TTL: ${manifest.ttlDays || 'Unknown'} days`);
+        console.log(`Expires At: ${manifest.expiresAt}`);
+
+        if (daysRemaining <= 0) {
+          console.log(`Status: EXPIRED (${Math.abs(daysRemaining)} days ago)`);
+        } else if (daysRemaining <= 7) {
+          console.log(`Status: EXPIRING SOON (${daysRemaining} days remaining)`);
+        } else {
+          console.log(`Status: Valid (${daysRemaining} days remaining)`);
+        }
+      }
     }
 
     console.log('');
@@ -1752,6 +1881,196 @@ function pullImport() {
   }
 }
 
+// ============================================================================
+// Compromise Management Commands
+// ============================================================================
+
+/**
+ * Mark a clone as compromised
+ */
+function markCloneCompromised(options) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  const cloneId = options.id;
+  if (!cloneId) {
+    console.error('Error: Clone ID required');
+    console.error('Usage: node cli.js mark-compromised --id=<clone-id> [--reason=<reason>]');
+    process.exit(1);
+  }
+
+  try {
+    const result = registry.markCompromised(cloneId, options.reason || '');
+
+    console.log('\n=== Clone Marked as Compromised ===\n');
+    console.log(`Clone ID: ${result.id}`);
+    console.log(`Status: ${result.status}`);
+    console.log(`Compromised At: ${result.compromisedAt}`);
+    console.log(`Reason: ${result.compromiseReason || '(none provided)'}`);
+    console.log(`Last Trusted Sequence: ${result.lastTrustedSequence}`);
+    console.log(`Last Trusted At: ${result.lastTrustedAt}`);
+    console.log('\nEntries from this clone after the trust cutoff will be rejected on import.');
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Clear compromised status from a clone
+ */
+function clearCloneCompromised(options) {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  const cloneId = options.id;
+  if (!cloneId) {
+    console.error('Error: Clone ID required');
+    console.error('Usage: node cli.js clear-compromised --id=<clone-id>');
+    process.exit(1);
+  }
+
+  try {
+    const result = registry.clearCompromised(cloneId);
+
+    console.log('\n=== Compromised Status Cleared ===\n');
+    console.log(`Clone ID: ${result.id}`);
+    console.log(`Status: ${result.status}`);
+    console.log('\nThis clone is now trusted again. Future imports will be accepted.');
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * List compromised clones
+ */
+function listCompromised() {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  try {
+    const compromised = registry.getCompromisedClones();
+
+    console.log('\n=== Compromised Clones ===\n');
+
+    if (compromised.length === 0) {
+      console.log('No clones are currently marked as compromised.');
+      return;
+    }
+
+    compromised.forEach(clone => {
+      console.log(`Clone: ${clone.id} (${clone.name})`);
+      console.log(`  Compromised At: ${clone.compromisedAt}`);
+      console.log(`  Reason: ${clone.compromiseReason || '(none)'}`);
+      console.log(`  Last Trusted Sequence: ${clone.lastTrustedSequence}`);
+      console.log(`  Last Trusted At: ${clone.lastTrustedAt}`);
+      console.log('');
+    });
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Verify birth certificate (on clone disk)
+ */
+function verifyCertificate() {
+  if (!isMounted()) {
+    console.error('Error: Floppy not mounted');
+    process.exit(1);
+  }
+
+  const certPath = path.join(IDENTITY_DIR, 'birth-certificate.json');
+  if (!fs.existsSync(certPath)) {
+    console.error('Error: No birth certificate found. This may not be a clone disk.');
+    process.exit(1);
+  }
+
+  try {
+    const certificate = JSON.parse(fs.readFileSync(certPath, 'utf8'));
+    const manifest = integrity.getManifest();
+
+    console.log('\n=== Birth Certificate Verification ===\n');
+    console.log(`Clone ID: ${certificate.cloneId}`);
+    console.log(`Mother ID: ${certificate.motherId}`);
+    console.log(`Derivation Index: ${certificate.derivationIndex}`);
+    console.log(`Derivation Path: ${certificate.derivationPath}`);
+    console.log(`Created At: ${certificate.createdAt}`);
+    console.log(`Expires At: ${certificate.expiresAt}`);
+    console.log(`TTL: ${certificate.ttlDays} days`);
+    console.log(`Mother Address: ${certificate.motherAddress}`);
+    console.log('');
+
+    // Verify signature
+    const result = cloneModule.verifyBirthCertificate(
+      certificate,
+      certificate.motherAddress
+    );
+
+    if (result.valid) {
+      console.log('✓ Signature: VALID');
+      console.log(`  Signed by: ${result.recoveredAddress}`);
+    } else {
+      console.log('✗ Signature: INVALID');
+      result.errors.forEach(e => console.log(`  Error: ${e}`));
+    }
+
+    // Check expiration
+    const now = new Date();
+    const expiresAt = new Date(certificate.expiresAt);
+    const daysRemaining = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
+
+    if (result.expired) {
+      console.log(`✗ Status: EXPIRED (${Math.abs(daysRemaining)} days ago)`);
+    } else if (daysRemaining <= 7) {
+      console.log(`! Status: EXPIRING SOON (${daysRemaining} days remaining)`);
+    } else {
+      console.log(`✓ Status: VALID (${daysRemaining} days remaining)`);
+    }
+
+    // Verify xprv hash matches keystore
+    const keystorePath = path.join(CONFIG.MOUNT_POINT, CONFIG.KEYSTORE_DIR, CONFIG.KEYSTORE_FILENAME);
+    if (fs.existsSync(keystorePath)) {
+      const keystore = JSON.parse(fs.readFileSync(keystorePath, 'utf8'));
+      if (keystore.clone && keystore.clone.xprvHash) {
+        if (keystore.clone.xprvHash === certificate.xprvHash) {
+          console.log('✓ xprv Hash: MATCHES');
+        } else {
+          console.log('✗ xprv Hash: MISMATCH (keystore may have been tampered)');
+        }
+      }
+    }
+
+    console.log('');
+
+    if (result.valid && !result.expired) {
+      console.log('Certificate is VALID and CURRENT.');
+    } else if (!result.valid) {
+      console.log('Certificate verification FAILED.');
+      process.exit(1);
+    } else {
+      console.log('Certificate has EXPIRED. Reconcile with mother to renew.');
+      process.exit(1);
+    }
+
+  } catch (error) {
+    console.error('Error:', error.message);
+    process.exit(1);
+  }
+}
+
 /**
  * Parse command line options
  */
@@ -1870,7 +2189,7 @@ switch (command) {
     break;
 
   case 'fork-write':
-    forkWrite();
+    forkWrite().catch(console.error);
     break;
 
   case 'status':
@@ -1899,6 +2218,26 @@ switch (command) {
 
   case 'pull-import':
     pullImport();
+    break;
+
+  // Compromise management commands
+  case 'mark-compromised':
+  case 'compromised':
+    markCloneCompromised(options);
+    break;
+
+  case 'clear-compromised':
+  case 'uncompromised':
+    clearCloneCompromised(options);
+    break;
+
+  case 'list-compromised':
+    listCompromised();
+    break;
+
+  case 'verify-cert':
+  case 'verify-certificate':
+    verifyCertificate();
     break;
 
   case 'help':

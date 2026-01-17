@@ -25,14 +25,16 @@ const REGISTRY_FILE = path.join(KEYSTORE_DIR, 'registry.json');
  */
 function createEmptyRegistry(motherId) {
   return {
-    version: 1,
+    version: 2,
     type: 'mother',
     motherId: motherId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
 
     // Derivation tracking
-    nextIndex: 0,
+    // Index 0 is reserved for mother's own addresses
+    // Clones start at index 1+
+    nextIndex: 1,
 
     // Clone records
     clones: [],
@@ -189,7 +191,8 @@ function updateClone(cloneId, updates) {
   const allowedFields = [
     'name', 'purpose', 'status',
     'lastSyncToMother', 'lastSyncFromMother', 'lastSyncSequence',
-    'primaryAddress'
+    'primaryAddress',
+    'expiresAt', 'ttlDays', 'xprvHash', 'birthCertificateHash'
   ];
 
   for (const field of allowedFields) {
@@ -334,6 +337,143 @@ function revokeClone(cloneId, reason = '') {
   return registry.clones[index];
 }
 
+// ============================================================================
+// Nullifier / Compromise Management
+// ============================================================================
+
+/**
+ * Mark a clone as compromised after a certain point
+ * All entries from this clone after the last trusted sync will be rejected
+ *
+ * @param {string} cloneId - ID of the compromised clone
+ * @param {string} reason - Reason for marking as compromised
+ * @returns {object} Updated clone record
+ */
+function markCompromised(cloneId, reason = '') {
+  const registry = getRegistry();
+  if (!registry) {
+    throw new Error('This disk is not a mother');
+  }
+
+  const index = registry.clones.findIndex(c => c.id === cloneId);
+  if (index === -1) {
+    throw new Error(`Clone "${cloneId}" not found`);
+  }
+
+  const clone = registry.clones[index];
+
+  // Mark as compromised - trust nothing after last successful sync
+  clone.status = 'compromised';
+  clone.compromisedAt = new Date().toISOString();
+  clone.compromiseReason = reason;
+  // lastTrustedSequence is the last sync sequence we trust
+  clone.lastTrustedSequence = clone.lastSyncSequence || clone.forkSequence;
+  clone.lastTrustedAt = clone.lastSyncToMother || clone.forkedAt;
+
+  saveRegistry(registry);
+  return clone;
+}
+
+/**
+ * Clear compromised status (if clone is recovered/re-secured)
+ *
+ * @param {string} cloneId
+ * @returns {object} Updated clone record
+ */
+function clearCompromised(cloneId) {
+  const registry = getRegistry();
+  if (!registry) {
+    throw new Error('This disk is not a mother');
+  }
+
+  const index = registry.clones.findIndex(c => c.id === cloneId);
+  if (index === -1) {
+    throw new Error(`Clone "${cloneId}" not found`);
+  }
+
+  const clone = registry.clones[index];
+
+  if (clone.status !== 'compromised') {
+    throw new Error(`Clone "${cloneId}" is not marked as compromised`);
+  }
+
+  clone.status = 'active';
+  delete clone.compromisedAt;
+  delete clone.compromiseReason;
+  delete clone.lastTrustedSequence;
+  delete clone.lastTrustedAt;
+
+  saveRegistry(registry);
+  return clone;
+}
+
+/**
+ * Check if an entry from a clone should be rejected
+ * Returns rejection reason if entry is after the trust cutoff
+ *
+ * @param {string} cloneId - Source clone ID
+ * @param {number} entrySequence - Sequence number of the entry
+ * @param {string} entryCreatedAt - ISO timestamp of entry creation
+ * @returns {object|null} { rejected: true, reason: '...' } or null if trusted
+ */
+function checkEntryTrust(cloneId, entrySequence, entryCreatedAt) {
+  const registry = getRegistry();
+  if (!registry) return null;
+
+  const clone = registry.clones.find(c => c.id === cloneId);
+  if (!clone) return null;
+
+  // Check if clone is compromised
+  if (clone.status === 'compromised') {
+    // Reject if entry is after the last trusted point
+    if (entrySequence > clone.lastTrustedSequence) {
+      return {
+        rejected: true,
+        reason: `Entry sequence ${entrySequence} is after trust cutoff ${clone.lastTrustedSequence}`,
+        lastTrustedSequence: clone.lastTrustedSequence,
+        compromisedAt: clone.compromisedAt
+      };
+    }
+
+    // Also check timestamp if available
+    if (clone.lastTrustedAt && entryCreatedAt) {
+      const trustedTime = new Date(clone.lastTrustedAt).getTime();
+      const entryTime = new Date(entryCreatedAt).getTime();
+      if (entryTime > trustedTime) {
+        return {
+          rejected: true,
+          reason: `Entry created after trust cutoff time`,
+          lastTrustedAt: clone.lastTrustedAt,
+          compromisedAt: clone.compromisedAt
+        };
+      }
+    }
+  }
+
+  // Check if clone is revoked (reject everything)
+  if (clone.status === 'revoked') {
+    return {
+      rejected: true,
+      reason: `Clone "${cloneId}" is revoked: ${clone.revokeReason || 'no reason'}`,
+      revokedAt: clone.revokedAt
+    };
+  }
+
+  return null; // Entry is trusted
+}
+
+/**
+ * Get all compromised clones
+ *
+ * @returns {object[]} Array of compromised clone records
+ */
+function getCompromisedClones() {
+  const registry = getRegistry();
+  if (!registry) return [];
+
+  return registry.clones.filter(c => c.status === 'compromised');
+}
+
 /**
  * Generate derivation path for a clone's Nth address
  *
@@ -428,6 +568,12 @@ module.exports = {
   getCloneByIndex,
   listClones,
   revokeClone,
+
+  // Compromise management
+  markCompromised,
+  clearCompromised,
+  checkEntryTrust,
+  getCompromisedClones,
 
   // Sync tracking
   recordSync,

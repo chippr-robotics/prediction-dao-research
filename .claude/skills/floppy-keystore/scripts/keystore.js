@@ -178,8 +178,169 @@ function constantTimeCompare(a, b) {
   return result === 0;
 }
 
+/**
+ * Encrypt an extended private key (xprv) to keystore format
+ * Used for clones that only get their branch, not the full mnemonic
+ *
+ * @param {string} xprv - Extended private key (base58)
+ * @param {string} password - Encryption password
+ * @param {object} metadata - Additional metadata (cloneId, motherId, etc.)
+ * @returns {Promise<object>} Encrypted keystore JSON object
+ */
+async function encryptXprv(xprv, password, metadata = {}) {
+  // Validate xprv format (starts with xprv for mainnet or tprv for testnet)
+  if (!xprv.startsWith('xprv') && !xprv.startsWith('tprv')) {
+    throw new Error('Invalid extended private key format');
+  }
+
+  // Generate random salt and IV
+  const salt = crypto.randomBytes(32);
+  const iv = crypto.randomBytes(16);
+
+  // Derive key using scrypt
+  console.log('Deriving key (this may take a moment)...');
+  const derivedKey = await scrypt(
+    utf8ToBytes(password),
+    salt,
+    CONFIG.SCRYPT_N,
+    CONFIG.SCRYPT_P,
+    CONFIG.SCRYPT_R,
+    CONFIG.SCRYPT_DKLEN
+  );
+
+  // Use first 16 bytes for AES-128
+  const encryptionKey = derivedKey.slice(0, 16);
+
+  // Encrypt the xprv using AES-128-CTR
+  const cipher = crypto.createCipheriv('aes-128-ctr', encryptionKey, iv);
+  const xprvBytes = Buffer.from(xprv, 'utf8');
+  const ciphertext = Buffer.concat([cipher.update(xprvBytes), cipher.final()]);
+
+  // Calculate MAC: keccak256(derivedKey[16:32] || ciphertext)
+  const macInput = Buffer.concat([
+    Buffer.from(derivedKey.slice(16, 32)),
+    ciphertext
+  ]);
+  const mac = keccak256(macInput);
+
+  // Clear sensitive data from memory
+  encryptionKey.fill(0);
+  xprvBytes.fill(0);
+
+  return {
+    version: 3,
+    id: crypto.randomUUID(),
+    type: 'xprv',  // Different from 'mnemonic'
+    crypto: {
+      cipher: CONFIG.CIPHER,
+      cipherparams: { iv: iv.toString('hex') },
+      ciphertext: ciphertext.toString('hex'),
+      kdf: 'scrypt',
+      kdfparams: {
+        dklen: CONFIG.SCRYPT_DKLEN,
+        n: CONFIG.SCRYPT_N,
+        r: CONFIG.SCRYPT_R,
+        p: CONFIG.SCRYPT_P,
+        salt: salt.toString('hex')
+      },
+      mac: bytesToHex(mac)
+    },
+    // Clone-specific metadata
+    clone: {
+      cloneId: metadata.cloneId || null,
+      motherId: metadata.motherId || null,
+      derivationIndex: metadata.derivationIndex || 0,
+      derivationPath: metadata.derivationPath || null,
+      xprvHash: bytesToHex(keccak256(utf8ToBytes(xprv))), // For verification
+      createdAt: new Date().toISOString(),
+      expiresAt: metadata.expiresAt || null,
+      birthCertificate: metadata.birthCertificate || null
+    }
+  };
+}
+
+/**
+ * Decrypt an extended private key from keystore format
+ * @param {object} keystore - Keystore JSON object
+ * @param {string} password - Decryption password
+ * @returns {Promise<string>} Decrypted xprv
+ */
+async function decryptXprv(keystore, password) {
+  if (keystore.version !== 3) {
+    throw new Error('Unsupported keystore version');
+  }
+
+  if (keystore.type !== 'xprv') {
+    throw new Error('Keystore is not an xprv keystore');
+  }
+
+  const { crypto: cryptoParams } = keystore;
+
+  if (cryptoParams.kdf !== 'scrypt') {
+    throw new Error('Unsupported KDF: ' + cryptoParams.kdf);
+  }
+
+  // Parse hex values
+  const salt = Buffer.from(cryptoParams.kdfparams.salt, 'hex');
+  const iv = Buffer.from(cryptoParams.cipherparams.iv, 'hex');
+  const ciphertext = Buffer.from(cryptoParams.ciphertext, 'hex');
+  const expectedMac = hexToBytes(cryptoParams.mac);
+
+  // Derive key using scrypt
+  console.log('Deriving key (this may take a moment)...');
+  const derivedKey = await scrypt(
+    utf8ToBytes(password),
+    salt,
+    cryptoParams.kdfparams.n,
+    cryptoParams.kdfparams.p,
+    cryptoParams.kdfparams.r,
+    cryptoParams.kdfparams.dklen
+  );
+
+  // Verify MAC
+  const macInput = Buffer.concat([
+    Buffer.from(derivedKey.slice(16, 32)),
+    ciphertext
+  ]);
+  const computedMac = keccak256(macInput);
+
+  if (!constantTimeCompare(computedMac, expectedMac)) {
+    throw new Error('Invalid password or corrupted keystore');
+  }
+
+  // Decrypt
+  const encryptionKey = derivedKey.slice(0, 16);
+  const decipher = crypto.createDecipheriv('aes-128-ctr', encryptionKey, iv);
+  const xprvBytes = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  const xprv = xprvBytes.toString('utf8');
+
+  // Clear sensitive data
+  encryptionKey.fill(0);
+
+  // Validate decrypted xprv format
+  if (!xprv.startsWith('xprv') && !xprv.startsWith('tprv')) {
+    throw new Error('Decrypted data is not a valid extended private key');
+  }
+
+  return xprv;
+}
+
+/**
+ * Check if keystore is xprv type (clone) vs mnemonic type (mother)
+ * @param {object} keystore - Keystore JSON object
+ * @returns {string} 'xprv', 'mnemonic', or 'unknown'
+ */
+function getKeystoreType(keystore) {
+  if (keystore.type === 'xprv') return 'xprv';
+  if (keystore.type === 'mnemonic') return 'mnemonic';
+  return 'unknown';
+}
+
 module.exports = {
   encryptMnemonic,
   decryptMnemonic,
+  encryptXprv,
+  decryptXprv,
+  getKeystoreType,
   constantTimeCompare
 };

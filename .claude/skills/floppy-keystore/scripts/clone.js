@@ -434,24 +434,132 @@ function initMother(motherId) {
 }
 
 /**
+ * Create a birth certificate for a clone
+ * Signed by mother to prove clone legitimacy
+ *
+ * @param {object} options
+ * @param {string} options.cloneId - Clone ID
+ * @param {string} options.motherId - Mother ID
+ * @param {number} options.derivationIndex - Clone's derivation index
+ * @param {string} options.xprvHash - Hash of clone's xprv (for verification)
+ * @param {number} options.ttlDays - Time-to-live in days (default: 30)
+ * @param {string} options.motherPrivateKey - Mother's ETH private key for signing
+ * @returns {object} Birth certificate with signature
+ */
+function createBirthCertificate(options) {
+  const {
+    cloneId,
+    motherId,
+    derivationIndex,
+    derivationPath,
+    xprvHash,
+    ttlDays = 30,
+    motherPrivateKey
+  } = options;
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + ttlDays * 24 * 60 * 60 * 1000);
+
+  const certificate = {
+    version: 1,
+    cloneId,
+    motherId,
+    derivationIndex,
+    derivationPath,
+    xprvHash,
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    ttlDays
+  };
+
+  // Create message to sign
+  const message = JSON.stringify(certificate, Object.keys(certificate).sort());
+  const messageHash = require('ethers').hashMessage(message);
+
+  // Sign with mother's key
+  const { Wallet } = require('ethers');
+  const wallet = new Wallet(motherPrivateKey);
+  const signature = wallet.signMessageSync(message);
+
+  return {
+    ...certificate,
+    motherAddress: wallet.address,
+    signature
+  };
+}
+
+/**
+ * Verify a birth certificate
+ *
+ * @param {object} certificate - Birth certificate to verify
+ * @param {string} expectedMotherAddress - Expected mother's ETH address
+ * @returns {object} { valid, expired, errors }
+ */
+function verifyBirthCertificate(certificate, expectedMotherAddress) {
+  const errors = [];
+
+  // Reconstruct message
+  const certCopy = { ...certificate };
+  delete certCopy.motherAddress;
+  delete certCopy.signature;
+  const message = JSON.stringify(certCopy, Object.keys(certCopy).sort());
+
+  // Verify signature
+  const { verifyMessage } = require('ethers');
+  let recoveredAddress;
+  try {
+    recoveredAddress = verifyMessage(message, certificate.signature);
+  } catch (e) {
+    errors.push('Invalid signature: ' + e.message);
+    return { valid: false, expired: false, errors };
+  }
+
+  if (recoveredAddress.toLowerCase() !== expectedMotherAddress.toLowerCase()) {
+    errors.push(`Signature not from expected mother (got ${recoveredAddress}, expected ${expectedMotherAddress})`);
+  }
+
+  // Check expiration
+  const now = new Date();
+  const expiresAt = new Date(certificate.expiresAt);
+  const expired = now > expiresAt;
+
+  if (expired) {
+    errors.push(`Certificate expired at ${certificate.expiresAt}`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    expired,
+    recoveredAddress,
+    errors
+  };
+}
+
+/**
  * Prepare fork data on mother disk
- * Returns all data needed to create a clone
+ * Returns all data needed to create a clone with xprv isolation
  *
  * @param {object} options
  * @param {string} options.cloneId - ID for the new clone
  * @param {string} options.cloneName - Human-readable name
  * @param {string} options.purpose - Purpose description
- * @returns {object} Fork data to write to clone disk
+ * @param {string} options.motherPassword - Password to decrypt mother's mnemonic (REQUIRED for xprv isolation)
+ * @param {number} options.ttlDays - Clone time-to-live in days (default: 30)
+ * @returns {Promise<object>} Fork data to write to clone disk
  */
-function prepareFork(options) {
+async function prepareFork(options) {
   if (!registry.isMother()) {
     throw new Error('This disk is not a mother. Run "init-mother" first.');
   }
 
-  const { cloneId, cloneName, purpose = '' } = options;
+  const { cloneId, cloneName, purpose = '', motherPassword, ttlDays = 30 } = options;
 
   if (!cloneId) {
     throw new Error('Clone ID is required');
+  }
+
+  if (!motherPassword) {
+    throw new Error('Mother password is required for secure xprv-based cloning');
   }
 
   // Get current state
@@ -468,14 +576,61 @@ function prepareFork(options) {
     purpose
   });
 
-  // Read all files
+  // Decrypt mnemonic and derive xprv for clone's account
+  const { decryptMnemonic } = require('./keystore');
+  const { HDNodeWallet } = require('ethers');
+  const keystorePath = path.join(KEYSTORE_DIR, CONFIG.KEYSTORE_FILENAME);
+
+  if (!fs.existsSync(keystorePath)) {
+    throw new Error('Mother keystore not found');
+  }
+
+  const keystore = JSON.parse(fs.readFileSync(keystorePath, 'utf8'));
+  console.log('Decrypting mother keystore...');
+  const mnemonic = await decryptMnemonic(keystore, motherPassword);
+
+  // Derive the clone's xprv at its account level
+  console.log(`Deriving xprv for clone account ${cloneRecord.derivationIndex}...`);
+  const hdNode = HDNodeWallet.fromPhrase(mnemonic);
+  // Derive to the account level: m/44'/60'/N'
+  const cloneNode = hdNode.derivePath(`44'/60'/${cloneRecord.derivationIndex}'`);
+  const xprv = cloneNode.extendedKey;
+
+  // Get mother's signing key (account 0)
+  const motherNode = hdNode.derivePath("44'/60'/0'/0/0");
+  const motherPrivateKey = motherNode.privateKey;
+  const motherAddress = motherNode.address;
+
+  // Create xprv hash for verification
+  const { keccak256 } = require('ethereum-cryptography/keccak');
+  const { utf8ToBytes, bytesToHex } = require('ethereum-cryptography/utils');
+  const xprvHash = bytesToHex(keccak256(utf8ToBytes(xprv)));
+
+  // Create birth certificate
+  console.log('Creating birth certificate...');
+  const birthCertificate = createBirthCertificate({
+    cloneId,
+    motherId: registry.getRegistry().motherId,
+    derivationIndex: cloneRecord.derivationIndex,
+    derivationPath: cloneRecord.derivationPath,
+    xprvHash,
+    ttlDays,
+    motherPrivateKey
+  });
+
+  // Read identity files (NOT the keystore - clone gets xprv instead)
   const files = {};
   const keystoreFiles = getKeystoreFiles();
   for (const file of keystoreFiles) {
     // Skip registry file - clones don't get it
     if (file.relativePath === 'registry.json') continue;
+    // Skip mnemonic keystore - clone gets xprv keystore instead
+    if (file.relativePath === CONFIG.KEYSTORE_FILENAME) continue;
     files[file.relativePath] = fs.readFileSync(file.absolutePath);
   }
+
+  // Calculate expiration
+  const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
 
   // Prepare clone manifest
   const cloneManifest = {
@@ -487,10 +642,19 @@ function prepareFork(options) {
 
     // Branching metadata
     motherId: registry.getRegistry().motherId,
+    motherAddress,
     derivationIndex: cloneRecord.derivationIndex,
     derivationPath: cloneRecord.derivationPath,
     forkSequence: currentSequence,
     forkedAt: new Date().toISOString(),
+
+    // TTL and certificate
+    expiresAt,
+    ttlDays,
+    birthCertificateHash: bytesToHex(keccak256(utf8ToBytes(JSON.stringify(birthCertificate)))),
+
+    // Keystore type
+    keystoreType: 'xprv',
 
     // Legacy clone tracking
     parentDiskId: registry.getRegistry().motherId,
@@ -502,6 +666,16 @@ function prepareFork(options) {
     hasUnsignedChanges: true
   };
 
+  // Update clone record with TTL info
+  registry.updateClone(cloneId, {
+    expiresAt,
+    ttlDays,
+    primaryAddress: cloneNode.derivePath("0/0").address
+  });
+
+  console.log(`\nClone will use xprv isolation (no mnemonic shared)`);
+  console.log(`TTL: ${ttlDays} days (expires ${expiresAt})`);
+
   return {
     cloneId,
     cloneName: cloneName || cloneId,
@@ -509,18 +683,37 @@ function prepareFork(options) {
     files,
     manifest: cloneManifest,
     forkSequence: currentSequence,
-    motherId: registry.getRegistry().motherId
+    motherId: registry.getRegistry().motherId,
+    motherAddress,
+    // xprv data for clone keystore
+    _xprv: xprv,
+    _xprvHash: xprvHash,
+    _birthCertificate: birthCertificate,
+    _expiresAt: expiresAt,
+    _ttlDays: ttlDays
   };
 }
 
 /**
  * Write fork data to destination disk (clone disk)
+ * Creates xprv-based keystore (no mnemonic shared)
  *
  * @param {object} forkData - Data from prepareFork()
- * @returns {boolean} Success
+ * @param {object} options - Write options
+ * @param {string} options.clonePassword - Password for the clone's xprv keystore (REQUIRED)
+ * @returns {Promise<boolean>} Success
  */
-function writeForkToDisk(forkData) {
-  const { files, manifest, cloneId } = forkData;
+async function writeForkToDisk(forkData, options = {}) {
+  const { files, manifest, cloneId, _xprv, _xprvHash, _birthCertificate, _expiresAt, _ttlDays } = forkData;
+  const { clonePassword } = options;
+
+  if (!clonePassword) {
+    throw new Error('Clone password is required for xprv keystore');
+  }
+
+  if (!_xprv) {
+    throw new Error('No xprv data found. Fork was not prepared with mother password.');
+  }
 
   console.log(`\nWriting clone "${cloneId}" to disk...`);
 
@@ -529,8 +722,22 @@ function writeForkToDisk(forkData) {
     fs.rmSync(KEYSTORE_DIR, { recursive: true, force: true });
   }
 
-  // Write all files
-  for (const [relativePath, content] of Object.entries(files)) {
+  // Create xprv keystore (NOT mnemonic keystore)
+  console.log('  Creating xprv keystore (cryptographically isolated)...');
+  const { encryptXprv } = require('./keystore');
+  const xprvKeystore = await encryptXprv(_xprv, clonePassword, {
+    cloneId,
+    motherId: forkData.motherId,
+    derivationIndex: forkData.cloneRecord.derivationIndex,
+    derivationPath: forkData.cloneRecord.derivationPath,
+    expiresAt: _expiresAt,
+    birthCertificate: _birthCertificate
+  });
+
+  // Write all identity files
+  let modifiedFiles = { ...files };
+
+  for (const [relativePath, content] of Object.entries(modifiedFiles)) {
     const fullPath = path.join(KEYSTORE_DIR, relativePath);
     const dir = path.dirname(fullPath);
 
@@ -542,6 +749,19 @@ function writeForkToDisk(forkData) {
     console.log(`  Wrote: ${relativePath} (${content.length} bytes)`);
   }
 
+  // Write xprv keystore
+  const keystorePath = path.join(KEYSTORE_DIR, CONFIG.KEYSTORE_FILENAME);
+  fs.writeFileSync(keystorePath, JSON.stringify(xprvKeystore, null, 2), { mode: 0o600 });
+  console.log(`  Wrote: ${CONFIG.KEYSTORE_FILENAME} (xprv keystore)`);
+
+  // Write birth certificate
+  const certPath = path.join(IDENTITY_DIR, 'birth-certificate.json');
+  if (!fs.existsSync(IDENTITY_DIR)) {
+    fs.mkdirSync(IDENTITY_DIR, { mode: 0o700, recursive: true });
+  }
+  fs.writeFileSync(certPath, JSON.stringify(_birthCertificate, null, 2), { mode: 0o600 });
+  console.log(`  Wrote: identity/birth-certificate.json`);
+
   // Write updated manifest
   const manifestPath = path.join(IDENTITY_DIR, 'manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), { mode: 0o600 });
@@ -549,20 +769,34 @@ function writeForkToDisk(forkData) {
 
   // Update metadata with clone info
   const metadataPath = path.join(IDENTITY_DIR, 'metadata.json');
+  let metadata = {};
   if (fs.existsSync(metadataPath)) {
-    const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-    metadata['disk.name'] = forkData.cloneId;
-    metadata['disk.mother'] = forkData.motherId;
-    metadata['disk.derivationIndex'] = forkData.cloneRecord.derivationIndex;
-    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+    metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
   }
+  metadata['disk.name'] = forkData.cloneId;
+  metadata['disk.mother'] = forkData.motherId;
+  metadata['disk.motherAddress'] = forkData.motherAddress;
+  metadata['disk.derivationIndex'] = forkData.cloneRecord.derivationIndex;
+  metadata['disk.keystoreType'] = 'xprv';
+  metadata['disk.expiresAt'] = _expiresAt;
+  metadata['disk.ttlDays'] = _ttlDays;
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), { mode: 0o600 });
+  console.log(`  Wrote: identity/metadata.json`);
 
   // Sync
   try {
     execSync('sync', { stdio: 'ignore' });
   } catch {}
 
-  console.log('\nClone written successfully!');
+  console.log('\n=== Clone Written Successfully ===');
+  console.log(`  Keystore type: xprv (isolated, no mnemonic)`);
+  console.log(`  Clone ID: ${cloneId}`);
+  console.log(`  Mother: ${forkData.motherId}`);
+  console.log(`  Derivation Index: ${forkData.cloneRecord.derivationIndex}`);
+  console.log(`  Expires: ${_expiresAt}`);
+  console.log(`  TTL: ${_ttlDays} days`);
+  console.log('\n  This clone CANNOT access other accounts or derive the mnemonic.');
+
   return true;
 }
 
@@ -640,6 +874,7 @@ function preparePush() {
  * @param {object} pushData - Data from preparePush()
  * @param {object} options
  * @param {boolean} options.dryRun - Just show what would be imported
+ * @param {boolean} options.force - Import even if clone is compromised (dangerous)
  * @returns {object} Import result
  */
 function importPush(pushData, options = {}) {
@@ -660,21 +895,56 @@ function importPush(pushData, options = {}) {
     throw new Error(`Clone "${cloneId}" has been revoked`);
   }
 
+  // Check for compromised status
+  if (cloneRecord.status === 'compromised' && !options.force) {
+    throw new Error(
+      `Clone "${cloneId}" is marked as compromised since ${cloneRecord.compromisedAt}. ` +
+      `Last trusted sequence: ${cloneRecord.lastTrustedSequence}. ` +
+      `Use --force to import anyway (dangerous).`
+    );
+  }
+
+  // Filter entries based on trust
+  const trustedEntries = [];
+  const rejectedEntries = [];
+
+  for (const entry of entries) {
+    const trustCheck = registry.checkEntryTrust(
+      cloneId,
+      entry.sequence,
+      entry.createdAt
+    );
+
+    if (trustCheck && trustCheck.rejected && !options.force) {
+      rejectedEntries.push({
+        entry,
+        reason: trustCheck.reason
+      });
+    } else {
+      trustedEntries.push(entry);
+    }
+  }
+
   if (options.dryRun) {
     return {
       dryRun: true,
       cloneId,
-      entriesWouldImport: entries.length,
+      entriesWouldImport: trustedEntries.length,
+      entriesWouldReject: rejectedEntries.length,
+      rejectedReasons: rejectedEntries.map(r => ({
+        sequence: r.entry.sequence,
+        reason: r.reason
+      })),
       fromSequence: forkSequence,
       toSequence: currentSequence
     };
   }
 
-  // Import entries with attribution
+  // Import trusted entries with attribution
   const identity = require('./identity');
   let imported = 0;
 
-  for (const entry of entries) {
+  for (const entry of trustedEntries) {
     // Add with clone attribution
     identity.addMemory({
       type: entry.type,
@@ -696,6 +966,7 @@ function importPush(pushData, options = {}) {
     cloneId,
     direction: 'push',
     entriesTransferred: imported,
+    entriesRejected: rejectedEntries.length,
     fromSequence: forkSequence,
     toSequence: currentSequence
   });
@@ -703,6 +974,11 @@ function importPush(pushData, options = {}) {
   return {
     cloneId,
     entriesImported: imported,
+    entriesRejected: rejectedEntries.length,
+    rejectedReasons: rejectedEntries.map(r => ({
+      sequence: r.entry.sequence,
+      reason: r.reason
+    })),
     fromSequence: forkSequence,
     toSequence: currentSequence
   };
@@ -797,6 +1073,10 @@ module.exports = {
   prepareFork,
   writeForkToDisk,
   getStatus,
+
+  // Birth certificate
+  createBirthCertificate,
+  verifyBirthCertificate,
 
   // Sync operations
   preparePush,
