@@ -144,18 +144,29 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
 
+  // Normalize preselectedRole - ensure it's a string, not an object
+  // This prevents crashes when an object is accidentally passed instead of a role name string
+  const normalizedRole = useMemo(() => {
+    if (!preselectedRole) return null
+    if (typeof preselectedRole === 'object') {
+      console.warn('[PremiumPurchaseModal] preselectedRole was an object, extracting roleName:', preselectedRole)
+      return preselectedRole.roleName || preselectedRole.name || null
+    }
+    return preselectedRole
+  }, [preselectedRole])
+
   // Determine if this is an upgrade/extend flow
   const isUpgradeFlow = action === 'upgrade'
   const isExtendFlow = action === 'extend'
 
   // Step navigation - skip role selection if preselected for upgrade/extend
   const [currentStep, setCurrentStep] = useState(
-    preselectedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0
+    normalizedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0
   )
 
   // Selected roles (multi-select) - pre-select if provided
   const [selectedRoles, setSelectedRoles] = useState(
-    preselectedRole ? [preselectedRole] : []
+    normalizedRole ? [normalizedRole] : []
   )
 
   // Selected tier
@@ -242,15 +253,15 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
   // Reset form
   const resetForm = useCallback(() => {
-    setCurrentStep(preselectedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0)
-    setSelectedRoles(preselectedRole ? [preselectedRole] : [])
+    setCurrentStep(normalizedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0)
+    setSelectedRoles(normalizedRole ? [normalizedRole] : [])
     setSelectedTier('BRONZE')
     setZkPublicKey('')
     setPurchaseResults([])
     setErrors({})
     setIsPurchasing(false)
     setUserCurrentTiers({})
-  }, [preselectedRole, isUpgradeFlow, isExtendFlow])
+  }, [normalizedRole, isUpgradeFlow, isExtendFlow])
 
   // Handle role toggle
   const handleRoleToggle = useCallback((roleKey) => {
@@ -527,9 +538,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
         {/* Step Indicator */}
         <nav className="ppm-steps" aria-label="Purchase steps">
-          {(preselectedRole && (isUpgradeFlow || isExtendFlow) ? SHORTENED_STEPS : STEPS).map((step, index) => {
+          {(normalizedRole && (isUpgradeFlow || isExtendFlow) ? SHORTENED_STEPS : STEPS).map((step, index) => {
             // Map display index to actual step index
-            const actualIndex = preselectedRole && (isUpgradeFlow || isExtendFlow) ? index + 1 : index
+            const actualIndex = normalizedRole && (isUpgradeFlow || isExtendFlow) ? index + 1 : index
             const isActive = actualIndex === currentStep
             const isCompleted = actualIndex < currentStep
 
@@ -642,14 +653,14 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                 </div>
 
                 {/* Show selected role when in upgrade/extend mode */}
-                {preselectedRole && (isUpgradeFlow || isExtendFlow) && (
+                {normalizedRole && (isUpgradeFlow || isExtendFlow) && (
                   <div className="ppm-info-card ppm-selected-role-info">
                     <span className="ppm-info-icon" aria-hidden="true">
-                      {ROLE_DETAILS[preselectedRole]?.icon || '⭐'}
+                      {ROLE_DETAILS[normalizedRole]?.icon || '⭐'}
                     </span>
                     <div>
-                      <strong>{isExtendFlow ? 'Extending' : 'Upgrading'}: {ROLE_INFO[preselectedRole]?.name}</strong>
-                      <p>{ROLE_DETAILS[preselectedRole]?.tagline}</p>
+                      <strong>{isExtendFlow ? 'Extending' : 'Upgrading'}: {ROLE_INFO[normalizedRole]?.name}</strong>
+                      <p>{ROLE_DETAILS[normalizedRole]?.tagline}</p>
                     </div>
                   </div>
                 )}
