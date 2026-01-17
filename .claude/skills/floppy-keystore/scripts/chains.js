@@ -69,8 +69,8 @@ async function deriveSecp256k1Keys(mnemonic, chain, options) {
     basePath = `m/${purpose}'/${chain.coinType}'/0'/0`;
   }
 
-  // Create master node from mnemonic
-  const masterNode = HDNodeWallet.fromPhrase(mnemonic);
+  // Create master node from mnemonic (ethers v6 requires explicit root path)
+  const masterNode = HDNodeWallet.fromPhrase(mnemonic, undefined, "m");
 
   for (let i = startIndex; i < startIndex + count; i++) {
     const path = `${basePath}/${i}`;

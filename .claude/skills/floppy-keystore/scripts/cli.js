@@ -30,6 +30,38 @@ const KEYSTORE_PATH = path.join(
   CONFIG.KEYSTORE_FILENAME
 );
 
+const IDENTITY_DIR = path.join(CONFIG.MOUNT_POINT, CONFIG.KEYSTORE_DIR, 'identity');
+
+/**
+ * Resolve password from env vars with auto-detection
+ * Checks FLOPPY_KEYSTORE_PASSWORD first, then FLOPPY_<DISKNAME>_PASSWORD
+ */
+function resolvePassword() {
+  // Check explicit password first
+  if (process.env.FLOPPY_KEYSTORE_PASSWORD) {
+    return process.env.FLOPPY_KEYSTORE_PASSWORD;
+  }
+
+  // Try to auto-detect from disk metadata
+  const metadataPath = path.join(IDENTITY_DIR, 'metadata.json');
+  if (fs.existsSync(metadataPath)) {
+    try {
+      const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+      const diskName = metadata['disk.name'];
+      if (diskName) {
+        const envKey = `FLOPPY_${diskName.toUpperCase()}_PASSWORD`;
+        if (process.env[envKey]) {
+          return process.env[envKey];
+        }
+      }
+    } catch (e) {
+      // Ignore metadata read errors
+    }
+  }
+
+  return null;
+}
+
 /**
  * Prompt for password without echoing
  */
@@ -335,7 +367,7 @@ async function deriveChainKeys(chainId, options = {}) {
   console.log(`\n=== Derive ${chain.name} (${chain.symbol}) Keys ===\n`);
 
   // Get password
-  let password = process.env.FLOPPY_KEYSTORE_PASSWORD;
+  let password = resolvePassword();
   if (!password) {
     password = await promptPassword('Enter keystore password: ');
   }
@@ -412,7 +444,7 @@ async function showAddresses(chainId, options = {}) {
 
   console.log(`\n=== ${chain.name} (${chain.symbol}) Addresses ===\n`);
 
-  let password = process.env.FLOPPY_KEYSTORE_PASSWORD;
+  let password = resolvePassword();
   if (!password) {
     password = await promptPassword('Enter keystore password: ');
   }
@@ -1104,6 +1136,12 @@ switch (command) {
 
   case 'metadata':
     manageMetadata(subcommand, options);
+    break;
+
+  case 'detect':
+  case 'which':
+    // Run disk detection script
+    require('./disk-detect');
     break;
 
   case 'help':
