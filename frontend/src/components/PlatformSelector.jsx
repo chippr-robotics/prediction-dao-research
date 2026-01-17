@@ -65,7 +65,7 @@ function PlatformSelector() {
             >
               <div className="platform-logo" aria-hidden="true">
                 <img 
-                  src="/logo_clearpath.svg" 
+                  src="/assets/logo_clearpath.svg" 
                   alt="" 
                   className="logo-image"
                   width="60"
@@ -109,7 +109,7 @@ function PlatformSelector() {
             >
               <div className="platform-logo" aria-hidden="true">
                 <img 
-                  src="/logo_fairwins.svg" 
+                  src="/assets/logo_fairwins.svg" 
                   alt="" 
                   className="logo-image"
                   width="60"
