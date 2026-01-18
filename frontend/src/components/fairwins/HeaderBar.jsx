@@ -1,25 +1,15 @@
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
-import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { useWallet } from '../../hooks'
-import { useNavigate } from 'react-router-dom'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import TokenMintButton from '../TokenMintButton'
 import ClearPathButton from '../clearpath/ClearPathButton'
 import WalletButton from '../wallet/WalletButton'
 import './HeaderBar.css'
 
-function HeaderBar({ isConnected }) {
+function HeaderBar() {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
-  const { preferences } = useUserPreferences()
-  const { address } = useWallet()
-  const navigate = useNavigate()
-
-  const handleOpenUserManagement = () => {
-    navigate('/wallet')
-  } 
 
   // Hide header on mobile when scrolling down
   const shouldHideHeader = isMobile && isScrollingDown && hasScrolled

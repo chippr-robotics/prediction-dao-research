@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
 import { TOKENS } from '../../constants/etcswap'
-import { isValidEthereumAddress } from '../../utils/validation'
 import {
   isCorrelationRegistryDeployed,
   fetchCorrelationGroups,
@@ -123,19 +122,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
   const [newGroupDescription, setNewGroupDescription] = useState('')
   const [correlationEnabled, setCorrelationEnabled] = useState(false)
 
-  // ENS resolution for collateral token address
-  const {
-    resolvedAddress: resolvedCollateralAddress,
-    isLoading: isResolvingCollateral,
-    error: collateralResolutionError,
-    isEns: isCollateralEns
-  } = useEnsResolution(paramsForm.collateralToken || '')
-
-  // Helper to shorten address for display
-  const shortenAddressForHint = (addr) => {
-    if (!addr || addr.length < 10) return addr
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  }
+  // ENS resolution for collateral token address - hook called for context subscription
+  useEnsResolution(paramsForm.collateralToken || '')
 
   // Reset form when modal opens/closes
   const resetForm = useCallback(() => {
@@ -331,7 +319,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [useCustomUri, customUri, metadataForm, paramsForm, address])
+  }, [useCustomUri, customUri, metadataForm, paramsForm])
 
   // Navigation handlers
   const handleNext = useCallback(() => {

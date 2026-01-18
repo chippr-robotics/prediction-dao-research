@@ -19,7 +19,7 @@ function MarketAcceptancePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { provider } = useWeb3()
-  const { account, isConnected } = useWallet()
+  useWallet() // For wallet state subscription
 
   const [marketData, setMarketData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -173,7 +173,7 @@ function MarketAcceptancePage() {
     navigate('/')
   }
 
-  const handleAccepted = (acceptedMarketId) => {
+  const handleAccepted = () => {
     // Refresh market data after acceptance
     setLoading(true)
     window.location.reload()

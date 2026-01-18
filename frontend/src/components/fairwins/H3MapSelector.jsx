@@ -168,7 +168,7 @@ function H3MapSelector({
         resolutionLabel: resInfo?.label || `Res ${res}`,
         area: resInfo?.area || 'Unknown'
       }
-    } catch (error) {
+    } catch {
       return null
     }
   }, [])

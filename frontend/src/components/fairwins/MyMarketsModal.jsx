@@ -655,7 +655,6 @@ function MyMarketsModal({
 function MarketsTable({
   markets,
   onSelect,
-  formatDate,
   getStatusClass,
   getStatusLabel,
   getTimeRemaining,
@@ -963,7 +962,6 @@ function ResolutionModal({
   market,
   onClose,
   onResolved,
-  signer,
   isCorrectNetwork,
   switchNetwork
 }) {
@@ -1193,10 +1191,8 @@ function DisputeModal({
   mode, // 'open', 'respond', 'escalate'
   onClose,
   onSubmitted,
-  signer,
   isCorrectNetwork,
-  switchNetwork,
-  account
+  switchNetwork
 }) {
   const [disputeReason, setDisputeReason] = useState('')
   const [evidenceUrl, setEvidenceUrl] = useState('')
@@ -1208,7 +1204,6 @@ function DisputeModal({
 
   const isOpenMode = mode === 'open'
   const isRespondMode = mode === 'respond'
-  const isEscalateMode = mode === 'escalate'
 
   const outcomes = market.marketType === 'friend'
     ? ['Pass', 'Fail']

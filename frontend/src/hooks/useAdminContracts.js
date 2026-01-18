@@ -148,7 +148,7 @@ export function useAdminContracts() {
       for (const roleName of roleNames) {
         try {
           roleHashes[roleName] = await contract[roleName]()
-        } catch (e) {
+        } catch {
           // Role might not exist on this contract version
           roleHashes[roleName] = null
         }
@@ -418,7 +418,7 @@ export function useAdminContracts() {
       console.error('Error checking role:', err)
       return false
     }
-  }, [getRoleManagerContract, contractState.supportsTiers])
+  }, [getRoleManagerContract])
 
   /**
    * Withdraw funds from the contract
@@ -524,7 +524,7 @@ export function useAdminContracts() {
       console.error('Error getting tier info:', err)
       return null
     }
-  }, [getRoleManagerContract])
+  }, [getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Get user's tier and membership info for a role

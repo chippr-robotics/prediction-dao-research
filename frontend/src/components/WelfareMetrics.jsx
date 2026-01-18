@@ -1,15 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getMockWelfareMetrics } from '../utils/mockDataLoader'
 
-function WelfareMetrics({ provider, signer }) {
+function WelfareMetrics({ provider }) {
   const [metrics, setMetrics] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadMetrics()
-  }, [provider])
-
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     try {
       // Load mock data from centralized source
       // In production, this would fetch from WelfareMetricRegistry contract
@@ -21,7 +17,11 @@ function WelfareMetrics({ provider, signer }) {
       console.error('Error loading metrics:', error)
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadMetrics()
+  }, [provider, loadMetrics])
 
   if (loading) {
     return <div className="loading">Loading welfare metrics...</div>

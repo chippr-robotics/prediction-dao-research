@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
@@ -31,16 +31,17 @@ function RoleManagementAdmin() {
   // Check if user has admin role
   const isAdmin = hasRole(ROLES.ADMIN)
 
+  // Define loadUsers before useEffect that uses it
+  const loadUsers = useCallback(() => {
+    const users = getAllUsersWithRoles()
+    setAllUsers(users)
+  }, [])
+
   useEffect(() => {
     if (isAdmin) {
       loadUsers()
     }
-  }, [isAdmin])
-
-  const loadUsers = () => {
-    const users = getAllUsersWithRoles()
-    setAllUsers(users)
-  }
+  }, [isAdmin, loadUsers])
 
   const handleGrantRole = () => {
     if (!newUserAddress || !selectedRole) {

@@ -105,7 +105,7 @@ export function useTierPrices() {
                 feeDiscount: Number(tierLimits.feeDiscount),
                 isActive
               }
-            } catch (limitsErr) {
+            } catch {
               // Limits not available, just store isActive
               limits[tierName][roleKey] = { isActive }
             }

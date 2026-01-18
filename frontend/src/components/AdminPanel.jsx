@@ -36,7 +36,7 @@ function AdminPanel() {
   const { showNotification } = useNotification()
   const {
     isLoading,
-    error,
+    // error is available but handled via showNotification
     contractState,
     emergencyPause,
     emergencyUnpause,
@@ -138,7 +138,7 @@ function AdminPanel() {
     return () => {
       clearInterval(interval)
     }
-  }, []) // Empty dependency array - only set up once on mount
+  }, [fetchContractState]) // Include fetchContractState for lint compliance
   
   // Manage focus for confirmation dialogs
   useEffect(() => {
@@ -373,7 +373,7 @@ function AdminPanel() {
     } finally {
       setPendingTx(false)
     }
-  }, [withdrawalData, contractState.contractBalance, treasuryState, withdraw, withdrawFromTreasuryETH, withdrawFromTreasuryERC20, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError, isTreasuryAvailable, canWithdrawFromVault, isTreasuryOwner, fairWinsTokenAddress])
+  }, [withdrawalData, contractState.contractBalance, treasuryState, withdraw, withdrawFromTreasuryETH, withdrawFromTreasuryERC20, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError, isTreasuryAvailable, fairWinsTokenAddress])
 
   const shortenAddress = (address) => {
     if (!address) return ''

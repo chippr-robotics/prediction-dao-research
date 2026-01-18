@@ -10,6 +10,30 @@ import './MarketDetailsPanel.css'
 function MarketDetailsPanel({ market, linkedMarkets = [] }) {
   const { formatPrice } = usePrice()
 
+  // Calculate time until settlement - must be called before any conditional returns
+  const getTimeUntilSettlement = useCallback((endTime) => {
+    if (!endTime) return 'Unknown'
+    const now = Date.now()
+    const end = new Date(endTime).getTime()
+    const diff = end - now
+
+    if (diff <= 0) return 'Ended'
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h`
+    return 'Less than 1h'
+  }, [])
+
+  // Get other markets in the same group - must be called before any conditional returns
+  // Using full market object as dependency for React Compiler compatibility
+  const relatedMarkets = useMemo(() => {
+    if (!market?.correlationGroup || !linkedMarkets?.length) return []
+    return linkedMarkets.filter(m => m.id !== market.id)
+  }, [linkedMarkets, market])
+
   if (!market) return null
 
   // Format date for display
@@ -31,31 +55,8 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
-  // Calculate time until settlement
-  const getTimeUntilSettlement = useCallback((endTime) => {
-    if (!endTime) return 'Unknown'
-    const now = Date.now()
-    const end = new Date(endTime).getTime()
-    const diff = end - now
-
-    if (diff <= 0) return 'Ended'
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-
-    if (days > 0) return `${days}d ${hours}h`
-    if (hours > 0) return `${hours}h`
-    return 'Less than 1h'
-  }, [])
-
   // Get correlation group info
   const correlationGroup = market.correlationGroup
-
-  // Get other markets in the same group (excluding current market)
-  const relatedMarkets = useMemo(() => {
-    if (!correlationGroup || !linkedMarkets?.length) return []
-    return linkedMarkets.filter(m => m.id !== market.id)
-  }, [correlationGroup, linkedMarkets, market.id])
 
   return (
     <div className="market-details-panel">

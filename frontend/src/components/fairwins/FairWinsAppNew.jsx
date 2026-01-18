@@ -7,7 +7,6 @@ import useFuseSearch from '../../hooks/useFuseSearch'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
-import { getSubcategoriesForCategory } from '../../config/subcategories'
 import { buyMarketShares } from '../../utils/blockchainService'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
@@ -39,7 +38,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
@@ -49,11 +48,10 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [viewMode, setViewMode] = useState(() => getViewPreference()) // View mode: grid or compact
   const [selectedSubcategories, setSelectedSubcategories] = useState([]) // Subcategory filter state
   const [showHero, setShowHero] = useState(false) // Hero view state
-  const [showTokenBuilder, setShowTokenBuilder] = useState(false) // Token builder state
+  const [, setShowTokenBuilder] = useState(false) // Token builder state - setter used by TokenMintTab
   const [showFilters, setShowFilters] = useState(false) // Collapsible filters state
   const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
   const [showWeatherMap, setShowWeatherMap] = useState(true) // Collapsible weather map state
-  const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
   // TokenMint state - kept for TokenMintTab display
@@ -93,14 +91,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
     { id: 'weather', name: 'Weather', icon: '🌤️' }
   ]
-
-  const getMarketsByCategory = () => {
-    const grouped = {}
-    categories.forEach(cat => {
-      grouped[cat.id] = markets.filter(m => m.category === cat.id)
-    })
-    return grouped
-  }
 
   const handleCategoryChange = (categoryId) => {
     // Handle special navigation categories
@@ -359,9 +349,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     })
   }, [roles, ROLES])
 
-  // Markets by category - currently unused but available for future features
-  // const marketsByCategory = getMarketsByCategory()
-
   // Memoize trending markets to avoid recalculation on every render
   const trendingMarkets = useMemo(() => {
     const getSafeLiquidity = (value) => {
@@ -508,7 +495,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             correlatedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
               ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
               : []}
-            onTrade={handleTrade}
             onOpenMarket={handleOpenIndividualMarket}
           />
 

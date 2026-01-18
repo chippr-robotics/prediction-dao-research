@@ -16,13 +16,11 @@ function ReviewStep({
   txHash,
   txError,
   createdToken,
-  estimatedGas,
   totalCostETC,
   walletAddress,
   isCorrectNetwork,
   isContractDeployed = true,
   getExplorerUrl,
-  onDeploy,
   onEstimateGas,
   disabled
 }) {

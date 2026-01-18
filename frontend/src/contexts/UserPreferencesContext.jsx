@@ -38,6 +38,7 @@ export function UserPreferencesProvider({ children }) {
         demoMode: true
       })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, isConnected])
 
   const loadPreferences = useCallback((walletAddress) => {

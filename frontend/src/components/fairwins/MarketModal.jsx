@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { usePrice } from '../../contexts/PriceContext'
 import MarketDetailsPanel from './MarketDetailsPanel'
 import ShareModal from '../ui/ShareModal'
 import './MarketModal.css'
@@ -81,13 +80,11 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const isTouchOnButton = useRef(false)
-  const { formatPrice } = usePrice()
 
   // Reset state when modal opens and set default values
   useEffect(() => {
     if (isOpen && market) {
       // Reset to defaults when modal opens
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedOutcome('YES')
       setOrderType('market')
       setAmount('1')
@@ -106,10 +103,9 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
     if (market && orderType === 'limit') {
       const passPrice = parseFloat(market.passTokenPrice)
       const failPrice = parseFloat(market.failTokenPrice)
-      const currentSpotPrice = selectedOutcome === 'YES' 
+      const currentSpotPrice = selectedOutcome === 'YES'
         ? (!isNaN(passPrice) && passPrice > 0 ? passPrice : 0.5)
         : (!isNaN(failPrice) && failPrice > 0 ? failPrice : 0.5)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPrice(currentSpotPrice.toFixed(2))
     }
   }, [selectedOutcome, orderType, market])
@@ -144,6 +140,7 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
         focusableElements[0].focus()
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen])
 
   if (!isOpen || !market) return null

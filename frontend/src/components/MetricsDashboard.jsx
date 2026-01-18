@@ -27,6 +27,7 @@ function MetricsDashboard({ daos }) {
     if (selectedDAO) {
       loadMetrics()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDAO])
 
   const loadMetrics = async () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import './ProposalDashboard.css'
 import { useEthers } from '../hooks/useWeb3'
@@ -10,19 +10,13 @@ const ProposalRegistryABI = [
 ]
 
 function ProposalDashboard({ daos }) {
-  const { provider, signer } = useEthers()
+  const { provider } = useEthers()
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, pending, completed
   const [selectedProposal, setSelectedProposal] = useState(null)
 
-  useEffect(() => {
-    if (provider && daos.length > 0) {
-      loadProposals()
-    }
-  }, [provider, daos])
-
-  const loadProposals = async () => {
+  const loadProposals = useCallback(async () => {
     try {
       setLoading(true)
       const allProposals = []
@@ -45,19 +39,25 @@ function ProposalDashboard({ daos }) {
               daoName: dao.name,
               ...proposal
             })
-          } catch (err) {
-            console.error(`Error loading proposal ${i}:`, err)
+          } catch (propErr) {
+            console.error(`Error loading proposal ${i}:`, propErr)
           }
         }
       }
 
       setProposals(allProposals)
-    } catch (error) {
-      console.error('Error loading proposals:', error)
+    } catch (loadErr) {
+      console.error('Error loading proposals:', loadErr)
     } finally {
       setLoading(false)
     }
-  }
+  }, [provider, daos])
+
+  useEffect(() => {
+    if (provider && daos.length > 0) {
+      loadProposals()
+    }
+  }, [provider, daos, loadProposals])
 
   const getStatusText = (status) => {
     const statuses = ['Pending', 'Active', 'Completed', 'Cancelled']

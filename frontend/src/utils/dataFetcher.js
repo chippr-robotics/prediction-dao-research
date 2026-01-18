@@ -55,7 +55,7 @@ import {
  * @param {Function} options.onBackgroundRefresh - Callback when background refresh completes
  * @returns {Promise<Array>} Array of market objects
  */
-export async function fetchMarkets(demoMode, contracts = null, options = {}) {
+export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
   const { forceRefresh = false, onBackgroundRefresh = null } = options
   console.log('fetchMarkets called with demoMode:', demoMode, 'forceRefresh:', forceRefresh)
 
@@ -122,7 +122,7 @@ export { clearMarketCache }
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Array>} Array of market objects
  */
-export async function fetchMarketsByCategory(demoMode, category, contracts = null) {
+export async function fetchMarketsByCategory(demoMode, category, _contracts = null) {
   if (demoMode) {
     return getMockMarketsByCategory(category)
   }
@@ -143,7 +143,7 @@ export async function fetchMarketsByCategory(demoMode, category, contracts = nul
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Object|null>} Market object or null if not found
  */
-export async function fetchMarketById(demoMode, id, contracts = null) {
+export async function fetchMarketById(demoMode, id, _contracts = null) {
   if (demoMode) {
     return getMockMarketById(id)
   }
@@ -163,7 +163,7 @@ export async function fetchMarketById(demoMode, id, contracts = null) {
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Array>} Array of proposal objects
  */
-export async function fetchProposals(demoMode, contracts = null) {
+export async function fetchProposals(demoMode, _contracts = null) {
   if (demoMode) {
     return getMockProposals()
   }
@@ -184,7 +184,7 @@ export async function fetchProposals(demoMode, contracts = null) {
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Array>} Array of position objects
  */
-export async function fetchPositions(demoMode, userAddress, contracts = null) {
+export async function fetchPositions(demoMode, userAddress, _contracts = null) {
   if (demoMode) {
     return getMockPositions()
   }
@@ -204,7 +204,7 @@ export async function fetchPositions(demoMode, userAddress, contracts = null) {
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Array>} Array of welfare metric objects
  */
-export async function fetchWelfareMetrics(demoMode, contracts = null) {
+export async function fetchWelfareMetrics(demoMode, _contracts = null) {
   if (demoMode) {
     return getMockWelfareMetrics()
   }
@@ -224,7 +224,7 @@ export async function fetchWelfareMetrics(demoMode, contracts = null) {
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Array>} Array of unique category strings
  */
-export async function fetchCategories(demoMode, contracts = null) {
+export async function fetchCategories(demoMode, _contracts = null) {
   if (demoMode) {
     return getMockCategories()
   }
@@ -245,7 +245,7 @@ export async function fetchCategories(demoMode, contracts = null) {
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @returns {Promise<Array>} Array of market objects
  */
-export async function fetchMarketsByCorrelationGroup(demoMode, correlationGroupId, contracts = null) {
+export async function fetchMarketsByCorrelationGroup(demoMode, correlationGroupId, _contracts = null) {
   if (demoMode) {
     return getMockMarketsByCorrelationGroup(correlationGroupId)
   }

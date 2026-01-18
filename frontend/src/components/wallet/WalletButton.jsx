@@ -63,7 +63,7 @@ const saveFriendMarketsToStorage = (markets) => {
   }
 }
 
-function WalletButton({ className = '', theme = 'dark' }) {
+function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
@@ -77,14 +77,14 @@ function WalletButton({ className = '', theme = 'dark' }) {
   const { showModal } = useModal()
   const { balances, loading: balanceLoading } = useETCswap()
   const { preferences, setDemoMode } = useUserPreferences()
-  const { roles, hasRole, rolesLoading, refreshRoles } = useWalletRoles()
+  const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
     loading: roleDetailsLoading,
     refresh: refreshRoleDetails
   } = useRoleDetails()
   const { signer } = useWeb3()
-  const { mode, toggleMode, isDark } = useTheme()
+  const { toggleMode, isDark } = useTheme()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   const [connectorStatus, setConnectorStatus] = useState({})
@@ -939,7 +939,7 @@ function WalletButton({ className = '', theme = 'dark' }) {
             if (decoded) {
               throw new Error(`Market creation would fail: ${decoded.name}(${decoded.args.join(', ')})`)
             }
-          } catch (decodeErr) {
+          } catch {
             // Check for standard Error(string) revert
             if (staticCallError.data.startsWith('0x08c379a0')) {
               const abiCoder = new ethers.AbiCoder()

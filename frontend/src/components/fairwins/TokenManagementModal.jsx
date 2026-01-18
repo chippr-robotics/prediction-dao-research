@@ -507,12 +507,8 @@ function TokenManagementModal({ isOpen, onClose }) {
       // Show success message
       window.alert(`Success! ${actionDescription}\n\nTransaction: ${tx.hash.slice(0, 10)}...${tx.hash.slice(-8)}`)
 
-      // Update local state based on action
-      if (actionModal === 'pause') {
-        updateItemState(selectedItem.id, { isPaused: true })
-      } else if (actionModal === 'unpause') {
-        updateItemState(selectedItem.id, { isPaused: false })
-      }
+      // Refresh token data after action completes
+      updateItemState()
 
       setActionModal(null)
       setActionData({})
@@ -535,7 +531,7 @@ function TokenManagementModal({ isOpen, onClose }) {
     }
   }
 
-  const updateItemState = async (id, updates) => {
+  const updateItemState = async () => {
     // Refresh token data from blockchain after successful actions
     await refreshTokens(true)
   }

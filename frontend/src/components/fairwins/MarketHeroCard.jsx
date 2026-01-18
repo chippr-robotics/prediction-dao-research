@@ -103,12 +103,10 @@ const generateHolderDistribution = () => {
   ]
 }
 
-function MarketHeroCard({ market, onTrade }) {
-  // Early return must come before hooks
-  if (!market) {
-    return null
-  }
+// Generate mock total trades count at module level to avoid impure function calls during render
+const MOCK_TOTAL_TRADES = Math.floor(Math.random() * 1000) + 100
 
+function MarketHeroCard({ market, onTrade }) {
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [showShareModal, setShowShareModal] = useState(false)
@@ -116,53 +114,21 @@ function MarketHeroCard({ market, onTrade }) {
   const priceChartRef = useRef(null)
   const activityHeatmapRef = useRef(null)
   const probabilityGaugeRef = useRef(null)
-  
+
   // Generate unique IDs for SVG elements to avoid conflicts with multiple instances
   const gradientId = useId()
   const uniqueGradientId = `line-gradient-${gradientId}`
 
-  const calculateImpliedProbability = (passPrice) => {
-    return (parseFloat(passPrice) * 100).toFixed(1)
-  }
-
-  const formatTimeRemaining = (endTime) => {
-    const now = new Date()
-    const end = new Date(endTime)
-    const diff = end - now
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    
-    if (days > 0) {
-      return `${days} days, ${hours} hours`
-    }
-    return `${hours} hours`
-  }
-
-
-
-  const handleTradeSubmit = (e) => {
-    e.preventDefault()
-    if (onTrade) {
-      onTrade({
-        market,
-        amount: tradeAmount,
-        type: tradeType
-      })
-    }
-  }
-
-  // Remove unused variables
-  // const yesProb = calculateImpliedProbability(market.passTokenPrice)
-  // const noProb = calculateImpliedProbability(market.failTokenPrice)
-  
   // Memoize mock data to prevent regeneration on every render
+  // These hooks must be called before any early returns (Rules of Hooks)
   const holderDistribution = useMemo(() => generateHolderDistribution(), [])
-  const totalTrades = useMemo(() => Math.floor(Math.random() * 1000) + 100, [])
+  // Use module-level constant to avoid impure function calls during render
+  const totalTrades = MOCK_TOTAL_TRADES
 
   // Render price history chart
   // Updates when passTokenPrice changes to regenerate chart with new probability data
   useEffect(() => {
-    if (!priceChartRef.current) return
+    if (!priceChartRef.current || !market) return
 
     const currentPrice = parseFloat(market.passTokenPrice)
     const data = generatePriceHistory(currentPrice)
@@ -251,18 +217,18 @@ function MarketHeroCard({ market, onTrade }) {
       .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'))
       .attr('color', '#9ca3af')
 
-  }, [market.passTokenPrice, uniqueGradientId])
+  }, [market, uniqueGradientId])
 
   // Render activity heatmap
   // Regenerates when market changes to show updated activity patterns
   useEffect(() => {
-    if (!activityHeatmapRef.current) return
+    if (!activityHeatmapRef.current || !market) return
 
     const data = generateActivityData()
     const container = activityHeatmapRef.current
     const width = container.clientWidth
     const { CELL_PADDING, LABEL_OFFSET, HOUR_LABEL_INTERVAL } = ACTIVITY_CONFIG
-    
+
     // Calculate cell size based on container width (24 hours + label space)
     const cellSize = Math.floor(width / 25)
     const height = cellSize * 8 // 7 days + label row
@@ -327,7 +293,7 @@ function MarketHeroCard({ market, onTrade }) {
   // Render probability gauge
   // Updates when passTokenPrice changes to show current market sentiment
   useEffect(() => {
-    if (!probabilityGaugeRef.current) return
+    if (!probabilityGaugeRef.current || !market) return
 
     const container = probabilityGaugeRef.current
     const { SIZE, STROKE_WIDTH, ANIMATION_DURATION } = GAUGE_CONFIG
@@ -393,7 +359,36 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('fill', '#9ca3af')
       .text('YES Probability')
 
-  }, [market.passTokenPrice])
+  }, [market])
+
+  // Early return after all hooks to comply with Rules of Hooks
+  if (!market) {
+    return null
+  }
+
+  const formatTimeRemaining = (endTime) => {
+    const now = new Date()
+    const end = new Date(endTime)
+    const diff = end - now
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+
+    if (days > 0) {
+      return `${days} days, ${hours} hours`
+    }
+    return `${hours} hours`
+  }
+
+  const handleTradeSubmit = (e) => {
+    e.preventDefault()
+    if (onTrade) {
+      onTrade({
+        market,
+        amount: tradeAmount,
+        type: tradeType
+      })
+    }
+  }
 
   return (
     <div className="market-hero-card">

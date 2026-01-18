@@ -96,10 +96,8 @@ function SwapPanel() {
     }
     
     try {
-      let tx
-      
       if (swapMode === 'wrap') {
-        tx = await wrapETC(amount)
+        await wrapETC(amount)
         setSuccess(`Successfully wrapped ${amount} ETC to WETC`)
       } else if (swapMode === 'unwrap') {
         // Execute unwrap

@@ -52,7 +52,6 @@ const LoadingScreen = ({
           onAnimationComplete()
         }
       }, 2000)
-      
       return () => clearTimeout(timer)
     } else {
       setAnimated(false)

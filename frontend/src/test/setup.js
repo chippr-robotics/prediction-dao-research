@@ -14,7 +14,7 @@ afterEach(() => {
 // Mock fetch globally to prevent real network requests
 // This is test code that mocks fetch responses - URL matching here is for test
 // purposes only and does not represent actual URL validation or network requests
-global.fetch = vi.fn().mockImplementation(async (url, options) => {
+global.fetch = vi.fn().mockImplementation(async (url, _options) => {
   // Mock CoinGecko API for price conversion
   // codeql[js/incomplete-url-substring-sanitization] - Safe: test mock, no real network requests
   if (url.startsWith('https://api.coingecko.com')) {
@@ -187,7 +187,7 @@ window.ethereum = window.ethereum || {}
 
 // Create a mock that returns proper responses for ethers.js
 const mockEthereumProvider = {
-  request: vi.fn().mockImplementation(async ({ method, params }) => {
+  request: vi.fn().mockImplementation(async ({ method, params: _params }) => {
     switch (method) {
       case 'eth_requestAccounts':
       case 'eth_accounts':
@@ -213,7 +213,7 @@ const mockEthereumProvider = {
   isMetaMask: true,
   selectedAddress: '0x1234567890123456789012345678901234567890',
   // Mock methods needed by ethers BrowserProvider
-  send: vi.fn().mockImplementation(async (method, params) => {
+  send: vi.fn().mockImplementation(async (method, _params) => {
     switch (method) {
       case 'eth_accounts':
         return ['0x1234567890123456789012345678901234567890']
