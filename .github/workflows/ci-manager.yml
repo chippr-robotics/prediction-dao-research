@@ -80,7 +80,7 @@ jobs:
 
       - name: Generate change summary
         run: |
-          set -e
+          set -eo pipefail
           
           # Set default values for outputs to ensure they're always defined
           contracts="${{ steps.filter.outputs.contracts }}"
