@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRoles } from '../../hooks/useRoles'
 import { useModal } from '../../hooks/useUI'
-import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWallet } from '../../hooks'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import ClearPathModal from './ClearPathModal'
@@ -9,10 +8,10 @@ import './ClearPathButton.css'
 
 /**
  * ClearPathButton Component
- * 
+ *
  * Displays a button with the ClearPath logo that opens a dropdown menu
  * with governance options based on user's roles and permissions.
- * 
+ *
  * Features:
  * - Role-based menu options (ClearPath User)
  * - Integration with ClearPath governance modals
@@ -22,10 +21,9 @@ function ClearPathButton() {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
-  
+
   const { hasRole, ROLES } = useRoles()
   const { showModal } = useModal()
-  useUserPreferences() // Hook called for context subscription
   const { isConnected } = useWallet()
 
   // Close dropdown when clicking outside

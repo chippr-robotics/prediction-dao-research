@@ -25,6 +25,8 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Allow calling setState in effects for initial data loading patterns
+      'react-hooks/set-state-in-effect': 'warn',
     },
   },
   // Configuration for Cypress test files

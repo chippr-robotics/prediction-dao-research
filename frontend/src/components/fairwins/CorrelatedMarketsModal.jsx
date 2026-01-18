@@ -16,7 +16,7 @@ const parseProposalTitle = (title) => {
   return title.split(':')[1]?.trim() || title
 }
 
-function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, onTrade, onOpenMarket }) {
+function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, onOpenMarket }) {
   const [selectedOption, setSelectedOption] = useState(market?.id)
   const [visibleMarkets, setVisibleMarkets] = useState(
     correlatedMarkets?.reduce((acc, m) => ({ ...acc, [m.id]: true }), {}) || {}
@@ -29,7 +29,8 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
   const modalRef = useRef(null)
 
   // useMemo hooks must be called unconditionally before any early returns
-  const selectedMarket = useMemo(() => {
+  // This memo tracks the currently selected market for future use
+  useMemo(() => {
     if (!correlatedMarkets || !market) return null
     return correlatedMarkets.find(m => m.id === selectedOption) || market
   }, [selectedOption, correlatedMarkets, market])

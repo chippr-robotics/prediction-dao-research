@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import Fuse from 'fuse.js'
 
 /**
@@ -9,17 +9,24 @@ import Fuse from 'fuse.js'
  * @returns {Array} Filtered array of items based on search query
  */
 function useFuseSearch(items, searchQuery, optionsOverride = {}) {
-  // Stringify options once for stable comparison
-  const optionsJson = JSON.stringify(optionsOverride)
+  // Use ref to cache options and avoid unnecessary Fuse recreation
+  const optionsRef = useRef(optionsOverride)
+
+  // Only update ref if options keys/values actually changed
+  const optionsKeys = Object.keys(optionsOverride).sort().join(',')
+  const optionsValues = Object.values(optionsOverride).map(String).join(',')
+  const prevKeys = Object.keys(optionsRef.current).sort().join(',')
+  const prevValues = Object.values(optionsRef.current).map(String).join(',')
+
+  if (optionsKeys !== prevKeys || optionsValues !== prevValues) {
+    optionsRef.current = optionsOverride
+  }
 
   // Create Fuse instance - memoized to avoid recreation on every render
   const fuse = useMemo(() => {
     if (!items || items.length === 0) {
       return null
     }
-
-    // Parse options from JSON to ensure stable object reference
-    const parsedOptions = JSON.parse(optionsJson)
 
     // Default Fuse.js options optimized for market search
     const fuseOptions = {
@@ -31,11 +38,11 @@ function useFuseSearch(items, searchQuery, optionsOverride = {}) {
       includeScore: true,
       useExtendedSearch: false,
       ignoreLocation: true,
-      ...parsedOptions
+      ...optionsRef.current
     }
 
     return new Fuse(items, fuseOptions)
-  }, [items, optionsJson])
+  }, [items, optionsKeys, optionsValues])
 
   // Perform search - memoized to avoid re-searching with same query
   const searchResults = useMemo(() => {

@@ -34,7 +34,8 @@ function FairWinsUserModal() {
   const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
   const { toggleMode, isDark, setThemePlatform, isClearPath } = useTheme()
-  const { showUsd, toggleCurrency } = usePrice()
+  const priceContext = usePrice() || {}
+  const { showUsd = false, toggleCurrency = () => {} } = priceContext
   const navigate = useNavigate()
   
   const [activeTab, setActiveTab] = useState('profile')

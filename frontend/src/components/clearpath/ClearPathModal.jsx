@@ -672,7 +672,7 @@ function DAOCompactList({ daos, onSelect, showJoinButton = false }) {
 
   return (
     <div className="cp-dao-list">
-      {daos.map((dao, index) => (
+      {daos.map((dao) => (
         <button
           key={dao.id}
           className="cp-dao-card"
@@ -817,7 +817,7 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
 
   return (
     <div className="cp-proposal-list">
-      {proposals.map((proposal, index) => (
+      {proposals.map((proposal) => (
         <button
           key={proposal.id}
           className="cp-proposal-card"

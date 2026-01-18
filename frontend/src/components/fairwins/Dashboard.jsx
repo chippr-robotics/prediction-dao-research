@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useWeb3 } from '../../hooks/useWeb3'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useDataFetcher } from '../../hooks/useDataFetcher'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import LoadingScreen from '../ui/LoadingScreen'
@@ -995,7 +994,6 @@ function RecentActivityFeed({ markets }) {
 // ============================================================================
 
 function Dashboard() {
-  useWeb3() // Hook called for web3 context
   const { getMarkets } = useDataFetcher()
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true

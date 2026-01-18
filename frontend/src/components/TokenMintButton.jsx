@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRoles } from '../hooks/useRoles'
 import { useModal } from '../hooks/useUI'
-import { useUserPreferences } from '../hooks/useUserPreferences'
-import { useWallet, useWeb3 } from '../hooks'
+import { useWallet } from '../hooks'
 import TokenCreationModal from './fairwins/TokenCreationModal'
 import TokenManagementModal from './fairwins/TokenManagementModal'
 import PremiumPurchaseModal from './ui/PremiumPurchaseModal'
@@ -31,7 +30,6 @@ function TokenMintButton() {
 
   const { hasRole, ROLES } = useRoles()
   const { showModal } = useModal()
-  useUserPreferences() // Hook called for context subscription
   const { isConnected } = useWallet()
 
   // Close dropdown when clicking outside

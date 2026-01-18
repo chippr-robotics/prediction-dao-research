@@ -506,7 +506,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             correlatedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
               ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
               : []}
-            onTrade={handleTrade}
             onOpenMarket={handleOpenIndividualMarket}
           />
 
