@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { usePrice } from '../../contexts/PriceContext'
 import MarketDetailsPanel from './MarketDetailsPanel'
 import ShareModal from '../ui/ShareModal'
 import './MarketModal.css'
@@ -81,7 +80,6 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const isTouchOnButton = useRef(false)
-  usePrice() // Hook called for price context
 
   // Reset state when modal opens and set default values
   useEffect(() => {

@@ -31,7 +31,7 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
   const relatedMarkets = useMemo(() => {
     if (!market?.correlationGroup || !linkedMarkets?.length) return []
     return linkedMarkets.filter(m => m.id !== market.id)
-  }, [linkedMarkets, market])
+  }, [linkedMarkets, market?.correlationGroup, market?.id])
 
   if (!market) return null
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import './ProposalDashboard.css'
 import { useEthers } from '../hooks/useWeb3'
@@ -16,50 +16,7 @@ function ProposalDashboard({ daos }) {
   const [filter, setFilter] = useState('all') // all, active, pending, completed
   const [selectedProposal, setSelectedProposal] = useState(null)
 
-  useEffect(() => {
-    const doLoadProposals = async () => {
-      try {
-        setLoading(true)
-        const allProposals = []
-
-        for (const dao of daos) {
-          const registry = new ethers.Contract(
-            dao.proposalRegistry,
-            ProposalRegistryABI,
-            provider
-          )
-
-          const count = await registry.getProposalCount()
-
-          for (let i = 0; i < count; i++) {
-            try {
-              const proposal = await registry.proposals(i)
-              allProposals.push({
-                id: i,
-                daoId: dao.id,
-                daoName: dao.name,
-                ...proposal
-              })
-            } catch (err) {
-              console.error(`Error loading proposal ${i}:`, err)
-            }
-          }
-        }
-
-        setProposals(allProposals)
-      } catch (error) {
-        console.error('Error loading proposals:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (provider && daos.length > 0) {
-      doLoadProposals()
-    }
-  }, [provider, daos])
-
-  const loadProposals = async () => {
+  const loadProposals = useCallback(async () => {
     try {
       setLoading(true)
       const allProposals = []
@@ -94,7 +51,13 @@ function ProposalDashboard({ daos }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [provider, daos])
+
+  useEffect(() => {
+    if (provider && daos.length > 0) {
+      loadProposals()
+    }
+  }, [provider, daos, loadProposals])
 
   const getStatusText = (status) => {
     const statuses = ['Pending', 'Active', 'Completed', 'Cancelled']

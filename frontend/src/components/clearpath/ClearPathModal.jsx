@@ -677,7 +677,7 @@ function DAOCompactList({ daos, onSelect, showJoinButton = false }) {
           key={dao.id}
           className="cp-dao-card"
           onClick={() => onSelect(dao)}
-          onKeyDown={(e) => handleKeyDown(e, dao, index)}
+          onKeyDown={(e) => handleKeyDown(e, dao)}
           type="button"
           aria-label={`${dao.name}, ${dao.memberCount || 0} members, ${dao.treasuryBalance || '0 ETC'} treasury`}
         >
@@ -822,7 +822,7 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
           key={proposal.id}
           className="cp-proposal-card"
           onClick={() => onSelect(proposal)}
-          onKeyDown={(e) => handleKeyDown(e, proposal, index)}
+          onKeyDown={(e) => handleKeyDown(e, proposal)}
           type="button"
           aria-label={`${proposal.title}, ${proposal.status} status, ${proposal.votesFor} for, ${proposal.votesAgainst} against`}
         >

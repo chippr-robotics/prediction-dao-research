@@ -107,7 +107,7 @@ function MarketHeroCard({ market, onTrade }) {
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [showShareModal, setShowShareModal] = useState(false)
-  usePrice() // Hook called for price context
+  const { formatPrice } = usePrice()
   const priceChartRef = useRef(null)
   const activityHeatmapRef = useRef(null)
   const probabilityGaugeRef = useRef(null)
