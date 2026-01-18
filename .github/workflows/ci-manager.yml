@@ -83,10 +83,16 @@ jobs:
           set -e
           
           # Set default values for outputs to ensure they're always defined
-          contracts="${{ steps.filter.outputs.contracts || 'false' }}"
-          frontend="${{ steps.filter.outputs.frontend || 'false' }}"
-          docs="${{ steps.filter.outputs.docs || 'false' }}"
-          security="${{ steps.filter.outputs.security || 'false' }}"
+          contracts="${{ steps.filter.outputs.contracts }}"
+          frontend="${{ steps.filter.outputs.frontend }}"
+          docs="${{ steps.filter.outputs.docs }}"
+          security="${{ steps.filter.outputs.security }}"
+          
+          # Ensure variables default to 'false' if empty
+          contracts="${contracts:-false}"
+          frontend="${frontend:-false}"
+          docs="${docs:-false}"
+          security="${security:-false}"
           
           echo "## 🔍 Change Detection Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
