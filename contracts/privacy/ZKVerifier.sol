@@ -226,24 +226,22 @@ contract ZKVerifier is AccessControl {
      */
     function _decodeProof(bytes calldata proofBytes) internal pure returns (Proof memory) {
         require(proofBytes.length >= 256, "Proof too short");
-        
-        Proof memory proof;
-        
-        // Decode A (64 bytes = 2 * 32 bytes)
-        proof.a[0] = uint256(bytes32(proofBytes[0:32]));
-        proof.a[1] = uint256(bytes32(proofBytes[32:64]));
-        
-        // Decode B (128 bytes = 2 * 2 * 32 bytes)
-        proof.b[0][0] = uint256(bytes32(proofBytes[64:96]));
-        proof.b[0][1] = uint256(bytes32(proofBytes[96:128]));
-        proof.b[1][0] = uint256(bytes32(proofBytes[128:160]));
-        proof.b[1][1] = uint256(bytes32(proofBytes[160:192]));
-        
-        // Decode C (64 bytes = 2 * 32 bytes)
-        proof.c[0] = uint256(bytes32(proofBytes[192:224]));
-        proof.c[1] = uint256(bytes32(proofBytes[224:256]));
-        
-        return proof;
+
+        // Decode proof components directly into struct literal to avoid uninitialized variable
+        return Proof({
+            a: [
+                uint256(bytes32(proofBytes[0:32])),
+                uint256(bytes32(proofBytes[32:64]))
+            ],
+            b: [
+                [uint256(bytes32(proofBytes[64:96])), uint256(bytes32(proofBytes[96:128]))],
+                [uint256(bytes32(proofBytes[128:160])), uint256(bytes32(proofBytes[160:192]))]
+            ],
+            c: [
+                uint256(bytes32(proofBytes[192:224])),
+                uint256(bytes32(proofBytes[224:256]))
+            ]
+        });
     }
     
     /**
