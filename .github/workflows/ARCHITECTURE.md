@@ -99,7 +99,7 @@
 
 ═══════════════════════════════════════════════════════════════
 
-Path Detection Rules (from ci-config.yml):
+Path Detection Rules (from .github/ci-config.yml):
 
 ┌──────────────────────────────────────────────────────────────┐
 │ Component: CONTRACTS                                         │
@@ -194,22 +194,23 @@ Key Benefits:
 ## File Structure
 
 ```
-.github/workflows/
-├── ci-manager.yml              # Main orchestration workflow
+.github/
 ├── ci-config.yml               # Path pattern configuration
-├── test.yml                    # Contract tests (reusable)
-├── security-testing.yml        # Security analysis (reusable)
-├── deploy-docs.yml             # Docs deployment (independent)
-├── deploy-contracts.yml        # Contract deployment (independent)
-├── README.md                   # Complete documentation
-├── QUICKSTART.md               # Quick reference guide
-└── CI_MANAGER_TEST_SCENARIOS.md # Test scenarios
+└── workflows/
+    ├── ci-manager.yml          # Main orchestration workflow
+    ├── test.yml                # Contract tests (reusable)
+    ├── security-testing.yml    # Security analysis (reusable)
+    ├── deploy-docs.yml         # Docs deployment (independent)
+    ├── deploy-contracts.yml    # Contract deployment (independent)
+    ├── README.md               # Complete documentation
+    ├── QUICKSTART.md           # Quick reference guide
+    └── CI_MANAGER_TEST_SCENARIOS.md # Test scenarios
 ```
 
 ## Configuration Flow
 
 ```
-ci-config.yml (patterns) ──▶ ci-manager.yml (filters) ──▶ Job execution
+.github/ci-config.yml (patterns) ──▶ ci-manager.yml (filters) ──▶ Job execution
                                        │
                                        ▼
                               Change detection outputs

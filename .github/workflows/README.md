@@ -9,7 +9,7 @@ The CI Manager is an intelligent workflow orchestrator that automatically detect
 The CI Manager consists of:
 
 1. **ci-manager.yml** - Main orchestration workflow
-2. **ci-config.yml** - Configuration file defining path patterns
+2. **ci-config.yml** - Configuration file defining path patterns (located in `.github/` directory)
 3. **Modified workflows** - test.yml and security-testing.yml support `workflow_call`
 
 ## How It Works
@@ -42,9 +42,9 @@ The CI Manager calls reusable workflows using `workflow_call`:
 
 ## Configuration
 
-### Path Patterns (ci-config.yml)
+### Path Patterns (.github/ci-config.yml)
 
-The `ci-config.yml` file defines glob patterns for each component:
+The `.github/ci-config.yml` file defines glob patterns for each component:
 
 ```yaml
 components:
@@ -65,7 +65,7 @@ components:
 
 To add a new component category:
 
-1. **Update ci-config.yml**:
+1. **Update .github/ci-config.yml**:
    ```yaml
    components:
      new-component:
@@ -344,7 +344,7 @@ For issues or questions:
 
 1. Check this documentation
 2. Review workflow run logs in GitHub Actions
-3. Check path patterns in ci-config.yml
+3. Check path patterns in .github/ci-config.yml
 4. Create an issue with the `ci-manager` label
 
 ## Version History
