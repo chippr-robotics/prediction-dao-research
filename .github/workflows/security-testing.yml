@@ -70,6 +70,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Coverage report generation can fail due to environment issues without indicating
+      # actual test failures. We allow this to fail gracefully while still uploading
+      # whatever coverage data was generated.
       - name: Generate coverage report
         run: npm run test:coverage
         continue-on-error: true
