@@ -56,7 +56,12 @@ def main():
     # Add remappings as solc arguments
     for remap in remappings:
         cmd.extend(['--solc-remaps', remap])
-    
+
+    # Pass --via-ir to solc to enable IR-based compilation
+    # This is required for complex contracts that would otherwise fail with "Stack too deep" errors
+    # The Hardhat config uses viaIR: true, so we need to match that for Manticore
+    cmd.extend(['--solc-args', '--via-ir'])
+
     # Set verbosity
     cmd.extend(['-v'])
     
