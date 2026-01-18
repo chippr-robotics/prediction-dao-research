@@ -309,6 +309,8 @@ contract MembershipPaymentManager is AccessControl, ReentrancyGuard, Pausable {
     ) external nonReentrant whenNotPaused returns (bytes32) {
         require(payer != address(0), "Invalid payer");
         require(buyer != address(0), "Invalid buyer");
+        // Security: Only allow msg.sender to pay, preventing arbitrary from in transferFrom
+        require(payer == msg.sender, "Payer must be msg.sender");
         require(amount > 0, "Amount must be greater than 0");
         require(paymentTokens[paymentToken].isActive, "Payment token not active");
         require(rolePricing[role].isActive, "Role pricing not configured");

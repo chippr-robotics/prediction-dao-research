@@ -725,8 +725,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             // Transfer collateral from buyer to this contract
             IERC20(market.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
             
-            // Approve ETCSwap integration to spend collateral
-            IERC20(market.collateralToken).approve(address(etcSwapIntegration), amount);
+            // Approve ETCSwap integration to spend collateral (using forceApprove for safety)
+            IERC20(market.collateralToken).forceApprove(address(etcSwapIntegration), amount);
             
             // Calculate minimum output with slippage protection
             // Use quoter to estimate output and apply default slippage tolerance
@@ -776,8 +776,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             // Transfer collateral from buyer to this contract
             IERC20(market.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
             
-            // Approve CTF1155 to spend collateral
-            IERC20(market.collateralToken).approve(address(ctf1155), amount);
+            // Approve CTF1155 to spend collateral (using forceApprove for safety)
+            IERC20(market.collateralToken).forceApprove(address(ctf1155), amount);
             
             // Split collateral into BOTH position tokens (binary market)
             // CTF1155 requires partition with at least 2 elements
@@ -851,8 +851,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             // Transfer tokens from seller to this contract
             IERC20(outcomeToken).safeTransferFrom(msg.sender, address(this), tokenAmount);
             
-            // Approve ETCSwap integration to spend outcome tokens
-            IERC20(outcomeToken).approve(address(etcSwapIntegration), tokenAmount);
+            // Approve ETCSwap integration to spend outcome tokens (using forceApprove for safety)
+            IERC20(outcomeToken).forceApprove(address(etcSwapIntegration), tokenAmount);
             
             // Calculate minimum output with slippage protection
             // Use quoter to estimate output and apply default slippage tolerance

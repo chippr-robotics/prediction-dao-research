@@ -152,10 +152,11 @@ contract WelfareMetricRegistry is Ownable, ReentrancyGuard {
 
         metrics[metricId].active = false;
 
-        // Remove from active array
-        for (uint256 i = 0; i < activeMetricIds.length; i++) {
+        // Remove from active array - cache length for gas optimization
+        uint256 length = activeMetricIds.length;
+        for (uint256 i = 0; i < length; i++) {
             if (activeMetricIds[i] == metricId) {
-                activeMetricIds[i] = activeMetricIds[activeMetricIds.length - 1];
+                activeMetricIds[i] = activeMetricIds[length - 1];
                 activeMetricIds.pop();
                 break;
             }
