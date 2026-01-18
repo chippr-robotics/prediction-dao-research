@@ -123,22 +123,10 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         
         TierRegistry.MembershipTier currentTier = tierRegistry.getUserTier(msg.sender, role);
         require(uint8(tier) > uint8(currentTier), "Must upgrade to higher tier");
-        
-        // Update tier
-        tierRegistry.setUserTier(msg.sender, role, tier);
 
-        // Grant role if not already granted
-        if (!roleManagerCore.hasRole(role, msg.sender)) {
-            roleManagerCore.grantRoleFromExtension(role, msg.sender);
-        }
-
-        // Set default membership duration (30 days) if membership manager is configured
-        if (address(membershipManager) != address(0)) {
-            uint256 currentExpiration = membershipManager.getMembershipExpiration(msg.sender, role);
-            if (currentExpiration == 0 || currentExpiration < block.timestamp) {
-                membershipManager.setMembershipExpiration(msg.sender, role, block.timestamp + 30 days);
-            }
-        }
+        // Grant tier on TieredRoleManager (sets role, tier, membership expiration, and usage stats)
+        // This is the authoritative source checked by FriendGroupMarketFactory
+        roleManagerCore.grantTierFromExtension(role, msg.sender, uint8(tier), 30);
 
         emit TierPurchased(msg.sender, role, tier, msg.value, address(0));
 
@@ -184,22 +172,10 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
             amount,
             uint8(tier)
         );
-        
-        // Update tier
-        tierRegistry.setUserTier(msg.sender, role, tier);
 
-        // Grant role if not already granted
-        if (!roleManagerCore.hasRole(role, msg.sender)) {
-            roleManagerCore.grantRoleFromExtension(role, msg.sender);
-        }
-
-        // Set default membership duration
-        if (address(membershipManager) != address(0)) {
-            uint256 currentExpiration = membershipManager.getMembershipExpiration(msg.sender, role);
-            if (currentExpiration == 0 || currentExpiration < block.timestamp) {
-                membershipManager.setMembershipExpiration(msg.sender, role, block.timestamp + 30 days);
-            }
-        }
+        // Grant tier on TieredRoleManager (sets role, tier, membership expiration, and usage stats)
+        // This is the authoritative source checked by FriendGroupMarketFactory
+        roleManagerCore.grantTierFromExtension(role, msg.sender, uint8(tier), 30);
 
         emit TierPurchased(msg.sender, role, tier, amount, paymentToken);
 
@@ -217,20 +193,9 @@ contract PaymentProcessor is Ownable, ReentrancyGuard {
         TierRegistry.MembershipTier tier,
         uint256 durationDays
     ) external onlyOwner {
-        tierRegistry.setUserTier(user, role, tier);
+        // Grant tier on TieredRoleManager (sets role, tier, membership expiration, and usage stats)
+        roleManagerCore.grantTierFromExtension(role, user, uint8(tier), durationDays);
 
-        if (!roleManagerCore.hasRole(role, user)) {
-            roleManagerCore.grantRoleFromExtension(role, user);
-        }
-
-        if (address(membershipManager) != address(0) && durationDays > 0) {
-            membershipManager.setMembershipExpiration(
-                user,
-                role,
-                block.timestamp + (durationDays * 1 days)
-            );
-        }
-        
         emit TierPurchased(user, role, tier, 0, address(0));
     }
     

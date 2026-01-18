@@ -611,12 +611,14 @@ function getProfile() {
  * Memory entry structure
  * @typedef {object} MemoryEntry
  * @property {string} id - Unique identifier
+ * @property {number} sequence - Monotonic sequence number (for integrity verification)
  * @property {string} type - Entry type (note, context, fact, etc.)
  * @property {string} content - The content
  * @property {string[]} tags - Searchable tags
  * @property {number} importance - 1-10 importance score
  * @property {string} createdAt - ISO timestamp
  * @property {string} updatedAt - ISO timestamp
+ * @property {string} previousHash - Hash chain link (for integrity verification)
  * @property {object} metadata - Additional metadata
  */
 
@@ -633,6 +635,55 @@ function getMemory() {
 }
 
 /**
+ * Get memory data including metadata
+ * @returns {object} { entries, stats, nextSequence }
+ */
+function getMemoryData() {
+  if (!fs.existsSync(MEMORY_FILE)) {
+    return { entries: [], stats: { count: 0 }, nextSequence: 1 };
+  }
+  const data = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+  return {
+    entries: data.entries || [],
+    stats: data.stats || { count: 0 },
+    nextSequence: data.nextSequence || (data.entries?.length || 0) + 1
+  };
+}
+
+/**
+ * Get the next sequence number
+ * @returns {number}
+ */
+function getNextSequence() {
+  const data = getMemoryData();
+  return data.nextSequence;
+}
+
+/**
+ * Get the last entry hash for chain linking
+ * @returns {string}
+ */
+function getLastEntryHash() {
+  const entries = getMemory();
+  if (entries.length === 0) {
+    return '0x0';
+  }
+  // Sort by sequence to get the last one
+  const sorted = [...entries].sort((a, b) => (b.sequence || 0) - (a.sequence || 0));
+  const lastEntry = sorted[0];
+
+  // Compute hash of last entry
+  const integrity = require('./integrity');
+  // Find the previous hash for this entry
+  const prevEntry = sorted[1];
+  const prevHash = prevEntry
+    ? integrity.computeEntryHash(prevEntry, prevEntry.previousHash || '0x0')
+    : '0x0';
+
+  return integrity.computeEntryHash(lastEntry, prevHash);
+}
+
+/**
  * Add a memory entry
  *
  * @param {object} entry - Memory entry
@@ -640,21 +691,30 @@ function getMemory() {
  * @param {string} entry.content - Content
  * @param {string[]} entry.tags - Tags
  * @param {number} entry.importance - Importance (1-10)
+ * @param {object} options - Additional options
+ * @param {boolean} options.updateManifest - Update manifest after adding (default: true)
  * @returns {MemoryEntry}
  */
-function addMemory(entry) {
+function addMemory(entry, options = {}) {
   ensureIdentityDir();
 
-  const entries = getMemory();
+  const memoryData = getMemoryData();
+  const entries = memoryData.entries;
+  const sequence = memoryData.nextSequence;
+
+  // Get previous entry hash for chain linking
+  const previousHash = getLastEntryHash();
 
   const newEntry = {
     id: crypto.randomBytes(8).toString('hex'),
+    sequence,
     type: entry.type || 'note',
     content: entry.content,
     tags: entry.tags || [],
     importance: Math.min(10, Math.max(1, entry.importance || 5)),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    previousHash,
     metadata: entry.metadata || {}
   };
 
@@ -663,6 +723,7 @@ function addMemory(entry) {
   const data = {
     version: 1,
     entries,
+    nextSequence: sequence + 1,
     stats: {
       count: entries.length,
       lastUpdated: new Date().toISOString()
@@ -672,7 +733,33 @@ function addMemory(entry) {
   fs.writeFileSync(MEMORY_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
   syncDisk();
 
+  // Update manifest (mark as having unsigned changes)
+  if (options.updateManifest !== false) {
+    updateManifestAfterChange();
+  }
+
   return newEntry;
+}
+
+/**
+ * Update manifest after a memory change
+ * This marks the manifest as having unsigned changes
+ */
+function updateManifestAfterChange() {
+  try {
+    const integrity = require('./integrity');
+    const entries = getMemory();
+    const metadata = getMetadata();
+
+    // Create/update manifest without signing
+    integrity.createManifest(entries, {
+      diskId: metadata['disk.name'] || 'unknown',
+      diskName: metadata['disk.network'] || 'Unknown Disk'
+    });
+  } catch (e) {
+    // Ignore errors during manifest update
+    // The manifest will be updated when sign command is run
+  }
 }
 
 /**
@@ -730,10 +817,13 @@ function searchMemory(query = {}) {
  *
  * @param {string} id - Entry ID
  * @param {object} updates - Fields to update
+ * @param {object} options - Additional options
+ * @param {boolean} options.updateManifest - Update manifest after change (default: true)
  * @returns {MemoryEntry|null}
  */
-function updateMemory(id, updates) {
-  const entries = getMemory();
+function updateMemory(id, updates, options = {}) {
+  const memoryData = getMemoryData();
+  const entries = memoryData.entries;
   const index = entries.findIndex(e => e.id === id);
 
   if (index === -1) {
@@ -744,13 +834,16 @@ function updateMemory(id, updates) {
     ...entries[index],
     ...updates,
     id: entries[index].id, // Preserve ID
+    sequence: entries[index].sequence, // Preserve sequence
     createdAt: entries[index].createdAt, // Preserve creation date
+    previousHash: entries[index].previousHash, // Preserve chain link
     updatedAt: new Date().toISOString()
   };
 
   const data = {
     version: 1,
     entries,
+    nextSequence: memoryData.nextSequence,
     stats: {
       count: entries.length,
       lastUpdated: new Date().toISOString()
@@ -760,17 +853,28 @@ function updateMemory(id, updates) {
   fs.writeFileSync(MEMORY_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
   syncDisk();
 
+  // Update manifest
+  if (options.updateManifest !== false) {
+    updateManifestAfterChange();
+  }
+
   return entries[index];
 }
 
 /**
  * Delete a memory entry
  *
+ * Note: Deleting entries breaks the hash chain. The manifest will track
+ * gaps in sequence numbers as a result of deletions.
+ *
  * @param {string} id - Entry ID
+ * @param {object} options - Additional options
+ * @param {boolean} options.updateManifest - Update manifest after change (default: true)
  * @returns {boolean}
  */
-function deleteMemory(id) {
-  const entries = getMemory();
+function deleteMemory(id, options = {}) {
+  const memoryData = getMemoryData();
+  const entries = memoryData.entries;
   const filtered = entries.filter(e => e.id !== id);
 
   if (filtered.length === entries.length) {
@@ -780,6 +884,7 @@ function deleteMemory(id) {
   const data = {
     version: 1,
     entries: filtered,
+    nextSequence: memoryData.nextSequence, // Don't reset sequence
     stats: {
       count: filtered.length,
       lastUpdated: new Date().toISOString()
@@ -789,16 +894,29 @@ function deleteMemory(id) {
   fs.writeFileSync(MEMORY_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
   syncDisk();
 
+  // Update manifest
+  if (options.updateManifest !== false) {
+    updateManifestAfterChange();
+  }
+
   return true;
 }
 
 /**
  * Clear all memory entries
+ *
+ * @param {object} options - Additional options
+ * @param {boolean} options.updateManifest - Update manifest after change (default: true)
  */
-function clearMemory() {
+function clearMemory(options = {}) {
   if (fs.existsSync(MEMORY_FILE)) {
     fs.unlinkSync(MEMORY_FILE);
     syncDisk();
+
+    // Update manifest
+    if (options.updateManifest !== false) {
+      updateManifestAfterChange();
+    }
   }
 }
 
@@ -1052,11 +1170,15 @@ module.exports = {
 
   // Memory (plain)
   getMemory,
+  getMemoryData,
+  getNextSequence,
+  getLastEntryHash,
   addMemory,
   searchMemory,
   updateMemory,
   deleteMemory,
   clearMemory,
+  updateManifestAfterChange,
 
   // Memory (encrypted)
   saveEncryptedMemory,

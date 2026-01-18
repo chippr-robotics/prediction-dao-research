@@ -148,6 +148,26 @@ async function loadMnemonicFromFloppy() {
 
   let password = process.env.FLOPPY_KEYSTORE_PASSWORD;
 
+  // Auto-detect disk and resolve password from named env var
+  if (!password) {
+    const metadataPath = path.join(CONFIG.KEYSTORE_DIR, 'identity', 'metadata.json');
+    if (fs.existsSync(metadataPath)) {
+      try {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        const diskName = metadata['disk.name'];
+        if (diskName) {
+          const envKey = `FLOPPY_${diskName.toUpperCase()}_PASSWORD`;
+          password = process.env[envKey];
+          if (password) {
+            console.log(`[Floppy] Auto-detected disk: ${diskName}`);
+          }
+        }
+      } catch (e) {
+        // Ignore metadata read errors
+      }
+    }
+  }
+
   if (!password) {
     console.log('\n[Floppy Keystore] Password required for network operations');
     password = await promptPasswordAsync('Enter floppy keystore password: ');
@@ -213,7 +233,8 @@ async function getFloppyPrivateKeys(options = {}) {
   const { HDNodeWallet } = require('ethers');
 
   const keys = [];
-  const masterNode = HDNodeWallet.fromPhrase(mnemonic);
+  // ethers v6 requires explicit root path "m" to get master node
+  const masterNode = HDNodeWallet.fromPhrase(mnemonic, undefined, "m");
 
   for (let i = initialIndex; i < initialIndex + count; i++) {
     const wallet = masterNode.derivePath(`m/44'/60'/0'/0/${i}`);

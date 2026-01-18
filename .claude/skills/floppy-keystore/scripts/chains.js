@@ -69,8 +69,8 @@ async function deriveSecp256k1Keys(mnemonic, chain, options) {
     basePath = `m/${purpose}'/${chain.coinType}'/0'/0`;
   }
 
-  // Create master node from mnemonic
-  const masterNode = HDNodeWallet.fromPhrase(mnemonic);
+  // Create master node from mnemonic (ethers v6 requires explicit root path)
+  const masterNode = HDNodeWallet.fromPhrase(mnemonic, undefined, "m");
 
   for (let i = startIndex; i < startIndex + count; i++) {
     const path = `${basePath}/${i}`;
@@ -444,8 +444,64 @@ function formatPrivateKey(privateKey, chainId) {
   }
 }
 
+/**
+ * Derive keys from an extended private key (xprv)
+ * Used by clones that only have their branch, not the full mnemonic
+ *
+ * @param {string} xprv - Extended private key (base58)
+ * @param {string} chainId - Chain identifier
+ * @param {object} options - Derivation options
+ * @param {number} options.count - Number of addresses to derive (default: 1)
+ * @param {number} options.startIndex - Starting index (default: 0)
+ * @returns {Promise<Array>} Derived keys
+ */
+async function deriveKeysFromXprv(xprv, chainId, options = {}) {
+  const chain = getChainConfig(chainId);
+  if (!chain) {
+    throw new Error(`Unsupported chain: ${chainId}`);
+  }
+
+  // Only secp256k1 chains support xprv derivation (EVM chains)
+  if (chain.curve !== 'secp256k1') {
+    throw new Error(`xprv derivation not supported for ${chain.curve} chains`);
+  }
+
+  const { HDNodeWallet } = require('ethers');
+  const { count = 1, startIndex = 0 } = options;
+
+  // Parse xprv - it's already at account level (m/44'/60'/N')
+  const hdNode = HDNodeWallet.fromExtendedKey(xprv);
+
+  const results = [];
+
+  for (let i = startIndex; i < startIndex + count; i++) {
+    // Derive: account_xprv/0/address_index
+    // The xprv is at m/44'/60'/N', so we add 0/i for external chain
+    const wallet = hdNode.derivePath(`0/${i}`);
+
+    const result = {
+      chain: chain.symbol,
+      index: i,
+      path: `xprv/0/${i}`,
+      privateKey: wallet.privateKey,
+      publicKey: wallet.publicKey,
+      address: wallet.address
+    };
+
+    // Handle ETC (Ethereum Classic) - same format as ETH
+    if (chain.symbol === 'ETC') {
+      result.network = chain.networks?.[0] || 'mainnet';
+    }
+
+    results.push(result);
+  }
+
+  return results;
+}
+
 module.exports = {
   deriveKeys,
+  deriveKeysFromXprv,
   getChainSummary,
   validatePrivateKey,
   formatPrivateKey,
