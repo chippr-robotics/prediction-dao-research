@@ -81,7 +81,7 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
   const isTouchOnButton = useRef(false)
-  const { formatPrice } = usePrice()
+  usePrice() // Hook called for price context
 
   // Reset state when modal opens and set default values
   useEffect(() => {

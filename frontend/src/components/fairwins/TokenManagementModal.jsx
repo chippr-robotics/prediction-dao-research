@@ -535,7 +535,7 @@ function TokenManagementModal({ isOpen, onClose }) {
     }
   }
 
-  const updateItemState = async (id, updates) => {
+  const updateItemState = async () => {
     // Refresh token data from blockchain after successful actions
     await refreshTokens(true)
   }

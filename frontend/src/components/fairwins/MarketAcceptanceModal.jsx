@@ -42,7 +42,7 @@ function MarketAcceptanceModal({
   contractABI
 }) {
   const { isConnected, account } = useWallet()
-  const { signer, provider, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
 
   const [step, setStep] = useState('review') // 'review', 'confirm', 'processing', 'success', 'error'
   const [error, setError] = useState(null)

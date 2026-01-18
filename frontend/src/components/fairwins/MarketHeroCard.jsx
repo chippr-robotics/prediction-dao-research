@@ -104,25 +104,21 @@ const generateHolderDistribution = () => {
 }
 
 function MarketHeroCard({ market, onTrade }) {
-  // Early return must come before hooks
-  if (!market) {
-    return null
-  }
-
   const [tradeAmount, setTradeAmount] = useState('')
   const [tradeType, setTradeType] = useState('PASS')
   const [showShareModal, setShowShareModal] = useState(false)
-  const { formatPrice } = usePrice()
+  usePrice() // Hook called for price context
   const priceChartRef = useRef(null)
   const activityHeatmapRef = useRef(null)
   const probabilityGaugeRef = useRef(null)
-  
+
   // Generate unique IDs for SVG elements to avoid conflicts with multiple instances
   const gradientId = useId()
   const uniqueGradientId = `line-gradient-${gradientId}`
 
-  const calculateImpliedProbability = (passPrice) => {
-    return (parseFloat(passPrice) * 100).toFixed(1)
+  // Early return after all hooks to comply with Rules of Hooks
+  if (!market) {
+    return null
   }
 
   const formatTimeRemaining = (endTime) => {
@@ -131,14 +127,12 @@ function MarketHeroCard({ market, onTrade }) {
     const diff = end - now
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    
+
     if (days > 0) {
       return `${days} days, ${hours} hours`
     }
     return `${hours} hours`
   }
-
-
 
   const handleTradeSubmit = (e) => {
     e.preventDefault()

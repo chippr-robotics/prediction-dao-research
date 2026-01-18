@@ -504,7 +504,6 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                   onBack={() => setSelectedDAO(null)}
                   formatDate={formatDate}
                   formatAddress={formatAddress}
-                  account={account}
                 />
               ) : (
                 <>
@@ -541,7 +540,6 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                       <DAOCompactList
                         daos={userDAOs}
                         onSelect={setSelectedDAO}
-                        formatDate={formatDate}
                       />
                     </div>
                   )}
@@ -559,7 +557,6 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                   onBack={() => setSelectedDAO(null)}
                   formatDate={formatDate}
                   formatAddress={formatAddress}
-                  account={account}
                   showJoinButton
                 />
               ) : (
@@ -589,7 +586,6 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                       <DAOCompactList
                         daos={allDAOs}
                         onSelect={setSelectedDAO}
-                        formatDate={formatDate}
                         showJoinButton
                       />
                     </div>
@@ -609,7 +605,6 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                   formatDate={formatDate}
                   formatAddress={formatAddress}
                   getStatusClass={getStatusClass}
-                  account={account}
                 />
               ) : (
                 <>
@@ -640,7 +635,7 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
           {/* Metrics Tab */}
           {activeTab === 'metrics' && (
             <div id="panel-metrics" role="tabpanel" className="cp-panel">
-              <MetricsOverview daos={userDAOs} demoMode={demoMode} />
+              <MetricsOverview daos={userDAOs} />
             </div>
           )}
 
@@ -659,8 +654,8 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
 /**
  * Compact list component for DAOs
  */
-function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) {
-  const handleKeyDown = (e, dao, index) => {
+function DAOCompactList({ daos, onSelect, showJoinButton = false }) {
+  const handleKeyDown = (e, dao) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onSelect(dao)
@@ -720,7 +715,7 @@ function DAOCompactList({ daos, onSelect, formatDate, showJoinButton = false }) 
 /**
  * DAO detail view component
  */
-function DAODetailView({ dao, onBack, formatDate, formatAddress, account, showJoinButton = false }) {
+function DAODetailView({ dao, onBack, formatDate, formatAddress, showJoinButton = false }) {
   return (
     <div className="cp-detail">
       <button type="button" className="cp-back-btn" onClick={onBack}>
@@ -805,7 +800,7 @@ function DAODetailView({ dao, onBack, formatDate, formatAddress, account, showJo
  * Compact list component for proposals
  */
 function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }) {
-  const handleKeyDown = (e, proposal, index) => {
+  const handleKeyDown = (e, proposal) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onSelect(proposal)
@@ -858,7 +853,7 @@ function ProposalCompactList({ proposals, onSelect, formatDate, getStatusClass }
 /**
  * Proposal detail view component
  */
-function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getStatusClass, account }) {
+function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getStatusClass }) {
   const totalVotes = proposal.votesFor + proposal.votesAgainst
   const forPercentage = totalVotes > 0 ? (proposal.votesFor / totalVotes) * 100 : 0
 
@@ -951,7 +946,7 @@ function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getSt
 /**
  * Metrics overview component
  */
-function MetricsOverview({ daos, demoMode }) {
+function MetricsOverview({ daos }) {
   const totalMembers = daos.reduce((sum, d) => sum + (d.memberCount || 0), 0)
   const totalProposals = daos.reduce((sum, d) => sum + (d.proposalCount || 0), 0)
 

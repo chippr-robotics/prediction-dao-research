@@ -18,7 +18,7 @@ const FutarchyMarketABI = [
   "function tradingVolume() external view returns (uint256)",
 ]
 
-function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
+function ProposalDetailView({ proposalId, dao, onClose }) {
   const { provider } = useEthers()
   const { formatPrice } = usePrice()
   const [proposal, setProposal] = useState(null)
@@ -27,57 +27,60 @@ function ProposalDetailView({ proposalId, daoId, dao, onClose }) {
   const [activeTab, setActiveTab] = useState('overview')
 
   useEffect(() => {
+    const doLoadProposalDetails = async () => {
+      try {
+        setLoading(true)
+        const registry = new ethers.Contract(
+          dao.proposalRegistry,
+          ProposalRegistryABI,
+          provider
+        )
+
+        const proposalData = await registry.proposals(proposalId)
+        setProposal(proposalData)
+
+        // Load market data
+        try {
+          const marketAddress = await registry.getProposalMarket(proposalId)
+          if (marketAddress && marketAddress !== ethers.ZeroAddress) {
+            const market = new ethers.Contract(
+              marketAddress,
+              FutarchyMarketABI,
+              provider
+            )
+
+            const [prices, liquidity, volume] = await Promise.all([
+              market.getCurrentPrices(),
+              market.totalLiquidity(),
+              market.tradingVolume()
+            ])
+
+            setMarketData({
+              address: marketAddress,
+              passPrice: prices[0],
+              failPrice: prices[1],
+              liquidity,
+              volume
+            })
+          }
+        } catch (marketErr) {
+          console.error('Error loading market data:', marketErr)
+        }
+
+      } catch (detailErr) {
+        console.error('Error loading proposal details:', detailErr)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     if (provider && dao) {
-      loadProposalDetails()
+      doLoadProposalDetails()
     }
   }, [provider, dao, proposalId])
 
-  const loadProposalDetails = async () => {
-    try {
-      setLoading(true)
-      const registry = new ethers.Contract(
-        dao.proposalRegistry,
-        ProposalRegistryABI,
-        provider
-      )
-
-      const proposalData = await registry.proposals(proposalId)
-      setProposal(proposalData)
-
-      // Load market data
-      try {
-        const marketAddress = await registry.getProposalMarket(proposalId)
-        if (marketAddress && marketAddress !== ethers.ZeroAddress) {
-          const market = new ethers.Contract(
-            marketAddress,
-            FutarchyMarketABI,
-            provider
-          )
-          
-          const [prices, liquidity, volume] = await Promise.all([
-            market.getCurrentPrices(),
-            market.totalLiquidity(),
-            market.tradingVolume()
-          ])
-
-          setMarketData({
-            address: marketAddress,
-            passPrice: prices[0],
-            failPrice: prices[1],
-            liquidity,
-            volume
-          })
-        }
-      } catch (err) {
-        console.error('Error loading market data:', err)
-      }
-
-    } catch (error) {
-      console.error('Error loading proposal details:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // loadProposalDetails is now inlined into the useEffect above
+  // to avoid "accessed before declared" lint warning
 
   const getStatusText = (status) => {
     const statuses = ['Pending', 'Active', 'Completed', 'Cancelled']

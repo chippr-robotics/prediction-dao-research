@@ -31,9 +31,8 @@ function TokenMintButton() {
 
   const { hasRole, ROLES } = useRoles()
   const { showModal } = useModal()
-  const { preferences } = useUserPreferences()
+  useUserPreferences() // Hook called for context subscription
   const { isConnected } = useWallet()
-  const { signer } = useWeb3()
 
   // Close dropdown when clicking outside
   useEffect(() => {

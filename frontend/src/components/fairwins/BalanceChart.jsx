@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useETCswap } from '../../hooks/useETCswap'
 import { TIME_HORIZONS } from '../../constants/etcswap'
 import './BalanceChart.css'
@@ -7,21 +7,27 @@ function BalanceChart() {
   const { balanceHistory } = useETCswap()
   const [selectedHorizon, setSelectedHorizon] = useState('24H')
   const [selectedToken, setSelectedToken] = useState('all')
-  
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
+
+  // Update current time periodically for filtering
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 60000) // Update every minute
+    return () => clearInterval(interval)
+  }, [])
+
   // Filter balance history based on selected time horizon
   const filteredHistory = useMemo(() => {
     if (!balanceHistory || balanceHistory.length === 0) return []
-    
+
     const horizonSeconds = TIME_HORIZONS[selectedHorizon]
-    const now = Date.now()
-    
+
     if (horizonSeconds === 0) {
       return balanceHistory // ALL
     }
-    
-    const cutoff = now - (horizonSeconds * 1000)
+
+    const cutoff = currentTime - (horizonSeconds * 1000)
     return balanceHistory.filter(entry => entry.timestamp >= cutoff)
-  }, [balanceHistory, selectedHorizon])
+  }, [balanceHistory, selectedHorizon, currentTime])
   
   // Calculate chart data
   const chartData = useMemo(() => {

@@ -9,17 +9,12 @@ import ClearPathButton from '../clearpath/ClearPathButton'
 import WalletButton from '../wallet/WalletButton'
 import './HeaderBar.css'
 
-function HeaderBar({ isConnected }) {
+function HeaderBar() {
   const { isScrollingDown } = useScrollDirection(10)
   const hasScrolled = useScrollPast(50)
   const isMobile = useIsMobile()
-  const { preferences } = useUserPreferences()
-  const { address } = useWallet()
-  const navigate = useNavigate()
-
-  const handleOpenUserManagement = () => {
-    navigate('/wallet')
-  } 
+  useUserPreferences() // Hook called for context subscription
+  useWallet() // Hook called for wallet context
 
   // Hide header on mobile when scrolling down
   const shouldHideHeader = isMobile && isScrollingDown && hasScrolled

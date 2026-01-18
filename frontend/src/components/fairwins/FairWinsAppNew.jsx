@@ -7,7 +7,6 @@ import useFuseSearch from '../../hooks/useFuseSearch'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
-import { getSubcategoriesForCategory } from '../../config/subcategories'
 import { buyMarketShares } from '../../utils/blockchainService'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
@@ -39,7 +38,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
@@ -49,11 +48,10 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [viewMode, setViewMode] = useState(() => getViewPreference()) // View mode: grid or compact
   const [selectedSubcategories, setSelectedSubcategories] = useState([]) // Subcategory filter state
   const [showHero, setShowHero] = useState(false) // Hero view state
-  const [showTokenBuilder, setShowTokenBuilder] = useState(false) // Token builder state
+  const [, setShowTokenBuilder] = useState(false) // Token builder state - setter used by TokenMintTab
   const [showFilters, setShowFilters] = useState(false) // Collapsible filters state
   const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
   const [showWeatherMap, setShowWeatherMap] = useState(true) // Collapsible weather map state
-  const heroBackButtonRef = useRef(null)
   const lastFocusedElementRef = useRef(null)
   
   // TokenMint state - kept for TokenMintTab display

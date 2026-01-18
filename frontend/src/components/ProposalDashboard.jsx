@@ -10,15 +10,52 @@ const ProposalRegistryABI = [
 ]
 
 function ProposalDashboard({ daos }) {
-  const { provider, signer } = useEthers()
+  const { provider } = useEthers()
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, pending, completed
   const [selectedProposal, setSelectedProposal] = useState(null)
 
   useEffect(() => {
+    const doLoadProposals = async () => {
+      try {
+        setLoading(true)
+        const allProposals = []
+
+        for (const dao of daos) {
+          const registry = new ethers.Contract(
+            dao.proposalRegistry,
+            ProposalRegistryABI,
+            provider
+          )
+
+          const count = await registry.getProposalCount()
+
+          for (let i = 0; i < count; i++) {
+            try {
+              const proposal = await registry.proposals(i)
+              allProposals.push({
+                id: i,
+                daoId: dao.id,
+                daoName: dao.name,
+                ...proposal
+              })
+            } catch (err) {
+              console.error(`Error loading proposal ${i}:`, err)
+            }
+          }
+        }
+
+        setProposals(allProposals)
+      } catch (error) {
+        console.error('Error loading proposals:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     if (provider && daos.length > 0) {
-      loadProposals()
+      doLoadProposals()
     }
   }, [provider, daos])
 
@@ -45,15 +82,15 @@ function ProposalDashboard({ daos }) {
               daoName: dao.name,
               ...proposal
             })
-          } catch (err) {
-            console.error(`Error loading proposal ${i}:`, err)
+          } catch (propErr) {
+            console.error(`Error loading proposal ${i}:`, propErr)
           }
         }
       }
 
       setProposals(allProposals)
-    } catch (error) {
-      console.error('Error loading proposals:', error)
+    } catch (loadErr) {
+      console.error('Error loading proposals:', loadErr)
     } finally {
       setLoading(false)
     }

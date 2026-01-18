@@ -25,7 +25,7 @@ function ClearPathButton() {
   
   const { hasRole, ROLES } = useRoles()
   const { showModal } = useModal()
-  const { preferences } = useUserPreferences()
+  useUserPreferences() // Hook called for context subscription
   const { isConnected } = useWallet()
 
   // Close dropdown when clicking outside

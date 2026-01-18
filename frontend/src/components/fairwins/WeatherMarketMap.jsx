@@ -185,7 +185,7 @@ function WeatherMarketMap({
           <FitBoundsToMarkets markets={weatherMarketsWithH3} />
 
           {/* Render market polygons */}
-          {marketPolygons.map(({ market, h3Index, polygon, color }) => {
+          {marketPolygons.map(({ market, polygon, color }) => {
             const isSelected = selectedMarket?.id === market.id
             const isHovered = hoveredMarket?.id === market.id
 

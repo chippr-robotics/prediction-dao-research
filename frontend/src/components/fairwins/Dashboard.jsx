@@ -995,13 +995,12 @@ function RecentActivityFeed({ markets }) {
 // ============================================================================
 
 function Dashboard() {
-  const { account, isConnected } = useWeb3()
+  useWeb3() // Hook called for web3 context
   const { getMarkets } = useDataFetcher()
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true
   const [markets, setMarkets] = useState([])
   const [isInitialLoad, setIsInitialLoad] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
 
   const categories = useMemo(() => [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -1022,37 +1021,17 @@ function Dashboard() {
           onBackgroundRefresh: (freshMarkets) => {
             console.log('Dashboard: Background refresh complete')
             setMarkets(freshMarkets)
-            setIsRefreshing(false)
           }
         })
         setMarkets(allMarkets)
-      } catch (error) {
-        console.error('Error loading markets:', error)
+      } catch (loadError) {
+        console.error('Error loading markets:', loadError)
       } finally {
         setIsInitialLoad(false)
       }
     }
     loadMarkets()
   }, [getMarkets, demoMode])
-
-  // Calculate platform metrics
-  const platformMetrics = useMemo(() => {
-    if (!markets.length) return null
-    
-    const activeMarkets = markets.filter(m => m.status === 'Active')
-    const totalLiquidity = markets.reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0)
-    const avgPrice = markets.reduce((sum, m) => sum + parseFloat(m.passTokenPrice || 0.5), 0) / markets.length
-    
-    const dateSeed = new Date().toDateString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    
-    return {
-      totalMarkets: activeMarkets.length,
-      totalLiquidity,
-      volume24h: totalLiquidity * (0.08 + stableRandom(dateSeed) * 0.04),
-      activeTraders: Math.floor(150 + stableRandom(dateSeed + 1) * 100),
-      avgSentiment: avgPrice
-    }
-  }, [markets])
 
   const handleMarketClick = useCallback((market) => {
     // Navigate to market - in real app would use router

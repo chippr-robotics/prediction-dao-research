@@ -44,18 +44,22 @@ const LoadingScreen = ({
   const [animated, setAnimated] = useState(false)
 
   useEffect(() => {
+    let timer
     if (visible) {
       // Initial animation completes after ~2s (all leaves + checkmark)
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setAnimated(true)
         if (onAnimationComplete) {
           onAnimationComplete()
         }
       }, 2000)
-      
-      return () => clearTimeout(timer)
     } else {
-      setAnimated(false)
+      // Use timeout to avoid synchronous setState in effect
+      timer = setTimeout(() => setAnimated(false), 0)
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer)
     }
   }, [visible, onAnimationComplete])
 

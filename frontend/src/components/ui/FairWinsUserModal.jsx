@@ -27,14 +27,14 @@ import './FairWinsUserModal.css'
  * 
  * @param {Function} onScanMarket - Callback for market scanning
  */
-function FairWinsUserModal({ onScanMarket }) {
+function FairWinsUserModal() {
   const { address, isConnected } = useWallet()
   const { disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
   const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
-  const { mode, toggleMode, isDark, platform, setThemePlatform, isClearPath } = useTheme()
-  const { showUsd, toggleCurrency, formatPrice } = usePrice()
+  const { toggleMode, isDark, setThemePlatform, isClearPath } = useTheme()
+  const { showUsd, toggleCurrency } = usePrice()
   const navigate = useNavigate()
   
   const [activeTab, setActiveTab] = useState('profile')

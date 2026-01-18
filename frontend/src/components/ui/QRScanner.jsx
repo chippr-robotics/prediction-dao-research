@@ -10,6 +10,27 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
   const scannerRef = useRef(null)
   const html5QrCodeRef = useRef(null)
 
+  // Define stopScanning first as it's used by handleClose
+  const stopScanning = useCallback(async () => {
+    if (html5QrCodeRef.current && scanning) {
+      try {
+        await html5QrCodeRef.current.stop()
+        html5QrCodeRef.current = null
+        setScanning(false)
+      } catch (err) {
+        console.error('Error stopping scanner:', err)
+      }
+    }
+  }, [scanning])
+
+  // Define handleClose early so it can be used in useEffect
+  const handleClose = useCallback(async () => {
+    await stopScanning()
+    if (onClose) {
+      onClose()
+    }
+  }, [stopScanning, onClose])
+
   useEffect(() => {
     if (isOpen) {
       // Get available cameras
@@ -34,13 +55,13 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
 
     return () => {
       // Cleanup on unmount
-      if (html5QrCodeRef.current && scanning) {
+      if (html5QrCodeRef.current) {
         html5QrCodeRef.current
           .stop()
           .catch((err) => console.error('Error stopping scanner:', err))
       }
     }
-  }, [isOpen, scanning])
+  }, [isOpen])
 
   // Handle Escape key press
   useEffect(() => {
@@ -56,7 +77,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen])
+  }, [isOpen, handleClose])
 
   const startScanning = async () => {
     if (!selectedCamera || html5QrCodeRef.current) return
@@ -89,18 +110,6 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }
 
-  const stopScanning = async () => {
-    if (html5QrCodeRef.current && scanning) {
-      try {
-        await html5QrCodeRef.current.stop()
-        html5QrCodeRef.current = null
-        setScanning(false)
-      } catch (err) {
-        console.error('Error stopping scanner:', err)
-      }
-    }
-  }
-
   const handleScanSuccess = useCallback(async (decodedText) => {
     // Stop scanning first
     await stopScanning()
@@ -118,13 +127,6 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
       }
     }
   }, [onScanSuccess, stopScanning])
-
-  const handleClose = async () => {
-    await stopScanning()
-    if (onClose) {
-      onClose()
-    }
-  }
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {

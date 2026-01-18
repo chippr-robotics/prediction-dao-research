@@ -352,7 +352,7 @@ function FriendMarketsModal({
     setMarketToAccept(null)
   }
 
-  const handleMarketAccepted = (marketId) => {
+  const handleMarketAccepted = () => {
     // Refresh data after acceptance - you may want to trigger a parent refresh
     handleCloseAcceptanceModal()
     // Force a refresh by closing and reopening the modal or triggering a data refresh
@@ -1720,7 +1720,6 @@ function MarketsCompactTable({
   markets,
   onSelect,
   formatDate,
-  formatAddress,
   getTypeLabel,
   getStatusClass,
   isPast = false

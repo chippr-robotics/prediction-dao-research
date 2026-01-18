@@ -9,15 +9,17 @@ import Fuse from 'fuse.js'
  * @returns {Array} Filtered array of items based on search query
  */
 function useFuseSearch(items, searchQuery, optionsOverride = {}) {
-  // Create a stable stringified version of options for dependency tracking
+  // Stringify options once for stable comparison
   const optionsJson = JSON.stringify(optionsOverride)
-  const optionsKey = useMemo(() => optionsJson, [optionsJson])
 
   // Create Fuse instance - memoized to avoid recreation on every render
   const fuse = useMemo(() => {
     if (!items || items.length === 0) {
       return null
     }
+
+    // Parse options from JSON to ensure stable object reference
+    const parsedOptions = JSON.parse(optionsJson)
 
     // Default Fuse.js options optimized for market search
     const fuseOptions = {
@@ -29,11 +31,11 @@ function useFuseSearch(items, searchQuery, optionsOverride = {}) {
       includeScore: true,
       useExtendedSearch: false,
       ignoreLocation: true,
-      ...optionsOverride
+      ...parsedOptions
     }
 
     return new Fuse(items, fuseOptions)
-  }, [items, optionsKey])
+  }, [items, optionsJson])
 
   // Perform search - memoized to avoid re-searching with same query
   const searchResults = useMemo(() => {

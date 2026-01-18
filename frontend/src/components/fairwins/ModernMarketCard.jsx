@@ -210,7 +210,7 @@ function ModernMarketCard({
   // Get ring color based on probability and market status
   const ringColor = useMemo(() => getRingColor(yesProb, market.status), [yesProb, market.status])
   
-  const sparklineData = useMemo(() => generateSparklineData(market), [market.id, market.passTokenPrice])
+  const sparklineData = useMemo(() => generateSparklineData(market), [market])
   const trend = useMemo(() => calculateTrend(sparklineData), [sparklineData])
   
   // Get subcategory display name

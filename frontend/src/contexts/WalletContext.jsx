@@ -4,7 +4,6 @@ import { ethers } from 'ethers'
 import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
 import {
   getUserRoles,
-  hasRole as checkRole,
   addUserRole,
   removeUserRole
 } from '../utils/roleStorage'

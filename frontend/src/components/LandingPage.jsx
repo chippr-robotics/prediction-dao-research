@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWeb3 } from '../hooks/useWeb3'
 import Header from './Header'
 import './LandingPage.css'
 
 function LandingPage() {
   const navigate = useNavigate()
-  const { isConnected, connectWallet } = useWeb3()
   const [logoErrors, setLogoErrors] = useState({ fairwins: false })
 
   const handleBrowseMarkets = () => {
@@ -16,8 +14,6 @@ function LandingPage() {
   const handleLogoError = (platform) => {
     setLogoErrors(prev => ({ ...prev, [platform]: true }))
   }
-
-  const isDevelopment = import.meta.env.DEV
 
   return (
     <div className="landing-page">

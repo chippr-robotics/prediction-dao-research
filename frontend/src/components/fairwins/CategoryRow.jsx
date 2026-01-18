@@ -3,16 +3,15 @@ import MarketTile from './MarketTile'
 import SubcategoryFilter from './SubcategoryFilter'
 import './CategoryRow.css'
 
-function CategoryRow({ 
-  title, 
-  markets = [], 
+function CategoryRow({
+  title,
+  markets = [],
   onMarketClick,
   selectedMarketId,
   icon,
   subcategories = [],
   selectedSubcategories = [],
-  onSubcategoryToggle,
-  categoryId
+  onSubcategoryToggle
 }) {
   const scrollerRef = useRef(null)
 

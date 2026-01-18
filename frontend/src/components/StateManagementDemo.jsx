@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { 
-  useWeb3, 
-  useAccount, 
-  useNetwork, 
+import { useState, useCallback } from 'react'
+import {
+  useWeb3,
+  useAccount,
+  useNetwork,
   useEthers,
   useWallet,
   useNotification,
@@ -34,6 +34,14 @@ function StateManagementDemo() {
   const { error, showError, clearError } = useError()
   const [eventLog, setEventLog] = useState([])
 
+  // Define addToLog before hooks that use it
+  const addToLog = useCallback((message) => {
+    setEventLog(prev => [
+      { timestamp: new Date().toLocaleTimeString(), message },
+      ...prev.slice(0, 9) // Keep last 10 entries
+    ])
+  }, [])
+
   // Listen to account changes
   useAccountChange((newAccount) => {
     addToLog('Account changed: ' + newAccount)
@@ -43,13 +51,6 @@ function StateManagementDemo() {
   useChainChange((newChainId) => {
     addToLog('Chain changed: ' + newChainId)
   })
-
-  const addToLog = (message) => {
-    setEventLog(prev => [
-      { timestamp: new Date().toLocaleTimeString(), message },
-      ...prev.slice(0, 9) // Keep last 10 entries
-    ])
-  }
 
   const handleConnect = async () => {
     const success = await connectWallet()
