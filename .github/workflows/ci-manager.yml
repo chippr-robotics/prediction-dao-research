@@ -80,6 +80,8 @@ jobs:
 
       - name: Generate change summary
         run: |
+          set -euo pipefail
+          
           echo "## 🔍 Change Detection Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "This workflow intelligently detects which components have changed" >> $GITHUB_STEP_SUMMARY
@@ -119,19 +121,19 @@ jobs:
           test_count=0
           if [[ "${{ steps.filter.outputs.contracts }}" == "true" ]]; then
             echo "- Smart Contract Tests" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
           if [[ "${{ steps.filter.outputs.frontend }}" == "true" ]]; then
             echo "- Frontend Lint & Build" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
           if [[ "${{ steps.filter.outputs.docs }}" == "true" ]]; then
             echo "- Documentation Build" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
           if [[ "${{ steps.filter.outputs.security }}" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "- Security Analysis" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
           
           if [[ $test_count -eq 0 ]]; then
