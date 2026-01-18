@@ -319,7 +319,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [useCustomUri, customUri, metadataForm, paramsForm, address])
+  }, [useCustomUri, customUri, metadataForm, paramsForm])
 
   // Navigation handlers
   const handleNext = useCallback(() => {

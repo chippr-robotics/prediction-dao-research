@@ -31,6 +31,7 @@ export function RoleProvider({ children }) {
       setRoles([])
       setBlockchainSynced(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, isConnected])
 
   /**
@@ -56,6 +57,7 @@ export function RoleProvider({ children }) {
     } finally {
       setIsLoading(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /**

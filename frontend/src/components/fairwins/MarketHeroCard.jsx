@@ -217,7 +217,7 @@ function MarketHeroCard({ market, onTrade }) {
       .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + '%'))
       .attr('color', '#9ca3af')
 
-  }, [market?.passTokenPrice, uniqueGradientId])
+  }, [market, uniqueGradientId])
 
   // Render activity heatmap
   // Regenerates when market changes to show updated activity patterns
@@ -359,7 +359,7 @@ function MarketHeroCard({ market, onTrade }) {
       .attr('fill', '#9ca3af')
       .text('YES Probability')
 
-  }, [market?.passTokenPrice])
+  }, [market])
 
   // Early return after all hooks to comply with Rules of Hooks
   if (!market) {

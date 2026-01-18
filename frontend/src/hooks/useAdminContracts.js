@@ -418,7 +418,7 @@ export function useAdminContracts() {
       console.error('Error checking role:', err)
       return false
     }
-  }, [getRoleManagerContract, contractState.supportsTiers])
+  }, [getRoleManagerContract])
 
   /**
    * Withdraw funds from the contract
@@ -524,7 +524,7 @@ export function useAdminContracts() {
       console.error('Error getting tier info:', err)
       return null
     }
-  }, [getRoleManagerContract])
+  }, [getRoleManagerContract, contractState.supportsTiers])
 
   /**
    * Get user's tier and membership info for a role

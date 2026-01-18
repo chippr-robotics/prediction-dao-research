@@ -64,6 +64,7 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
     // Update current block periodically
     const interval = setInterval(loadCurrentBlock, 10000) // Every 10 seconds
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [governorAddress, registryAddress, provider, account])
 
   const loadCurrentBlock = async () => {
