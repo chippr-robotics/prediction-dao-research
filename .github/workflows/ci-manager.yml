@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  security-events: write
 
 jobs:
   detect-changes:
@@ -79,6 +80,20 @@ jobs:
 
       - name: Generate change summary
         run: |
+          set -eo pipefail
+          
+          # Set default values for outputs to ensure they're always defined
+          contracts="${{ steps.filter.outputs.contracts }}"
+          frontend="${{ steps.filter.outputs.frontend }}"
+          docs="${{ steps.filter.outputs.docs }}"
+          security="${{ steps.filter.outputs.security }}"
+          
+          # Ensure variables default to 'false' if empty
+          contracts="${contracts:-false}"
+          frontend="${frontend:-false}"
+          docs="${docs:-false}"
+          security="${security:-false}"
+          
           echo "## 🔍 Change Detection Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "This workflow intelligently detects which components have changed" >> $GITHUB_STEP_SUMMARY
@@ -87,25 +102,25 @@ jobs:
           echo "### Components Changed:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [[ "${{ steps.filter.outputs.contracts }}" == "true" ]]; then
+          if [[ "$contracts" == "true" ]]; then
             echo "✅ **Smart Contracts** - Will run contract tests" >> $GITHUB_STEP_SUMMARY
           else
             echo "⏭️ **Smart Contracts** - No changes detected, tests skipped" >> $GITHUB_STEP_SUMMARY
           fi
           
-          if [[ "${{ steps.filter.outputs.frontend }}" == "true" ]]; then
+          if [[ "$frontend" == "true" ]]; then
             echo "✅ **Frontend** - Will run frontend tests" >> $GITHUB_STEP_SUMMARY
           else
             echo "⏭️ **Frontend** - No changes detected, tests skipped" >> $GITHUB_STEP_SUMMARY
           fi
           
-          if [[ "${{ steps.filter.outputs.docs }}" == "true" ]]; then
+          if [[ "$docs" == "true" ]]; then
             echo "✅ **Documentation** - Will build docs" >> $GITHUB_STEP_SUMMARY
           else
             echo "⏭️ **Documentation** - No changes detected, build skipped" >> $GITHUB_STEP_SUMMARY
           fi
           
-          if [[ "${{ steps.filter.outputs.security }}" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "$security" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "✅ **Security Testing** - Will run security analysis" >> $GITHUB_STEP_SUMMARY
           else
             echo "⏭️ **Security Testing** - No changes detected, analysis skipped" >> $GITHUB_STEP_SUMMARY
@@ -116,21 +131,21 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           test_count=0
-          if [[ "${{ steps.filter.outputs.contracts }}" == "true" ]]; then
+          if [[ "$contracts" == "true" ]]; then
             echo "- Smart Contract Tests" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
-          if [[ "${{ steps.filter.outputs.frontend }}" == "true" ]]; then
+          if [[ "$frontend" == "true" ]]; then
             echo "- Frontend Lint & Build" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
-          if [[ "${{ steps.filter.outputs.docs }}" == "true" ]]; then
+          if [[ "$docs" == "true" ]]; then
             echo "- Documentation Build" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
-          if [[ "${{ steps.filter.outputs.security }}" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          if [[ "$security" == "true" ]] || [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "- Security Analysis" >> $GITHUB_STEP_SUMMARY
-            ((test_count++))
+            test_count=$((test_count + 1))
           fi
           
           if [[ $test_count -eq 0 ]]; then
@@ -172,7 +187,6 @@ jobs:
 
       - name: Run linter
         run: npm run lint
-        continue-on-error: true
 
       - name: Build frontend
         run: npm run build

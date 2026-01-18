@@ -62,7 +62,7 @@ The CI Manager tracks these components:
 
 - **Full Documentation**: See [README.md](README.md)
 - **Test Scenarios**: See [CI_MANAGER_TEST_SCENARIOS.md](CI_MANAGER_TEST_SCENARIOS.md)
-- **Configuration**: See [ci-config.yml](ci-config.yml)
+- **Configuration**: See [../ci-config.yml](../ci-config.yml)
 - **Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## Troubleshooting
