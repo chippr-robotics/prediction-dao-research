@@ -47,7 +47,6 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
     isConnected,
     isCorrectNetwork,
     walletAddress,
-    hasContract,
     isContractDeployed,
     txState,
     txHash,

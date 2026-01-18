@@ -370,7 +370,7 @@ async function tryGetPriceHistory(contract, marketId, currentPassPrice = 0.5, nu
     // If we have very few trades, interpolate to fill numPoints
     if (tradeData.length < numPoints) {
       const prices = []
-      const startPrice = 0.5 // Markets start at 50/50
+      // Note: Markets start at 50/50, but we interpolate from available trade data
 
       // Linear interpolation between trades
       for (let i = 0; i < numPoints; i++) {
@@ -703,7 +703,7 @@ export async function fetchMarketsFromBlockchain() {
  * @param {string} category - Market category (currently unused as contract doesn't support categories)
  * @returns {Promise<Array>} Array of market objects
  */
-export async function fetchMarketsByCategoryFromBlockchain(category) {
+export async function fetchMarketsByCategoryFromBlockchain(_category) {
   try {
     // The contract doesn't have category filtering - fetch all and filter client-side
     const allMarkets = await fetchMarketsFromBlockchain()
@@ -1686,7 +1686,7 @@ export async function hasRoleOnChain(userAddress, roleName) {
  * @param {number} durationDays - Duration in days (0 for permanent)
  * @returns {Promise<Object>} Transaction receipt
  */
-export async function grantRoleOnChain(signer, userAddress, roleName, durationDays = 365) {
+export async function grantRoleOnChain(signer, userAddress, roleName, _durationDays = 365) {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
@@ -1811,7 +1811,7 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
     let paymentManagerAddress
     try {
       paymentManagerAddress = await paymentProcessor.paymentManager()
-    } catch (e) {
+    } catch {
       paymentManagerAddress = ethers.ZeroAddress
     }
 

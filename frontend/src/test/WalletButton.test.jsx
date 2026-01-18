@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { axe } from 'vitest-axe'
+// import { axe } from 'vitest-axe' // Unused, commented out for now
 import WalletButton from '../components/wallet/WalletButton'
 import { WalletContext, ThemeContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
 import { BrowserRouter } from 'react-router-dom'

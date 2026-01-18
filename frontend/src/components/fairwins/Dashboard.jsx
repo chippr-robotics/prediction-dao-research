@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useDataFetcher } from '../../hooks/useDataFetcher'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import LoadingScreen from '../ui/LoadingScreen'

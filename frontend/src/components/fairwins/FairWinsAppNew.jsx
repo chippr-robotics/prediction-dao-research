@@ -92,14 +92,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     { id: 'weather', name: 'Weather', icon: '🌤️' }
   ]
 
-  const getMarketsByCategory = () => {
-    const grouped = {}
-    categories.forEach(cat => {
-      grouped[cat.id] = markets.filter(m => m.category === cat.id)
-    })
-    return grouped
-  }
-
   const handleCategoryChange = (categoryId) => {
     // Handle special navigation categories
     if (categoryId === 'tokenmint') {
@@ -356,9 +348,6 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       return role
     })
   }, [roles, ROLES])
-
-  // Markets by category - currently unused but available for future features
-  // const marketsByCategory = getMarketsByCategory()
 
   // Memoize trending markets to avoid recalculation on every render
   const trendingMarkets = useMemo(() => {

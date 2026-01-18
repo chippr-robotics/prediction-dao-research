@@ -245,10 +245,10 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   const availableTiers = useMemo(() => {
     if (isExtendFlow) {
       // For extend, show current tier and higher tiers
-      return Object.entries(MEMBERSHIP_TIERS).filter(([_, tier]) => tier.id >= highestCurrentTier)
+      return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => tier.id >= highestCurrentTier)
     }
     // For upgrade/purchase, show only higher tiers
-    return Object.entries(MEMBERSHIP_TIERS).filter(([_, tier]) => tier.id > highestCurrentTier)
+    return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => tier.id > highestCurrentTier)
   }, [highestCurrentTier, isExtendFlow])
 
   // Reset form

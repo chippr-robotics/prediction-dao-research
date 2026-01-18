@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useWallet, useWeb3, useEnsResolution } from '../../hooks'
 import { isValidCid } from '../../constants/ipfs'
 import { TOKENS } from '../../constants/etcswap'
-import { isValidEthereumAddress } from '../../utils/validation'
 import {
   isCorrelationRegistryDeployed,
   fetchCorrelationGroups,

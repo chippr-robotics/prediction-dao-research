@@ -28,10 +28,11 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
   }, [])
 
   // Get other markets in the same group - must be called before any conditional returns
+  // Using full market object as dependency for React Compiler compatibility
   const relatedMarkets = useMemo(() => {
     if (!market?.correlationGroup || !linkedMarkets?.length) return []
     return linkedMarkets.filter(m => m.id !== market.id)
-  }, [linkedMarkets, market?.correlationGroup, market?.id])
+  }, [linkedMarkets, market])
 
   if (!market) return null
 

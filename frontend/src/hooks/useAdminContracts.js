@@ -148,7 +148,7 @@ export function useAdminContracts() {
       for (const roleName of roleNames) {
         try {
           roleHashes[roleName] = await contract[roleName]()
-        } catch (e) {
+        } catch {
           // Role might not exist on this contract version
           roleHashes[roleName] = null
         }

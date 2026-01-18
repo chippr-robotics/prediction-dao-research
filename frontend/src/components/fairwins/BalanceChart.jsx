@@ -3,25 +3,23 @@ import { useETCswap } from '../../hooks/useETCswap'
 import { TIME_HORIZONS } from '../../constants/etcswap'
 import './BalanceChart.css'
 
+// Helper function to filter history by time horizon (pure function)
+const filterByHorizon = (history, horizonSeconds) => {
+  if (!history || history.length === 0) return []
+  if (horizonSeconds === 0) return history // ALL
+  const cutoff = Date.now() - (horizonSeconds * 1000)
+  return history.filter(entry => entry.timestamp >= cutoff)
+}
+
 function BalanceChart() {
   const { balanceHistory } = useETCswap()
   const [selectedHorizon, setSelectedHorizon] = useState('24H')
   const [selectedToken, setSelectedToken] = useState('all')
 
-  // Compute cutoff time outside useMemo for purity
-  const horizonSeconds = TIME_HORIZONS[selectedHorizon]
-  const cutoffTime = horizonSeconds === 0 ? 0 : Date.now() - (horizonSeconds * 1000)
-
   // Filter balance history based on selected time horizon
-  const filteredHistory = useMemo(() => {
-    if (!balanceHistory || balanceHistory.length === 0) return []
-
-    if (horizonSeconds === 0) {
-      return balanceHistory // ALL
-    }
-
-    return balanceHistory.filter(entry => entry.timestamp >= cutoffTime)
-  }, [balanceHistory, horizonSeconds, cutoffTime])
+  // Not memoized since filtering is simple and we need current time
+  const horizonSeconds = TIME_HORIZONS[selectedHorizon]
+  const filteredHistory = filterByHorizon(balanceHistory, horizonSeconds)
   
   // Calculate chart data
   const chartData = useMemo(() => {
