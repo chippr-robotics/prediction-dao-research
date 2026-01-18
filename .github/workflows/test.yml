@@ -39,6 +39,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # Coverage report generation can fail due to environment issues without indicating
+      # actual test failures. We allow this to fail gracefully while still uploading
+      # whatever coverage data was generated.
       - name: Generate coverage report
         run: npm run test:coverage
         continue-on-error: true
@@ -73,9 +76,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # IMPORTANT: Linting errors must fail the build to prevent code quality regressions.
+      # Do not add 'continue-on-error: true' to this step as it would hide ESLint failures.
       - name: Run linter
         run: npm run lint
-        continue-on-error: true
 
   frontend-tests:
     name: Frontend Unit Tests
@@ -102,6 +106,9 @@ jobs:
       - name: Run tests
         run: npm test -- --run
 
+      # Coverage report generation can fail due to environment issues without indicating
+      # actual test failures. We allow this to fail gracefully while still uploading
+      # whatever coverage data was generated.
       - name: Generate coverage report
         run: npm run test:coverage -- --run
         continue-on-error: true

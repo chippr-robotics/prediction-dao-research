@@ -14,7 +14,7 @@ The test pipeline (`test.yml`) includes three main jobs:
 
 2. **Frontend Lint** - Checks frontend code quality
    - Runs ESLint on React/JavaScript code
-   - **Status**: Informational ⚠️ (PR can still merge, but issues should be addressed)
+   - **Status**: Required ✅ (PR cannot merge if this fails - errors indicate code quality issues)
 
 3. **Frontend Build** - Verifies frontend builds successfully
    - Builds the Vite/React application
@@ -37,8 +37,8 @@ To require tests to pass before merging PRs, follow these steps:
    - ☑️ **Require branches to be up to date before merging**
 6. In the status checks search box, select:
    - `Smart Contract Tests`
+   - `Frontend Lint`
    - `Frontend Build`
-   - (Optionally) `Frontend Lint`
 7. Additional recommended settings:
    - ☑️ **Do not allow bypassing the above settings**
    - ☑️ **Require linear history** (optional, keeps commit history clean)
@@ -114,6 +114,35 @@ If you have administrator access and need to bypass checks in an emergency:
 2. Merge the PR
 3. Re-enable branch protection
 4. **Important**: Create a follow-up PR to fix the issues that caused the test failures
+
+## CI/CD Error Handling Policy
+
+We maintain strict policies about error handling in our CI/CD pipeline to prevent silent failures and maintain code quality. See **[CI_ERROR_HANDLING_POLICY.md](./CI_ERROR_HANDLING_POLICY.md)** for detailed guidelines.
+
+### Key Principles
+
+1. **Fail Loudly on Code Quality Issues**: Linting, testing, and build steps MUST fail the CI pipeline when errors occur
+2. **Never Hide Failures**: Do not use `continue-on-error: true` on quality checks (linting, tests, builds)
+3. **Document Exceptions**: If a step must use `continue-on-error`, it must include inline documentation explaining why
+
+### Acceptable vs Unacceptable Error Handling
+
+✅ **Acceptable**: Coverage report generation may fail without blocking (auxiliary operation)
+```yaml
+# Coverage generation can fail due to environment issues
+- name: Generate coverage report
+  run: npm run test:coverage
+  continue-on-error: true
+```
+
+❌ **Not Acceptable**: Hiding linting or test failures
+```yaml
+- name: Run linter
+  run: npm run lint
+  continue-on-error: true  # WRONG: Hides code quality issues
+```
+
+For complete guidelines, see **[CI_ERROR_HANDLING_POLICY.md](./CI_ERROR_HANDLING_POLICY.md)**.
 
 ## Support
 

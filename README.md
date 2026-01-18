@@ -633,6 +633,28 @@ test/
 - JavaScript/React: Use ESLint with Airbnb config
 - Comments: Document all public functions
 
+### CI/CD and Testing
+
+Our CI/CD pipeline enforces strict code quality standards:
+
+- **Linting**: ESLint errors will fail the build (see [CI Error Handling Policy](.github/CI_ERROR_HANDLING_POLICY.md))
+- **Testing**: All tests must pass before merging
+- **Coverage**: Coverage reports are generated but won't block builds
+
+**Before submitting a PR:**
+```bash
+# Run linter to catch issues early
+cd frontend && npm run lint
+
+# Run tests
+npm test
+
+# Build to ensure no build errors
+npm run build
+```
+
+For complete CI/CD guidelines, see [Test Pipeline Documentation](.github/TEST_PIPELINE.md).
+
 ### Smart Contract Security
 
 This repository uses an automated Ethereum security review agent that analyzes all smart contract code changes:

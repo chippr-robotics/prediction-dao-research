@@ -48,6 +48,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      # Coverage report generation can fail due to environment issues without indicating
+      # actual test failures. We allow this to fail gracefully while still uploading
+      # whatever coverage data was generated.
       - name: Generate coverage report
         run: npm run test:coverage -- --run
         continue-on-error: true
