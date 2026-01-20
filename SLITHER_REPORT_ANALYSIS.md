@@ -264,7 +264,11 @@ Protected by `nonReentrant` modifier.
 
 The report also included several low-priority informational findings:
 
-- **Reentrancy-benign** (10 instances): These are benign reentrancies where state is updated after external calls but doesn't pose a security risk due to the checks-effects-interactions pattern being followed elsewhere.
+- **Reentrancy-benign** (10 instances): These are benign reentrancies where state is updated after external calls. These don't pose a security risk because:
+  - State changes are to independent variables that don't affect the outcome of external calls
+  - External calls are to trusted contracts (e.g., Uniswap pools, CTF1155)
+  - Critical state changes (balances, ownership) happen before external calls
+  - Functions have nonReentrant guards preventing recursive calls to the same function
 
 - **Reentrancy-events** (9 instances): Events emitted after external calls. Not a security issue.
 
@@ -314,5 +318,5 @@ The development team has clearly prioritized security by:
 
 ---
 
-*Analysis Date: 2026-01-20*
+*Analysis Date: January 2024*
 *Slither Report Source: https://github.com/user-attachments/files/24699106/slither-report.json.txt*
