@@ -8,6 +8,7 @@ import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import { buyMarketShares } from '../../utils/blockchainService'
+import { hasAnyMarketsCache } from '../../utils/marketCache'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -34,7 +35,7 @@ import './FairWinsAppNew.css'
 function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
   const { roles, ROLES } = useRoles()
-  const { getMarkets } = useDataFetcher()
+  const { getMarkets, invalidateCaches } = useDataFetcher()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
   const navigate = useNavigate()
@@ -42,7 +43,9 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
-  const [loading, setLoading] = useState(true)
+  // Start with loading=false if we have cached data, to show stale data immediately
+  const [loading, setLoading] = useState(() => !hasAnyMarketsCache())
+  const [isRefreshing, setIsRefreshing] = useState(false) // Background refresh indicator
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'volume24h', 'activity', 'popularity', 'probability', 'category'
   const [searchQuery, setSearchQuery] = useState('') // Search query state
   const [viewMode, setViewMode] = useState(() => getViewPreference()) // View mode: grid or compact
@@ -53,6 +56,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
   const [showWeatherMap, setShowWeatherMap] = useState(true) // Collapsible weather map state
   const lastFocusedElementRef = useRef(null)
+  const initialLoadRef = useRef(true)
   
   // TokenMint state - kept for TokenMintTab display
   const [tokens, setTokens] = useState([])
@@ -66,21 +70,58 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     }
   }, [searchParams, selectedCategory])
 
-  const loadMarkets = useCallback(async () => {
+  // Handle background refresh - updates markets without showing loading spinner
+  const handleBackgroundRefresh = useCallback((freshMarkets) => {
+    console.log('[FairWinsAppNew] Background refresh complete:', freshMarkets?.length, 'markets')
+    setMarkets(freshMarkets)
+    setIsRefreshing(false)
+
+    // Update selectedMarket if one is selected
+    if (selectedMarket) {
+      const updatedMarket = freshMarkets.find(m => m.id === selectedMarket.id)
+      if (updatedMarket) {
+        setSelectedMarket(updatedMarket)
+      }
+    }
+  }, [selectedMarket])
+
+  // Handle stale data notification
+  const handleStaleData = useCallback((staleMarkets, age) => {
+    console.log(`[FairWinsAppNew] Using stale data: ${staleMarkets?.length} markets, age: ${Math.round(age / 1000)}s`)
+    // Set refreshing indicator to show subtle loading state
+    setIsRefreshing(true)
+  }, [])
+
+  const loadMarkets = useCallback(async (forceRefresh = false) => {
     try {
-      setLoading(true)
-      const allMarkets = await getMarkets()
+      // Only show full loading on initial load or force refresh when no data
+      const isInitial = initialLoadRef.current
+      if (isInitial && markets.length === 0) {
+        setLoading(true)
+      } else if (forceRefresh) {
+        setIsRefreshing(true)
+      }
+
+      const allMarkets = await getMarkets(null, {
+        forceRefresh,
+        onBackgroundRefresh: handleBackgroundRefresh,
+        onStaleData: handleStaleData
+      })
+
       setMarkets(allMarkets)
       setLoading(false)
+      setIsRefreshing(false)
+      initialLoadRef.current = false
     } catch (error) {
       console.error('Error loading markets:', error)
       setLoading(false)
+      setIsRefreshing(false)
     }
-  }, [getMarkets])
+  }, [getMarkets, markets.length, handleBackgroundRefresh, handleStaleData])
 
   useEffect(() => {
     loadMarkets()
-  }, [loadMarkets])
+  }, []) // Only run on mount - loadMarkets is stable due to useCallback
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -208,11 +249,22 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
       console.log('Transaction receipt:', receipt)
 
-      // Refresh market data and update selectedMarket with fresh data
+      // Invalidate caches after trade - this will trigger background refresh
+      invalidateCaches('trade', {
+        marketId: marketId,
+        userAddress: account
+      })
+
+      // Refresh market data - use force refresh to get latest prices
       // Note: We don't set loading=true here to keep the modal open during refresh
+      setIsRefreshing(true)
       try {
-        const allMarkets = await getMarkets()
+        const allMarkets = await getMarkets(null, {
+          forceRefresh: true,
+          onBackgroundRefresh: handleBackgroundRefresh
+        })
         setMarkets(allMarkets)
+        setIsRefreshing(false)
 
         // Update selectedMarket with the refreshed data if one is selected
         if (selectedMarket) {
@@ -223,6 +275,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
         }
       } catch (refreshError) {
         console.error('Error refreshing markets:', refreshError)
+        setIsRefreshing(false)
       }
 
     } catch (error) {
@@ -443,23 +496,24 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     return [...groupedMarkets, ...sortedUngrouped]
   }, [searchFilteredMarkets, compareMarkets])
 
-  if (loading) {
+  // Only show full loading screen if we have no data at all
+  if (loading && markets.length === 0) {
     return (
       <div className="fairwins-app-new">
-        <SidebarNav 
+        <SidebarNav
           selectedCategory={selectedCategory}
           onCategoryChange={handleCategoryChange}
           userRoles={userRoleNames}
         />
-        <HeaderBar 
+        <HeaderBar
           onConnect={onConnect}
           onDisconnect={onDisconnect}
           isConnected={isConnected}
           account={account}
         />
         <main className="main-canvas">
-          <LoadingScreen 
-            visible={true} 
+          <LoadingScreen
+            visible={true}
             text="Loading markets"
             inline
             size="large"
@@ -477,13 +531,21 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
         userRoles={userRoleNames}
       />
       
-      <HeaderBar 
+      <HeaderBar
         onConnect={onConnect}
         onDisconnect={onDisconnect}
         isConnected={isConnected}
         account={account}
         onScanMarket={handleScanMarket}
       />
+
+      {/* Subtle refreshing indicator - shows when background refresh is in progress */}
+      {isRefreshing && (
+        <div className="refresh-indicator" aria-live="polite">
+          <span className="refresh-spinner" aria-hidden="true"></span>
+          <span className="refresh-text">Updating...</span>
+        </div>
+      )}
 
       <main className="main-canvas">
         <div className="unified-view">

@@ -1,13 +1,19 @@
 /**
  * Data Fetcher Utility
- * 
+ *
  * This module provides a unified interface for fetching data that can switch between
  * mock data (for demos/testing) and real blockchain data based on user preferences.
- * 
+ *
+ * Features:
+ * - Automatic caching with stale-while-revalidate pattern
+ * - Background refresh for instant UX
+ * - Request deduplication
+ * - Extended TTLs for all data types
+ *
  * Usage:
  * ```javascript
  * import { useDataFetcher } from '../hooks/useDataFetcher'
- * 
+ *
  * function MyComponent() {
  *   const { getMarkets, getProposals } = useDataFetcher()
  *   const markets = await getMarkets()
@@ -33,7 +39,8 @@ import {
   fetchProposalsFromBlockchain,
   fetchPositionsFromBlockchain,
   fetchWelfareMetricsFromBlockchain,
-  fetchCategoriesFromBlockchain
+  fetchCategoriesFromBlockchain,
+  fetchCorrelationGroups as fetchCorrelationGroupsFromBlockchain
 } from './blockchainService'
 
 import {
@@ -42,21 +49,32 @@ import {
   clearMarketCache
 } from './marketCache'
 
+import {
+  fetchWithCache,
+  invalidateCachesForAction,
+  warmCaches,
+  getCacheStats,
+  CACHE_CONFIG,
+  clearAllCaches
+} from './cacheService'
+
 /**
  * Fetch markets based on demo mode with caching support
  * Uses stale-while-revalidate pattern for blockchain data:
- * - Returns cached data immediately if available
+ * - Returns cached data immediately if available (even if stale)
  * - Refreshes in background if cache is stale
+ * - Uses localStorage for persistence across sessions
  *
  * @param {boolean} demoMode - Whether to use mock data
  * @param {Object} contracts - Contract instances for live data fetching (optional)
  * @param {Object} options - Additional options
  * @param {boolean} options.forceRefresh - Skip cache and fetch fresh data
  * @param {Function} options.onBackgroundRefresh - Callback when background refresh completes
+ * @param {Function} options.onStaleData - Callback when returning stale cached data
  * @returns {Promise<Array>} Array of market objects
  */
 export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
-  const { forceRefresh = false, onBackgroundRefresh = null } = options
+  const { forceRefresh = false, onBackgroundRefresh = null, onStaleData = null } = options
   console.log('fetchMarkets called with demoMode:', demoMode, 'forceRefresh:', forceRefresh)
 
   if (demoMode) {
@@ -65,39 +83,40 @@ export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
     return getMockMarkets()
   }
 
-  // Try to load from cache first (unless forcing refresh)
-  if (!forceRefresh) {
-    const cached = loadCachedMarkets()
-    if (cached) {
-      console.log(`Cache hit: ${cached.markets.length} markets, age: ${Math.round(cached.age / 1000)}s, stale: ${cached.isStale}`)
-
-      // If cache is stale, trigger background refresh
-      if (cached.isStale && onBackgroundRefresh) {
-        console.log('Cache is stale, triggering background refresh')
-        fetchMarketsFromBlockchain()
-          .then(freshMarkets => {
-            console.log('Background refresh complete:', freshMarkets.length, 'markets')
-            cacheMarkets(freshMarkets)
-            onBackgroundRefresh(freshMarkets)
-          })
-          .catch(error => {
-            console.warn('Background refresh failed:', error.message)
-          })
-      }
-
-      // Return cached data immediately
-      return cached.markets
-    }
-  }
-
   try {
-    // Fetch from Mordor testnet
-    console.log('Live mode - fetching from blockchain (cache miss or refresh)')
-    const markets = await fetchMarketsFromBlockchain()
-    console.log('Fetched', markets.length, 'markets from blockchain')
+    // Use unified cache service with stale-while-revalidate
+    const result = await fetchWithCache({
+      configKey: 'markets',
+      fetchFn: fetchMarketsFromBlockchain,
+      forceRefresh,
+      onBackgroundRefresh: onBackgroundRefresh
+        ? (freshData) => {
+            console.log('Background refresh complete:', freshData.markets?.length || freshData?.length, 'markets')
+            // Also update legacy cache for compatibility
+            const markets = freshData.markets || freshData
+            cacheMarkets(markets, freshData.lastBlock)
+            onBackgroundRefresh(markets)
+          }
+        : null,
+      onStaleData: onStaleData
+        ? (data, age) => {
+            const markets = data.markets || data
+            console.log(`Returning stale data: ${markets?.length} markets, age: ${Math.round(age / 1000)}s`)
+            onStaleData(markets, age)
+          }
+        : null
+    })
 
-    // Cache the results
-    cacheMarkets(markets)
+    // Extract markets from cached data structure
+    const markets = result.data?.markets || result.data || []
+
+    if (result.fromCache) {
+      console.log(`Cache ${result.isStale ? 'stale' : 'hit'}: ${markets.length} markets, age: ${Math.round((result.age || 0) / 1000)}s`)
+    } else {
+      console.log('Fetched', markets.length, 'markets from blockchain')
+      // Update legacy cache for compatibility
+      cacheMarkets(markets)
+    }
 
     return markets
   } catch (error) {
@@ -158,18 +177,36 @@ export async function fetchMarketById(demoMode, id, _contracts = null) {
 }
 
 /**
- * Fetch proposals based on demo mode
+ * Fetch proposals based on demo mode with caching
+ * Uses 10-minute TTL since proposals change less frequently
+ *
  * @param {boolean} demoMode - Whether to use mock data
  * @param {Object} contracts - Contract instances for live data fetching (optional)
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceRefresh - Skip cache and fetch fresh
+ * @param {Function} options.onBackgroundRefresh - Callback for background refresh
  * @returns {Promise<Array>} Array of proposal objects
  */
-export async function fetchProposals(demoMode, _contracts = null) {
+export async function fetchProposals(demoMode, _contracts = null, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+
   if (demoMode) {
     return getMockProposals()
   }
-  
+
   try {
-    return await fetchProposalsFromBlockchain()
+    const result = await fetchWithCache({
+      configKey: 'proposals',
+      fetchFn: fetchProposalsFromBlockchain,
+      forceRefresh,
+      onBackgroundRefresh
+    })
+
+    if (result.fromCache) {
+      console.log(`Proposals cache ${result.isStale ? 'stale' : 'hit'}: ${result.data?.length || 0} proposals`)
+    }
+
+    return result.data || []
   } catch (error) {
     console.error('Failed to fetch proposals from blockchain:', error)
     console.warn('Falling back to mock data due to blockchain error')
@@ -178,19 +215,44 @@ export async function fetchProposals(demoMode, _contracts = null) {
 }
 
 /**
- * Fetch user positions based on demo mode
+ * Fetch user positions based on demo mode with caching
+ * Uses 2-minute TTL since positions change with trades
+ * Cache is per-user address
+ *
  * @param {boolean} demoMode - Whether to use mock data
  * @param {string} userAddress - User wallet address
  * @param {Object} contracts - Contract instances for live data fetching (optional)
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceRefresh - Skip cache and fetch fresh
+ * @param {Function} options.onBackgroundRefresh - Callback for background refresh
  * @returns {Promise<Array>} Array of position objects
  */
-export async function fetchPositions(demoMode, userAddress, _contracts = null) {
+export async function fetchPositions(demoMode, userAddress, _contracts = null, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+
   if (demoMode) {
     return getMockPositions()
   }
-  
+
+  if (!userAddress) {
+    return []
+  }
+
   try {
-    return await fetchPositionsFromBlockchain(userAddress)
+    const cacheKey = `${CACHE_CONFIG.positions.keyPrefix}${userAddress.toLowerCase()}`
+    const result = await fetchWithCache({
+      configKey: 'positions',
+      customKey: cacheKey,
+      fetchFn: () => fetchPositionsFromBlockchain(userAddress),
+      forceRefresh,
+      onBackgroundRefresh
+    })
+
+    if (result.fromCache) {
+      console.log(`Positions cache ${result.isStale ? 'stale' : 'hit'}: ${result.data?.length || 0} positions`)
+    }
+
+    return result.data || []
   } catch (error) {
     console.error('Failed to fetch positions from blockchain:', error)
     console.warn('Falling back to mock data due to blockchain error')
@@ -199,18 +261,36 @@ export async function fetchPositions(demoMode, userAddress, _contracts = null) {
 }
 
 /**
- * Fetch welfare metrics based on demo mode
+ * Fetch welfare metrics based on demo mode with caching
+ * Uses 15-minute TTL since metrics don't change frequently
+ *
  * @param {boolean} demoMode - Whether to use mock data
  * @param {Object} contracts - Contract instances for live data fetching (optional)
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceRefresh - Skip cache and fetch fresh
+ * @param {Function} options.onBackgroundRefresh - Callback for background refresh
  * @returns {Promise<Array>} Array of welfare metric objects
  */
-export async function fetchWelfareMetrics(demoMode, _contracts = null) {
+export async function fetchWelfareMetrics(demoMode, _contracts = null, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+
   if (demoMode) {
     return getMockWelfareMetrics()
   }
-  
+
   try {
-    return await fetchWelfareMetricsFromBlockchain()
+    const result = await fetchWithCache({
+      configKey: 'welfareMetrics',
+      fetchFn: fetchWelfareMetricsFromBlockchain,
+      forceRefresh,
+      onBackgroundRefresh
+    })
+
+    if (result.fromCache) {
+      console.log(`Welfare metrics cache ${result.isStale ? 'stale' : 'hit'}: ${result.data?.length || 0} metrics`)
+    }
+
+    return result.data || []
   } catch (error) {
     console.error('Failed to fetch welfare metrics from blockchain:', error)
     console.warn('Falling back to mock data due to blockchain error')
@@ -219,18 +299,36 @@ export async function fetchWelfareMetrics(demoMode, _contracts = null) {
 }
 
 /**
- * Fetch categories based on demo mode
+ * Fetch categories based on demo mode with caching
+ * Uses 30-minute TTL since categories rarely change
+ *
  * @param {boolean} demoMode - Whether to use mock data
  * @param {Object} contracts - Contract instances for live data fetching (optional)
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceRefresh - Skip cache and fetch fresh
+ * @param {Function} options.onBackgroundRefresh - Callback for background refresh
  * @returns {Promise<Array>} Array of unique category strings
  */
-export async function fetchCategories(demoMode, _contracts = null) {
+export async function fetchCategories(demoMode, _contracts = null, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+
   if (demoMode) {
     return getMockCategories()
   }
-  
+
   try {
-    return await fetchCategoriesFromBlockchain()
+    const result = await fetchWithCache({
+      configKey: 'categories',
+      fetchFn: fetchCategoriesFromBlockchain,
+      forceRefresh,
+      onBackgroundRefresh
+    })
+
+    if (result.fromCache) {
+      console.log(`Categories cache ${result.isStale ? 'stale' : 'hit'}: ${result.data?.length || 0} categories`)
+    }
+
+    return result.data || []
   } catch (error) {
     console.error('Failed to fetch categories from blockchain:', error)
     console.warn('Falling back to mock data due to blockchain error')
@@ -249,9 +347,108 @@ export async function fetchMarketsByCorrelationGroup(demoMode, correlationGroupI
   if (demoMode) {
     return getMockMarketsByCorrelationGroup(correlationGroupId)
   }
-  
+
   // Note: Correlation groups are currently a frontend-only feature
   // When implemented on-chain, this should fetch from blockchain
   console.warn('Correlation groups not yet implemented on blockchain. Using mock data.')
   return getMockMarketsByCorrelationGroup(correlationGroupId)
 }
+
+/**
+ * Fetch correlation groups with caching
+ * Uses 10-minute TTL
+ *
+ * @param {boolean} demoMode - Whether to use mock data
+ * @param {Object} options - Additional options
+ * @param {boolean} options.forceRefresh - Skip cache and fetch fresh
+ * @param {Function} options.onBackgroundRefresh - Callback for background refresh
+ * @returns {Promise<Array>} Array of correlation group objects
+ */
+export async function fetchCorrelationGroups(demoMode, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+
+  if (demoMode) {
+    // Return empty array for demo mode as correlation groups are blockchain-specific
+    return []
+  }
+
+  try {
+    const result = await fetchWithCache({
+      configKey: 'correlationGroups',
+      fetchFn: fetchCorrelationGroupsFromBlockchain,
+      forceRefresh,
+      onBackgroundRefresh
+    })
+
+    if (result.fromCache) {
+      console.log(`Correlation groups cache ${result.isStale ? 'stale' : 'hit'}: ${result.data?.length || 0} groups`)
+    }
+
+    return result.data || []
+  } catch (error) {
+    console.error('Failed to fetch correlation groups:', error)
+    return []
+  }
+}
+
+/**
+ * Fetch a single market by ID with caching
+ * Uses 3-minute TTL per market
+ *
+ * @param {boolean} demoMode - Whether to use mock data
+ * @param {number} id - Market ID
+ * @param {Object} contracts - Contract instances (optional)
+ * @param {Object} options - Additional options
+ * @returns {Promise<Object|null>} Market object or null
+ */
+export async function fetchMarketByIdCached(demoMode, id, _contracts = null, options = {}) {
+  const { forceRefresh = false, onBackgroundRefresh = null } = options
+
+  if (demoMode) {
+    return getMockMarketById(id)
+  }
+
+  try {
+    const cacheKey = `${CACHE_CONFIG.singleMarket.keyPrefix}${id}`
+    const result = await fetchWithCache({
+      configKey: 'singleMarket',
+      customKey: cacheKey,
+      fetchFn: () => fetchMarketByIdFromBlockchain(id),
+      forceRefresh,
+      onBackgroundRefresh
+    })
+
+    if (result.fromCache) {
+      console.log(`Market ${id} cache ${result.isStale ? 'stale' : 'hit'}`)
+    }
+
+    return result.data || null
+  } catch (error) {
+    console.error(`Failed to fetch market ${id}:`, error)
+    return getMockMarketById(id)
+  }
+}
+
+/**
+ * Invalidate caches after an action (trade, create market, etc.)
+ * @param {string} action - Action type
+ * @param {Object} context - Action context
+ */
+export { invalidateCachesForAction }
+
+/**
+ * Warm caches on app initialization
+ * @param {Object} fetchFunctions - Fetch functions to use
+ */
+export { warmCaches }
+
+/**
+ * Get cache statistics
+ * @returns {Object} Cache statistics
+ */
+export { getCacheStats }
+
+/**
+ * Clear all caches
+ */
+export { clearAllCaches }

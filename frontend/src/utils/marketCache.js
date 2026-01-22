@@ -5,69 +5,78 @@
  * and improve dashboard load times.
  *
  * Features:
- * - SessionStorage-based caching for persistence across page navigations
- * - TTL-based expiration
+ * - LocalStorage-based caching for persistence across sessions
+ * - Extended TTL (5 minutes) for better UX
  * - Stale-while-revalidate pattern support
  * - Event query caching with block range tracking
+ * - Integrates with unified cacheService
+ *
+ * NOTE: This module is maintained for backwards compatibility.
+ * New code should use cacheService.js directly.
  */
 
-// Cache configuration
+import {
+  setCache,
+  getCache,
+  clearCache,
+  clearCachesByPrefix,
+  CACHE_CONFIG as UNIFIED_CONFIG
+} from './cacheService'
+
+// Legacy cache configuration (for backwards compatibility)
+// Actual values come from cacheService.js
 const CACHE_CONFIG = {
-  MARKETS_KEY: 'fairwins_markets_cache',
+  MARKETS_KEY: 'fairwins_markets_v2',
   EVENTS_KEY_PREFIX: 'fairwins_events_',
-  // Default TTL: 2 minutes for market data
-  DEFAULT_MARKET_TTL: 2 * 60 * 1000,
-  // Default TTL: 5 minutes for event data (less frequently updated)
-  DEFAULT_EVENTS_TTL: 5 * 60 * 1000,
-  // Stale threshold: 50% of TTL - data is "stale" but still usable
-  STALE_THRESHOLD: 0.5
+  // Extended TTL: 5 minutes for market data (improved from 2 minutes)
+  DEFAULT_MARKET_TTL: UNIFIED_CONFIG.markets.ttl,
+  // Default TTL: 5 minutes for event data
+  DEFAULT_EVENTS_TTL: UNIFIED_CONFIG.events.ttl,
+  // Stale threshold: 40% of TTL - data is "stale" but still usable
+  STALE_THRESHOLD: UNIFIED_CONFIG.markets.staleFactor
 }
 
 /**
  * Cache market data with timestamp
+ * Uses localStorage for longer persistence across sessions
  * @param {Array} markets - Array of market objects
  * @param {number|null} lastBlock - Optional last block number for incremental updates
  */
 export function cacheMarkets(markets, lastBlock = null) {
   try {
-    const cacheData = {
-      timestamp: Date.now(),
+    // Use unified cache service with localStorage persistence
+    const dataWithMeta = {
+      markets: markets,
       lastBlock: lastBlock,
-      markets: markets
+      marketCount: markets?.length || 0
     }
-    sessionStorage.setItem(CACHE_CONFIG.MARKETS_KEY, JSON.stringify(cacheData))
+    setCache('markets', dataWithMeta)
   } catch (error) {
-    // SessionStorage might be full or disabled - fail silently
+    // Storage might be full or disabled - fail silently
     console.warn('Failed to cache market data:', error.message)
   }
 }
 
 /**
  * Load cached markets if not expired
- * @param {number} maxAge - Maximum age in milliseconds (default: 2 minutes)
+ * Uses unified cache service with stale-while-revalidate pattern
+ * @param {number} maxAge - Maximum age in milliseconds (default: 5 minutes) - ignored, uses config
  * @returns {Object|null} Cached data with isStale flag, or null if not found/expired
  */
-export function loadCachedMarkets(maxAge = CACHE_CONFIG.DEFAULT_MARKET_TTL) {
+export function loadCachedMarkets(_maxAge = CACHE_CONFIG.DEFAULT_MARKET_TTL) {
   try {
-    const cached = sessionStorage.getItem(CACHE_CONFIG.MARKETS_KEY)
+    const cached = getCache('markets')
     if (!cached) return null
 
-    const data = JSON.parse(cached)
-    const age = Date.now() - data.timestamp
-
-    // Cache is completely expired
-    if (age > maxAge) {
-      sessionStorage.removeItem(CACHE_CONFIG.MARKETS_KEY)
-      return null
-    }
+    const { data, age, isStale, timestamp } = cached
 
     // Return data with stale indicator for background refresh
     return {
-      markets: data.markets,
-      lastBlock: data.lastBlock,
-      timestamp: data.timestamp,
+      markets: data.markets || data, // Support both old and new format
+      lastBlock: data.lastBlock || null,
+      timestamp: timestamp,
       age: age,
-      isStale: age > maxAge * CACHE_CONFIG.STALE_THRESHOLD
+      isStale: isStale
     }
   } catch (error) {
     console.warn('Failed to load cached markets:', error.message)
@@ -135,30 +144,46 @@ export function loadCachedEvents(marketId, maxAge = CACHE_CONFIG.DEFAULT_EVENTS_
  */
 export function clearMarketCache() {
   try {
-    // Clear markets cache
-    sessionStorage.removeItem(CACHE_CONFIG.MARKETS_KEY)
+    // Clear markets cache using unified service
+    clearCache('markets')
 
     // Clear all event caches
-    const keysToRemove = []
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i)
-      if (key && key.startsWith(CACHE_CONFIG.EVENTS_KEY_PREFIX)) {
-        keysToRemove.push(key)
+    clearCachesByPrefix('events')
+
+    // Also clear from sessionStorage for legacy data
+    try {
+      const keysToRemove = []
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i)
+        if (key && key.startsWith(CACHE_CONFIG.EVENTS_KEY_PREFIX)) {
+          keysToRemove.push(key)
+        }
       }
+      keysToRemove.forEach(key => sessionStorage.removeItem(key))
+    } catch {
+      // Ignore sessionStorage errors
     }
-    keysToRemove.forEach(key => sessionStorage.removeItem(key))
   } catch (error) {
     console.warn('Failed to clear market cache:', error.message)
   }
 }
 
 /**
- * Check if markets cache exists and is valid
- * @returns {boolean} True if valid cache exists
+ * Check if markets cache exists and is valid (not stale)
+ * @returns {boolean} True if valid non-stale cache exists
  */
 export function hasValidMarketsCache() {
-  const cached = loadCachedMarkets()
+  const cached = getCache('markets')
   return cached !== null && !cached.isStale
+}
+
+/**
+ * Check if markets cache exists (even if stale)
+ * @returns {boolean} True if any cache exists
+ */
+export function hasAnyMarketsCache() {
+  const cached = getCache('markets')
+  return cached !== null
 }
 
 /**
@@ -167,31 +192,39 @@ export function hasValidMarketsCache() {
  */
 export function getCacheStats() {
   try {
-    const marketsCache = sessionStorage.getItem(CACHE_CONFIG.MARKETS_KEY)
+    const cached = getCache('markets')
     let marketsCacheInfo = null
 
-    if (marketsCache) {
-      const data = JSON.parse(marketsCache)
+    if (cached) {
+      const data = cached.data
       marketsCacheInfo = {
-        marketCount: data.markets?.length || 0,
-        age: Date.now() - data.timestamp,
-        lastBlock: data.lastBlock
+        marketCount: data.markets?.length || data?.length || 0,
+        age: cached.age,
+        ageSeconds: Math.round(cached.age / 1000),
+        isStale: cached.isStale,
+        lastBlock: data.lastBlock,
+        storage: 'localStorage'
       }
     }
 
-    // Count event caches
+    // Count event caches in sessionStorage
     let eventCacheCount = 0
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i)
-      if (key && key.startsWith(CACHE_CONFIG.EVENTS_KEY_PREFIX)) {
-        eventCacheCount++
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i)
+        if (key && key.startsWith(CACHE_CONFIG.EVENTS_KEY_PREFIX)) {
+          eventCacheCount++
+        }
       }
+    } catch {
+      // Ignore
     }
 
     return {
-      hasMarketsCache: marketsCache !== null,
+      hasMarketsCache: cached !== null,
       marketsCache: marketsCacheInfo,
-      eventCacheCount: eventCacheCount
+      eventCacheCount: eventCacheCount,
+      ttlSeconds: Math.round(CACHE_CONFIG.DEFAULT_MARKET_TTL / 1000)
     }
   } catch (error) {
     return { error: error.message }

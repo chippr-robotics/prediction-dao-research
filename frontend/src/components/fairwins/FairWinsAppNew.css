@@ -595,3 +595,61 @@ button,
 input {
   transition-property: transform, opacity, background-color, border-color, box-shadow, color;
 }
+
+/* Background refresh indicator */
+.refresh-indicator {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.8));
+  color: var(--text-primary, #fff);
+  padding: 0.5rem 1rem;
+  border-radius: 0 0 8px 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  z-index: 1100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateX(-50%) translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+.refresh-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--text-secondary, rgba(255, 255, 255, 0.3));
+  border-top-color: var(--brand-primary, #36b37e);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.refresh-text {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+}
+
+/* Mobile adjustments for refresh indicator */
+@media (max-width: 768px) {
+  .refresh-indicator {
+    top: var(--mobile-header-height, 56px);
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
