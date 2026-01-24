@@ -96,9 +96,19 @@ function main() {
 
   // Update known keys used by the frontend.
   const mapping = {
-    // New naming
+    // Role manager contracts
     tieredRoleManager: deployed.tieredRoleManager,
-    // Existing frontend keys
+    roleManager: deployed.tieredRoleManager,
+    roleManagerCore: deployed.roleManagerCore || deployed.tieredRoleManager,
+
+    // RBAC contracts
+    tierRegistry: deployed.tierRegistry,
+    usageTracker: deployed.usageTracker,
+    membershipManager: deployed.membershipManager,
+    paymentProcessor: deployed.paymentProcessor,
+    membershipPaymentManager: deployed.membershipPaymentManager,
+
+    // Core contracts
     welfareRegistry: deployed.welfareRegistry,
     proposalRegistry: deployed.proposalRegistry,
     marketFactory: deployed.marketFactory,
@@ -111,12 +121,13 @@ function main() {
     tokenMintFactory: deployed.tokenMintFactory,
     daoFactory: deployed.daoFactory,
 
-    // Role manager contracts
-    // roleManager points to TieredRoleManager (for tier-based checks)
-    roleManager: deployed.tieredRoleManager,
-    // roleManagerCore can be separate (modular RoleManagerCore for PaymentProcessor)
-    // If not explicitly set in deployment, falls back to tieredRoleManager
-    roleManagerCore: deployed.roleManagerCore || deployed.tieredRoleManager,
+    // Market contracts
+    ctf1155: deployed.ctf1155,
+    friendGroupMarketFactory: deployed.friendGroupMarketFactory,
+
+    // Registry contracts
+    marketCorrelationRegistry: deployed.marketCorrelationRegistry,
+    nullifierRegistry: deployed.nullifierRegistry,
   }
 
   for (const [key, value] of Object.entries(mapping)) {

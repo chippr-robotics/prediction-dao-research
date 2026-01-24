@@ -113,6 +113,17 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Configure the role manager on the market factory
+     * @dev This allows the FutarchyGovernor owner to set the roleManager on ConditionalMarketFactory
+     *      since ownership of marketFactory was transferred to this contract
+     * @param _roleManager Address of TieredRoleManager contract
+     */
+    function configureMarketFactoryRoleManager(address _roleManager) external onlyOwner {
+        require(_roleManager != address(0), "Invalid role manager address");
+        marketFactory.setRoleManager(_roleManager);
+    }
+
+    /**
      * @notice Initialize the contract (used for clones)
      * @param initialOwner Address of the initial owner
      * @param _welfareRegistry Address of the welfare registry
