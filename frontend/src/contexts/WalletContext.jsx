@@ -110,6 +110,32 @@ export function WalletProvider({ children }) {
     }
   }, [chainId, isConnected])
 
+  // Clear stale WalletConnect data on mount if not connected
+  // This prevents "failed to process inbound message" errors from stale sessions
+  useEffect(() => {
+    // Only run once on mount, and only if not already connected
+    if (!isConnected) {
+      try {
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          // Only clear WalletConnect message/pairing data, not session data
+          // This allows reconnection while clearing stale relay messages
+          if (key && (key.startsWith('wc@2:core:') || key.includes(':messages:'))) {
+            keysToRemove.push(key)
+          }
+        }
+        if (keysToRemove.length > 0) {
+          keysToRemove.forEach(key => localStorage.removeItem(key))
+          console.log('[WalletContext] Cleared stale WalletConnect data')
+        }
+      } catch (error) {
+        // Silently ignore cleanup errors
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /**
    * Sync local roles with blockchain state
    * If a role exists on-chain but not locally, add it
@@ -313,24 +339,35 @@ export function WalletProvider({ children }) {
     disconnect()
     setRoles([])
     setBalances({ etc: '0', wetc: '0', tokens: {} })
-    
-    // Clear wagmi persistence from storage
+
+    // Clear wagmi and WalletConnect persistence from storage
     try {
       // List of known wagmi storage keys to clear
       const wagmiKeys = [
         'wagmi.store',
-        'wagmi.cache', 
+        'wagmi.cache',
         'wagmi.wallet',
         'wagmi.connected',
         'wagmi.recentConnectorId',
         'wagmi.injected.shimDisconnect'
       ]
-      
+
       // Clear from both localStorage and sessionStorage
       wagmiKeys.forEach(key => {
         localStorage.removeItem(key)
         sessionStorage.removeItem(key)
       })
+
+      // Clear WalletConnect v2 storage to prevent stale relay message errors
+      // WalletConnect stores data under keys starting with "wc@2:"
+      const keysToRemove = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('wc@2:')) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key))
     } catch (error) {
       console.error('Error clearing wallet persistence:', error)
     }
