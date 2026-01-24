@@ -4,7 +4,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../hooks'
 import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
-import { CONTRACT_ADDRESSES } from '../constants/contracts'
+import { getContractAddress } from '../config/contracts'
 import './MarketAcceptancePage.css'
 
 /**
@@ -45,7 +45,7 @@ function MarketAcceptancePage() {
       if (provider) {
         try {
           setLoading(true)
-          const contractAddress = CONTRACT_ADDRESSES.friendGroupMarketFactory
+          const contractAddress = getContractAddress('friendGroupMarketFactory')
 
           if (!contractAddress) {
             throw new Error('Contract address not configured')

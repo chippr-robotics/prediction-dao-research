@@ -13,15 +13,15 @@ const ADDRESSES_BY_NETWORK = {
     proposalRegistry: '',
     tokenMintFactory: ''
   },
-  // Mordor Testnet (Chain ID 63)
+  // Mordor Testnet (Chain ID 63) - Updated 2026-01-24
   63: {
     conditionalMarketFactory: '0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a',
-    friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
-    tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
-    proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-    tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
-    ragequitModule: '0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7',
-    membershipPaymentManager: '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28'
+    friendGroupMarketFactory: '0x0E118DEf0946f0e7F1BEAAA385c6c37CAc6acfa7',
+    tieredRoleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
+    proposalRegistry: '0x095146344Ab39a0cbF37494Cb50fb293E55AF76E',
+    tokenMintFactory: '0x5bBa4c4985c36525D14D7d7627Ab479B8b2E2205',
+    ragequitModule: '0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c',
+    membershipPaymentManager: '0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7'
   }
 }
 
