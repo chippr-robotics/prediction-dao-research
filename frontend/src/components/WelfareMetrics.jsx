@@ -1,27 +1,36 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { getMockWelfareMetrics } from '../utils/mockDataLoader'
 
 function WelfareMetrics({ provider }) {
   const [metrics, setMetrics] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const loadMetrics = useCallback(async () => {
-    try {
-      // Load mock data from centralized source
-      // In production, this would fetch from WelfareMetricRegistry contract
-      const mockMetrics = getMockWelfareMetrics()
-
-      setMetrics(mockMetrics)
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading metrics:', error)
-      setLoading(false)
-    }
-  }, [])
-
+  // Load metrics on mount or when provider changes
   useEffect(() => {
+    let ignore = false
+
+    const loadMetrics = async () => {
+      try {
+        // Load mock data from centralized source
+        // In production, this would fetch from WelfareMetricRegistry contract
+        const mockMetrics = getMockWelfareMetrics()
+
+        if (!ignore) {
+          setMetrics(mockMetrics)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error loading metrics:', error)
+        if (!ignore) {
+          setLoading(false)
+        }
+      }
+    }
+
     loadMetrics()
-  }, [provider, loadMetrics])
+
+    return () => { ignore = true }
+  }, [provider])
 
   if (loading) {
     return <div className="loading">Loading welfare metrics...</div>

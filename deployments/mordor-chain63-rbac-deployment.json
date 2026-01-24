@@ -1,0 +1,19 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "contracts": {
+    "tieredRoleManager": "0x55e6346Be542B13462De504FCC379a2477D227f0",
+    "roleManagerCore": "0x6a6422Ed3198332AC8DA2852BBff4749B66a3D8D",
+    "tierRegistry": "0x476cf3dEA109D6FC95aD19d246FD4e95693c47a3",
+    "usageTracker": "0x10f1b557a53C05A92DF820CCfDC77EaB0c732Bde",
+    "membershipManager": "0xCD172d9888a6F47203dD6f0684f250f6Ac56f6Ed",
+    "paymentProcessor": "0x6e063138809263820F61146c34a74EB3B2629A59",
+    "membershipPaymentManager": "0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7"
+  },
+  "roles": {
+    "FRIEND_MARKET_ROLE": "0xdb55b9a5e3db03c050b2061aa4630dce0551d72bfbab51ffb04a59ffd866d209",
+    "MARKET_MAKER_ROLE": "0x75e5bf8b7de9fd9f24c97951733c6410a040b7a07b543096cb36c6dda365aa8b"
+  },
+  "timestamp": "2026-01-24T00:05:46.734Z"
+}

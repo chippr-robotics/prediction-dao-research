@@ -68,7 +68,7 @@ function updateObjectLiteralValue(source, key, newValueLiteral) {
 function main() {
   const args = parseArgs(process.argv.slice(2))
 
-  const repoRoot = path.join(__dirname, '..')
+  const repoRoot = path.join(__dirname, '..', '..')
   const deploymentsDir = path.join(repoRoot, 'deployments')
 
   const network = args.network || 'mordor'

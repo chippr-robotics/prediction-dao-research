@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { usePrice } from '../contexts/PriceContext'
 import { getMockPositions } from '../utils/mockDataLoader'
@@ -12,25 +12,32 @@ function MyPositions() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, settled
 
-  const loadPositions = useCallback(async () => {
-    try {
-      // Load mock data from centralized source
-      // In production, this would fetch from PrivacyCoordinator and ConditionalMarketFactory
-      // Note: Dependencies omitted intentionally - this is mock data that doesn't need to re-fetch
-      // In production implementation, add contract dependencies when using real data
-      const mockPositions = getMockPositions()
-
-      setPositions(mockPositions)
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading positions:', error)
-      setLoading(false)
-    }
-  }, [])
-
+  // Load positions on mount
   useEffect(() => {
-    loadPositions()
-  }, [loadPositions])
+    let ignore = false
+
+    const fetchPositions = async () => {
+      try {
+        // Load mock data from centralized source
+        // In production, this would fetch from PrivacyCoordinator and ConditionalMarketFactory
+        const mockPositions = getMockPositions()
+
+        if (!ignore) {
+          setPositions(mockPositions)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error loading positions:', error)
+        if (!ignore) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchPositions()
+
+    return () => { ignore = true }
+  }, [])
 
   const filteredPositions = positions.filter(position => {
     if (filter === 'all') return true

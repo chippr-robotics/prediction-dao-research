@@ -31,17 +31,29 @@ function RoleManagementAdmin() {
   // Check if user has admin role
   const isAdmin = hasRole(ROLES.ADMIN)
 
-  // Define loadUsers before useEffect that uses it
+  // Define loadUsers for use in handlers
   const loadUsers = useCallback(() => {
     const users = getAllUsersWithRoles()
     setAllUsers(users)
   }, [])
 
+  // Load users on mount when admin
   useEffect(() => {
-    if (isAdmin) {
-      loadUsers()
+    let ignore = false
+
+    const loadUsersAsync = async () => {
+      if (isAdmin && !ignore) {
+        const users = getAllUsersWithRoles()
+        if (!ignore) {
+          setAllUsers(users)
+        }
+      }
     }
-  }, [isAdmin, loadUsers])
+
+    loadUsersAsync()
+
+    return () => { ignore = true }
+  }, [isAdmin])
 
   const handleGrantRole = () => {
     if (!newUserAddress || !selectedRole) {

@@ -17,33 +17,53 @@ export function Web3Provider({ children }) {
 
   // Update provider and signer when connection changes
   useEffect(() => {
+    let ignore = false
+
     const updateProviderAndSigner = async () => {
       if (isConnected && window.ethereum) {
         try {
           const ethersProvider = new ethers.BrowserProvider(window.ethereum)
           const ethersSigner = await ethersProvider.getSigner()
-          setProvider(ethersProvider)
-          setSigner(ethersSigner)
+          if (!ignore) {
+            setProvider(ethersProvider)
+            setSigner(ethersSigner)
+          }
         } catch (error) {
           console.error('Error creating provider/signer:', error)
         }
       } else {
-        setProvider(null)
-        setSigner(null)
+        if (!ignore) {
+          setProvider(null)
+          setSigner(null)
+        }
       }
     }
-    
+
     updateProviderAndSigner()
+
+    return () => { ignore = true }
   }, [isConnected, address])
 
   // Check network compatibility
   useEffect(() => {
-    if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
-      const expectedChain = getExpectedChain()
-      setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
-    } else {
-      setNetworkError(null)
+    let ignore = false
+
+    const checkNetwork = async () => {
+      if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
+        const expectedChain = getExpectedChain()
+        if (!ignore) {
+          setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
+        }
+      } else {
+        if (!ignore) {
+          setNetworkError(null)
+        }
+      }
     }
+
+    checkNetwork()
+
+    return () => { ignore = true }
   }, [chainId, isConnected])
 
   const connectWallet = useCallback(async () => {
