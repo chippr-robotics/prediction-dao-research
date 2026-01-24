@@ -95,8 +95,8 @@
 }
 
 .fm-close-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--bg-primary, #0E141B);
+  border: 2px solid var(--text-secondary, #AAB6C2);
   border-radius: 8px;
   width: 36px;
   height: 36px;
@@ -104,8 +104,15 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #E6EDF3;
+  color: var(--text-primary, #E6EDF3);
   transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.fm-close-btn svg {
+  stroke: currentColor;
+  width: 16px;
+  height: 16px;
 }
 
 .fm-close-btn:hover:not(:disabled) {
