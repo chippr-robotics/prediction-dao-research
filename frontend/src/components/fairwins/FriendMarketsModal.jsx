@@ -53,10 +53,21 @@ const getMarketDescription = (market) => {
   // If market has decrypted metadata, use it
   if (market.metadata && market.canView !== false) {
     // Decrypted metadata may have name, description, or question field
-    return market.metadata.name || market.metadata.description || market.metadata.question || market.description
+    const title = market.metadata.name || market.metadata.description || market.metadata.question
+    if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+      return title
+    }
   }
-  // Fall back to raw description
-  return market.description
+
+  // Check raw description, skip placeholder values
+  const desc = market.description
+  if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+    return desc
+  }
+
+  // For encrypted/private markets, show stake and time info instead of "Market #X"
+  const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+  return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
 }
 
 /**

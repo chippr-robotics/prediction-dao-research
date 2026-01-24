@@ -761,6 +761,34 @@ function MyMarketsModal({
 /**
  * Markets Table Component
  */
+/**
+ * Get display title for a market, handling encrypted markets
+ */
+function getMarketDisplayTitle(market) {
+  // First check decrypted metadata (from useDecryptedMarkets hook)
+  if (market.metadata && market.canView !== false) {
+    const title = market.metadata.name || market.metadata.description || market.metadata.question
+    if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+      return title
+    }
+  }
+
+  // For friend markets, use description field
+  if (market.marketType === 'friend') {
+    const desc = market.description
+    // Skip placeholder values
+    if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+      return desc
+    }
+    // If encrypted/private, show stake and time info
+    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+    return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
+  }
+
+  // For prediction markets, use proposalTitle or description
+  return market.proposalTitle || market.description || `Market #${market.id}`
+}
+
 function MarketsTable({
   markets,
   onSelect,
@@ -799,6 +827,7 @@ function MarketsTable({
             const showDisputeBtn = showActions && canRespondToDispute?.(market)
             const showAcceptBtn = canAccept?.(market)
             const showUnderConsideration = isCreatorOfPending?.(market)
+            const displayTitle = getMarketDisplayTitle(market)
 
             return (
               <tr
@@ -811,7 +840,23 @@ function MarketsTable({
               >
                 <td className="mm-table-market">
                   <span className="mm-table-market-title">
-                    {market.proposalTitle || market.description || `Market #${market.id}`}
+                    {market.isPrivate && (
+                      <svg
+                        className="mm-privacy-icon"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        title="Private market"
+                        style={{ marginRight: '6px', verticalAlign: 'middle', opacity: 0.7 }}
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0110 0v4"/>
+                      </svg>
+                    )}
+                    {displayTitle}
                   </span>
                   {market.category && (
                     <span className="mm-table-category">{market.category}</span>
@@ -1049,7 +1094,25 @@ function MarketDetailView({
 
       <div className="mm-detail-header">
         <div className="mm-detail-title-row">
-          <h3>{market.proposalTitle || market.description || `Market #${market.id}`}</h3>
+          <h3>
+            {market.isPrivate && (
+              <svg
+                className="mm-privacy-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                title="Private market"
+                style={{ marginRight: '8px', verticalAlign: 'middle', opacity: 0.7 }}
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0110 0v4"/>
+              </svg>
+            )}
+            {getMarketDisplayTitle(market)}
+          </h3>
           <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
             {getStatusLabel(market.computedStatus)}
           </span>
@@ -1062,7 +1125,11 @@ function MarketDetailView({
         </div>
       </div>
 
-      {market.description && market.proposalTitle && (
+      {/* Show description if it's different from the title and not a placeholder */}
+      {market.description &&
+       market.proposalTitle &&
+       market.description !== 'Encrypted Market' &&
+       market.description !== 'Private Market' && (
         <div className="mm-detail-description">
           <p>{market.description}</p>
         </div>
@@ -1297,7 +1364,7 @@ function ResolutionModal({
           {step === 'select' && (
             <>
               <div className="mm-resolution-market-info">
-                <h4>{market.proposalTitle || market.description}</h4>
+                <h4>{getMarketDisplayTitle(market)}</h4>
                 <p className="mm-resolution-hint">
                   Select the winning outcome for this market. This action will distribute
                   winnings to participants who predicted correctly.
@@ -1547,7 +1614,7 @@ function DisputeModal({
           {step === 'form' && (
             <>
               <div className="mm-dispute-market-info">
-                <h4>{market.proposalTitle || market.description}</h4>
+                <h4>{getMarketDisplayTitle(market)}</h4>
                 {market.outcome && (
                   <p className="mm-dispute-current-outcome">
                     Current resolution: <strong>{market.outcome}</strong>
