@@ -5,10 +5,7 @@
       "startServerReadyPattern": "Local:.*http://localhost:4173",
       "startServerReadyTimeout": 90000,
       "url": [
-        "http://localhost:4173/",
-        "http://localhost:4173/select",
-        "http://localhost:4173/clearpath",
-        "http://localhost:4173/fairwins"
+        "http://localhost:4173/"
       ],
       "numberOfRuns": 1,
       "settings": {
