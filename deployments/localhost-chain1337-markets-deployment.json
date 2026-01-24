@@ -1,0 +1,16 @@
+{
+  "network": "localhost",
+  "chainId": 1337,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "contracts": {
+    "ctf1155": "0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9",
+    "friendGroupMarketFactory": "0xf6691Dc0b38e46DF23bC25416A53B66A0Ca43828"
+  },
+  "dependencies": {
+    "marketFactory": "0x75e81ba01f3aBC160381f3b2b3c59acB2E1800F7",
+    "ragequitModule": "0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c",
+    "tieredRoleManager": "0x55e6346Be542B13462De504FCC379a2477D227f0",
+    "paymentManager": "0xa14540D0Db83A914444E6d5a8800238f0B3A36c9"
+  },
+  "timestamp": "2026-01-23T23:29:29.712Z"
+}

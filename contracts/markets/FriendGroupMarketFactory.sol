@@ -6,22 +6,21 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ConditionalMarketFactory.sol";
+import "./FriendGroupMarketLib.sol";
 import "../security/RagequitModule.sol";
 import "../security/NullifierRegistry.sol";
 import "../access/TieredRoleManager.sol";
 import "../access/MembershipPaymentManager.sol";
 
-// Custom errors for gas-efficient reverts
+// Custom errors (some moved to library)
 error InvalidAddress();
 error InvalidMarketId();
-error InvalidMember();
 error InvalidOpponent();
 error InvalidDescription();
 error InvalidDeadline();
 error InvalidStake();
 error InvalidLimit();
 error InvalidThreshold();
-error DuplicateMember();
 error NotAuthorized();
 error MembershipRequired();
 error MembershipExpired();
@@ -38,11 +37,7 @@ error DeadlineNotPassed();
 error AlreadyPegged();
 error NotPegged();
 error NotResolved();
-error TransferFailed();
-error InsufficientPayment();
 error TokenNotAccepted();
-error AddressNullified();
-error NullifierEnforcementEnabled();
 
 /**
  * @title FriendGroupMarketFactory

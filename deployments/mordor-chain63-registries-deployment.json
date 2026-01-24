@@ -1,0 +1,10 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "contracts": {
+    "marketCorrelationRegistry": "0x2a820A38997743fC3303cDcA56b996598963B909",
+    "nullifierRegistry": "0x5569FEe7f8Bab39EEd08bf448Dd6824640C7d272"
+  },
+  "timestamp": "2026-01-24T00:09:27.317Z"
+}
