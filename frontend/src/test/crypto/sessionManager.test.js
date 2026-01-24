@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock the crypto dependencies before importing SessionManager
 vi.mock('../../utils/crypto/primitives.js', () => ({
@@ -11,7 +11,7 @@ vi.mock('../../utils/crypto/primitives.js', () => ({
 }))
 
 vi.mock('../../utils/crypto/x3dh.js', () => ({
-  generateKeyBundle: vi.fn((identityPrivate) => ({
+  generateKeyBundle: vi.fn((_identityPrivate) => ({
     publicBundle: {
       identityKey: 'mock-identity-key',
       signedPreKey: { publicKey: 'mock-signed-prekey' },
@@ -262,7 +262,7 @@ describe('crypto/sessionManager', () => {
     })
 
     it('should handle corrupted localStorage data gracefully', () => {
-      const key = `fairwins_crypto_sessions_${ALICE_ADDRESS.toLowerCase()}`
+      const _key = `fairwins_crypto_sessions_${ALICE_ADDRESS.toLowerCase()}`
       localStorageMock.getItem.mockReturnValueOnce('not valid json {{{')
 
       const manager = new SessionManager(ALICE_ADDRESS)

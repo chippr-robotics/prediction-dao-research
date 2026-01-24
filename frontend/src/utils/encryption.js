@@ -25,8 +25,7 @@ import { keccak256, toUtf8Bytes, getBytes, hexlify, recoverPublicKey, hashMessag
 import {
   KEY_DERIVATION_MESSAGE,
   ENCRYPTION_ALGORITHM,
-  CURRENT_ENCRYPTION_VERSION,
-  getSigningMessage
+  CURRENT_ENCRYPTION_VERSION
 } from './crypto/constants'
 
 // Re-export for backwards compatibility

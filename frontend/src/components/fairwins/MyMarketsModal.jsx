@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { ethers } from 'ethers'
 import { useWallet, useWeb3, useDataFetcher } from '../../hooks'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
@@ -1070,7 +1069,7 @@ function MarketDetailView({
   getTimeRemaining,
   account,
   userPositions,
-  canResolve,
+  canResolve: _canResolve,
   canOpenDispute,
   canRespondToDispute,
   onOpenResolution,

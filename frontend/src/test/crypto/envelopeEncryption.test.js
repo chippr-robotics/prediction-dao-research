@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   deriveKeyPair,
   publicKeyFromSignature,
@@ -20,7 +20,7 @@ import { CURRENT_ENCRYPTION_VERSION, getMarketSigningMessage } from '../../utils
 
 // Mock signer for testing
 const createMockSigner = (address, signatureBase = 'test-signature') => ({
-  signMessage: vi.fn().mockImplementation((message) =>
+  signMessage: vi.fn().mockImplementation((_message) =>
     Promise.resolve(`0x${signatureBase}-${address.slice(0, 6)}-sig`)
   ),
   getAddress: vi.fn().mockResolvedValue(address)
