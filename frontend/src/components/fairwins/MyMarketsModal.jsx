@@ -6,6 +6,7 @@ import './MyMarketsModal.css'
  * Market Status Constants
  */
 const MarketStatus = {
+  PENDING_ACCEPTANCE: 'pending_acceptance',
   ACTIVE: 'active',
   PENDING_RESOLUTION: 'pending_resolution',
   DISPUTED: 'disputed',
@@ -171,6 +172,10 @@ function MyMarketsModal({
           : new Date(market.tradingEndTime).getTime())
         : (market.endDate ? new Date(market.endDate).getTime() : 0)
 
+      // Check for pending_acceptance status first (friend markets awaiting participant stakes)
+      if (market.status === 'pending_acceptance' || market.status === 'pending') {
+        return MarketStatus.PENDING_ACCEPTANCE
+      }
       if (market.status === 'resolved') return MarketStatus.RESOLVED
       if (market.status === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
         return MarketStatus.DISPUTED
@@ -259,6 +264,7 @@ function MyMarketsModal({
 
   const getStatusClass = (status) => {
     switch (status) {
+      case MarketStatus.PENDING_ACCEPTANCE: return 'status-pending-acceptance'
       case MarketStatus.ACTIVE: return 'status-active'
       case MarketStatus.PENDING_RESOLUTION: return 'status-pending'
       case MarketStatus.DISPUTED: return 'status-disputed'
@@ -269,6 +275,7 @@ function MyMarketsModal({
 
   const getStatusLabel = (status) => {
     switch (status) {
+      case MarketStatus.PENDING_ACCEPTANCE: return 'Pending Acceptance'
       case MarketStatus.ACTIVE: return 'Active'
       case MarketStatus.PENDING_RESOLUTION: return 'Pending Resolution'
       case MarketStatus.DISPUTED: return 'Disputed'
@@ -448,6 +455,7 @@ function MyMarketsModal({
               className="mm-filter-select"
             >
               <option value="all">All Status</option>
+              <option value={MarketStatus.PENDING_ACCEPTANCE}>Pending Acceptance</option>
               <option value={MarketStatus.ACTIVE}>Active</option>
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
               <option value={MarketStatus.DISPUTED}>Disputed</option>

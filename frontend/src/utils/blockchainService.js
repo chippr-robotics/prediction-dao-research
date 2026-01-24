@@ -898,6 +898,12 @@ export async function fetchFriendMarketsForUser(userAddress) {
           const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
           const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
 
+          // Determine token decimals first (before fetching acceptances)
+          // USC has 6 decimals, most others have 18
+          const stakeToken = marketResult.stakeToken
+          const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
+          const tokenDecimals = isUSC ? 6 : 18
+
           // Fetch acceptances for participants
           const acceptances = {}
           const members = marketResult.members || []
@@ -907,7 +913,7 @@ export async function fetchFriendMarketsForUser(userAddress) {
               const record = await contract.getParticipantAcceptance(marketId, member)
               acceptances[member.toLowerCase()] = {
                 hasAccepted: record.hasAccepted,
-                stakedAmount: ethers.formatEther(record.stakedAmount),
+                stakedAmount: ethers.formatUnits(record.stakedAmount, tokenDecimals),
                 isArbitrator: record.isArbitrator
               }
             } catch {
@@ -938,10 +944,7 @@ export async function fetchFriendMarketsForUser(userAddress) {
             endDateStr = defaultEndDate.toISOString()
           }
 
-          // Determine token decimals - USC has 6 decimals, most others have 18
-          const stakeToken = marketResult.stakeToken
-          const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
-          const tokenDecimals = isUSC ? 6 : 18
+          // stakeToken, isUSC, and tokenDecimals are already defined above for acceptances
           const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
 
           // Check if description is an encrypted envelope (JSON with version, algorithm, content, keys)

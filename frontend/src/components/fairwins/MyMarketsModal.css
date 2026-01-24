@@ -458,6 +458,11 @@
   color: #36B37E;
 }
 
+.mm-status-badge.status-pending-acceptance {
+  background: rgba(156, 39, 176, 0.15);
+  color: #AB47BC;
+}
+
 .mm-status-badge.status-pending {
   background: rgba(245, 166, 35, 0.15);
   color: #F5A623;

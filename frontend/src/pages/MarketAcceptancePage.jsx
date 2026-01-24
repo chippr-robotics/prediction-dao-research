@@ -5,7 +5,52 @@ import { useWallet, useWeb3 } from '../hooks'
 import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { getContractAddress } from '../config/contracts'
+import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import './MarketAcceptancePage.css'
+
+/**
+ * Determine token symbol based on token address
+ */
+function getTokenSymbol(tokenAddress) {
+  if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
+    return 'ETC'
+  }
+  const addr = tokenAddress.toLowerCase()
+  if (addr === ETCSWAP_ADDRESSES.USC_STABLECOIN?.toLowerCase()) {
+    return 'USC'
+  }
+  if (addr === ETCSWAP_ADDRESSES.WETC?.toLowerCase()) {
+    return 'WETC'
+  }
+  return 'tokens'
+}
+
+/**
+ * Get decimal places for a token
+ */
+function getTokenDecimals(tokenAddress) {
+  if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
+    return 18
+  }
+  const addr = tokenAddress.toLowerCase()
+  if (addr === ETCSWAP_ADDRESSES.USC_STABLECOIN?.toLowerCase()) {
+    return 6 // USC has 6 decimals
+  }
+  return 18
+}
+
+/**
+ * Check if a description is an encrypted JSON envelope
+ */
+function isEncryptedDescription(description) {
+  if (!description || typeof description !== 'string') return false
+  try {
+    const parsed = JSON.parse(description)
+    return parsed.version && parsed.algorithm && parsed.content
+  } catch {
+    return false
+  }
+}
 
 /**
  * MarketAcceptancePage
@@ -97,9 +142,25 @@ function MarketAcceptancePage() {
           const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
           const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
 
+          // Determine token info
+          const stakeTokenAddr = marketResult.stakeToken
+          const tokenSymbol = getTokenSymbol(stakeTokenAddr)
+          const tokenDecimals = getTokenDecimals(stakeTokenAddr)
+
+          // Format stake amount with correct decimals
+          const stakeAmount = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
+
+          // Handle encrypted descriptions - show placeholder instead of JSON
+          const rawDescription = marketResult.description
+          const displayDescription = isEncryptedDescription(rawDescription)
+            ? 'Encrypted Market (details visible to participants)'
+            : rawDescription
+
           setMarketData({
             id: marketId,
-            description: marketResult.description,
+            description: displayDescription,
+            rawDescription: rawDescription, // Keep original for decryption
+            isEncrypted: isEncryptedDescription(rawDescription),
             creator: marketResult.creator,
             participants: members,
             arbitrator: arbitrator !== ethers.ZeroAddress ? arbitrator : null,
@@ -107,9 +168,9 @@ function MarketAcceptancePage() {
             status: statusNames[Number(marketResult.status)] || 'unknown',
             acceptanceDeadline: Number(marketResult.acceptanceDeadline) * 1000,
             minAcceptanceThreshold: Number(marketResult.minThreshold),
-            stakePerParticipant: ethers.formatEther(marketResult.stakePerParticipant),
-            stakeToken: marketResult.stakeToken,
-            stakeTokenSymbol: 'ETC', // TODO: Fetch token symbol dynamically
+            stakePerParticipant: stakeAmount,
+            stakeToken: stakeTokenAddr,
+            stakeTokenSymbol: tokenSymbol,
             acceptances,
             acceptedCount: Number(acceptanceStatus.accepted)
           })

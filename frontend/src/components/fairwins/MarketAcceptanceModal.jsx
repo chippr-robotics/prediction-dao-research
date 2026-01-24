@@ -54,7 +54,9 @@ function MarketAcceptanceModal({
   const isParticipant = marketData?.participants?.some(
     p => p.toLowerCase() === account?.toLowerCase()
   )
-  const hasAlreadyAccepted = marketData?.acceptances?.[account?.toLowerCase()]?.hasAccepted
+  const isCreator = marketData?.creator?.toLowerCase() === account?.toLowerCase()
+  // Creator's acceptance is automatically recorded at market creation
+  const hasAlreadyAccepted = isCreator || marketData?.acceptances?.[account?.toLowerCase()]?.hasAccepted
 
   // Calculate time remaining
   useEffect(() => {
@@ -130,25 +132,26 @@ function MarketAcceptanceModal({
         // Arbitrators don't stake
         tx = await contract.acceptMarket(marketId)
       } else {
-        // Determine token decimals - USC has 6 decimals, most others have 18
-        const isUSC = marketData.stakeToken &&
-          marketData.stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
+        // CRITICAL: Fetch the actual on-chain stake value - don't rely on formatted data
+        // The contract will use the raw on-chain value for the transfer, so we must match it
+        const onChainMarket = await contract.getFriendMarketWithStatus(marketId)
+        const stakeAmount = onChainMarket.stakePerParticipant
+        const stakeTokenAddress = onChainMarket.stakeToken
+
+        // Determine token decimals for display purposes
+        const isUSC = stakeTokenAddress &&
+          stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
         const tokenDecimals = isUSC ? 6 : 18
 
-        // Participants stake
-        const stakeAmount = ethers.parseUnits(
-          marketData.stakePerParticipant || '0',
-          tokenDecimals
-        )
-
-        console.log('Stake calculation:', {
-          stakePerParticipant: marketData.stakePerParticipant,
+        console.log('Stake calculation (using on-chain value):', {
+          stakePerParticipantFormatted: marketData.stakePerParticipant,
+          stakePerParticipantOnChain: stakeAmount.toString(),
+          stakeToken: stakeTokenAddress,
           isUSC,
-          tokenDecimals,
-          stakeAmountWei: stakeAmount.toString()
+          tokenDecimals
         })
 
-        if (!marketData.stakeToken || marketData.stakeToken === ethers.ZeroAddress) {
+        if (!stakeTokenAddress || stakeTokenAddress === ethers.ZeroAddress) {
           // Native token stake - check balance first
           const balance = await signer.provider.getBalance(account)
           console.log('Native balance check:', {
@@ -166,7 +169,7 @@ function MarketAcceptanceModal({
         } else {
           // ERC20 token - check balance and approval
           const tokenContract = new ethers.Contract(
-            marketData.stakeToken,
+            stakeTokenAddress,
             [
               'function approve(address,uint256) returns (bool)',
               'function allowance(address,address) view returns (uint256)',
@@ -313,7 +316,17 @@ function MarketAcceptanceModal({
             <>
               {/* Market Details */}
               <div className="ma-market-info">
-                <h3 className="ma-description">{marketData?.description}</h3>
+                {marketData?.isEncrypted ? (
+                  <div className="ma-encrypted-notice">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                    <span>Encrypted Market</span>
+                  </div>
+                ) : (
+                  <h3 className="ma-description">{marketData?.description}</h3>
+                )}
                 <div className={`ma-deadline-warning ${isExpired ? 'expired' : ''}`}>
                   <span className="ma-clock-icon">&#9200;</span>
                   <span>{formatTimeRemaining()}</span>
@@ -387,7 +400,9 @@ function MarketAcceptanceModal({
               {hasAlreadyAccepted && (
                 <div className="ma-already-accepted">
                   <span>&#10003;</span>
-                  You have already accepted this market
+                  {isCreator
+                    ? 'You created this market and are already accepted. Waiting for other participants to join.'
+                    : 'You have already accepted this market'}
                 </div>
               )}
 

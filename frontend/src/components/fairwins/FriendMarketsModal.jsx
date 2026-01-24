@@ -792,33 +792,33 @@ function FriendMarketsModal({
     return token
   }, [formData.stakeTokenId, formData.customStakeTokenAddress])
 
-  // Filter markets where user is participating (using decrypted markets for proper filtering)
+  // Helper to check if user is a participant/creator
+  const isUserInMarket = useCallback((market) => {
+    if (!account) return false
+    const userAddr = account.toLowerCase()
+    return market.participants?.some(p => p.toLowerCase() === userAddr) ||
+           market.creator?.toLowerCase() === userAddr
+  }, [account])
+
+  // Filter markets where user is participating
+  // Note: Show markets even if canView is false (encrypted), as long as user is a participant
+  // They should see these markets with "encrypted" placeholder to prompt acceptance
   const userActiveMarkets = useMemo(() => {
     return decryptedActiveMarkets.filter(m =>
-      m.canView !== false && // Only include viewable markets
-      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()) &&
-      m.status !== 'pending_acceptance'
+      isUserInMarket(m) && m.status !== 'pending_acceptance'
     )
-  }, [decryptedActiveMarkets, account])
+  }, [decryptedActiveMarkets, isUserInMarket])
 
   // Filter pending markets awaiting acceptance
   const userPendingMarkets = useMemo(() => {
     return decryptedActiveMarkets.filter(m =>
-      m.canView !== false && // Only include viewable markets
-      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()) &&
-      m.status === 'pending_acceptance'
+      isUserInMarket(m) && m.status === 'pending_acceptance'
     )
-  }, [decryptedActiveMarkets, account])
+  }, [decryptedActiveMarkets, isUserInMarket])
 
   const userPastMarkets = useMemo(() => {
-    return decryptedPastMarkets.filter(m =>
-      m.canView !== false && // Only include viewable markets
-      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase())
-    )
-  }, [decryptedPastMarkets, account])
+    return decryptedPastMarkets.filter(m => isUserInMarket(m))
+  }, [decryptedPastMarkets, isUserInMarket])
 
   if (!isOpen) return null
 

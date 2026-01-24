@@ -244,6 +244,50 @@ async function main() {
   }
 
   // =========================================================================
+  // Grant MARKET_MAKER_ROLE to FriendGroupMarketFactory
+  // =========================================================================
+  console.log("\n\n--- Granting MARKET_MAKER_ROLE to FriendGroupMarketFactory ---");
+
+  const friendGroupMarketFactoryAddress = marketsDeployment?.contracts?.friendGroupMarketFactory;
+
+  if (contracts.tieredRoleManager && friendGroupMarketFactoryAddress) {
+    try {
+      const MARKET_MAKER_ROLE = await contracts.tieredRoleManager.MARKET_MAKER_ROLE();
+      const hasRole = await contracts.tieredRoleManager.hasRole(MARKET_MAKER_ROLE, friendGroupMarketFactoryAddress);
+
+      if (hasRole) {
+        console.log("  ✓ FriendGroupMarketFactory already has MARKET_MAKER_ROLE");
+
+        // Check if membership is active
+        const isActive = await contracts.tieredRoleManager.isMembershipActive(friendGroupMarketFactoryAddress, MARKET_MAKER_ROLE);
+        console.log(`  ✓ Membership active: ${isActive}`);
+      } else {
+        // Grant PLATINUM tier for 100 years
+        const PLATINUM = 4; // MembershipTier.PLATINUM
+        const DURATION_DAYS = 36500; // 100 years
+
+        console.log(`  Granting PLATINUM tier (${PLATINUM}) for ${DURATION_DAYS} days...`);
+        const tx = await contracts.tieredRoleManager.grantTier(
+          friendGroupMarketFactoryAddress,
+          MARKET_MAKER_ROLE,
+          PLATINUM,
+          DURATION_DAYS
+        );
+        await tx.wait();
+        console.log("  ✓ MARKET_MAKER_ROLE granted to FriendGroupMarketFactory");
+
+        // Verify
+        const verifyHasRole = await contracts.tieredRoleManager.hasRole(MARKET_MAKER_ROLE, friendGroupMarketFactoryAddress);
+        console.log(`  ✓ Verification - hasRole: ${verifyHasRole}`);
+      }
+    } catch (error) {
+      console.warn(`  ⚠️  FriendGroupMarketFactory role grant skipped: ${error.message?.split("\n")[0]}`);
+    }
+  } else if (!friendGroupMarketFactoryAddress) {
+    console.log("  ⚠️  FriendGroupMarketFactory not deployed - skipping role grant");
+  }
+
+  // =========================================================================
   // Summary
   // =========================================================================
   console.log("\n\n" + "=".repeat(60));
@@ -259,6 +303,12 @@ async function main() {
     console.log("  - CLEARPATH_USER_ROLE: 10 USC");
   } else {
     console.log("  - Skipped (no USC on this network)");
+  }
+  console.log("\nFactory roles configured:");
+  if (friendGroupMarketFactoryAddress) {
+    console.log("  - FriendGroupMarketFactory → MARKET_MAKER_ROLE (PLATINUM tier)");
+  } else {
+    console.log("  - Skipped (FriendGroupMarketFactory not deployed)");
   }
 
   console.log("\n✓ Configuration completed!");
