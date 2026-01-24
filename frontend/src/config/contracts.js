@@ -30,7 +30,7 @@ export const DEPLOYED_CONTRACTS = {
   usageTracker: '0x10f1b557a53C05A92DF820CCfDC77EaB0c732Bde',
   membershipManager: '0xCD172d9888a6F47203dD6f0684f250f6Ac56f6Ed',
   paymentProcessor: '0x6e063138809263820F61146c34a74EB3B2629A59',
-  membershipPaymentManager: '0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7',
+  membershipPaymentManager: '0x9CDc3D0Aff85F89C04d03b6b9E9Ba99fDf033E34',
 
   // Market Contracts (03-deploy-markets.js)
   ctf1155: '0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9',

@@ -182,10 +182,34 @@ async function main() {
         await tx.wait();
         console.log("  ✓ PaymentProcessor authorized on TieredRoleManager");
       } else {
-        console.log("  ✓ PaymentProcessor authorization checked");
+        console.log("  ✓ PaymentProcessor already authorized on TieredRoleManager");
       }
     } catch (error) {
       console.warn(`  ⚠️  TieredRoleManager authorization skipped: ${error.message?.split("\n")[0]}`);
+    }
+  }
+
+  // =========================================================================
+  // Configure PaymentProcessor to use TieredRoleManager for role grants
+  // =========================================================================
+  console.log("\n\n--- Configuring PaymentProcessor Role Manager ---");
+
+  if (contracts.paymentProcessor && rbacDeployment.contracts.tieredRoleManager) {
+    try {
+      const currentRoleManager = await contracts.paymentProcessor.roleManagerCore();
+      const expectedRoleManager = rbacDeployment.contracts.tieredRoleManager;
+
+      if (currentRoleManager.toLowerCase() !== expectedRoleManager.toLowerCase()) {
+        console.log(`  Current roleManagerCore: ${currentRoleManager}`);
+        console.log(`  Setting to TieredRoleManager: ${expectedRoleManager}`);
+        const tx = await contracts.paymentProcessor.setRoleManagerCore(expectedRoleManager);
+        await tx.wait();
+        console.log("  ✓ PaymentProcessor.roleManagerCore set to TieredRoleManager");
+      } else {
+        console.log("  ✓ PaymentProcessor.roleManagerCore already correct");
+      }
+    } catch (error) {
+      console.warn(`  ⚠️  PaymentProcessor roleManagerCore skipped: ${error.message?.split("\n")[0]}`);
     }
   }
 
@@ -253,6 +277,7 @@ async function main() {
   console.log("  - PaymentProcessor → TierRegistry");
   console.log("  - PaymentProcessor → MembershipManager");
   console.log("  - PaymentProcessor → TieredRoleManager");
+  console.log("  - PaymentProcessor.roleManagerCore → TieredRoleManager (for role grants)");
   console.log("\nRole prices configured:");
   if (uscAddress) {
     console.log("  - TOKENMINT_ROLE: 25 USC");
