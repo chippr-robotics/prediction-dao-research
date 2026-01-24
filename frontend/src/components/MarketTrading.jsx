@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { usePrice } from '../contexts/PriceContext'
 import { useTheme } from '../hooks/useTheme'
@@ -19,23 +19,32 @@ function MarketTrading() {
   const [errors, setErrors] = useState({})
   const [searchQuery, setSearchQuery] = useState('')
 
-  const loadMarkets = useCallback(async () => {
-    try {
-      // Load data based on user's demo mode preference
-      // In production with demo mode off, this would fetch from ConditionalMarketFactory contract
-      const fetchedMarkets = await getMarkets()
-
-      setMarkets(fetchedMarkets)
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading markets:', error)
-      setLoading(false)
-    }
-  }, [getMarkets])
-
+  // Load markets on mount
   useEffect(() => {
-    loadMarkets()
-  }, [loadMarkets])
+    let ignore = false
+
+    const fetchMarkets = async () => {
+      try {
+        // Load data based on user's demo mode preference
+        // In production with demo mode off, this would fetch from ConditionalMarketFactory contract
+        const fetchedMarkets = await getMarkets()
+
+        if (!ignore) {
+          setMarkets(fetchedMarkets)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error loading markets:', error)
+        if (!ignore) {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchMarkets()
+
+    return () => { ignore = true }
+  }, [getMarkets])
 
   const validateTrade = () => {
     const newErrors = {}

@@ -60,27 +60,46 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
   // Handle URL query parameters for category
   useEffect(() => {
-    const categoryParam = searchParams.get('category')
-    if (categoryParam && categoryParam !== selectedCategory) {
-      setSelectedCategory(categoryParam)
+    let ignore = false
+
+    const updateCategory = async () => {
+      const categoryParam = searchParams.get('category')
+      if (categoryParam && categoryParam !== selectedCategory && !ignore) {
+        setSelectedCategory(categoryParam)
+      }
     }
+
+    updateCategory()
+
+    return () => { ignore = true }
   }, [searchParams, selectedCategory])
 
-  const loadMarkets = useCallback(async () => {
-    try {
-      setLoading(true)
-      const allMarkets = await getMarkets()
-      setMarkets(allMarkets)
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading markets:', error)
-      setLoading(false)
-    }
-  }, [getMarkets])
-
+  // Load markets on mount
   useEffect(() => {
+    let ignore = false
+
+    const loadMarkets = async () => {
+      try {
+        if (!ignore) {
+          setLoading(true)
+        }
+        const allMarkets = await getMarkets()
+        if (!ignore) {
+          setMarkets(allMarkets)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error loading markets:', error)
+        if (!ignore) {
+          setLoading(false)
+        }
+      }
+    }
+
     loadMarkets()
-  }, [loadMarkets])
+
+    return () => { ignore = true }
+  }, [getMarkets])
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -284,58 +303,69 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     }
   }
 
-  // TokenMint handlers
-  const loadUserTokens = useCallback(async () => {
-    if (!account || !isConnected) {
-      setTokens([])
-      return
-    }
-    
-    try {
-      setTokenLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      const mockTokens = [
-        {
-          tokenId: 1,
-          tokenType: 0,
-          tokenAddress: '0x1234567890123456789012345678901234567890',
-          owner: account,
-          name: 'Demo Token',
-          symbol: 'DEMO',
-          metadataURI: 'ipfs://QmDemo123',
-          createdAt: Math.floor(Date.now() / 1000) - 86400 * 7,
-          listedOnETCSwap: true,
-          isBurnable: true,
-          isPausable: false
-        },
-        {
-          tokenId: 2,
-          tokenType: 1,
-          tokenAddress: '0x0987654321098765432109876543210987654321',
-          owner: account,
-          name: 'Demo NFT Collection',
-          symbol: 'DNFT',
-          metadataURI: 'ipfs://QmNFTBase/',
-          createdAt: Math.floor(Date.now() / 1000) - 86400 * 3,
-          listedOnETCSwap: false,
-          isBurnable: false,
-          isPausable: false
-        }
-      ]
-      
-      setTokens(mockTokens)
-      setTokenLoading(false)
-    } catch (error) {
-      console.error('Error loading tokens:', error)
-      setTokenLoading(false)
-    }
-  }, [account, isConnected])
-
   // Load user tokens when account changes
   useEffect(() => {
+    let ignore = false
+
+    const loadUserTokens = async () => {
+      if (!account || !isConnected) {
+        if (!ignore) {
+          setTokens([])
+        }
+        return
+      }
+
+      try {
+        if (!ignore) {
+          setTokenLoading(true)
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        const mockTokens = [
+          {
+            tokenId: 1,
+            tokenType: 0,
+            tokenAddress: '0x1234567890123456789012345678901234567890',
+            owner: account,
+            name: 'Demo Token',
+            symbol: 'DEMO',
+            metadataURI: 'ipfs://QmDemo123',
+            createdAt: Math.floor(Date.now() / 1000) - 86400 * 7,
+            listedOnETCSwap: true,
+            isBurnable: true,
+            isPausable: false
+          },
+          {
+            tokenId: 2,
+            tokenType: 1,
+            tokenAddress: '0x0987654321098765432109876543210987654321',
+            owner: account,
+            name: 'Demo NFT Collection',
+            symbol: 'DNFT',
+            metadataURI: 'ipfs://QmNFTBase/',
+            createdAt: Math.floor(Date.now() / 1000) - 86400 * 3,
+            listedOnETCSwap: false,
+            isBurnable: false,
+            isPausable: false
+          }
+        ]
+
+        if (!ignore) {
+          setTokens(mockTokens)
+          setTokenLoading(false)
+        }
+      } catch (error) {
+        console.error('Error loading tokens:', error)
+        if (!ignore) {
+          setTokenLoading(false)
+        }
+      }
+    }
+
     loadUserTokens()
-  }, [loadUserTokens])
+
+    return () => { ignore = true }
+  }, [account, isConnected])
 
   // Convert roles array to role names for sidebar compatibility
   const userRoleNames = useMemo(() => {

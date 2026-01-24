@@ -41,20 +41,26 @@ export function useEncryption() {
 
   // Load cached signature on mount and derive full keypair (no wallet interaction needed)
   useEffect(() => {
+    let ignore = false
+
     if (account) {
       const cached = sessionStorage.getItem(`${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`)
-      if (cached) {
+      if (cached && !ignore) {
         setSignature(cached)
         // Derive FULL keypair from cached signature (including privateKey for decryption)
         try {
           const keys = deriveKeyPairFromSignature(cached)
-          setKeyPair(keys)
+          if (!ignore) {
+            setKeyPair(keys)
+          }
           console.log('[useEncryption] Restored keypair from cached signature')
         } catch (err) {
           console.error('Failed to derive keypair from cached signature:', err)
         }
       }
     }
+
+    return () => { ignore = true }
   }, [account])
 
   /**
@@ -253,10 +259,14 @@ export function useEncryption() {
 
   // Clear on disconnect
   useEffect(() => {
-    if (!isConnected) {
+    let ignore = false
+
+    if (!isConnected && !ignore) {
       setKeyPair(null)
       setSignature(null)
     }
+
+    return () => { ignore = true }
   }, [isConnected])
 
   return {
@@ -296,34 +306,48 @@ export function useDecryptedMarkets(markets) {
   const [isDecrypting, setIsDecrypting] = useState(false)
 
   useEffect(() => {
+    let ignore = false
+
     if (!markets?.length) {
-      setDecryptedMarkets([])
-      return
+      const clearMarkets = async () => {
+        if (!ignore) {
+          setDecryptedMarkets([])
+        }
+      }
+      clearMarkets()
+      return () => { ignore = true }
     }
 
     if (!isConnected || !signer) {
       // Not connected - mark encrypted as not viewable
-      const processed = markets.map(market => {
-        if (isEncrypted(market.metadata)) {
-          return {
-            ...market,
-            isPrivate: true,
-            canView: false,
-            metadata: {
-              name: 'Private Market',
-              description: 'Connect wallet to view',
-              encrypted: true
+      const processNotConnected = async () => {
+        const processed = markets.map(market => {
+          if (isEncrypted(market.metadata)) {
+            return {
+              ...market,
+              isPrivate: true,
+              canView: false,
+              metadata: {
+                name: 'Private Market',
+                description: 'Connect wallet to view',
+                encrypted: true
+              }
             }
           }
+          return { ...market, isPrivate: false, canView: true }
+        })
+        if (!ignore) {
+          setDecryptedMarkets(processed)
         }
-        return { ...market, isPrivate: false, canView: true }
-      })
-      setDecryptedMarkets(processed)
-      return
+      }
+      processNotConnected()
+      return () => { ignore = true }
     }
 
     const decryptAll = async () => {
-      setIsDecrypting(true)
+      if (!ignore) {
+        setIsDecrypting(true)
+      }
 
       const processed = await Promise.all(
         markets.map(async (market) => {
@@ -370,11 +394,15 @@ export function useDecryptedMarkets(markets) {
         })
       )
 
-      setDecryptedMarkets(processed)
-      setIsDecrypting(false)
+      if (!ignore) {
+        setDecryptedMarkets(processed)
+        setIsDecrypting(false)
+      }
     }
 
     decryptAll()
+
+    return () => { ignore = true }
   }, [markets, account, isConnected, signer, decryptMetadata, canUserDecrypt, isEncrypted])
 
   // Filter helpers
