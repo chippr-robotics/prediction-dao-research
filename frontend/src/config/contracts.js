@@ -1,68 +1,47 @@
 /**
  * Deployed Contract Addresses on Mordor Testnet
- * 
+ *
  * These addresses are deterministically deployed and should remain consistent
  * across deployments. Update these if contracts are redeployed.
+ *
+ * Last updated: 2026-01-24 (consolidated deployment)
  */
 
 export const DEPLOYED_CONTRACTS = {
+  // Deployer / Treasury
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-  // Source of truth: TieredRoleManager used by FriendGroupMarketFactory
-  tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager (optimized, with tier limits)
-  welfareRegistry: '0x31c8028D872e8c994A1b505A082ABD1B367673e7',
-  proposalRegistry: '0xBB402Bc027eB1534B73FB41b5b3040B4a803b525',
-  marketFactory: '0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a', // ConditionalMarketFactory v2 (used by FriendGroupMarketFactory)
-  privacyCoordinator: '0x99C4CA1dB381C91c3Ad350bCE79fC8B661671F32',
-  oracleResolver: '0x8DfE774E72482aeDF5eaE6A43E9F181343E42E86',
-  ragequitModule: '0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7', // RagequitModule (used by FriendGroupMarketFactory)
-  futarchyGovernor: '0xD379002D90a38245dC99D9dd7BE430Ab9C0B3e54',
-  fairWinsToken: '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB',
-  treasuryVault: '0x93F7ee39C02d99289E3c29696f1F3a70656d0772',
+  treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
 
-  // Token and DAO factories
-  tokenMintFactory: '0x8D4485C3bDb16dc782403B36e8BC2524000C54DB',
-  daoFactory: '0x89E2bEC5f1AAf40c8232D50c53e6048E2386567a',
+  // Core Contracts (01-deploy-core.js)
+  roleManagerCore: '0x6a6422Ed3198332AC8DA2852BBff4749B66a3D8D',
+  welfareRegistry: '0x034494F9eA0821FB6167EcA41A6850fd2D11b8b1',
+  proposalRegistry: '0x095146344Ab39a0cbF37494Cb50fb293E55AF76E',
+  marketFactory: '0x75e81ba01f3aBC160381f3b2b3c59acB2E1800F7',
+  privacyCoordinator: '0x9897CBb96b1931A3c019A9d2126dab59630D4414',
+  oracleResolver: '0x2AaCC0D91AF255667683ece0A363649Cc9Ed8776',
+  ragequitModule: '0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c',
+  futarchyGovernor: '0x0292a5bdf60E851c043bDceE378D505801A6aEef',
+  tokenMintFactory: '0x5bBa4c4985c36525D14D7d7627Ab479B8b2E2205',
+  daoFactory: '0x9B1692272D54CA7b4dEAa7622aBddb6059eb8202',
 
-  // CTF1155 - Deployed via: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
-  ctf1155: '0xE56d9034591C6A6A5C023883354FAeB435E3b441',
+  // RBAC Contracts (02-deploy-rbac.js)
+  tieredRoleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
+  tierRegistry: '0x476cf3dEA109D6FC95aD19d246FD4e95693c47a3',
+  usageTracker: '0x10f1b557a53C05A92DF820CCfDC77EaB0c732Bde',
+  membershipManager: '0xCD172d9888a6F47203dD6f0684f250f6Ac56f6Ed',
+  paymentProcessor: '0x6e063138809263820F61146c34a74EB3B2629A59',
+  membershipPaymentManager: '0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7',
+
+  // Market Contracts (03-deploy-markets.js)
+  ctf1155: '0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9',
+  friendGroupMarketFactory: '0x0E118DEf0946f0e7F1BEAAA385c6c37CAc6acfa7',
+
+  // Registry Contracts (04-deploy-registries.js)
+  marketCorrelationRegistry: '0x2a820A38997743fC3303cDcA56b996598963B909',
+  nullifierRegistry: '0x5569FEe7f8Bab39EEd08bf448Dd6824640C7d272',
 
   // Back-compat aliases
-  roleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF', // TieredRoleManager with full interface
-  roleManagerCore: '0x147284A99d4857fCb610eA7B11aF0483FE590cE0', // RoleManagerCore (modular) - used by PaymentProcessor for role grants
-
-  // Modular RBAC contracts - Deployed via: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
-  paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
-  tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
-  membershipManager: '0x6698C2ba129D18C1930e19C586f7Da6aB30b86D6',
-  // MembershipPaymentManager used by PaymentProcessor (verified on-chain)
-  membershipPaymentManager: '0x8b09cbC2275398C00D43854393e09D40334a1B81',
-
-  // Perpetual Futures - Deployed via: npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
-  fundingRateEngine: '0x507F1569F5Ed9d367AFe2C03A3E6115Ca7Bb68fc',
-  perpFactory: '0xAEfd08EF350B7132BDbE8a9de96C6d24eAbd7988',
-
-  // Market Correlation Registry - Deploy via: npx hardhat run scripts/deploy-correlation-registry.js --network mordor
-  // Used for grouping related markets (e.g., election candidates, tournament brackets)
-  marketCorrelationRegistry: '0x282af85e6c189EeE04EdFdD2c2994bA4EcB0D09A',
-
-  // Friend Group Market Factory - Deploy via: npx hardhat run scripts/deploy-friend-group-market-factory.js --network mordor
-  // For P2P friend markets with tiered membership
-  friendGroupMarketFactory: '0x8cFE477e267bB36925047df8A6E30348f82b0085',
-
-  // NullifierRegistry - Deploy via: npx hardhat run scripts/deploy-nullifier-registry.js --network mordor
-  // Anti-money-laundering protection for markets and addresses
-  nullifierRegistry: '0x239C06E7AD066b5087Ed84686475f04f364ACBb7',
-
-  // TieredRoleManager (optimized) - For friend markets with BRONZE/SILVER/GOLD/PLATINUM tiers
-  // Deployed via: npx hardhat run scripts/deploy-tiered-role-manager.js --network mordor
-  // Has checkMarketCreationLimitFor for tier-based limits
-  tieredRoleManagerFull: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
-
-  tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
-  marketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac',
-  ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
-  roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
-  roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
+  roleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
 }
 
 /**
@@ -83,7 +62,7 @@ export function getContractAddress(contractName) {
     const envAddress = import.meta.env[envKey]
     if (envAddress) return envAddress
   }
-  
+
   // Fall back to deployed contract addresses
   return DEPLOYED_CONTRACTS[contractName]
 }
