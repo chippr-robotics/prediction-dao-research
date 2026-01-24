@@ -58,6 +58,11 @@ export const DEPLOYED_CONTRACTS = {
   // Has checkMarketCreationLimitFor for tier-based limits
   tieredRoleManagerFull: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
 
+  tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
+  marketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac',
+  ragequitModule: '0xc6E2a7a5A12d4Dfb290ef3934F6Ed7fF3C2496bc',
+  roleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
+  roleManagerCore: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
 }
 
 /**

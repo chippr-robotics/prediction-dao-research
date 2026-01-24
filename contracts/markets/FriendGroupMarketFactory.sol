@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./ConditionalMarketFactory.sol";
 import "./FriendGroupMarketLib.sol";
 import "../security/RagequitModule.sol";
@@ -12,7 +11,7 @@ import "../security/NullifierRegistry.sol";
 import "../access/TieredRoleManager.sol";
 import "../access/MembershipPaymentManager.sol";
 
-// Custom errors (some moved to library)
+// Custom errors (stake/nullification errors from library, reused here)
 error InvalidAddress();
 error InvalidMarketId();
 error InvalidOpponent();
@@ -37,7 +36,9 @@ error DeadlineNotPassed();
 error AlreadyPegged();
 error NotPegged();
 error NotResolved();
-error TokenNotAccepted();
+error TransferFailed();
+error InsufficientPayment();
+error InvalidMember();
 
 /**
  * @title FriendGroupMarketFactory
@@ -60,7 +61,6 @@ error TokenNotAccepted();
  * 4. Friend group contests and competitions
  */
 contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
-    using SafeERC20 for IERC20;
     
     // Market type to distinguish friend markets from public markets
     enum MarketType {
@@ -405,46 +405,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Check if an address is nullified (blocked)
-     * @param addr Address to check
-     * @return True if address is nullified
-     */
-    function isAddressNullified(address addr) public view returns (bool) {
-        if (!enforceNullification || address(nullifierRegistry) == address(0)) {
-            return false;
-        }
-        return nullifierRegistry.isAddressNullified(addr);
-    }
-
-    /**
-     * @notice Internal function to check nullification for multiple addresses
-     * @dev Reverts if any address is nullified and enforcement is enabled
-     */
-    function _checkNullification(address[] memory addresses) internal view {
-        if (!enforceNullification || address(nullifierRegistry) == address(0)) {
-            return;
-        }
-        for (uint256 i = 0; i < addresses.length; i++) {
-            if (nullifierRegistry.isAddressNullified(addresses[i])) {
-                revert AddressNullified();
-            }
-        }
-    }
-
-    /**
-     * @notice Internal function to check nullification for a single address
-     * @dev Reverts if address is nullified and enforcement is enabled
-     */
-    function _checkSingleNullification(address addr) internal view {
-        if (!enforceNullification || address(nullifierRegistry) == address(0)) {
-            return;
-        }
-        if (nullifierRegistry.isAddressNullified(addr)) {
-            revert AddressNullified();
-        }
-    }
-
-    /**
      * @notice Create a 1v1 friend market for direct betting
      * @param opponent Address of the other party
      * @param description Description of the bet
@@ -466,8 +426,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
         // Anti-money-laundering: Check if creator or opponent is nullified
-        _checkSingleNullification(msg.sender);
-        _checkSingleNullification(opponent);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
 
         if (opponent == address(0)) revert InvalidOpponent();
         if (opponent == msg.sender) revert InvalidOpponent();
@@ -576,19 +536,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
         // Anti-money-laundering: Check if creator or any member is nullified
-        _checkSingleNullification(msg.sender);
-        _checkNullification(initialMembers);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
+        FriendGroupMarketLib.checkNullificationBatch(nullifierRegistry, enforceNullification, initialMembers);
 
         if (bytes(description).length == 0) revert InvalidDescription();
         if (memberLimit <= 2 || memberLimit > maxSmallGroupMembers) revert InvalidLimit();
         if (initialMembers.length == 0 || initialMembers.length > memberLimit) revert InvalidLimit();
 
-        for (uint256 i = 0; i < initialMembers.length; i++) {
-            if (initialMembers[i] == address(0)) revert InvalidMember();
-            for (uint256 j = i + 1; j < initialMembers.length; j++) {
-                if (initialMembers[i] == initialMembers[j]) revert DuplicateMember();
-            }
-        }
+        FriendGroupMarketLib.validateMembers(initialMembers);
 
         if (peggedPublicMarketId > 0) {
             if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
@@ -682,18 +637,13 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
         // Anti-money-laundering: Check if creator or any player is nullified
-        _checkSingleNullification(msg.sender);
-        _checkNullification(players);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
+        FriendGroupMarketLib.checkNullificationBatch(nullifierRegistry, enforceNullification, players);
 
         if (bytes(description).length == 0) revert InvalidDescription();
         if (players.length < minEventTrackingMembers || players.length > maxEventTrackingMembers) revert InvalidLimit();
 
-        for (uint256 i = 0; i < players.length; i++) {
-            if (players[i] == address(0)) revert InvalidMember();
-            for (uint256 j = i + 1; j < players.length; j++) {
-                if (players[i] == players[j]) revert DuplicateMember();
-            }
-        }
+        FriendGroupMarketLib.validateMembers(players);
 
         if (peggedPublicMarketId > 0) {
             if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
@@ -795,10 +745,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
         // Anti-money-laundering: Check if creator or opponent is nullified
-        _checkSingleNullification(msg.sender);
-        _checkSingleNullification(opponent);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
 
-        _collectStake(msg.sender, stakeToken, stakeAmount);
+        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, stakeAmount);
 
         // Create pending market (no underlying market yet - created on activation)
         friendMarketId = friendMarketCount++;
@@ -893,12 +843,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (minAcceptanceThreshold < 2) revert InvalidThreshold();
         if (minAcceptanceThreshold > invitedMembers.length + 1) revert InvalidThreshold();
 
-        for (uint256 i = 0; i < invitedMembers.length; i++) {
-            if (invitedMembers[i] == address(0) || invitedMembers[i] == msg.sender) revert InvalidMember();
-            for (uint256 j = i + 1; j < invitedMembers.length; j++) {
-                if (invitedMembers[i] == invitedMembers[j]) revert DuplicateMember();
-            }
-        }
+        FriendGroupMarketLib.validateMembersExcluding(invitedMembers, msg.sender);
 
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
         if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
@@ -906,10 +851,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
         // Anti-money-laundering: Check if creator or any invited member is nullified
-        _checkSingleNullification(msg.sender);
-        _checkNullification(invitedMembers);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
+        FriendGroupMarketLib.checkNullificationBatch(nullifierRegistry, enforceNullification, invitedMembers);
 
-        _collectStake(msg.sender, stakeToken, stakeAmount);
+        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, stakeAmount);
 
         // Build full participant list (creator + invited)
         address[] memory allParticipants = new address[](invitedMembers.length + 1);
@@ -991,7 +936,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (memberCount[friendMarketId] >= market.memberLimit) revert MemberLimitReached();
 
         // Anti-money-laundering: Check if new member is nullified
-        _checkSingleNullification(newMember);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, newMember);
 
         for (uint256 i = 0; i < market.members.length; i++) {
             if (market.members[i] == newMember) revert AlreadyMember();
@@ -1033,7 +978,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (marketAcceptances[friendMarketId][msg.sender].hasAccepted) revert AlreadyAccepted();
 
         // Anti-money-laundering: Check if accepting participant is nullified
-        _checkSingleNullification(msg.sender);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
 
         bool isInvited = false;
         bool isArbitrator = market.arbitrator == msg.sender;
@@ -1060,7 +1005,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             emit ArbitratorAccepted(friendMarketId, msg.sender, block.timestamp);
         } else {
             // Collect stake from participant
-            _collectStake(msg.sender, market.stakeToken, market.stakePerParticipant);
+            FriendGroupMarketLib.collectStake(msg.sender, market.stakeToken, market.stakePerParticipant);
 
             marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
                 participant: msg.sender,
@@ -1097,7 +1042,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (msg.sender != market.creator) revert NotAuthorized();
 
         market.status = FriendMarketStatus.Cancelled;
-        _refundAllStakes(friendMarketId);
+        _refundAllStakesInternal(friendMarketId);
 
         emit MarketCancelledByCreator(friendMarketId, msg.sender, block.timestamp);
     }
@@ -1124,7 +1069,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         } else {
             // Threshold not met - refund all
             market.status = FriendMarketStatus.Refunded;
-            _refundAllStakes(friendMarketId);
+            _refundAllStakesInternal(friendMarketId);
 
             emit AcceptanceDeadlinePassed(friendMarketId, market.acceptanceDeadline, accepted, required);
         }
@@ -1133,25 +1078,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // ========== Internal Helper Functions for Acceptance Flow ==========
 
     /**
-     * @notice Collect stake from a participant
+     * @notice Refund all stakes for a market (uses library for individual refunds)
      */
-    function _collectStake(address from, address token, uint256 amount) internal {
-        if (token == address(0)) {
-            if (msg.value < amount) revert InsufficientPayment();
-            if (msg.value > amount) {
-                (bool success, ) = payable(from).call{value: msg.value - amount}("");
-                if (!success) revert TransferFailed();
-            }
-        } else {
-            // Use SafeERC20 for proper proxy token handling
-            IERC20(token).safeTransferFrom(from, address(this), amount);
-        }
-    }
-
-    /**
-     * @notice Refund all stakes for a market
-     */
-    function _refundAllStakes(uint256 friendMarketId) internal {
+    function _refundAllStakesInternal(uint256 friendMarketId) internal {
         FriendMarket storage market = friendMarkets[friendMarketId];
 
         for (uint256 i = 0; i < market.members.length; i++) {
@@ -1159,29 +1088,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             AcceptanceRecord storage record = marketAcceptances[friendMarketId][participant];
 
             if (record.hasAccepted && record.stakedAmount > 0) {
-                _refundStake(participant, market.stakeToken, record.stakedAmount);
+                FriendGroupMarketLib.refundStake(participant, market.stakeToken, record.stakedAmount);
                 emit StakeRefunded(friendMarketId, participant, record.stakedAmount);
             }
         }
 
         marketTotalStaked[friendMarketId] = 0;
-    }
-
-    /**
-     * @notice Refund stake to a single participant
-     */
-    function _refundStake(address to, address token, uint256 amount) internal {
-        if (token == address(0)) {
-            (bool success, ) = payable(to).call{value: amount}("");
-            if (!success) revert TransferFailed();
-        } else {
-            // Use direct transfer instead of SafeERC20 for proxy token compatibility
-            (bool success, bytes memory returnData) = token.call(
-                abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
-            );
-            if (!success) revert TransferFailed();
-            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
-        }
     }
 
     /**
@@ -1281,31 +1193,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         return marketAcceptances[friendMarketId][participant];
     }
 
-    /**
-     * @notice Get pending participants who haven't accepted yet
-     */
-    function getPendingParticipants(uint256 friendMarketId) external view returns (address[] memory) {
-        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Count pending
-        uint256 pendingCount = 0;
-        for (uint256 i = 0; i < market.members.length; i++) {
-            if (!marketAcceptances[friendMarketId][market.members[i]].hasAccepted) {
-                pendingCount++;
-            }
-        }
-
-        // Build array
-        address[] memory pending = new address[](pendingCount);
-        uint256 idx = 0;
-        for (uint256 i = 0; i < market.members.length; i++) {
-            if (!marketAcceptances[friendMarketId][market.members[i]].hasAccepted) {
-                pending[idx++] = market.members[i];
-            }
-        }
-
-        return pending;
+    function hasAccepted(uint256 friendMarketId, address participant) external view returns (bool) {
+        return marketAcceptances[friendMarketId][participant].hasAccepted;
     }
 
     /**
@@ -1557,45 +1446,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         return publicMarketToPeggedFriendMarkets[publicMarketId];
     }
 
-    function _handlePayment(address paymentToken, uint256 amount, string memory) internal {
-        if (!acceptedPaymentTokens[paymentToken]) revert TokenNotAccepted();
-
-        if (paymentToken == address(0)) {
-            if (msg.value < amount) revert InsufficientPayment();
-        } else {
-            if (amount == 0) revert InvalidStake();
-            IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
-        }
-    }
-    
     /**
-     * @notice Get list of accepted payment tokens
-     * @return Array of accepted token addresses
+     * @notice Get list of accepted payment tokens (returns full list, check acceptedPaymentTokens for status)
      */
     function getAcceptedTokens() external view returns (address[] memory) {
-        // Count active tokens
-        uint256 activeCount = acceptedPaymentTokens[address(0)] ? 1 : 0;
-        for (uint256 i = 0; i < acceptedTokenList.length; i++) {
-            if (acceptedPaymentTokens[acceptedTokenList[i]]) {
-                activeCount++;
-            }
-        }
-        
-        // Build return array
-        address[] memory tokens = new address[](activeCount);
-        uint256 index = 0;
-        
-        if (acceptedPaymentTokens[address(0)]) {
-            tokens[index++] = address(0);
-        }
-        
-        for (uint256 i = 0; i < acceptedTokenList.length; i++) {
-            if (acceptedPaymentTokens[acceptedTokenList[i]]) {
-                tokens[index++] = acceptedTokenList[i];
-            }
-        }
-        
-        return tokens;
+        return acceptedTokenList;
     }
     
     receive() external payable {}
