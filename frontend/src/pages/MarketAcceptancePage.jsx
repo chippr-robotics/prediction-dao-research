@@ -209,7 +209,7 @@ function MarketAcceptancePage() {
         marketId={marketId}
         marketData={marketData}
         onAccepted={handleAccepted}
-        contractAddress={CONTRACT_ADDRESSES.friendGroupMarketFactory}
+        contractAddress={getContractAddress('friendGroupMarketFactory')}
         contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
       />
     </div>

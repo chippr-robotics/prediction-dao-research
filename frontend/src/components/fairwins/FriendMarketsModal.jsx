@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption, useDecryptedMarkets } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
-import { CONTRACT_ADDRESSES } from '../../constants/contracts'
+import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
@@ -378,7 +378,7 @@ function FriendMarketsModal({
 
     setCancellingMarketId(marketId)
     try {
-      const factoryAddress = CONTRACT_ADDRESSES.friendGroupMarketFactory
+      const factoryAddress = getContractAddress('friendGroupMarketFactory')
       const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
 
       console.log('Cancelling market:', marketId)
@@ -1705,7 +1705,7 @@ function FriendMarketsModal({
           marketId={marketToAccept.id}
           marketData={marketToAccept}
           onAccepted={handleMarketAccepted}
-          contractAddress={CONTRACT_ADDRESSES.friendGroupMarketFactory}
+          contractAddress={getContractAddress('friendGroupMarketFactory')}
           contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
         />
       )}
