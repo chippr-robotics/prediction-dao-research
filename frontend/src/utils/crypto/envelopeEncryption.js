@@ -21,20 +21,23 @@ import { chacha20poly1305 } from '@noble/ciphers/chacha'
 import { randomBytes } from '@noble/ciphers/webcrypto'
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/ciphers/utils'
 import { keccak256, toUtf8Bytes, getBytes } from 'ethers'
-
-// Constants
-const KEY_DERIVATION_MESSAGE = 'FairWins Market Encryption v1'
-const ENVELOPE_INFO = 'FairWins_Envelope_v1'
+import {
+  CURRENT_ENCRYPTION_VERSION,
+  getMarketSigningMessage,
+  ENVELOPE_INFO
+} from './constants.js'
 
 /**
  * Derive an X25519 key pair from a wallet signature
- * Deterministic: same wallet always produces same keypair
+ * Deterministic: same wallet + same version always produces same keypair
  *
  * @param {Object} signer - Ethers signer
- * @returns {Promise<{publicKey: Uint8Array, privateKey: Uint8Array, signature: string}>}
+ * @param {number} [version=CURRENT_ENCRYPTION_VERSION] - Signing message version
+ * @returns {Promise<{publicKey: Uint8Array, privateKey: Uint8Array, signature: string, version: number}>}
  */
-export async function deriveKeyPair(signer) {
-  const signature = await signer.signMessage(KEY_DERIVATION_MESSAGE)
+export async function deriveKeyPair(signer, version = CURRENT_ENCRYPTION_VERSION) {
+  const message = getMarketSigningMessage(version)
+  const signature = await signer.signMessage(message)
   const hash = keccak256(toUtf8Bytes(signature))
   const privateKey = getBytes(hash)
   const publicKey = x25519.getPublicKey(privateKey)
@@ -42,7 +45,8 @@ export async function deriveKeyPair(signer) {
   return {
     publicKey,
     privateKey,
-    signature // Include for sharing with others
+    signature, // Include for sharing with others
+    version    // Include version for decryption
   }
 }
 
@@ -83,9 +87,10 @@ export function deriveKeyPairFromSignature(signature) {
  *
  * @param {Object|string} data - Data to encrypt
  * @param {Array<{address: string, publicKey: Uint8Array}>} recipients - List of recipients
- * @returns {Object} - Encrypted envelope
+ * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version used for key derivation
+ * @returns {Object} - Encrypted envelope with version info
  */
-export function encryptEnvelope(data, recipients) {
+export function encryptEnvelope(data, recipients, signingVersion = CURRENT_ENCRYPTION_VERSION) {
   // 1. Generate random Data Encryption Key (DEK)
   const dek = randomBytes(32)
 
@@ -127,6 +132,8 @@ export function encryptEnvelope(data, recipients) {
   return {
     version: '1.0',
     algorithm: 'x25519-chacha20poly1305',
+    // Store the signing message version for decryption
+    signingVersion: signingVersion,
     content: {
       nonce: bytesToHex(contentNonce),
       ciphertext: bytesToHex(encryptedContent)
@@ -305,20 +312,24 @@ function generateEphemeralKeyPair() {
  *
  * @param {Object} metadata - Market metadata (name, description, etc.)
  * @param {Array<{address: string, signature: string}>} participants - Participants with signatures
+ * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version
  * @returns {Object} - Encrypted envelope ready for IPFS
  */
-export function encryptMarketMetadata(metadata, participants) {
+export function encryptMarketMetadata(metadata, participants, signingVersion = CURRENT_ENCRYPTION_VERSION) {
   // Convert signatures to public keys
   const recipients = participants.map(p => ({
     address: p.address,
     publicKey: publicKeyFromSignature(p.signature)
   }))
 
-  return encryptEnvelope(metadata, recipients)
+  return encryptEnvelope(metadata, recipients, signingVersion)
 }
 
 /**
  * Decrypt market metadata
+ *
+ * Uses the signing version stored in the envelope to derive the correct keys.
+ * For backwards compatibility, assumes version 1 if not specified.
  *
  * @param {Object} envelope - Encrypted envelope from IPFS
  * @param {string} myAddress - Our address
@@ -326,16 +337,31 @@ export function encryptMarketMetadata(metadata, participants) {
  * @returns {Promise<Object>} - Decrypted metadata
  */
 export async function decryptMarketMetadata(envelope, myAddress, signerOrPrivateKey) {
+  // Get the signing version from envelope (default to 1 for backwards compatibility)
+  const signingVersion = envelope.signingVersion || 1
+
   // If it's already a Uint8Array (cached private key), use it directly
+  // Note: cached private keys are version-specific, caller must ensure correct version
   let privateKey
   if (signerOrPrivateKey instanceof Uint8Array) {
     privateKey = signerOrPrivateKey
   } else {
-    // It's a signer - derive the key (requires wallet popup)
-    const result = await deriveKeyPair(signerOrPrivateKey)
+    // It's a signer - derive the key with the correct version (requires wallet popup)
+    const result = await deriveKeyPair(signerOrPrivateKey, signingVersion)
     privateKey = result.privateKey
   }
   return decryptEnvelope(envelope, myAddress, privateKey)
+}
+
+/**
+ * Get the signing version required to decrypt an envelope
+ * Useful for UI to inform users which signing message will be shown
+ *
+ * @param {Object} envelope - Encrypted envelope
+ * @returns {number} - Signing version (defaults to 1 for legacy envelopes)
+ */
+export function getEnvelopeSigningVersion(envelope) {
+  return envelope?.signingVersion || 1
 }
 
 /**
@@ -344,40 +370,49 @@ export async function decryptMarketMetadata(envelope, myAddress, signerOrPrivate
  * @param {Object} metadata - Market metadata
  * @param {Object} signer - Creator's signer
  * @param {string} creatorAddress - Creator's address
- * @returns {Promise<{envelope: Object, creatorSignature: string}>}
+ * @returns {Promise<{envelope: Object, creatorSignature: string, signingVersion: number}>}
  */
 export async function createEncryptedMarket(metadata, signer, creatorAddress) {
-  const { signature } = await deriveKeyPair(signer)
+  // Use current version for new markets
+  const { signature, version } = await deriveKeyPair(signer, CURRENT_ENCRYPTION_VERSION)
 
   // Start with just creator as recipient
   const envelope = encryptMarketMetadata(metadata, [
     { address: creatorAddress, signature }
-  ])
+  ], version)
 
   return {
     envelope,
-    creatorSignature: signature
+    creatorSignature: signature,
+    signingVersion: version
   }
 }
 
 /**
  * Add a participant to an encrypted market
  *
+ * IMPORTANT: The new participant must have signed with the SAME version
+ * as the original market. Use getEnvelopeSigningVersion() to determine
+ * which signing message to present to the new participant.
+ *
  * @param {Object} envelope - Existing envelope
  * @param {string} existingAddress - An existing recipient's address
  * @param {Object|Uint8Array} existingSignerOrPrivateKey - Existing recipient's signer OR cached private key
  * @param {string} newAddress - New participant's address
- * @param {string} newSignature - New participant's key derivation signature
+ * @param {string} newSignature - New participant's key derivation signature (must be same version as envelope)
  * @returns {Promise<Object>} - Updated envelope
  */
 export async function addParticipantToMarket(envelope, existingAddress, existingSignerOrPrivateKey, newAddress, newSignature) {
+  // Get the signing version from the envelope
+  const signingVersion = envelope.signingVersion || 1
+
   // If it's already a Uint8Array (cached private key), use it directly
   let privateKey
   if (existingSignerOrPrivateKey instanceof Uint8Array) {
     privateKey = existingSignerOrPrivateKey
   } else {
-    // It's a signer - derive the key (requires wallet popup)
-    const result = await deriveKeyPair(existingSignerOrPrivateKey)
+    // It's a signer - derive the key with the envelope's version (requires wallet popup)
+    const result = await deriveKeyPair(existingSignerOrPrivateKey, signingVersion)
     privateKey = result.privateKey
   }
 

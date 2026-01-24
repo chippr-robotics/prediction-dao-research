@@ -22,12 +22,14 @@
 import nacl from 'tweetnacl'
 import { encodeBase64, decodeBase64, encodeUTF8, decodeUTF8 } from 'tweetnacl-util'
 import { keccak256, toUtf8Bytes, getBytes, hexlify, recoverPublicKey, hashMessage } from 'ethers'
+import {
+  KEY_DERIVATION_MESSAGE,
+  ENCRYPTION_ALGORITHM,
+  CURRENT_ENCRYPTION_VERSION
+} from './crypto/constants'
 
-// Version string for key derivation - changing this invalidates all existing keys
-const KEY_DERIVATION_MESSAGE = 'FairWins Encryption Key v1'
-
-// Algorithm identifier for metadata
-export const ENCRYPTION_ALGORITHM = 'x25519-xsalsa20-poly1305'
+// Re-export for backwards compatibility
+export { ENCRYPTION_ALGORITHM, CURRENT_ENCRYPTION_VERSION }
 
 /**
  * Derive a deterministic X25519 keypair from a wallet signature

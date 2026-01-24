@@ -14,12 +14,42 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
     const diff = end - now
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    
+
     if (days > 0) {
       return `${days}d ${hours}h`
     }
     return `${hours}h`
   }
+
+  // Get display title for market, handling encrypted/private markets
+  const getDisplayTitle = () => {
+    // First check decrypted metadata (from useDecryptedMarkets hook)
+    if (market.metadata && market.canView !== false) {
+      const title = market.metadata.name || market.metadata.description || market.metadata.question
+      if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+        return title
+      }
+    }
+
+    // For friend markets, use description field
+    if (market.marketType === 'friend') {
+      const desc = market.description
+      // Skip placeholder values
+      if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+        return desc
+      }
+      // If encrypted/private, show stake info
+      const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+      return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
+    }
+
+    // For prediction markets, use proposalTitle or description
+    return market.proposalTitle || market.description || `Market #${market.id}`
+  }
+
+  // Check if this is a private/encrypted market
+  const isPrivateMarket = market.marketType === 'friend' || market.isPrivate ||
+    (market.metadata && (market.metadata.encrypted || market.canView === false))
 
 
 
@@ -36,14 +66,16 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
     }
   }
 
+  const displayTitle = getDisplayTitle()
+
   return (
-    <div 
-      className={`market-tile ${isActive ? 'active' : ''} ${compact ? 'compact' : ''} ${market.correlationGroupId ? 'grouped' : ''}`}
+    <div
+      className={`market-tile ${isActive ? 'active' : ''} ${compact ? 'compact' : ''} ${market.correlationGroupId ? 'grouped' : ''} ${isPrivateMarket ? 'private' : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex="0"
-      aria-label={`View market: ${market.proposalTitle}`}
+      aria-label={`View market: ${displayTitle}`}
       aria-pressed={isActive}
     >
       <div className="tile-header">
@@ -56,8 +88,8 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
         <div className="header-right">
           <span className="moneyline-label">Moneyline</span>
           <div className="probability-bar">
-            <div 
-              className="probability-fill" 
+            <div
+              className="probability-fill"
               style={{ width: `${calculateImpliedProbability(market.passTokenPrice)}%` }}
               aria-hidden="true"
             />
@@ -65,7 +97,10 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
         </div>
       </div>
 
-      <h3 className="tile-title">{market.proposalTitle}</h3>
+      <h3 className="tile-title">
+        {isPrivateMarket && <span className="private-icon" title="Private Market">🔒 </span>}
+        {displayTitle}
+      </h3>
 
       <div className="tile-footer">
         <p className="tile-secondary">

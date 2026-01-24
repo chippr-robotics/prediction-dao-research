@@ -34,12 +34,13 @@ import {
 import {
   GroupSession
 } from './senderKeys.js'
+import {
+  CURRENT_ENCRYPTION_VERSION,
+  getSigningMessage
+} from './constants.js'
 
 // Storage key prefix
 const STORAGE_PREFIX = 'fairwins_crypto_'
-
-// Key derivation message
-const KEY_DERIVATION_MESSAGE = 'FairWins Encryption Key v1'
 
 /**
  * Session Manager for encrypted friend market communications
@@ -61,13 +62,18 @@ export class SessionManager {
    * Initialize the session manager with wallet-derived keys
    *
    * @param {Object} signer - Ethers signer
+   * @param {number} [version=CURRENT_ENCRYPTION_VERSION] - Signing message version
    * @returns {Promise<Object>} - Public key bundle
    */
-  async initialize(signer) {
-    // Derive identity key from wallet signature
-    const signature = await signer.signMessage(KEY_DERIVATION_MESSAGE)
+  async initialize(signer, version = CURRENT_ENCRYPTION_VERSION) {
+    // Derive identity key from wallet signature using versioned message
+    const message = getSigningMessage(version)
+    const signature = await signer.signMessage(message)
     const hash = keccak256(toUtf8Bytes(signature))
     const identityPrivateKey = getBytes(hash)
+
+    // Store the version used for this session
+    this.signingVersion = version
 
     // Store identity key pair
     this.identityKeyPair = {

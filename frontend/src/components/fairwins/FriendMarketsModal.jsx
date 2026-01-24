@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption, useDecryptedMarkets } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
-import { CONTRACT_ADDRESSES } from '../../constants/contracts'
+import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
@@ -53,10 +53,21 @@ const getMarketDescription = (market) => {
   // If market has decrypted metadata, use it
   if (market.metadata && market.canView !== false) {
     // Decrypted metadata may have name, description, or question field
-    return market.metadata.name || market.metadata.description || market.metadata.question || market.description
+    const title = market.metadata.name || market.metadata.description || market.metadata.question
+    if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+      return title
+    }
   }
-  // Fall back to raw description
-  return market.description
+
+  // Check raw description, skip placeholder values
+  const desc = market.description
+  if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+    return desc
+  }
+
+  // For encrypted/private markets, show stake and time info instead of "Market #X"
+  const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+  return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
 }
 
 /**
@@ -137,6 +148,10 @@ function FriendMarketsModal({
 
   // Market cancellation state
   const [cancellingMarketId, setCancellingMarketId] = useState(null)
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareMarketData, setShareMarketData] = useState(null)
 
   // Encryption state
   const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
@@ -359,6 +374,22 @@ function FriendMarketsModal({
     window.location.reload()
   }
 
+  // Share modal handlers
+  const handleOpenShareModal = (market) => {
+    setShareMarketData({
+      url: getMarketUrl(market),
+      description: getMarketDescription(market),
+      stakeAmount: market.stakeAmount,
+      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC'
+    })
+    setShowShareModal(true)
+  }
+
+  const handleCloseShareModal = () => {
+    setShowShareModal(false)
+    setShareMarketData(null)
+  }
+
   // Cancel a pending market (creator only)
   const handleCancelMarket = async (market) => {
     if (!signer || !isCorrectNetwork) {
@@ -378,7 +409,7 @@ function FriendMarketsModal({
 
     setCancellingMarketId(marketId)
     try {
-      const factoryAddress = CONTRACT_ADDRESSES.friendGroupMarketFactory
+      const factoryAddress = getContractAddress('friendGroupMarketFactory')
       const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
 
       console.log('Cancelling market:', marketId)
@@ -421,6 +452,12 @@ function FriendMarketsModal({
     const hasAccepted = market.acceptances?.[account.toLowerCase()]?.hasAccepted
 
     return isInvited && !isCreator && !hasAccepted
+  }, [account])
+
+  // Check if user is the creator of a pending market (shows "Under Consideration" status)
+  const isCreatorOfPendingMarket = useCallback((market) => {
+    if (!account || market.status !== 'pending_acceptance') return false
+    return market.creator?.toLowerCase() === account.toLowerCase()
   }, [account])
 
   const validateForm = useCallback(() => {
@@ -792,33 +829,33 @@ function FriendMarketsModal({
     return token
   }, [formData.stakeTokenId, formData.customStakeTokenAddress])
 
-  // Filter markets where user is participating (using decrypted markets for proper filtering)
+  // Helper to check if user is a participant/creator
+  const isUserInMarket = useCallback((market) => {
+    if (!account) return false
+    const userAddr = account.toLowerCase()
+    return market.participants?.some(p => p.toLowerCase() === userAddr) ||
+           market.creator?.toLowerCase() === userAddr
+  }, [account])
+
+  // Filter markets where user is participating
+  // Note: Show markets even if canView is false (encrypted), as long as user is a participant
+  // They should see these markets with "encrypted" placeholder to prompt acceptance
   const userActiveMarkets = useMemo(() => {
     return decryptedActiveMarkets.filter(m =>
-      m.canView !== false && // Only include viewable markets
-      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()) &&
-      m.status !== 'pending_acceptance'
+      isUserInMarket(m) && m.status !== 'pending_acceptance'
     )
-  }, [decryptedActiveMarkets, account])
+  }, [decryptedActiveMarkets, isUserInMarket])
 
   // Filter pending markets awaiting acceptance
   const userPendingMarkets = useMemo(() => {
     return decryptedActiveMarkets.filter(m =>
-      m.canView !== false && // Only include viewable markets
-      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase()) &&
-      m.status === 'pending_acceptance'
+      isUserInMarket(m) && m.status === 'pending_acceptance'
     )
-  }, [decryptedActiveMarkets, account])
+  }, [decryptedActiveMarkets, isUserInMarket])
 
   const userPastMarkets = useMemo(() => {
-    return decryptedPastMarkets.filter(m =>
-      m.canView !== false && // Only include viewable markets
-      (m.participants?.some(p => p.toLowerCase() === account?.toLowerCase()) ||
-      m.creator?.toLowerCase() === account?.toLowerCase())
-    )
-  }, [decryptedPastMarkets, account])
+    return decryptedPastMarkets.filter(m => isUserInMarket(m))
+  }, [decryptedPastMarkets, isUserInMarket])
 
   if (!isOpen) return null
 
@@ -972,9 +1009,9 @@ function FriendMarketsModal({
                       Back
                     </button>
                     <div className="fm-form-type-badge">
-                      {friendMarketType === 'oneVsOne' && '&#127919; 1v1'}
-                      {friendMarketType === 'smallGroup' && '&#128106; Group'}
-                      {friendMarketType === 'eventTracking' && '&#127942; Event'}
+                      {friendMarketType === 'oneVsOne' && <><span>🎯</span> 1v1</>}
+                      {friendMarketType === 'smallGroup' && <><span>👪</span> Group</>}
+                      {friendMarketType === 'eventTracking' && <><span>🏆</span> Event</>}
                     </div>
                   </div>
 
@@ -1535,14 +1572,19 @@ function FriendMarketsModal({
                     <div className="fm-pending-section">
                       <h4 className="fm-section-title">
                         <span className="fm-pending-icon">&#9203;</span>
-                        Awaiting Acceptance ({userPendingMarkets.length})
+                        Pending Offers ({userPendingMarkets.length})
                       </h4>
                       <div className="fm-pending-list">
-                        {userPendingMarkets.map((market, index) => (
+                        {userPendingMarkets.map((market, index) => {
+                          const isCreator = isCreatorOfPendingMarket(market)
+                          const canAccept = canUserAcceptMarket(market)
+                          return (
                           <div key={`pending-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`} className="fm-pending-card">
                             <div className="fm-pending-header">
                               <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
-                              <span className="fm-pending-badge">Pending</span>
+                              <span className={`fm-pending-badge ${isCreator ? 'fm-badge-consideration' : ''}`}>
+                                {isCreator ? 'Under Consideration' : 'Offer Received'}
+                              </span>
                             </div>
                             <p className="fm-pending-desc">{getMarketDescription(market)}</p>
                             <div className="fm-pending-progress">
@@ -1569,31 +1611,31 @@ function FriendMarketsModal({
                               )}
                             </div>
                             <div className="fm-pending-actions">
-                              {/* Accept button for invited participants */}
-                              {canUserAcceptMarket(market) && (
+                              {/* View Offer button for invited participants */}
+                              {canAccept && (
                                 <button
                                   type="button"
                                   className="fm-btn-accept"
                                   onClick={() => handleOpenAcceptanceModal(market)}
                                 >
-                                  Accept & Stake
+                                  View Offer
                                 </button>
                               )}
                               <button
                                 type="button"
                                 className="fm-btn-outline"
-                                onClick={() => {
-                                  const url = getMarketUrl(market)
-                                  if (navigator.clipboard?.writeText) {
-                                    navigator.clipboard.writeText(url)
-                                      .then(() => window.alert('Link copied!'))
-                                      .catch(() => window.alert('Failed to copy'))
-                                  }
-                                }}
+                                onClick={() => handleOpenShareModal(market)}
                               >
-                                &#128279; Copy Link
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                                  <circle cx="18" cy="5" r="3"/>
+                                  <circle cx="6" cy="12" r="3"/>
+                                  <circle cx="18" cy="19" r="3"/>
+                                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                                </svg>
+                                Share
                               </button>
-                              {market.creator?.toLowerCase() === account?.toLowerCase() && (
+                              {isCreator && (
                                 <button
                                   type="button"
                                   className="fm-btn-danger-outline"
@@ -1605,7 +1647,7 @@ function FriendMarketsModal({
                               )}
                             </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
                     </div>
                   )}
@@ -1705,10 +1747,141 @@ function FriendMarketsModal({
           marketId={marketToAccept.id}
           marketData={marketToAccept}
           onAccepted={handleMarketAccepted}
-          contractAddress={CONTRACT_ADDRESSES.friendGroupMarketFactory}
+          contractAddress={getContractAddress('friendGroupMarketFactory')}
           contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
         />
       )}
+
+      {/* Share Modal */}
+      {showShareModal && shareMarketData && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={handleCloseShareModal}
+          url={shareMarketData.url}
+          description={shareMarketData.description}
+          stakeAmount={shareMarketData.stakeAmount}
+          stakeTokenSymbol={shareMarketData.stakeTokenSymbol}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Share Modal Component for QR code and link sharing
+ */
+function ShareModal({
+  isOpen,
+  onClose,
+  url,
+  description,
+  stakeAmount,
+  stakeTokenSymbol
+}) {
+  const [copied, setCopied] = useState(false)
+
+  if (!isOpen) return null
+
+  const handleCopyLink = async () => {
+    if (!navigator.clipboard?.writeText) {
+      window.alert('Copy to clipboard is not supported in this browser. Please copy the link manually.')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy link:', error)
+      window.alert('Failed to copy the link. Please copy it manually.')
+    }
+  }
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }
+
+  return (
+    <div className="fm-share-modal-backdrop" onClick={handleBackdropClick}>
+      <div className="fm-share-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="fm-share-close" onClick={onClose} aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
+
+        <div className="fm-share-header">
+          <h3>Share Market</h3>
+          <p className="fm-share-desc">{description}</p>
+        </div>
+
+        <div className="fm-share-qr-section">
+          <div className="fm-share-qr-container">
+            <QRCodeSVG
+              value={url}
+              size={200}
+              level="H"
+              includeMargin={false}
+              fgColor="#36B37E"
+              bgColor="transparent"
+              aria-label="QR code to share this market"
+              imageSettings={{
+                src: '/assets/logo_fairwins.svg',
+                height: 32,
+                width: 32,
+                excavate: true,
+              }}
+            />
+          </div>
+          <p className="fm-share-qr-hint">
+            Scan to accept this market
+          </p>
+        </div>
+
+        <div className="fm-share-url-section">
+          <label htmlFor="share-url">Share link</label>
+          <div className="fm-share-url-row">
+            <input
+              id="share-url"
+              type="text"
+              value={url}
+              readOnly
+              onFocus={(e) => e.target.select()}
+            />
+            <button
+              type="button"
+              className="fm-share-copy-btn"
+              onClick={handleCopyLink}
+            >
+              {copied ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                  </svg>
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {stakeAmount && (
+          <div className="fm-share-stake-info">
+            <span>Stake required:</span>
+            <strong>{stakeAmount} {stakeTokenSymbol}</strong>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

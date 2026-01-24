@@ -134,15 +134,18 @@ function WalletButton({ className = '' }) {
       m.participants?.some(p => p.toLowerCase() === userAddr)
     )
 
-    const active = userMarkets.filter(m => {
+    // Markets that are ended, resolved, or cancelled go to past
+    const isPastMarket = (m) => {
       const endDate = new Date(m.endDate)
-      return endDate > now && m.status !== 'resolved'
-    })
+      const status = m.status?.toLowerCase()
+      return endDate <= now ||
+             status === 'resolved' ||
+             status === 'cancelled' ||
+             status === 'canceled'
+    }
 
-    const past = userMarkets.filter(m => {
-      const endDate = new Date(m.endDate)
-      return endDate <= now || m.status === 'resolved'
-    })
+    const active = userMarkets.filter(m => !isPastMarket(m))
+    const past = userMarkets.filter(m => isPastMarket(m))
 
     return { activeFriendMarkets: active, pastFriendMarkets: past }
   }, [friendMarkets, address])
