@@ -300,7 +300,7 @@ function MarketAcceptanceModal({
       <div className="ma-modal">
         <header className="ma-header">
           <h2 id="ma-title">
-            {isArbitrator ? 'Accept Arbitrator Role' : 'Accept Market Invitation'}
+            {isArbitrator ? 'Accept Arbitrator Role' : 'Review Market Offer'}
           </h2>
           <button
             className="ma-close-btn"
@@ -401,8 +401,8 @@ function MarketAcceptanceModal({
                 <div className="ma-already-accepted">
                   <span>&#10003;</span>
                   {isCreator
-                    ? 'You created this market and are already accepted. Waiting for other participants to join.'
-                    : 'You have already accepted this market'}
+                    ? 'You created this offer. Waiting for participants to consider and accept.'
+                    : 'You have already accepted this offer'}
                 </div>
               )}
 
@@ -410,7 +410,7 @@ function MarketAcceptanceModal({
               {isExpired && !hasAlreadyAccepted && (
                 <div className="ma-expired">
                   <span>&#9888;</span>
-                  The acceptance deadline has passed
+                  This offer has expired
                 </div>
               )}
 
@@ -426,20 +426,20 @@ function MarketAcceptanceModal({
               {canAccept && (
                 <div className="ma-actions">
                   <button className="ma-btn-secondary" onClick={handleDecline}>
-                    Decline
+                    Decline Offer
                   </button>
                   <button
                     className="ma-btn-primary"
                     onClick={() => setStep('confirm')}
                   >
-                    {isArbitrator ? 'Accept Role' : 'Stake & Accept'}
+                    {isArbitrator ? 'Accept Role' : 'Accept Offer'}
                   </button>
                 </div>
               )}
 
               {!isConnected && (
                 <div className="ma-connect-prompt">
-                  Please connect your wallet to accept this market
+                  Please connect your wallet to respond to this offer
                 </div>
               )}
             </>
@@ -447,7 +447,7 @@ function MarketAcceptanceModal({
 
           {step === 'confirm' && (
             <div className="ma-confirmation">
-              <h3>Confirm Acceptance</h3>
+              <h3>Confirm Offer Acceptance</h3>
 
               {/* Safety Warning Section */}
               <div className="ma-safety-warning">
@@ -507,7 +507,7 @@ function MarketAcceptanceModal({
                   Back
                 </button>
                 <button className="ma-btn-primary" onClick={handleAccept}>
-                  I Understand, Accept Market
+                  I Understand, Accept Offer
                 </button>
               </div>
             </div>
@@ -524,11 +524,11 @@ function MarketAcceptanceModal({
           {step === 'success' && (
             <div className="ma-success">
               <div className="ma-success-icon">&#10003;</div>
-              <h3>Successfully Accepted!</h3>
+              <h3>Offer Accepted!</h3>
               <p>
                 {isArbitrator
                   ? 'You are now the arbitrator for this market.'
-                  : 'Your stake has been deposited. The market will activate when all required participants accept.'}
+                  : 'Your stake has been deposited. The market will activate when all participants have accepted the offer.'}
               </p>
               {txHash && (
                 <a

@@ -95,8 +95,8 @@
 }
 
 .mm-close-btn {
-  background: transparent;
-  border: 1px solid var(--border-color, #23303D);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   width: 36px;
   height: 36px;
@@ -104,7 +104,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-secondary, #AAB6C2);
+  color: #E6EDF3;
   transition: all 0.2s;
 }
 
@@ -478,6 +478,11 @@
   color: #4C9AFF;
 }
 
+.mm-status-badge.status-cancelled {
+  background: rgba(170, 182, 194, 0.15);
+  color: #AAB6C2;
+}
+
 .mm-status-badge.status-default {
   background: rgba(170, 182, 194, 0.15);
   color: #AAB6C2;
@@ -529,6 +534,51 @@
 
 .mm-action-btn.mm-action-dispute:hover {
   background: rgba(245, 166, 35, 0.25);
+}
+
+.mm-action-btn.mm-action-accept {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+}
+
+.mm-action-btn.mm-action-accept:hover {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+}
+
+/* Resolve Countdown */
+.mm-resolve-countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: rgba(76, 154, 255, 0.1);
+  border: 1px solid rgba(76, 154, 255, 0.3);
+  border-radius: 6px;
+  color: #4C9AFF;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mm-resolve-countdown svg {
+  opacity: 0.8;
+}
+
+/* Full variant countdown (for detail view) */
+.mm-resolve-countdown-full {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(76, 154, 255, 0.1);
+  border: 1px solid rgba(76, 154, 255, 0.3);
+  border-radius: 8px;
+  color: #4C9AFF;
+  font-size: 0.875rem;
+}
+
+.mm-resolve-countdown-full strong {
+  color: #6CB8FF;
 }
 
 /* Detail View */

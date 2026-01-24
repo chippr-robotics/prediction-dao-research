@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ethers } from 'ethers'
 import { useWallet, useWeb3, useDataFetcher } from '../../hooks'
+import { getContractAddress } from '../../config/contracts'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
+import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './MyMarketsModal.css'
 
 /**
@@ -11,7 +15,8 @@ const MarketStatus = {
   PENDING_RESOLUTION: 'pending_resolution',
   DISPUTED: 'disputed',
   RESOLVED: 'resolved',
-  EXPIRED: 'expired'
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled'
 }
 
 /**
@@ -67,6 +72,10 @@ function MyMarketsModal({
   const [showDisputeModal, setShowDisputeModal] = useState(false)
   const [disputeMarket, setDisputeMarket] = useState(null)
   const [disputeMode, setDisputeMode] = useState(null) // 'open', 'respond', 'escalate'
+
+  // Acceptance modal state (for friend markets)
+  const [showAcceptanceModal, setShowAcceptanceModal] = useState(false)
+  const [acceptanceMarket, setAcceptanceMarket] = useState(null)
 
   // Filter state
   const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'prediction', 'friend'
@@ -172,12 +181,18 @@ function MyMarketsModal({
           : new Date(market.tradingEndTime).getTime())
         : (market.endDate ? new Date(market.endDate).getTime() : 0)
 
-      // Check for pending_acceptance status first (friend markets awaiting participant stakes)
-      if (market.status === 'pending_acceptance' || market.status === 'pending') {
+      // Check for terminal statuses first
+      const statusLower = market.status?.toLowerCase()
+      if (statusLower === 'cancelled' || statusLower === 'canceled') {
+        return MarketStatus.CANCELLED
+      }
+      if (statusLower === 'resolved') return MarketStatus.RESOLVED
+
+      // Check for pending_acceptance status (friend markets awaiting participant stakes)
+      if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
         return MarketStatus.PENDING_ACCEPTANCE
       }
-      if (market.status === 'resolved') return MarketStatus.RESOLVED
-      if (market.status === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
+      if (statusLower === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
         return MarketStatus.DISPUTED
       }
       if (endTime && now > endTime) return MarketStatus.PENDING_RESOLUTION
@@ -219,7 +234,8 @@ function MyMarketsModal({
         return
       }
 
-      if (status === MarketStatus.RESOLVED) {
+      // Resolved and cancelled markets go to history
+      if (status === MarketStatus.RESOLVED || status === MarketStatus.CANCELLED) {
         if (isCreator(market) || isParticipant(market)) {
           history.push(marketWithStatus)
         }
@@ -269,6 +285,7 @@ function MyMarketsModal({
       case MarketStatus.PENDING_RESOLUTION: return 'status-pending'
       case MarketStatus.DISPUTED: return 'status-disputed'
       case MarketStatus.RESOLVED: return 'status-resolved'
+      case MarketStatus.CANCELLED: return 'status-cancelled'
       default: return 'status-default'
     }
   }
@@ -280,6 +297,7 @@ function MyMarketsModal({
       case MarketStatus.PENDING_RESOLUTION: return 'Pending Resolution'
       case MarketStatus.DISPUTED: return 'Disputed'
       case MarketStatus.RESOLVED: return 'Resolved'
+      case MarketStatus.CANCELLED: return 'Cancelled'
       default: return status
     }
   }
@@ -351,6 +369,69 @@ function MyMarketsModal({
     const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
     const status = market.computedStatus || MarketStatus.ACTIVE
     return isCreator && status === MarketStatus.DISPUTED
+  }
+
+  // Check if user can accept a pending friend market (is invited participant, not creator)
+  const canAcceptMarket = useCallback((market) => {
+    if (!account || market.marketType !== 'friend') return false
+    const status = market.computedStatus || market.status
+    if (status !== MarketStatus.PENDING_ACCEPTANCE) return false
+
+    // User must be in participants list
+    const isInvited = market.participants?.some(
+      p => p.toLowerCase() === account.toLowerCase()
+    )
+    // User must NOT be the creator (creator has already accepted by creating)
+    const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
+    // User must not have already accepted
+    const hasAccepted = market.acceptances?.[account.toLowerCase()]?.hasAccepted
+
+    return isInvited && !isCreator && !hasAccepted
+  }, [account])
+
+  // Check if user is creator of a pending market (shows "Under Consideration" status)
+  const isCreatorOfPendingMarket = useCallback((market) => {
+    if (!account || market.marketType !== 'friend') return false
+    const status = market.computedStatus || market.status
+    if (status !== MarketStatus.PENDING_ACCEPTANCE) return false
+
+    return market.creator?.toLowerCase() === account.toLowerCase()
+  }, [account])
+
+  // Handle opening acceptance modal
+  const handleOpenAcceptance = (market) => {
+    // Transform market data to match what MarketAcceptanceModal expects
+    const marketData = {
+      id: market.id,
+      description: market.description || market.proposalTitle,
+      creator: market.creator,
+      participants: market.participants || [],
+      arbitrator: market.arbitrator || null,
+      marketType: market.type || 'oneVsOne',
+      status: market.status,
+      acceptanceDeadline: typeof market.acceptanceDeadline === 'number'
+        ? market.acceptanceDeadline
+        : market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime() : null,
+      minAcceptanceThreshold: market.minAcceptanceThreshold || 2,
+      stakePerParticipant: market.stakeAmount,
+      stakeToken: market.stakeTokenAddress || null,
+      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
+      acceptances: market.acceptances || {},
+      acceptedCount: market.acceptedCount || 0
+    }
+    setAcceptanceMarket(marketData)
+    setShowAcceptanceModal(true)
+  }
+
+  const handleCloseAcceptance = () => {
+    setShowAcceptanceModal(false)
+    setAcceptanceMarket(null)
+  }
+
+  const handleMarketAccepted = () => {
+    handleCloseAcceptance()
+    // Refresh markets data
+    fetchMarketsData()
   }
 
   if (!isOpen) return null
@@ -532,6 +613,10 @@ function MyMarketsModal({
                       getStatusLabel={getStatusLabel}
                       getTimeRemaining={getTimeRemaining}
                       showActions={false}
+                      canAccept={canAcceptMarket}
+                      isCreatorOfPending={isCreatorOfPendingMarket}
+                      onAccept={handleOpenAcceptance}
+                      account={account}
                     />
                   )}
                 </div>
@@ -574,9 +659,12 @@ function MyMarketsModal({
                       getTimeRemaining={getTimeRemaining}
                       canResolve={canResolve}
                       canRespondToDispute={canRespondToDispute}
+                      isCreatorOfPending={isCreatorOfPendingMarket}
                       onResolve={handleOpenResolution}
                       onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
                       showActions
+                      account={account}
+                      showResolveCountdown
                     />
                   )}
                 </div>
@@ -653,6 +741,19 @@ function MyMarketsModal({
           account={account}
         />
       )}
+
+      {/* Market Acceptance Modal (for friend markets) */}
+      {showAcceptanceModal && acceptanceMarket && (
+        <MarketAcceptanceModal
+          isOpen={showAcceptanceModal}
+          onClose={handleCloseAcceptance}
+          marketId={acceptanceMarket.id}
+          marketData={acceptanceMarket}
+          onAccepted={handleMarketAccepted}
+          contractAddress={getContractAddress('friendGroupMarketFactory')}
+          contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
+        />
+      )}
     </div>
   )
 }
@@ -670,8 +771,13 @@ function MarketsTable({
   showOutcome = false,
   canResolve,
   canRespondToDispute,
+  canAccept,
+  isCreatorOfPending,
   onResolve,
-  onRespondToDispute
+  onRespondToDispute,
+  onAccept,
+  account,
+  showResolveCountdown = false
 }) {
   return (
     <div className="mm-table-container">
@@ -682,7 +788,7 @@ function MarketsTable({
             <th>Type</th>
             <th>{showOutcome ? 'Outcome' : 'Time Left'}</th>
             <th>Status</th>
-            {showActions && <th>Actions</th>}
+            {(showActions || canAccept || showResolveCountdown) && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>
@@ -691,6 +797,8 @@ function MarketsTable({
             const timeLeft = getTimeRemaining(endTime)
             const showResolveBtn = showActions && canResolve?.(market)
             const showDisputeBtn = showActions && canRespondToDispute?.(market)
+            const showAcceptBtn = canAccept?.(market)
+            const showUnderConsideration = isCreatorOfPending?.(market)
 
             return (
               <tr
@@ -725,12 +833,28 @@ function MarketsTable({
                 </td>
                 <td>
                   <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
-                    {getStatusLabel(market.computedStatus)}
+                    {showUnderConsideration ? 'Under Consideration' : getStatusLabel(market.computedStatus)}
                   </span>
                 </td>
-                {showActions && (
+                {(showActions || showAcceptBtn || showUnderConsideration || showResolveCountdown) && (
                   <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>
-                    {showResolveBtn && (
+                    {showAcceptBtn && (
+                      <button
+                        className="mm-action-btn mm-action-accept"
+                        onClick={(e) => { e.stopPropagation(); onAccept(market) }}
+                        title="View offer details"
+                      >
+                        View Offer
+                      </button>
+                    )}
+                    {showResolveCountdown && (
+                      <ResolveButtonWithCountdown
+                        market={market}
+                        onResolve={onResolve}
+                        account={account}
+                      />
+                    )}
+                    {showResolveBtn && !showResolveCountdown && (
                       <button
                         className="mm-action-btn mm-action-resolve"
                         onClick={(e) => { e.stopPropagation(); onResolve(market) }}
@@ -757,6 +881,135 @@ function MarketsTable({
       </table>
     </div>
   )
+}
+
+/**
+ * Resolve Button with Countdown Component
+ * Shows countdown timer until resolution time, then becomes active
+ * @param {string} variant - 'compact' (table) or 'full' (detail view)
+ */
+function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'compact' }) {
+  const [timeRemaining, setTimeRemaining] = useState(null)
+  const [canResolveNow, setCanResolveNow] = useState(false)
+
+  // Check if user is creator
+  const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
+
+  // Get end time
+  const endTime = useMemo(() => {
+    const rawEndTime = market.tradingEndTime || market.endDate
+    if (!rawEndTime) return null
+    if (typeof rawEndTime === 'bigint') {
+      return Number(rawEndTime) * 1000
+    } else if (typeof rawEndTime === 'number') {
+      return rawEndTime > 1e12 ? rawEndTime : rawEndTime * 1000
+    }
+    return new Date(rawEndTime).getTime()
+  }, [market.tradingEndTime, market.endDate])
+
+  // Update countdown every second
+  useEffect(() => {
+    if (!endTime || !isCreator) return
+
+    const updateCountdown = () => {
+      const now = Date.now()
+      const remaining = endTime - now
+
+      if (remaining <= 0) {
+        setCanResolveNow(true)
+        setTimeRemaining(null)
+      } else {
+        setCanResolveNow(false)
+        setTimeRemaining(remaining)
+      }
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+
+    return () => clearInterval(interval)
+  }, [endTime, isCreator])
+
+  // Don't show if not creator
+  if (!isCreator) return null
+
+  // If already resolved, disputed, or cancelled, don't show
+  const status = market.computedStatus || market.status
+  if (status === 'resolved' || status === 'disputed' || status === 'cancelled' || status === 'canceled') {
+    return null
+  }
+
+  // Format remaining time
+  const formatCountdown = (ms) => {
+    if (!ms || ms <= 0) return null
+
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((ms % (1000 * 60)) / 1000)
+
+    if (days > 0) return `${days}d ${hours}h`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    if (minutes > 0) return `${minutes}m ${seconds}s`
+    return `${seconds}s`
+  }
+
+  // Show resolve button if can resolve now
+  if (canResolveNow) {
+    if (variant === 'full') {
+      return (
+        <button
+          type="button"
+          className="mm-btn-primary"
+          onClick={() => onResolve(market)}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Resolve Market
+        </button>
+      )
+    }
+    return (
+      <button
+        className="mm-action-btn mm-action-resolve"
+        onClick={(e) => { e.stopPropagation(); onResolve(market) }}
+        title="Resolve market"
+      >
+        Resolve
+      </button>
+    )
+  }
+
+  // Show countdown
+  if (timeRemaining) {
+    const countdownText = formatCountdown(timeRemaining)
+    if (variant === 'full') {
+      return (
+        <div className="mm-resolve-countdown-full">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>Resolution available in <strong>{countdownText}</strong></span>
+        </div>
+      )
+    }
+    return (
+      <span
+        className="mm-resolve-countdown"
+        title={`Resolution available in ${countdownText}`}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        {countdownText}
+      </span>
+    )
+  }
+
+  return null
 }
 
 /**
@@ -920,17 +1173,13 @@ function MarketDetailView({
 
       {/* Actions */}
       <div className="mm-detail-actions">
-        {isCreatorView && canResolve?.(market) && (
-          <button
-            type="button"
-            className="mm-btn-primary"
-            onClick={() => onOpenResolution(market)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            Resolve Market
-          </button>
+        {isCreatorView && (
+          <ResolveButtonWithCountdown
+            market={market}
+            onResolve={onOpenResolution}
+            account={account}
+            variant="full"
+          />
         )}
         {isCreatorView && canRespondToDispute?.(market) && (
           <button
