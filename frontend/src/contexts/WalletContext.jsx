@@ -129,7 +129,7 @@ export function WalletProvider({ children }) {
           keysToRemove.forEach(key => localStorage.removeItem(key))
           console.log('[WalletContext] Cleared stale WalletConnect data')
         }
-      } catch (error) {
+      } catch {
         // Silently ignore cleanup errors
       }
     }
