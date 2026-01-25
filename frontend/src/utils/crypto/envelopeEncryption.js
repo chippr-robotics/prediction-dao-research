@@ -15,17 +15,138 @@
  */
 
 import { x25519 } from '@noble/curves/ed25519'
+import { ml_kem768 } from '@noble/post-quantum/ml-kem'
 import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
+import { sha3_256 } from '@noble/hashes/sha3'
 import { chacha20poly1305 } from '@noble/ciphers/chacha'
 import { randomBytes } from '@noble/ciphers/webcrypto'
-import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/ciphers/utils'
+import { bytesToHex, hexToBytes, utf8ToBytes, concatBytes } from '@noble/ciphers/utils'
 import { keccak256, toUtf8Bytes, getBytes } from 'ethers'
 import {
   CURRENT_ENCRYPTION_VERSION,
   getMarketSigningMessage,
-  ENVELOPE_INFO
+  ENVELOPE_INFO,
+  XWING_ENVELOPE_INFO,
+  XWING_ALGORITHM,
+  SUPPORTED_ALGORITHMS
 } from './constants.js'
+
+// ==================== X-Wing Hybrid KEM Implementation ====================
+// X-Wing combines X25519 + ML-KEM-768 per IETF draft-connolly-cfrg-xwing-kem
+// If either algorithm remains secure, the combined scheme is secure
+
+const XWING_LABEL = new TextEncoder().encode('\\./\n\\./\n')  // X-Wing label per spec
+
+/**
+ * X-Wing combiner function per IETF spec
+ * SharedSecret = SHA3-256(XWING_LABEL || ss_M || ss_X || ct_X || pk_X)
+ */
+function xwingCombiner(mlkemSharedSecret, x25519SharedSecret, x25519Ciphertext, x25519PublicKey) {
+  return sha3_256(concatBytes(
+    XWING_LABEL,
+    mlkemSharedSecret,
+    x25519SharedSecret,
+    x25519Ciphertext,
+    x25519PublicKey
+  ))
+}
+
+/**
+ * X-Wing key generation from 32-byte seed
+ * Returns hybrid public key (1184 ML-KEM + 32 X25519 = 1216 bytes)
+ * and secret key (32-byte seed that can regenerate both component keys)
+ */
+function xwingKeygen(seed) {
+  // Derive component seeds using domain separation
+  // ML-KEM requires 64-byte seed, so we expand using SHA3-256 twice
+  const mlkemSeed1 = sha3_256(concatBytes(new TextEncoder().encode('xwing-mlkem-1'), seed))
+  const mlkemSeed2 = sha3_256(concatBytes(new TextEncoder().encode('xwing-mlkem-2'), seed))
+  const mlkemSeed = concatBytes(mlkemSeed1, mlkemSeed2) // 64 bytes
+
+  const x25519Seed = sha3_256(concatBytes(new TextEncoder().encode('xwing-x25519'), seed))
+
+  // Generate ML-KEM-768 keypair (deterministic from 64-byte seed)
+  const mlkemKeys = ml_kem768.keygen(mlkemSeed)
+
+  // Generate X25519 keypair
+  const x25519PrivateKey = x25519Seed.slice(0, 32)
+  const x25519PublicKey = x25519.getPublicKey(x25519PrivateKey)
+
+  // Combine public keys: ML-KEM (1184 bytes) || X25519 (32 bytes)
+  const publicKey = concatBytes(mlkemKeys.publicKey, x25519PublicKey)
+
+  return {
+    publicKey,         // 1216 bytes
+    secretKey: seed    // 32 bytes (the original seed)
+  }
+}
+
+/**
+ * X-Wing encapsulation - generate shared secret from recipient's public key
+ */
+function xwingEncapsulate(publicKey) {
+  // Split public key into components
+  const mlkemPublicKey = publicKey.slice(0, 1184)
+  const x25519PublicKey = publicKey.slice(1184, 1216)
+
+  // Generate ephemeral X25519 keypair
+  const x25519EphemeralPrivate = randomBytes(32)
+  const x25519EphemeralPublic = x25519.getPublicKey(x25519EphemeralPrivate)
+
+  // ML-KEM encapsulation
+  const { cipherText: mlkemCiphertext, sharedSecret: mlkemSharedSecret } = ml_kem768.encapsulate(mlkemPublicKey)
+
+  // X25519 key agreement
+  const x25519SharedSecret = x25519.getSharedSecret(x25519EphemeralPrivate, x25519PublicKey)
+
+  // Combine shared secrets using X-Wing combiner
+  const sharedSecret = xwingCombiner(
+    mlkemSharedSecret,
+    x25519SharedSecret,
+    x25519EphemeralPublic,  // ct_X is the ephemeral public key
+    x25519PublicKey
+  )
+
+  // Ciphertext: ML-KEM (1088 bytes) || X25519 ephemeral public (32 bytes) = 1120 bytes
+  const cipherText = concatBytes(mlkemCiphertext, x25519EphemeralPublic)
+
+  return { cipherText, sharedSecret }
+}
+
+/**
+ * X-Wing decapsulation - recover shared secret using secret key
+ */
+function xwingDecapsulate(cipherText, secretKey) {
+  // Regenerate component keys from seed (same derivation as xwingKeygen)
+  const mlkemSeed1 = sha3_256(concatBytes(new TextEncoder().encode('xwing-mlkem-1'), secretKey))
+  const mlkemSeed2 = sha3_256(concatBytes(new TextEncoder().encode('xwing-mlkem-2'), secretKey))
+  const mlkemSeed = concatBytes(mlkemSeed1, mlkemSeed2) // 64 bytes
+
+  const x25519Seed = sha3_256(concatBytes(new TextEncoder().encode('xwing-x25519'), secretKey))
+
+  const mlkemKeys = ml_kem768.keygen(mlkemSeed)
+  const x25519PrivateKey = x25519Seed.slice(0, 32)
+  const x25519PublicKey = x25519.getPublicKey(x25519PrivateKey)
+
+  // Split ciphertext into components
+  const mlkemCiphertext = cipherText.slice(0, 1088)
+  const x25519EphemeralPublic = cipherText.slice(1088, 1120)
+
+  // ML-KEM decapsulation
+  const mlkemSharedSecret = ml_kem768.decapsulate(mlkemCiphertext, mlkemKeys.secretKey)
+
+  // X25519 key agreement
+  const x25519SharedSecret = x25519.getSharedSecret(x25519PrivateKey, x25519EphemeralPublic)
+
+  // Combine shared secrets using X-Wing combiner
+  return xwingCombiner(
+    mlkemSharedSecret,
+    x25519SharedSecret,
+    x25519EphemeralPublic,
+    x25519PublicKey
+  )
+}
 
 /**
  * Derive an X25519 key pair from a wallet signature
@@ -78,6 +199,67 @@ export function deriveKeyPairFromSignature(signature) {
   return {
     publicKey,
     privateKey,
+    signature
+  }
+}
+
+// ==================== X-Wing Post-Quantum Functions ====================
+
+/**
+ * Derive an X-Wing key pair from a wallet signature
+ * Uses the same deterministic approach as X25519 - same wallet + version = same keypair
+ * X-Wing combines X25519 + ML-KEM-768 for post-quantum security
+ *
+ * @param {Object} signer - Ethers signer
+ * @param {number} [version=CURRENT_ENCRYPTION_VERSION] - Signing message version
+ * @returns {Promise<{publicKey: Uint8Array, secretKey: Uint8Array, signature: string, version: number, algorithm: string}>}
+ */
+export async function deriveXWingKeyPair(signer, version = CURRENT_ENCRYPTION_VERSION) {
+  const message = getMarketSigningMessage(version)
+  const signature = await signer.signMessage(message)
+  const hash = keccak256(toUtf8Bytes(signature))
+  const seed = getBytes(hash)
+
+  // X-Wing keygen with 32-byte seed produces deterministic keypair
+  const { publicKey, secretKey } = xwingKeygen(seed)
+
+  return {
+    publicKey,      // 1216 bytes (1184 ML-KEM + 32 X25519)
+    secretKey,      // 32 bytes (seed)
+    signature,
+    version,
+    algorithm: 'xwing'
+  }
+}
+
+/**
+ * Derive X-Wing public key from a signature
+ * Allows getting someone's encryption public key from their signature
+ *
+ * @param {string} signature - Their signature of the signing message
+ * @returns {Uint8Array} - Their X-Wing public key (1216 bytes)
+ */
+export function xwingPublicKeyFromSignature(signature) {
+  const hash = keccak256(toUtf8Bytes(signature))
+  const seed = getBytes(hash)
+  const { publicKey } = xwingKeygen(seed)
+  return publicKey
+}
+
+/**
+ * Derive full X-Wing keypair from a cached signature (no wallet interaction)
+ *
+ * @param {string} signature - Cached signature
+ * @returns {{publicKey: Uint8Array, secretKey: Uint8Array, signature: string}}
+ */
+export function deriveXWingKeyPairFromSignature(signature) {
+  const hash = keccak256(toUtf8Bytes(signature))
+  const seed = getBytes(hash)
+  const { publicKey, secretKey } = xwingKeygen(seed)
+
+  return {
+    publicKey,
+    secretKey,
     signature
   }
 }
@@ -257,6 +439,181 @@ export function removeRecipient(envelope, addressToRemove) {
   }
 }
 
+// ==================== X-Wing Envelope Encryption ====================
+
+/**
+ * Encrypt data for multiple recipients using X-Wing hybrid KEM (post-quantum)
+ *
+ * @param {Object|string} data - Data to encrypt
+ * @param {Array<{address: string, publicKey: Uint8Array}>} recipients - Recipients with X-Wing public keys
+ * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version
+ * @returns {Object} - X-Wing encrypted envelope (v2.0)
+ */
+export function encryptEnvelopeXWing(data, recipients, signingVersion = CURRENT_ENCRYPTION_VERSION) {
+  // 1. Generate random Data Encryption Key (DEK)
+  const dek = randomBytes(32)
+
+  // 2. Encrypt the content with DEK (same as v1.0)
+  const plaintext = typeof data === 'string'
+    ? utf8ToBytes(data)
+    : utf8ToBytes(JSON.stringify(data))
+
+  const contentNonce = randomBytes(12)
+  const cipher = chacha20poly1305(dek, contentNonce)
+  const encryptedContent = cipher.encrypt(plaintext)
+
+  // 3. Wrap DEK for each recipient using X-Wing KEM
+  const wrappedKeys = recipients.map(recipient => {
+    // X-Wing encapsulate generates shared secret and ciphertext
+    const { cipherText, sharedSecret } = xwingEncapsulate(recipient.publicKey)
+
+    // Derive Key Encryption Key (KEK) from X-Wing shared secret
+    const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+
+    // Encrypt DEK with KEK
+    const keyNonce = randomBytes(12)
+    const keyCipher = chacha20poly1305(kek, keyNonce)
+    const wrappedDek = keyCipher.encrypt(dek)
+
+    return {
+      address: recipient.address.toLowerCase(),
+      // X-Wing ciphertext contains both ML-KEM and X25519 components (1120 bytes)
+      xwingCiphertext: bytesToHex(cipherText),
+      nonce: bytesToHex(keyNonce),
+      wrappedKey: bytesToHex(wrappedDek)
+    }
+  })
+
+  return {
+    version: '2.0',
+    algorithm: XWING_ALGORITHM,
+    signingVersion: signingVersion,
+    content: {
+      nonce: bytesToHex(contentNonce),
+      ciphertext: bytesToHex(encryptedContent)
+    },
+    keys: wrappedKeys
+  }
+}
+
+/**
+ * Decrypt an X-Wing envelope using our secret key
+ *
+ * @param {Object} envelope - X-Wing encrypted envelope
+ * @param {string} myAddress - Our address
+ * @param {Uint8Array} mySecretKey - Our X-Wing secret key (32-byte seed)
+ * @returns {Object|string} - Decrypted data
+ */
+export function decryptEnvelopeXWing(envelope, myAddress, mySecretKey) {
+  const normalizedAddress = myAddress.toLowerCase()
+
+  // Find our wrapped key
+  const wrappedKeyEntry = envelope.keys.find(
+    k => k.address === normalizedAddress
+  )
+
+  if (!wrappedKeyEntry) {
+    throw new Error('No key found for this address')
+  }
+
+  // Recover shared secret using X-Wing decapsulate
+  const xwingCiphertext = hexToBytes(wrappedKeyEntry.xwingCiphertext)
+  const sharedSecret = xwingDecapsulate(xwingCiphertext, mySecretKey)
+
+  // Derive Key Encryption Key
+  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+
+  // Decrypt the DEK
+  const keyNonce = hexToBytes(wrappedKeyEntry.nonce)
+  const wrappedKey = hexToBytes(wrappedKeyEntry.wrappedKey)
+  const keyCipher = chacha20poly1305(kek, keyNonce)
+  const dek = keyCipher.decrypt(wrappedKey)
+
+  // Decrypt the content
+  const contentNonce = hexToBytes(envelope.content.nonce)
+  const ciphertext = hexToBytes(envelope.content.ciphertext)
+  const contentCipher = chacha20poly1305(dek, contentNonce)
+  const plaintext = contentCipher.decrypt(ciphertext)
+
+  // Parse as JSON if possible
+  const decoded = new TextDecoder().decode(plaintext)
+  try {
+    return JSON.parse(decoded)
+  } catch {
+    return decoded
+  }
+}
+
+/**
+ * Add a new recipient to an existing X-Wing envelope
+ *
+ * @param {Object} envelope - Existing X-Wing encrypted envelope
+ * @param {string} existingRecipientAddress - Address of existing recipient
+ * @param {Uint8Array} existingRecipientSecretKey - Secret key to decrypt DEK
+ * @param {{address: string, publicKey: Uint8Array}} newRecipient - New recipient to add
+ * @returns {Object} - Updated envelope
+ */
+export function addRecipientXWing(envelope, existingRecipientAddress, existingRecipientSecretKey, newRecipient) {
+  // First, recover the DEK
+  const normalizedAddress = existingRecipientAddress.toLowerCase()
+  const wrappedKeyEntry = envelope.keys.find(k => k.address === normalizedAddress)
+
+  if (!wrappedKeyEntry) {
+    throw new Error('Not a recipient of this envelope')
+  }
+
+  // Decrypt DEK using X-Wing
+  const xwingCiphertext = hexToBytes(wrappedKeyEntry.xwingCiphertext)
+  const sharedSecret = xwingDecapsulate(xwingCiphertext, existingRecipientSecretKey)
+  const kek = hkdf(sha256, sharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+  const keyNonce = hexToBytes(wrappedKeyEntry.nonce)
+  const wrappedKey = hexToBytes(wrappedKeyEntry.wrappedKey)
+  const keyCipher = chacha20poly1305(kek, keyNonce)
+  const dek = keyCipher.decrypt(wrappedKey)
+
+  // Encrypt DEK for new recipient using X-Wing
+  const { cipherText: newCiphertext, sharedSecret: newSharedSecret } = xwingEncapsulate(newRecipient.publicKey)
+  const newKek = hkdf(sha256, newSharedSecret, new Uint8Array(0), XWING_ENVELOPE_INFO, 32)
+  const newKeyNonce = randomBytes(12)
+  const newKeyCipher = chacha20poly1305(newKek, newKeyNonce)
+  const newWrappedDek = newKeyCipher.encrypt(dek)
+
+  // Add to envelope
+  const newWrappedKey = {
+    address: newRecipient.address.toLowerCase(),
+    xwingCiphertext: bytesToHex(newCiphertext),
+    nonce: bytesToHex(newKeyNonce),
+    wrappedKey: bytesToHex(newWrappedDek)
+  }
+
+  return {
+    ...envelope,
+    keys: [...envelope.keys, newWrappedKey]
+  }
+}
+
+/**
+ * Unified decrypt function - auto-detects envelope version and uses appropriate decryption
+ *
+ * @param {Object} envelope - Encrypted envelope (any version)
+ * @param {string} myAddress - Our address
+ * @param {Object} keys - Object containing both key types: { x25519PrivateKey?, xwingSecretKey? }
+ * @returns {Object|string} - Decrypted data
+ */
+export function decryptEnvelopeUnified(envelope, myAddress, keys) {
+  if (isXWingEnvelope(envelope)) {
+    if (!keys.xwingSecretKey) {
+      throw new Error('X-Wing secret key required for v2.0 envelope')
+    }
+    return decryptEnvelopeXWing(envelope, myAddress, keys.xwingSecretKey)
+  } else {
+    if (!keys.x25519PrivateKey) {
+      throw new Error('X25519 private key required for v1.0 envelope')
+    }
+    return decryptEnvelope(envelope, myAddress, keys.x25519PrivateKey)
+  }
+}
+
 /**
  * Check if an address can decrypt an envelope
  *
@@ -282,16 +639,36 @@ export function getRecipients(envelope) {
 }
 
 /**
- * Check if data is an encrypted envelope
+ * Check if data is an encrypted envelope (any supported version)
  *
  * @param {Object} data
  * @returns {boolean}
  */
 export function isEncryptedEnvelope(data) {
-  return data?.version === '1.0' &&
-         data?.algorithm === 'x25519-chacha20poly1305' &&
-         data?.content?.ciphertext != null &&
-         Array.isArray(data?.keys)
+  if (!data?.version || !data?.algorithm || !data?.content?.ciphertext || !Array.isArray(data?.keys)) {
+    return false
+  }
+  return SUPPORTED_ALGORITHMS.includes(data.algorithm)
+}
+
+/**
+ * Check if data is an X-Wing (post-quantum) envelope
+ *
+ * @param {Object} data
+ * @returns {boolean}
+ */
+export function isXWingEnvelope(data) {
+  return data?.algorithm === XWING_ALGORITHM
+}
+
+/**
+ * Check if data is a v1.0 X25519 envelope
+ *
+ * @param {Object} data
+ * @returns {boolean}
+ */
+export function isX25519Envelope(data) {
+  return data?.algorithm === 'x25519-chacha20poly1305'
 }
 
 // ==================== Helper Functions ====================
@@ -422,4 +799,110 @@ export async function addParticipantToMarket(envelope, existingAddress, existing
     address: newAddress,
     publicKey: newPublicKey
   })
+}
+
+// ==================== X-Wing High-Level API ====================
+
+/**
+ * Encrypt market metadata using X-Wing (post-quantum)
+ *
+ * @param {Object} metadata - Market metadata (name, description, etc.)
+ * @param {Array<{address: string, signature: string}>} participants - Participants with signatures
+ * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version
+ * @returns {Object} - X-Wing encrypted envelope
+ */
+export function encryptMarketMetadataXWing(metadata, participants, signingVersion = CURRENT_ENCRYPTION_VERSION) {
+  // Convert signatures to X-Wing public keys
+  const recipients = participants.map(p => ({
+    address: p.address,
+    publicKey: xwingPublicKeyFromSignature(p.signature)
+  }))
+
+  return encryptEnvelopeXWing(metadata, recipients, signingVersion)
+}
+
+/**
+ * Create encrypted friend market using X-Wing (post-quantum)
+ *
+ * @param {Object} metadata - Market metadata
+ * @param {Object} signer - Creator's signer
+ * @param {string} creatorAddress - Creator's address
+ * @returns {Promise<{envelope: Object, creatorSignature: string, signingVersion: number}>}
+ */
+export async function createEncryptedMarketXWing(metadata, signer, creatorAddress) {
+  // Use current version for new markets
+  const { signature, version } = await deriveXWingKeyPair(signer, CURRENT_ENCRYPTION_VERSION)
+
+  // Start with just creator as recipient
+  const envelope = encryptMarketMetadataXWing(metadata, [
+    { address: creatorAddress, signature }
+  ], version)
+
+  return {
+    envelope,
+    creatorSignature: signature,
+    signingVersion: version
+  }
+}
+
+/**
+ * Add a participant to an X-Wing encrypted market
+ *
+ * @param {Object} envelope - Existing X-Wing envelope
+ * @param {string} existingAddress - An existing recipient's address
+ * @param {Object|Uint8Array} existingSignerOrSecretKey - Existing recipient's signer OR cached secret key
+ * @param {string} newAddress - New participant's address
+ * @param {string} newSignature - New participant's signature
+ * @returns {Promise<Object>} - Updated envelope
+ */
+export async function addParticipantToMarketXWing(envelope, existingAddress, existingSignerOrSecretKey, newAddress, newSignature) {
+  const signingVersion = envelope.signingVersion || CURRENT_ENCRYPTION_VERSION
+
+  // If it's already a Uint8Array (cached secret key), use it directly
+  let secretKey
+  if (existingSignerOrSecretKey instanceof Uint8Array) {
+    secretKey = existingSignerOrSecretKey
+  } else {
+    const result = await deriveXWingKeyPair(existingSignerOrSecretKey, signingVersion)
+    secretKey = result.secretKey
+  }
+
+  const newPublicKey = xwingPublicKeyFromSignature(newSignature)
+
+  return addRecipientXWing(envelope, existingAddress, secretKey, {
+    address: newAddress,
+    publicKey: newPublicKey
+  })
+}
+
+/**
+ * Unified add participant - auto-detects envelope type
+ *
+ * @param {Object} envelope - Encrypted envelope (any version)
+ * @param {string} existingAddress - Existing recipient's address
+ * @param {Object} keys - { x25519PrivateKey?, xwingSecretKey? }
+ * @param {string} newAddress - New participant's address
+ * @param {string} newSignature - New participant's signature
+ * @returns {Object} - Updated envelope
+ */
+export function addParticipantUnified(envelope, existingAddress, keys, newAddress, newSignature) {
+  if (isXWingEnvelope(envelope)) {
+    if (!keys.xwingSecretKey) {
+      throw new Error('X-Wing secret key required for v2.0 envelope')
+    }
+    const newPublicKey = xwingPublicKeyFromSignature(newSignature)
+    return addRecipientXWing(envelope, existingAddress, keys.xwingSecretKey, {
+      address: newAddress,
+      publicKey: newPublicKey
+    })
+  } else {
+    if (!keys.x25519PrivateKey) {
+      throw new Error('X25519 private key required for v1.0 envelope')
+    }
+    const newPublicKey = publicKeyFromSignature(newSignature)
+    return addRecipient(envelope, existingAddress, keys.x25519PrivateKey, {
+      address: newAddress,
+      publicKey: newPublicKey
+    })
+  }
 }

@@ -11,6 +11,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useWallet } from './useWalletManagement'
 import {
+  // X25519 (v1.0) functions
   deriveKeyPair,
   deriveKeyPairFromSignature,
   publicKeyFromSignature,
@@ -18,9 +19,20 @@ import {
   decryptMarketMetadata,
   createEncryptedMarket,
   addParticipantToMarket,
+  // X-Wing (v2.0) functions
+  deriveXWingKeyPair,
+  deriveXWingKeyPairFromSignature,
+  xwingPublicKeyFromSignature,
+  createEncryptedMarketXWing,
+  // Unified functions
+  decryptEnvelopeUnified,
+  addParticipantUnified,
+  isXWingEnvelope,
+  // Utilities
   canDecrypt,
   getRecipients,
-  isEncryptedEnvelope
+  isEncryptedEnvelope,
+  getEnvelopeSigningVersion
 } from '../utils/crypto/envelopeEncryption.js'
 
 // Cache signatures in session storage
@@ -31,15 +43,20 @@ let initializationPromise = null
 
 /**
  * Main encryption hook for friend markets
+ * Supports both X25519 (v1.0) and X-Wing (v2.0 post-quantum) envelopes
  */
 export function useEncryption() {
   const { account, signer, isConnected } = useWallet()
-  const [keyPair, setKeyPair] = useState(null)
+  // Dual keypair state: X25519 for backward compatibility, X-Wing for new markets
+  const [keyPairs, setKeyPairs] = useState({
+    x25519: null,  // { publicKey, privateKey }
+    xwing: null    // { publicKey, secretKey }
+  })
   const [signature, setSignature] = useState(null)
   const [isInitializing, setIsInitializing] = useState(false)
   const [error, setError] = useState(null)
 
-  // Load cached signature on mount and derive full keypair (no wallet interaction needed)
+  // Load cached signature on mount and derive both keypairs (no wallet interaction needed)
   useEffect(() => {
     let ignore = false
 
@@ -47,15 +64,25 @@ export function useEncryption() {
       const cached = sessionStorage.getItem(`${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`)
       if (cached && !ignore) {
         setSignature(cached)
-        // Derive FULL keypair from cached signature (including privateKey for decryption)
+        // Derive BOTH keypairs from cached signature
         try {
-          const keys = deriveKeyPairFromSignature(cached)
+          const x25519Keys = deriveKeyPairFromSignature(cached)
+          const xwingKeys = deriveXWingKeyPairFromSignature(cached)
           if (!ignore) {
-            setKeyPair(keys)
+            setKeyPairs({
+              x25519: {
+                publicKey: x25519Keys.publicKey,
+                privateKey: x25519Keys.privateKey
+              },
+              xwing: {
+                publicKey: xwingKeys.publicKey,
+                secretKey: xwingKeys.secretKey
+              }
+            })
           }
-          console.log('[useEncryption] Restored keypair from cached signature')
+          console.log('[useEncryption] Restored dual keypairs from cached signature')
         } catch (err) {
-          console.error('Failed to derive keypair from cached signature:', err)
+          console.error('Failed to derive keypairs from cached signature:', err)
         }
       }
     }
@@ -65,6 +92,7 @@ export function useEncryption() {
 
   /**
    * Initialize encryption keys by signing the derivation message
+   * Derives both X25519 and X-Wing keypairs from the same signature
    * Requires user interaction (wallet popup)
    * Uses global promise to prevent concurrent signature requests
    */
@@ -85,25 +113,35 @@ export function useEncryption() {
     // Create and store the promise to prevent concurrent requests
     initializationPromise = (async () => {
       try {
-        const result = await deriveKeyPair(signer)
-        setSignature(result.signature)
-        setKeyPair({
-          publicKey: result.publicKey,
-          privateKey: result.privateKey,
-          signature: result.signature
+        // Derive X25519 keypair (also gets the signature)
+        const x25519Result = await deriveKeyPair(signer)
+        // Derive X-Wing keypair from the same signature (no additional wallet popup)
+        const xwingKeys = deriveXWingKeyPairFromSignature(x25519Result.signature)
+
+        setSignature(x25519Result.signature)
+        setKeyPairs({
+          x25519: {
+            publicKey: x25519Result.publicKey,
+            privateKey: x25519Result.privateKey
+          },
+          xwing: {
+            publicKey: xwingKeys.publicKey,
+            secretKey: xwingKeys.secretKey
+          }
         })
 
-        // Cache signature
+        // Cache signature (works for deriving both key types)
         sessionStorage.setItem(
           `${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`,
-          result.signature
+          x25519Result.signature
         )
 
-        console.log('[useEncryption] Keys initialized and cached for session')
+        console.log('[useEncryption] Dual keypairs initialized and cached for session')
 
         return {
-          signature: result.signature,
-          publicKey: result.publicKey
+          signature: x25519Result.signature,
+          publicKey: x25519Result.publicKey,
+          xwingPublicKey: xwingKeys.publicKey
         }
       } catch (err) {
         setError(err.message)
@@ -122,35 +160,64 @@ export function useEncryption() {
    * Uses cached signature if available (no wallet popup)
    */
   const ensureInitialized = useCallback(async () => {
-    // Already have full keypair
-    if (keyPair?.privateKey) {
-      return { signature, publicKey: keyPair.publicKey }
+    // Already have both keypairs
+    if (keyPairs.x25519?.privateKey && keyPairs.xwing?.secretKey) {
+      return {
+        signature,
+        publicKey: keyPairs.x25519.publicKey,
+        xwingPublicKey: keyPairs.xwing.publicKey
+      }
     }
 
     // Try to derive from cached signature WITHOUT wallet interaction
     if (signature) {
-      const keys = deriveKeyPairFromSignature(signature)
-      setKeyPair(keys)
-      console.log('[useEncryption] Derived keypair from cached signature (no wallet popup)')
-      return { signature, publicKey: keys.publicKey }
+      const x25519Keys = deriveKeyPairFromSignature(signature)
+      const xwingKeys = deriveXWingKeyPairFromSignature(signature)
+      setKeyPairs({
+        x25519: {
+          publicKey: x25519Keys.publicKey,
+          privateKey: x25519Keys.privateKey
+        },
+        xwing: {
+          publicKey: xwingKeys.publicKey,
+          secretKey: xwingKeys.secretKey
+        }
+      })
+      console.log('[useEncryption] Derived dual keypairs from cached signature (no wallet popup)')
+      return {
+        signature,
+        publicKey: x25519Keys.publicKey,
+        xwingPublicKey: xwingKeys.publicKey
+      }
     }
 
     // No cached signature - need to prompt user to sign
     return initializeKeys()
-  }, [signature, keyPair, initializeKeys])
+  }, [signature, keyPairs, initializeKeys])
 
   /**
    * Create encrypted market metadata
    * Returns envelope ready for IPFS upload
+   * Uses X-Wing (post-quantum) by default for new markets
+   *
+   * @param {Object} metadata - Market metadata to encrypt
+   * @param {Object} options - { algorithm: 'xwing' | 'x25519' }
    */
-  const createEncrypted = useCallback(async (metadata) => {
+  const createEncrypted = useCallback(async (metadata, options = {}) => {
+    const { algorithm = 'xwing' } = options
+
     if (!signer || !account) {
       throw new Error('Wallet not connected')
     }
 
     await ensureInitialized()
 
-    return createEncryptedMarket(metadata, signer, account)
+    // Use X-Wing (post-quantum) by default for new markets
+    if (algorithm === 'xwing') {
+      return createEncryptedMarketXWing(metadata, signer, account)
+    } else {
+      return createEncryptedMarket(metadata, signer, account)
+    }
   }, [signer, account, ensureInitialized])
 
   /**
@@ -172,7 +239,8 @@ export function useEncryption() {
 
   /**
    * Decrypt market metadata
-   * Uses cached private key to avoid wallet popups
+   * Auto-detects envelope version (X25519 v1.0 or X-Wing v2.0)
+   * Uses cached keys to avoid wallet popups
    */
   const decryptMetadata = useCallback(async (envelope) => {
     if (!account) {
@@ -182,21 +250,25 @@ export function useEncryption() {
     // Ensure we have keys (may prompt user once if no cached signature)
     await ensureInitialized()
 
-    // Use cached private key if available (no wallet popup)
-    if (keyPair?.privateKey) {
-      return decryptMarketMetadata(envelope, account, keyPair.privateKey)
+    // Use unified decrypt with both key types
+    if (keyPairs.x25519?.privateKey && keyPairs.xwing?.secretKey) {
+      return decryptEnvelopeUnified(envelope, account, {
+        x25519PrivateKey: keyPairs.x25519.privateKey,
+        xwingSecretKey: keyPairs.xwing.secretKey
+      })
     }
 
-    // Fallback to signer if no cached key (shouldn't happen after ensureInitialized)
+    // Fallback to signer-based decryption for v1.0 only (shouldn't happen after ensureInitialized)
     if (!signer) {
       throw new Error('No signer available')
     }
     return decryptMarketMetadata(envelope, account, signer)
-  }, [signer, account, keyPair, ensureInitialized])
+  }, [signer, account, keyPairs, ensureInitialized])
 
   /**
    * Add a participant to an encrypted market
-   * Uses cached private key to avoid wallet popups
+   * Auto-detects envelope version and uses appropriate key wrapping
+   * Uses cached keys to avoid wallet popups
    */
   const addParticipant = useCallback(async (envelope, newAddress, newSignature) => {
     if (!account) {
@@ -205,17 +277,20 @@ export function useEncryption() {
 
     await ensureInitialized()
 
-    // Use cached private key if available (no wallet popup)
-    if (keyPair?.privateKey) {
-      return addParticipantToMarket(envelope, account, keyPair.privateKey, newAddress, newSignature)
+    // Use unified add participant with both key types
+    if (keyPairs.x25519?.privateKey && keyPairs.xwing?.secretKey) {
+      return addParticipantUnified(envelope, account, {
+        x25519PrivateKey: keyPairs.x25519.privateKey,
+        xwingSecretKey: keyPairs.xwing.secretKey
+      }, newAddress, newSignature)
     }
 
-    // Fallback to signer if no cached key
+    // Fallback to signer for v1.0 only (shouldn't happen after ensureInitialized)
     if (!signer) {
       throw new Error('No signer available')
     }
     return addParticipantToMarket(envelope, account, signer, newAddress, newSignature)
-  }, [signer, account, keyPair, ensureInitialized])
+  }, [signer, account, keyPairs, ensureInitialized])
 
   /**
    * Check if current user can decrypt an envelope
@@ -240,10 +315,24 @@ export function useEncryption() {
   }, [])
 
   /**
-   * Get public key for another user from their signature
+   * Get X25519 public key for another user from their signature
    */
   const getPublicKeyFromSignature = useCallback((sig) => {
     return publicKeyFromSignature(sig)
+  }, [])
+
+  /**
+   * Get X-Wing public key for another user from their signature
+   */
+  const getXWingPublicKeyFromSignature = useCallback((sig) => {
+    return xwingPublicKeyFromSignature(sig)
+  }, [])
+
+  /**
+   * Check if an envelope is X-Wing (post-quantum)
+   */
+  const isPostQuantum = useCallback((envelope) => {
+    return isXWingEnvelope(envelope)
   }, [])
 
   /**
@@ -253,7 +342,7 @@ export function useEncryption() {
     if (account) {
       sessionStorage.removeItem(`${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`)
     }
-    setKeyPair(null)
+    setKeyPairs({ x25519: null, xwing: null })
     setSignature(null)
   }, [account])
 
@@ -262,7 +351,7 @@ export function useEncryption() {
     let ignore = false
 
     if (!isConnected && !ignore) {
-      setKeyPair(null)
+      setKeyPairs({ x25519: null, xwing: null })
       setSignature(null)
     }
 
@@ -271,11 +360,12 @@ export function useEncryption() {
 
   return {
     // State
-    isInitialized: !!keyPair?.privateKey,
+    isInitialized: !!(keyPairs.x25519?.privateKey && keyPairs.xwing?.secretKey),
     isInitializing,
     error,
     signature,
-    publicKey: keyPair?.publicKey,
+    publicKey: keyPairs.x25519?.publicKey,
+    xwingPublicKey: keyPairs.xwing?.publicKey,
 
     // Key management
     initializeKeys,
@@ -292,7 +382,9 @@ export function useEncryption() {
     canUserDecrypt,
     getEnvelopeRecipients,
     isEncrypted,
-    getPublicKeyFromSignature
+    isPostQuantum,
+    getPublicKeyFromSignature,
+    getXWingPublicKeyFromSignature
   }
 }
 

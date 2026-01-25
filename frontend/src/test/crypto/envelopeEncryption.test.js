@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
+  // X25519 (v1.0) functions
   deriveKeyPair,
   publicKeyFromSignature,
   deriveKeyPairFromSignature,
@@ -14,9 +15,25 @@ import {
   decryptMarketMetadata,
   createEncryptedMarket,
   addParticipantToMarket,
-  getEnvelopeSigningVersion
+  getEnvelopeSigningVersion,
+  // X-Wing (v2.0 post-quantum) functions
+  deriveXWingKeyPair,
+  deriveXWingKeyPairFromSignature,
+  xwingPublicKeyFromSignature,
+  encryptEnvelopeXWing,
+  decryptEnvelopeXWing,
+  addRecipientXWing,
+  decryptEnvelopeUnified,
+  addParticipantUnified,
+  isXWingEnvelope,
+  isX25519Envelope,
+  createEncryptedMarketXWing
 } from '../../utils/crypto/envelopeEncryption'
-import { CURRENT_ENCRYPTION_VERSION, getMarketSigningMessage } from '../../utils/crypto/constants'
+import {
+  CURRENT_ENCRYPTION_VERSION,
+  getMarketSigningMessage,
+  XWING_ALGORITHM
+} from '../../utils/crypto/constants'
 
 // Mock signer for testing
 const createMockSigner = (address, signatureBase = 'test-signature') => ({
@@ -652,6 +669,435 @@ describe('crypto/envelopeEncryption', () => {
       // Decrypt should work with same keypair (version doesn't matter for direct private key usage)
       const decrypted = decryptEnvelope(envelope, ALICE_ADDRESS, keypair.privateKey)
       expect(decrypted).toEqual(data)
+    })
+  })
+
+  // ==================== X-Wing Post-Quantum Tests ====================
+
+  describe('X-Wing Post-Quantum Encryption', () => {
+    describe('deriveXWingKeyPair', () => {
+      it('should derive keypair with publicKey, secretKey, signature, version, and algorithm', async () => {
+        const signer = createMockSigner(ALICE_ADDRESS)
+        const result = await deriveXWingKeyPair(signer)
+
+        expect(result).toHaveProperty('publicKey')
+        expect(result).toHaveProperty('secretKey')
+        expect(result).toHaveProperty('signature')
+        expect(result).toHaveProperty('version')
+        expect(result).toHaveProperty('algorithm')
+        expect(result.publicKey).toBeInstanceOf(Uint8Array)
+        expect(result.secretKey).toBeInstanceOf(Uint8Array)
+        expect(result.algorithm).toBe('xwing')
+      })
+
+      it('should produce correct key sizes (1216 bytes public, 32 bytes secret)', async () => {
+        const signer = createMockSigner(ALICE_ADDRESS)
+        const result = await deriveXWingKeyPair(signer)
+
+        // X-Wing public key: 1184 bytes (ML-KEM) + 32 bytes (X25519) = 1216 bytes
+        expect(result.publicKey.length).toBe(1216)
+        // X-Wing secret key is the 32-byte seed
+        expect(result.secretKey.length).toBe(32)
+      })
+
+      it('should be deterministic - same signature produces same keys', async () => {
+        const fixedSigner = {
+          signMessage: vi.fn().mockResolvedValue('0xfixed-xwing-sig'),
+          getAddress: vi.fn().mockResolvedValue(ALICE_ADDRESS)
+        }
+
+        const result1 = await deriveXWingKeyPair(fixedSigner)
+        const result2 = await deriveXWingKeyPair(fixedSigner)
+
+        expect(result1.publicKey).toEqual(result2.publicKey)
+        expect(result1.secretKey).toEqual(result2.secretKey)
+      })
+    })
+
+    describe('xwingPublicKeyFromSignature', () => {
+      it('should derive X-Wing public key from signature', () => {
+        const signature = '0xtest-xwing-sig'
+        const publicKey = xwingPublicKeyFromSignature(signature)
+
+        expect(publicKey).toBeInstanceOf(Uint8Array)
+        expect(publicKey.length).toBe(1216) // X-Wing public key size
+      })
+
+      it('should be deterministic', () => {
+        const signature = '0xdeterministic-xwing'
+        const pk1 = xwingPublicKeyFromSignature(signature)
+        const pk2 = xwingPublicKeyFromSignature(signature)
+
+        expect(pk1).toEqual(pk2)
+      })
+
+      it('should match publicKey from deriveXWingKeyPairFromSignature', () => {
+        const signature = '0xmatch-test-xwing'
+        const publicKeyDirect = xwingPublicKeyFromSignature(signature)
+        const keypair = deriveXWingKeyPairFromSignature(signature)
+
+        expect(publicKeyDirect).toEqual(keypair.publicKey)
+      })
+    })
+
+    describe('deriveXWingKeyPairFromSignature', () => {
+      it('should derive full X-Wing keypair from cached signature', () => {
+        const signature = '0xcached-xwing-sig'
+        const result = deriveXWingKeyPairFromSignature(signature)
+
+        expect(result).toHaveProperty('publicKey')
+        expect(result).toHaveProperty('secretKey')
+        expect(result).toHaveProperty('signature')
+        expect(result.signature).toBe(signature)
+        expect(result.publicKey.length).toBe(1216)
+        expect(result.secretKey.length).toBe(32)
+      })
+    })
+
+    describe('encryptEnvelopeXWing', () => {
+      it('should create proper v2.0 envelope structure', () => {
+        const data = { message: 'Post-quantum secure!' }
+        const signature = '0xalice-xwing-sig'
+        const alicePublicKey = xwingPublicKeyFromSignature(signature)
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: alicePublicKey }
+        ])
+
+        expect(envelope).toHaveProperty('version', '2.0')
+        expect(envelope).toHaveProperty('algorithm', XWING_ALGORITHM)
+        expect(envelope).toHaveProperty('signingVersion')
+        expect(envelope).toHaveProperty('content')
+        expect(envelope.content).toHaveProperty('nonce')
+        expect(envelope.content).toHaveProperty('ciphertext')
+        expect(envelope).toHaveProperty('keys')
+        expect(Array.isArray(envelope.keys)).toBe(true)
+      })
+
+      it('should include xwingCiphertext instead of ephemeralPublicKey', () => {
+        const data = { test: true }
+        const signature = '0xtest-xwing'
+        const publicKey = xwingPublicKeyFromSignature(signature)
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey }
+        ])
+
+        expect(envelope.keys[0]).toHaveProperty('xwingCiphertext')
+        expect(envelope.keys[0]).not.toHaveProperty('ephemeralPublicKey')
+        // X-Wing ciphertext is 1120 bytes = 2240 hex chars
+        expect(envelope.keys[0].xwingCiphertext.length).toBe(2240)
+      })
+
+      it('should encrypt for multiple recipients', () => {
+        const data = { shared: 'quantum-safe secret' }
+        const aliceSig = '0xalice-xwing'
+        const bobSig = '0xbob-xwing'
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: xwingPublicKeyFromSignature(aliceSig) },
+          { address: BOB_ADDRESS, publicKey: xwingPublicKeyFromSignature(bobSig) }
+        ])
+
+        expect(envelope.keys).toHaveLength(2)
+        expect(envelope.keys.map(k => k.address)).toContain(ALICE_ADDRESS.toLowerCase())
+        expect(envelope.keys.map(k => k.address)).toContain(BOB_ADDRESS.toLowerCase())
+      })
+    })
+
+    describe('decryptEnvelopeXWing', () => {
+      it('should successfully decrypt when address is in recipients', () => {
+        const data = { secret: 'quantum message', number: 42 }
+        const signature = '0xalice-xwing-decrypt'
+        const keypair = deriveXWingKeyPairFromSignature(signature)
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: keypair.publicKey }
+        ])
+
+        const decrypted = decryptEnvelopeXWing(envelope, ALICE_ADDRESS, keypair.secretKey)
+
+        expect(decrypted).toEqual(data)
+      })
+
+      it('should throw when address not in recipients', () => {
+        const data = { secret: 'message' }
+        const aliceSig = '0xalice-xwing-only'
+        const bobSig = '0xbob-xwing-outsider'
+        const aliceKeypair = deriveXWingKeyPairFromSignature(aliceSig)
+        const bobKeypair = deriveXWingKeyPairFromSignature(bobSig)
+
+        // Encrypt only for Alice
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: aliceKeypair.publicKey }
+        ])
+
+        // Bob tries to decrypt
+        expect(() => {
+          decryptEnvelopeXWing(envelope, BOB_ADDRESS, bobKeypair.secretKey)
+        }).toThrow('No key found for this address')
+      })
+
+      it('should decrypt correctly for any recipient in multi-recipient envelope', () => {
+        const data = { shared: 'quantum-safe among all' }
+        const aliceKeypair = deriveXWingKeyPairFromSignature('0xalice-xwing-multi')
+        const bobKeypair = deriveXWingKeyPairFromSignature('0xbob-xwing-multi')
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: aliceKeypair.publicKey },
+          { address: BOB_ADDRESS, publicKey: bobKeypair.publicKey }
+        ])
+
+        const aliceDecrypted = decryptEnvelopeXWing(envelope, ALICE_ADDRESS, aliceKeypair.secretKey)
+        const bobDecrypted = decryptEnvelopeXWing(envelope, BOB_ADDRESS, bobKeypair.secretKey)
+
+        expect(aliceDecrypted).toEqual(data)
+        expect(bobDecrypted).toEqual(data)
+      })
+    })
+
+    describe('addRecipientXWing', () => {
+      it('should add new recipient to X-Wing envelope', () => {
+        const data = { original: 'quantum data' }
+        const aliceKeypair = deriveXWingKeyPairFromSignature('0xalice-xwing-add')
+        const bobKeypair = deriveXWingKeyPairFromSignature('0xbob-xwing-add')
+
+        // Create envelope with just Alice
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: aliceKeypair.publicKey }
+        ])
+
+        expect(envelope.keys).toHaveLength(1)
+
+        // Add Bob
+        const updatedEnvelope = addRecipientXWing(
+          envelope,
+          ALICE_ADDRESS,
+          aliceKeypair.secretKey,
+          { address: BOB_ADDRESS, publicKey: bobKeypair.publicKey }
+        )
+
+        expect(updatedEnvelope.keys).toHaveLength(2)
+      })
+
+      it('should allow new recipient to decrypt', () => {
+        const data = { message: 'welcome to quantum safety' }
+        const aliceKeypair = deriveXWingKeyPairFromSignature('0xalice-xwing-welcome')
+        const bobKeypair = deriveXWingKeyPairFromSignature('0xbob-xwing-welcome')
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: aliceKeypair.publicKey }
+        ])
+
+        const updatedEnvelope = addRecipientXWing(
+          envelope,
+          ALICE_ADDRESS,
+          aliceKeypair.secretKey,
+          { address: BOB_ADDRESS, publicKey: bobKeypair.publicKey }
+        )
+
+        const decrypted = decryptEnvelopeXWing(updatedEnvelope, BOB_ADDRESS, bobKeypair.secretKey)
+        expect(decrypted).toEqual(data)
+      })
+    })
+
+    describe('isXWingEnvelope / isX25519Envelope', () => {
+      it('should correctly identify X-Wing envelope', () => {
+        const keypair = deriveXWingKeyPairFromSignature('0xsig')
+        const envelope = encryptEnvelopeXWing({ test: true }, [
+          { address: ALICE_ADDRESS, publicKey: keypair.publicKey }
+        ])
+
+        expect(isXWingEnvelope(envelope)).toBe(true)
+        expect(isX25519Envelope(envelope)).toBe(false)
+      })
+
+      it('should correctly identify X25519 envelope', () => {
+        const keypair = deriveKeyPairFromSignature('0xsig')
+        const envelope = encryptEnvelope({ test: true }, [
+          { address: ALICE_ADDRESS, publicKey: keypair.publicKey }
+        ])
+
+        expect(isXWingEnvelope(envelope)).toBe(false)
+        expect(isX25519Envelope(envelope)).toBe(true)
+      })
+    })
+
+    describe('isEncryptedEnvelope (unified)', () => {
+      it('should return true for X25519 v1.0 envelope', () => {
+        const keypair = deriveKeyPairFromSignature('0xsig')
+        const envelope = encryptEnvelope({ test: true }, [
+          { address: ALICE_ADDRESS, publicKey: keypair.publicKey }
+        ])
+
+        expect(isEncryptedEnvelope(envelope)).toBe(true)
+      })
+
+      it('should return true for X-Wing v2.0 envelope', () => {
+        const keypair = deriveXWingKeyPairFromSignature('0xsig')
+        const envelope = encryptEnvelopeXWing({ test: true }, [
+          { address: ALICE_ADDRESS, publicKey: keypair.publicKey }
+        ])
+
+        expect(isEncryptedEnvelope(envelope)).toBe(true)
+      })
+
+      it('should return false for unsupported algorithm', () => {
+        const invalidEnvelope = {
+          version: '3.0',
+          algorithm: 'unknown-algorithm',
+          content: { ciphertext: 'test' },
+          keys: []
+        }
+
+        expect(isEncryptedEnvelope(invalidEnvelope)).toBe(false)
+      })
+    })
+  })
+
+  describe('Unified Decrypt (Backward Compatibility)', () => {
+    describe('decryptEnvelopeUnified', () => {
+      it('should decrypt X25519 v1.0 envelope with x25519PrivateKey', () => {
+        const data = { v1: 'classical data' }
+        const x25519Keypair = deriveKeyPairFromSignature('0xunified-x25519')
+        const xwingKeypair = deriveXWingKeyPairFromSignature('0xunified-x25519')
+
+        const envelope = encryptEnvelope(data, [
+          { address: ALICE_ADDRESS, publicKey: x25519Keypair.publicKey }
+        ])
+
+        const decrypted = decryptEnvelopeUnified(envelope, ALICE_ADDRESS, {
+          x25519PrivateKey: x25519Keypair.privateKey,
+          xwingSecretKey: xwingKeypair.secretKey
+        })
+
+        expect(decrypted).toEqual(data)
+      })
+
+      it('should decrypt X-Wing v2.0 envelope with xwingSecretKey', () => {
+        const data = { v2: 'quantum data' }
+        const x25519Keypair = deriveKeyPairFromSignature('0xunified-xwing')
+        const xwingKeypair = deriveXWingKeyPairFromSignature('0xunified-xwing')
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: xwingKeypair.publicKey }
+        ])
+
+        const decrypted = decryptEnvelopeUnified(envelope, ALICE_ADDRESS, {
+          x25519PrivateKey: x25519Keypair.privateKey,
+          xwingSecretKey: xwingKeypair.secretKey
+        })
+
+        expect(decrypted).toEqual(data)
+      })
+
+      it('should throw if X25519 key missing for v1.0 envelope', () => {
+        const data = { test: true }
+        const keypair = deriveKeyPairFromSignature('0xmissing-key')
+        const xwingKeypair = deriveXWingKeyPairFromSignature('0xmissing-key')
+
+        const envelope = encryptEnvelope(data, [
+          { address: ALICE_ADDRESS, publicKey: keypair.publicKey }
+        ])
+
+        expect(() => {
+          decryptEnvelopeUnified(envelope, ALICE_ADDRESS, {
+            xwingSecretKey: xwingKeypair.secretKey
+          })
+        }).toThrow('X25519 private key required')
+      })
+
+      it('should throw if X-Wing key missing for v2.0 envelope', () => {
+        const data = { test: true }
+        const x25519Keypair = deriveKeyPairFromSignature('0xmissing-xwing')
+        const xwingKeypair = deriveXWingKeyPairFromSignature('0xmissing-xwing')
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: xwingKeypair.publicKey }
+        ])
+
+        expect(() => {
+          decryptEnvelopeUnified(envelope, ALICE_ADDRESS, {
+            x25519PrivateKey: x25519Keypair.privateKey
+          })
+        }).toThrow('X-Wing secret key required')
+      })
+    })
+
+    describe('addParticipantUnified', () => {
+      it('should preserve X25519 algorithm when adding to v1.0 envelope', () => {
+        const data = { test: 'v1 add' }
+        const aliceX25519 = deriveKeyPairFromSignature('0xalice-unified')
+        const aliceXWing = deriveXWingKeyPairFromSignature('0xalice-unified')
+        const bobSig = '0xbob-unified'
+
+        const envelope = encryptEnvelope(data, [
+          { address: ALICE_ADDRESS, publicKey: aliceX25519.publicKey }
+        ])
+
+        const updatedEnvelope = addParticipantUnified(
+          envelope,
+          ALICE_ADDRESS,
+          {
+            x25519PrivateKey: aliceX25519.privateKey,
+            xwingSecretKey: aliceXWing.secretKey
+          },
+          BOB_ADDRESS,
+          bobSig
+        )
+
+        // Should still be X25519 envelope
+        expect(isX25519Envelope(updatedEnvelope)).toBe(true)
+        expect(updatedEnvelope.keys).toHaveLength(2)
+        // New key should have ephemeralPublicKey (X25519 format)
+        expect(updatedEnvelope.keys[1]).toHaveProperty('ephemeralPublicKey')
+      })
+
+      it('should preserve X-Wing algorithm when adding to v2.0 envelope', () => {
+        const data = { test: 'v2 add' }
+        const aliceX25519 = deriveKeyPairFromSignature('0xalice-unified-xwing')
+        const aliceXWing = deriveXWingKeyPairFromSignature('0xalice-unified-xwing')
+        const bobSig = '0xbob-unified-xwing'
+
+        const envelope = encryptEnvelopeXWing(data, [
+          { address: ALICE_ADDRESS, publicKey: aliceXWing.publicKey }
+        ])
+
+        const updatedEnvelope = addParticipantUnified(
+          envelope,
+          ALICE_ADDRESS,
+          {
+            x25519PrivateKey: aliceX25519.privateKey,
+            xwingSecretKey: aliceXWing.secretKey
+          },
+          BOB_ADDRESS,
+          bobSig
+        )
+
+        // Should still be X-Wing envelope
+        expect(isXWingEnvelope(updatedEnvelope)).toBe(true)
+        expect(updatedEnvelope.keys).toHaveLength(2)
+        // New key should have xwingCiphertext (X-Wing format)
+        expect(updatedEnvelope.keys[1]).toHaveProperty('xwingCiphertext')
+      })
+    })
+  })
+
+  describe('X-Wing High-Level API', () => {
+    describe('createEncryptedMarketXWing', () => {
+      it('should create X-Wing envelope with creator as first recipient', async () => {
+        const metadata = { name: 'Quantum-Safe Market' }
+        const signer = createMockSigner(ALICE_ADDRESS)
+
+        const result = await createEncryptedMarketXWing(metadata, signer, ALICE_ADDRESS)
+
+        expect(result).toHaveProperty('envelope')
+        expect(result).toHaveProperty('creatorSignature')
+        expect(result).toHaveProperty('signingVersion')
+        expect(isXWingEnvelope(result.envelope)).toBe(true)
+        expect(result.envelope.keys).toHaveLength(1)
+        expect(result.envelope.version).toBe('2.0')
+      })
     })
   })
 })

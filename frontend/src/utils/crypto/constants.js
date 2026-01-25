@@ -137,9 +137,24 @@ export const MARKET_ENCRYPTION_MESSAGE = MARKET_SIGNING_MESSAGES[CURRENT_ENCRYPT
 export const ENVELOPE_INFO = 'FairWins_Envelope_v1'
 
 /**
+ * X-Wing envelope info string (post-quantum)
+ */
+export const XWING_ENVELOPE_INFO = 'FairWins_XWing_Envelope_v1'
+
+/**
  * Algorithm identifiers
  */
 export const ENCRYPTION_ALGORITHM = 'x25519-xsalsa20-poly1305'
+export const X25519_ALGORITHM = 'x25519-chacha20poly1305'
+export const XWING_ALGORITHM = 'xwing-chacha20poly1305'
+
+/**
+ * Supported envelope algorithms for version detection
+ */
+export const SUPPORTED_ALGORITHMS = [
+  'x25519-chacha20poly1305',   // v1.0 - classical
+  'xwing-chacha20poly1305'     // v2.0 - post-quantum hybrid
+]
 
 /**
  * Derive key pair for a specific version
