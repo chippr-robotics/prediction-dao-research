@@ -1,4 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+// Mock the IPFS constants module to provide test Pinata credentials
+// This prevents "Pinata authentication not configured" errors in upload tests
+vi.mock('../constants/ipfs', async (importOriginal) => {
+  const original = await importOriginal()
+  return {
+    ...original,
+    PINATA_CONFIG: {
+      ...original.PINATA_CONFIG,
+      JWT: 'test-jwt-token', // Provide test JWT to pass auth check
+    },
+  }
+})
+
 import {
   fetchFromIpfs,
   fetchTokenMetadata,
