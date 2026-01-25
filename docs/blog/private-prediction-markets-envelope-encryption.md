@@ -42,7 +42,16 @@ She specifies Marcus as the counterparty and sets an acceptance deadline: he has
 
 Here's where private markets diverge from public ones. When Sarah clicks "Create," her terms don't go to a public order book. Instead, they're encrypted.
 
-The system generates a random encryption key—unique to this specific market. Sarah's terms are locked with this key and stored on decentralized storage. No one browsing that storage can read them. They see only encrypted data that appears as random characters.
+The system generates a random encryption key—unique to this specific market. Sarah's terms are locked with this key.
+
+Here's what happens next: the encrypted envelope—containing the locked terms and the sealed key-envelopes for each participant—is uploaded to IPFS (InterPlanetary File System), a decentralized storage network. The blockchain stores only a small reference (a content identifier, or CID) pointing to this encrypted data.
+
+This architecture serves multiple purposes:
+- **Gas efficiency**: Storing a 60-byte CID costs a fraction of storing a 1,000+ byte encrypted envelope on-chain
+- **Scalability**: Larger envelopes (especially with X-Wing's post-quantum keys) don't increase transaction costs
+- **Privacy**: The encrypted data lives off-chain, reducing on-chain metadata exposure
+
+No one browsing IPFS can read Sarah's terms. They see only encrypted data that appears as random characters. The blockchain reveals only that an encrypted market exists—not its contents.
 
 But Sarah needs Marcus to read the terms. How does she share the key without exposing it?
 
@@ -114,14 +123,15 @@ Sarah and Marcus go about their work. The pharmaceutical merger progresses throu
 
 ### What Observers See vs. What Participants Know
 
-| Visible On-Chain | Private to Participants |
-|-----------------|------------------------|
-| Participant wallet addresses | Prediction question |
-| Stake amounts (50,000 USDC each) | Resolution criteria |
-| Market status (Active) | Deadline details |
-| Creation and acceptance timestamps | Any custom terms |
+| Visible On-Chain | Visible on IPFS (Encrypted) | Private to Participants |
+|-----------------|----------------------------|------------------------|
+| Participant wallet addresses | Encrypted envelope blob | Prediction question |
+| Stake amounts (50,000 USDC each) | Recipient addresses (in envelope) | Resolution criteria |
+| Market status (Active) | Algorithm version | Deadline details |
+| Creation and acceptance timestamps | Wrapped key ciphertexts | Any custom terms |
+| IPFS reference (CID) | Encrypted content | Decryption keys |
 
-This balance is intentional. The blockchain needs enough information to enforce settlement—but not enough to reveal trading thesis or strategic intent.
+This balance is intentional. The blockchain stores the minimum information needed to enforce settlement—participant addresses, stakes, timing, and a pointer to the encrypted terms. The actual terms live on IPFS, encrypted so that only participants can read them.
 
 For Sarah and Marcus, this means their firms' research remains proprietary. Competitors see two addresses with a locked position. They don't see the pharmaceutical merger, the Q3 deadline, or anything that would expose the underlying conviction.
 
@@ -198,11 +208,35 @@ The hybrid construction means Sarah and Marcus's market is protected if *either*
 
 **Key sizes are larger**: X-Wing public keys are 1,216 bytes compared to 32 bytes for pure X25519. The ciphertext overhead per participant increases from ~80 bytes to ~1,200 bytes. For typical private markets with 2-10 participants, this remains negligible—a few extra kilobytes in exchange for decades of quantum resistance.
 
+**IPFS storage absorbs the overhead**: Because encrypted envelopes are stored on IPFS rather than on-chain, the larger X-Wing ciphertexts don't increase gas costs. The blockchain stores only a 60-byte CID reference regardless of envelope size. This architectural choice makes post-quantum security essentially free from a cost perspective.
+
 **Performance remains practical**: Key generation and encapsulation add a few hundred microseconds. For the scale of private market operations—creation, acceptance, adding participants—this is imperceptible.
+
+### Off-Chain Storage, On-Chain Settlement
+
+The architecture deliberately separates encrypted content from settlement logic:
+
+**IPFS** stores the encrypted envelope containing:
+- The encrypted market terms
+- Per-participant wrapped keys (sealed with X-Wing or X25519)
+- Algorithm version and envelope metadata
+
+**Blockchain** stores only:
+- A reference to the IPFS content (`encrypted:ipfs://CID`)
+- Participant addresses and stakes
+- Market status and timing
+- Settlement outcome
+
+This separation provides several benefits:
+- Gas costs remain constant regardless of encryption overhead
+- Encrypted data can be updated (new participants added) without on-chain transactions
+- The blockchain provides settlement guarantees without exposing any encrypted content
+
+When Marcus accesses the market, his browser fetches the envelope from IPFS, decrypts it locally using his wallet-derived keys, and displays the terms. The blockchain never sees the plaintext.
 
 ### Backward Compatibility
 
-Markets created before the X-Wing upgrade remain fully readable. The envelope format includes a version field, and the system automatically uses the appropriate decryption path. Old markets use X25519; new markets use X-Wing. Participants don't need to manage this—it happens transparently.
+Markets created before the X-Wing upgrade remain fully readable. The envelope format includes a version field, and the system automatically uses the appropriate decryption path. Old markets use X25519; new markets use X-Wing. Markets with inline JSON envelopes (legacy) continue to work alongside the newer IPFS-referenced format. Participants don't need to manage this—it happens transparently.
 
 ### Forward Secrecy
 

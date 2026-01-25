@@ -256,10 +256,60 @@ async function initializeKeys() {
 | Removed participant access | Document limitation; recommend new market for true revocation |
 | Wallet compromise | User responsibility; recommend hardware wallets |
 
+## IPFS Storage
+
+Encrypted envelopes are stored on IPFS via Pinata, with only a CID reference stored on-chain.
+
+### On-Chain Reference Format
+
+```
+encrypted:ipfs://bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze
+```
+
+### Storage Architecture
+
+| Layer | Content | Size |
+|-------|---------|------|
+| Blockchain | `encrypted:ipfs://CID` | ~60 bytes |
+| IPFS | Full encrypted envelope | 1-10 KB |
+
+### Benefits
+
+1. **Gas efficiency**: CID reference costs ~60 bytes regardless of envelope size
+2. **Scalability**: X-Wing's larger ciphertexts don't increase transaction costs
+3. **Privacy**: Encrypted data lives off-chain, reducing on-chain metadata
+4. **Flexibility**: Envelopes can be updated (adding participants) without on-chain transactions
+
+### IPFS Functions
+
+```javascript
+// Upload encrypted envelope to IPFS
+const { cid, uri } = await uploadEncryptedEnvelope(envelope, { marketType: 'oneVsOne' })
+
+// Fetch encrypted envelope from IPFS
+const envelope = await fetchEncryptedEnvelope(cid)
+
+// Parse on-chain reference
+const { isIpfs, cid } = parseEncryptedIpfsReference(description)
+
+// Build on-chain reference
+const reference = buildEncryptedIpfsReference(cid)
+```
+
+### Backward Compatibility
+
+The system auto-detects envelope storage format:
+
+1. **IPFS reference** (`encrypted:ipfs://...`): Fetch from IPFS, then decrypt
+2. **Inline JSON**: Parse directly from description field (legacy)
+
+Both v1.0 (X25519) and v2.0 (X-Wing) envelopes work with either storage method.
+
 ## File Locations
 
 ```
 frontend/src/utils/crypto/envelopeEncryption.js  # Core cryptographic functions
+frontend/src/utils/ipfsService.js                # IPFS upload/fetch functions
 frontend/src/hooks/useEncryption.js              # React hook with session management
 ```
 
@@ -277,6 +327,8 @@ When testing the encryption system:
 
 | Version | Changes |
 |---------|---------|
+| 2.0 | X-Wing hybrid KEM (X25519 + ML-KEM-768) for post-quantum security |
+| 1.1 | IPFS storage for envelopes, CID reference on-chain |
 | 1.0 | Initial implementation with X25519 + ChaCha20-Poly1305 |
 
 ## References
