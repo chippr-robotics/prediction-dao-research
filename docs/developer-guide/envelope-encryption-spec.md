@@ -144,7 +144,6 @@ function isX25519Envelope(envelope) {
   return envelope?.algorithm === 'x25519-chacha20poly1305'
 }
 ```
-```
 
 ## Encryption Flow
 

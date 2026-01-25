@@ -963,20 +963,21 @@ export async function fetchFriendMarketsForUser(userAddress) {
           // First check for IPFS reference (new format)
           const ipfsRef = parseEncryptedIpfsReference(description)
           if (ipfsRef.isIpfs && ipfsRef.cid) {
+            // Preserve the CID even if fetch fails - allows UI retry logic
+            ipfsCid = ipfsRef.cid
+            isEncryptedMarket = true
             try {
               // Fetch encrypted envelope from IPFS
               console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, fetching CID: ${ipfsRef.cid}`)
               const envelope = await fetchEncryptedEnvelope(ipfsRef.cid)
               metadata = envelope
-              ipfsCid = ipfsRef.cid
-              isEncryptedMarket = true
               description = 'Encrypted Market' // Placeholder until decrypted
               console.log(`[fetchFriendMarketsForUser] Market ${marketId} envelope fetched from IPFS, algorithm: ${envelope.algorithm}`)
             } catch (ipfsError) {
               console.error(`[fetchFriendMarketsForUser] Failed to fetch IPFS envelope for market ${marketId}:`, ipfsError)
               // Keep the IPFS reference as description so user knows it's encrypted but unavailable
+              // Note: ipfsCid is preserved from before the try block to allow UI retry logic
               description = 'Encrypted Market (IPFS fetch failed)'
-              isEncryptedMarket = true
             }
           } else {
             // Fallback: check for inline JSON envelope (legacy format)

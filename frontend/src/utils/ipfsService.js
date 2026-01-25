@@ -574,6 +574,16 @@ export const uploadEncryptedEnvelope = async (envelope, options = {}) => {
     throw new Error('Invalid envelope format: missing required fields (version, algorithm, content, keys)')
   }
 
+  // Validate keys is an array
+  if (!Array.isArray(envelope.keys)) {
+    throw new Error('Invalid envelope format: keys must be an array')
+  }
+
+  // Validate content structure
+  if (typeof envelope.content.nonce !== 'string' || typeof envelope.content.ciphertext !== 'string') {
+    throw new Error('Invalid envelope format: content must have nonce and ciphertext strings')
+  }
+
   // Validate supported algorithms
   const supportedAlgorithms = ['x25519-chacha20poly1305', 'xwing-chacha20poly1305']
   if (!supportedAlgorithms.includes(envelope.algorithm)) {
@@ -614,6 +624,16 @@ export const fetchEncryptedEnvelope = async (cid, options = {}) => {
   // Validate it looks like an encrypted envelope
   if (!envelope || !envelope.version || !envelope.algorithm) {
     throw new Error('Fetched data is not a valid encrypted envelope')
+  }
+
+  // Validate content structure
+  if (!envelope.content || typeof envelope.content.nonce !== 'string' || typeof envelope.content.ciphertext !== 'string') {
+    throw new Error('Fetched envelope has invalid content structure: missing nonce or ciphertext')
+  }
+
+  // Validate keys is an array
+  if (!Array.isArray(envelope.keys)) {
+    throw new Error('Fetched envelope has invalid keys: must be an array')
   }
 
   console.log('Fetched encrypted envelope from IPFS:', {

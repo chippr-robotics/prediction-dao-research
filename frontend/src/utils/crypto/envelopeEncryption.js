@@ -84,8 +84,15 @@ function xwingKeygen(seed) {
 
 /**
  * X-Wing encapsulation - generate shared secret from recipient's public key
+ * @param {Uint8Array} publicKey - X-Wing public key (must be exactly 1216 bytes)
+ * @returns {{cipherText: Uint8Array, sharedSecret: Uint8Array}} Ciphertext (1120 bytes) and shared secret (32 bytes)
  */
 function xwingEncapsulate(publicKey) {
+  // Validate public key length (ML-KEM-768 public key: 1184 bytes + X25519 public key: 32 bytes = 1216 bytes)
+  if (!publicKey || publicKey.length !== 1216) {
+    throw new Error(`Invalid X-Wing public key: expected 1216 bytes, got ${publicKey?.length ?? 0}`)
+  }
+
   // Split public key into components
   const mlkemPublicKey = publicKey.slice(0, 1184)
   const x25519PublicKey = publicKey.slice(1184, 1216)
@@ -116,8 +123,21 @@ function xwingEncapsulate(publicKey) {
 
 /**
  * X-Wing decapsulation - recover shared secret using secret key
+ * @param {Uint8Array} cipherText - X-Wing ciphertext (must be exactly 1120 bytes)
+ * @param {Uint8Array} secretKey - X-Wing secret key seed (must be exactly 32 bytes)
+ * @returns {Uint8Array} Shared secret (32 bytes)
  */
 function xwingDecapsulate(cipherText, secretKey) {
+  // Validate ciphertext length (ML-KEM-768 ciphertext: 1088 bytes + X25519 ephemeral: 32 bytes = 1120 bytes)
+  if (!cipherText || cipherText.length !== 1120) {
+    throw new Error(`Invalid X-Wing ciphertext: expected 1120 bytes, got ${cipherText?.length ?? 0}`)
+  }
+
+  // Validate secret key seed length
+  if (!secretKey || secretKey.length !== 32) {
+    throw new Error(`Invalid X-Wing secret key: expected 32-byte seed, got ${secretKey?.length ?? 0}`)
+  }
+
   // Regenerate component keys from seed (same derivation as xwingKeygen)
   const mlkemSeed1 = sha3_256(concatBytes(new TextEncoder().encode('xwing-mlkem-1'), secretKey))
   const mlkemSeed2 = sha3_256(concatBytes(new TextEncoder().encode('xwing-mlkem-2'), secretKey))
