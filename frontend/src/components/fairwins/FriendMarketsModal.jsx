@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
-import { useEncryption, useDecryptedMarkets } from '../../hooks/useEncryption'
+import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
@@ -100,9 +100,17 @@ function FriendMarketsModal({
     createEncrypted
   } = useEncryption()
 
-  // Decrypt markets for display
-  const { markets: decryptedActiveMarkets } = useDecryptedMarkets(activeMarkets)
-  const { markets: decryptedPastMarkets } = useDecryptedMarkets(pastMarkets)
+  // Lazy decrypt markets for display - only decrypts when user clicks on a market
+  const {
+    markets: lazyActiveMarkets,
+    decryptMarket: decryptActiveMarket,
+    isMarketDecrypting: isActiveMarketDecrypting
+  } = useLazyMarketDecryption(activeMarkets)
+  const {
+    markets: lazyPastMarkets,
+    decryptMarket: decryptPastMarket,
+    isMarketDecrypting: isPastMarketDecrypting
+  } = useLazyMarketDecryption(pastMarkets)
 
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
@@ -786,13 +794,53 @@ function FriendMarketsModal({
     setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
   }
 
-  const handleMarketSelect = (market) => {
+  const handleMarketSelect = async (market) => {
+    // If the market is encrypted and not yet decrypted, trigger decryption
+    if (market.encryptionStatus === 'encrypted' && market.canView) {
+      try {
+        // Determine which decrypt function to use based on market source
+        const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(market.id))
+        const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
+
+        // Decrypt the market
+        await decryptFn(market.id)
+
+        // After decryption, find the updated market from the lazy arrays
+        // The market object will be updated in the next render cycle via useMemo
+        // For now, set the market and it will update when lazyActiveMarkets/lazyPastMarkets change
+      } catch (err) {
+        console.error('Failed to decrypt market:', err)
+        // Still select the market - it will show the error state
+      }
+    }
     setSelectedMarket(market)
   }
 
   const handleBackToList = () => {
     setSelectedMarket(null)
   }
+
+  // Update selected market when decryption completes
+  // Use a ref to track the market ID to avoid infinite loops
+  const selectedMarketIdRef = useRef(null)
+  useEffect(() => {
+    if (selectedMarket && selectedMarket.encryptionStatus === 'encrypted') {
+      // Only update if we're looking for a decryption update
+      const marketIdStr = String(selectedMarket.id)
+
+      // Skip if we already processed this market
+      if (selectedMarketIdRef.current === marketIdStr) {
+        const updatedMarket = lazyActiveMarkets.find(m => String(m.id) === marketIdStr) ||
+                             lazyPastMarkets.find(m => String(m.id) === marketIdStr)
+        if (updatedMarket && updatedMarket.encryptionStatus === 'decrypted') {
+          selectedMarketIdRef.current = null // Reset so we can process again if needed
+          setSelectedMarket(updatedMarket)
+        }
+      } else {
+        selectedMarketIdRef.current = marketIdStr
+      }
+    }
+  }, [selectedMarket?.id, selectedMarket?.encryptionStatus, lazyActiveMarkets, lazyPastMarkets])
 
   // Generate market acceptance URL for QR code
   const getMarketUrl = (market) => {
@@ -873,21 +921,21 @@ function FriendMarketsModal({
   // Note: Show markets even if canView is false (encrypted), as long as user is a participant
   // They should see these markets with "encrypted" placeholder to prompt acceptance
   const userActiveMarkets = useMemo(() => {
-    return decryptedActiveMarkets.filter(m =>
+    return lazyActiveMarkets.filter(m =>
       isUserInMarket(m) && m.status !== 'pending_acceptance'
     )
-  }, [decryptedActiveMarkets, isUserInMarket])
+  }, [lazyActiveMarkets, isUserInMarket])
 
   // Filter pending markets awaiting acceptance
   const userPendingMarkets = useMemo(() => {
-    return decryptedActiveMarkets.filter(m =>
+    return lazyActiveMarkets.filter(m =>
       isUserInMarket(m) && m.status === 'pending_acceptance'
     )
-  }, [decryptedActiveMarkets, isUserInMarket])
+  }, [lazyActiveMarkets, isUserInMarket])
 
   const userPastMarkets = useMemo(() => {
-    return decryptedPastMarkets.filter(m => isUserInMarket(m))
-  }, [decryptedPastMarkets, isUserInMarket])
+    return lazyPastMarkets.filter(m => isUserInMarket(m))
+  }, [lazyPastMarkets, isUserInMarket])
 
   if (!isOpen) return null
 
@@ -1681,6 +1729,12 @@ function FriendMarketsModal({
                   getTypeLabel={getTypeLabel}
                   getStatusClass={getStatusClass}
                   account={account}
+                  onDecrypt={() => {
+                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(selectedMarket.id))
+                    const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
+                    decryptFn(selectedMarket.id).catch(err => console.error('Decrypt failed:', err))
+                  }}
+                  isDecrypting={isActiveMarketDecrypting(selectedMarket.id) || isPastMarketDecrypting(selectedMarket.id)}
                 />
               ) : (
                 <>
@@ -1799,6 +1853,7 @@ function FriendMarketsModal({
                           formatAddress={formatAddress}
                           getTypeLabel={getTypeLabel}
                           getStatusClass={getStatusClass}
+                          isMarketDecrypting={isActiveMarketDecrypting}
                         />
                       </div>
                     </>
@@ -1820,6 +1875,12 @@ function FriendMarketsModal({
                   getTypeLabel={getTypeLabel}
                   getStatusClass={getStatusClass}
                   account={account}
+                  onDecrypt={() => {
+                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(selectedMarket.id))
+                    const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
+                    decryptFn(selectedMarket.id).catch(err => console.error('Decrypt failed:', err))
+                  }}
+                  isDecrypting={isActiveMarketDecrypting(selectedMarket.id) || isPastMarketDecrypting(selectedMarket.id)}
                 />
               ) : (
                 <>
@@ -1839,6 +1900,7 @@ function FriendMarketsModal({
                         getTypeLabel={getTypeLabel}
                         getStatusClass={getStatusClass}
                         isPast
+                        isMarketDecrypting={isPastMarketDecrypting}
                       />
                     </div>
                   )}
@@ -2012,7 +2074,8 @@ function MarketsCompactTable({
   formatDate,
   getTypeLabel,
   getStatusClass,
-  isPast = false
+  isPast = false,
+  isMarketDecrypting = () => false
 }) {
   return (
     <table className="fm-table" role="table">
@@ -2026,54 +2089,66 @@ function MarketsCompactTable({
         </tr>
       </thead>
       <tbody>
-        {markets.map((market, index) => (
-          <tr
-            key={`market-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`}
-            onClick={() => onSelect(market)}
-            className="fm-table-row"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
-          >
-            <td className="fm-table-desc">
-              <span className="fm-table-desc-text">
-                {market.isPrivate && (
-                  <svg
-                    className="fm-privacy-icon"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    title="Encrypted market"
-                  >
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4"/>
-                  </svg>
-                )}
-                {getMarketDescription(market)}
-              </span>
-            </td>
-            <td>
-              <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
-            </td>
-            <td className="fm-table-stake">
-              {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
-            </td>
-            <td className="fm-table-date">
-              {isPast
-                ? (market.outcome || 'Resolved')
-                : formatDate(market.endDate)
-              }
-            </td>
-            <td>
-              <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
-                {market.status}
-              </span>
-            </td>
-          </tr>
-        ))}
+        {markets.map((market, index) => {
+          const isDecrypting = isMarketDecrypting(market.id)
+          const needsUnlock = market.encryptionStatus === 'encrypted' && market.canView && !isDecrypting
+
+          return (
+            <tr
+              key={`market-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`}
+              onClick={() => onSelect(market)}
+              className={`fm-table-row ${isDecrypting ? 'decrypting' : ''}`}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
+            >
+              <td className="fm-table-desc">
+                <span className="fm-table-desc-text">
+                  {market.isPrivate && (
+                    <svg
+                      className={`fm-privacy-icon ${needsUnlock ? 'unlockable' : ''}`}
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      title={needsUnlock ? 'Click to unlock' : 'Encrypted market'}
+                    >
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                  )}
+                  {isDecrypting ? (
+                    <span className="fm-decrypting-indicator">
+                      <span className="fm-spinner-small"></span>
+                      Unlocking...
+                    </span>
+                  ) : (
+                    getMarketDescription(market)
+                  )}
+                </span>
+              </td>
+              <td>
+                <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
+              </td>
+              <td className="fm-table-stake">
+                {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
+              </td>
+              <td className="fm-table-date">
+                {isPast
+                  ? (market.outcome || 'Resolved')
+                  : formatDate(market.endDate)
+                }
+              </td>
+              <td>
+                <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
+                  {market.status}
+                </span>
+              </td>
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )
@@ -2089,7 +2164,9 @@ function MarketDetailView({
   formatAddress,
   getTypeLabel,
   getStatusClass,
-  account
+  account,
+  onDecrypt,
+  isDecrypting = false
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const marketUrl = `${window.location.origin}/friend-market/${market.id}`
@@ -2152,13 +2229,32 @@ function MarketDetailView({
             <div className="fm-detail-item fm-item-encrypted">
               <span className="fm-detail-label">Bet Terms</span>
               <span className="fm-detail-value fm-value-decrypted">
-                {market.canView !== false ? getMarketDescription(market) : (
+                {market.encryptionStatus === 'decrypted' || market.encryptionStatus === 'not_encrypted' ? (
+                  getMarketDescription(market)
+                ) : isDecrypting ? (
+                  <span className="fm-decrypting-indicator">
+                    <span className="fm-spinner-small"></span>
+                    Decrypting...
+                  </span>
+                ) : market.canView ? (
+                  <button
+                    type="button"
+                    className="fm-decrypt-btn"
+                    onClick={onDecrypt}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                    Click to decrypt
+                  </button>
+                ) : (
                   <span className="fm-encrypted-placeholder">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                       <path d="M7 11V7a5 5 0 0110 0v4"/>
                     </svg>
-                    Sign to decrypt
+                    Not a participant
                   </span>
                 )}
               </span>

@@ -388,6 +388,8 @@ export function useEncryption() {
 
 /**
  * Hook for automatically decrypting a list of markets
+ * @deprecated Use useLazyMarketDecryption for better performance.
+ * This hook decrypts ALL markets on mount which causes poor UX with many markets.
  */
 export function useDecryptedMarkets(markets) {
   const { decryptMetadata, canUserDecrypt, isEncrypted } = useEncryption()
@@ -517,6 +519,246 @@ export function useDecryptedMarkets(markets) {
     privateMarkets,
     publicMarkets,
     isDecrypting
+  }
+}
+
+/**
+ * Hook for lazy/on-demand market decryption
+ * Only decrypts markets when explicitly requested, not on mount.
+ * This provides much better UX when users have many private markets.
+ *
+ * @param {Array} markets - Array of markets (may contain encrypted/non-encrypted)
+ * @returns {Object} - Lazy decryption state and functions
+ */
+export function useLazyMarketDecryption(markets) {
+  const { decryptMetadata, canUserDecrypt, isEncrypted, ensureInitialized } = useEncryption()
+  const { account, isConnected, signer } = useWallet()
+
+  // Cache: Map<marketId, { metadata, timestamp }>
+  const [decryptionCache, setDecryptionCache] = useState(new Map())
+
+  // Track which markets are currently being decrypted
+  const [decryptingIds, setDecryptingIds] = useState(new Set())
+
+  // Track decryption errors per market
+  const [decryptionErrors, setDecryptionErrors] = useState(new Map())
+
+  // Process markets to add encryption status WITHOUT decrypting
+  const processedMarkets = useMemo(() => {
+    if (!markets?.length) return []
+
+    return markets.map(market => {
+      const metadata = market.metadata
+      const marketId = String(market.id)
+
+      // Check if already in cache
+      const cached = decryptionCache.get(marketId)
+      if (cached) {
+        return {
+          ...market,
+          encryptionStatus: 'decrypted',
+          isPrivate: true,
+          canView: true,
+          decryptedMetadata: cached.metadata,
+          metadata: cached.metadata, // Replace metadata with decrypted version
+          decryptionError: null,
+          isDecrypting: false,
+        }
+      }
+
+      // Check for decryption error
+      const errorMsg = decryptionErrors.get(marketId)
+      if (errorMsg) {
+        return {
+          ...market,
+          encryptionStatus: 'error',
+          isPrivate: true,
+          canView: false,
+          decryptedMetadata: null,
+          decryptionError: errorMsg,
+          isDecrypting: false,
+        }
+      }
+
+      // Not encrypted
+      if (!isEncrypted(metadata)) {
+        return {
+          ...market,
+          encryptionStatus: 'not_encrypted',
+          isPrivate: false,
+          canView: true,
+          decryptedMetadata: null,
+          decryptionError: null,
+          isDecrypting: false,
+        }
+      }
+
+      // Encrypted - check if user can decrypt
+      const userCanDecrypt = account && canUserDecrypt(metadata)
+      return {
+        ...market,
+        encryptionStatus: 'encrypted',
+        isPrivate: true,
+        canView: userCanDecrypt,
+        decryptedMetadata: null,
+        decryptionError: userCanDecrypt ? null : 'You are not a participant in this market',
+        isDecrypting: decryptingIds.has(marketId),
+      }
+    })
+  }, [markets, decryptionCache, decryptingIds, decryptionErrors, account, isEncrypted, canUserDecrypt])
+
+  // Function to decrypt a single market on demand
+  const decryptMarket = useCallback(async (marketId) => {
+    const marketIdStr = String(marketId)
+    const market = markets?.find(m => String(m.id) === marketIdStr)
+
+    if (!market) {
+      throw new Error('Market not found')
+    }
+
+    // Already cached?
+    const cached = decryptionCache.get(marketIdStr)
+    if (cached) {
+      return cached.metadata
+    }
+
+    // Not encrypted?
+    if (!isEncrypted(market.metadata)) {
+      return market.metadata
+    }
+
+    // Can user decrypt?
+    if (!canUserDecrypt(market.metadata)) {
+      const error = 'You are not a participant in this market'
+      setDecryptionErrors(prev => {
+        const next = new Map(prev)
+        next.set(marketIdStr, error)
+        return next
+      })
+      throw new Error(error)
+    }
+
+    // Already decrypting? Skip to avoid duplicate work
+    // The UI will update when decryption completes via the processedMarkets useMemo
+    if (decryptingIds.has(marketIdStr)) {
+      return null
+    }
+
+    // Mark as decrypting
+    setDecryptingIds(prev => new Set([...prev, marketIdStr]))
+
+    // Clear any previous error
+    setDecryptionErrors(prev => {
+      const next = new Map(prev)
+      next.delete(marketIdStr)
+      return next
+    })
+
+    try {
+      // This may prompt for signature if not yet initialized
+      const decrypted = await decryptMetadata(market.metadata)
+
+      // Cache the result
+      setDecryptionCache(prev => {
+        const next = new Map(prev)
+        next.set(marketIdStr, { metadata: decrypted, timestamp: Date.now() })
+        return next
+      })
+
+      return decrypted
+    } catch (err) {
+      // Store the error
+      const errorMsg = err.message || 'Failed to decrypt market'
+      setDecryptionErrors(prev => {
+        const next = new Map(prev)
+        next.set(marketIdStr, errorMsg)
+        return next
+      })
+      throw err
+    } finally {
+      // Remove from decrypting set
+      setDecryptingIds(prev => {
+        const next = new Set(prev)
+        next.delete(marketIdStr)
+        return next
+      })
+    }
+  }, [markets, decryptionCache, decryptingIds, decryptionErrors, isEncrypted, canUserDecrypt, decryptMetadata])
+
+  // Check if a specific market is currently decrypting
+  const isMarketDecrypting = useCallback((marketId) => {
+    return decryptingIds.has(String(marketId))
+  }, [decryptingIds])
+
+  // Clear cache for a specific market or all
+  const clearCache = useCallback((marketId) => {
+    if (marketId) {
+      const marketIdStr = String(marketId)
+      setDecryptionCache(prev => {
+        const next = new Map(prev)
+        next.delete(marketIdStr)
+        return next
+      })
+      setDecryptionErrors(prev => {
+        const next = new Map(prev)
+        next.delete(marketIdStr)
+        return next
+      })
+    } else {
+      setDecryptionCache(new Map())
+      setDecryptionErrors(new Map())
+    }
+  }, [])
+
+  // Clear cache on disconnect
+  useEffect(() => {
+    if (!isConnected) {
+      setDecryptionCache(new Map())
+      setDecryptionErrors(new Map())
+      setDecryptingIds(new Set())
+    }
+  }, [isConnected])
+
+  // Check if any market is currently decrypting
+  const isAnyDecrypting = decryptingIds.size > 0
+
+  // Filter helpers (similar to useDecryptedMarkets for compatibility)
+  const viewableMarkets = useMemo(() =>
+    processedMarkets.filter(m => m.canView || !m.isPrivate),
+    [processedMarkets]
+  )
+
+  const privateMarkets = useMemo(() =>
+    processedMarkets.filter(m => m.isPrivate && m.canView),
+    [processedMarkets]
+  )
+
+  const publicMarkets = useMemo(() =>
+    processedMarkets.filter(m => !m.isPrivate),
+    [processedMarkets]
+  )
+
+  return {
+    // Markets with encryption status (decrypted only if explicitly requested)
+    markets: processedMarkets,
+    viewableMarkets,
+    privateMarkets,
+    publicMarkets,
+
+    // Function to decrypt a single market on demand
+    decryptMarket,
+
+    // Check if a specific market is currently decrypting
+    isMarketDecrypting,
+
+    // Global loading state (true if any market is decrypting)
+    isAnyDecrypting,
+
+    // Clear cache for a specific market or all
+    clearCache,
+
+    // Get the decryption cache (for debugging/testing)
+    decryptionCache,
   }
 }
 

@@ -57,11 +57,31 @@ vi.mock('../hooks/useEncryption', () => ({
     addParticipant: vi.fn().mockResolvedValue({}),
     canUserDecrypt: vi.fn().mockReturnValue(true),
     isEncrypted: vi.fn().mockReturnValue(false),
-    getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey')
+    getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey'),
+    isInitialized: true,
+    isInitializing: false
   }),
   useDecryptedMarkets: (markets) => ({
-    markets,
+    markets: markets || [],
     isDecrypting: false
+  }),
+  useLazyMarketDecryption: (markets) => ({
+    markets: (markets || []).map(m => ({
+      ...m,
+      encryptionStatus: 'not_encrypted',
+      isPrivate: false,
+      canView: true,
+      decryptedMetadata: null,
+      decryptionError: null,
+      isDecrypting: false
+    })),
+    decryptMarket: vi.fn().mockResolvedValue({}),
+    isMarketDecrypting: vi.fn().mockReturnValue(false),
+    isAnyDecrypting: false,
+    clearCache: vi.fn(),
+    viewableMarkets: markets || [],
+    privateMarkets: [],
+    publicMarkets: markets || []
   })
 }))
 

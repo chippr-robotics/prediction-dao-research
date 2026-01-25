@@ -93,5 +93,6 @@ export {
 // Encryption hooks (for friend market privacy)
 export {
   useEncryption,
-  useDecryptedMarkets
+  useDecryptedMarkets,
+  useLazyMarketDecryption
 } from './useEncryption'

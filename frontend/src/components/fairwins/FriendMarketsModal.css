@@ -980,6 +980,61 @@
   white-space: nowrap;
 }
 
+/* Decrypting indicator */
+.fm-decrypting-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary, #AAB6C2);
+  font-style: italic;
+}
+
+.fm-table-row.decrypting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Unlockable privacy icon */
+.fm-privacy-icon.unlockable {
+  color: #F5A623;
+  cursor: pointer;
+  animation: fmPulse 2s ease-in-out infinite;
+}
+
+@keyframes fmPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Decrypt button in detail view */
+.fm-decrypt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(245, 166, 35, 0.15);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+  border-radius: 6px;
+  color: #F5A623;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fm-decrypt-btn:hover {
+  background: rgba(245, 166, 35, 0.25);
+  border-color: rgba(245, 166, 35, 0.5);
+}
+
+.fm-decrypt-btn:active {
+  transform: scale(0.98);
+}
+
+.fm-decrypt-btn svg {
+  animation: fmPulse 2s ease-in-out infinite;
+}
+
 .fm-table-stake {
   font-weight: 600;
   color: #36B37E;
