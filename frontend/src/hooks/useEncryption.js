@@ -20,7 +20,6 @@ import {
   createEncryptedMarket,
   addParticipantToMarket,
   // X-Wing (v2.0) functions
-  deriveXWingKeyPair,
   deriveXWingKeyPairFromSignature,
   xwingPublicKeyFromSignature,
   createEncryptedMarketXWing,
@@ -31,8 +30,7 @@ import {
   // Utilities
   canDecrypt,
   getRecipients,
-  isEncryptedEnvelope,
-  getEnvelopeSigningVersion
+  isEncryptedEnvelope
 } from '../utils/crypto/envelopeEncryption.js'
 
 // Cache signatures in session storage

@@ -645,11 +645,11 @@ function WalletButton({ className = '' }) {
       // For encrypted markets, upload envelope to IPFS and store only CID on-chain
       // This reduces gas costs and keeps the encrypted data off-chain for better privacy
       let marketDescription
-      let isEncryptedMarket = false
+      let _isEncryptedMarket = false
       let ipfsCid = null
 
       if (data.data.isEncrypted && data.data.encryptedMetadata) {
-        isEncryptedMarket = true
+        _isEncryptedMarket = true
 
         // Upload encrypted envelope to IPFS via Pinata
         onProgress({ step: 'upload', message: 'Uploading encrypted metadata to IPFS...' })
