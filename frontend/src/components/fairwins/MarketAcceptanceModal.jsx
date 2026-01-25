@@ -98,13 +98,6 @@ function MarketAcceptanceModal({
       setDecryptedDescription(null)
       setDecryptionError(null)
 
-      // If we have a URL description (shared via QR code), use it directly
-      // This allows receivers to see the bet text without needing to decrypt
-      if (marketData?.urlDescription) {
-        setDecryptedDescription(marketData.urlDescription)
-        return
-      }
-
       // Check if user is a participant who can decrypt
       if (!account) {
         setDecryptionError('Connect wallet to view encrypted content')
@@ -114,11 +107,9 @@ function MarketAcceptanceModal({
       try {
         const envelope = JSON.parse(marketData.rawDescription)
 
-        // Check if user can decrypt (they're in the keys array)
+        // Check if user can decrypt
         if (!canUserDecrypt(envelope)) {
-          // User is not in keys array - this is expected for receivers
-          // They need the URL description to see the bet text
-          setDecryptionError('Bet details were not shared in the invite link')
+          setDecryptionError('You are not a participant in this encrypted market')
           return
         }
 
@@ -137,7 +128,7 @@ function MarketAcceptanceModal({
     }
 
     tryDecrypt()
-  }, [marketData?.isEncrypted, marketData?.rawDescription, marketData?.urlDescription, account, encryptionInitialized, canUserDecrypt, decryptMetadata])
+  }, [marketData?.isEncrypted, marketData?.rawDescription, account, encryptionInitialized, canUserDecrypt, decryptMetadata])
 
   // Handler to manually trigger decryption (requires wallet signature)
   const handleDecrypt = async () => {
@@ -428,15 +419,7 @@ function MarketAcceptanceModal({
                     ) : decryptionError ? (
                       <div className="ma-decrypt-error">
                         <p>{decryptionError}</p>
-                        {/* Only show unlock button if user can actually decrypt (is in keys array) */}
-                        {(isParticipant || isArbitrator) && !encryptionInitialized && marketData?.rawDescription && (() => {
-                          try {
-                            const envelope = JSON.parse(marketData.rawDescription)
-                            return canUserDecrypt(envelope)
-                          } catch {
-                            return false
-                          }
-                        })() && (
+                        {(isParticipant || isArbitrator) && !encryptionInitialized && (
                           <button
                             type="button"
                             className="ma-btn-decrypt"

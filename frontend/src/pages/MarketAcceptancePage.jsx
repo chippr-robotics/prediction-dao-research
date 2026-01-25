@@ -77,9 +77,6 @@ function MarketAcceptancePage() {
   const urlStake = searchParams.get('stake')
   const urlToken = searchParams.get('token')
   const urlDeadline = searchParams.get('deadline')
-  // Description passed in URL for encrypted markets (base64 encoded)
-  const urlDescEncoded = searchParams.get('desc')
-  const urlDescription = urlDescEncoded ? decodeURIComponent(atob(urlDescEncoded)) : null
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -210,8 +207,6 @@ function MarketAcceptancePage() {
             id: marketId,
             description: displayDescription,
             rawDescription: rawDescription, // Keep original for decryption
-            // For encrypted markets, include URL description so receiver can see bet text
-            urlDescription: urlDescription,
             isEncrypted: isEncryptedDescription(rawDescription),
             creator: marketResult.creator,
             participants: members,
@@ -284,7 +279,7 @@ function MarketAcceptancePage() {
     }
 
     fetchMarketData()
-  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlDescription])
+  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline])
 
   const handleClose = () => {
     navigate('/')

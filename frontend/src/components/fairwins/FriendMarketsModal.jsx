@@ -807,14 +807,6 @@ function FriendMarketsModal({
       deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
     })
 
-    // For encrypted markets, include the description in URL so receiver can see the bet text
-    // This allows viewing without decryption while on-chain data remains encrypted for privacy
-    if (market.isEncrypted && market.description) {
-      // Base64 encode to handle special characters in URL
-      const encodedDesc = btoa(encodeURIComponent(market.description))
-      params.set('desc', encodedDesc)
-    }
-
     return `${window.location.origin}/friend-market/accept?${params.toString()}`
   }
 
