@@ -12,6 +12,18 @@ Private markets use envelope encryption to protect market metadata. The scheme p
 
 ## Cryptographic Primitives
 
+### v2.0 (Current - Post-Quantum)
+
+| Component | Algorithm | Library |
+|-----------|-----------|---------|
+| Key Exchange | X-Wing (X25519 + ML-KEM-768) | @noble/curves, @noble/post-quantum |
+| Key Derivation | HKDF-SHA256 | @noble/hashes/hkdf |
+| Symmetric Encryption | ChaCha20-Poly1305 | @noble/ciphers/chacha |
+| Wallet Key Derivation | Keccak-256 | ethers.js |
+| X-Wing Combiner | SHA3-256 | @noble/hashes/sha3 |
+
+### v1.0 (Legacy - Classical)
+
 | Component | Algorithm | Library |
 |-----------|-----------|---------|
 | Key Exchange | X25519 (Curve25519 ECDH) | @noble/curves/ed25519 |
@@ -20,6 +32,34 @@ Private markets use envelope encryption to protect market metadata. The scheme p
 | Wallet Key Derivation | Keccak-256 | ethers.js |
 
 All cryptographic operations use the Noble suite, which provides audited, side-channel resistant implementations.
+
+## Post-Quantum Security (v2.0)
+
+Version 2.0 uses X-Wing, a hybrid key encapsulation mechanism combining classical X25519 with post-quantum ML-KEM-768. This protects against "harvest now, decrypt later" attacks where an adversary stores encrypted data today and decrypts it with future quantum computers.
+
+### X-Wing Key Sizes
+
+| Component | v1.0 (X25519) | v2.0 (X-Wing) |
+|-----------|---------------|---------------|
+| Public Key | 32 bytes | 1216 bytes |
+| Secret Key | 32 bytes | 32 bytes (seed) |
+| Ciphertext | 32 bytes | 1120 bytes |
+| Shared Secret | 32 bytes | 32 bytes |
+
+### X-Wing Combiner
+
+Per the IETF X-Wing specification, the shared secret is derived as:
+
+```
+SharedSecret = SHA3-256(XWING_LABEL || ss_ML-KEM || ss_X25519 || ct_X25519 || pk_X25519)
+```
+
+Where:
+- `XWING_LABEL` = `"\\./\n\\./\n"` (domain separator)
+- `ss_ML-KEM` = ML-KEM-768 shared secret (32 bytes)
+- `ss_X25519` = X25519 shared secret (32 bytes)
+- `ct_X25519` = X25519 ephemeral public key (32 bytes)
+- `pk_X25519` = Recipient's X25519 public key (32 bytes)
 
 ## Key Derivation
 
@@ -49,10 +89,35 @@ KEK: HKDF(SHA256, SharedSecret, salt="", info="FairWins_Envelope_v1", length=32)
 
 ## Envelope Structure
 
+### v2.0 (X-Wing - Post-Quantum)
+
+```json
+{
+  "version": "2.0",
+  "algorithm": "xwing-chacha20poly1305",
+  "signingVersion": 2,
+  "content": {
+    "nonce": "<hex: 12 bytes>",
+    "ciphertext": "<hex: encrypted data + 16-byte auth tag>"
+  },
+  "keys": [
+    {
+      "address": "<lowercase ethereum address>",
+      "xwingCiphertext": "<hex: 1120 bytes (ML-KEM ciphertext + X25519 ephemeral)>",
+      "nonce": "<hex: 12 bytes>",
+      "wrappedKey": "<hex: encrypted DEK + 16-byte auth tag>"
+    }
+  ]
+}
+```
+
+### v1.0 (X25519 - Classical)
+
 ```json
 {
   "version": "1.0",
   "algorithm": "x25519-chacha20poly1305",
+  "signingVersion": 2,
   "content": {
     "nonce": "<hex: 12 bytes>",
     "ciphertext": "<hex: encrypted data + 16-byte auth tag>"
@@ -66,6 +131,19 @@ KEK: HKDF(SHA256, SharedSecret, salt="", info="FairWins_Envelope_v1", length=32)
     }
   ]
 }
+```
+
+### Version Detection
+
+```javascript
+function isXWingEnvelope(envelope) {
+  return envelope?.algorithm === 'xwing-chacha20poly1305'
+}
+
+function isX25519Envelope(envelope) {
+  return envelope?.algorithm === 'x25519-chacha20poly1305'
+}
+```
 ```
 
 ## Encryption Flow

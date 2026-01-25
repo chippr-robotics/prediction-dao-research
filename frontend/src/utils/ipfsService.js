@@ -548,3 +548,134 @@ export const uploadAndRegister = async (content, options = {}) => {
 
   return { ...uploadResult, registered: false }
 }
+
+// ==========================================
+// Encrypted Envelope IPFS Functions
+// ==========================================
+
+/**
+ * Upload an encrypted envelope to IPFS
+ * This is the recommended approach for private market metadata:
+ * - Encrypted envelope is stored on IPFS (private, off-chain)
+ * - Only the CID is stored on-chain (public, minimal gas)
+ *
+ * @param {Object} envelope - The encrypted envelope object (from envelopeEncryption)
+ * @param {Object} options - Upload options
+ * @param {string} options.marketType - Type of market (e.g., 'oneVsOne', 'smallGroup')
+ * @returns {Promise<{cid: string, uri: string, size: number}>} Upload result
+ */
+export const uploadEncryptedEnvelope = async (envelope, options = {}) => {
+  if (!envelope || typeof envelope !== 'object') {
+    throw new Error('Envelope must be a valid object')
+  }
+
+  // Validate it looks like an encrypted envelope
+  if (!envelope.version || !envelope.algorithm || !envelope.content || !envelope.keys) {
+    throw new Error('Invalid envelope format: missing required fields (version, algorithm, content, keys)')
+  }
+
+  // Validate supported algorithms
+  const supportedAlgorithms = ['x25519-chacha20poly1305', 'xwing-chacha20poly1305']
+  if (!supportedAlgorithms.includes(envelope.algorithm)) {
+    throw new Error(`Unsupported envelope algorithm: ${envelope.algorithm}`)
+  }
+
+  const namePrefix = options.marketType
+    ? `encrypted-market-${options.marketType}`
+    : 'encrypted-envelope'
+
+  const result = await uploadJson(envelope, { namePrefix })
+
+  console.log('Encrypted envelope uploaded to IPFS:', {
+    cid: result.cid,
+    algorithm: envelope.algorithm,
+    recipientCount: envelope.keys?.length || 0,
+    size: result.size
+  })
+
+  return result
+}
+
+/**
+ * Fetch an encrypted envelope from IPFS
+ * Returns the raw envelope object for decryption by the caller
+ *
+ * @param {string} cid - IPFS content identifier
+ * @param {Object} options - Fetch options
+ * @returns {Promise<Object>} The encrypted envelope object
+ */
+export const fetchEncryptedEnvelope = async (cid, options = {}) => {
+  if (!cid) {
+    throw new Error('CID is required')
+  }
+
+  const envelope = await fetchByCid(cid, options)
+
+  // Validate it looks like an encrypted envelope
+  if (!envelope || !envelope.version || !envelope.algorithm) {
+    throw new Error('Fetched data is not a valid encrypted envelope')
+  }
+
+  console.log('Fetched encrypted envelope from IPFS:', {
+    cid,
+    algorithm: envelope.algorithm,
+    version: envelope.version,
+    recipientCount: envelope.keys?.length || 0
+  })
+
+  return envelope
+}
+
+/**
+ * Check if a description field contains an IPFS CID reference
+ * Supports formats:
+ * - Raw CID: "bafybeic..."
+ * - IPFS URI: "ipfs://bafybeic..."
+ * - Prefixed: "encrypted:ipfs://bafybeic..."
+ *
+ * @param {string} description - The description field from on-chain market data
+ * @returns {{ isIpfs: boolean, cid: string | null }} Detection result
+ */
+export const parseEncryptedIpfsReference = (description) => {
+  if (!description || typeof description !== 'string') {
+    return { isIpfs: false, cid: null }
+  }
+
+  // Check for "encrypted:ipfs://" prefix (our standard format)
+  if (description.startsWith('encrypted:ipfs://')) {
+    const cid = description.replace('encrypted:ipfs://', '').trim()
+    if (isValidCid(cid)) {
+      return { isIpfs: true, cid }
+    }
+  }
+
+  // Check for plain "ipfs://" prefix
+  if (description.startsWith('ipfs://')) {
+    const cid = description.replace('ipfs://', '').split('/')[0].trim()
+    if (isValidCid(cid)) {
+      return { isIpfs: true, cid }
+    }
+  }
+
+  // Check for raw CID (starts with 'bafy' for CIDv1 or 'Qm' for CIDv0)
+  const trimmed = description.trim()
+  if (isValidCid(trimmed)) {
+    return { isIpfs: true, cid: trimmed }
+  }
+
+  return { isIpfs: false, cid: null }
+}
+
+/**
+ * Build the on-chain reference string for an encrypted IPFS envelope
+ * This is what gets stored on-chain instead of the full encrypted envelope
+ *
+ * @param {string} cid - The IPFS CID of the uploaded envelope
+ * @returns {string} The reference string to store on-chain
+ */
+export const buildEncryptedIpfsReference = (cid) => {
+  if (!cid || !isValidCid(cid)) {
+    throw new Error('Invalid CID')
+  }
+  return `encrypted:ipfs://${cid}`
+}

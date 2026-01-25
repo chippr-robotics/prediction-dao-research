@@ -174,15 +174,35 @@ The signature—unique to his wallet—is mathematically transformed into an enc
 - **No central authority**: The platform never holds master keys. Decryption happens entirely in Marcus's browser.
 - **Session convenience**: Once signed, the key is cached for the browser session. Marcus accesses all his private markets without repeated prompts.
 
-### Why X25519 and ChaCha20-Poly1305?
+### Why X-Wing and ChaCha20-Poly1305?
 
-The envelope encryption uses the same algorithms that secure Signal messages and Cloudflare's edge network:
+The envelope encryption uses algorithms designed for long-term security:
 
-- **X25519** for key exchange—fast, secure, and resistant to implementation errors
+- **X-Wing** for key exchange—a hybrid combining classical X25519 with post-quantum ML-KEM-768
 - **ChaCha20-Poly1305** for symmetric encryption—authenticated encryption that detects tampering
 - **HKDF-SHA256** for key derivation—NIST-recommended, deterministic, and auditable
 
-These aren't experimental. They're the current industry consensus on performant, secure cryptography.
+### Post-Quantum Protection
+
+Here's a scenario that keeps cryptographers awake at night: an adversary records Sarah and Marcus's encrypted market terms today. The encryption is unbreakable with current computers. But in fifteen years, a sufficiently powerful quantum computer could theoretically crack the key exchange and reveal those terms.
+
+This "harvest now, decrypt later" attack is particularly relevant for private markets. The terms Sarah and Marcus agreed to might still be sensitive years later—competitive intelligence doesn't always have an expiration date.
+
+X-Wing addresses this by combining two key exchange mechanisms:
+
+1. **X25519**: The same elliptic curve cryptography that secures Signal and modern TLS. Fast, well-audited, and secure against classical computers.
+
+2. **ML-KEM-768**: A lattice-based key encapsulation mechanism from the NIST post-quantum standardization process. Believed to be secure against both classical and quantum computers.
+
+The hybrid construction means Sarah and Marcus's market is protected if *either* algorithm remains secure. If quantum computers never materialize, X25519 provides proven classical security. If quantum computers arrive but ML-KEM holds, the market remains protected. The encryption only fails if both algorithms are broken—an exceedingly unlikely scenario.
+
+**Key sizes are larger**: X-Wing public keys are 1,216 bytes compared to 32 bytes for pure X25519. The ciphertext overhead per participant increases from ~80 bytes to ~1,200 bytes. For typical private markets with 2-10 participants, this remains negligible—a few extra kilobytes in exchange for decades of quantum resistance.
+
+**Performance remains practical**: Key generation and encapsulation add a few hundred microseconds. For the scale of private market operations—creation, acceptance, adding participants—this is imperceptible.
+
+### Backward Compatibility
+
+Markets created before the X-Wing upgrade remain fully readable. The envelope format includes a version field, and the system automatically uses the appropriate decryption path. Old markets use X25519; new markets use X-Wing. Participants don't need to manage this—it happens transparently.
 
 ### Forward Secrecy
 

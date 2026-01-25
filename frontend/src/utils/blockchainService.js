@@ -15,6 +15,10 @@ import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
+import {
+  parseEncryptedIpfsReference,
+  fetchEncryptedEnvelope
+} from './ipfsService'
 
 // Constants for friend market detection
 const FRIEND_MARKET_PROPOSAL_MIN = 1_000_000
@@ -947,26 +951,57 @@ export async function fetchFriendMarketsForUser(userAddress) {
           // stakeToken, isUSC, and tokenDecimals are already defined above for acceptances
           const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
 
-          // Check if description is an encrypted envelope (JSON with version, algorithm, content, keys)
+          // Check if description contains encrypted metadata
+          // Supports:
+          // 1. IPFS reference: "encrypted:ipfs://..." (new, preferred)
+          // 2. Inline JSON envelope (legacy, for backwards compatibility)
           let description = marketResult.description
           let metadata = null
           let isEncryptedMarket = false
+          let ipfsCid = null
 
-          try {
-            const parsed = JSON.parse(description)
-            // Check if it matches encrypted envelope format
-            if (parsed?.version === '1.0' &&
-                parsed?.algorithm?.startsWith('x25519-') &&
-                parsed?.content?.ciphertext &&
-                Array.isArray(parsed?.keys)) {
-              // This is an encrypted envelope - store in metadata for decryption hook
-              metadata = parsed
+          // First check for IPFS reference (new format)
+          const ipfsRef = parseEncryptedIpfsReference(description)
+          if (ipfsRef.isIpfs && ipfsRef.cid) {
+            try {
+              // Fetch encrypted envelope from IPFS
+              console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, fetching CID: ${ipfsRef.cid}`)
+              const envelope = await fetchEncryptedEnvelope(ipfsRef.cid)
+              metadata = envelope
+              ipfsCid = ipfsRef.cid
               isEncryptedMarket = true
               description = 'Encrypted Market' // Placeholder until decrypted
-              console.log(`[fetchFriendMarketsForUser] Market ${marketId} has encrypted metadata`)
+              console.log(`[fetchFriendMarketsForUser] Market ${marketId} envelope fetched from IPFS, algorithm: ${envelope.algorithm}`)
+            } catch (ipfsError) {
+              console.error(`[fetchFriendMarketsForUser] Failed to fetch IPFS envelope for market ${marketId}:`, ipfsError)
+              // Keep the IPFS reference as description so user knows it's encrypted but unavailable
+              description = 'Encrypted Market (IPFS fetch failed)'
+              isEncryptedMarket = true
             }
-          } catch {
-            // Not JSON, keep as plain description
+          } else {
+            // Fallback: check for inline JSON envelope (legacy format)
+            try {
+              const parsed = JSON.parse(description)
+              // Check if it matches encrypted envelope format (v1.0 or v2.0)
+              const isV1Envelope = parsed?.version === '1.0' &&
+                  parsed?.algorithm === 'x25519-chacha20poly1305' &&
+                  parsed?.content?.ciphertext &&
+                  Array.isArray(parsed?.keys)
+              const isV2Envelope = parsed?.version === '2.0' &&
+                  parsed?.algorithm === 'xwing-chacha20poly1305' &&
+                  parsed?.content?.ciphertext &&
+                  Array.isArray(parsed?.keys)
+
+              if (isV1Envelope || isV2Envelope) {
+                // This is an encrypted envelope - store in metadata for decryption hook
+                metadata = parsed
+                isEncryptedMarket = true
+                description = 'Encrypted Market' // Placeholder until decrypted
+                console.log(`[fetchFriendMarketsForUser] Market ${marketId} has inline encrypted metadata (${parsed.algorithm})`)
+              }
+            } catch {
+              // Not JSON, keep as plain description
+            }
           }
 
           return {
@@ -974,6 +1009,7 @@ export async function fetchFriendMarketsForUser(userAddress) {
             description: description,
             metadata: metadata,
             isEncrypted: isEncryptedMarket,
+            ipfsCid: ipfsCid, // CID for IPFS-stored encrypted envelopes
             creator: marketResult.creator,
             participants: members,
             arbitrator: hasArbitrator ? arbitrator : null,

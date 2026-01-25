@@ -1294,7 +1294,7 @@ function FriendMarketsModal({
 
                     {/* Privacy / Encryption Toggle */}
                     <div className="fm-form-group fm-form-full">
-                      <div className="fm-encryption-toggle">
+                      <div className={`fm-encryption-toggle ${enableEncryption ? 'fm-encryption-enabled' : ''}`}>
                         <label className="fm-toggle-label">
                           <input
                             type="checkbox"
@@ -1308,27 +1308,72 @@ function FriendMarketsModal({
                               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                               <path d="M7 11V7a5 5 0 0110 0v4"/>
                             </svg>
-                            Encrypt Market Details
+                            Private Market
                           </span>
                         </label>
+
+                        {enableEncryption && (
+                          <div className="fm-pq-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            <span>Post-Quantum Secure</span>
+                          </div>
+                        )}
+
                         <span className="fm-hint">
                           {enableEncryption
-                            ? 'Only participants can view market details. Recommended for private bets.'
-                            : 'Market details will be publicly visible on IPFS.'}
+                            ? 'End-to-end encrypted with X-Wing (quantum-resistant). Only participants can decrypt.'
+                            : 'Market details will be publicly visible on the blockchain.'}
                         </span>
+
+                        {enableEncryption && (
+                          <div className="fm-encryption-info">
+                            <div className="fm-encryption-info-header">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                              </svg>
+                              <span>What gets encrypted?</span>
+                            </div>
+                            <div className="fm-encryption-fields">
+                              <div className="fm-field-encrypted">
+                                <span className="fm-field-icon">🔒</span>
+                                <span>Bet description &amp; terms</span>
+                              </div>
+                              <div className="fm-field-encrypted">
+                                <span className="fm-field-icon">🔒</span>
+                                <span>Market metadata</span>
+                              </div>
+                              <div className="fm-field-public">
+                                <span className="fm-field-icon">🌐</span>
+                                <span>Participant addresses</span>
+                              </div>
+                              <div className="fm-field-public">
+                                <span className="fm-field-icon">🌐</span>
+                                <span>Stake amount &amp; token</span>
+                              </div>
+                              <div className="fm-field-public">
+                                <span className="fm-field-icon">🌐</span>
+                                <span>Market timing</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {enableEncryption && !encryptionInitialized && !encryptionInitializing && (
                           <div className="fm-encryption-warning">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <circle cx="12" cy="12" r="10"/>
                               <path d="M12 16v-4M12 8h.01"/>
                             </svg>
-                            <span>You&apos;ll be asked to sign a message to enable encryption</span>
+                            <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
                           </div>
                         )}
                         {encryptionInitializing && (
                           <div className="fm-encryption-status">
                             <span className="fm-spinner-small"></span>
-                            <span>Initializing encryption...</span>
+                            <span>Deriving encryption keys...</span>
                           </div>
                         )}
                       </div>
@@ -2060,7 +2105,7 @@ function MarketDetailView({
 
       <div className="fm-detail-header">
         <h3>
-          {market.isPrivate && (
+          {(market.isPrivate || market.isEncrypted) && (
             <svg
               className="fm-privacy-icon"
               width="18"
@@ -2077,51 +2122,99 @@ function MarketDetailView({
           )}
           {getMarketDescription(market)}
         </h3>
-        <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
-          {market.status}
-        </span>
+        <div className="fm-detail-badges">
+          <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
+            {market.status}
+          </span>
+          {(market.isPrivate || market.isEncrypted) && (
+            <span className="fm-pq-badge-small">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              PQ Secure
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="fm-detail-grid">
-        {market.isPrivate && (
-          <div className="fm-detail-item">
-            <span className="fm-detail-label">Privacy</span>
-            <span className="fm-detail-value fm-privacy-badge fm-private">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0110 0v4"/>
-              </svg>
-              Encrypted
-            </span>
+      {/* Encrypted Data Section */}
+      {(market.isPrivate || market.isEncrypted) && (
+        <div className="fm-detail-section fm-encrypted-section">
+          <div className="fm-section-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+            <span>Encrypted Data</span>
+            <span className="fm-section-hint">Only visible to participants</span>
+          </div>
+          <div className="fm-encrypted-content">
+            <div className="fm-detail-item fm-item-encrypted">
+              <span className="fm-detail-label">Bet Terms</span>
+              <span className="fm-detail-value fm-value-decrypted">
+                {market.canView !== false ? getMarketDescription(market) : (
+                  <span className="fm-encrypted-placeholder">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4"/>
+                    </svg>
+                    Sign to decrypt
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="fm-detail-item fm-item-encrypted">
+              <span className="fm-detail-label">Type</span>
+              <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Public Data Section */}
+      <div className={`fm-detail-section ${(market.isPrivate || market.isEncrypted) ? 'fm-public-section' : ''}`}>
+        {(market.isPrivate || market.isEncrypted) && (
+          <div className="fm-section-header fm-section-public">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="2" y1="12" x2="22" y2="12"/>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <span>Public Data</span>
+            <span className="fm-section-hint">Visible on blockchain</span>
           </div>
         )}
-        <div className="fm-detail-item">
-          <span className="fm-detail-label">Type</span>
-          <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
-        </div>
-        <div className="fm-detail-item">
-          <span className="fm-detail-label">Stake</span>
-          <span className="fm-detail-value">
-            {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
-          </span>
-        </div>
-        <div className="fm-detail-item">
-          <span className="fm-detail-label">Total Pool</span>
-          <span className="fm-detail-value">
-            {market.stakeTokenIcon || '💵'} {formatUSD(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2), market.stakeTokenSymbol)}
-          </span>
-        </div>
-        <div className="fm-detail-item">
-          <span className="fm-detail-label">Created</span>
-          <span className="fm-detail-value">{formatDate(market.createdAt)}</span>
-        </div>
-        <div className="fm-detail-item">
-          <span className="fm-detail-label">Ends</span>
-          <span className="fm-detail-value">{formatDate(market.endDate)}</span>
-        </div>
-        <div className="fm-detail-item">
-          <span className="fm-detail-label">Participants</span>
-          <span className="fm-detail-value">{market.participants?.length || 0}</span>
+        <div className="fm-detail-grid">
+          {!(market.isPrivate || market.isEncrypted) && (
+            <div className="fm-detail-item">
+              <span className="fm-detail-label">Type</span>
+              <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
+            </div>
+          )}
+          <div className="fm-detail-item">
+            <span className="fm-detail-label">Stake</span>
+            <span className="fm-detail-value">
+              {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
+            </span>
+          </div>
+          <div className="fm-detail-item">
+            <span className="fm-detail-label">Total Pool</span>
+            <span className="fm-detail-value">
+              {market.stakeTokenIcon || '💵'} {formatUSD(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2), market.stakeTokenSymbol)}
+            </span>
+          </div>
+          <div className="fm-detail-item">
+            <span className="fm-detail-label">Created</span>
+            <span className="fm-detail-value">{formatDate(market.createdAt)}</span>
+          </div>
+          <div className="fm-detail-item">
+            <span className="fm-detail-label">Ends</span>
+            <span className="fm-detail-value">{formatDate(market.endDate)}</span>
+          </div>
+          <div className="fm-detail-item">
+            <span className="fm-detail-label">Participants</span>
+            <span className="fm-detail-value">{market.participants?.length || 0}</span>
+          </div>
         </div>
       </div>
 
