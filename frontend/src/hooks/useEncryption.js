@@ -27,17 +27,67 @@ import {
   decryptEnvelopeUnified,
   addParticipantUnified,
   isXWingEnvelope,
+  // Version
+  getEnvelopeSigningVersion,
   // Utilities
   canDecrypt,
   getRecipients,
   isEncryptedEnvelope
 } from '../utils/crypto/envelopeEncryption.js'
 
-// Cache signatures in session storage
+// Cache signatures in session storage (now stores JSON with version info)
 const SIGNATURE_CACHE_KEY = 'fairwins_encryption_signature'
 
 // Global initialization promise to prevent concurrent signature requests
 let initializationPromise = null
+
+/**
+ * Get cached signature data (includes version info)
+ * @param {string} account - Wallet address
+ * @returns {{ signature: string, version: number } | null}
+ */
+function getCachedSignatureData(account) {
+  if (!account) return null
+  const cacheKey = `${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`
+  const cached = sessionStorage.getItem(cacheKey)
+  if (!cached) return null
+
+  try {
+    // Try to parse as JSON (new format with version)
+    const parsed = JSON.parse(cached)
+    if (parsed.signature && typeof parsed.version === 'number') {
+      return parsed
+    }
+    // Invalid JSON format, treat as legacy
+    return null
+  } catch {
+    // Legacy format: plain signature string without version
+    // Assume version 1 for legacy cached signatures
+    return { signature: cached, version: 1 }
+  }
+}
+
+/**
+ * Save signature data to cache (with version info)
+ * @param {string} account - Wallet address
+ * @param {string} signature - The signature
+ * @param {number} version - Signing message version
+ */
+function saveSignatureToCache(account, signature, version) {
+  if (!account) return
+  const cacheKey = `${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`
+  sessionStorage.setItem(cacheKey, JSON.stringify({ signature, version }))
+}
+
+/**
+ * Clear cached signature for account
+ * @param {string} account - Wallet address
+ */
+function clearSignatureCache(account) {
+  if (!account) return
+  const cacheKey = `${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`
+  sessionStorage.removeItem(cacheKey)
+}
 
 /**
  * Main encryption hook for friend markets
@@ -51,6 +101,7 @@ export function useEncryption() {
     xwing: null    // { publicKey, secretKey }
   })
   const [signature, setSignature] = useState(null)
+  const [cachedVersion, setCachedVersion] = useState(null) // Track signing version of cached signature
   const [isInitializing, setIsInitializing] = useState(false)
   const [error, setError] = useState(null)
 
@@ -59,13 +110,14 @@ export function useEncryption() {
     let ignore = false
 
     if (account) {
-      const cached = sessionStorage.getItem(`${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`)
-      if (cached && !ignore) {
-        setSignature(cached)
+      const cachedData = getCachedSignatureData(account)
+      if (cachedData && !ignore) {
+        setSignature(cachedData.signature)
+        setCachedVersion(cachedData.version)
         // Derive BOTH keypairs from cached signature
         try {
-          const x25519Keys = deriveKeyPairFromSignature(cached)
-          const xwingKeys = deriveXWingKeyPairFromSignature(cached)
+          const x25519Keys = deriveKeyPairFromSignature(cachedData.signature)
+          const xwingKeys = deriveXWingKeyPairFromSignature(cachedData.signature)
           if (!ignore) {
             setKeyPairs({
               x25519: {
@@ -78,9 +130,11 @@ export function useEncryption() {
               }
             })
           }
-          console.log('[useEncryption] Restored dual keypairs from cached signature')
+          console.log(`[useEncryption] Restored dual keypairs from cached signature (version ${cachedData.version})`)
         } catch (err) {
           console.error('Failed to derive keypairs from cached signature:', err)
+          // Clear invalid cache
+          clearSignatureCache(account)
         }
       }
     }
@@ -111,12 +165,14 @@ export function useEncryption() {
     // Create and store the promise to prevent concurrent requests
     initializationPromise = (async () => {
       try {
-        // Derive X25519 keypair (also gets the signature)
+        // Derive X25519 keypair (also gets the signature and version)
         const x25519Result = await deriveKeyPair(signer)
+        const signingVersion = x25519Result.version || 2 // Default to current version
         // Derive X-Wing keypair from the same signature (no additional wallet popup)
         const xwingKeys = deriveXWingKeyPairFromSignature(x25519Result.signature)
 
         setSignature(x25519Result.signature)
+        setCachedVersion(signingVersion)
         setKeyPairs({
           x25519: {
             publicKey: x25519Result.publicKey,
@@ -128,13 +184,10 @@ export function useEncryption() {
           }
         })
 
-        // Cache signature (works for deriving both key types)
-        sessionStorage.setItem(
-          `${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`,
-          x25519Result.signature
-        )
+        // Cache signature with version info
+        saveSignatureToCache(account, x25519Result.signature, signingVersion)
 
-        console.log('[useEncryption] Dual keypairs initialized and cached for session')
+        console.log(`[useEncryption] Dual keypairs initialized and cached for session (version ${signingVersion})`)
 
         return {
           signature: x25519Result.signature,
@@ -238,11 +291,25 @@ export function useEncryption() {
   /**
    * Decrypt market metadata
    * Auto-detects envelope version (X25519 v1.0 or X-Wing v2.0)
-   * Uses cached keys to avoid wallet popups
+   * Checks signing version and re-derives keys if needed
+   * Uses cached keys to avoid wallet popups when possible
    */
   const decryptMetadata = useCallback(async (envelope) => {
     if (!account) {
       throw new Error('Wallet not connected')
+    }
+
+    // Get the envelope's signing version
+    const envelopeVersion = getEnvelopeSigningVersion(envelope)
+
+    // Check if cached signature version matches envelope's signing version
+    if (cachedVersion !== null && cachedVersion !== envelopeVersion) {
+      console.log(`[useEncryption] Version mismatch: cached v${cachedVersion}, envelope v${envelopeVersion}. Re-signing...`)
+      // Clear the stale cache and force re-initialization
+      clearSignatureCache(account)
+      setSignature(null)
+      setCachedVersion(null)
+      setKeyPairs({ x25519: null, xwing: null })
     }
 
     // Ensure we have keys (may prompt user once if no cached signature)
@@ -261,7 +328,7 @@ export function useEncryption() {
       throw new Error('No signer available')
     }
     return decryptMarketMetadata(envelope, account, signer)
-  }, [signer, account, keyPairs, ensureInitialized])
+  }, [signer, account, keyPairs, cachedVersion, ensureInitialized])
 
   /**
    * Add a participant to an encrypted market
@@ -566,14 +633,14 @@ export function useLazyMarketDecryption(markets) {
         }
       }
 
-      // Check for decryption error
+      // Check for decryption error - still allow retry by keeping canView: true
       const errorMsg = decryptionErrors.get(marketId)
       if (errorMsg) {
         return {
           ...market,
           encryptionStatus: 'error',
           isPrivate: true,
-          canView: false,
+          canView: true,  // Allow retry
           decryptedMetadata: null,
           decryptionError: errorMsg,
           isDecrypting: false,
@@ -595,13 +662,25 @@ export function useLazyMarketDecryption(markets) {
 
       // Encrypted - check if user can decrypt
       const userCanDecrypt = account && canUserDecrypt(metadata)
+
+      // Also check if user is a market participant (fallback for encryption key mismatch)
+      const userAddr = account?.toLowerCase()
+      const isMarketParticipant = userAddr && (
+        market.participants?.some(p => p?.toLowerCase() === userAddr) ||
+        market.creator?.toLowerCase() === userAddr
+      )
+
+      // User can view if they can decrypt OR if they're a market participant
+      // (participant check is a fallback - decryption might still fail, but let them try)
+      const canViewMarket = userCanDecrypt || isMarketParticipant
+
       return {
         ...market,
         encryptionStatus: 'encrypted',
         isPrivate: true,
-        canView: userCanDecrypt,
+        canView: canViewMarket,
         decryptedMetadata: null,
-        decryptionError: userCanDecrypt ? null : 'You are not a participant in this market',
+        decryptionError: canViewMarket ? null : 'You are not a participant in this market',
         isDecrypting: decryptingIds.has(marketId),
       }
     })
@@ -667,8 +746,16 @@ export function useLazyMarketDecryption(markets) {
 
       return decrypted
     } catch (err) {
-      // Store the error
-      const errorMsg = err.message || 'Failed to decrypt market'
+      // Check for "invalid tag" error - likely version mismatch, clear cache
+      if (err.message === 'invalid tag') {
+        console.log('[useLazyMarketDecryption] Invalid tag error - clearing signature cache for retry')
+        clearSignatureCache(account)
+      }
+
+      // Store a user-friendly error message
+      const errorMsg = err.message === 'invalid tag'
+        ? 'Decryption failed - please try again'
+        : (err.message || 'Failed to decrypt market')
       setDecryptionErrors(prev => {
         const next = new Map(prev)
         next.set(marketIdStr, errorMsg)

@@ -1035,6 +1035,34 @@
   animation: fmPulse 2s ease-in-out infinite;
 }
 
+/* Decryption error state */
+.fm-decrypt-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.fm-error-message {
+  color: #E5533D;
+  font-size: 0.85rem;
+}
+
+.fm-retry-btn {
+  background: rgba(229, 83, 61, 0.15);
+  border-color: rgba(229, 83, 61, 0.3);
+  color: #E5533D;
+}
+
+.fm-retry-btn:hover {
+  background: rgba(229, 83, 61, 0.25);
+  border-color: rgba(229, 83, 61, 0.5);
+}
+
+.fm-retry-btn svg {
+  animation: none;
+}
+
 .fm-table-stake {
   font-weight: 600;
   color: #36B37E;

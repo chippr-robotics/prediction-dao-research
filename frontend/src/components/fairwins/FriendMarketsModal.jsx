@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
@@ -794,53 +794,14 @@ function FriendMarketsModal({
     setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
   }
 
-  const handleMarketSelect = async (market) => {
-    // If the market is encrypted and not yet decrypted, trigger decryption
-    if (market.encryptionStatus === 'encrypted' && market.canView) {
-      try {
-        // Determine which decrypt function to use based on market source
-        const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(market.id))
-        const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
-
-        // Decrypt the market
-        await decryptFn(market.id)
-
-        // After decryption, find the updated market from the lazy arrays
-        // The market object will be updated in the next render cycle via useMemo
-        // For now, set the market and it will update when lazyActiveMarkets/lazyPastMarkets change
-      } catch (err) {
-        console.error('Failed to decrypt market:', err)
-        // Still select the market - it will show the error state
-      }
-    }
+  const handleMarketSelect = (market) => {
+    // Just select the market - decryption happens when user clicks "Click to decrypt"
     setSelectedMarket(market)
   }
 
   const handleBackToList = () => {
     setSelectedMarket(null)
   }
-
-  // Update selected market when decryption completes
-  // Use a ref to track the market ID to avoid infinite loops
-  const selectedMarketIdRef = useRef(null)
-  useEffect(() => {
-    if (selectedMarket && selectedMarket.encryptionStatus === 'encrypted') {
-      // Only update if we're looking for a decryption update
-      const marketIdStr = String(selectedMarket.id)
-
-      // Skip if we already processed this market
-      if (selectedMarketIdRef.current === marketIdStr) {
-        const updatedMarket = lazyActiveMarkets.find(m => String(m.id) === marketIdStr) ||
-                             lazyPastMarkets.find(m => String(m.id) === marketIdStr)
-        if (updatedMarket && updatedMarket.encryptionStatus === 'decrypted') {
-          selectedMarketIdRef.current = null // Reset so we can process again if needed
-          setSelectedMarket(updatedMarket)
-        }
-      } else {
-        selectedMarketIdRef.current = marketIdStr
-      }
-    }
-  }, [selectedMarket?.id, selectedMarket?.encryptionStatus, lazyActiveMarkets, lazyPastMarkets])
 
   // Generate market acceptance URL for QR code
   const getMarketUrl = (market) => {
@@ -936,6 +897,15 @@ function FriendMarketsModal({
   const userPastMarkets = useMemo(() => {
     return lazyPastMarkets.filter(m => isUserInMarket(m))
   }, [lazyPastMarkets, isUserInMarket])
+
+  // Get current market state from lazy arrays (always up-to-date after decryption)
+  const currentMarket = useMemo(() => {
+    if (!selectedMarket) return null
+    const marketIdStr = String(selectedMarket.id)
+    return lazyActiveMarkets.find(m => String(m.id) === marketIdStr) ||
+           lazyPastMarkets.find(m => String(m.id) === marketIdStr) ||
+           selectedMarket // Fallback to selected if not found
+  }, [selectedMarket, lazyActiveMarkets, lazyPastMarkets])
 
   if (!isOpen) return null
 
@@ -1720,9 +1690,9 @@ function FriendMarketsModal({
           {/* Active Markets Tab */}
           {activeTab === 'active' && (
             <div id="panel-active" role="tabpanel" className="fm-panel">
-              {selectedMarket ? (
+              {currentMarket ? (
                 <MarketDetailView
-                  market={selectedMarket}
+                  market={currentMarket}
                   onBack={handleBackToList}
                   formatDate={formatDate}
                   formatAddress={formatAddress}
@@ -1730,11 +1700,11 @@ function FriendMarketsModal({
                   getStatusClass={getStatusClass}
                   account={account}
                   onDecrypt={() => {
-                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(selectedMarket.id))
+                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(currentMarket.id))
                     const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
-                    decryptFn(selectedMarket.id).catch(err => console.error('Decrypt failed:', err))
+                    decryptFn(currentMarket.id).catch(err => console.error('Decrypt failed:', err))
                   }}
-                  isDecrypting={isActiveMarketDecrypting(selectedMarket.id) || isPastMarketDecrypting(selectedMarket.id)}
+                  isDecrypting={isActiveMarketDecrypting(currentMarket.id) || isPastMarketDecrypting(currentMarket.id)}
                 />
               ) : (
                 <>
@@ -1866,9 +1836,9 @@ function FriendMarketsModal({
           {/* Past Markets Tab */}
           {activeTab === 'past' && (
             <div id="panel-past" role="tabpanel" className="fm-panel">
-              {selectedMarket ? (
+              {currentMarket ? (
                 <MarketDetailView
-                  market={selectedMarket}
+                  market={currentMarket}
                   onBack={handleBackToList}
                   formatDate={formatDate}
                   formatAddress={formatAddress}
@@ -1876,11 +1846,11 @@ function FriendMarketsModal({
                   getStatusClass={getStatusClass}
                   account={account}
                   onDecrypt={() => {
-                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(selectedMarket.id))
+                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(currentMarket.id))
                     const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
-                    decryptFn(selectedMarket.id).catch(err => console.error('Decrypt failed:', err))
+                    decryptFn(currentMarket.id).catch(err => console.error('Decrypt failed:', err))
                   }}
-                  isDecrypting={isActiveMarketDecrypting(selectedMarket.id) || isPastMarketDecrypting(selectedMarket.id)}
+                  isDecrypting={isActiveMarketDecrypting(currentMarket.id) || isPastMarketDecrypting(currentMarket.id)}
                 />
               ) : (
                 <>
@@ -2236,6 +2206,21 @@ function MarketDetailView({
                     <span className="fm-spinner-small"></span>
                     Decrypting...
                   </span>
+                ) : market.encryptionStatus === 'error' ? (
+                  <div className="fm-decrypt-error">
+                    <span className="fm-error-message">{market.decryptionError}</span>
+                    <button
+                      type="button"
+                      className="fm-decrypt-btn fm-retry-btn"
+                      onClick={onDecrypt}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M23 4v6h-6M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                      </svg>
+                      Try Again
+                    </button>
+                  </div>
                 ) : market.canView ? (
                   <button
                     type="button"
