@@ -115,6 +115,13 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
     type: 'function'
   },
   {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'getTradingPeriod',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     inputs: [],
     name: 'tieredRoleManager',
     outputs: [{ name: '', type: 'address' }],

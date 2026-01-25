@@ -16,7 +16,18 @@ vi.mock('../hooks', () => ({
   }))
 }))
 
+vi.mock('../hooks/useEncryption', () => ({
+  useEncryption: vi.fn(() => ({
+    decryptMetadata: vi.fn(),
+    canUserDecrypt: vi.fn(() => false),
+    isInitialized: false,
+    isInitializing: false,
+    initializeKeys: vi.fn()
+  }))
+}))
+
 import { useWallet, useWeb3 } from '../hooks'
+import { useEncryption } from '../hooks/useEncryption'
 
 // Test data
 const CREATOR_ADDRESS = '0xCreator0000000000000000000000000000000001'
@@ -65,6 +76,14 @@ describe('MarketAcceptanceModal', () => {
       signer: { provider: { getBalance: vi.fn() } },
       isCorrectNetwork: true,
       switchNetwork: vi.fn()
+    })
+
+    useEncryption.mockReturnValue({
+      decryptMetadata: vi.fn(),
+      canUserDecrypt: vi.fn(() => false),
+      isInitialized: false,
+      isInitializing: false,
+      initializeKeys: vi.fn()
     })
   })
 
@@ -155,11 +174,28 @@ describe('MarketAcceptanceModal', () => {
       expect(screen.getByText('1v1')).toBeInTheDocument()
     })
 
-    it('should display encrypted notice for encrypted markets', () => {
+    it('should display encrypted badge for encrypted markets', () => {
       const marketData = createMockMarketData({ isEncrypted: true })
       render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
 
-      expect(screen.getByText('Encrypted Market')).toBeInTheDocument()
+      expect(screen.getByText('Private Market')).toBeInTheDocument()
+    })
+
+    it('should show decrypt prompt for encrypted markets when user can decrypt', () => {
+      useEncryption.mockReturnValue({
+        decryptMetadata: vi.fn(),
+        canUserDecrypt: vi.fn(() => true),
+        isInitialized: false,
+        isInitializing: false,
+        initializeKeys: vi.fn()
+      })
+      const marketData = createMockMarketData({
+        isEncrypted: true,
+        rawDescription: '{"version":1,"algorithm":"test","content":"encrypted"}'
+      })
+      render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
+
+      expect(screen.getByText('Unlock Market Details')).toBeInTheDocument()
     })
 
     it('should display stake with non-stablecoin symbol', () => {
@@ -187,7 +223,7 @@ describe('MarketAcceptanceModal', () => {
       })
       render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
 
-      expect(screen.getByText('Expired')).toBeInTheDocument()
+      expect(screen.getByText('Accept by: Expired')).toBeInTheDocument()
     })
 
     it('should format days when > 24 hours', () => {

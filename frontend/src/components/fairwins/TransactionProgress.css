@@ -1,0 +1,361 @@
+/* TransactionProgress.css */
+
+.tp-container {
+  padding: 1rem;
+  background: var(--bg-secondary, #1a1a2e);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+/* Pending State Banner */
+.tp-pending-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--warning-bg, rgba(255, 193, 7, 0.1));
+  border: 1px solid var(--warning-border, rgba(255, 193, 7, 0.3));
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.tp-pending-icon {
+  font-size: 1.5rem;
+  color: var(--warning-color, #ffc107);
+}
+
+.tp-pending-content {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tp-pending-content strong {
+  display: block;
+  color: var(--text-primary, #fff);
+  margin-bottom: 0.25rem;
+}
+
+.tp-pending-content p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #a0a0a0);
+}
+
+.tp-pending-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Step Progress Bar */
+.tp-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  padding: 0 0.5rem;
+}
+
+.tp-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.tp-step-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: var(--bg-tertiary, #2a2a4a);
+  border: 2px solid var(--border-color, #3a3a5a);
+  color: var(--text-secondary, #a0a0a0);
+  transition: all 0.3s ease;
+  z-index: 2;
+}
+
+.tp-step.current .tp-step-indicator {
+  background: var(--primary-color, #6366f1);
+  border-color: var(--primary-color, #6366f1);
+  color: #fff;
+}
+
+.tp-step.complete .tp-step-indicator {
+  background: var(--success-color, #10b981);
+  border-color: var(--success-color, #10b981);
+  color: #fff;
+}
+
+.tp-step-label {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #a0a0a0);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.tp-step.current .tp-step-label,
+.tp-step.complete .tp-step-label {
+  color: var(--text-primary, #fff);
+}
+
+.tp-step-connector {
+  position: absolute;
+  top: 16px;
+  left: calc(50% + 20px);
+  right: calc(-50% + 20px);
+  height: 2px;
+  background: var(--border-color, #3a3a5a);
+  z-index: 1;
+}
+
+.tp-step-connector.complete {
+  background: var(--success-color, #10b981);
+}
+
+.tp-check {
+  font-size: 1rem;
+}
+
+.tp-number {
+  font-size: 0.875rem;
+}
+
+/* Spinner */
+.tp-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: tp-spin 0.8s linear infinite;
+}
+
+.tp-spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: tp-spin 0.8s linear infinite;
+}
+
+@keyframes tp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Current Step Description */
+.tp-current-step {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.tp-step-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #a0a0a0);
+  margin-bottom: 0.5rem;
+}
+
+.tp-wallet-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--primary-bg, rgba(99, 102, 241, 0.1));
+  border: 1px solid var(--primary-border, rgba(99, 102, 241, 0.3));
+  border-radius: 6px;
+  color: var(--primary-color, #6366f1);
+  font-size: 0.875rem;
+}
+
+.tp-wallet-icon {
+  font-size: 1rem;
+}
+
+/* Error State */
+.tp-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--error-bg, rgba(239, 68, 68, 0.1));
+  border: 1px solid var(--error-border, rgba(239, 68, 68, 0.3));
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.tp-error-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--error-color, #ef4444);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.tp-error-content {
+  flex: 1;
+  min-width: 200px;
+}
+
+.tp-error-content strong {
+  display: block;
+  color: var(--error-color, #ef4444);
+  margin-bottom: 0.25rem;
+}
+
+.tp-error-content p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #a0a0a0);
+  word-break: break-word;
+}
+
+.tp-error-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Success State */
+.tp-success {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--success-bg, rgba(16, 185, 129, 0.1));
+  border: 1px solid var(--success-border, rgba(16, 185, 129, 0.3));
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.tp-success-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--success-color, #10b981);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.tp-success-content {
+  flex: 1;
+}
+
+.tp-success-content strong {
+  display: block;
+  color: var(--success-color, #10b981);
+  margin-bottom: 0.25rem;
+}
+
+/* Transaction Links */
+.tp-tx-link {
+  color: var(--primary-color, #6366f1);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.tp-tx-link:hover {
+  text-decoration: underline;
+}
+
+.tp-tx-pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary, #2a2a4a);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #a0a0a0);
+}
+
+/* Buttons */
+.tp-btn-primary,
+.tp-btn-secondary {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.tp-btn-primary {
+  background: var(--primary-color, #6366f1);
+  color: #fff;
+}
+
+.tp-btn-primary:hover {
+  background: var(--primary-hover, #4f46e5);
+}
+
+.tp-btn-secondary {
+  background: var(--bg-tertiary, #2a2a4a);
+  color: var(--text-secondary, #a0a0a0);
+  border: 1px solid var(--border-color, #3a3a5a);
+}
+
+.tp-btn-secondary:hover {
+  background: var(--bg-hover, #3a3a5a);
+  color: var(--text-primary, #fff);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .tp-steps {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tp-step {
+    flex: 0 0 auto;
+    min-width: 60px;
+  }
+
+  .tp-step-connector {
+    display: none;
+  }
+
+  .tp-step-label {
+    font-size: 0.625rem;
+  }
+
+  .tp-pending-banner,
+  .tp-error,
+  .tp-success {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .tp-pending-actions,
+  .tp-error-actions {
+    width: 100%;
+    justify-content: center;
+  }
+}

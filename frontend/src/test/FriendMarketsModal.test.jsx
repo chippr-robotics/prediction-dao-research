@@ -222,7 +222,9 @@ describe('FriendMarketsModal', () => {
     onCreate: vi.fn(),
     activeMarkets: mockActiveMarkets,
     pastMarkets: mockPastMarkets,
-    onMarketClick: vi.fn()
+    onMarketClick: vi.fn(),
+    pendingTransaction: null,
+    onClearPendingTransaction: vi.fn()
   }
 
   beforeEach(() => {
@@ -780,6 +782,55 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Back to list')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Transaction Progress', () => {
+    it('should display pending transaction banner when pendingTransaction exists', async () => {
+      const pendingTransaction = {
+        step: 'create',
+        txHash: '0xabc123',
+        timestamp: Date.now() - 60000, // 1 minute ago
+        data: {
+          description: 'Test pending market',
+          opponent: '0xabcdef1234567890123456789012345678901234',
+          stakeAmount: '10'
+        }
+      }
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} pendingTransaction={pendingTransaction} />
+      )
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+
+      // Should show pending transaction banner
+      expect(screen.getByText('Previous transaction in progress')).toBeInTheDocument()
+    })
+
+    it('should call onClearPendingTransaction when Start Fresh is clicked', async () => {
+      const onClearPendingTransaction = vi.fn()
+      const pendingTransaction = {
+        step: 'create',
+        txHash: '0xabc123',
+        timestamp: Date.now() - 60000,
+        data: {
+          description: 'Test pending market',
+          opponent: '0xabcdef1234567890123456789012345678901234',
+          stakeAmount: '10'
+        }
+      }
+      renderWithProviders(
+        <FriendMarketsModal
+          {...defaultProps}
+          pendingTransaction={pendingTransaction}
+          onClearPendingTransaction={onClearPendingTransaction}
+        />
+      )
+
+      await userEvent.click(screen.getByText('1 vs 1'))
+      await userEvent.click(screen.getByText('Start Fresh'))
+
+      expect(onClearPendingTransaction).toHaveBeenCalled()
     })
   })
 

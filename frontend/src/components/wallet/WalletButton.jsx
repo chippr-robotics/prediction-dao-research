@@ -63,6 +63,45 @@ const saveFriendMarketsToStorage = (markets) => {
   }
 }
 
+// Helper to track pending transactions for resume capability
+const PENDING_TX_KEY = 'pendingFriendMarketTx'
+
+const savePendingTransaction = (txData) => {
+  try {
+    localStorage.setItem(PENDING_TX_KEY, JSON.stringify({
+      ...txData,
+      timestamp: Date.now()
+    }))
+  } catch (e) {
+    console.warn('Failed to save pending transaction:', e)
+  }
+}
+
+const loadPendingTransaction = () => {
+  try {
+    const stored = localStorage.getItem(PENDING_TX_KEY)
+    if (!stored) return null
+    const data = JSON.parse(stored)
+    // Expire pending transactions after 1 hour
+    if (Date.now() - data.timestamp > 60 * 60 * 1000) {
+      clearPendingTransaction()
+      return null
+    }
+    return data
+  } catch (e) {
+    console.warn('Failed to load pending transaction:', e)
+    return null
+  }
+}
+
+const clearPendingTransaction = () => {
+  try {
+    localStorage.removeItem(PENDING_TX_KEY)
+  } catch (e) {
+    console.warn('Failed to clear pending transaction:', e)
+  }
+}
+
 function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
@@ -335,7 +374,25 @@ function WalletButton({ className = '' }) {
 
     console.log('Friend market creation data:', data)
 
+    // Progress callback for UI updates
+    const onProgress = data.data?.onProgress || (() => {})
+
+    // Save initial pending state for recovery
+    savePendingTransaction({
+      step: 'verify',
+      data: {
+        description: data.data?.description,
+        opponent: data.data?.opponent,
+        stakeAmount: data.data?.stakeAmount,
+        stakeTokenId: data.data?.stakeTokenId,
+        tradingPeriod: data.data?.tradingPeriod,
+        acceptanceDeadline: data.data?.acceptanceDeadline
+      }
+    })
+
     try {
+      onProgress({ step: 'verify', message: 'Checking membership status...' })
+
       // Use FriendGroupMarketFactory for friend markets (not ConditionalMarketFactory)
       const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
       if (!friendFactoryAddress) {
@@ -552,10 +609,31 @@ function WalletButton({ className = '' }) {
       if (!isNativeETC && stakeToken) {
         const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
         if (currentAllowance < stakeAmountWei) {
+          onProgress({ step: 'approve', message: 'Approving token spend...' })
           console.log('Approving stake token for FriendGroupMarketFactory...')
           const approveTx = await stakeToken.approve(friendFactoryAddress, stakeAmountWei)
+          onProgress({ step: 'approve', message: 'Waiting for approval confirmation...', txHash: approveTx.hash })
+          savePendingTransaction({
+            step: 'approve',
+            approveTxHash: approveTx.hash,
+            data: {
+              description: data.data?.description,
+              opponent: data.data?.opponent,
+              stakeAmount: data.data?.stakeAmount
+            }
+          })
           await approveTx.wait()
           console.log('Stake token approved')
+          // Mark approval as complete
+          savePendingTransaction({
+            step: 'approved',
+            approvalComplete: true,
+            data: {
+              description: data.data?.description,
+              opponent: data.data?.opponent,
+              stakeAmount: data.data?.stakeAmount
+            }
+          })
         }
       }
 
@@ -574,6 +652,7 @@ function WalletButton({ className = '' }) {
       }
 
       // Create the 1v1 pending market
+      onProgress({ step: 'create', message: 'Creating market...' })
       console.log('Creating 1v1 pending market...', {
         opponent,
         description: marketDescription.substring(0, 100) + (marketDescription.length > 100 ? '...' : ''),
@@ -617,8 +696,21 @@ function WalletButton({ className = '' }) {
       }
 
       console.log('Friend market transaction sent:', tx.hash)
+      onProgress({ step: 'create', message: 'Waiting for confirmation...', txHash: tx.hash })
+      savePendingTransaction({
+        step: 'create',
+        txHash: tx.hash,
+        data: {
+          description: data.data?.description,
+          opponent: data.data?.opponent,
+          stakeAmount: data.data?.stakeAmount
+        }
+      })
       const receipt = await tx.wait()
       console.log('Friend market created:', receipt)
+      onProgress({ step: 'complete', message: 'Market created successfully!', txHash: receipt.hash })
+      // Clear pending state on success
+      clearPendingTransaction()
 
       // Extract friendMarketId from event logs
       let friendMarketId = null
@@ -1349,6 +1441,8 @@ function WalletButton({ className = '' }) {
         onCreate={handleFriendMarketCreation}
         activeMarkets={activeFriendMarkets}
         pastMarkets={pastFriendMarkets}
+        pendingTransaction={loadPendingTransaction()}
+        onClearPendingTransaction={clearPendingTransaction}
       />
 
       {/* Market Creation Modal - Prediction Markets */}
