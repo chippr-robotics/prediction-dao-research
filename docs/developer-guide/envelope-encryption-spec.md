@@ -12,6 +12,18 @@ Private markets use envelope encryption to protect market metadata. The scheme p
 
 ## Cryptographic Primitives
 
+### v2.0 (Current - Post-Quantum)
+
+| Component | Algorithm | Library |
+|-----------|-----------|---------|
+| Key Exchange | X-Wing (X25519 + ML-KEM-768) | @noble/curves, @noble/post-quantum |
+| Key Derivation | HKDF-SHA256 | @noble/hashes/hkdf |
+| Symmetric Encryption | ChaCha20-Poly1305 | @noble/ciphers/chacha |
+| Wallet Key Derivation | Keccak-256 | ethers.js |
+| X-Wing Combiner | SHA3-256 | @noble/hashes/sha3 |
+
+### v1.0 (Legacy - Classical)
+
 | Component | Algorithm | Library |
 |-----------|-----------|---------|
 | Key Exchange | X25519 (Curve25519 ECDH) | @noble/curves/ed25519 |
@@ -20,6 +32,34 @@ Private markets use envelope encryption to protect market metadata. The scheme p
 | Wallet Key Derivation | Keccak-256 | ethers.js |
 
 All cryptographic operations use the Noble suite, which provides audited, side-channel resistant implementations.
+
+## Post-Quantum Security (v2.0)
+
+Version 2.0 uses X-Wing, a hybrid key encapsulation mechanism combining classical X25519 with post-quantum ML-KEM-768. This protects against "harvest now, decrypt later" attacks where an adversary stores encrypted data today and decrypts it with future quantum computers.
+
+### X-Wing Key Sizes
+
+| Component | v1.0 (X25519) | v2.0 (X-Wing) |
+|-----------|---------------|---------------|
+| Public Key | 32 bytes | 1216 bytes |
+| Secret Key | 32 bytes | 32 bytes (seed) |
+| Ciphertext | 32 bytes | 1120 bytes |
+| Shared Secret | 32 bytes | 32 bytes |
+
+### X-Wing Combiner
+
+Per the IETF X-Wing specification, the shared secret is derived as:
+
+```
+SharedSecret = SHA3-256(XWING_LABEL || ss_ML-KEM || ss_X25519 || ct_X25519 || pk_X25519)
+```
+
+Where:
+- `XWING_LABEL` = `"\\./\n\\./\n"` (domain separator)
+- `ss_ML-KEM` = ML-KEM-768 shared secret (32 bytes)
+- `ss_X25519` = X25519 shared secret (32 bytes)
+- `ct_X25519` = X25519 ephemeral public key (32 bytes)
+- `pk_X25519` = Recipient's X25519 public key (32 bytes)
 
 ## Key Derivation
 
@@ -49,10 +89,35 @@ KEK: HKDF(SHA256, SharedSecret, salt="", info="FairWins_Envelope_v1", length=32)
 
 ## Envelope Structure
 
+### v2.0 (X-Wing - Post-Quantum)
+
+```json
+{
+  "version": "2.0",
+  "algorithm": "xwing-chacha20poly1305",
+  "signingVersion": 2,
+  "content": {
+    "nonce": "<hex: 12 bytes>",
+    "ciphertext": "<hex: encrypted data + 16-byte auth tag>"
+  },
+  "keys": [
+    {
+      "address": "<lowercase ethereum address>",
+      "xwingCiphertext": "<hex: 1120 bytes (ML-KEM ciphertext + X25519 ephemeral)>",
+      "nonce": "<hex: 12 bytes>",
+      "wrappedKey": "<hex: encrypted DEK + 16-byte auth tag>"
+    }
+  ]
+}
+```
+
+### v1.0 (X25519 - Classical)
+
 ```json
 {
   "version": "1.0",
   "algorithm": "x25519-chacha20poly1305",
+  "signingVersion": 2,
   "content": {
     "nonce": "<hex: 12 bytes>",
     "ciphertext": "<hex: encrypted data + 16-byte auth tag>"
@@ -65,6 +130,18 @@ KEK: HKDF(SHA256, SharedSecret, salt="", info="FairWins_Envelope_v1", length=32)
       "wrappedKey": "<hex: encrypted DEK + 16-byte auth tag>"
     }
   ]
+}
+```
+
+### Version Detection
+
+```javascript
+function isXWingEnvelope(envelope) {
+  return envelope?.algorithm === 'xwing-chacha20poly1305'
+}
+
+function isX25519Envelope(envelope) {
+  return envelope?.algorithm === 'x25519-chacha20poly1305'
 }
 ```
 
@@ -178,10 +255,60 @@ async function initializeKeys() {
 | Removed participant access | Document limitation; recommend new market for true revocation |
 | Wallet compromise | User responsibility; recommend hardware wallets |
 
+## IPFS Storage
+
+Encrypted envelopes are stored on IPFS via Pinata, with only a CID reference stored on-chain.
+
+### On-Chain Reference Format
+
+```
+encrypted:ipfs://bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze
+```
+
+### Storage Architecture
+
+| Layer | Content | Size |
+|-------|---------|------|
+| Blockchain | `encrypted:ipfs://CID` | ~60 bytes |
+| IPFS | Full encrypted envelope | 1-10 KB |
+
+### Benefits
+
+1. **Gas efficiency**: CID reference costs ~60 bytes regardless of envelope size
+2. **Scalability**: X-Wing's larger ciphertexts don't increase transaction costs
+3. **Privacy**: Encrypted data lives off-chain, reducing on-chain metadata
+4. **Flexibility**: Envelopes can be updated (adding participants) without on-chain transactions
+
+### IPFS Functions
+
+```javascript
+// Upload encrypted envelope to IPFS
+const { cid, uri } = await uploadEncryptedEnvelope(envelope, { marketType: 'oneVsOne' })
+
+// Fetch encrypted envelope from IPFS
+const envelope = await fetchEncryptedEnvelope(cid)
+
+// Parse on-chain reference
+const { isIpfs, cid } = parseEncryptedIpfsReference(description)
+
+// Build on-chain reference
+const reference = buildEncryptedIpfsReference(cid)
+```
+
+### Backward Compatibility
+
+The system auto-detects envelope storage format:
+
+1. **IPFS reference** (`encrypted:ipfs://...`): Fetch from IPFS, then decrypt
+2. **Inline JSON**: Parse directly from description field (legacy)
+
+Both v1.0 (X25519) and v2.0 (X-Wing) envelopes work with either storage method.
+
 ## File Locations
 
 ```
 frontend/src/utils/crypto/envelopeEncryption.js  # Core cryptographic functions
+frontend/src/utils/ipfsService.js                # IPFS upload/fetch functions
 frontend/src/hooks/useEncryption.js              # React hook with session management
 ```
 
@@ -199,6 +326,8 @@ When testing the encryption system:
 
 | Version | Changes |
 |---------|---------|
+| 2.0 | X-Wing hybrid KEM (X25519 + ML-KEM-768) for post-quantum security |
+| 1.1 | IPFS storage for envelopes, CID reference on-chain |
 | 1.0 | Initial implementation with X25519 + ChaCha20-Poly1305 |
 
 ## References

@@ -1,4 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+// Mock the IPFS constants module to provide test Pinata credentials
+// This prevents "Pinata authentication not configured" errors in upload tests
+vi.mock('../constants/ipfs', async (importOriginal) => {
+  const original = await importOriginal()
+  return {
+    ...original,
+    PINATA_CONFIG: {
+      ...original.PINATA_CONFIG,
+      JWT: 'test-jwt-token', // Provide test JWT to pass auth check
+    },
+  }
+})
+
 import {
   fetchFromIpfs,
   fetchTokenMetadata,
@@ -9,6 +23,10 @@ import {
   clearCache,
   clearCacheEntry,
   checkGatewayHealth,
+  uploadEncryptedEnvelope,
+  fetchEncryptedEnvelope,
+  parseEncryptedIpfsReference,
+  buildEncryptedIpfsReference,
 } from '../utils/ipfsService'
 
 // Mock fetch globally
@@ -322,6 +340,170 @@ describe('IPFS Service', () => {
 
       const result = await checkGatewayHealth()
       expect(result).toBe(false)
+    })
+  })
+
+  // ==========================================
+  // Encrypted Envelope IPFS Tests
+  // ==========================================
+
+  describe('parseEncryptedIpfsReference', () => {
+    it('parses encrypted:ipfs:// prefix correctly', () => {
+      const result = parseEncryptedIpfsReference('encrypted:ipfs://bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+      expect(result.isIpfs).toBe(true)
+      expect(result.cid).toBe('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+    })
+
+    it('parses plain ipfs:// prefix correctly', () => {
+      const result = parseEncryptedIpfsReference('ipfs://bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+      expect(result.isIpfs).toBe(true)
+      expect(result.cid).toBe('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+    })
+
+    it('parses raw CIDv1 correctly', () => {
+      const result = parseEncryptedIpfsReference('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+      expect(result.isIpfs).toBe(true)
+      expect(result.cid).toBe('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+    })
+
+    it('parses CIDv0 (Qm prefix) correctly', () => {
+      const result = parseEncryptedIpfsReference('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
+      expect(result.isIpfs).toBe(true)
+      expect(result.cid).toBe('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
+    })
+
+    it('returns isIpfs false for plaintext descriptions', () => {
+      const result = parseEncryptedIpfsReference('Will ETH reach $5000 by December?')
+      expect(result.isIpfs).toBe(false)
+      expect(result.cid).toBeNull()
+    })
+
+    it('returns isIpfs false for JSON envelopes', () => {
+      const envelope = JSON.stringify({ version: '1.0', algorithm: 'x25519-chacha20poly1305' })
+      const result = parseEncryptedIpfsReference(envelope)
+      expect(result.isIpfs).toBe(false)
+      expect(result.cid).toBeNull()
+    })
+
+    it('returns isIpfs false for null/undefined', () => {
+      expect(parseEncryptedIpfsReference(null).isIpfs).toBe(false)
+      expect(parseEncryptedIpfsReference(undefined).isIpfs).toBe(false)
+      expect(parseEncryptedIpfsReference('').isIpfs).toBe(false)
+    })
+  })
+
+  describe('buildEncryptedIpfsReference', () => {
+    it('builds correct reference format', () => {
+      const cid = 'bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze'
+      const result = buildEncryptedIpfsReference(cid)
+      expect(result).toBe('encrypted:ipfs://bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+    })
+
+    it('throws error for invalid CID', () => {
+      expect(() => buildEncryptedIpfsReference('invalid')).toThrow('Invalid CID')
+      expect(() => buildEncryptedIpfsReference('')).toThrow('Invalid CID')
+      expect(() => buildEncryptedIpfsReference(null)).toThrow('Invalid CID')
+    })
+  })
+
+  describe('uploadEncryptedEnvelope', () => {
+    const validEnvelope = {
+      version: '2.0',
+      algorithm: 'xwing-chacha20poly1305',
+      content: {
+        nonce: 'abc123',
+        ciphertext: 'def456'
+      },
+      keys: [
+        { address: '0x1234', xwingCiphertext: 'ghi789', nonce: 'jkl012', wrappedKey: 'mno345' }
+      ]
+    }
+
+    it('uploads valid X-Wing envelope successfully', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          IpfsHash: 'bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze',
+          PinSize: 1234,
+          Timestamp: '2026-01-24T00:00:00.000Z'
+        })
+      })
+
+      const result = await uploadEncryptedEnvelope(validEnvelope, { marketType: 'oneVsOne' })
+
+      expect(result.cid).toBe('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+      expect(result.uri).toBe('ipfs://bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+    })
+
+    it('uploads valid X25519 envelope successfully', async () => {
+      const x25519Envelope = {
+        ...validEnvelope,
+        version: '1.0',
+        algorithm: 'x25519-chacha20poly1305',
+        keys: [{ address: '0x1234', ephemeralPublicKey: 'abc', nonce: 'def', wrappedKey: 'ghi' }]
+      }
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          IpfsHash: 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
+          PinSize: 1234
+        })
+      })
+
+      const result = await uploadEncryptedEnvelope(x25519Envelope)
+      expect(result.cid).toBe('QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG')
+    })
+
+    it('throws error for invalid envelope structure', async () => {
+      await expect(uploadEncryptedEnvelope({})).rejects.toThrow('Invalid envelope format')
+      await expect(uploadEncryptedEnvelope({ version: '1.0' })).rejects.toThrow('Invalid envelope format')
+    })
+
+    it('throws error for unsupported algorithm', async () => {
+      const invalidAlgorithmEnvelope = {
+        ...validEnvelope,
+        algorithm: 'aes-256-gcm'
+      }
+      await expect(uploadEncryptedEnvelope(invalidAlgorithmEnvelope)).rejects.toThrow('Unsupported envelope algorithm')
+    })
+
+    it('throws error for null envelope', async () => {
+      await expect(uploadEncryptedEnvelope(null)).rejects.toThrow('Envelope must be a valid object')
+    })
+  })
+
+  describe('fetchEncryptedEnvelope', () => {
+    it('fetches and validates envelope from IPFS', async () => {
+      const mockEnvelope = {
+        version: '2.0',
+        algorithm: 'xwing-chacha20poly1305',
+        content: { nonce: 'abc', ciphertext: 'def' },
+        keys: []
+      }
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockEnvelope
+      })
+
+      const result = await fetchEncryptedEnvelope('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+      expect(result).toEqual(mockEnvelope)
+    })
+
+    it('throws error if fetched data is not a valid envelope', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ foo: 'bar' }) // Not an envelope
+      })
+
+      await expect(
+        fetchEncryptedEnvelope('bafybeic5dplry3twzpb3l5byo5tqyj7vfk3vxl7skrn6kzqd7p6ey3mmze')
+      ).rejects.toThrow('not a valid encrypted envelope')
+    })
+
+    it('throws error when CID is missing', async () => {
+      await expect(fetchEncryptedEnvelope('')).rejects.toThrow('CID is required')
     })
   })
 })

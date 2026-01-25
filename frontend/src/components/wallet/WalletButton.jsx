@@ -21,7 +21,11 @@ import {
   checkRoleSyncNeeded,
   fetchFriendMarketsForUser
 } from '../../utils/blockchainService'
-import { uploadMarketMetadata } from '../../utils/ipfsService'
+import {
+  uploadMarketMetadata,
+  uploadEncryptedEnvelope,
+  buildEncryptedIpfsReference
+} from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import MarketCreationModal from '../fairwins/MarketCreationModal'
@@ -638,26 +642,49 @@ function WalletButton({ className = '' }) {
       }
 
       // Determine description: use encrypted envelope if encryption enabled, otherwise plaintext
-      // When encrypted, the envelope is a JSON object that needs to be stringified
+      // For encrypted markets, upload envelope to IPFS and store only CID on-chain
+      // This reduces gas costs and keeps the encrypted data off-chain for better privacy
       let marketDescription
-      let isEncryptedMarket = false
+      let _isEncryptedMarket = false
+      let ipfsCid = null
+
       if (data.data.isEncrypted && data.data.encryptedMetadata) {
-        // Stringify the encrypted envelope for on-chain storage
-        marketDescription = JSON.stringify(data.data.encryptedMetadata)
-        isEncryptedMarket = true
-        console.log('Using encrypted metadata for description, length:', marketDescription.length, 'chars')
+        _isEncryptedMarket = true
+
+        // Upload encrypted envelope to IPFS via Pinata
+        onProgress({ step: 'upload', message: 'Uploading encrypted metadata to IPFS...' })
+        try {
+          const uploadResult = await uploadEncryptedEnvelope(data.data.encryptedMetadata, {
+            marketType: data.marketType || 'oneVsOne'
+          })
+          ipfsCid = uploadResult.cid
+          // Store only the IPFS reference on-chain (much smaller than full envelope)
+          // Format: "encrypted:ipfs://CID" for easy detection and parsing
+          marketDescription = buildEncryptedIpfsReference(ipfsCid)
+          console.log('Encrypted metadata uploaded to IPFS:', {
+            cid: ipfsCid,
+            onChainRef: marketDescription,
+            originalSize: JSON.stringify(data.data.encryptedMetadata).length,
+            onChainSize: marketDescription.length,
+            savings: `${Math.round((1 - marketDescription.length / JSON.stringify(data.data.encryptedMetadata).length) * 100)}% smaller`
+          })
+        } catch (uploadError) {
+          console.error('Failed to upload encrypted metadata to IPFS:', uploadError)
+          throw new Error(`Failed to upload encrypted metadata: ${uploadError.message}. Please check your Pinata configuration.`)
+        }
       } else {
         marketDescription = data.data.description || 'Friend Market'
         console.log('Using plaintext description, length:', marketDescription.length, 'chars')
       }
 
       // Create the 1v1 pending market
-      onProgress({ step: 'create', message: 'Creating market...' })
+      onProgress({ step: 'create', message: 'Creating market on blockchain...' })
       console.log('Creating 1v1 pending market...', {
         opponent,
         description: marketDescription.substring(0, 100) + (marketDescription.length > 100 ? '...' : ''),
         descriptionLength: marketDescription.length,
         isEncrypted: data.data.isEncrypted,
+        ipfsCid: ipfsCid || 'N/A (plaintext)',
         tradingPeriodSeconds,
         arbitrator,
         acceptanceDeadline,
@@ -667,9 +694,9 @@ function WalletButton({ className = '' }) {
       })
 
       // For native ETC, send the stake as msg.value; for ERC20, no value needed
-      // Use manual gasLimit - encrypted markets need more gas due to larger string storage
-      // Each 32-byte word costs ~20,000 gas for storage, encrypted envelopes can be 1000+ chars
-      const gasLimit = isEncryptedMarket ? 3000000n : 1000000n
+      // With IPFS storage, encrypted markets now have small on-chain footprint
+      // CID reference is ~60 bytes vs 1000+ bytes for full envelope
+      const gasLimit = 1000000n
       let tx
       if (isNativeETC) {
         tx = await friendFactory.createOneVsOneMarketPending(
@@ -736,7 +763,8 @@ function WalletButton({ className = '' }) {
         type: data.marketType || 'oneVsOne',
         description: data.data.description || 'Friend Market', // Always store plaintext for local display
         isEncrypted: data.data.isEncrypted || false,
-        encryptedMetadata: data.data.encryptedMetadata || null, // Store envelope for verification
+        encryptedMetadata: data.data.encryptedMetadata || null, // Store envelope for local verification
+        ipfsCid: ipfsCid || null, // IPFS CID for encrypted envelope (for fetching/sharing)
         stakeAmount: stakeAmount,
         tradingPeriod: tradingPeriodDays.toString(),
         participants: [userAddress, opponent],
