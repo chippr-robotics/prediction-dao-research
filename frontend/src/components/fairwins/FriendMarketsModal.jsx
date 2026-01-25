@@ -8,6 +8,7 @@ import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
+import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
 
 // Stake token options derived from ETCswap tokens
@@ -85,7 +86,9 @@ function FriendMarketsModal({
   onClose,
   onCreate,
   activeMarkets = [],
-  pastMarkets = []
+  pastMarkets = [],
+  pendingTransaction = null,
+  onClearPendingTransaction = () => {}
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
@@ -131,6 +134,14 @@ function FriendMarketsModal({
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+
+  // Transaction progress state
+  const [txProgress, setTxProgress] = useState({
+    step: 'idle', // 'idle', 'verify', 'approve', 'create', 'complete'
+    message: '',
+    txHash: null,
+    error: null
+  })
 
   // QR Scanner state
   const [qrScannerOpen, setQrScannerOpen] = useState(false)
@@ -621,6 +632,19 @@ function FriendMarketsModal({
     if (!validateForm()) return
 
     setSubmitting(true)
+    // Reset transaction progress
+    setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
+
+    // Progress callback for updating UI
+    const handleProgress = (progress) => {
+      setTxProgress(prev => ({
+        ...prev,
+        step: progress.step || prev.step,
+        message: progress.message || prev.message,
+        txHash: progress.txHash || prev.txHash
+      }))
+    }
+
     try {
       // Get the stake token info for submission
       const getStakeTokenInfo = () => {
@@ -671,28 +695,33 @@ function FriendMarketsModal({
         creatorSignatureForSharing = creatorSignature
       }
 
+      // Calculate trading period in days BEFORE building submit data
+      // This must happen before onCreate so WalletButton receives the correct value
+      const endDate = new Date(formData.endDateTime)
+      const now = new Date()
+      const tradingPeriodDays = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
       // Build submit data with token address for WalletButton
       const submitData = {
         type: 'friend',
         marketType: friendMarketType,
         data: {
           ...formData,
+          // Pass calculated trading period so WalletButton uses the user's selected end date
+          tradingPeriod: tradingPeriodDays,
           // Pass actual token address so WalletButton can use correct decimals
           // 'native' means native ETC (no ERC20 address), pass null for this case
           collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null),
           // Include encrypted metadata and creator's signature for participant key exchange
           encryptedMetadata: enableEncryption ? finalMetadata : null,
           creatorSignature: creatorSignatureForSharing,
-          isEncrypted: enableEncryption
+          isEncrypted: enableEncryption,
+          // Progress callback for transaction status updates
+          onProgress: handleProgress
         }
       }
 
       const result = await onCreate(submitData, signer)
-
-      // Calculate trading period in days for display
-      const endDate = new Date(formData.endDateTime)
-      const now = new Date()
-      const tradingPeriodDays = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
       // Calculate acceptance deadline info
       const acceptanceDeadline = new Date(formData.acceptanceDeadline)
@@ -741,7 +770,9 @@ function FriendMarketsModal({
       setCreationStep('success')
     } catch (error) {
       console.error('Error creating friend market:', error)
-      setErrors({ submit: error.message || 'Failed to create market. Please try again.' })
+      const errorMessage = error.message || 'Failed to create market. Please try again.'
+      setErrors({ submit: errorMessage })
+      setTxProgress(prev => ({ ...prev, error: errorMessage }))
     } finally {
       setSubmitting(false)
     }
@@ -752,6 +783,7 @@ function FriendMarketsModal({
     setFriendMarketType(null)
     setCreatedMarket(null)
     resetForm()
+    setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
   }
 
   const handleMarketSelect = (market) => {
@@ -774,6 +806,14 @@ function FriendMarketsModal({
       token: market.stakeTokenSymbol || 'ETC',
       deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
     })
+
+    // For encrypted markets, include the description in URL so receiver can see the bet text
+    // This allows viewing without decryption while on-chain data remains encrypted for privacy
+    if (market.isEncrypted && market.description) {
+      // Base64 encode to handle special characters in URL
+      const encodedDesc = btoa(encodeURIComponent(market.description))
+      params.set('desc', encodedDesc)
+    }
 
     return `${window.location.origin}/friend-market/accept?${params.toString()}`
   }
@@ -1386,8 +1426,48 @@ function FriendMarketsModal({
                     </div>
                   )}
 
-                  {/* Submit Error */}
-                  {errors.submit && (
+                  {/* Transaction Progress - shows during active submission or when pending transaction exists */}
+                  {(submitting && txProgress.step !== 'idle') || (pendingTransaction && !submitting) ? (
+                    <TransactionProgress
+                      type="friend_market"
+                      currentStep={submitting ? txProgress.step : 'idle'}
+                      error={txProgress.error}
+                      txHash={txProgress.txHash}
+                      isNativeToken={formData.stakeTokenId === 'ETC'}
+                      pendingState={!submitting && pendingTransaction ? {
+                        step: pendingTransaction.step,
+                        txHash: pendingTransaction.txHash,
+                        timestamp: pendingTransaction.timestamp
+                      } : null}
+                      onRetry={() => {
+                        if (pendingTransaction && !submitting) {
+                          // Resume: pre-fill form with pending data and start submission
+                          if (pendingTransaction.data) {
+                            setFormData(prev => ({
+                              ...prev,
+                              description: pendingTransaction.data.description || prev.description,
+                              opponent: pendingTransaction.data.opponent || prev.opponent,
+                              stakeAmount: pendingTransaction.data.stakeAmount || prev.stakeAmount
+                            }))
+                          }
+                          // Clear pending state and let user try again
+                          onClearPendingTransaction()
+                        } else {
+                          setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
+                          setErrors({})
+                        }
+                      }}
+                      onCancel={() => {
+                        setSubmitting(false)
+                        setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
+                        setErrors({})
+                        onClearPendingTransaction()
+                      }}
+                    />
+                  ) : null}
+
+                  {/* Submit Error (only show when not in progress view) */}
+                  {errors.submit && txProgress.step === 'idle' && (
                     <div className="fm-error-banner">{errors.submit}</div>
                   )}
 

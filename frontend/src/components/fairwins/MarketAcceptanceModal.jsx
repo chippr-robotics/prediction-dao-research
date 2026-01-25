@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useEncryption } from '../../hooks/useEncryption'
 import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import './MarketAcceptanceModal.css'
 
@@ -43,11 +44,23 @@ function MarketAcceptanceModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const {
+    decryptMetadata,
+    canUserDecrypt,
+    isInitialized: encryptionInitialized,
+    isInitializing: encryptionInitializing,
+    initializeKeys
+  } = useEncryption()
 
   const [step, setStep] = useState('review') // 'review', 'confirm', 'processing', 'success', 'error'
   const [error, setError] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [timeRemaining, setTimeRemaining] = useState(0)
+
+  // Decryption state for encrypted markets
+  const [decryptedDescription, setDecryptedDescription] = useState(null)
+  const [isDecrypting, setIsDecrypting] = useState(false)
+  const [decryptionError, setDecryptionError] = useState(null)
 
   // Determine user's role
   const isArbitrator = marketData?.arbitrator?.toLowerCase() === account?.toLowerCase()
@@ -72,6 +85,83 @@ function MarketAcceptanceModal({
 
     return () => clearInterval(interval)
   }, [marketData?.acceptanceDeadline])
+
+  // Attempt to decrypt encrypted market description
+  useEffect(() => {
+    const tryDecrypt = async () => {
+      // Only try if market is encrypted and we have the raw description
+      if (!marketData?.isEncrypted || !marketData?.rawDescription) {
+        return
+      }
+
+      // Reset decryption state
+      setDecryptedDescription(null)
+      setDecryptionError(null)
+
+      // If we have a URL description (shared via QR code), use it directly
+      // This allows receivers to see the bet text without needing to decrypt
+      if (marketData?.urlDescription) {
+        setDecryptedDescription(marketData.urlDescription)
+        return
+      }
+
+      // Check if user is a participant who can decrypt
+      if (!account) {
+        setDecryptionError('Connect wallet to view encrypted content')
+        return
+      }
+
+      try {
+        const envelope = JSON.parse(marketData.rawDescription)
+
+        // Check if user can decrypt (they're in the keys array)
+        if (!canUserDecrypt(envelope)) {
+          // User is not in keys array - this is expected for receivers
+          // They need the URL description to see the bet text
+          setDecryptionError('Bet details were not shared in the invite link')
+          return
+        }
+
+        // Try to decrypt if keys are initialized
+        if (encryptionInitialized) {
+          setIsDecrypting(true)
+          const decrypted = await decryptMetadata(envelope)
+          setDecryptedDescription(decrypted.description || decrypted.name || 'Market Details')
+          setIsDecrypting(false)
+        }
+      } catch (err) {
+        console.error('Failed to decrypt market:', err)
+        setDecryptionError('Failed to decrypt market content')
+        setIsDecrypting(false)
+      }
+    }
+
+    tryDecrypt()
+  }, [marketData?.isEncrypted, marketData?.rawDescription, marketData?.urlDescription, account, encryptionInitialized, canUserDecrypt, decryptMetadata])
+
+  // Handler to manually trigger decryption (requires wallet signature)
+  const handleDecrypt = async () => {
+    if (!marketData?.rawDescription) return
+
+    try {
+      setIsDecrypting(true)
+      setDecryptionError(null)
+
+      // Initialize keys if needed (may prompt user to sign)
+      if (!encryptionInitialized) {
+        await initializeKeys()
+      }
+
+      const envelope = JSON.parse(marketData.rawDescription)
+      const decrypted = await decryptMetadata(envelope)
+      setDecryptedDescription(decrypted.description || decrypted.name || 'Market Details')
+    } catch (err) {
+      console.error('Failed to decrypt market:', err)
+      setDecryptionError(err.message || 'Failed to decrypt')
+    } finally {
+      setIsDecrypting(false)
+    }
+  }
 
   // Format time remaining
   const formatTimeRemaining = useCallback(() => {
@@ -319,19 +409,64 @@ function MarketAcceptanceModal({
               {/* Market Details */}
               <div className="ma-market-info">
                 {marketData?.isEncrypted ? (
-                  <div className="ma-encrypted-notice">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0110 0v4"/>
-                    </svg>
-                    <span>Encrypted Market</span>
+                  <div className="ma-encrypted-section">
+                    <div className="ma-encrypted-badge">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0110 0v4"/>
+                      </svg>
+                      <span>Private Market</span>
+                    </div>
+                    {/* Show decrypted description if available */}
+                    {decryptedDescription ? (
+                      <h3 className="ma-description">{decryptedDescription}</h3>
+                    ) : isDecrypting || encryptionInitializing ? (
+                      <div className="ma-decrypting">
+                        <span className="ma-spinner-small"></span>
+                        <span>Decrypting...</span>
+                      </div>
+                    ) : decryptionError ? (
+                      <div className="ma-decrypt-error">
+                        <p>{decryptionError}</p>
+                        {/* Only show unlock button if user can actually decrypt (is in keys array) */}
+                        {(isParticipant || isArbitrator) && !encryptionInitialized && marketData?.rawDescription && (() => {
+                          try {
+                            const envelope = JSON.parse(marketData.rawDescription)
+                            return canUserDecrypt(envelope)
+                          } catch {
+                            return false
+                          }
+                        })() && (
+                          <button
+                            type="button"
+                            className="ma-btn-decrypt"
+                            onClick={handleDecrypt}
+                          >
+                            Unlock to View Details
+                          </button>
+                        )}
+                      </div>
+                    ) : (isParticipant || isArbitrator) ? (
+                      <div className="ma-decrypt-prompt">
+                        <p>Sign a message to decrypt and view the market details</p>
+                        <button
+                          type="button"
+                          className="ma-btn-decrypt"
+                          onClick={handleDecrypt}
+                        >
+                          Unlock Market Details
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="ma-encrypted-hint">Only participants can view encrypted market details</p>
+                    )}
                   </div>
                 ) : (
                   <h3 className="ma-description">{marketData?.description}</h3>
                 )}
                 <div className={`ma-deadline-warning ${isExpired ? 'expired' : ''}`}>
                   <span className="ma-clock-icon">&#9200;</span>
-                  <span>{formatTimeRemaining()}</span>
+                  <span>Accept by: {formatTimeRemaining()}</span>
                 </div>
               </div>
 
@@ -357,6 +492,18 @@ function MarketAcceptanceModal({
                     {marketData?.acceptedCount || 0} / {marketData?.minAcceptanceThreshold || 2}
                   </span>
                 </div>
+                {marketData?.estimatedMarketEndDate && (
+                  <div className="ma-term">
+                    <label>Market Ends</label>
+                    <span className="ma-value">
+                      {new Date(marketData.estimatedMarketEndDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
                 {!isArbitrator && (
                   <div className="ma-term ma-term-highlight">
                     <label>Your Stake</label>
@@ -491,7 +638,10 @@ function MarketAcceptanceModal({
               <div className="ma-confirm-details">
                 <div className="ma-confirm-row">
                   <span>Market:</span>
-                  <span>{marketData?.description?.slice(0, 50)}...</span>
+                  <span>
+                    {(decryptedDescription || marketData?.description)?.slice(0, 50)}
+                    {(decryptedDescription || marketData?.description)?.length > 50 ? '...' : ''}
+                  </span>
                 </div>
                 <div className="ma-confirm-row">
                   <span>Created By:</span>

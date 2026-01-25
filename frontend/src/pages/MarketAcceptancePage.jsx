@@ -77,6 +77,9 @@ function MarketAcceptancePage() {
   const urlStake = searchParams.get('stake')
   const urlToken = searchParams.get('token')
   const urlDeadline = searchParams.get('deadline')
+  // Description passed in URL for encrypted markets (base64 encoded)
+  const urlDescEncoded = searchParams.get('desc')
+  const urlDescription = urlDescEncoded ? decodeURIComponent(atob(urlDescEncoded)) : null
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -105,6 +108,19 @@ function MarketAcceptancePage() {
           // Fetch market details with status
           const marketResult = await contract.getFriendMarketWithStatus(marketId)
           const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
+
+          // Also fetch full market details to get createdAt
+          const fullMarketResult = await contract.getFriendMarket(marketId)
+
+          // Try to get tradingPeriodSeconds from contract if available
+          // Note: This requires the getTradingPeriod getter to be added to the contract
+          let tradingPeriodSeconds = null
+          try {
+            tradingPeriodSeconds = await contract.getTradingPeriod(marketId)
+            tradingPeriodSeconds = Number(tradingPeriodSeconds)
+          } catch {
+            // Getter not available yet, will try to parse from metadata
+          }
 
           // Fetch individual acceptances
           const acceptances = {}
@@ -156,23 +172,63 @@ function MarketAcceptancePage() {
             ? 'Encrypted Market (details visible to participants)'
             : rawDescription
 
+          // Get createdAt from full market result
+          const createdAt = Number(fullMarketResult.createdAt) * 1000
+          const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
+
+          // Try to extract market end date from encrypted metadata if available
+          let estimatedMarketEndDate = null
+          let tradingPeriodFromMetadata = null
+
+          if (isEncryptedDescription(rawDescription)) {
+            try {
+              const envelope = JSON.parse(rawDescription)
+              // The endDateTime might be in the encrypted content, which we can't read here
+              // But we store it in attributes for display purposes
+              if (envelope.attributes) {
+                const endDateAttr = envelope.attributes.find(a => a.trait_type === 'End Date')
+                if (endDateAttr) {
+                  estimatedMarketEndDate = new Date(endDateAttr.value).getTime()
+                }
+              }
+            } catch {
+              // Could not parse metadata
+            }
+          }
+
+          // If we got tradingPeriodSeconds from contract, use it
+          if (tradingPeriodSeconds) {
+            // For pending markets, estimate end date as when they might activate + trading period
+            // Best estimate: acceptance deadline + trading period
+            estimatedMarketEndDate = acceptanceDeadlineMs + (tradingPeriodSeconds * 1000)
+          } else if (!estimatedMarketEndDate) {
+            // Fallback: acceptance deadline + 7 days default
+            estimatedMarketEndDate = acceptanceDeadlineMs + (7 * 24 * 60 * 60 * 1000)
+          }
+
           setMarketData({
             id: marketId,
             description: displayDescription,
             rawDescription: rawDescription, // Keep original for decryption
+            // For encrypted markets, include URL description so receiver can see bet text
+            urlDescription: urlDescription,
             isEncrypted: isEncryptedDescription(rawDescription),
             creator: marketResult.creator,
             participants: members,
             arbitrator: arbitrator !== ethers.ZeroAddress ? arbitrator : null,
             marketType: marketTypes[Number(marketResult.marketType)] || 'unknown',
             status: statusNames[Number(marketResult.status)] || 'unknown',
-            acceptanceDeadline: Number(marketResult.acceptanceDeadline) * 1000,
+            acceptanceDeadline: acceptanceDeadlineMs,
             minAcceptanceThreshold: Number(marketResult.minThreshold),
             stakePerParticipant: stakeAmount,
             stakeToken: stakeTokenAddr,
             stakeTokenSymbol: tokenSymbol,
             acceptances,
-            acceptedCount: Number(acceptanceStatus.accepted)
+            acceptedCount: Number(acceptanceStatus.accepted),
+            // Add market end date info
+            createdAt,
+            tradingPeriodSeconds: tradingPeriodSeconds || tradingPeriodFromMetadata,
+            estimatedMarketEndDate
           })
 
         } catch (err) {
@@ -228,7 +284,7 @@ function MarketAcceptancePage() {
     }
 
     fetchMarketData()
-  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline])
+  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlDescription])
 
   const handleClose = () => {
     navigate('/')
