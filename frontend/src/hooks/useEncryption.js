@@ -305,15 +305,15 @@ export function useEncryption() {
     // Check if cached signature version matches envelope's signing version
     if (cachedVersion !== null && cachedVersion !== envelopeVersion) {
       console.log(`[useEncryption] Version mismatch: cached v${cachedVersion}, envelope v${envelopeVersion}. Re-signing...`)
-      // Clear the stale cache and force re-initialization
+      // Clear the stale cache and directly call initializeKeys to force fresh signature
+      // Note: We call initializeKeys directly instead of updating state and calling ensureInitialized
+      // because state updates are async and ensureInitialized would see stale values
       clearSignatureCache(account)
-      setSignature(null)
-      setCachedVersion(null)
-      setKeyPairs({ x25519: null, xwing: null })
+      await initializeKeys()
+    } else {
+      // Ensure we have keys (may prompt user once if no cached signature)
+      await ensureInitialized()
     }
-
-    // Ensure we have keys (may prompt user once if no cached signature)
-    await ensureInitialized()
 
     // Use unified decrypt with both key types
     if (keyPairs.x25519?.privateKey && keyPairs.xwing?.secretKey) {
@@ -328,7 +328,7 @@ export function useEncryption() {
       throw new Error('No signer available')
     }
     return decryptMarketMetadata(envelope, account, signer)
-  }, [signer, account, keyPairs, cachedVersion, ensureInitialized])
+  }, [signer, account, keyPairs, cachedVersion, ensureInitialized, initializeKeys])
 
   /**
    * Add a participant to an encrypted market
@@ -409,6 +409,7 @@ export function useEncryption() {
     }
     setKeyPairs({ x25519: null, xwing: null })
     setSignature(null)
+    setCachedVersion(null)
   }, [account])
 
   // Clear on disconnect
@@ -418,6 +419,7 @@ export function useEncryption() {
     if (!isConnected && !ignore) {
       setKeyPairs({ x25519: null, xwing: null })
       setSignature(null)
+      setCachedVersion(null)
     }
 
     return () => { ignore = true }
@@ -598,8 +600,8 @@ export function useDecryptedMarkets(markets) {
  * @returns {Object} - Lazy decryption state and functions
  */
 export function useLazyMarketDecryption(markets) {
-  const { decryptMetadata, canUserDecrypt, isEncrypted, ensureInitialized } = useEncryption()
-  const { account, isConnected, signer } = useWallet()
+  const { decryptMetadata, canUserDecrypt, isEncrypted } = useEncryption()
+  const { account, isConnected } = useWallet()
 
   // Cache: Map<marketId, { metadata, timestamp }>
   const [decryptionCache, setDecryptionCache] = useState(new Map())
@@ -706,16 +708,10 @@ export function useLazyMarketDecryption(markets) {
       return market.metadata
     }
 
-    // Can user decrypt?
-    if (!canUserDecrypt(market.metadata)) {
-      const error = 'You are not a participant in this market'
-      setDecryptionErrors(prev => {
-        const next = new Map(prev)
-        next.set(marketIdStr, error)
-        return next
-      })
-      throw new Error(error)
-    }
+    // Note: We don't hard-block based on canUserDecrypt here.
+    // The UI allows participants to attempt decryption even if canUserDecrypt returns false
+    // (e.g., when the user is a market participant but envelope key check fails due to version mismatch).
+    // We let the actual decryption attempt determine success/failure.
 
     // Already decrypting? Skip to avoid duplicate work
     // The UI will update when decryption completes via the processedMarkets useMemo
@@ -770,7 +766,7 @@ export function useLazyMarketDecryption(markets) {
         return next
       })
     }
-  }, [markets, decryptionCache, decryptingIds, decryptionErrors, isEncrypted, canUserDecrypt, decryptMetadata])
+  }, [markets, decryptionCache, decryptingIds, isEncrypted, decryptMetadata, account])
 
   // Check if a specific market is currently decrypting
   const isMarketDecrypting = useCallback((marketId) => {
