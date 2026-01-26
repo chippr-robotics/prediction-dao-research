@@ -110,10 +110,11 @@ contract PerpetualFuturesFactory is Ownable, ReentrancyGuard {
     // ============ Constructor ============
 
     constructor(
+        address _owner,
         address _fundingRateEngine,
         address _feeRecipient,
         address _defaultCollateralToken
-    ) Ownable(msg.sender) {
+    ) Ownable(_owner) {
         require(_feeRecipient != address(0), "Invalid recipient");
 
         if (_fundingRateEngine != address(0)) {

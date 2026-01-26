@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -104,6 +105,9 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
 
     /// @notice Collateral token (e.g., USC stablecoin)
     IERC20 public collateralToken;
+
+    /// @notice Collateral token decimals (for normalizing calculations)
+    uint8 public collateralDecimals;
 
     /// @notice Current market status
     MarketStatus public status;
@@ -279,6 +283,7 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         marketName = _marketName;
         underlyingAsset = _underlyingAsset;
         collateralToken = IERC20(_collateralToken);
+        collateralDecimals = IERC20Metadata(_collateralToken).decimals();
         feeRecipient = _feeRecipient;
         status = MarketStatus.Active;
 
@@ -323,20 +328,24 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         require(leverage <= config.maxLeverage, "Leverage exceeds maximum");
         require(traderPositions[msg.sender].length < MAX_POSITIONS_PER_TRADER, "Max positions reached");
 
-        // Calculate required margin
+        // Normalize collateral to 18 decimals for margin calculations
+        uint256 normalizedCollateral = _normalizeCollateral(collateralAmount);
+
+        // Calculate required margin (all in 18 decimals)
         uint256 notionalValue = (size * markPrice) / PRICE_PRECISION;
         uint256 requiredMargin = (notionalValue * config.initialMarginRate) / RATE_PRECISION;
-        require(collateralAmount >= requiredMargin, "Insufficient margin");
+        require(normalizedCollateral >= requiredMargin, "Insufficient margin");
 
-        // Verify leverage matches collateral
-        uint256 effectiveLeverage = (notionalValue * LEVERAGE_PRECISION) / collateralAmount;
+        // Verify leverage matches collateral (using normalized values)
+        uint256 effectiveLeverage = (notionalValue * LEVERAGE_PRECISION) / normalizedCollateral;
         require(effectiveLeverage <= leverage, "Effective leverage exceeds requested");
 
         // Transfer collateral
         collateralToken.safeTransferFrom(msg.sender, address(this), collateralAmount);
 
-        // Calculate and collect trading fee
-        uint256 tradingFee = (notionalValue * config.tradingFeeRate) / RATE_PRECISION;
+        // Calculate and collect trading fee (convert from 18 decimals to token decimals)
+        uint256 tradingFeeNormalized = (notionalValue * config.tradingFeeRate) / RATE_PRECISION;
+        uint256 tradingFee = _denormalizeCollateral(tradingFeeNormalized);
         if (tradingFee > 0 && tradingFee < collateralAmount) {
             collateralAmount -= tradingFee;
             totalFeesCollected += tradingFee;
@@ -419,9 +428,10 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
             }
         }
 
-        // Calculate and deduct trading fee
+        // Calculate and deduct trading fee (convert from 18 decimals to token decimals)
         uint256 notionalValue = (position.size * markPrice) / PRICE_PRECISION;
-        uint256 tradingFee = (notionalValue * config.tradingFeeRate) / RATE_PRECISION;
+        uint256 tradingFeeNormalized = (notionalValue * config.tradingFeeRate) / RATE_PRECISION;
+        uint256 tradingFee = _denormalizeCollateral(tradingFeeNormalized);
         if (tradingFee > 0 && tradingFee < exitAmount) {
             exitAmount -= tradingFee;
             totalFeesCollected += tradingFee;
@@ -474,9 +484,10 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         collateralToken.safeTransferFrom(msg.sender, address(this), amount);
         position.collateral += amount;
 
-        // Recalculate leverage
+        // Recalculate leverage (using normalized collateral for calculation)
         uint256 notionalValue = (position.size * markPrice) / PRICE_PRECISION;
-        position.leverage = (notionalValue * LEVERAGE_PRECISION) / position.collateral;
+        uint256 normalizedCollateral = _normalizeCollateral(position.collateral);
+        position.leverage = (notionalValue * LEVERAGE_PRECISION) / normalizedCollateral;
 
         emit CollateralDeposited(positionId, msg.sender, amount, block.timestamp);
         emit PositionModified(positionId, msg.sender, position.size, position.collateral, block.timestamp);
@@ -499,20 +510,26 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         Position storage position = positions[positionId];
         require(amount < position.collateral, "Cannot remove all collateral");
 
-        // Calculate remaining margin after removal
+        // Calculate remaining margin after removal (all calculations in 18 decimals)
         uint256 remainingCollateral = position.collateral - amount;
+        uint256 normalizedRemaining = _normalizeCollateral(remainingCollateral);
         uint256 notionalValue = (position.size * markPrice) / PRICE_PRECISION;
         uint256 requiredMargin = (notionalValue * config.initialMarginRate) / RATE_PRECISION;
 
         // Apply pending funding before checking margin
         _applyFunding(positionId);
         int256 pnl = _calculatePnL(position);
-        int256 effectiveCollateral = int256(remainingCollateral) + pnl + position.accumulatedFunding;
+        // Normalize PnL and funding to 18 decimals for comparison
+        int256 normalizedPnl = int256(_normalizeCollateral(pnl >= 0 ? uint256(pnl) : uint256(-pnl)));
+        if (pnl < 0) normalizedPnl = -normalizedPnl;
+        int256 normalizedFunding = int256(_normalizeCollateral(position.accumulatedFunding >= 0 ? uint256(position.accumulatedFunding) : uint256(-position.accumulatedFunding)));
+        if (position.accumulatedFunding < 0) normalizedFunding = -normalizedFunding;
+        int256 effectiveCollateral = int256(normalizedRemaining) + normalizedPnl + normalizedFunding;
 
         require(effectiveCollateral >= int256(requiredMargin), "Insufficient margin after removal");
 
         // Check leverage doesn't exceed max
-        uint256 newLeverage = (notionalValue * LEVERAGE_PRECISION) / remainingCollateral;
+        uint256 newLeverage = (notionalValue * LEVERAGE_PRECISION) / normalizedRemaining;
         require(newLeverage <= config.maxLeverage, "Leverage would exceed maximum");
 
         position.collateral = remainingCollateral;
@@ -543,9 +560,10 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         // Check if position is liquidatable
         require(_isLiquidatable(positionId), "Position not liquidatable");
 
-        // Calculate liquidation values
+        // Calculate liquidation values (convert from 18 decimals to token decimals)
         uint256 notionalValue = (position.size * markPrice) / PRICE_PRECISION;
-        uint256 liquidationFee = (notionalValue * config.liquidationFeeRate) / RATE_PRECISION;
+        uint256 liquidationFeeNormalized = (notionalValue * config.liquidationFeeRate) / RATE_PRECISION;
+        uint256 liquidationFee = _denormalizeCollateral(liquidationFeeNormalized);
 
         // Calculate remaining collateral after PnL
         int256 pnl = _calculatePnL(position);
@@ -823,7 +841,10 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         Position memory position = positions[positionId];
         if (!position.isOpen) return 0;
 
-        // Calculate liquidation price
+        // Normalize collateral to 18 decimals for calculations
+        uint256 normalizedCollateral = _normalizeCollateral(position.collateral);
+
+        // Calculate liquidation price (all in 18 decimals)
         uint256 maintenanceMargin = (position.size * position.entryPrice * config.maintenanceMarginRate)
             / (PRICE_PRECISION * RATE_PRECISION);
 
@@ -831,15 +852,15 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
             // Long: liquidation when price drops
             // collateral - (entryPrice - liqPrice) * size = maintenanceMargin
             // liqPrice = entryPrice - (collateral - maintenanceMargin) / size
-            if (position.collateral <= maintenanceMargin) return position.entryPrice;
-            uint256 buffer = ((position.collateral - maintenanceMargin) * PRICE_PRECISION) / position.size;
+            if (normalizedCollateral <= maintenanceMargin) return position.entryPrice;
+            uint256 buffer = ((normalizedCollateral - maintenanceMargin) * PRICE_PRECISION) / position.size;
             if (buffer >= position.entryPrice) return 0;
             return position.entryPrice - buffer;
         } else {
             // Short: liquidation when price rises
             // liqPrice = entryPrice + (collateral - maintenanceMargin) / size
-            if (position.collateral <= maintenanceMargin) return position.entryPrice;
-            uint256 buffer = ((position.collateral - maintenanceMargin) * PRICE_PRECISION) / position.size;
+            if (normalizedCollateral <= maintenanceMargin) return position.entryPrice;
+            uint256 buffer = ((normalizedCollateral - maintenanceMargin) * PRICE_PRECISION) / position.size;
             return position.entryPrice + buffer;
         }
     }
@@ -871,6 +892,34 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
     // ============ Internal Functions ============
 
     /**
+     * @notice Normalize collateral amount to 18 decimals for calculations
+     * @param amount Amount in collateral token decimals
+     * @return Normalized amount in 18 decimals
+     */
+    function _normalizeCollateral(uint256 amount) internal view returns (uint256) {
+        if (collateralDecimals == 18) return amount;
+        if (collateralDecimals < 18) {
+            return amount * (10 ** (18 - collateralDecimals));
+        } else {
+            return amount / (10 ** (collateralDecimals - 18));
+        }
+    }
+
+    /**
+     * @notice Denormalize amount from 18 decimals to collateral token decimals
+     * @param amount Amount in 18 decimals
+     * @return Denormalized amount in collateral token decimals
+     */
+    function _denormalizeCollateral(uint256 amount) internal view returns (uint256) {
+        if (collateralDecimals == 18) return amount;
+        if (collateralDecimals < 18) {
+            return amount / (10 ** (18 - collateralDecimals));
+        } else {
+            return amount * (10 ** (collateralDecimals - 18));
+        }
+    }
+
+    /**
      * @notice Calculate PnL for a position
      * @param position Position struct
      * @return PnL value
@@ -900,8 +949,10 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
     function _isLiquidatable(uint256 positionId) internal view returns (bool) {
         Position memory position = positions[positionId];
 
+        // All calculations in 18 decimals
         int256 pnl = _calculatePnL(position);
-        int256 effectiveCollateral = int256(position.collateral) + pnl + position.accumulatedFunding;
+        uint256 normalizedCollateral = _normalizeCollateral(position.collateral);
+        int256 effectiveCollateral = int256(normalizedCollateral) + pnl + position.accumulatedFunding;
 
         uint256 notionalValue = (position.size * markPrice) / PRICE_PRECISION;
         uint256 maintenanceMargin = (notionalValue * config.maintenanceMarginRate) / RATE_PRECISION;

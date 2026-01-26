@@ -212,9 +212,12 @@ export function usePerpetualsContract(factoryAddress) {
       throw new Error('Failed to initialize contracts')
     }
 
-    // Parse amounts
+    // Get token decimals for correct amount parsing
+    const decimals = await tokenContract.decimals()
+
+    // Parse amounts - size uses 18 decimals (internal), collateral uses token decimals
     const sizeWei = ethers.parseEther(size.toString())
-    const collateralWei = ethers.parseEther(collateralAmount.toString())
+    const collateralWei = ethers.parseUnits(collateralAmount.toString(), decimals)
     const leverageScaled = Math.floor(leverage * 10000)
 
     // Check and approve token allowance
@@ -290,7 +293,9 @@ export function usePerpetualsContract(factoryAddress) {
       throw new Error('Failed to initialize contracts')
     }
 
-    const amountWei = ethers.parseEther(amount.toString())
+    // Get token decimals for correct amount parsing
+    const decimals = await tokenContract.decimals()
+    const amountWei = ethers.parseUnits(amount.toString(), decimals)
 
     // Check and approve token allowance
     const allowance = await tokenContract.allowance(account, marketAddress)
@@ -309,6 +314,7 @@ export function usePerpetualsContract(factoryAddress) {
    */
   const removePositionCollateral = useCallback(async (
     marketAddress,
+    collateralToken,
     positionId,
     amount
   ) => {
@@ -317,15 +323,19 @@ export function usePerpetualsContract(factoryAddress) {
     }
 
     const marketContract = getMarketContract(marketAddress, true)
-    if (!marketContract) {
-      throw new Error('Failed to initialize market contract')
+    const tokenContract = getTokenContract(collateralToken, true)
+
+    if (!marketContract || !tokenContract) {
+      throw new Error('Failed to initialize contracts')
     }
 
-    const amountWei = ethers.parseEther(amount.toString())
+    // Get token decimals for correct amount parsing
+    const decimals = await tokenContract.decimals()
+    const amountWei = ethers.parseUnits(amount.toString(), decimals)
     const tx = await marketContract.removeCollateral(positionId, amountWei)
     await tx.wait()
     return true
-  }, [signer, isConnected, isCorrectNetwork, getMarketContract])
+  }, [signer, isConnected, isCorrectNetwork, getMarketContract, getTokenContract])
 
   /**
    * Liquidate a position

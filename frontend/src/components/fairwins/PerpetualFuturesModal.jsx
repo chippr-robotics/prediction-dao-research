@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { usePerpetualsContract, PositionSide, MarketCategory } from '../../hooks/usePerpetualsContract'
+import { getContractAddress } from '../../config/contracts'
 import './PerpetualFuturesModal.css'
 
-// Default factory address (to be configured via environment variable)
-const DEFAULT_FACTORY_ADDRESS = import.meta.env.VITE_PERPETUAL_FACTORY_ADDRESS ?? '' // Set after deployment
+// Factory address from centralized config (same pattern as usePerpetualsAdmin)
+const DEFAULT_FACTORY_ADDRESS = getContractAddress('perpFactory') || null
 
 // Leverage presets
 const LEVERAGE_PRESETS = [1, 2, 5, 10, 15, 20]
@@ -226,7 +227,14 @@ function PerpetualFuturesModal({
       await fetchPositions(selectedMarket.address)
     } catch (err) {
       console.error('Trade error:', err)
-      setErrors({ submit: err.message || 'Failed to open position' })
+      // Parse common error messages for better UX
+      let errorMessage = err.message || 'Failed to open position'
+      if (errorMessage.includes('transfer amount exceeds balance')) {
+        errorMessage = 'Insufficient USC balance. You need USC tokens to open positions.'
+      } else if (errorMessage.includes('allowance')) {
+        errorMessage = 'Please approve USC spending first.'
+      }
+      setErrors({ submit: errorMessage })
     } finally {
       setSubmitting(false)
     }
@@ -283,6 +291,7 @@ function PerpetualFuturesModal({
     try {
       await removePositionCollateral(
         selectedMarket.address,
+        selectedMarket.collateralToken,
         selectedPosition.id,
         parseFloat(marginAmount)
       )
@@ -668,6 +677,9 @@ function PerpetualFuturesModal({
               {!loading && markets.length === 0 && (
                 <div className="perp-no-markets">
                   <p>No perpetual markets available yet.</p>
+                  <p className="perp-role-hint">
+                    Market creation requires the <strong>Market Maker</strong> role and is managed via the Admin Panel.
+                  </p>
                 </div>
               )}
             </div>

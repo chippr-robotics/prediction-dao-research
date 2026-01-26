@@ -1,0 +1,38 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "timestamp": "2026-01-26T11:51:20.865Z",
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "version": "2.1-fixed-decimals-ownership",
+  "contracts": {
+    "fundingRateEngine": "0x32AD4F7a1e05138fc0F485c786aeDB90dBE100e8",
+    "perpFactory": "0xE3B84aecc9Ee0D2a35530BfAcb3D184c372cdc71"
+  },
+  "markets": [
+    {
+      "id": 0,
+      "name": "BTC-PERP",
+      "fullName": "Bitcoin Perpetual",
+      "address": "0xBEB67D166A4d79B257DBf1Ca0c3675B554eB5631",
+      "underlyingAsset": "BTC"
+    },
+    {
+      "id": 1,
+      "name": "ETH-PERP",
+      "fullName": "Ethereum Perpetual",
+      "address": "0xa615Ad90ea5465a7df17c19bC9AaC30423B0a4B0",
+      "underlyingAsset": "ETH"
+    },
+    {
+      "id": 2,
+      "name": "ETC-PERP",
+      "fullName": "Ethereum Classic Perpetual",
+      "address": "0xAaEC78704D986aAE60b28D28799793b58B0Ed72d",
+      "underlyingAsset": "ETC"
+    }
+  ],
+  "tokens": {
+    "USC": "0xDE093684c796204224BC081f937aa059D903c52a",
+    "WETC": "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a"
+  }
+}
