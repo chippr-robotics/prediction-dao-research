@@ -2,7 +2,23 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { usePerpetualsContract, PositionSide, MarketCategory } from '../../hooks/usePerpetualsContract'
 import { getContractAddress } from '../../config/contracts'
+import { getUserPreference, saveUserPreference, removeUserPreference, saveGlobalPreference, getGlobalPreference } from '../../utils/userStorage'
+import { VIEW_MODES } from '../../utils/viewPreference'
+import PerpEducationModal from './PerpEducationModal'
+import ViewToggle from './ViewToggle'
 import './PerpetualFuturesModal.css'
+
+// Order flow steps
+const ORDER_FLOW_STEPS = [
+  { id: 'market', label: 'Select Market' },
+  { id: 'configure', label: 'Configure' },
+  { id: 'review', label: 'Review' },
+  { id: 'executing', label: 'Executing' }
+]
+
+// Order flow storage key
+const ORDER_FLOW_KEY = 'perp_order_flow_state'
+const ORDER_FLOW_EXPIRY_MS = 30 * 60 * 1000 // 30 minutes
 
 // Factory address from centralized config (same pattern as usePerpetualsAdmin)
 const DEFAULT_FACTORY_ADDRESS = getContractAddress('perpFactory') || null
@@ -28,7 +44,7 @@ function PerpetualFuturesModal({
   onClose,
   factoryAddress = DEFAULT_FACTORY_ADDRESS
 }) {
-  const { isConnected } = useWallet()
+  const { isConnected, address } = useWallet()
   const { isCorrectNetwork, switchNetwork } = useWeb3()
 
   // Perpetuals hook
@@ -36,11 +52,13 @@ function PerpetualFuturesModal({
     markets,
     selectedMarket,
     positions,
+    allPositions,
     loading,
     error,
     setSelectedMarket,
     fetchMarkets,
     fetchPositions,
+    fetchAllPositions,
     openPosition,
     closePosition,
     addPositionCollateral,
@@ -48,8 +66,8 @@ function PerpetualFuturesModal({
     getTokenBalance
   } = usePerpetualsContract(factoryAddress)
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState('trade') // 'trade', 'positions', 'markets'
+  // Tab state - Markets is now the default tab
+  const [activeTab, setActiveTab] = useState('markets') // 'markets', 'trade', 'positions'
 
   // Trading form state
   const [tradeSide, setTradeSide] = useState(PositionSide.Long)
@@ -68,10 +86,23 @@ function PerpetualFuturesModal({
   const [errors, setErrors] = useState({})
   const [successMessage, setSuccessMessage] = useState('')
 
+  // Education modal state (show once per wallet)
+  const [showEducationModal, setShowEducationModal] = useState(false)
+
+  // Markets view mode (grid/card or compact/table)
+  const [marketsViewMode, setMarketsViewMode] = useState(() =>
+    getGlobalPreference('perpMarketsView', VIEW_MODES.GRID)
+  )
+
+  // Order flow state for breadcrumbs
+  const [orderFlowStep, setOrderFlowStep] = useState(0) // 0: market, 1: configure, 2: review, 3: executing
+  const [showResumePrompt, setShowResumePrompt] = useState(false)
+  const [savedOrderState, setSavedOrderState] = useState(null)
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setActiveTab('trade')
+      setActiveTab('markets')
       setTradeSide(PositionSide.Long)
       setTradeCollateral('')
       setTradeLeverage(1)
@@ -80,6 +111,58 @@ function PerpetualFuturesModal({
       fetchMarkets()
     }
   }, [isOpen, fetchMarkets])
+
+  // Check if user has seen the education modal
+  // Uses per-wallet preference if connected, otherwise uses global preference
+  useEffect(() => {
+    if (isOpen) {
+      let hasSeenEducation = false
+      if (address) {
+        // Check per-wallet preference
+        hasSeenEducation = getUserPreference(address, 'perp_education_seen', false, true)
+      } else {
+        // Check global preference for non-connected users
+        hasSeenEducation = getGlobalPreference('perp_education_seen_global', false)
+      }
+      if (!hasSeenEducation) {
+        setShowEducationModal(true)
+      }
+    }
+  }, [isOpen, address])
+
+  // Check for saved order state to resume (per wallet)
+  useEffect(() => {
+    if (isOpen && address) {
+      const savedState = getUserPreference(address, ORDER_FLOW_KEY, null, true)
+      if (savedState && savedState.startedAt) {
+        const isRecent = Date.now() - savedState.startedAt < ORDER_FLOW_EXPIRY_MS
+        if (isRecent && savedState.step > 0) {
+          setSavedOrderState(savedState)
+          setShowResumePrompt(true)
+        } else {
+          // Expired, clear it
+          removeUserPreference(address, ORDER_FLOW_KEY, true)
+        }
+      }
+    }
+  }, [isOpen, address])
+
+  // Save order flow state when it changes (for resumption)
+  useEffect(() => {
+    if (address && orderFlowStep > 0 && orderFlowStep < 3) {
+      const stateToSave = {
+        step: orderFlowStep,
+        startedAt: Date.now(),
+        formData: {
+          marketId: selectedMarket?.id || null,
+          side: tradeSide,
+          collateral: tradeCollateral,
+          leverage: tradeLeverage
+        }
+      }
+      saveUserPreference(address, ORDER_FLOW_KEY, stateToSave, true)
+    }
+  }, [address, orderFlowStep, selectedMarket?.id, tradeSide, tradeCollateral, tradeLeverage])
 
   // Fetch collateral balance when market changes
   useEffect(() => {
@@ -154,6 +237,41 @@ function PerpetualFuturesModal({
     }
   }, [selectedMarket, tradeCollateral, tradeLeverage, tradeSide])
 
+  // Trade tab is only visible when user is actively setting up a position
+  const showTradeTab = useMemo(() => {
+    return selectedMarket !== null || tradeCollateral !== '' || orderFlowStep > 0
+  }, [selectedMarket, tradeCollateral, orderFlowStep])
+
+  // Update order flow step based on current state
+  useEffect(() => {
+    if (selectedMarket && orderFlowStep === 0) {
+      setOrderFlowStep(1) // Move to configure step when market is selected
+    }
+  }, [selectedMarket, orderFlowStep])
+
+  // Fetch all positions when Positions tab is activated
+  useEffect(() => {
+    if (activeTab === 'positions' && markets.length > 0) {
+      fetchAllPositions()
+    }
+  }, [activeTab, markets.length, fetchAllPositions])
+
+  // Group positions by market for display
+  const positionsByMarket = useMemo(() => {
+    const grouped = {}
+    allPositions.forEach(pos => {
+      if (!grouped[pos.marketAddress]) {
+        grouped[pos.marketAddress] = {
+          marketName: pos.marketName,
+          marketId: pos.marketId,
+          positions: []
+        }
+      }
+      grouped[pos.marketAddress].positions.push(pos)
+    })
+    return grouped
+  }, [allPositions])
+
   // Validate trade form
   const validateTradeForm = useCallback(() => {
     const newErrors = {}
@@ -202,6 +320,8 @@ function PerpetualFuturesModal({
 
     if (!validateTradeForm()) return
 
+    // Move to executing step
+    setOrderFlowStep(3)
     setSubmitting(true)
     setErrors({})
     setSuccessMessage('')
@@ -223,6 +343,9 @@ function PerpetualFuturesModal({
       setTradeCollateral('')
       setTradeLeverage(1)
 
+      // Clear order flow state on success
+      clearOrderFlow()
+
       // Refresh positions
       await fetchPositions(selectedMarket.address)
     } catch (err) {
@@ -235,6 +358,8 @@ function PerpetualFuturesModal({
         errorMessage = 'Please approve USC spending first.'
       }
       setErrors({ submit: errorMessage })
+      // Go back to review step on error
+      setOrderFlowStep(2)
     } finally {
       setSubmitting(false)
     }
@@ -342,6 +467,78 @@ function PerpetualFuturesModal({
     return 'pnl-neutral'
   }
 
+  // Handle education modal dismiss
+  const handleEducationDismiss = (dontShowAgain) => {
+    if (dontShowAgain) {
+      if (address) {
+        // Save per-wallet preference
+        saveUserPreference(address, 'perp_education_seen', true, true)
+      } else {
+        // Save global preference for non-connected users
+        saveGlobalPreference('perp_education_seen_global', true)
+      }
+    }
+    setShowEducationModal(false)
+  }
+
+  // Handle markets view mode change
+  const handleMarketsViewChange = (mode) => {
+    setMarketsViewMode(mode)
+    saveGlobalPreference('perpMarketsView', mode)
+  }
+
+  // Handle resuming saved order flow
+  const handleResumeOrder = () => {
+    if (savedOrderState) {
+      // Find and select the saved market
+      const savedMarket = markets.find(m => m.id === savedOrderState.formData.marketId)
+      if (savedMarket) {
+        setSelectedMarket(savedMarket)
+      }
+      setTradeSide(savedOrderState.formData.side)
+      setTradeCollateral(savedOrderState.formData.collateral)
+      setTradeLeverage(savedOrderState.formData.leverage)
+      setOrderFlowStep(savedOrderState.step)
+      setActiveTab('trade')
+    }
+    setShowResumePrompt(false)
+    setSavedOrderState(null)
+  }
+
+  // Handle discarding saved order flow
+  const handleDiscardOrder = () => {
+    if (address) {
+      removeUserPreference(address, ORDER_FLOW_KEY, true)
+    }
+    setShowResumePrompt(false)
+    setSavedOrderState(null)
+  }
+
+  // Clear order flow state on completion
+  const clearOrderFlow = useCallback(() => {
+    setOrderFlowStep(0)
+    if (address) {
+      removeUserPreference(address, ORDER_FLOW_KEY, true)
+    }
+  }, [address])
+
+  // Progress to next step
+  const handleNextStep = () => {
+    setOrderFlowStep(prev => Math.min(prev + 1, ORDER_FLOW_STEPS.length - 1))
+  }
+
+  // Go back to previous step
+  const handlePrevStep = () => {
+    setOrderFlowStep(prev => Math.max(prev - 1, 0))
+  }
+
+  // Handle step click (can go back to completed steps)
+  const handleStepClick = (stepIndex) => {
+    if (stepIndex < orderFlowStep) {
+      setOrderFlowStep(stepIndex)
+    }
+  }
+
   if (!isOpen) return null
 
   return (
@@ -374,20 +571,37 @@ function PerpetualFuturesModal({
           </button>
         </header>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation - Markets first, Trade conditional, Positions last */}
         <nav className="perp-tabs" role="tablist">
           <button
-            className={`perp-tab ${activeTab === 'trade' ? 'active' : ''}`}
-            onClick={() => setActiveTab('trade')}
+            className={`perp-tab ${activeTab === 'markets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('markets')}
             role="tab"
-            aria-selected={activeTab === 'trade'}
+            aria-selected={activeTab === 'markets'}
             disabled={submitting}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2v20M2 12h20"/>
+              <path d="M3 3v18h18"/>
+              <path d="M18 17V9"/>
+              <path d="M13 17V5"/>
+              <path d="M8 17v-3"/>
             </svg>
-            <span>Trade</span>
+            <span>Markets</span>
           </button>
+          {showTradeTab && (
+            <button
+              className={`perp-tab ${activeTab === 'trade' ? 'active' : ''}`}
+              onClick={() => setActiveTab('trade')}
+              role="tab"
+              aria-selected={activeTab === 'trade'}
+              disabled={submitting}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v20M2 12h20"/>
+              </svg>
+              <span>Trade</span>
+            </button>
+          )}
           <button
             className={`perp-tab ${activeTab === 'positions' ? 'active' : ''}`}
             onClick={() => setActiveTab('positions')}
@@ -403,21 +617,6 @@ function PerpetualFuturesModal({
             {positions.length > 0 && (
               <span className="perp-tab-badge">{positions.length}</span>
             )}
-          </button>
-          <button
-            className={`perp-tab ${activeTab === 'markets' ? 'active' : ''}`}
-            onClick={() => setActiveTab('markets')}
-            role="tab"
-            aria-selected={activeTab === 'markets'}
-            disabled={submitting}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 3v18h18"/>
-              <path d="M18 17V9"/>
-              <path d="M13 17V5"/>
-              <path d="M8 17v-3"/>
-            </svg>
-            <span>Markets</span>
           </button>
         </nav>
 
@@ -457,36 +656,83 @@ function PerpetualFuturesModal({
           {/* Trade Tab */}
           {activeTab === 'trade' && !loading && (
             <div className="perp-trade-panel">
-              {/* Market Selector */}
-              <div className="perp-market-selector">
-                <label>Select Market</label>
-                <select
-                  value={selectedMarket?.id || ''}
-                  onChange={(e) => {
-                    const market = markets.find(m => m.id === parseInt(e.target.value))
-                    setSelectedMarket(market)
-                  }}
-                  disabled={submitting}
-                >
-                  <option value="">Choose a market...</option>
-                  {markets.map(market => (
-                    <option key={market.id} value={market.id}>
-                      {market.underlyingAsset}-PERP | ${formatPrice(market.markPrice)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Order Flow Step Indicator */}
+              <nav className="perp-order-steps" aria-label="Order progress">
+                {ORDER_FLOW_STEPS.map((step, index) => {
+                  const isCompleted = index < orderFlowStep
+                  const isActive = index === orderFlowStep
+                  const isClickable = isCompleted && orderFlowStep < 3
 
-              {selectedMarket && (
+                  return (
+                    <button
+                      key={step.id}
+                      className={`perp-order-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                      onClick={() => isClickable && handleStepClick(index)}
+                      disabled={!isClickable}
+                      aria-current={isActive ? 'step' : undefined}
+                      type="button"
+                    >
+                      <span className="perp-step-number">
+                        {isCompleted ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          index + 1
+                        )}
+                      </span>
+                      <span className="perp-step-label">{step.label}</span>
+                      {index < ORDER_FLOW_STEPS.length - 1 && <span className="perp-step-connector" aria-hidden="true" />}
+                    </button>
+                  )
+                })}
+              </nav>
+
+              {/* Step 0: Market Selection */}
+              {orderFlowStep === 0 && (
+                <div className="perp-market-selector">
+                  <label>Select Market</label>
+                  <select
+                    value={selectedMarket?.id || ''}
+                    onChange={(e) => {
+                      const market = markets.find(m => m.id === parseInt(e.target.value))
+                      setSelectedMarket(market)
+                    }}
+                    disabled={submitting}
+                  >
+                    <option value="">Choose a market...</option>
+                    {markets.map(market => (
+                      <option key={market.id} value={market.id}>
+                        {market.underlyingAsset}-PERP | ${formatPrice(market.markPrice)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Steps 1-3: Market selected - show market info */}
+              {orderFlowStep > 0 && selectedMarket && (
+                <div className="perp-market-selector compact">
+                  <span className="perp-selected-market">
+                    <strong>{selectedMarket.underlyingAsset}-PERP</strong>
+                    <span className="perp-selected-price">${formatPrice(selectedMarket.markPrice)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="perp-change-market-btn"
+                    onClick={() => setOrderFlowStep(0)}
+                    disabled={submitting}
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+
+              {/* Step 1: Configure Position */}
+              {orderFlowStep === 1 && selectedMarket && (
                 <>
                   {/* Market Info */}
                   <div className="perp-market-info">
-                    <div className="perp-market-header">
-                      <h3>{selectedMarket.underlyingAsset}-PERP</h3>
-                      <span className={`perp-category-badge category-${selectedMarket.category}`}>
-                        {getCategoryLabel(selectedMarket.category)}
-                      </span>
-                    </div>
                     <div className="perp-market-stats">
                       <div className="perp-stat">
                         <span className="perp-stat-label">Mark Price</span>
@@ -510,7 +756,7 @@ function PerpetualFuturesModal({
                   </div>
 
                   {/* Trade Form */}
-                  <form className="perp-trade-form" onSubmit={handleTrade}>
+                  <div className="perp-trade-form">
                     {/* Side Selection */}
                     <div className="perp-side-selector">
                       <button
@@ -608,61 +854,124 @@ function PerpetualFuturesModal({
                       {errors.leverage && <span className="perp-error">{errors.leverage}</span>}
                     </div>
 
-                    {/* Trade Summary */}
-                    <div className="perp-trade-summary">
-                      <div className="perp-summary-row">
-                        <span>Position Size</span>
-                        <span>{estimatedValues.size} {selectedMarket.underlyingAsset}</span>
-                      </div>
-                      <div className="perp-summary-row">
-                        <span>Notional Value</span>
-                        <span>${estimatedValues.notional}</span>
-                      </div>
-                      <div className="perp-summary-row">
-                        <span>Liquidation Price</span>
-                        <span className="liquidation-price">${estimatedValues.liquidationPrice}</span>
-                      </div>
-                      <div className="perp-summary-row">
-                        <span>Trading Fee</span>
-                        <span>{estimatedValues.fee} USC</span>
-                      </div>
+                    {/* Step Navigation */}
+                    <div className="perp-step-actions">
+                      <button
+                        type="button"
+                        className="perp-step-btn secondary"
+                        onClick={handlePrevStep}
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        className="perp-step-btn primary"
+                        onClick={() => {
+                          if (validateTradeForm()) {
+                            setOrderFlowStep(2)
+                          }
+                        }}
+                        disabled={!tradeCollateral || parseFloat(tradeCollateral) <= 0}
+                      >
+                        Continue to Review
+                      </button>
                     </div>
-
-                    {/* Network Warning */}
-                    {isConnected && !isCorrectNetwork && (
-                      <div className="perp-warning">
-                        <span>Wrong network</span>
-                        <button type="button" onClick={switchNetwork}>Switch</button>
-                      </div>
-                    )}
-
-                    {/* Submit Error */}
-                    {errors.submit && (
-                      <div className="perp-error-message">{errors.submit}</div>
-                    )}
-
-                    {/* Submit Button */}
-                    <button
-                      type="submit"
-                      className={`perp-submit-btn ${tradeSide === PositionSide.Long ? 'long' : 'short'}`}
-                      disabled={submitting || !isConnected || !isCorrectNetwork || !selectedMarket}
-                    >
-                      {submitting ? (
-                        <>
-                          <span className="perp-spinner-small"></span>
-                          Opening Position...
-                        </>
-                      ) : !isConnected ? (
-                        'Connect Wallet'
-                      ) : (
-                        `Open ${tradeSide === PositionSide.Long ? 'Long' : 'Short'} Position`
-                      )}
-                    </button>
-                  </form>
+                  </div>
                 </>
               )}
 
-              {!selectedMarket && !loading && markets.length > 0 && (
+              {/* Step 2: Review */}
+              {orderFlowStep === 2 && selectedMarket && (
+                <form className="perp-trade-form" onSubmit={handleTrade}>
+                  <div className="perp-review-header">
+                    <h3>Review Your Order</h3>
+                    <p>Please confirm the details below before submitting.</p>
+                  </div>
+
+                  {/* Order Summary */}
+                  <div className="perp-review-summary">
+                    <div className="perp-review-row highlight">
+                      <span>Position</span>
+                      <span className={tradeSide === PositionSide.Long ? 'long' : 'short'}>
+                        {tradeSide === PositionSide.Long ? 'LONG' : 'SHORT'} {tradeLeverage}x
+                      </span>
+                    </div>
+                    <div className="perp-review-row">
+                      <span>Market</span>
+                      <span>{selectedMarket.underlyingAsset}-PERP</span>
+                    </div>
+                    <div className="perp-review-row">
+                      <span>Collateral</span>
+                      <span>{tradeCollateral} USC</span>
+                    </div>
+                    <div className="perp-review-row">
+                      <span>Position Size</span>
+                      <span>{estimatedValues.size} {selectedMarket.underlyingAsset}</span>
+                    </div>
+                    <div className="perp-review-row">
+                      <span>Notional Value</span>
+                      <span>${estimatedValues.notional}</span>
+                    </div>
+                    <div className="perp-review-row">
+                      <span>Entry Price</span>
+                      <span>${formatPrice(selectedMarket.markPrice)}</span>
+                    </div>
+                    <div className="perp-review-row warning">
+                      <span>Liquidation Price</span>
+                      <span>${estimatedValues.liquidationPrice}</span>
+                    </div>
+                    <div className="perp-review-row">
+                      <span>Trading Fee</span>
+                      <span>{estimatedValues.fee} USC</span>
+                    </div>
+                  </div>
+
+                  {/* Network Warning */}
+                  {isConnected && !isCorrectNetwork && (
+                    <div className="perp-warning">
+                      <span>Wrong network</span>
+                      <button type="button" onClick={switchNetwork}>Switch</button>
+                    </div>
+                  )}
+
+                  {/* Submit Error */}
+                  {errors.submit && (
+                    <div className="perp-error-message">{errors.submit}</div>
+                  )}
+
+                  {/* Step Navigation */}
+                  <div className="perp-step-actions">
+                    <button
+                      type="button"
+                      className="perp-step-btn secondary"
+                      onClick={handlePrevStep}
+                      disabled={submitting}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className={`perp-step-btn primary ${tradeSide === PositionSide.Long ? 'long' : 'short'}`}
+                      disabled={submitting || !isConnected || !isCorrectNetwork}
+                    >
+                      {!isConnected ? 'Connect Wallet' : `Confirm ${tradeSide === PositionSide.Long ? 'Long' : 'Short'}`}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Step 3: Executing */}
+              {orderFlowStep === 3 && (
+                <div className="perp-executing">
+                  <div className="perp-executing-content">
+                    <span className="perp-spinner-large"></span>
+                    <h3>Opening Position</h3>
+                    <p>Please confirm the transaction in your wallet...</p>
+                  </div>
+                </div>
+              )}
+
+              {orderFlowStep === 0 && !selectedMarket && !loading && markets.length > 0 && (
                 <div className="perp-select-market-prompt">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M3 3v18h18"/>
@@ -670,7 +979,7 @@ function PerpetualFuturesModal({
                     <path d="M13 17V5"/>
                     <path d="M8 17v-3"/>
                   </svg>
-                  <p>Select a market to start trading</p>
+                  <p>Select a market above to start trading</p>
                 </div>
               )}
 
@@ -685,94 +994,112 @@ function PerpetualFuturesModal({
             </div>
           )}
 
-          {/* Positions Tab */}
+          {/* Positions Tab - Aggregated across all markets */}
           {activeTab === 'positions' && !loading && (
             <div className="perp-positions-panel">
-              {!selectedMarket ? (
-                <div className="perp-select-market-prompt">
-                  <p>Select a market from the Trade tab to view positions</p>
-                </div>
-              ) : positions.length === 0 ? (
+              <div className="perp-positions-header">
+                <h3>All Open Positions</h3>
+                <span className="perp-positions-count">{allPositions.length} position{allPositions.length !== 1 ? 's' : ''}</span>
+              </div>
+              {allPositions.length === 0 ? (
                 <div className="perp-no-positions">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <path d="M3 9h18"/>
                   </svg>
-                  <p>No open positions in {selectedMarket.underlyingAsset}-PERP</p>
-                  <button onClick={() => setActiveTab('trade')}>Open a Position</button>
+                  <p>No open positions across any markets</p>
+                  <button onClick={() => setActiveTab('markets')}>Browse Markets</button>
                 </div>
               ) : (
-                <div className="perp-positions-list">
-                  <h3>Open Positions - {selectedMarket.underlyingAsset}-PERP</h3>
-                  {positions.map(position => (
-                    <div key={position.id} className="perp-position-card">
-                      <div className="perp-position-header">
-                        <span className={`perp-position-side ${position.side === PositionSide.Long ? 'long' : 'short'}`}>
-                          {position.side === PositionSide.Long ? 'LONG' : 'SHORT'} {position.leverage}x
-                        </span>
-                        <span className={`perp-position-pnl ${getPnLClass(position.unrealizedPnL)}`}>
-                          {parseFloat(position.unrealizedPnL) >= 0 ? '+' : ''}{parseFloat(position.unrealizedPnL).toFixed(2)} USC
+                <div className="perp-positions-grouped">
+                  {Object.entries(positionsByMarket).map(([marketAddress, marketData]) => (
+                    <div key={marketAddress} className="perp-market-group">
+                      <div className="perp-market-group-header">
+                        <h4>{marketData.marketName}-PERP</h4>
+                        <span className="perp-market-group-count">
+                          {marketData.positions.length} position{marketData.positions.length !== 1 ? 's' : ''}
                         </span>
                       </div>
-                      <div className="perp-position-details">
-                        <div className="perp-position-row">
-                          <span>Size</span>
-                          <span>{parseFloat(position.size).toFixed(4)} {selectedMarket.underlyingAsset}</span>
-                        </div>
-                        <div className="perp-position-row">
-                          <span>Entry Price</span>
-                          <span>${formatPrice(position.entryPrice)}</span>
-                        </div>
-                        <div className="perp-position-row">
-                          <span>Mark Price</span>
-                          <span>${formatPrice(selectedMarket.markPrice)}</span>
-                        </div>
-                        <div className="perp-position-row">
-                          <span>Collateral</span>
-                          <span>{parseFloat(position.collateral).toFixed(2)} USC</span>
-                        </div>
-                        <div className="perp-position-row">
-                          <span>Liq. Price</span>
-                          <span className="liquidation-price">${formatPrice(position.liquidationPrice)}</span>
-                        </div>
-                        {position.isLiquidatable && (
-                          <div className="perp-liquidation-warning">
-                            &#9888; Position at risk of liquidation!
+                      <div className="perp-market-group-content">
+                        {marketData.positions.map(position => (
+                          <div key={`${marketAddress}-${position.id}`} className="perp-position-card">
+                            <div className="perp-position-header">
+                              <span className={`perp-position-side ${position.side === PositionSide.Long ? 'long' : 'short'}`}>
+                                {position.side === PositionSide.Long ? 'LONG' : 'SHORT'} {position.leverage}x
+                              </span>
+                              <span className={`perp-position-pnl ${getPnLClass(position.unrealizedPnL)}`}>
+                                {parseFloat(position.unrealizedPnL) >= 0 ? '+' : ''}{parseFloat(position.unrealizedPnL).toFixed(2)} USC
+                              </span>
+                            </div>
+                            <div className="perp-position-details">
+                              <div className="perp-position-row">
+                                <span>Size</span>
+                                <span>{parseFloat(position.size).toFixed(4)} {position.marketName}</span>
+                              </div>
+                              <div className="perp-position-row">
+                                <span>Entry Price</span>
+                                <span>${formatPrice(position.entryPrice)}</span>
+                              </div>
+                              <div className="perp-position-row">
+                                <span>Mark Price</span>
+                                <span>${formatPrice(position.markPrice)}</span>
+                              </div>
+                              <div className="perp-position-row">
+                                <span>Collateral</span>
+                                <span>{parseFloat(position.collateral).toFixed(2)} USC</span>
+                              </div>
+                              <div className="perp-position-row">
+                                <span>Liq. Price</span>
+                                <span className="liquidation-price">${formatPrice(position.liquidationPrice)}</span>
+                              </div>
+                              {position.isLiquidatable && (
+                                <div className="perp-liquidation-warning">
+                                  &#9888; Position at risk of liquidation!
+                                </div>
+                              )}
+                            </div>
+                            <div className="perp-position-actions">
+                              <button
+                                onClick={() => {
+                                  // Find the market for this position
+                                  const market = markets.find(m => m.address === marketAddress)
+                                  if (market) setSelectedMarket(market)
+                                  setSelectedPosition(position)
+                                  setPositionAction('addMargin')
+                                  setShowPositionModal(true)
+                                }}
+                                disabled={submitting}
+                              >
+                                Add Margin
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const market = markets.find(m => m.address === marketAddress)
+                                  if (market) setSelectedMarket(market)
+                                  setSelectedPosition(position)
+                                  setPositionAction('removeMargin')
+                                  setShowPositionModal(true)
+                                }}
+                                disabled={submitting}
+                              >
+                                Remove Margin
+                              </button>
+                              <button
+                                className="close-btn"
+                                onClick={() => {
+                                  const market = markets.find(m => m.address === marketAddress)
+                                  if (market) setSelectedMarket(market)
+                                  setSelectedPosition(position)
+                                  setPositionAction('close')
+                                  setShowPositionModal(true)
+                                }}
+                                disabled={submitting}
+                              >
+                                Close
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="perp-position-actions">
-                        <button
-                          onClick={() => {
-                            setSelectedPosition(position)
-                            setPositionAction('addMargin')
-                            setShowPositionModal(true)
-                          }}
-                          disabled={submitting}
-                        >
-                          Add Margin
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedPosition(position)
-                            setPositionAction('removeMargin')
-                            setShowPositionModal(true)
-                          }}
-                          disabled={submitting}
-                        >
-                          Remove Margin
-                        </button>
-                        <button
-                          className="close-btn"
-                          onClick={() => {
-                            setSelectedPosition(position)
-                            setPositionAction('close')
-                            setShowPositionModal(true)
-                          }}
-                          disabled={submitting}
-                        >
-                          Close
-                        </button>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -784,12 +1111,19 @@ function PerpetualFuturesModal({
           {/* Markets Tab */}
           {activeTab === 'markets' && !loading && (
             <div className="perp-markets-panel">
-              <h3>Available Markets</h3>
+              <div className="perp-markets-header">
+                <h3>Available Markets</h3>
+                <ViewToggle
+                  currentView={marketsViewMode}
+                  onViewChange={handleMarketsViewChange}
+                />
+              </div>
               {markets.length === 0 ? (
                 <div className="perp-no-markets">
                   <p>No markets available</p>
                 </div>
-              ) : (
+              ) : marketsViewMode === VIEW_MODES.GRID ? (
+                /* Card/Grid View */
                 <div className="perp-markets-grid">
                   {markets.map(market => (
                     <div
@@ -834,6 +1168,53 @@ function PerpetualFuturesModal({
                       </button>
                     </div>
                   ))}
+                </div>
+              ) : (
+                /* Table View */
+                <div className="perp-markets-table-wrapper">
+                  <table className="perp-markets-table">
+                    <thead>
+                      <tr>
+                        <th>Market</th>
+                        <th>Category</th>
+                        <th>Mark Price</th>
+                        <th>Open Interest</th>
+                        <th>Funding Rate</th>
+                        <th>Max Leverage</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {markets.map(market => (
+                        <tr
+                          key={market.id}
+                          className={`perp-market-row ${selectedMarket?.id === market.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedMarket(market)
+                            setActiveTab('trade')
+                          }}
+                        >
+                          <td className="market-name">
+                            <strong>{market.underlyingAsset}-PERP</strong>
+                          </td>
+                          <td>
+                            <span className={`perp-category-badge category-${market.category}`}>
+                              {getCategoryLabel(market.category)}
+                            </span>
+                          </td>
+                          <td className="market-price">${formatPrice(market.markPrice)}</td>
+                          <td>${formatPrice(market.metrics.openInterest)}</td>
+                          <td className={market.metrics.currentFundingRate >= 0 ? 'funding-positive' : 'funding-negative'}>
+                            {formatFundingRate(market.metrics.currentFundingRate)}
+                          </td>
+                          <td>{market.config.maxLeverage}x</td>
+                          <td>
+                            <button className="perp-trade-btn-small">Trade</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -907,6 +1288,32 @@ function PerpetualFuturesModal({
           </div>
         </div>
       )}
+
+      {/* Resume Order Prompt */}
+      {showResumePrompt && savedOrderState && (
+        <div className="perp-resume-backdrop">
+          <div className="perp-resume-modal">
+            <h3>Resume Previous Order?</h3>
+            <p>You have an unfinished order. Would you like to continue where you left off?</p>
+            <div className="perp-resume-details">
+              <span>Step: {ORDER_FLOW_STEPS[savedOrderState.step]?.label}</span>
+              {savedOrderState.formData.marketId && (
+                <span>Collateral: {savedOrderState.formData.collateral} USC</span>
+              )}
+            </div>
+            <div className="perp-resume-actions">
+              <button onClick={handleDiscardOrder}>Start Fresh</button>
+              <button className="primary" onClick={handleResumeOrder}>Resume Order</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Education Modal - shown once per wallet */}
+      <PerpEducationModal
+        isOpen={showEducationModal}
+        onDismiss={handleEducationDismiss}
+      />
     </div>
   )
 }
