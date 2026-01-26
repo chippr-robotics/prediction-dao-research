@@ -621,6 +621,12 @@
   color: var(--text-secondary);
 }
 
+.perp-role-hint {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
 .perp-select-market-prompt svg,
 .perp-no-positions svg {
   margin-bottom: 1rem;
@@ -976,6 +982,526 @@
 .perp-modal-actions button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ========================================
+   Markets View Toggle
+   ======================================== */
+
+.perp-markets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.perp-markets-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+/* ========================================
+   Order Flow Step Indicator
+   ======================================== */
+
+.perp-order-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: var(--surface-color);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.perp-order-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  cursor: default;
+  transition: all var(--transition-fast);
+}
+
+.perp-order-step:not(:disabled) {
+  cursor: pointer;
+}
+
+.perp-order-step:not(:disabled):hover {
+  color: var(--text-primary);
+}
+
+.perp-order-step.active {
+  color: var(--brand-primary);
+}
+
+.perp-order-step.completed {
+  color: var(--success-color, #10b981);
+}
+
+.perp-step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.perp-order-step.active .perp-step-number {
+  background: var(--brand-primary);
+  color: white;
+}
+
+.perp-order-step.completed .perp-step-number {
+  background: var(--success-color, #10b981);
+  color: white;
+}
+
+.perp-step-label {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .perp-step-label {
+    display: inline;
+  }
+}
+
+.perp-step-connector {
+  width: 24px;
+  height: 2px;
+  background: var(--border-color);
+  margin: 0 0.25rem;
+}
+
+.perp-order-step.completed + .perp-order-step .perp-step-connector,
+.perp-order-step.completed .perp-step-connector {
+  background: var(--success-color, #10b981);
+}
+
+/* Compact Market Selector */
+.perp-market-selector.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--surface-color);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+
+.perp-selected-market {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.perp-selected-market strong {
+  color: var(--text-primary);
+}
+
+.perp-selected-price {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.perp-change-market-btn {
+  padding: 0.375rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.perp-change-market-btn:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+/* Step Actions */
+.perp-step-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.perp-step-btn {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.perp-step-btn.secondary {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.perp-step-btn.secondary:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.perp-step-btn.primary {
+  background: var(--brand-primary);
+  border: none;
+  color: white;
+}
+
+.perp-step-btn.primary:hover:not(:disabled) {
+  background: var(--primary-button-hover);
+}
+
+.perp-step-btn.primary.long {
+  background: var(--success-color, #10b981);
+}
+
+.perp-step-btn.primary.short {
+  background: var(--error-color, #ef4444);
+}
+
+.perp-step-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Review Step */
+.perp-review-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.perp-review-header h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.perp-review-header p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.perp-review-summary {
+  background: var(--surface-color);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.perp-review-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.perp-review-row:last-child {
+  border-bottom: none;
+}
+
+.perp-review-row span:first-child {
+  color: var(--text-secondary);
+}
+
+.perp-review-row span:last-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.perp-review-row.highlight {
+  background: rgba(var(--brand-primary-rgb), 0.05);
+}
+
+.perp-review-row.highlight span:last-child.long {
+  color: var(--success-color, #10b981);
+}
+
+.perp-review-row.highlight span:last-child.short {
+  color: var(--error-color, #ef4444);
+}
+
+.perp-review-row.warning span:last-child {
+  color: var(--warning-color, #f59e0b);
+}
+
+/* Executing Step */
+.perp-executing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.perp-executing-content {
+  text-align: center;
+}
+
+.perp-spinner-large {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1.5rem;
+}
+
+.perp-executing-content h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.perp-executing-content p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Resume Prompt Modal */
+.perp-resume-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 1rem;
+}
+
+.perp-resume-modal {
+  background: var(--modal-background, #1a1b23);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 100%;
+  border: 1px solid var(--border-color);
+}
+
+.perp-resume-modal h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.perp-resume-modal > p {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.perp-resume-details {
+  background: var(--surface-color);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.perp-resume-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.perp-resume-actions button {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.perp-resume-actions button:first-child {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.perp-resume-actions button:first-child:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.perp-resume-actions button.primary {
+  background: var(--brand-primary);
+  border: none;
+  color: white;
+}
+
+.perp-resume-actions button.primary:hover {
+  background: var(--primary-button-hover);
+}
+
+/* ========================================
+   Aggregated Positions
+   ======================================== */
+
+.perp-positions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.perp-positions-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--text-primary);
+}
+
+.perp-positions-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  background: var(--surface-color);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+}
+
+.perp-positions-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.perp-market-group {
+  background: var(--surface-color);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.perp-market-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  background: rgba(var(--brand-primary-rgb), 0.05);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.perp-market-group-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.perp-market-group-count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.perp-market-group-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ========================================
+   Markets Table View
+   ======================================== */
+
+.perp-markets-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.perp-markets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.perp-markets-table th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--surface-color);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.perp-markets-table td {
+  padding: 0.875rem 1rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.perp-markets-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.perp-market-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.perp-market-row:hover {
+  background: rgba(var(--brand-primary-rgb), 0.05);
+}
+
+.perp-market-row.selected {
+  background: rgba(var(--brand-primary-rgb), 0.1);
+}
+
+.perp-market-row .market-name strong {
+  color: var(--text-primary);
+}
+
+.perp-market-row .market-price {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.perp-trade-btn-small {
+  padding: 0.5rem 1rem;
+  background: var(--brand-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.perp-trade-btn-small:hover {
+  background: var(--primary-button-hover);
 }
 
 /* ========================================

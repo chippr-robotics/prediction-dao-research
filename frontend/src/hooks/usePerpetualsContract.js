@@ -43,6 +43,7 @@ export function usePerpetualsContract(factoryAddress) {
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [positions, setPositions] = useState([])
+  const [allPositions, setAllPositions] = useState([]) // Aggregated positions across all markets
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -153,6 +154,20 @@ export function usePerpetualsContract(factoryAddress) {
       const marketContract = getMarketContract(marketAddress)
       if (!marketContract) return []
 
+      // Get collateral token decimals for proper formatting
+      const market = markets.find(m => m.address === marketAddress)
+      let collateralDecimals = 18 // Default fallback
+      if (market?.collateralToken) {
+        try {
+          const tokenContract = getTokenContract(market.collateralToken)
+          if (tokenContract) {
+            collateralDecimals = await tokenContract.decimals()
+          }
+        } catch (err) {
+          console.warn('Error getting collateral decimals, using 18:', err)
+        }
+      }
+
       const positionIds = await marketContract.getTraderPositions(account)
       const positionsList = []
 
@@ -170,11 +185,11 @@ export function usePerpetualsContract(factoryAddress) {
             trader: position.trader,
             side: Number(position.side),
             size: ethers.formatEther(position.size),
-            collateral: ethers.formatEther(position.collateral),
+            collateral: ethers.formatUnits(position.collateral, collateralDecimals),
             entryPrice: ethers.formatEther(position.entryPrice),
             leverage: Number(position.leverage) / 10000,
-            unrealizedPnL: ethers.formatEther(unrealizedPnL),
-            accumulatedFunding: ethers.formatEther(position.accumulatedFunding),
+            unrealizedPnL: ethers.formatUnits(unrealizedPnL, collateralDecimals),
+            accumulatedFunding: ethers.formatUnits(position.accumulatedFunding, collateralDecimals),
             openedAt: new Date(Number(position.openedAt) * 1000),
             liquidationPrice: ethers.formatEther(liquidationPrice),
             isLiquidatable
@@ -188,7 +203,83 @@ export function usePerpetualsContract(factoryAddress) {
       console.error('Error fetching positions:', err)
       return []
     }
-  }, [account, getMarketContract])
+  }, [account, getMarketContract, getTokenContract, markets])
+
+  /**
+   * Fetch ALL positions across ALL markets for current user
+   * Returns aggregated positions with market info attached
+   */
+  const fetchAllPositions = useCallback(async () => {
+    if (!account || markets.length === 0) {
+      setAllPositions([])
+      return []
+    }
+
+    try {
+      const aggregatedPositions = []
+
+      for (const market of markets) {
+        try {
+          const marketContract = getMarketContract(market.address)
+          if (!marketContract) continue
+
+          // Get collateral token decimals for proper formatting
+          let collateralDecimals = 18 // Default fallback
+          if (market.collateralToken) {
+            try {
+              const tokenContract = getTokenContract(market.collateralToken)
+              if (tokenContract) {
+                collateralDecimals = await tokenContract.decimals()
+              }
+            } catch (err) {
+              console.warn('Error getting collateral decimals, using 18:', err)
+            }
+          }
+
+          const positionIds = await marketContract.getTraderPositions(account)
+
+          for (const positionId of positionIds) {
+            const position = await marketContract.getPosition(positionId)
+            if (position.isOpen) {
+              const [unrealizedPnL, liquidationPrice, isLiquidatable] = await Promise.all([
+                marketContract.getUnrealizedPnL(positionId),
+                marketContract.getLiquidationPrice(positionId),
+                marketContract.isLiquidatable(positionId)
+              ])
+
+              aggregatedPositions.push({
+                id: Number(positionId),
+                marketAddress: market.address,
+                marketName: market.underlyingAsset,
+                marketId: market.id,
+                collateralToken: market.collateralToken,
+                trader: position.trader,
+                side: Number(position.side),
+                size: ethers.formatEther(position.size),
+                collateral: ethers.formatUnits(position.collateral, collateralDecimals),
+                entryPrice: ethers.formatEther(position.entryPrice),
+                markPrice: market.markPrice,
+                leverage: Number(position.leverage) / 10000,
+                unrealizedPnL: ethers.formatUnits(unrealizedPnL, collateralDecimals),
+                accumulatedFunding: ethers.formatUnits(position.accumulatedFunding, collateralDecimals),
+                openedAt: new Date(Number(position.openedAt) * 1000),
+                liquidationPrice: ethers.formatEther(liquidationPrice),
+                isLiquidatable
+              })
+            }
+          }
+        } catch (err) {
+          console.warn(`Error fetching positions for market ${market.address}:`, err)
+        }
+      }
+
+      setAllPositions(aggregatedPositions)
+      return aggregatedPositions
+    } catch (err) {
+      console.error('Error fetching all positions:', err)
+      return []
+    }
+  }, [account, markets, getMarketContract, getTokenContract])
 
   /**
    * Open a new position
@@ -212,9 +303,12 @@ export function usePerpetualsContract(factoryAddress) {
       throw new Error('Failed to initialize contracts')
     }
 
-    // Parse amounts
+    // Get token decimals for correct amount parsing
+    const decimals = await tokenContract.decimals()
+
+    // Parse amounts - size uses 18 decimals (internal), collateral uses token decimals
     const sizeWei = ethers.parseEther(size.toString())
-    const collateralWei = ethers.parseEther(collateralAmount.toString())
+    const collateralWei = ethers.parseUnits(collateralAmount.toString(), decimals)
     const leverageScaled = Math.floor(leverage * 10000)
 
     // Check and approve token allowance
@@ -290,7 +384,9 @@ export function usePerpetualsContract(factoryAddress) {
       throw new Error('Failed to initialize contracts')
     }
 
-    const amountWei = ethers.parseEther(amount.toString())
+    // Get token decimals for correct amount parsing
+    const decimals = await tokenContract.decimals()
+    const amountWei = ethers.parseUnits(amount.toString(), decimals)
 
     // Check and approve token allowance
     const allowance = await tokenContract.allowance(account, marketAddress)
@@ -309,6 +405,7 @@ export function usePerpetualsContract(factoryAddress) {
    */
   const removePositionCollateral = useCallback(async (
     marketAddress,
+    collateralToken,
     positionId,
     amount
   ) => {
@@ -317,15 +414,19 @@ export function usePerpetualsContract(factoryAddress) {
     }
 
     const marketContract = getMarketContract(marketAddress, true)
-    if (!marketContract) {
-      throw new Error('Failed to initialize market contract')
+    const tokenContract = getTokenContract(collateralToken, true)
+
+    if (!marketContract || !tokenContract) {
+      throw new Error('Failed to initialize contracts')
     }
 
-    const amountWei = ethers.parseEther(amount.toString())
+    // Get token decimals for correct amount parsing
+    const decimals = await tokenContract.decimals()
+    const amountWei = ethers.parseUnits(amount.toString(), decimals)
     const tx = await marketContract.removeCollateral(positionId, amountWei)
     await tx.wait()
     return true
-  }, [signer, isConnected, isCorrectNetwork, getMarketContract])
+  }, [signer, isConnected, isCorrectNetwork, getMarketContract, getTokenContract])
 
   /**
    * Liquidate a position
@@ -383,6 +484,7 @@ export function usePerpetualsContract(factoryAddress) {
     markets,
     selectedMarket,
     positions,
+    allPositions,
     loading,
     error,
 
@@ -392,6 +494,7 @@ export function usePerpetualsContract(factoryAddress) {
     // Actions
     fetchMarkets,
     fetchPositions,
+    fetchAllPositions,
     openPosition,
     closePosition,
     addPositionCollateral,

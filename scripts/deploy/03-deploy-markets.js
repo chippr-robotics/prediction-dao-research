@@ -177,7 +177,11 @@ async function main() {
     console.log("\n  Deploying PerpetualFuturesFactory...");
     const perpFactory = await deployDeterministic(
       "PerpetualFuturesFactory",
-      [fundingRateEngine.address],
+      [
+        fundingRateEngine.address,  // _fundingRateEngine
+        deployer.address,           // _feeRecipient (treasury)
+        collateralToken             // _defaultCollateralToken (USC)
+      ],
       generateSalt(perpSaltPrefix + "PerpetualFuturesFactory"),
       deployer
     );
@@ -244,7 +248,7 @@ async function main() {
   if (deployPerpetuals && deployments.fundingRateEngine) {
     verificationTargets.push(
       { name: "FundingRateEngine", address: deployments.fundingRateEngine, constructorArguments: [] },
-      { name: "PerpetualFuturesFactory", address: deployments.perpFactory, constructorArguments: [deployments.fundingRateEngine] }
+      { name: "PerpetualFuturesFactory", address: deployments.perpFactory, constructorArguments: [deployments.fundingRateEngine, deployer.address, collateralToken] }
     );
   }
 

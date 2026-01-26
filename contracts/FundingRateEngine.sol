@@ -126,7 +126,7 @@ contract FundingRateEngine is Ownable {
 
     // ============ Constructor ============
 
-    constructor() Ownable(msg.sender) {
+    constructor(address _owner) Ownable(_owner) {
         // Set default configuration
         defaultConfig = FundingConfig({
             fundingInterval: FUNDING_PERIOD,        // 8 hours

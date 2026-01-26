@@ -24,12 +24,13 @@ describe("Perpetual Futures System", function () {
 
     // Deploy FundingRateEngine
     const FundingRateEngine = await ethers.getContractFactory("FundingRateEngine");
-    fundingRateEngine = await FundingRateEngine.deploy();
+    fundingRateEngine = await FundingRateEngine.deploy(owner.address);
     await fundingRateEngine.waitForDeployment();
 
     // Deploy PerpetualFuturesFactory
     const PerpetualFuturesFactory = await ethers.getContractFactory("PerpetualFuturesFactory");
     perpFactory = await PerpetualFuturesFactory.deploy(
+      owner.address,
       await fundingRateEngine.getAddress(),
       feeRecipient.address,
       await mockCollateralToken.getAddress()

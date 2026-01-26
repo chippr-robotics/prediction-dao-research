@@ -1,71 +1,86 @@
 const { ethers } = require("hardhat");
+const { requireAddress, MembershipTier, getRoleHash } = require("./lib/addresses");
 
 /**
  * Grant FRIEND_MARKET_ROLE to a user on TieredRoleManager
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor
+ *   USER=0x123... npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor
+ *   USER=0x123... TIER=SILVER npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor
  */
 
-const CONTRACTS = {
-  tieredRoleManager: '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF',
-};
-
-// User to grant role to
-const USER_ADDRESS = '0x52502d049571C7893447b86c4d8B38e6184bF6e1';
-
-// Tier values
-const MembershipTier = {
-  NONE: 0,
-  BRONZE: 1,
-  SILVER: 2,
-  GOLD: 3,
-  PLATINUM: 4
-};
-
 async function main() {
+  // Get user address from environment
+  const userAddress = process.env.USER;
+  if (!userAddress || !ethers.isAddress(userAddress)) {
+    console.error("Error: Valid USER address required");
+    console.log("\nUsage:");
+    console.log("  USER=0x123... npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor");
+    process.exit(1);
+  }
+
+  // Get tier from environment or default to BRONZE
+  const tierName = (process.env.TIER || "BRONZE").toUpperCase();
+  const tier = MembershipTier[tierName];
+  if (tier === undefined) {
+    console.error(`Error: Invalid tier '${tierName}'`);
+    console.log("Valid tiers: NONE, BRONZE, SILVER, GOLD, PLATINUM");
+    process.exit(1);
+  }
+
   console.log("=".repeat(60));
   console.log("Grant FRIEND_MARKET_ROLE to User");
   console.log("=".repeat(60));
 
+  const network = await ethers.provider.getNetwork();
+  console.log(`\nNetwork: ${network.name || "unknown"} (Chain ID: ${network.chainId})`);
+
   const [signer] = await ethers.getSigners();
   console.log("Signer address:", signer.address);
-  console.log("User address:", USER_ADDRESS);
+  console.log("User address:", userAddress);
+  console.log("Tier:", tierName);
+
+  // Get contract address from shared config
+  const tieredRoleManagerAddress = requireAddress("tieredRoleManager");
+  console.log("\nTieredRoleManager:", tieredRoleManagerAddress);
 
   // Connect to TieredRoleManager
   const tieredRoleManager = await ethers.getContractAt(
     "TieredRoleManager",
-    CONTRACTS.tieredRoleManager
+    tieredRoleManagerAddress
   );
 
   // Get role hash
-  const friendMarketRole = await tieredRoleManager.FRIEND_MARKET_ROLE();
+  const friendMarketRole = getRoleHash("FRIEND_MARKET");
   console.log("\nFRIEND_MARKET_ROLE hash:", friendMarketRole);
 
   // Check current role status
-  const hasRole = await tieredRoleManager.hasRole(friendMarketRole, USER_ADDRESS);
+  const hasRole = await tieredRoleManager.hasRole(friendMarketRole, userAddress);
   console.log("Current hasRole:", hasRole);
 
   if (hasRole) {
     // Check tier
-    const tier = await tieredRoleManager.getUserTier(USER_ADDRESS, friendMarketRole);
-    console.log("Current tier:", tier);
-    console.log("\nUser already has FRIEND_MARKET_ROLE!");
+    try {
+      const currentTier = await tieredRoleManager.getUserTier(userAddress, friendMarketRole);
+      console.log("Current tier:", currentTier);
 
-    // Check if membership is active
-    const isActive = await tieredRoleManager.isMembershipActive(USER_ADDRESS, friendMarketRole);
-    console.log("Membership active:", isActive);
+      // Check if membership is active
+      const isActive = await tieredRoleManager.isMembershipActive(userAddress, friendMarketRole);
+      console.log("Membership active:", isActive);
 
-    if (!isActive) {
+      if (isActive) {
+        console.log("\nUser already has active FRIEND_MARKET_ROLE!");
+        console.log("No action needed.");
+        return;
+      }
       console.log("Membership expired, will re-grant...");
-    } else {
-      console.log("No action needed.");
-      return;
+    } catch (e) {
+      // Some contracts may not have these functions
     }
   }
 
   // Check if signer has admin role
-  const adminRole = await tieredRoleManager.DEFAULT_ADMIN_ROLE();
+  const adminRole = ethers.ZeroHash;
   const isAdmin = await tieredRoleManager.hasRole(adminRole, signer.address);
   console.log("\nSigner is admin:", isAdmin);
 
@@ -75,9 +90,9 @@ async function main() {
     process.exit(1);
   }
 
-  // Grant role using grantTier with BRONZE tier (matching TierRegistry)
+  // Grant role using grantTier
   console.log("\n--- Granting FRIEND_MARKET_ROLE ---");
-  console.log("Using tier: BRONZE (1)");
+  console.log(`Using tier: ${tierName} (${tier})`);
   console.log("Duration: 1 year");
 
   try {
@@ -85,9 +100,9 @@ async function main() {
     const oneYearDuration = 365 * 24 * 60 * 60;
 
     const tx = await tieredRoleManager.grantTier(
-      USER_ADDRESS,
+      userAddress,
       friendMarketRole,
-      MembershipTier.BRONZE,
+      tier,
       oneYearDuration
     );
     console.log("Transaction hash:", tx.hash);
@@ -96,14 +111,14 @@ async function main() {
     console.log("Transaction confirmed in block:", receipt.blockNumber);
 
     // Verify the role was granted
-    const hasRoleNow = await tieredRoleManager.hasRole(friendMarketRole, USER_ADDRESS);
+    const hasRoleNow = await tieredRoleManager.hasRole(friendMarketRole, userAddress);
     console.log("\nVerification - hasRole after grant:", hasRoleNow);
 
     if (hasRoleNow) {
-      console.log("\n SUCCESS: FRIEND_MARKET_ROLE granted!");
+      console.log("\nSUCCESS: FRIEND_MARKET_ROLE granted!");
       console.log("User can now create friend markets.");
     } else {
-      console.log("\n FAILED: Role was not granted. Please check contract state.");
+      console.log("\nFAILED: Role was not granted. Please check contract state.");
     }
 
   } catch (error) {

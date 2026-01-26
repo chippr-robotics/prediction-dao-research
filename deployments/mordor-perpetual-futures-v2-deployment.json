@@ -1,0 +1,16 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "timestamp": "2026-01-26T01:24:29.299Z",
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "version": "2.0-fixed-decimals",
+  "contracts": {
+    "fundingRateEngine": "0x1F3ec2FaB298Dd684e90f73e44f9267e02b958fE",
+    "perpFactory": "0xF6B327a581D99CC55ed0BA00de2aF6edf2f9b5Db"
+  },
+  "markets": [],
+  "tokens": {
+    "USC": "0xDE093684c796204224BC081f937aa059D903c52a",
+    "WETC": "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a"
+  }
+}

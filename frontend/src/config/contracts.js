@@ -4,7 +4,7 @@
  * These addresses are deterministically deployed and should remain consistent
  * across deployments. Update these if contracts are redeployed.
  *
- * Last updated: 2026-01-24 (consolidated deployment)
+ * Last updated: 2026-01-26 (perpetual futures v2.1 redeployment)
  */
 
 export const DEPLOYED_CONTRACTS = {
@@ -35,6 +35,10 @@ export const DEPLOYED_CONTRACTS = {
   // Market Contracts (03-deploy-markets.js)
   ctf1155: '0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9',
   friendGroupMarketFactory: '0x0E118DEf0946f0e7F1BEAAA385c6c37CAc6acfa7',
+
+  // Perpetual Futures Contracts (v2.1 - fixed decimals + ownership)
+  fundingRateEngine: '0x32AD4F7a1e05138fc0F485c786aeDB90dBE100e8',
+  perpFactory: '0xE3B84aecc9Ee0D2a35530BfAcb3D184c372cdc71',
 
   // Registry Contracts (04-deploy-registries.js)
   marketCorrelationRegistry: '0x2a820A38997743fC3303cDcA56b996598963B909',

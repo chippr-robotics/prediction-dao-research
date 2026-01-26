@@ -143,6 +143,8 @@ export function WalletProvider({ children }) {
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
     const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+    const adminRoles = ['ADMIN', 'CORE_SYSTEM_ADMIN', 'OPERATIONS_ADMIN', 'EMERGENCY_GUARDIAN', 'OVERSIGHT_COMMITTEE']
+    const allSyncedRoles = [...premiumRoles, ...adminRoles]
     const updatedRoles = []
     let hasChanges = false
     let syncErrors = []
@@ -150,8 +152,8 @@ export function WalletProvider({ children }) {
     console.log('[RoleSync] Starting blockchain sync for:', walletAddress)
     console.log('[RoleSync] Local roles:', localRoles)
 
-    // Check each premium role on-chain
-    for (const roleName of premiumRoles) {
+    // Check each role on-chain (both premium and admin roles)
+    for (const roleName of allSyncedRoles) {
       try {
         const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
         const hasLocally = localRoles.includes(roleName)
@@ -184,9 +186,9 @@ export function WalletProvider({ children }) {
       }
     }
 
-    // Keep non-premium roles (like ADMIN) that are stored locally
+    // Keep any other roles that are stored locally but not in our synced list
     for (const role of localRoles) {
-      if (!premiumRoles.includes(role) && !updatedRoles.includes(role)) {
+      if (!allSyncedRoles.includes(role) && !updatedRoles.includes(role)) {
         updatedRoles.push(role)
       }
     }
