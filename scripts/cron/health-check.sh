@@ -22,8 +22,15 @@ set -e
 # CONFIGURATION
 # =============================================================================
 
-LOG_DIR="/var/log/perp-funding"
-PROJECT_DIR="/chipprbots/NAS/github/prediction-dao-research"
+LOG_DIR="${LOG_DIR:-/var/log/perp-funding}"
+
+# Path to the project directory
+# Can be overridden via environment variable or auto-detected
+if [ -z "$PROJECT_DIR" ]; then
+    # Try to auto-detect project root (script is in scripts/cron/)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
 
 # Thresholds
 MAX_LOG_AGE_MINUTES=60       # Alert if no logs in this time

@@ -522,11 +522,6 @@ function PerpetualFuturesModal({
     }
   }, [address])
 
-  // Progress to next step
-  const handleNextStep = () => {
-    setOrderFlowStep(prev => Math.min(prev + 1, ORDER_FLOW_STEPS.length - 1))
-  }
-
   // Go back to previous step
   const handlePrevStep = () => {
     setOrderFlowStep(prev => Math.max(prev - 1, 0))

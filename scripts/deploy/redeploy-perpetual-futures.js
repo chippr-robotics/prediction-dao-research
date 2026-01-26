@@ -14,7 +14,6 @@ const fs = require("fs");
 const path = require("path");
 
 const {
-  SALT_PREFIXES,
   TOKENS,
 } = require("./lib/constants");
 
@@ -22,7 +21,6 @@ const {
   generateSalt,
   deployDeterministic,
   ensureSingletonFactory,
-  saveDeployment,
   verifyOnBlockscout,
 } = require("./lib/helpers");
 

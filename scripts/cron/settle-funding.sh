@@ -23,7 +23,12 @@ set -e
 # =============================================================================
 
 # Path to the project directory
-PROJECT_DIR="/chipprbots/NAS/github/prediction-dao-research"
+# Can be overridden via environment variable or auto-detected
+if [ -z "$PROJECT_DIR" ]; then
+    # Try to auto-detect project root (script is in scripts/cron/)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
 
 # Network to use (mordor, mainnet, etc.)
 NETWORK="mordor"

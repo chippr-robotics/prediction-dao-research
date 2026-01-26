@@ -283,7 +283,14 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         marketName = _marketName;
         underlyingAsset = _underlyingAsset;
         collateralToken = IERC20(_collateralToken);
-        collateralDecimals = IERC20Metadata(_collateralToken).decimals();
+
+        // Try to get decimals from ERC20Metadata, default to 18 if not supported
+        try IERC20Metadata(_collateralToken).decimals() returns (uint8 decimals) {
+            collateralDecimals = decimals;
+        } catch {
+            collateralDecimals = 18;
+        }
+
         feeRecipient = _feeRecipient;
         status = MarketStatus.Active;
 
@@ -520,10 +527,19 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
         _applyFunding(positionId);
         int256 pnl = _calculatePnL(position);
         // Normalize PnL and funding to 18 decimals for comparison
-        int256 normalizedPnl = int256(_normalizeCollateral(pnl >= 0 ? uint256(pnl) : uint256(-pnl)));
-        if (pnl < 0) normalizedPnl = -normalizedPnl;
-        int256 normalizedFunding = int256(_normalizeCollateral(position.accumulatedFunding >= 0 ? uint256(position.accumulatedFunding) : uint256(-position.accumulatedFunding)));
-        if (position.accumulatedFunding < 0) normalizedFunding = -normalizedFunding;
+        // Use safe conversion pattern to avoid overflow on int256.min
+        int256 normalizedPnl;
+        if (pnl >= 0) {
+            normalizedPnl = int256(_normalizeCollateral(uint256(pnl)));
+        } else {
+            normalizedPnl = -int256(_normalizeCollateral(uint256(-(pnl + 1)) + 1));
+        }
+        int256 normalizedFunding;
+        if (position.accumulatedFunding >= 0) {
+            normalizedFunding = int256(_normalizeCollateral(uint256(position.accumulatedFunding)));
+        } else {
+            normalizedFunding = -int256(_normalizeCollateral(uint256(-(position.accumulatedFunding + 1)) + 1));
+        }
         int256 effectiveCollateral = int256(normalizedRemaining) + normalizedPnl + normalizedFunding;
 
         require(effectiveCollateral >= int256(requiredMargin), "Insufficient margin after removal");
@@ -895,12 +911,16 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
      * @notice Normalize collateral amount to 18 decimals for calculations
      * @param amount Amount in collateral token decimals
      * @return Normalized amount in 18 decimals
+     * @dev Supports tokens with 0-36 decimals. Tokens with >18 decimals lose precision
+     *      when normalizing down. Most ERC20 tokens use 6-18 decimals.
+     *      For tokens with decimals > 18, division may result in precision loss.
      */
     function _normalizeCollateral(uint256 amount) internal view returns (uint256) {
         if (collateralDecimals == 18) return amount;
         if (collateralDecimals < 18) {
             return amount * (10 ** (18 - collateralDecimals));
         } else {
+            // Note: This division may result in precision loss for high-decimal tokens
             return amount / (10 ** (collateralDecimals - 18));
         }
     }
@@ -909,12 +929,17 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
      * @notice Denormalize amount from 18 decimals to collateral token decimals
      * @param amount Amount in 18 decimals
      * @return Denormalized amount in collateral token decimals
+     * @dev Supports tokens with 0-36 decimals. Tokens with >18 decimals may cause
+     *      overflow on large amounts when multiplying up. Division for <18 decimal
+     *      tokens may result in precision loss.
      */
     function _denormalizeCollateral(uint256 amount) internal view returns (uint256) {
         if (collateralDecimals == 18) return amount;
         if (collateralDecimals < 18) {
+            // Note: This division may result in precision loss
             return amount / (10 ** (18 - collateralDecimals));
         } else {
+            // Note: Large amounts with high-decimal tokens could overflow
             return amount * (10 ** (collateralDecimals - 18));
         }
     }
