@@ -27,12 +27,13 @@ async function deployPerpetualFuturesFixture() {
 
   // Deploy FundingRateEngine
   const FundingRateEngine = await ethers.getContractFactory("FundingRateEngine");
-  const fundingRateEngine = await FundingRateEngine.deploy();
+  const fundingRateEngine = await FundingRateEngine.deploy(owner.address);
   await fundingRateEngine.waitForDeployment();
 
   // Deploy PerpetualFuturesFactory
   const PerpetualFuturesFactory = await ethers.getContractFactory("PerpetualFuturesFactory");
   const perpFactory = await PerpetualFuturesFactory.deploy(
+    owner.address,
     await fundingRateEngine.getAddress(),
     feeRecipient.address,
     await collateralToken.getAddress()
