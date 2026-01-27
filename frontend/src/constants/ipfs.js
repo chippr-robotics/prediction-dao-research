@@ -10,13 +10,22 @@
  * API keys and gateway URL for Pinata IPFS service
  */
 export const PINATA_CONFIG = {
-  // Pinata API endpoint for pinning
+  // Pinata API endpoint for pinning (direct - for local dev with JWT)
   API_URL: 'https://api.pinata.cloud',
+
+  // Pinata Proxy endpoint (via nginx - for production, handles auth server-side)
+  // This bypasses CORS and CSP restrictions by proxying through our own server
+  PROXY_URL: '/api/pinata',
+
+  // Whether to use the proxy (true in production, false for local dev with JWT)
+  // In production, nginx handles the JWT authentication
+  USE_PROXY: import.meta.env.PROD && !import.meta.env.VITE_PINATA_JWT,
 
   // Pinata Gateway URL (use custom gateway if provided, otherwise public gateway)
   GATEWAY: import.meta.env.VITE_PINATA_GATEWAY || 'https://gateway.pinata.cloud',
 
-  // Pinata JWT for authentication (required for uploads)
+  // Pinata JWT for authentication (required for uploads in dev, optional in prod)
+  // In production, this is handled by the nginx proxy
   JWT: import.meta.env.VITE_PINATA_JWT || '',
 
   // Pinata API Key (alternative auth method)

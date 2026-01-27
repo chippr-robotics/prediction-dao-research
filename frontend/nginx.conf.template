@@ -1,35 +1,64 @@
 server {
     listen 8080;
     server_name _;
-    
+
     root /usr/share/nginx/html;
     index index.html;
-    
+
+    # Pinata API proxy - bypasses CORS restrictions
+    # JWT is injected at container startup via envsubst
+    location /api/pinata/ {
+        # Proxy to Pinata API
+        proxy_pass https://api.pinata.cloud/pinning/;
+        proxy_ssl_server_name on;
+
+        # Set required headers
+        proxy_set_header Host api.pinata.cloud;
+        proxy_set_header Authorization "Bearer ${VITE_PINATA_JWT}";
+        proxy_set_header Content-Type "application/json";
+
+        # Remove headers that might cause issues
+        proxy_set_header Origin "";
+        proxy_hide_header Access-Control-Allow-Origin;
+
+        # Add CORS headers for browser
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
+
+        # Handle preflight requests
+        if ($request_method = 'OPTIONS') {
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization";
+            add_header Content-Length 0;
+            add_header Content-Type text/plain;
+            return 204;
+        }
+
+        # Timeouts for upload operations
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
     # Handle SPA routing - all routes should serve index.html
     location / {
         try_files $uri $uri/ /index.html;
     }
-    
+
     # Cache static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
-    
+
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    # Content Security Policy (CSP) - controls what resources can be loaded
-    # default-src: Base policy for unspecified directives
-    # script-src: JavaScript sources (includes Cloudflare Insights for analytics with wildcard subdomain support)
-    # style-src: CSS sources
-    # img-src: Image sources (includes WalletConnect explorer API, data URIs, and external images)
-    # font-src: Font sources
-    # connect-src: XHR/fetch/WebSocket connections (includes blockchain RPCs, IPFS, WalletConnect, and Cloudflare)
-    # frame-src: iFrame sources (WalletConnect verification UI)
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://explorer-api.walletconnect.com https://explorer-api.walletconnect.org https://ipfs.fairwins.app https://gateway.pinata.cloud https://ipfs.io https://cloudflare-ipfs.com https://*.tile.openstreetmap.org; font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com https://fonts.reown.com; connect-src 'self' https://rpc.mordor.etccooperative.org https://etc.rivet.link http://localhost:8545 https://ipfs.fairwins.app https://gateway.pinata.cloud https://ipfs.io https://cloudflare-ipfs.com https://api.coingecko.com wss://relay.walletconnect.com wss://relay.walletconnect.org https://relay.walletconnect.com https://relay.walletconnect.org https://rpc.walletconnect.com https://rpc.walletconnect.org https://explorer-api.walletconnect.com https://explorer-api.walletconnect.org https://verify.walletconnect.com https://verify.walletconnect.org https://pulse.walletconnect.com https://pulse.walletconnect.org https://api.web3modal.com https://api.web3modal.org https://keys.walletconnect.com https://keys.walletconnect.org https://notify.walletconnect.com https://notify.walletconnect.org https://echo.walletconnect.com https://echo.walletconnect.org https://push.walletconnect.com https://push.walletconnect.org https://*.cloudflareinsights.com; frame-src https://verify.walletconnect.com https://verify.walletconnect.org;" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    
+
     # Gzip compression
     gzip on;
     gzip_vary on;

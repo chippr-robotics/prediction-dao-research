@@ -1,27 +1,33 @@
 steps:
-  # Build the Docker image with secrets passed as build arguments
+  # Build the Docker image
+  # Note: VITE_PINATA_JWT is NOT passed as a build arg - it's injected at runtime
+  # via Cloud Run environment variable from Secret Manager
   - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
     args:
-      - '-c'
-      - |
-        docker build \
-          --build-arg VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e \
-          --build-arg VITE_APP_URL=https://fairwins.app \
-          --build-arg VITE_NETWORK_ID=63 \
-          --build-arg VITE_RPC_URL=https://rpc.mordor.etccooperative.org \
-          --build-arg VITE_IPFS_GATEWAY=https://ipfs.fairwins.app \
-          --build-arg VITE_PINATA_JWT=$$PINATA_JWT \
-          -t us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA \
-          -t us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:latest \
-          .
-    secretEnv: ['PINATA_JWT']
+      - 'build'
+      - '--build-arg'
+      - 'VITE_WALLETCONNECT_PROJECT_ID=c30d7d7a8d575fe3dcc72ed55e5b287e'
+      - '--build-arg'
+      - 'VITE_APP_URL=https://fairwins.app'
+      - '--build-arg'
+      - 'VITE_NETWORK_ID=63'
+      - '--build-arg'
+      - 'VITE_RPC_URL=https://rpc.mordor.etccooperative.org'
+      - '--build-arg'
+      - 'VITE_IPFS_GATEWAY=https://ipfs.fairwins.app'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:latest'
+      - '.'
 
   # Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', '--all-tags', 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research']
 
   # Deploy to Cloud Run
+  # The VITE_PINATA_JWT environment variable is already configured in Cloud Run
+  # to be pulled from Secret Manager at runtime
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -39,11 +45,6 @@ steps:
 images:
   - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:$COMMIT_SHA'
   - 'us-central1-docker.pkg.dev/chippr-bots-site-wp/cloud-run-source-deploy/prediction-dao-research/prediction-dao-research:latest'
-
-availableSecrets:
-  secretManager:
-    - versionName: projects/266380754692/secrets/VITE_PINATA_JWT/versions/latest
-      env: 'PINATA_JWT'
 
 options:
   logging: CLOUD_LOGGING_ONLY
