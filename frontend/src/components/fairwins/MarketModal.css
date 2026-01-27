@@ -860,6 +860,42 @@
   .modal-stat-value {
     font-size: 0.8rem;
   }
+
+  /* Smaller navigation dots on mobile */
+  .market-modal-new .panel-indicators {
+    gap: 0.2rem;
+    padding: 0.2rem 0;
+  }
+
+  .market-modal-new .indicator {
+    width: 5px !important;
+    height: 5px !important;
+  }
+
+  .market-modal-new .indicator.active {
+    width: 10px !important;
+    height: 5px !important;
+    border-radius: 2.5px !important;
+  }
+}
+
+/* Portrait mode on mobile - even smaller dots */
+@media (max-width: 480px) and (orientation: portrait) {
+  .market-modal-new .panel-indicators {
+    gap: 0.15rem;
+    padding: 0.15rem 0;
+  }
+
+  .market-modal-new .indicator {
+    width: 4px !important;
+    height: 4px !important;
+  }
+
+  .market-modal-new .indicator.active {
+    width: 8px !important;
+    height: 4px !important;
+    border-radius: 2px !important;
+  }
 }
 
 @media (max-height: 700px) {
@@ -919,6 +955,23 @@
 
   .send-btn {
     padding: 0.625rem;
+  }
+
+  /* Smaller navigation dots on shorter screens */
+  .market-modal-new .panel-indicators {
+    gap: 0.2rem;
+    padding: 0.15rem 0;
+  }
+
+  .market-modal-new .indicator {
+    width: 5px !important;
+    height: 5px !important;
+  }
+
+  .market-modal-new .indicator.active {
+    width: 10px !important;
+    height: 5px !important;
+    border-radius: 2.5px !important;
   }
 }
 
@@ -1006,6 +1059,23 @@
   .quick-action-btn {
     padding: 0.25rem 0.375rem;
     font-size: 0.7rem;
+  }
+
+  /* Even smaller navigation dots */
+  .market-modal-new .panel-indicators {
+    gap: 0.15rem;
+    padding: 0.1rem 0;
+  }
+
+  .market-modal-new .indicator {
+    width: 4px !important;
+    height: 4px !important;
+  }
+
+  .market-modal-new .indicator.active {
+    width: 8px !important;
+    height: 4px !important;
+    border-radius: 2px !important;
   }
 }
 

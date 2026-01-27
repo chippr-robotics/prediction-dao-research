@@ -51,9 +51,7 @@ export function generateMarketMetadata(params) {
 
   const metadata = {
     name,
-    description: resolutionCriteria
-      ? `${description}\n\n**Description:**\n${resolutionCriteria}`
-      : description,
+    description, // Short question/title for the market
     external_url: `https://fairwins.app/market/${marketId}`,
     image: imageUrl,
     attributes: [
@@ -169,6 +167,11 @@ export function generateMarketMetadata(params) {
 
   if (oracleSources.length > 0) {
     metadata.properties.oracle_sources = oracleSources
+  }
+
+  // Store resolution criteria separately (detailed description)
+  if (resolutionCriteria) {
+    metadata.properties.resolution_criteria = resolutionCriteria
   }
 
   return metadata

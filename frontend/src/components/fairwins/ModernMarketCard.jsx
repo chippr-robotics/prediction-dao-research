@@ -72,7 +72,7 @@ const formatNumber = (num) => {
 }
 
 // Sparkline generation constants
-const SPARKLINE_DATA_POINTS = 12
+const SPARKLINE_DATA_POINTS = 24
 const SPARKLINE_MIN_PRICE = 0.05
 const SPARKLINE_MAX_PRICE = 0.95
 const SPARKLINE_TREND_FACTOR = 0.1
@@ -177,18 +177,36 @@ const formatTimeRemaining = (endTime) => {
   const now = new Date()
   const end = new Date(endTime)
   const diff = end - now
-  
+
   if (diff <= 0) return 'Ended'
-  
+
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  
+
   if (days > 30) {
     const months = Math.floor(days / 30)
     return `${months}mo`
   }
   if (days > 0) return `${days}d`
   return `${hours}h`
+}
+
+// Extract short description (text before **Description:**) for card display
+const getShortDescription = (description) => {
+  if (!description) return ''
+
+  // Find text before **Description:** marker
+  const descriptionMarkerPattern = /\*\*[Dd]escription:?\*\*/
+  const match = description.match(descriptionMarkerPattern)
+
+  if (match) {
+    // Return only the text before the **Description:** marker
+    const beforeMarker = description.substring(0, match.index).trim()
+    return beforeMarker
+  }
+
+  // If no marker found, return the full description (trimmed)
+  return description.trim()
 }
 
 function ModernMarketCard({
@@ -215,45 +233,38 @@ function ModernMarketCard({
   const trend = useMemo(() => calculateTrend(sparklineData), [sparklineData])
   
   // Get subcategory display name
-  const subcategoryName = useMemo(() => 
-    market.subcategory ? getSubcategoryName(market.subcategory) : null, 
+  const subcategoryName = useMemo(() =>
+    market.subcategory ? getSubcategoryName(market.subcategory) : null,
     [market.subcategory]
   )
 
-  // Precompute sparkline points (shared by path and area)
-  const sparklinePoints = useMemo(() => {
+  // Get short description (text before **Description:**) for card display
+  const shortDescription = useMemo(() =>
+    getShortDescription(market.description),
+    [market.description]
+  )
+
+  // Precompute sparkline bars for bar chart
+  const sparklineBars = useMemo(() => {
     const min = Math.min(...sparklineData)
     const max = Math.max(...sparklineData)
     const range = max - min || 0.1
+    const barCount = sparklineData.length
+    const gap = 1
+    const totalGapWidth = gap * (barCount - 1)
+    const availableWidth = SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING - totalGapWidth
+    const barWidth = availableWidth / barCount
+    const maxBarHeight = SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING
 
     return sparklineData.map((val, i) => {
-      const x =
-        SPARKLINE_PADDING +
-        (i / (sparklineData.length - 1)) *
-          (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
-      const y =
-        SPARKLINE_PADDING +
-        (1 - (val - min) / range) *
-          (SPARKLINE_HEIGHT - 2 * SPARKLINE_PADDING)
-      return `${x},${y}`
+      const normalizedHeight = ((val - min) / range) * maxBarHeight
+      const barHeight = Math.max(2, normalizedHeight) // minimum height of 2px
+      const x = SPARKLINE_PADDING + i * (barWidth + gap)
+      const y = SPARKLINE_HEIGHT - SPARKLINE_PADDING - barHeight
+
+      return { x, y, width: barWidth, height: barHeight }
     })
   }, [sparklineData])
-
-  // Create SVG path for sparkline
-  const sparklinePath = useMemo(() => {
-    return `M ${sparklinePoints.join(' L ')}`
-  }, [sparklinePoints])
-
-  // Create area path for sparkline
-  const sparklineArea = useMemo(() => {
-    const firstX = SPARKLINE_PADDING
-    const lastX =
-      SPARKLINE_PADDING + (SPARKLINE_WIDTH - 2 * SPARKLINE_PADDING)
-
-    return `M ${firstX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} L ${sparklinePoints.join(
-      ' L '
-    )} L ${lastX},${SPARKLINE_HEIGHT - SPARKLINE_PADDING} Z`
-  }, [sparklinePoints])
 
   // Calculate gauge arc for full circle (use circumference and dashoffset so 100% => full circle)
   const gaugeArc = useMemo(() => {
@@ -365,6 +376,7 @@ function ModernMarketCard({
         <div className="thumbnail-overlay">
           {/* Header with badges - positioned at top of image */}
           <div className="card-header">
+            <h3 className="card-title">{market.proposalTitle}</h3>
             <div className="card-badges">
               {/* Show subcategory instead of category since we pre-sort by category */}
               {subcategoryName && (
@@ -385,10 +397,9 @@ function ModernMarketCard({
           </div>
           
           {/* Primary question text over the background image */}
-          {market.description && (
-          <p className="card-description">{market.description}</p>
-        )}
-          <h3 className="card-title">{market.proposalTitle}</h3>
+          {shortDescription && (
+            <p className="card-description">{shortDescription}</p>
+          )}
         </div>
       </div>
 
@@ -434,16 +445,19 @@ function ModernMarketCard({
           <div className="trend-label">Price History</div>
           <div className="sparkline-container-v2">
             <svg viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} preserveAspectRatio="none">
-              <path
-                className="sparkline-area"
-                d={sparklineArea}
-                fill={trend.direction === 'up' ? '#36B37E' : '#e17055'}
-              />
-              <path
-                className="sparkline-line"
-                d={sparklinePath}
-                stroke={trend.direction === 'up' ? '#36B37E' : '#e17055'}
-              />
+              {sparklineBars.map((bar, i) => (
+                <rect
+                  key={i}
+                  x={bar.x}
+                  y={bar.y}
+                  width={bar.width}
+                  height={bar.height}
+                  rx={2}
+                  ry={2}
+                  fill={trend.direction === 'up' ? '#36B37E' : '#e17055'}
+                  opacity={0.6 + (i / sparklineBars.length) * 0.4}
+                />
+              ))}
             </svg>
           </div>
           <div>

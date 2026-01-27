@@ -35,7 +35,7 @@ describe('generateMarketMetadata', () => {
     expect(metadata.properties.market_id).toBe(123)
   })
 
-  it('should include resolution criteria in description', () => {
+  it('should store resolution criteria separately in properties', () => {
     const metadata = generateMarketMetadata({
       marketId: 1,
       name: 'Test Market',
@@ -45,9 +45,23 @@ describe('generateMarketMetadata', () => {
       onChainData: {}
     })
 
-    expect(metadata.description).toContain('Base description')
-    expect(metadata.description).toContain('**Description:**')
-    expect(metadata.description).toContain('Market resolves when price hits $100K')
+    // Description should remain unchanged (not concatenated)
+    expect(metadata.description).toBe('Base description')
+    // Resolution criteria should be stored separately in properties
+    expect(metadata.properties.resolution_criteria).toBe('Market resolves when price hits $100K')
+  })
+
+  it('should not include resolution_criteria in properties when not provided', () => {
+    const metadata = generateMarketMetadata({
+      marketId: 1,
+      name: 'Test Market',
+      description: 'Base description',
+      category: 'test',
+      onChainData: {}
+    })
+
+    expect(metadata.description).toBe('Base description')
+    expect(metadata.properties.resolution_criteria).toBeUndefined()
   })
 
   it('should add numeric attributes from on-chain data', () => {
