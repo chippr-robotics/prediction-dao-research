@@ -3,6 +3,40 @@ import { useCallback, useMemo } from 'react'
 import './MarketDetailsPanel.css'
 
 /**
+ * Parse description to extract question and detailed description
+ * Handles both old format (concatenated with **Description:**) and new format (separate fields)
+ * @param {string} description - The raw description field
+ * @param {string} resolutionCriteria - The separate resolution criteria field (if available)
+ * @returns {{ question: string, detailedDescription: string }}
+ */
+function parseDescription(description, resolutionCriteria) {
+  // If resolutionCriteria is provided separately, use the new format
+  if (resolutionCriteria) {
+    return {
+      question: description || '',
+      detailedDescription: resolutionCriteria
+    }
+  }
+
+  // Handle old concatenated format: "Question **Description:** Detailed description"
+  if (description) {
+    const descriptionMarkerPattern = /\*\*[Dd]escription:?\*\*:?\s*/
+    const match = description.match(descriptionMarkerPattern)
+
+    if (match) {
+      const question = description.substring(0, match.index).trim()
+      const detailedDescription = description.substring(match.index + match[0].length).trim()
+      return { question, detailedDescription }
+    }
+
+    // No marker found, treat entire description as question
+    return { question: description, detailedDescription: '' }
+  }
+
+  return { question: '', detailedDescription: '' }
+}
+
+/**
  * MarketDetailsPanel - Displays detailed information about a prediction market
  * Shows market creation, maker, settlement time, decision criteria, etc.
  * Uses a compact table layout for better visibility
@@ -33,6 +67,13 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
     if (!market?.correlationGroup || !linkedMarkets?.length) return []
     return linkedMarkets.filter(m => m.id !== market.id)
   }, [linkedMarkets, market])
+
+  // Parse description to separate question and detailed description
+  // Handles both old concatenated format and new separate fields
+  const { question, detailedDescription } = useMemo(() =>
+    parseDescription(market?.description, market?.resolutionCriteria),
+    [market?.description, market?.resolutionCriteria]
+  )
 
   if (!market) return null
 
@@ -168,18 +209,18 @@ function MarketDetailsPanel({ market, linkedMarkets = [] }) {
       )}
 
       {/* Question */}
-      {market.description && (
+      {question && (
         <div className="criteria-section">
           <div className="section-label">Question</div>
-          <div className="criteria-content">{market.description}</div>
+          <div className="criteria-content">{question}</div>
         </div>
       )}
 
       {/* Description */}
-      {market.resolutionCriteria && (
+      {detailedDescription && (
         <div className="criteria-section">
           <div className="section-label">Description</div>
-          <div className="criteria-content">{market.resolutionCriteria}</div>
+          <div className="criteria-content">{detailedDescription}</div>
         </div>
       )}
     </div>
