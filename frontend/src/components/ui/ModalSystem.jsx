@@ -43,7 +43,7 @@ function ModalSystem() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [modal, hideModal])
 
-  if (!modal) {
+  if (!modal || !modal.content) {
     return null
   }
 
