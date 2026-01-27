@@ -385,10 +385,10 @@ function ModernMarketCard({
           </div>
           
           {/* Primary question text over the background image */}
-          {market.description && (
-          <p className="card-description">{market.description}</p>
-        )}
           <h3 className="card-title">{market.proposalTitle}</h3>
+          {market.description && (
+            <p className="card-description">{market.description}</p>
+          )}
         </div>
       </div>
 

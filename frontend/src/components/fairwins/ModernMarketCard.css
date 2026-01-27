@@ -137,15 +137,16 @@
   position: relative;
   z-index: 5;
   padding: 0px 14px;
-  margin: 0;
-  font-size: .5rem;
-  font-weight: 800;
-  color: #dddddd;
-  line-height: 1.35;
+  margin: 0 0 6px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   line-clamp: 3;
   -webkit-box-orient: vertical;
+  overflow: hidden;
   overflow-wrap: break-word;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
 }
@@ -156,27 +157,29 @@
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
 }
 
-/* Card title - Primary text over background - BOLD and VISIBLE */
+/* Card description - Subtitle below title - smaller and muted */
 .card-description {
   position: relative;
-  z-index: 1;
-  padding: 0px 14px;
+  z-index: 5;
+  padding: 0px 14px 8px;
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #ffffff;
-  line-height: 1;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
   display: -webkit-box;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
   overflow-wrap: break-word;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* Light mode title - still white over dark overlay */
+/* Light mode description - still lighter over dark overlay */
 .theme-light .card-description {
-  color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
 .card-badges {

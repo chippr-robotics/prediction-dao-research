@@ -525,6 +525,8 @@ async function fetchSingleMarket(contract, marketId) {
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
       resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+      // H3 index for weather markets (geographic location)
+      h3_index: metadata?.properties?.h3_index || null,
       // CTF fields for trading
       useCTF: market.useCTF,
       conditionId: market.conditionId,
@@ -805,6 +807,8 @@ export async function fetchMarketByIdFromBlockchain(id) {
       image: metadata?.image || null,
       tags: metadata?.properties?.tags || [],
       resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+      // H3 index for weather markets (geographic location)
+      h3_index: metadata?.properties?.h3_index || null,
       // CTF fields for trading
       useCTF: market.useCTF,
       conditionId: market.conditionId,
