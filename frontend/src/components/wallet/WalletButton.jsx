@@ -430,14 +430,12 @@ function WalletButton({ className = '' }) {
 
       // Check if user has FRIEND_MARKET role (checks both TierRegistry AND RoleManager)
       let hasFriendMarketRole = false
-      let friendMarketTierName = 'Unknown'
       try {
         // First check TierRegistry for tier info
         const friendMarketTier = await getUserTierOnChain(userAddress, 'FRIEND_MARKET')
         console.log('TierRegistry FRIEND_MARKET tier:', friendMarketTier)
         if (friendMarketTier.tier > 0) {
           hasFriendMarketRole = true
-          friendMarketTierName = friendMarketTier.tierName
           console.log('User has FRIEND_MARKET role via TierRegistry (tier', friendMarketTier.tierName + ')')
         }
       } catch (tierError) {
@@ -450,7 +448,6 @@ function WalletButton({ className = '' }) {
           const hasRoleInManager = await hasRoleOnChain(userAddress, 'FRIEND_MARKET')
           if (hasRoleInManager) {
             hasFriendMarketRole = true
-            friendMarketTierName = 'RoleManager'
             console.log('User has FRIEND_MARKET role via RoleManager (legacy)')
           }
         } catch (roleError) {
