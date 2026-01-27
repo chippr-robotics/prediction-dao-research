@@ -157,15 +157,15 @@
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 1);
 }
 
-/* Card description - Subtitle below title - smaller and muted */
+/* Card description - Subtitle below title */
 .card-description {
   position: relative;
   z-index: 5;
   padding: 0px 14px 8px;
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 2rem;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.75);
+  color: #ffffff;
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -176,9 +176,9 @@
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* Light mode description - still lighter over dark overlay */
+/* Light mode description */
 .theme-light .card-description {
-  color: rgba(255, 255, 255, 0.8);
+  color: #ffffff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
@@ -378,14 +378,14 @@
 .stats-row{
   position: absolute;
   right: 8px;
-  bottom: 8px;
+  bottom: -2px;
   z-index: 1;
   display:flex;
   flex-direction:row;
   flex-wrap:nowrap;
   gap:6px;
   align-items: center;
-  padding: 4px 6px;
+  padding: 0;
   background: rgba(0,0,0,0.25);
   border-radius: 8px;
   backdrop-filter: blur(4px);
