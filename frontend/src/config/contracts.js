@@ -21,7 +21,7 @@ export const DEPLOYED_CONTRACTS = {
   oracleResolver: '0x2AaCC0D91AF255667683ece0A363649Cc9Ed8776',
   ragequitModule: '0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c',
   futarchyGovernor: '0x0292a5bdf60E851c043bDceE378D505801A6aEef',
-  tokenMintFactory: '0x5bBa4c4985c36525D14D7d7627Ab479B8b2E2205',
+  tokenMintFactory: '0xD5cAcc508F7e0d578D014E9552d73F8cd18CA5CC',
   daoFactory: '0x9B1692272D54CA7b4dEAa7622aBddb6059eb8202',
 
   // RBAC Contracts (02-deploy-rbac.js)

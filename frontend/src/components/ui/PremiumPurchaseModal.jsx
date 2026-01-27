@@ -43,35 +43,58 @@ const MEMBERSHIP_TIERS = {
   PLATINUM: { id: 4, name: 'Platinum', color: '#e5e4e2' }
 }
 
-// Tier benefits for display
+// Tier benefits matching TierLimits struct from TierRegistry contract:
+// - dailyBetLimit, weeklyBetLimit, monthlyMarketCreation, maxPositionSize
+// - maxConcurrentMarkets, withdrawalLimit, canCreatePrivateMarkets
+// - canUseAdvancedFeatures, feeDiscount (basis points)
 const TIER_BENEFITS = {
   BRONZE: {
-    dailyBets: 10,
-    monthlyMarkets: 5,
-    maxPosition: '100 USC',
-    duration: '30 days',
-    features: ['Basic market access', 'Standard support']
+    dailyBetLimit: 10,
+    weeklyBetLimit: 50,
+    monthlyMarketCreation: 5,
+    maxPositionSize: '100 USC',
+    maxConcurrentMarkets: 3,
+    withdrawalLimit: '500 USC',
+    canCreatePrivateMarkets: false,
+    canUseAdvancedFeatures: false,
+    feeDiscount: 0,
+    duration: '30 days'
   },
   SILVER: {
-    dailyBets: 25,
-    monthlyMarkets: 15,
-    maxPosition: '500 USC',
-    duration: '30 days',
-    features: ['Priority support', 'Advanced analytics']
+    dailyBetLimit: 25,
+    weeklyBetLimit: 125,
+    monthlyMarketCreation: 15,
+    maxPositionSize: '500 USC',
+    maxConcurrentMarkets: 10,
+    withdrawalLimit: '2,000 USC',
+    canCreatePrivateMarkets: false,
+    canUseAdvancedFeatures: true,
+    feeDiscount: 5,
+    duration: '30 days'
   },
   GOLD: {
-    dailyBets: 50,
-    monthlyMarkets: 30,
-    maxPosition: '2,000 USC',
-    duration: '30 days',
-    features: ['Premium support', 'Full analytics', 'Private markets']
+    dailyBetLimit: 50,
+    weeklyBetLimit: 250,
+    monthlyMarketCreation: 30,
+    maxPositionSize: '2,000 USC',
+    maxConcurrentMarkets: 25,
+    withdrawalLimit: '10,000 USC',
+    canCreatePrivateMarkets: true,
+    canUseAdvancedFeatures: true,
+    feeDiscount: 10,
+    duration: '30 days'
   },
   PLATINUM: {
-    dailyBets: 'Unlimited',
-    monthlyMarkets: 'Unlimited',
-    maxPosition: 'Unlimited',
-    duration: '30 days',
-    features: ['Dedicated support', 'API access', 'Exclusive features']
+    dailyBetLimit: 'Unlimited',
+    weeklyBetLimit: 'Unlimited',
+    monthlyMarketCreation: 'Unlimited',
+    maxPositionSize: 'Unlimited',
+    maxConcurrentMarkets: 'Unlimited',
+    withdrawalLimit: 'Unlimited',
+    canCreatePrivateMarkets: true,
+    canUseAdvancedFeatures: true,
+    feeDiscount: 20,
+    duration: '30 days'
   }
 }
 
@@ -127,8 +150,222 @@ const ROLE_DETAILS = {
   }
 }
 
+// Role-specific benefit categories
+// Each role type shows different relevant limits/features
+const ROLE_BENEFIT_CATEGORIES = {
+  TOKENMINT: {
+    type: 'token_creation',
+    tierBenefits: {
+      BRONZE: { tokenCreations: 5, nftCollections: 2, etcSwapListing: false, advancedFeatures: false },
+      SILVER: { tokenCreations: 15, nftCollections: 10, etcSwapListing: true, advancedFeatures: true },
+      GOLD: { tokenCreations: 50, nftCollections: 25, etcSwapListing: true, advancedFeatures: true },
+      PLATINUM: { tokenCreations: 'Unlimited', nftCollections: 'Unlimited', etcSwapListing: true, advancedFeatures: true }
+    }
+  },
+  CLEARPATH_USER: {
+    type: 'governance',
+    tierBenefits: {
+      BRONZE: { proposalsPerMonth: 3, daosManaged: 2, zkPrivacy: true, advancedAnalytics: false },
+      SILVER: { proposalsPerMonth: 10, daosManaged: 5, zkPrivacy: true, advancedAnalytics: true },
+      GOLD: { proposalsPerMonth: 25, daosManaged: 10, zkPrivacy: true, advancedAnalytics: true },
+      PLATINUM: { proposalsPerMonth: 'Unlimited', daosManaged: 'Unlimited', zkPrivacy: true, advancedAnalytics: true }
+    }
+  },
+  FRIEND_MARKET: {
+    type: 'betting',
+    useLegacyBenefits: true
+  },
+  MARKET_MAKER: {
+    type: 'betting',
+    useLegacyBenefits: true
+  }
+}
+
 // Note: Tier prices are now fetched from TierRegistry contract via useTierPrices hook
 // All prices are in USC (stablecoin) - ETC is only used for gas
+
+/**
+ * RoleBenefitsDisplay - Renders role-specific tier benefits
+ * Shows different limits/features based on role type (token, governance, betting)
+ */
+function RoleBenefitsDisplay({ roleKey, tierName, chainLimits }) {
+  const category = ROLE_BENEFIT_CATEGORIES[roleKey]
+
+  if (!category) return null
+
+  // Token creation role (TOKENMINT)
+  if (category.type === 'token_creation') {
+    const benefits = category.tierBenefits[tierName]
+    return (
+      <div className="ppm-tier-limits ppm-tier-limits--tokens">
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">Tokens/Month:</span>
+          <span className="ppm-limit-value">{benefits.tokenCreations}</span>
+        </div>
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">NFT Collections:</span>
+          <span className="ppm-limit-value">{benefits.nftCollections}</span>
+        </div>
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">ETCSwap Listing:</span>
+          <span className="ppm-limit-value">{benefits.etcSwapListing ? 'Yes' : 'No'}</span>
+        </div>
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">Advanced Features:</span>
+          <span className="ppm-limit-value">{benefits.advancedFeatures ? 'Yes' : 'No'}</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Governance role (CLEARPATH_USER)
+  if (category.type === 'governance') {
+    const benefits = category.tierBenefits[tierName]
+    return (
+      <div className="ppm-tier-limits ppm-tier-limits--governance">
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">Proposals/Month:</span>
+          <span className="ppm-limit-value">{benefits.proposalsPerMonth}</span>
+        </div>
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">DAOs Managed:</span>
+          <span className="ppm-limit-value">{benefits.daosManaged}</span>
+        </div>
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">ZK Privacy:</span>
+          <span className="ppm-limit-value">{benefits.zkPrivacy ? 'Enabled' : 'No'}</span>
+        </div>
+        <div className="ppm-limit-item">
+          <span className="ppm-limit-label">Advanced Analytics:</span>
+          <span className="ppm-limit-value">{benefits.advancedAnalytics ? 'Yes' : 'No'}</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Betting roles (FRIEND_MARKET, MARKET_MAKER) - use legacy benefits or chain limits
+  const benefits = chainLimits || TIER_BENEFITS[tierName]
+  return (
+    <div className="ppm-tier-limits">
+      <div className="ppm-limit-item">
+        <span className="ppm-limit-label">Daily Bets:</span>
+        <span className="ppm-limit-value">{benefits.dailyBetLimit}</span>
+      </div>
+      <div className="ppm-limit-item">
+        <span className="ppm-limit-label">Weekly Bets:</span>
+        <span className="ppm-limit-value">{benefits.weeklyBetLimit}</span>
+      </div>
+      <div className="ppm-limit-item">
+        <span className="ppm-limit-label">Markets/Month:</span>
+        <span className="ppm-limit-value">{benefits.monthlyMarketCreation}</span>
+      </div>
+      <div className="ppm-limit-item">
+        <span className="ppm-limit-label">Max Position:</span>
+        <span className="ppm-limit-value">{benefits.maxPositionSize}</span>
+      </div>
+      <div className="ppm-limit-item">
+        <span className="ppm-limit-label">Active Markets:</span>
+        <span className="ppm-limit-value">{benefits.maxConcurrentMarkets}</span>
+      </div>
+      <div className="ppm-limit-item">
+        <span className="ppm-limit-label">Daily Withdrawals:</span>
+        <span className="ppm-limit-value">{benefits.withdrawalLimit}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * RoleBenefitFeatures - Renders role-specific feature checkmarks
+ */
+function RoleBenefitFeatures({ roleKey, tierName, chainLimits }) {
+  const category = ROLE_BENEFIT_CATEGORIES[roleKey]
+
+  if (!category) return null
+
+  // Token creation features
+  if (category.type === 'token_creation') {
+    const benefits = category.tierBenefits[tierName]
+    return (
+      <ul className="ppm-tier-features">
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          Create ERC20 Tokens
+        </li>
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          Create NFT Collections
+        </li>
+        {benefits.etcSwapListing && (
+          <li>
+            <span className="ppm-feature-check" aria-hidden="true">✓</span>
+            ETCSwap Integration
+          </li>
+        )}
+        {benefits.advancedFeatures && (
+          <li>
+            <span className="ppm-feature-check" aria-hidden="true">✓</span>
+            Advanced Token Features
+          </li>
+        )}
+      </ul>
+    )
+  }
+
+  // Governance features
+  if (category.type === 'governance') {
+    const benefits = category.tierBenefits[tierName]
+    return (
+      <ul className="ppm-tier-features">
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          DAO Governance Access
+        </li>
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          Vote on Proposals
+        </li>
+        {benefits.zkPrivacy && (
+          <li>
+            <span className="ppm-feature-check" aria-hidden="true">✓</span>
+            ZK Privacy Features
+          </li>
+        )}
+        {benefits.advancedAnalytics && (
+          <li>
+            <span className="ppm-feature-check" aria-hidden="true">✓</span>
+            Advanced Analytics
+          </li>
+        )}
+      </ul>
+    )
+  }
+
+  // Betting features
+  const benefits = chainLimits || TIER_BENEFITS[tierName]
+  return (
+    <ul className="ppm-tier-features">
+      {benefits.canCreatePrivateMarkets && (
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          Private Markets
+        </li>
+      )}
+      {benefits.canUseAdvancedFeatures && (
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          Advanced Features
+        </li>
+      )}
+      {benefits.feeDiscount > 0 && (
+        <li>
+          <span className="ppm-feature-check" aria-hidden="true">✓</span>
+          {benefits.feeDiscount}% Fee Discount
+        </li>
+      )}
+    </ul>
+  )
+}
 
 /**
  * PremiumPurchaseModal Component
@@ -184,8 +421,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   const [userCurrentTiers, setUserCurrentTiers] = useState({})
   const [isLoadingTiers, setIsLoadingTiers] = useState(false)
 
-  // Fetch tier prices from contract
-  const { getPrice, getTotalPrice } = useTierPrices()
+  // Fetch tier prices and limits from contract
+  const { getPrice, getTotalPrice, getLimits } = useTierPrices()
 
   // Calculate pricing based on tier (uses prices from contract)
   const pricing = useMemo(() => {
@@ -324,47 +561,65 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   }, [currentStep, validateStep])
 
   // Get a verified signer that is authorized for the connected account
+  // Always requests fresh authorization to avoid stale signer issues after rejected transactions
   const getVerifiedSigner = async () => {
-    let activeSigner = signer
+    if (!window.ethereum) {
+      throw new Error('No wallet detected. Please install MetaMask or another Web3 wallet.')
+    }
 
-    // Verify the signer is authorized for the connected address
-    if (activeSigner) {
-      try {
-        const signerAddress = await activeSigner.getAddress()
-        console.log('[PremiumPurchaseModal] Signer address:', signerAddress)
-        console.log('[PremiumPurchaseModal] Connected address:', account)
+    try {
+      // Always request fresh authorization - this handles cases where:
+      // 1. User previously rejected a transaction (signer becomes stale)
+      // 2. User switched accounts in the wallet
+      // 3. Wallet session expired
+      console.log('[PremiumPurchaseModal] Requesting wallet authorization...')
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
 
-        if (account && signerAddress.toLowerCase() !== account.toLowerCase()) {
-          console.warn('[PremiumPurchaseModal] Signer address mismatch, requesting fresh authorization...')
-          activeSigner = null // Force refresh
-        }
-      } catch (addressError) {
-        console.warn('[PremiumPurchaseModal] Error verifying signer:', addressError)
-        activeSigner = null // Force refresh
+      if (!accounts || accounts.length === 0) {
+        throw new Error('No accounts returned from wallet')
       }
-    }
 
-    // If signer is stale or not available, get a fresh one
-    if (!activeSigner && window.ethereum) {
-      try {
-        // Request accounts to ensure authorization
-        await window.ethereum.request({ method: 'eth_requestAccounts' })
-        // Create fresh provider and signer
-        const { ethers } = await import('ethers')
-        const freshProvider = new ethers.BrowserProvider(window.ethereum)
-        activeSigner = await freshProvider.getSigner()
-        console.log('[PremiumPurchaseModal] Fresh signer obtained')
-      } catch (refreshError) {
-        console.error('[PremiumPurchaseModal] Failed to get fresh signer:', refreshError)
-        throw new Error('Wallet authorization failed. Please reconnect your wallet.')
+      // Verify the returned account matches the expected connected account
+      const authorizedAccount = accounts[0].toLowerCase()
+      const expectedAccount = account?.toLowerCase()
+
+      if (expectedAccount && authorizedAccount !== expectedAccount) {
+        console.warn('[PremiumPurchaseModal] Account mismatch:', {
+          authorized: authorizedAccount,
+          expected: expectedAccount
+        })
+        throw new Error(`Wallet account mismatch. Expected ${account?.slice(0, 8)}... but got ${accounts[0].slice(0, 8)}...`)
       }
-    }
 
-    if (!activeSigner) {
-      throw new Error('No signer available. Please reconnect your wallet.')
-    }
+      // Create fresh provider and signer with the authorized account
+      const { ethers } = await import('ethers')
+      const freshProvider = new ethers.BrowserProvider(window.ethereum)
+      const freshSigner = await freshProvider.getSigner()
 
-    return activeSigner
+      // Double-check the signer address
+      const signerAddress = await freshSigner.getAddress()
+      console.log('[PremiumPurchaseModal] Signer address:', signerAddress)
+      console.log('[PremiumPurchaseModal] Connected address:', account)
+
+      if (signerAddress.toLowerCase() !== authorizedAccount) {
+        throw new Error('Signer address does not match authorized account')
+      }
+
+      console.log('[PremiumPurchaseModal] Fresh signer obtained successfully')
+      return freshSigner
+    } catch (error) {
+      console.error('[PremiumPurchaseModal] Failed to get verified signer:', error)
+
+      // Provide user-friendly error messages
+      if (error.code === 4001) {
+        throw new Error('You rejected the wallet connection request. Please try again and approve the connection.')
+      }
+      if (error.code === 4100) {
+        throw new Error('The wallet account is not authorized. Please reconnect your wallet.')
+      }
+
+      throw new Error(`Wallet authorization failed: ${error.message}`)
+    }
   }
 
   // Purchase handler
@@ -711,9 +966,10 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                 {!isLoadingTiers && availableTiers.length > 0 && (
                   <div className="ppm-tier-grid">
                     {availableTiers.map(([tierKey, tier]) => {
-                      const benefits = TIER_BENEFITS[tierKey]
                       const tierTotal = selectedRoles.reduce((sum, role) => sum + getPrice(role, tierKey), 0)
                       const isSelected = selectedTier === tierKey
+                      const primaryRole = selectedRoles[0]
+                      const chainLimits = getLimits(primaryRole, tierKey)
 
                       return (
                         <label
@@ -741,33 +997,42 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                               <span className="ppm-tier-price">${tierTotal} USC</span>
                             </div>
 
-                            <div className="ppm-tier-limits">
-                              <div className="ppm-limit-item">
-                                <span className="ppm-limit-label">Daily Bets:</span>
-                                <span className="ppm-limit-value">{benefits.dailyBets}</span>
-                              </div>
-                              <div className="ppm-limit-item">
-                                <span className="ppm-limit-label">Monthly Markets:</span>
-                                <span className="ppm-limit-value">{benefits.monthlyMarkets}</span>
-                              </div>
-                              <div className="ppm-limit-item">
-                                <span className="ppm-limit-label">Max Position:</span>
-                                <span className="ppm-limit-value">{benefits.maxPosition}</span>
-                              </div>
-                              <div className="ppm-limit-item">
-                                <span className="ppm-limit-label">Duration:</span>
-                                <span className="ppm-limit-value">{benefits.duration}</span>
-                              </div>
-                            </div>
+                            {/* Single role: show that role's specific benefits */}
+                            {selectedRoles.length === 1 && (
+                              <>
+                                <RoleBenefitsDisplay
+                                  roleKey={primaryRole}
+                                  tierName={tierKey}
+                                  chainLimits={chainLimits}
+                                />
+                                <RoleBenefitFeatures
+                                  roleKey={primaryRole}
+                                  tierName={tierKey}
+                                  chainLimits={chainLimits}
+                                />
+                              </>
+                            )}
 
-                            <ul className="ppm-tier-features">
-                              {benefits.features.map((feature, idx) => (
-                                <li key={idx}>
-                                  <span className="ppm-feature-check" aria-hidden="true">✓</span>
-                                  {feature}
-                                </li>
-                              ))}
-                            </ul>
+                            {/* Multiple roles: show grouped benefits per role */}
+                            {selectedRoles.length > 1 && (
+                              <div className="ppm-multi-role-benefits">
+                                {selectedRoles.map(roleKey => {
+                                  const roleChainLimits = getLimits(roleKey, tierKey)
+                                  return (
+                                    <div key={roleKey} className="ppm-role-benefit-section">
+                                      <h5>
+                                        {ROLE_DETAILS[roleKey]?.icon} {ROLE_INFO[roleKey]?.name}
+                                      </h5>
+                                      <RoleBenefitsDisplay
+                                        roleKey={roleKey}
+                                        tierName={tierKey}
+                                        chainLimits={roleChainLimits}
+                                      />
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
                           </div>
                         </label>
                       )
@@ -969,17 +1234,22 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                   ))}
                 </div>
 
-                {/* Tier Benefits */}
+                {/* Tier Benefits - Per Role */}
                 <div className="ppm-tier-summary">
                   <h4>Your {tierInfo?.name} Benefits</h4>
-                  <ul>
-                    <li>Daily Bets: {tierBenefits?.dailyBets}</li>
-                    <li>Monthly Markets: {tierBenefits?.monthlyMarkets}</li>
-                    <li>Max Position: {tierBenefits?.maxPosition}</li>
-                    {tierBenefits?.features.map((feature, idx) => (
-                      <li key={idx}>{feature}</li>
-                    ))}
-                  </ul>
+                  {selectedRoles.map(roleKey => {
+                    const roleChainLimits = getLimits(roleKey, selectedTier)
+                    return (
+                      <div key={roleKey} className="ppm-role-summary-section">
+                        <h5>{ROLE_DETAILS[roleKey]?.icon} {ROLE_INFO[roleKey]?.name}</h5>
+                        <RoleBenefitsDisplay
+                          roleKey={roleKey}
+                          tierName={selectedTier}
+                          chainLimits={roleChainLimits}
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* What's Next */}

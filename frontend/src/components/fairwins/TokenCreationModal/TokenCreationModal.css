@@ -679,6 +679,15 @@
   border-top: 1px solid var(--border-color, #e5e7eb);
 }
 
+.tcm-cost-note {
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6b7280);
+  text-align: center;
+}
+
 .tcm-address-short {
   font-family: monospace;
   font-size: 0.85rem;

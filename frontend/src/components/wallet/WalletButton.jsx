@@ -1350,7 +1350,7 @@ function WalletButton({ className = '' }) {
                   <div className="friend-market-promo">
                     <p className="promo-text">Create private prediction markets with friends!</p>
                     <button
-                      onClick={handleOpenPurchaseModal}
+                      onClick={() => handleOpenPurchaseModal()}
                       className="action-button purchase-access-btn"
                       role="menuitem"
                     >
@@ -1377,7 +1377,7 @@ function WalletButton({ className = '' }) {
                   <div className="create-market-promo">
                     <p className="promo-text">Create prediction markets with liquidity pools!</p>
                     <button
-                      onClick={handleOpenPurchaseModal}
+                      onClick={() => handleOpenPurchaseModal()}
                       className="action-button purchase-access-btn"
                       role="menuitem"
                     >

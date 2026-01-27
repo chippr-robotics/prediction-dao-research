@@ -1488,6 +1488,62 @@
   color: var(--text-secondary, #718096);
 }
 
+/* Multi-role benefits display */
+.ppm-multi-role-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ppm-role-benefit-section {
+  padding: 0.75rem;
+  background: var(--bg-secondary, #f1f5f9);
+  border-radius: var(--radius-sm, 6px);
+  border-left: 3px solid var(--tier-color, #4299e1);
+}
+
+.ppm-role-benefit-section h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--text-primary, #1a202c);
+}
+
+.ppm-role-summary-section {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.ppm-role-summary-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ppm-role-summary-section h5 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary, #1a202c);
+}
+
+/* Token creation specific styling */
+.ppm-tier-limits--tokens {
+  border-left: 3px solid var(--tokenmint-color, #ffd700);
+  background: rgba(255, 215, 0, 0.05);
+}
+
+/* Governance specific styling */
+.ppm-tier-limits--governance {
+  border-left: 3px solid var(--clearpath-color, #36b37e);
+  background: rgba(54, 179, 126, 0.05);
+}
+
 /* ===========================
    Responsive Design
    =========================== */
