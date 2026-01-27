@@ -2,7 +2,7 @@
 
 .tp-container {
   padding: 1rem;
-  background: var(--bg-secondary, #1a1a2e);
+  background: var(--surface-color, var(--bg-secondary, #FFFFFF));
   border-radius: 8px;
   margin-bottom: 1rem;
 }
@@ -32,14 +32,14 @@
 
 .tp-pending-content strong {
   display: block;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary, #1F2933);
   margin-bottom: 0.25rem;
 }
 
 .tp-pending-content p {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #a0a0a0);
+  color: var(--text-secondary, #5A6772);
 }
 
 .tp-pending-actions {
@@ -74,9 +74,9 @@
   justify-content: center;
   font-size: 0.875rem;
   font-weight: 600;
-  background: var(--bg-tertiary, #2a2a4a);
-  border: 2px solid var(--border-color, #3a3a5a);
-  color: var(--text-secondary, #a0a0a0);
+  background: var(--bg-primary, #F7F9FA);
+  border: 2px solid var(--border-color, #E3E7EB);
+  color: var(--text-secondary, #5A6772);
   transition: all 0.3s ease;
   z-index: 2;
 }
@@ -96,7 +96,7 @@
 .tp-step-label {
   margin-top: 0.5rem;
   font-size: 0.75rem;
-  color: var(--text-secondary, #a0a0a0);
+  color: var(--text-secondary, #5A6772);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -106,7 +106,7 @@
 
 .tp-step.current .tp-step-label,
 .tp-step.complete .tp-step-label {
-  color: var(--text-primary, #fff);
+  color: var(--text-primary, #1F2933);
 }
 
 .tp-step-connector {
@@ -115,7 +115,7 @@
   left: calc(50% + 20px);
   right: calc(-50% + 20px);
   height: 2px;
-  background: var(--border-color, #3a3a5a);
+  background: var(--border-color, #E3E7EB);
   z-index: 1;
 }
 
@@ -131,7 +131,7 @@
   font-size: 0.875rem;
 }
 
-/* Spinner */
+/* Spinner - Note: Spinners inside step indicators stay white (on colored bg) */
 .tp-spinner {
   width: 16px;
   height: 16px;
@@ -141,12 +141,13 @@
   animation: tp-spin 0.8s linear infinite;
 }
 
+/* Small spinner uses theme-aware colors for non-indicator contexts */
 .tp-spinner-small {
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid var(--border-color, #E3E7EB);
+  border-top-color: var(--brand-primary, #36B37E);
   border-radius: 50%;
   animation: tp-spin 0.8s linear infinite;
 }
@@ -165,7 +166,7 @@
 
 .tp-step-description {
   font-size: 0.875rem;
-  color: var(--text-secondary, #a0a0a0);
+  color: var(--text-secondary, #5A6772);
   margin-bottom: 0.5rem;
 }
 
@@ -226,7 +227,7 @@
 .tp-error-content p {
   margin: 0;
   font-size: 0.875rem;
-  color: var(--text-secondary, #a0a0a0);
+  color: var(--text-secondary, #5A6772);
   word-break: break-word;
 }
 
@@ -288,10 +289,10 @@
   gap: 0.5rem;
   margin-top: 1rem;
   padding: 0.75rem;
-  background: var(--bg-tertiary, #2a2a4a);
+  background: var(--bg-primary, #F7F9FA);
   border-radius: 6px;
   font-size: 0.875rem;
-  color: var(--text-secondary, #a0a0a0);
+  color: var(--text-secondary, #5A6772);
 }
 
 /* Buttons */
@@ -307,23 +308,23 @@
 }
 
 .tp-btn-primary {
-  background: var(--primary-color, #6366f1);
-  color: #fff;
+  background: var(--brand-primary, var(--primary-button, #36B37E));
+  color: var(--primary-button-text, #fff);
 }
 
 .tp-btn-primary:hover {
-  background: var(--primary-hover, #4f46e5);
+  background: var(--primary-button-hover, #2F9E6E);
 }
 
 .tp-btn-secondary {
-  background: var(--bg-tertiary, #2a2a4a);
-  color: var(--text-secondary, #a0a0a0);
-  border: 1px solid var(--border-color, #3a3a5a);
+  background: var(--bg-secondary, #FFFFFF);
+  color: var(--text-secondary, #5A6772);
+  border: 1px solid var(--border-color, #E3E7EB);
 }
 
 .tp-btn-secondary:hover {
-  background: var(--bg-hover, #3a3a5a);
-  color: var(--text-primary, #fff);
+  background: var(--surface-color, var(--bg-primary, #F7F9FA));
+  color: var(--text-primary, #1F2933);
 }
 
 /* Responsive */
