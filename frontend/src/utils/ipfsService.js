@@ -281,9 +281,15 @@ export const checkGatewayHealth = async () => {
 /**
  * Get Pinata authentication headers
  * Prefers JWT over API Key/Secret if available
+ * When using the proxy, returns empty object (nginx handles auth)
  * @returns {Object} Headers object with authorization
  */
 const getPinataAuthHeaders = () => {
+  // When using proxy, nginx handles authentication - no headers needed from frontend
+  if (PINATA_CONFIG.USE_PROXY) {
+    return {}
+  }
+
   if (PINATA_CONFIG.JWT) {
     return {
       'Authorization': `Bearer ${PINATA_CONFIG.JWT}`,
@@ -298,6 +304,18 @@ const getPinataAuthHeaders = () => {
   }
 
   throw new Error('Pinata authentication not configured. Please set VITE_PINATA_JWT or VITE_PINATA_API_KEY and VITE_PINATA_API_SECRET environment variables.')
+}
+
+/**
+ * Get the Pinata upload endpoint URL
+ * Uses proxy in production, direct API in development
+ * @returns {string} The upload endpoint URL
+ */
+const getPinataUploadUrl = () => {
+  if (PINATA_CONFIG.USE_PROXY) {
+    return `${PINATA_CONFIG.PROXY_URL}/pinJSONToIPFS`
+  }
+  return `${PINATA_CONFIG.API_URL}/pinning/pinJSONToIPFS`
 }
 
 /**
@@ -344,11 +362,12 @@ export const uploadJson = async (data, options = {}) => {
   const timeoutId = setTimeout(() => controller.abort(), IPFS_CONFIG.UPLOAD_TIMEOUT)
 
   try {
-    // Get auth headers for Pinata
+    // Get auth headers for Pinata (empty when using proxy)
     const authHeaders = getPinataAuthHeaders()
 
-    // Pinata pinJSONToIPFS endpoint
-    const response = await fetch(`${PINATA_CONFIG.API_URL}/pinning/pinJSONToIPFS`, {
+    // Use proxy endpoint in production, direct API in development
+    const uploadUrl = getPinataUploadUrl()
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
