@@ -14,6 +14,10 @@ vi.mock('../hooks/useUserPreferences', () => ({
   useUserPreferences: vi.fn()
 }))
 
+vi.mock('../hooks/useRoles', () => ({
+  useRoles: vi.fn()
+}))
+
 // Mock contracts config
 vi.mock('../config/contracts', () => ({
   getContractAddress: vi.fn((name) => {
@@ -24,6 +28,7 @@ vi.mock('../config/contracts', () => ({
 
 import { useEthers, useAccount } from '../hooks/useWeb3'
 import { useUserPreferences } from '../hooks/useUserPreferences'
+import { useRoles } from '../hooks/useRoles'
 
 describe('ClearPathModal Component', () => {
   const mockOnClose = vi.fn()
@@ -38,6 +43,10 @@ describe('ClearPathModal Component', () => {
     useAccount.mockReturnValue({ account: mockAccount })
     useUserPreferences.mockReturnValue({
       preferences: { demoMode: true }
+    })
+    useRoles.mockReturnValue({
+      hasRole: vi.fn(() => false),
+      ROLES: { CLEARPATH_USER: 'CLEARPATH_USER' }
     })
   })
 
