@@ -3,7 +3,8 @@ import { useRoles } from '../../hooks/useRoles'
 import { useModal } from '../../hooks/useUI'
 import { useWallet } from '../../hooks'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
-import ClearPathModal from './ClearPathModal'
+import ClearPathUserModal from './ClearPathUserModal'
+import ClearPathProModal from './ClearPathProModal'
 import './ClearPathButton.css'
 
 /**
@@ -64,87 +65,61 @@ function ClearPathButton() {
     setIsOpen(!isOpen)
   }
 
-  const handleOpenGovernance = () => {
+  // Handler for ClearPath User (free) - Browse, Proposals, View DAOs
+  const handleOpenUserModal = () => {
     setIsOpen(false)
-    showModal(<ClearPathModal onClose={() => showModal(null)} />, {
-      title: 'ClearPath Governance',
+    showModal(<ClearPathUserModal onClose={() => showModal(null)} />, {
+      title: 'ClearPath',
       size: 'large',
       closable: true
     })
   }
 
-  const handleViewDAOs = () => {
+  // Handler for ClearPath Pro - Full features including DAO creation/management
+  const handleOpenProModal = () => {
     setIsOpen(false)
-    showModal(<ClearPathModal onClose={() => showModal(null)} defaultTab="daos" />, {
-      title: 'My DAOs',
-      size: 'large',
-      closable: true
-    })
-  }
-
-  const handleViewProposals = () => {
-    setIsOpen(false)
-    showModal(<ClearPathModal onClose={() => showModal(null)} defaultTab="proposals" />, {
-      title: 'Proposals',
-      size: 'large',
-      closable: true
-    })
-  }
-
-  const handlePurchaseMembership = () => {
-    setIsOpen(false)
-    showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
-      title: '',
-      size: 'large',
-      closable: false
-    })
-  }
-
-  // Determine available options based on roles and membership
-  const getMenuOptions = () => {
-    const options = []
-    
-    // Check if user has active ClearPath membership (ClearPath User role)
     const hasMembership = hasRole(ROLES.CLEARPATH_USER)
 
-    // ClearPath governance options - requires CLEARPATH_USER role
     if (hasMembership) {
-      options.push({
-        id: 'governance',
-        label: 'Governance Dashboard',
+      showModal(<ClearPathProModal onClose={() => showModal(null)} />, {
+        title: 'ClearPath Pro',
+        size: 'large',
+        closable: true
+      })
+    } else {
+      // Show purchase modal if user doesn't have membership
+      showModal(<PremiumPurchaseModal onClose={() => showModal(null)} />, {
+        title: '',
+        size: 'large',
+        closable: false
+      })
+    }
+  }
+
+  // Determine available options - always show both options
+  const getMenuOptions = () => {
+    const hasMembership = hasRole(ROLES.CLEARPATH_USER)
+
+    return [
+      {
+        id: 'clearpath-user',
+        label: 'ClearPath',
         icon: '🏛️',
-        description: 'Access DAO governance and decision-making',
-        action: handleOpenGovernance
-      })
-      options.push({
-        id: 'view-daos',
-        label: 'My DAOs',
-        icon: '📋',
-        description: 'View and manage your DAOs',
-        action: handleViewDAOs
-      })
-      options.push({
-        id: 'view-proposals',
-        label: 'Proposals',
-        icon: '📝',
-        description: 'View and vote on proposals',
-        action: handleViewProposals
-      })
-    }
-
-    // If no membership, show purchase option
-    if (!hasMembership) {
-      options.push({
-        id: 'purchase-membership',
-        label: 'Purchase ClearPath Membership',
-        icon: '🎫',
-        description: 'Get access to institutional-grade DAO governance',
-        action: handlePurchaseMembership,
-        highlight: true
-      })
-    }
-
-    return options
+        description: 'Browse DAOs, view proposals, and explore governance',
+        action: handleOpenUserModal
+      },
+      {
+        id: 'clearpath-pro',
+        label: hasMembership ? 'ClearPath Pro' : 'Upgrade to Pro',
+        icon: hasMembership ? '🚀' : '⭐',
+        description: hasMembership
+          ? 'Launch DAOs, advanced metrics, and full management'
+          : 'Create DAOs and access advanced governance features',
+        action: handleOpenProModal,
+        premium: hasMembership,
+        highlight: !hasMembership
+      }
+    ]
   }
 
   const menuOptions = getMenuOptions()
@@ -182,7 +157,7 @@ function ClearPathButton() {
             {menuOptions.map((option) => (
               <button
                 key={option.id}
-                className={`dropdown-option ${option.highlight ? 'highlight' : ''}`}
+                className={`dropdown-option ${option.highlight ? 'highlight' : ''} ${option.premium ? 'premium' : ''}`}
                 onClick={option.action}
                 role="menuitem"
               >

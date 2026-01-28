@@ -1895,8 +1895,12 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
         console.log('USC approved successfully')
       } catch (approveError) {
         console.error('Approve failed:', approveError)
-        if (approveError.code === 'ACTION_REJECTED') {
+        if (approveError.code === 'ACTION_REJECTED' || approveError.code === 4001) {
           throw new Error('Transaction rejected by user')
+        }
+        // Check for wallet authorization errors (code 4100)
+        if (approveError.code === 4100 || approveError.message?.includes('4100') || approveError.message?.includes('not been authorized')) {
+          throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.')
         }
         // Try to provide more helpful error message
         throw new Error(`Failed to approve USC. Please ensure you have enough ETC for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
@@ -1944,9 +1948,11 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
   } catch (error) {
     console.error('Error purchasing role:', error)
 
-    if (error.code === 'ACTION_REJECTED') {
+    if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
       throw new Error('Transaction rejected by user')
-    } else if (error.message.includes('Insufficient USC balance')) {
+    } else if (error.code === 4100 || error.message?.includes('4100') || error.message?.includes('not been authorized')) {
+      throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.')
+    } else if (error.message?.includes('Insufficient USC balance')) {
       throw error
     } else {
       throw new Error(error.message || 'Transaction failed')

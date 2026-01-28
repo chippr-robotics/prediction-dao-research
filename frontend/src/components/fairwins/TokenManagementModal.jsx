@@ -705,7 +705,7 @@ function TokenManagementModal({ isOpen, onClose }) {
                             </button>
                             {activeTab !== 'markets' && (
                               <div className="tm-action-dropdown">
-                                <button className="tm-action-trigger">
+                                <button className="tm-action-trigger" title="Token Actions">
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <circle cx="12" cy="12" r="1" />
                                     <circle cx="19" cy="12" r="1" />
@@ -936,55 +936,49 @@ function TokenManagementModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              <div className="tm-info-section">
-                <h4>Deployment</h4>
-                <div className="tm-info-grid">
-                  <div className="tm-info-item">
-                    <label>Block Number</label>
-                    <span>{chainInfo.blockNumber.toLocaleString()}</span>
-                  </div>
-                  <div className="tm-info-item full-width">
-                    <label>Transaction Hash</label>
-                    <div className="tm-address-row">
-                      {(() => {
-                        const isValidHash = typeof chainInfo.transactionHash === 'string' && chainInfo.transactionHash.length > 0
-                        return (
-                          <>
-                            <code>
-                              {isValidHash ? formatAddress(chainInfo.transactionHash) : 'N/A'}
-                            </code>
-                            <button
-                              className={`tm-copy-btn ${copySuccess === chainInfo.transactionHash ? 'success' : ''}`}
-                              disabled={!isValidHash}
-                              onClick={() => isValidHash && copyToClipboard(chainInfo.transactionHash)}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" />
-                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                              </svg>
-                            </button>
-                            {isValidHash && (
-                              <a
-                                href={getTransactionUrl(chainId || 63, chainInfo.transactionHash)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="tm-explorer-link"
-                                title="View on Blockscout"
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                                  <polyline points="15,3 21,3 21,9" />
-                                  <line x1="10" y1="14" x2="21" y2="3" />
-                                </svg>
-                              </a>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
+              {(chainInfo.blockNumber || chainInfo.transactionHash) && (
+                <div className="tm-info-section">
+                  <h4>Deployment</h4>
+                  <div className="tm-info-grid">
+                    {chainInfo.blockNumber && (
+                      <div className="tm-info-item">
+                        <label>Block Number</label>
+                        <span>{chainInfo.blockNumber.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {chainInfo.transactionHash && (
+                      <div className="tm-info-item full-width">
+                        <label>Transaction Hash</label>
+                        <div className="tm-address-row">
+                          <code>{formatAddress(chainInfo.transactionHash)}</code>
+                          <button
+                            className={`tm-copy-btn ${copySuccess === chainInfo.transactionHash ? 'success' : ''}`}
+                            onClick={() => copyToClipboard(chainInfo.transactionHash)}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="9" y="9" width="13" height="13" rx="2" />
+                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                            </svg>
+                          </button>
+                          <a
+                            href={getTransactionUrl(chainId || 63, chainInfo.transactionHash)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="tm-explorer-link"
+                            title="View on Blockscout"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                              <polyline points="15,3 21,3 21,9" />
+                              <line x1="10" y1="14" x2="21" y2="3" />
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}

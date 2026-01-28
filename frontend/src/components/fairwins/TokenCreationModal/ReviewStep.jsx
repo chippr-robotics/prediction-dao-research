@@ -16,13 +16,11 @@ function ReviewStep({
   txHash,
   txError,
   createdToken,
-  totalCostETC,
   walletAddress,
   isCorrectNetwork,
   isContractDeployed = true,
   getExplorerUrl,
-  onEstimateGas,
-  disabled
+  disabled: _disabled
 }) {
   // Copy address to clipboard
   const copyToClipboard = async (text) => {
@@ -336,36 +334,15 @@ function ReviewStep({
         </h3>
 
         <div className="tcm-cost-card">
-          {totalCostETC ? (
-            <>
-              <div className="tcm-cost-row">
-                <span>Estimated Gas</span>
-                <span>~{totalCostETC} ETC</span>
-              </div>
-              <div className="tcm-cost-row tcm-cost-deployer">
-                <span>Deployer</span>
-                <span className="tcm-address-short">
-                  {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="tcm-cost-estimate">
-              <button
-                type="button"
-                className="tcm-estimate-btn"
-                onClick={onEstimateGas}
-                disabled={disabled || txState !== TxState.IDLE}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="23 4 23 10 17 10" />
-                  <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-                </svg>
-                Estimate Gas
-              </button>
-              <span className="tcm-hint">Click to calculate deployment cost</span>
-            </div>
-          )}
+          <div className="tcm-cost-row tcm-cost-deployer">
+            <span>Deployer</span>
+            <span className="tcm-address-short">
+              {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
+            </span>
+          </div>
+          <div className="tcm-cost-note">
+            <span>Gas will be calculated automatically when you deploy</span>
+          </div>
         </div>
       </section>
 

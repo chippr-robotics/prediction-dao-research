@@ -52,8 +52,6 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
     txHash,
     txError,
     createdToken,
-    totalCostETC,
-    estimateGas,
     createToken,
     resetTxState,
     getExplorerUrl
@@ -148,18 +146,6 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
       setCurrentStep(stepIndex)
     }
   }, [currentStep, validateStep])
-
-  // Gas estimation
-  const handleEstimateGas = useCallback(async () => {
-    try {
-      await estimateGas({
-        tokenType,
-        ...formData
-      })
-    } catch (error) {
-      console.error('Gas estimation failed:', error)
-    }
-  }, [estimateGas, tokenType, formData])
 
   // Deploy token
   const handleDeploy = useCallback(async () => {
@@ -286,13 +272,10 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
               txHash={txHash}
               txError={txError}
               createdToken={createdToken}
-              totalCostETC={totalCostETC}
               walletAddress={walletAddress}
               isCorrectNetwork={isCorrectNetwork}
               isContractDeployed={isContractDeployed}
               getExplorerUrl={getExplorerUrl}
-              onDeploy={handleDeploy}
-              onEstimateGas={handleEstimateGas}
               disabled={isDeploying || !isContractDeployed}
             />
           )}
