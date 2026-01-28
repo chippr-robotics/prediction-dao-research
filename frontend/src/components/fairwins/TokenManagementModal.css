@@ -223,7 +223,28 @@
 .tm-table-container {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
+}
+
+/* Use clip-path for rounded corners instead of overflow:hidden to allow dropdown to show */
+.tm-table-container .tm-table {
+  border-radius: 12px;
+}
+
+.tm-table-container .tm-table thead tr:first-child th:first-child {
+  border-top-left-radius: 11px;
+}
+
+.tm-table-container .tm-table thead tr:first-child th:last-child {
+  border-top-right-radius: 11px;
+}
+
+.tm-table-container .tm-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 11px;
+}
+
+.tm-table-container .tm-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 11px;
 }
 
 .tm-table {
@@ -249,7 +270,7 @@
 
 .tm-table th.th-actions {
   text-align: right;
-  width: 100px;
+  width: 120px;
 }
 
 .tm-table tbody tr {
@@ -262,7 +283,7 @@
 }
 
 .tm-table tbody tr:hover {
-  background: #fafafa;
+  background: #f8fafc;
 }
 
 .tm-table td {
@@ -418,7 +439,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 8px;
 }
 
 .tm-info-btn {
@@ -427,18 +448,25 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: transparent;
-  border: 1px solid #e5e7eb;
+  background: #f0f9ff;
+  border: 1px solid #93c5fd;
   border-radius: 8px;
-  color: #6b7280;
+  color: #2563eb;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .tm-info-btn:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  color: #1a1a1a;
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  transform: scale(1.05);
+}
+
+.tm-info-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
 }
 
 /* Action Dropdown */
@@ -452,35 +480,41 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: transparent;
-  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  color: #6b7280;
+  color: #475569;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .tm-action-trigger:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  color: #1a1a1a;
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+  transform: scale(1.05);
+}
+
+.tm-action-trigger svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
 }
 
 .tm-dropdown-menu {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px);
   right: 0;
-  margin-top: 4px;
   min-width: 180px;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  padding: 6px;
-  z-index: 100;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: 4px;
+  z-index: 1000;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(-8px);
+  transform: translateY(-4px);
   transition: all 0.15s ease;
 }
 
@@ -494,21 +528,23 @@
 .tm-dropdown-menu button {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
   background: transparent;
   border: none;
   border-radius: 6px;
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: #374151;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease;
+  transition: all 0.12s ease;
 }
 
 .tm-dropdown-menu button:hover {
-  background: #f3f4f6;
+  background: #f1f5f9;
+  color: #1e293b;
 }
 
 .tm-dropdown-menu button.danger {
@@ -516,13 +552,14 @@
 }
 
 .tm-dropdown-menu button.danger:hover {
-  background: rgba(220, 38, 38, 0.05);
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .tm-dropdown-menu hr {
   border: none;
-  border-top: 1px solid #e5e7eb;
-  margin: 6px 0;
+  border-top: 1px solid #f1f5f9;
+  margin: 4px 0;
 }
 
 .tm-dropdown-menu .action-icon {
@@ -530,7 +567,8 @@
   align-items: center;
   justify-content: center;
   width: 18px;
-  font-size: 0.9rem;
+  height: 18px;
+  font-size: 0.8rem;
 }
 
 /* Pagination */

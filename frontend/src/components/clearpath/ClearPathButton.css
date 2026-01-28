@@ -140,6 +140,25 @@
   background: linear-gradient(135deg, rgba(74, 85, 104, 0.15) 0%, rgba(45, 55, 72, 0.15) 100%);
 }
 
+/* Premium option indicator */
+.clearpath-dropdown .dropdown-option.premium {
+  position: relative;
+}
+
+.clearpath-dropdown .dropdown-option.premium::after {
+  content: 'PRO';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  background: linear-gradient(135deg, #4C9AFF 0%, #36B37E 100%);
+  color: white;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
 /* Option Icon */
 .clearpath-dropdown .option-icon {
   font-size: 1.5rem;

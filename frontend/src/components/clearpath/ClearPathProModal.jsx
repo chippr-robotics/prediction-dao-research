@@ -8,19 +8,18 @@ import { getContractAddress } from '../../config/contracts'
 import './ClearPathModal.css'
 
 /**
- * ClearPathModal Component
+ * ClearPathProModal Component
  *
- * Modern modal for ClearPath governance features following the
- * FriendMarketsModal design pattern with tabbed navigation.
+ * Pro/Premium modal for ClearPath with full governance features.
+ * Requires CLEARPATH_USER role for access.
  *
  * Features:
  * - My DAOs: View and manage your DAOs
  * - Browse: Discover and join new DAOs
  * - Proposals: View active governance proposals
- * - Submit: Create new proposals
- * - Metrics: Welfare metrics dashboard
- * - Launch: Create new DAOs
- * 
+ * - Metrics: Welfare metrics dashboard (Pro)
+ * - Launch: Create new DAOs (Pro)
+ *
  * @param {Object} props - Component props
  * @param {boolean} [props.isOpen=true] - Whether the modal is open (defaults to true)
  * @param {() => void} [props.onClose=() => {}] - Function to call when modal should close (defaults to no-op)
@@ -160,7 +159,7 @@ const DEMO_PROPOSALS = [
   }
 ]
 
-function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos' }) {
+function ClearPathProModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos' }) {
   const { provider } = useEthers()
   const { account, isConnected } = useAccount()
   const { preferences } = useUserPreferences()
@@ -406,11 +405,12 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                 className="cp-brand-logo"
                 onError={(e) => { e.target.style.display = 'none' }}
               />
-              <h2 id="clearpath-modal-title">ClearPath</h2>
+              <h2 id="clearpath-modal-title">ClearPath Pro</h2>
             </div>
-            <p className="cp-subtitle">Institutional-Grade DAO Governance</p>
+            <p className="cp-subtitle">Full-Featured DAO Governance & Management</p>
           </div>
           <div className="cp-header-actions">
+            <span className="cp-pro-badge">Pro</span>
             {demoMode && <span className="cp-demo-badge">Demo</span>}
             <button
               className="cp-close-btn"
@@ -1341,10 +1341,10 @@ function LaunchDAOForm({ onSuccess, hasClearPathRole = false, isWalletConnected 
   )
 }
 
-ClearPathModal.propTypes = {
+ClearPathProModal.propTypes = {
   isOpen: PropTypes.bool,
   onClose: PropTypes.func,
   defaultTab: PropTypes.oneOf(['daos', 'browse', 'proposals', 'metrics', 'launch'])
 }
 
-export default ClearPathModal
+export default ClearPathProModal

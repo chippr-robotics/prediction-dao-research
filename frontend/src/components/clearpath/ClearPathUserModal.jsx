@@ -3,46 +3,34 @@ import PropTypes from 'prop-types'
 import { ethers } from 'ethers'
 import { useEthers, useAccount } from '../../hooks/useWeb3'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { useRoles } from '../../hooks/useRoles'
 import { getContractAddress } from '../../config/contracts'
 import './ClearPathModal.css'
 
 /**
- * ClearPathModal Component
+ * ClearPathUserModal Component
  *
- * Modern modal for ClearPath governance features following the
- * FriendMarketsModal design pattern with tabbed navigation.
+ * Free user modal for ClearPath with basic governance features.
+ * Provides view-only access to DAOs and proposals.
  *
  * Features:
- * - My DAOs: View and manage your DAOs
+ * - My DAOs: View DAOs you are a member of
  * - Browse: Discover and join new DAOs
- * - Proposals: View active governance proposals
- * - Submit: Create new proposals
- * - Metrics: Welfare metrics dashboard
- * - Launch: Create new DAOs
- * 
+ * - Proposals: View and vote on active governance proposals
+ *
  * @param {Object} props - Component props
- * @param {boolean} [props.isOpen=true] - Whether the modal is open (defaults to true)
- * @param {() => void} [props.onClose=() => {}] - Function to call when modal should close (defaults to no-op)
- * @param {string} [props.defaultTab='daos'] - Default tab to show when modal opens
+ * @param {boolean} [props.isOpen=true] - Whether the modal is open
+ * @param {() => void} [props.onClose=() => {}] - Function to call when modal should close
+ * @param {string} [props.defaultTab='browse'] - Default tab to show when modal opens
  */
 
 const DAOFactoryABI = [
   "function getUserDAOs(address user) external view returns (uint256[])",
   "function getAllDAOs() external view returns (uint256[])",
   "function getDAO(uint256 daoId) external view returns (tuple(string name, string description, address futarchyGovernor, address welfareRegistry, address proposalRegistry, address marketFactory, address privacyCoordinator, address oracleResolver, address ragequitModule, address treasuryVault, address creator, uint256 createdAt, bool active))",
-  "function hasDAORole(uint256 daoId, address user, bytes32 role) external view returns (bool)",
-  "function DAO_ADMIN_ROLE() external view returns (bytes32)",
-  "function createDAO(string memory name, string memory description, address treasuryVault, address[] memory admins) external returns (uint256)"
+  "function hasDAORole(uint256 daoId, address user, bytes32 role) external view returns (bool)"
 ]
 
-// Check for factory address from environment or deployed config
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || import.meta.env.VITE_DAO_FACTORY_ADDRESS || getContractAddress('daoFactory')
-
-// Helper to check if factory is deployed
-const isFactoryDeployed = () => {
-  return FACTORY_ADDRESS && FACTORY_ADDRESS !== ethers.ZeroAddress && FACTORY_ADDRESS !== null
-}
 
 // Date validation constants
 const MIN_VALID_DATE = new Date('2000-01-01T00:00:00Z').getTime()
@@ -71,17 +59,6 @@ const DEMO_USER_DAOS = [
     memberCount: 523,
     treasuryBalance: '45,000 ETC',
     proposalCount: 12
-  },
-  {
-    id: '3',
-    name: 'Research & Development DAO',
-    description: 'Funding and coordinating research initiatives for blockchain scalability and security.',
-    creator: '0xCCCC345678901234567890123456789012345678',
-    createdAt: BigInt(Date.now() - 120 * 24 * 60 * 60 * 1000),
-    active: true,
-    memberCount: 89,
-    treasuryBalance: '78,500 ETC',
-    proposalCount: 8
   }
 ]
 
@@ -145,30 +122,14 @@ const DEMO_PROPOSALS = [
     votesAgainst: 89,
     endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     creator: '0x2345678901234567890123456789012345678901'
-  },
-  {
-    id: 'prop-3',
-    title: 'Research Partnership with University',
-    description: 'Establish formal research partnership with leading blockchain research institution.',
-    daoId: '3',
-    daoName: 'Research & Development DAO',
-    status: 'pending',
-    votesFor: 45,
-    votesAgainst: 12,
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    creator: '0x3456789012345678901234567890123456789012'
   }
 ]
 
-function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos' }) {
+function ClearPathUserModal({ isOpen = true, onClose = () => {}, defaultTab = 'browse' }) {
   const { provider } = useEthers()
   const { account, isConnected } = useAccount()
   const { preferences } = useUserPreferences()
-  const { hasRole, ROLES } = useRoles()
   const demoMode = preferences?.demoMode ?? true
-
-  // Check if user has ClearPath membership (required for DAO creation/management)
-  const hasClearPathRole = hasRole(ROLES.CLEARPATH_USER)
 
   // Tab state
   const [activeTab, setActiveTab] = useState(defaultTab)
@@ -234,10 +195,9 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
       const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, provider)
       const daoIds = await factory.getUserDAOs(account)
 
-      // Batch fetch all DAO data in parallel
       const daoPromises = daoIds.map(daoId => factory.getDAO(daoId))
       const daoResults = await Promise.all(daoPromises)
-      
+
       const daos = daoResults.map((dao, index) => ({
         id: daoIds[index].toString(),
         ...dao
@@ -276,11 +236,10 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
       const userDaoIds = await factory.getUserDAOs(account)
       const userDaoIdSet = new Set(userDaoIds.map(id => id.toString()))
 
-      // Filter out user DAOs and batch fetch remaining DAO data in parallel
       const browseDaoIds = allDaoIds.filter(daoId => !userDaoIdSet.has(daoId.toString()))
       const daoPromises = browseDaoIds.map(daoId => factory.getDAO(daoId))
       const daoResults = await Promise.all(daoPromises)
-      
+
       const daos = daoResults.map((dao, index) => ({
         id: browseDaoIds[index].toString(),
         ...dao
@@ -341,7 +300,6 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
 
   // Format helpers
   const formatDate = (dateInput) => {
-    // Guard against clearly invalid/empty inputs
     if (dateInput === null || dateInput === undefined || dateInput === '') return 'N/A'
 
     try {
@@ -349,16 +307,13 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
         ? new Date(Number(dateInput))
         : new Date(dateInput)
 
-      // Invalid Date handling
       if (Number.isNaN(date.getTime())) return 'N/A'
 
-      // Reasonable date range validation (prevent absurd past/future dates)
       const time = date.getTime()
       if (time < MIN_VALID_DATE || time > MAX_VALID_DATE) return 'N/A'
 
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     } catch {
-      // In case of any unexpected errors during conversion/formatting
       return 'N/A'
     }
   }
@@ -393,7 +348,7 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="clearpath-modal-title"
+      aria-labelledby="clearpath-user-modal-title"
     >
       <div className="clearpath-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -406,9 +361,9 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                 className="cp-brand-logo"
                 onError={(e) => { e.target.style.display = 'none' }}
               />
-              <h2 id="clearpath-modal-title">ClearPath</h2>
+              <h2 id="clearpath-user-modal-title">ClearPath</h2>
             </div>
-            <p className="cp-subtitle">Institutional-Grade DAO Governance</p>
+            <p className="cp-subtitle">DAO Governance Explorer</p>
           </div>
           <div className="cp-header-actions">
             {demoMode && <span className="cp-demo-badge">Demo</span>}
@@ -424,22 +379,8 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
           </div>
         </header>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation - Only 3 tabs for free users */}
         <nav className="cp-tabs" role="tablist">
-          <button
-            className={`cp-tab ${activeTab === 'daos' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('daos'); setSelectedDAO(null) }}
-            role="tab"
-            aria-selected={activeTab === 'daos'}
-            aria-controls="panel-daos"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            <span>My DAOs</span>
-            {userDAOs.length > 0 && <span className="cp-tab-badge">{userDAOs.length}</span>}
-          </button>
           <button
             className={`cp-tab ${activeTab === 'browse' ? 'active' : ''}`}
             onClick={() => { setActiveTab('browse'); setSelectedDAO(null) }}
@@ -451,7 +392,7 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
               <circle cx="11" cy="11" r="8"/>
               <path d="M21 21l-4.35-4.35"/>
             </svg>
-            <span>Browse</span>
+            <span>Browse DAOs</span>
           </button>
           <button
             className={`cp-tab ${activeTab === 'proposals' ? 'active' : ''}`}
@@ -470,89 +411,23 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
             {userProposals.length > 0 && <span className="cp-tab-badge">{userProposals.length}</span>}
           </button>
           <button
-            className={`cp-tab ${activeTab === 'metrics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('metrics')}
+            className={`cp-tab ${activeTab === 'daos' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('daos'); setSelectedDAO(null) }}
             role="tab"
-            aria-selected={activeTab === 'metrics'}
-            aria-controls="panel-metrics"
+            aria-selected={activeTab === 'daos'}
+            aria-controls="panel-daos"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="18" y1="20" x2="18" y2="10"/>
-              <line x1="12" y1="20" x2="12" y2="4"/>
-              <line x1="6" y1="20" x2="6" y2="14"/>
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
-            <span>Metrics</span>
-          </button>
-          <button
-            className={`cp-tab ${activeTab === 'launch' ? 'active' : ''}`}
-            onClick={() => setActiveTab('launch')}
-            role="tab"
-            aria-selected={activeTab === 'launch'}
-            aria-controls="panel-launch"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-            <span>Launch</span>
+            <span>My DAOs</span>
+            {userDAOs.length > 0 && <span className="cp-tab-badge">{userDAOs.length}</span>}
           </button>
         </nav>
 
         {/* Content Area */}
         <div className="cp-content">
-          {/* My DAOs Tab */}
-          {activeTab === 'daos' && (
-            <div id="panel-daos" role="tabpanel" className="cp-panel">
-              {selectedDAO ? (
-                <DAODetailView
-                  dao={selectedDAO}
-                  onBack={() => setSelectedDAO(null)}
-                  formatDate={formatDate}
-                  formatAddress={formatAddress}
-                />
-              ) : (
-                <>
-                  {loading ? (
-                    <div className="cp-loading">
-                      <span className="cp-spinner"></span>
-                      <p>Loading your DAOs...</p>
-                    </div>
-                  ) : error ? (
-                    <div className="cp-error-state">
-                      <div className="cp-error-icon">&#9888;</div>
-                      <h3>Error Loading DAOs</h3>
-                      <p>{error}</p>
-                      <button className="cp-btn-primary" onClick={loadUserDAOs}>
-                        Try Again
-                      </button>
-                    </div>
-                  ) : userDAOs.length === 0 ? (
-                    <div className="cp-empty-state">
-                      <div className="cp-empty-icon">&#127970;</div>
-                      <h3>No DAOs Yet</h3>
-                      <p>You haven&apos;t joined any DAOs yet. Browse available DAOs or create your own.</p>
-                      <div className="cp-empty-actions">
-                        <button className="cp-btn-secondary" onClick={() => setActiveTab('browse')}>
-                          Browse DAOs
-                        </button>
-                        <button className="cp-btn-primary" onClick={() => setActiveTab('launch')}>
-                          Launch DAO
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="cp-list">
-                      <DAOCompactList
-                        daos={userDAOs}
-                        onSelect={setSelectedDAO}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
           {/* Browse Tab */}
           {activeTab === 'browse' && (
             <div id="panel-browse" role="tabpanel" className="cp-panel">
@@ -618,8 +493,8 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
                       <div className="cp-empty-icon">&#128203;</div>
                       <h3>No Active Proposals</h3>
                       <p>There are no active proposals in your DAOs right now.</p>
-                      <button className="cp-btn-primary" onClick={() => setActiveTab('daos')}>
-                        View My DAOs
+                      <button className="cp-btn-primary" onClick={() => setActiveTab('browse')}>
+                        Browse DAOs
                       </button>
                     </div>
                   ) : (
@@ -637,21 +512,51 @@ function ClearPathModal({ isOpen = true, onClose = () => {}, defaultTab = 'daos'
             </div>
           )}
 
-          {/* Metrics Tab */}
-          {activeTab === 'metrics' && (
-            <div id="panel-metrics" role="tabpanel" className="cp-panel">
-              <MetricsOverview daos={userDAOs} />
-            </div>
-          )}
-
-          {/* Launch Tab */}
-          {activeTab === 'launch' && (
-            <div id="panel-launch" role="tabpanel" className="cp-panel">
-              <LaunchDAOForm
-                onSuccess={() => { loadUserDAOs(); setActiveTab('daos') }}
-                hasClearPathRole={hasClearPathRole}
-                isWalletConnected={isConnected}
-              />
+          {/* My DAOs Tab */}
+          {activeTab === 'daos' && (
+            <div id="panel-daos" role="tabpanel" className="cp-panel">
+              {selectedDAO ? (
+                <DAODetailView
+                  dao={selectedDAO}
+                  onBack={() => setSelectedDAO(null)}
+                  formatDate={formatDate}
+                  formatAddress={formatAddress}
+                />
+              ) : (
+                <>
+                  {loading ? (
+                    <div className="cp-loading">
+                      <span className="cp-spinner"></span>
+                      <p>Loading your DAOs...</p>
+                    </div>
+                  ) : error ? (
+                    <div className="cp-error-state">
+                      <div className="cp-error-icon">&#9888;</div>
+                      <h3>Error Loading DAOs</h3>
+                      <p>{error}</p>
+                      <button className="cp-btn-primary" onClick={loadUserDAOs}>
+                        Try Again
+                      </button>
+                    </div>
+                  ) : userDAOs.length === 0 ? (
+                    <div className="cp-empty-state">
+                      <div className="cp-empty-icon">&#127970;</div>
+                      <h3>No DAOs Yet</h3>
+                      <p>You haven&apos;t joined any DAOs yet. Browse available DAOs to get started.</p>
+                      <button className="cp-btn-primary" onClick={() => setActiveTab('browse')}>
+                        Browse DAOs
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="cp-list">
+                      <DAOCompactList
+                        daos={userDAOs}
+                        onSelect={setSelectedDAO}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -722,7 +627,7 @@ function DAOCompactList({ daos, onSelect, showJoinButton = false }) {
 }
 
 /**
- * DAO detail view component
+ * DAO detail view component (view-only for free users)
  */
 function DAODetailView({ dao, onBack, formatDate, formatAddress, showJoinButton = false }) {
   return (
@@ -787,18 +692,9 @@ function DAODetailView({ dao, onBack, formatDate, formatAddress, showJoinButton 
             Join DAO
           </button>
         ) : (
-          <>
-            <button type="button" className="cp-btn-secondary">
-              View Proposals
-            </button>
-            <button type="button" className="cp-btn-primary">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-              Manage DAO
-            </button>
-          </>
+          <button type="button" className="cp-btn-secondary">
+            View Proposals
+          </button>
         )}
       </div>
     </div>
@@ -952,399 +848,10 @@ function ProposalDetailView({ proposal, onBack, formatDate, formatAddress, getSt
   )
 }
 
-/**
- * Metrics overview component
- */
-function MetricsOverview({ daos }) {
-  const totalMembers = daos.reduce((sum, d) => sum + (d.memberCount || 0), 0)
-  const totalProposals = daos.reduce((sum, d) => sum + (d.proposalCount || 0), 0)
-
-  return (
-    <div className="cp-metrics">
-      <h3 className="cp-section-title">Governance Overview</h3>
-
-      <div className="cp-metrics-grid">
-        <div className="cp-metric-card">
-          <div className="cp-metric-icon">&#127970;</div>
-          <div className="cp-metric-data">
-            <span className="cp-metric-value">{daos.length}</span>
-            <span className="cp-metric-label">Active DAOs</span>
-          </div>
-        </div>
-        <div className="cp-metric-card">
-          <div className="cp-metric-icon">&#128101;</div>
-          <div className="cp-metric-data">
-            <span className="cp-metric-value">{totalMembers.toLocaleString()}</span>
-            <span className="cp-metric-label">Total Members</span>
-          </div>
-        </div>
-        <div className="cp-metric-card">
-          <div className="cp-metric-icon">&#128203;</div>
-          <div className="cp-metric-data">
-            <span className="cp-metric-value">{totalProposals}</span>
-            <span className="cp-metric-label">Proposals</span>
-          </div>
-        </div>
-        <div className="cp-metric-card">
-          <div className="cp-metric-icon">&#128200;</div>
-          <div className="cp-metric-data">
-            <span className="cp-metric-value">87%</span>
-            <span className="cp-metric-label">Participation Rate</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="cp-welfare-section">
-        <h3>Welfare Indicators</h3>
-        <div className="cp-welfare-grid">
-          <div className="cp-welfare-item">
-            <div className="cp-welfare-header">
-              <span>Community Health</span>
-              <span className="cp-welfare-score">92</span>
-            </div>
-            <div className="cp-welfare-bar">
-              <div className="cp-welfare-fill" style={{ width: '92%' }}></div>
-            </div>
-          </div>
-          <div className="cp-welfare-item">
-            <div className="cp-welfare-header">
-              <span>Treasury Efficiency</span>
-              <span className="cp-welfare-score">78</span>
-            </div>
-            <div className="cp-welfare-bar">
-              <div className="cp-welfare-fill" style={{ width: '78%' }}></div>
-            </div>
-          </div>
-          <div className="cp-welfare-item">
-            <div className="cp-welfare-header">
-              <span>Governance Activity</span>
-              <span className="cp-welfare-score">85</span>
-            </div>
-            <div className="cp-welfare-bar">
-              <div className="cp-welfare-fill" style={{ width: '85%' }}></div>
-            </div>
-          </div>
-          <div className="cp-welfare-item">
-            <div className="cp-welfare-header">
-              <span>Proposal Success Rate</span>
-              <span className="cp-welfare-score">71</span>
-            </div>
-            <div className="cp-welfare-bar">
-              <div className="cp-welfare-fill" style={{ width: '71%' }}></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Launch DAO form component
- */
-function LaunchDAOForm({ onSuccess, hasClearPathRole = false, isWalletConnected = false }) {
-  const { provider, signer } = useEthers()
-  const { account, isConnected } = useAccount()
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    treasuryVault: '',
-    admins: ''
-  })
-  const [errors, setErrors] = useState({})
-  const [creating, setCreating] = useState(false)
-
-  // Determine if the form should be disabled (use prop or hook value)
-  const walletConnected = isWalletConnected || isConnected
-  const canCreateDAO = walletConnected && hasClearPathRole && isFactoryDeployed()
-
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev }
-        delete newErrors[field]
-        return newErrors
-      })
-    }
-  }
-
-  const validate = () => {
-    const newErrors = {}
-    if (!formData.name.trim()) {
-      newErrors.name = 'DAO name is required'
-    } else if (formData.name.length < 3) {
-      newErrors.name = 'Name must be at least 3 characters'
-    }
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required'
-    } else if (formData.description.length < 20) {
-      newErrors.description = 'Description must be at least 20 characters'
-    }
-    const treasuryVaultAddress = formData.treasuryVault.trim()
-    if (treasuryVaultAddress && !ethers.isAddress(treasuryVaultAddress)) {
-      newErrors.treasuryVault = 'Treasury vault must be a valid Ethereum address'
-    }
-    const adminsInput = formData.admins.trim()
-    if (adminsInput) {
-      const adminAddresses = adminsInput.split(',').map(addr => addr.trim()).filter(Boolean)
-      for (const addr of adminAddresses) {
-        if (!ethers.isAddress(addr)) {
-          newErrors.admins = 'All admin addresses must be valid Ethereum addresses'
-          break
-        }
-      }
-    }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!validate()) return
-
-    // Check factory deployment
-    if (!isFactoryDeployed()) {
-      setErrors({ submit: 'DAO Factory contract is not deployed on this network. DAO creation is temporarily unavailable.' })
-      return
-    }
-
-    // Check wallet connection
-    if (!walletConnected || !signer || !account) {
-      setErrors({ submit: 'Please connect your wallet to create a DAO' })
-      return
-    }
-
-    // Check ClearPath role
-    if (!hasClearPathRole) {
-      setErrors({ submit: 'ClearPath membership is required to create DAOs. Please upgrade your membership.' })
-      return
-    }
-
-    setCreating(true)
-    try {
-      // Create contract instance with signer
-      const factory = new ethers.Contract(FACTORY_ADDRESS, DAOFactoryABI, signer)
-
-      // Parse admin addresses
-      const adminAddresses = formData.admins
-        ? formData.admins.split(',').map(a => a.trim()).filter(a => a)
-        : []
-
-      // Determine treasury vault address
-      // If empty, use a zero address which the contract should handle
-      const treasuryAddress = formData.treasuryVault.trim() || ethers.ZeroAddress
-
-      // Create DAO transaction
-      const tx = await factory.createDAO(
-        formData.name,
-        formData.description,
-        treasuryAddress,
-        adminAddresses
-      )
-
-      // Wait for transaction confirmation
-      const receipt = await tx.wait()
-
-      // Check if transaction was successful
-      if (receipt.status === 1) {
-        // Clear form data
-        setFormData({
-          name: '',
-          description: '',
-          treasuryVault: '',
-          admins: ''
-        })
-        setErrors({})
-
-        // Call success callback to refresh DAO list and switch tabs
-        onSuccess()
-      } else {
-        throw new Error('Transaction failed')
-      }
-    } catch (err) {
-      console.error('Error creating DAO:', err)
-
-      // Handle common error cases
-      let errorMessage = 'Failed to create DAO'
-
-      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
-        errorMessage = 'Transaction was rejected by user'
-      } else if (err.code === 'INSUFFICIENT_FUNDS') {
-        errorMessage = 'Insufficient funds for transaction'
-      } else if (err.message?.includes('DAO_CREATOR_ROLE')) {
-        errorMessage = 'Your account does not have permission to create DAOs. Please contact an administrator.'
-      } else if (err.message?.includes('Name cannot be empty')) {
-        errorMessage = 'DAO name cannot be empty'
-      } else if (err.message?.includes('Invalid treasury vault')) {
-        errorMessage = 'Invalid treasury vault address'
-      } else if (err.message) {
-        // Try to extract a readable error message
-        const match = err.message.match(/reason="([^"]+)"/)
-        if (match) {
-          errorMessage = match[1]
-        } else {
-          errorMessage = err.message
-        }
-      }
-
-      setErrors({ submit: errorMessage })
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  return (
-    <div className="cp-launch">
-      <h3 className="cp-section-title">Launch New DAO</h3>
-      <p className="cp-launch-desc">Create a new decentralized autonomous organization with futarchy-based governance.</p>
-
-      {/* Wallet Connection Warning - Show prominently at top */}
-      {!walletConnected && (
-        <div className="cp-warning-banner cp-wallet-warning">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12v4" />
-            <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
-            <circle cx="18" cy="12" r="2" />
-          </svg>
-          <div className="cp-warning-content">
-            <span className="cp-warning-title">Wallet Not Connected</span>
-            <span className="cp-warning-text">Please connect your wallet to create a DAO.</span>
-          </div>
-        </div>
-      )}
-
-      {/* ClearPath Role Warning - Show if wallet connected but no role */}
-      {walletConnected && !hasClearPathRole && (
-        <div className="cp-warning-banner cp-role-warning">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <div className="cp-warning-content">
-            <span className="cp-warning-title">ClearPath Membership Required</span>
-            <span className="cp-warning-text">Creating DAOs requires a ClearPath membership. Upgrade your account to access this feature.</span>
-          </div>
-        </div>
-      )}
-
-      {/* Factory Not Deployed Warning */}
-      {!isFactoryDeployed() && (
-        <div className="cp-warning-banner">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="15" y1="9" x2="9" y2="15" />
-            <line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-          <span>DAO Factory contract is not deployed on this network. DAO creation is temporarily unavailable.</span>
-        </div>
-      )}
-
-      <form className="cp-launch-form" onSubmit={handleSubmit}>
-        <div className="cp-form-group">
-          <label htmlFor="dao-name">
-            DAO Name <span className="cp-required">*</span>
-          </label>
-          <input
-            id="dao-name"
-            type="text"
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            placeholder="e.g., My Community DAO"
-            disabled={creating || !canCreateDAO}
-            className={errors.name ? 'error' : ''}
-            maxLength={50}
-          />
-          {errors.name && <span className="cp-error">{errors.name}</span>}
-        </div>
-
-        <div className="cp-form-group">
-          <label htmlFor="dao-description">
-            Description <span className="cp-required">*</span>
-          </label>
-          <textarea
-            id="dao-description"
-            value={formData.description}
-            onChange={(e) => handleChange('description', e.target.value)}
-            placeholder="Describe your DAO's purpose and goals..."
-            disabled={creating || !canCreateDAO}
-            className={errors.description ? 'error' : ''}
-            rows={3}
-            maxLength={500}
-          />
-          {errors.description && <span className="cp-error">{errors.description}</span>}
-        </div>
-
-        <div className="cp-form-group">
-          <label htmlFor="treasury-vault">
-            Treasury Vault Address
-          </label>
-          <input
-            id="treasury-vault"
-            type="text"
-            value={formData.treasuryVault}
-            onChange={(e) => handleChange('treasuryVault', e.target.value)}
-            placeholder="0x... (optional - will create new if empty)"
-            disabled={creating || !canCreateDAO}
-            className={errors.treasuryVault ? 'error' : ''}
-          />
-          {errors.treasuryVault && <span className="cp-error">{errors.treasuryVault}</span>}
-          <span className="cp-hint">Leave empty to create a new treasury vault</span>
-        </div>
-
-        <div className="cp-form-group">
-          <label htmlFor="dao-admins">
-            Initial Admins
-          </label>
-          <input
-            id="dao-admins"
-            type="text"
-            value={formData.admins}
-            onChange={(e) => handleChange('admins', e.target.value)}
-            placeholder="0x123..., 0x456... (comma-separated)"
-            disabled={creating || !canCreateDAO}
-            className={errors.admins ? 'error' : ''}
-          />
-          {errors.admins && <span className="cp-error">{errors.admins}</span>}
-          <span className="cp-hint">Your address will be added automatically</span>
-        </div>
-
-        {errors.submit && (
-          <div className="cp-error-banner">{errors.submit}</div>
-        )}
-
-        <div className="cp-form-actions">
-          <button
-            type="submit"
-            className="cp-btn-primary cp-btn-lg"
-            disabled={creating || !canCreateDAO}
-          >
-            {creating ? (
-              <>
-                <span className="cp-spinner-small"></span>
-                Creating DAO...
-              </>
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                Launch DAO
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
-ClearPathModal.propTypes = {
+ClearPathUserModal.propTypes = {
   isOpen: PropTypes.bool,
   onClose: PropTypes.func,
-  defaultTab: PropTypes.oneOf(['daos', 'browse', 'proposals', 'metrics', 'launch'])
+  defaultTab: PropTypes.oneOf(['browse', 'proposals', 'daos'])
 }
 
-export default ClearPathModal
+export default ClearPathUserModal

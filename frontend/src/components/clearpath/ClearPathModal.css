@@ -114,6 +114,17 @@
   letter-spacing: 0.5px;
 }
 
+.cp-pro-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.625rem;
+  background: linear-gradient(135deg, #4C9AFF 0%, #36B37E 100%);
+  color: white;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .cp-close-btn {
   background: transparent;
   border: 1px solid var(--border-color, #23303D);
@@ -1044,6 +1055,36 @@
 .cp-warning-banner svg {
   flex-shrink: 0;
   margin-top: 0.125rem;
+}
+
+/* Wallet connection warning - amber/yellow theme */
+.cp-warning-banner.cp-wallet-warning {
+  background: rgba(245, 166, 35, 0.12);
+  border-color: rgba(245, 166, 35, 0.4);
+  color: #F5A623;
+}
+
+/* Role requirement warning - amber/yellow theme */
+.cp-warning-banner.cp-role-warning {
+  background: rgba(245, 166, 35, 0.12);
+  border-color: rgba(245, 166, 35, 0.4);
+  color: #F5A623;
+}
+
+.cp-warning-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cp-warning-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.cp-warning-text {
+  font-size: 0.8rem;
+  opacity: 0.9;
 }
 
 .cp-form-actions {
