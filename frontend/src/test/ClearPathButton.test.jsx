@@ -31,8 +31,18 @@ describe('ClearPathButton Component', () => {
     address: '0x1234567890123456789012345678901234567890',
     account: '0x1234567890123456789012345678901234567890',
     isConnected: true,
-    provider: null,
-    signer: null
+    // Add proper EIP-1193 provider mock
+    provider: {
+      request: vi.fn(),
+      on: vi.fn(),
+      removeListener: vi.fn(),
+      send: vi.fn(),
+      sendAsync: vi.fn()
+    },
+    signer: {
+      getAddress: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890'),
+      signMessage: vi.fn()
+    }
   }
 
   const defaultUIContext = {
@@ -151,7 +161,7 @@ describe('ClearPathButton Component', () => {
   })
 
   describe('Role-based Menu Options', () => {
-    it('shows governance options for users with CLEARPATH_USER role', async () => {
+    it('shows ClearPath Pro option for users with CLEARPATH_USER role', async () => {
       const user = userEvent.setup()
       const walletContext = {
         ...defaultWalletContext,
@@ -163,102 +173,79 @@ describe('ClearPathButton Component', () => {
           clearPathStatus: { active: true, lastUpdated: Date.now() }
         }
       }
-      
+
       renderWithProviders(<ClearPathButton />, { walletContext, preferencesContext })
-      
+
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
-      
+
       await waitFor(() => {
-        expect(screen.getByText('Governance Dashboard')).toBeInTheDocument()
-        expect(screen.getByText('My DAOs')).toBeInTheDocument()
-        expect(screen.getByText('Proposals')).toBeInTheDocument()
+        // Should show both ClearPath options with proper descriptions
+        expect(screen.getByText('ClearPath Pro')).toBeInTheDocument()
+        expect(screen.getByText('Browse DAOs, view proposals, and explore governance')).toBeInTheDocument()
+        expect(screen.getByText('Launch DAOs, advanced metrics, and full management')).toBeInTheDocument()
       })
     })
 
-    it('shows membership purchase option for users without membership', async () => {
+    it('shows Upgrade to Pro option for users without membership', async () => {
       const user = userEvent.setup()
       const preferencesContext = {
         preferences: {
           clearPathStatus: { active: false, lastUpdated: null }
         }
       }
-      
+
       renderWithProviders(<ClearPathButton />, { preferencesContext })
-      
+
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
-      
+
       await waitFor(() => {
-        expect(screen.getByText('Purchase ClearPath Membership')).toBeInTheDocument()
+        expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument()
+        expect(screen.getByText('Create DAOs and access advanced governance features')).toBeInTheDocument()
       })
     })
 
-    it('does not show governance options for users without role', async () => {
+    it('always shows both ClearPath options regardless of role', async () => {
       const user = userEvent.setup()
       const preferencesContext = {
         preferences: {
           clearPathStatus: { active: false, lastUpdated: null }
         }
       }
-      
+
       renderWithProviders(<ClearPathButton />, { preferencesContext })
-      
+
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
-      
+
       await waitFor(() => {
-        expect(screen.queryByText('Governance Dashboard')).not.toBeInTheDocument()
-        expect(screen.queryByText('My DAOs')).not.toBeInTheDocument()
-        expect(screen.queryByText('Proposals')).not.toBeInTheDocument()
+        // Both options should always be visible - check by description to avoid title conflict
+        expect(screen.getByText('Browse DAOs, view proposals, and explore governance')).toBeInTheDocument()
+        expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument()
       })
     })
   })
 
   describe('Modal Integration', () => {
-    it('opens governance modal when governance dashboard option is clicked', async () => {
+    it('opens ClearPath User modal when ClearPath option is clicked', async () => {
       const user = userEvent.setup()
-      const walletContext = {
-        ...defaultWalletContext,
-        roles: [ROLES.CLEARPATH_USER],
-        hasRole: vi.fn((role) => role === ROLES.CLEARPATH_USER)
-      }
-      const preferencesContext = {
-        preferences: {
-          clearPathStatus: { active: true, lastUpdated: Date.now() }
-        }
-      }
-      
-      renderWithProviders(<ClearPathButton />, { walletContext, preferencesContext })
-      
-      const button = screen.getByRole('button', { name: /clearpath/i })
-      await user.click(button)
-      
-      const governanceOption = await screen.findByText('Governance Dashboard')
-      await user.click(governanceOption)
-      
-      await waitFor(() => {
-        expect(mockShowModal).toHaveBeenCalled()
-      })
-    })
 
-    it('shows role purchase modal when purchase membership is clicked', async () => {
-      const user = userEvent.setup()
-      
       renderWithProviders(<ClearPathButton />)
-      
+
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
-      
-      const purchaseOption = await screen.findByText('Purchase ClearPath Membership')
-      await user.click(purchaseOption)
-      
+
+      // Find the ClearPath option by its description to avoid matching the dropdown title
+      const clearPathOption = await screen.findByText('Browse DAOs, view proposals, and explore governance')
+      await user.click(clearPathOption.closest('button'))
+
       await waitFor(() => {
         expect(mockShowModal).toHaveBeenCalled()
       })
     })
 
-    it('opens DAO modal when My DAOs option is clicked', async () => {
+    it('opens Pro modal when ClearPath Pro is clicked for members', async () => {
       const user = userEvent.setup()
       const walletContext = {
         ...defaultWalletContext,
@@ -270,15 +257,31 @@ describe('ClearPathButton Component', () => {
           clearPathStatus: { active: true, lastUpdated: Date.now() }
         }
       }
-      
+
       renderWithProviders(<ClearPathButton />, { walletContext, preferencesContext })
-      
+
       const button = screen.getByRole('button', { name: /clearpath/i })
       await user.click(button)
-      
-      const daosOption = await screen.findByText('My DAOs')
-      await user.click(daosOption)
-      
+
+      const proOption = await screen.findByText('ClearPath Pro')
+      await user.click(proOption)
+
+      await waitFor(() => {
+        expect(mockShowModal).toHaveBeenCalled()
+      })
+    })
+
+    it('opens purchase modal when Upgrade to Pro is clicked for non-members', async () => {
+      const user = userEvent.setup()
+
+      renderWithProviders(<ClearPathButton />)
+
+      const button = screen.getByRole('button', { name: /clearpath/i })
+      await user.click(button)
+
+      const upgradeOption = await screen.findByText('Upgrade to Pro')
+      await user.click(upgradeOption)
+
       await waitFor(() => {
         expect(mockShowModal).toHaveBeenCalled()
       })

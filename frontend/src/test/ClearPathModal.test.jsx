@@ -32,15 +32,29 @@ import { useRoles } from '../hooks/useRoles'
 
 describe('ClearPathModal Component', () => {
   const mockOnClose = vi.fn()
-  const mockProvider = {}
+  // Proper EIP-1193 provider mock for ethers.js v6 compatibility
+  const mockProvider = {
+    request: vi.fn(),
+    on: vi.fn(),
+    removeListener: vi.fn(),
+    send: vi.fn(),
+    sendAsync: vi.fn(),
+    _isProvider: true
+  }
   const mockAccount = '0x1234567890123456789012345678901234567890'
 
   beforeEach(() => {
     vi.clearAllMocks()
     
     // Default mock implementations
-    useEthers.mockReturnValue({ provider: mockProvider })
-    useAccount.mockReturnValue({ account: mockAccount })
+    useEthers.mockReturnValue({
+      provider: mockProvider,
+      signer: {
+        getAddress: vi.fn().mockResolvedValue(mockAccount),
+        signMessage: vi.fn()
+      }
+    })
+    useAccount.mockReturnValue({ account: mockAccount, isConnected: true })
     useUserPreferences.mockReturnValue({
       preferences: { demoMode: true }
     })
@@ -302,6 +316,14 @@ describe('ClearPathModal Component', () => {
   })
 
   describe('Launch DAO Form', () => {
+    beforeEach(() => {
+      // Enable form by mocking hasRole to return true for CLEARPATH_USER
+      useRoles.mockReturnValue({
+        hasRole: vi.fn(() => true),
+        ROLES: { CLEARPATH_USER: 'CLEARPATH_USER' }
+      })
+    })
+
     it('should display Launch DAO form in launch tab', async () => {
       const user = userEvent.setup()
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
