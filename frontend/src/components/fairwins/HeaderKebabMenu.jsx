@@ -20,6 +20,21 @@ function HeaderKebabMenu({ collapseWidth = 480 }) {
   const isExtraSmall = useIsExtraSmall()
   const menuRef = useRef(null)
   const buttonRef = useRef(null)
+  const tokenMintItemRef = useRef(null)
+  const clearPathItemRef = useRef(null)
+
+  // Handle clicking anywhere on the menu item to trigger the button
+  const handleMenuItemClick = (itemRef) => (e) => {
+    // Don't trigger if clicking directly on the button (it handles itself)
+    if (e.target.closest('.tokenmint-button, .clearpath-button')) {
+      return
+    }
+    // Find and click the button inside this menu item
+    const button = itemRef.current?.querySelector('.tokenmint-button, .clearpath-button')
+    if (button) {
+      button.click()
+    }
+  }
 
   // Close menu when clicking outside
   // Note: We check for nested dropdowns to avoid closing when interacting with button dropdowns
@@ -129,11 +144,35 @@ function HeaderKebabMenu({ collapseWidth = 480 }) {
               </button>
             </div>
             <div className="kebab-dropdown-content">
-              <div className="kebab-menu-item">
+              <div
+                ref={tokenMintItemRef}
+                className="kebab-menu-item"
+                onClick={handleMenuItemClick(tokenMintItemRef)}
+                role="menuitem"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleMenuItemClick(tokenMintItemRef)(e)
+                  }
+                }}
+              >
                 <TokenMintButton />
                 <span className="kebab-item-label">Token Mint</span>
               </div>
-              <div className="kebab-menu-item">
+              <div
+                ref={clearPathItemRef}
+                className="kebab-menu-item"
+                onClick={handleMenuItemClick(clearPathItemRef)}
+                role="menuitem"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleMenuItemClick(clearPathItemRef)(e)
+                  }
+                }}
+              >
                 <ClearPathButton />
                 <span className="kebab-item-label">ClearPath</span>
               </div>

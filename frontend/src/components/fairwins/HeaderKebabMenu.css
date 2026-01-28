@@ -152,7 +152,7 @@
   overflow: visible;
 }
 
-/* Menu items with labels */
+/* Menu items with labels - entire row is clickable */
 .kebab-menu-item {
   display: flex;
   align-items: center;
@@ -164,11 +164,23 @@
   transition: all 0.2s;
   position: relative;
   overflow: visible;
+  cursor: pointer;
+  user-select: none;
 }
 
 .kebab-menu-item:hover {
   background: rgba(76, 154, 255, 0.08);
   border-color: rgba(76, 154, 255, 0.3);
+}
+
+.kebab-menu-item:focus {
+  outline: 2px solid rgba(76, 154, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.kebab-menu-item:active {
+  background: rgba(76, 154, 255, 0.15);
+  transform: scale(0.98);
 }
 
 /* Style the buttons inside menu items */
@@ -189,6 +201,8 @@
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--text-primary, #E6EDF3);
+  flex: 1;
+  pointer-events: none;
 }
 
 /* Override dropdown positioning when inside kebab menu - render UPWARD */
