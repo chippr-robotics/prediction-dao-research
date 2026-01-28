@@ -20,7 +20,7 @@ function ReviewStep({
   isCorrectNetwork,
   isContractDeployed = true,
   getExplorerUrl,
-  disabled
+  disabled: _disabled
 }) {
   // Copy address to clipboard
   const copyToClipboard = async (text) => {

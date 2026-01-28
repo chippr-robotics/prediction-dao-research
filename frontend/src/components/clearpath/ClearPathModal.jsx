@@ -40,11 +40,6 @@ const DAOFactoryABI = [
 // Check for factory address from environment or deployed config
 const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || import.meta.env.VITE_DAO_FACTORY_ADDRESS || getContractAddress('daoFactory')
 
-// Helper to check if factory is deployed
-const isFactoryDeployed = () => {
-  return FACTORY_ADDRESS && FACTORY_ADDRESS !== ethers.ZeroAddress
-}
-
 // Date validation constants
 const MIN_VALID_DATE = new Date('2000-01-01T00:00:00Z').getTime()
 const MAX_VALID_DATE = new Date('2100-01-01T00:00:00Z').getTime()

@@ -378,7 +378,7 @@ function RoleBenefitFeatures({ roleKey, tierName, chainLimits }) {
 function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, action = 'purchase' }) {
   const { ROLE_INFO, grantRole, hasRole, loadRoles } = useRoles()
   const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
-  const { signer } = useWalletTransactions()
+  const { signer: _signer } = useWalletTransactions()
   const { showNotification } = useNotification()
 
   // Normalize preselectedRole - ensure it's a string, not an object
