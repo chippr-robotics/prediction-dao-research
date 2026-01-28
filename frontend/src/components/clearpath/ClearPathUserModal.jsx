@@ -127,7 +127,7 @@ const DEMO_PROPOSALS = [
 
 function ClearPathUserModal({ isOpen = true, onClose = () => {}, defaultTab = 'browse' }) {
   const { provider } = useEthers()
-  const { account, isConnected } = useAccount()
+  const { account } = useAccount()
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true
 

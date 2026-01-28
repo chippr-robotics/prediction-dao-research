@@ -8,22 +8,22 @@ function ModalSystem() {
   const previousFocusRef = useRef(null)
 
   useEffect(() => {
-    if (modal) {
+    if (modal?.content) {
       // Store previously focused element
       previousFocusRef.current = document.activeElement
-      
+
       // Focus modal
       if (modalRef.current) {
         modalRef.current.focus()
       }
-      
+
       // Prevent body scroll
       document.body.style.overflow = 'hidden'
-      
+
       return () => {
         // Restore body scroll
         document.body.style.overflow = ''
-        
+
         // Restore focus
         if (previousFocusRef.current) {
           previousFocusRef.current.focus()
