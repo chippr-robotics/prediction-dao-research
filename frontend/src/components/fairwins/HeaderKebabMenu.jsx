@@ -11,11 +11,8 @@ import './HeaderKebabMenu.css'
  * Collapses header action buttons into a kebab menu on extra-small screens.
  * Below 480px viewport width, TokenMint and ClearPath buttons collapse
  * into a vertical ellipsis (kebab) menu while WalletButton remains visible.
- *
- * @param {Object} props
- * @param {number} props.collapseWidth - Width below which to show kebab (default: 480)
  */
-function HeaderKebabMenu({ collapseWidth = 480 }) {
+function HeaderKebabMenu() {
   const [isOpen, setIsOpen] = useState(false)
   const isExtraSmall = useIsExtraSmall()
   const menuRef = useRef(null)

@@ -4,6 +4,7 @@ import {
   useMediaQuery,
   useIsMobile,
   useIsTablet,
+  useIsExtraSmall,
   useOrientation,
   useDeviceInfo
 } from '../hooks/useMediaQuery'
@@ -155,6 +156,38 @@ describe('useMediaQuery hooks', () => {
       })
 
       const { result } = renderHook(() => useIsTablet())
+      expect(result.current).toBe(false)
+    })
+  })
+
+  describe('useIsExtraSmall', () => {
+    it('should return true for extra-small viewport (<= 480px)', () => {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: vi.fn().mockImplementation(query => ({
+          matches: query === '(max-width: 480px)',
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }))
+      })
+
+      const { result } = renderHook(() => useIsExtraSmall())
+      expect(result.current).toBe(true)
+    })
+
+    it('should return false for larger viewport', () => {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: vi.fn().mockImplementation(query => ({
+          matches: false,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }))
+      })
+
+      const { result } = renderHook(() => useIsExtraSmall())
       expect(result.current).toBe(false)
     })
   })

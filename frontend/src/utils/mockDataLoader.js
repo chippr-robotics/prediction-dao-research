@@ -78,27 +78,34 @@ function processRelativeTimes(obj) {
 const mockData = processRelativeTimes(mockDataRaw)
 
 /**
- * Transforms flat correlation data to nested structure expected by components
- * Converts: { correlationGroupId, correlationGroupName }
- * To: { correlationGroup: { groupId, groupName, ... } }
+ * Transforms flat correlation data to nested structure expected by components.
+ * Creates a nested correlationGroup object while preserving the original flat
+ * fields (correlationGroupId, correlationGroupName) for backward compatibility.
+ *
+ * Input:  { correlationGroupId: 'abc', correlationGroupName: 'Test', ... }
+ * Output: { correlationGroupId: 'abc', correlationGroupName: 'Test', correlationGroup: { groupId: 'abc', ... }, ... }
+ *
  * @param {Object} market - Market object with potential flat correlation data
- * @returns {Object} Market with nested correlationGroup structure
+ * @returns {Object} Market with both flat fields and nested correlationGroup structure
  */
 function transformCorrelationData(market) {
-  if (market.correlationGroupId && !market.correlationGroup) {
-    return {
-      ...market,
-      correlationGroup: {
-        groupId: market.correlationGroupId,
-        groupName: market.correlationGroupName || market.correlationGroupId,
-        groupDescription: '',
-        category: market.category || 'other',
-        creator: null,
-        active: true
-      }
+  // Skip if no flat correlation data or already has nested structure
+  if (!market.correlationGroupId || market.correlationGroup) {
+    return market
+  }
+
+  // Add nested structure while preserving original flat fields via spread
+  return {
+    ...market, // Preserves correlationGroupId, correlationGroupName, and all other fields
+    correlationGroup: {
+      groupId: market.correlationGroupId,
+      groupName: market.correlationGroupName || market.correlationGroupId,
+      groupDescription: '',
+      category: market.category || 'other',
+      creator: null,
+      active: true
     }
   }
-  return market
 }
 
 /**

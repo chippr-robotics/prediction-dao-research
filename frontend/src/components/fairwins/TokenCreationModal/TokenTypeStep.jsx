@@ -2,7 +2,8 @@
  * TokenTypeStep Component
  *
  * Step 1: Token type selection (ERC-20 vs ERC-721)
- * Uses radio inputs for proper mutually exclusive selection.
+ * Features large, card-based selection with clear descriptions.
+ * Uses radio inputs for proper mutually exclusive selection and accessibility.
  */
 function TokenTypeStep({ tokenType, onTokenTypeChange, disabled }) {
   return (

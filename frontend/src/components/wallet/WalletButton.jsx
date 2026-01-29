@@ -262,13 +262,13 @@ function WalletButton({ className = '' }) {
   }, [isConnected, isOpen])
 
   // Reset pending connector when connection attempt fails
+  // Uses a short delay to handle wagmi's async state updates where isConnecting
+  // may become false briefly before isConnected becomes true on success
   useEffect(() => {
     if (!isConnecting && pendingConnector && !isConnected) {
-      // Connection attempt finished but we're not connected = failure
-      // Delay to ensure isConnected has had time to update from wagmi
       const timeout = setTimeout(() => {
         setPendingConnector(null)
-      }, 1000)
+      }, 500)
       return () => clearTimeout(timeout)
     }
   }, [isConnecting, pendingConnector, isConnected])
