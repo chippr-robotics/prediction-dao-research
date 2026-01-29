@@ -469,6 +469,9 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
         className="correlated-markets-modal-container"
       >
         <div className="correlated-markets-modal">
+          {/* Drag handle for mobile bottom sheet */}
+          <div className="correlated-modal-drag-handle" aria-hidden="true" />
+
           {/* Header */}
           <div className="correlated-modal-header">
             <img 

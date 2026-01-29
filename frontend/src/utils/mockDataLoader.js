@@ -78,11 +78,36 @@ function processRelativeTimes(obj) {
 const mockData = processRelativeTimes(mockDataRaw)
 
 /**
+ * Transforms flat correlation data to nested structure expected by components
+ * Converts: { correlationGroupId, correlationGroupName }
+ * To: { correlationGroup: { groupId, groupName, ... } }
+ * @param {Object} market - Market object with potential flat correlation data
+ * @returns {Object} Market with nested correlationGroup structure
+ */
+function transformCorrelationData(market) {
+  if (market.correlationGroupId && !market.correlationGroup) {
+    return {
+      ...market,
+      correlationGroup: {
+        groupId: market.correlationGroupId,
+        groupName: market.correlationGroupName || market.correlationGroupId,
+        groupDescription: '',
+        category: market.category || 'other',
+        creator: null,
+        active: true
+      }
+    }
+  }
+  return market
+}
+
+/**
  * Gets all mock markets
  * @returns {Array} Array of market objects
  */
 export function getMockMarkets() {
-  return mockData.markets || []
+  const markets = mockData.markets || []
+  return markets.map(transformCorrelationData)
 }
 
 /**
