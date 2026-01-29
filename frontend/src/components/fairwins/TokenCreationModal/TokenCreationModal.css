@@ -226,6 +226,15 @@
   gap: 1rem;
 }
 
+/* Hidden but accessible radio input */
+.tcm-type-radio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 .tcm-type-card {
   display: flex;
   flex-direction: column;
@@ -235,11 +244,11 @@
   border-radius: 12px;
   background: var(--bg-secondary, #ffffff);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
   text-align: left;
 }
 
-.tcm-type-card:hover:not(:disabled) {
+.tcm-type-card:hover:not(.disabled) {
   border-color: #2D7A4F;
   box-shadow: 0 4px 12px rgba(45, 122, 79, 0.1);
 }
@@ -249,9 +258,15 @@
   background: rgba(45, 122, 79, 0.05);
 }
 
-.tcm-type-card:disabled {
+.tcm-type-card.disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Focus state for accessibility */
+.tcm-type-card:has(.tcm-type-radio:focus-visible) {
+  outline: 2px solid #2D7A4F;
+  outline-offset: 2px;
 }
 
 .tcm-type-icon {

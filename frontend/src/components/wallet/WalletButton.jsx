@@ -245,30 +245,33 @@ function WalletButton({ className = '' }) {
 
   // Track previous connection state to detect connection success
   const wasConnected = useRef(isConnected)
-  
-  // Close dropdown only when connection state changes from disconnected to connected
-  // while we have a pending connection attempt
+
+  // Close dropdown when connection state changes from disconnected to connected
+  // This handles both immediate connections and delayed confirmations
   useEffect(() => {
-    // Only close if we were disconnected and now we're connected
-    // AND we initiated a connection (pendingConnector is set)
-    if (!wasConnected.current && isConnected && pendingConnector) {
-      setIsOpen(false)
+    // Detect transition from disconnected to connected
+    if (!wasConnected.current && isConnected) {
+      // Successfully connected - close dropdown and clear pending state
+      if (isOpen) {
+        setIsOpen(false)
+      }
       setPendingConnector(null)
     }
     // Update the ref for next comparison
     wasConnected.current = isConnected
-  }, [isConnected, pendingConnector])
+  }, [isConnected, isOpen])
 
-  // Reset pending connector when connection attempt finishes (success or failure)
+  // Reset pending connector when connection attempt fails
+  // Uses a short delay to handle wagmi's async state updates where isConnecting
+  // may become false briefly before isConnected becomes true on success
   useEffect(() => {
-    if (!isConnecting && pendingConnector) {
-      // Small delay to allow isConnected to update first
+    if (!isConnecting && pendingConnector && !isConnected) {
       const timeout = setTimeout(() => {
         setPendingConnector(null)
-      }, 100)
+      }, 500)
       return () => clearTimeout(timeout)
     }
-  }, [isConnecting, pendingConnector])
+  }, [isConnecting, pendingConnector, isConnected])
 
   // Close dropdown when clicking outside
   useEffect(() => {

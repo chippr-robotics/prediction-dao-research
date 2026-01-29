@@ -54,6 +54,15 @@ export function useIsTablet() {
 }
 
 /**
+ * Custom hook to detect if device is extra-small (<= 480px)
+ * Used for collapsing header icons into kebab menu
+ * @returns {boolean} - Whether the device is extra-small
+ */
+export function useIsExtraSmall() {
+  return useMediaQuery('(max-width: 480px)')
+}
+
+/**
  * Custom hook to detect device orientation
  * @returns {'portrait'|'landscape'} - Current orientation
  */

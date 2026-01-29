@@ -1,0 +1,252 @@
+/* HeaderKebabMenu Styles
+ * Responsive kebab menu for header action buttons
+ */
+
+/* Expanded state - show all buttons inline */
+.header-actions-expanded {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Kebab container */
+.header-kebab-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+/* Kebab button (vertical ellipsis) */
+.kebab-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 8px;
+}
+
+.kebab-button:hover,
+.kebab-button.active {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.kebab-button:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.kebab-dot {
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+/* Animate dots to X when active */
+.kebab-button.active .kebab-dot:nth-child(1) {
+  transform: translateY(7px) rotate(45deg) scaleX(1.8);
+}
+
+.kebab-button.active .kebab-dot:nth-child(2) {
+  opacity: 0;
+  transform: scale(0);
+}
+
+.kebab-button.active .kebab-dot:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg) scaleX(1.8);
+}
+
+/* Backdrop overlay */
+.kebab-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Kebab dropdown - bottom sheet on mobile */
+.kebab-dropdown {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-secondary, #141C24);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  animation: kebabSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  overflow: visible;
+}
+
+@keyframes kebabSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dropdown header */
+.kebab-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, #23303D);
+}
+
+.kebab-dropdown-header span {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #E6EDF3);
+}
+
+.kebab-close-btn {
+  background: transparent;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 1.25rem;
+  transition: all 0.2s;
+}
+
+.kebab-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--text-secondary, #AAB6C2);
+  color: var(--text-primary, #E6EDF3);
+}
+
+/* Dropdown content */
+.kebab-dropdown-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  overflow: visible;
+}
+
+/* Menu items with labels - entire row is clickable */
+.kebab-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 12px;
+  transition: all 0.2s;
+  position: relative;
+  overflow: visible;
+  cursor: pointer;
+  user-select: none;
+}
+
+.kebab-menu-item:hover {
+  background: rgba(76, 154, 255, 0.08);
+  border-color: rgba(76, 154, 255, 0.3);
+}
+
+.kebab-menu-item:focus {
+  outline: 2px solid rgba(76, 154, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.kebab-menu-item:active {
+  background: rgba(76, 154, 255, 0.15);
+  transform: scale(0.98);
+}
+
+/* Style the buttons inside menu items */
+.kebab-menu-item .tokenmint-button-container,
+.kebab-menu-item .clearpath-button-container {
+  margin: 0;
+  padding: 0;
+}
+
+.kebab-menu-item .tokenmint-button,
+.kebab-menu-item .clearpath-button {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.kebab-item-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary, #E6EDF3);
+  flex: 1;
+  pointer-events: none;
+}
+
+/* Override dropdown positioning when inside kebab menu - render UPWARD */
+.kebab-dropdown-content .tokenmint-dropdown,
+.kebab-dropdown-content .clearpath-dropdown {
+  top: auto !important;
+  bottom: calc(100% + 8px) !important;
+  right: auto !important;
+  left: 0 !important;
+  transform: none !important;
+  max-height: 60vh;
+  overflow-y: auto;
+  z-index: 1200 !important;
+}
+
+/* Ensure button containers have higher z-index */
+.kebab-dropdown-content .tokenmint-button-container,
+.kebab-dropdown-content .clearpath-button-container {
+  position: relative;
+  z-index: 1002;
+}
+
+/* Prevent kebab menu from closing when interacting with button dropdowns */
+.kebab-dropdown-content .tokenmint-dropdown,
+.kebab-dropdown-content .clearpath-dropdown {
+  pointer-events: auto;
+}
+
+/* Light mode support */
+.theme-light .kebab-dropdown {
+  background: var(--bg-secondary, #FFFFFF);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.theme-light .kebab-menu-item {
+  background: var(--bg-primary, #F7F9FA);
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .kebab-dropdown,
+  .kebab-backdrop,
+  .kebab-dot {
+    animation: none;
+    transition: none;
+  }
+}

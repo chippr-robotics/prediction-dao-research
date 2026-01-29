@@ -128,17 +128,7 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
     return Object.keys(newErrors).length === 0
   }, [formData, tokenType])
 
-  // Navigation
-  const handleNext = useCallback(() => {
-    if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1))
-    }
-  }, [currentStep, validateStep])
-
-  const handleBack = useCallback(() => {
-    setCurrentStep((prev) => Math.max(prev - 1, 0))
-  }, [])
-
+  // Step indicator click handler
   const handleStepClick = useCallback((stepIndex) => {
     if (stepIndex < currentStep) {
       setCurrentStep(stepIndex)
@@ -202,6 +192,13 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
     }
   }, [isOpen])
 
+  // Handle backdrop click - only close if clicking directly on overlay
+  const handleBackdropClick = useCallback((e) => {
+    if (e.target === e.currentTarget) {
+      handleClose()
+    }
+  }, [handleClose])
+
   if (!isOpen) return null
 
   const isDeploying = txState === TxState.PENDING_SIGNATURE || txState === TxState.PENDING_CONFIRMATION
@@ -210,7 +207,7 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
   return (
     <div
       className="tcm-overlay"
-      onClick={handleClose}
+      onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="tcm-title"
@@ -288,7 +285,7 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
               <button
                 type="button"
                 className="tcm-btn-secondary"
-                onClick={handleBack}
+                onClick={() => setCurrentStep((prev) => Math.max(prev - 1, 0))}
                 disabled={isDeploying}
               >
                 Back
@@ -309,7 +306,11 @@ function TokenCreationModal({ isOpen, onClose, onSuccess }) {
               <button
                 type="button"
                 className="tcm-btn-primary"
-                onClick={handleNext}
+                onClick={() => {
+                  if (validateStep(currentStep)) {
+                    setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1))
+                  }
+                }}
                 disabled={isDeploying}
               >
                 Continue
