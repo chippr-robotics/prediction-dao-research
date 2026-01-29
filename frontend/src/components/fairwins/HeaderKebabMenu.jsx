@@ -71,8 +71,10 @@ function HeaderKebabMenu() {
   }, [isOpen])
 
   // Close menu when screen size changes to non-collapsed
+  // This is a valid use case: syncing with external media query state change
   useEffect(() => {
     if (!isExtraSmall && isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsOpen(false)
     }
   }, [isExtraSmall, isOpen])
@@ -144,7 +146,7 @@ function HeaderKebabMenu() {
               <div
                 ref={tokenMintItemRef}
                 className="kebab-menu-item"
-                onClick={handleMenuItemClick(tokenMintItemRef)}
+                onClick={(e) => handleMenuItemClick(tokenMintItemRef)(e)}
                 role="menuitem"
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -160,7 +162,7 @@ function HeaderKebabMenu() {
               <div
                 ref={clearPathItemRef}
                 className="kebab-menu-item"
-                onClick={handleMenuItemClick(clearPathItemRef)}
+                onClick={(e) => handleMenuItemClick(clearPathItemRef)(e)}
                 role="menuitem"
                 tabIndex={0}
                 onKeyDown={(e) => {
