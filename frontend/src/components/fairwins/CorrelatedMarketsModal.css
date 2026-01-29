@@ -16,6 +16,11 @@
   box-sizing: border-box;
 }
 
+/* Drag handle for mobile bottom sheet */
+.correlated-modal-drag-handle {
+  display: none;
+}
+
 /* Modal Container */
 .correlated-markets-modal-container {
   width: 100%;
@@ -481,18 +486,35 @@
 }
 
 @media (max-width: 768px) {
+  /* Bottom sheet pattern for mobile */
   .correlated-markets-modal-backdrop {
-    padding: 1rem 0.5rem;
+    padding: 0;
+    align-items: flex-end;
+    overflow: hidden;
   }
 
   .correlated-markets-modal-container {
-    max-width: calc(100vw - 1rem);
-    margin: 1rem auto;
+    max-width: 100%;
+    margin: 0;
   }
 
   .correlated-markets-modal {
-    padding: 1.25rem;
-    max-height: calc(100vh - 2rem);
+    padding: 1rem 1.25rem;
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+    animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Show drag handle on mobile */
+  .correlated-modal-drag-handle {
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: var(--text-secondary);
+    border-radius: 2px;
+    margin: 0 auto 0.75rem;
+    opacity: 0.5;
   }
 
   .correlated-modal-title {
@@ -544,6 +566,17 @@
     flex: 1;
     padding: 0.5rem 0.5rem;
     font-size: 0.7rem;
+  }
+}
+
+@keyframes slideUpMobile {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 

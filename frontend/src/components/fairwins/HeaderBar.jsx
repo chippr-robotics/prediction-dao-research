@@ -1,9 +1,6 @@
 import { useScrollDirection, useScrollPast } from '../../hooks/useScrollDirection'
 import { useIsMobile } from '../../hooks/useMediaQuery'
-import BlockiesAvatar from '../ui/BlockiesAvatar'
-import TokenMintButton from '../TokenMintButton'
-import ClearPathButton from '../clearpath/ClearPathButton'
-import WalletButton from '../wallet/WalletButton'
+import HeaderKebabMenu from './HeaderKebabMenu'
 import './HeaderBar.css'
 
 function HeaderBar() {
@@ -37,9 +34,7 @@ function HeaderBar() {
         </div>
 
         <div className="header-right">
-          <WalletButton />
-          <TokenMintButton />
-          <ClearPathButton />
+          <HeaderKebabMenu collapseWidth={480} />
         </div>
       </div>
     </header>

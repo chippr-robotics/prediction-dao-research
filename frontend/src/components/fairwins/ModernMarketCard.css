@@ -240,6 +240,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.correlation-group-pill:hover {
+  background: rgba(76, 154, 255, 0.4);
+  border-color: rgba(76, 154, 255, 0.6);
+  transform: scale(1.02);
 }
 
 .resolution-date {
