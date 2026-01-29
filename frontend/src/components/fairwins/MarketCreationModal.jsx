@@ -48,13 +48,6 @@ const CATEGORIES = [
   'Technology', 'Business', 'Finance', 'Culture', 'Weather', 'Other'
 ]
 
-// Collateral token options derived from ETCswap tokens
-const COLLATERAL_TOKEN_OPTIONS = [
-  { id: 'USC', ...TOKENS.USC, isDefault: true },
-  { id: 'WETC', ...TOKENS.WETC },
-  { id: 'ETC', ...TOKENS.ETC },
-  { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token Address', address: '', icon: '🔧' }
-]
 
 const STEPS = [
   { id: 'metadata', label: 'Content', icon: '📝' },
@@ -104,8 +97,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     resolutionDateTime: getDefaultResolutionDate(),
     initialLiquidity: '',
     betType: 1, // Default to Pass/Fail (more appropriate for governance-style predictions)
-    collateralTokenId: 'USC', // Default to USC stablecoin
-    customCollateralAddress: '' // Used when collateralTokenId is 'CUSTOM'
+    collateralTokenId: 'USC' // USC stablecoin is the only supported collateral
   })
 
   const [errors, setErrors] = useState({})
@@ -145,8 +137,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
       resolutionDateTime: getDefaultResolutionDate(),
       initialLiquidity: '',
       betType: 1,
-      collateralTokenId: 'USC',
-      customCollateralAddress: ''
+      collateralTokenId: 'USC'
     })
     setErrors({})
     setSubmitting(false)
@@ -302,18 +293,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
 
       const liquidity = parseFloat(paramsForm.initialLiquidity)
       if (!paramsForm.initialLiquidity || isNaN(liquidity) || liquidity < 100) {
-        newErrors.initialLiquidity = 'Minimum liquidity is 100 ETC'
+        newErrors.initialLiquidity = 'Minimum liquidity is 100 USC'
       } else if (liquidity > 1000000) {
-        newErrors.initialLiquidity = 'Maximum liquidity is 1,000,000 ETC'
-      }
-
-      // Validate custom collateral address if custom token is selected
-      if (paramsForm.collateralTokenId === 'CUSTOM') {
-        if (!paramsForm.customCollateralAddress) {
-          newErrors.customCollateralAddress = 'Custom token address is required'
-        } else if (!/^0x[a-fA-F0-9]{40}$/.test(paramsForm.customCollateralAddress)) {
-          newErrors.customCollateralAddress = 'Invalid token address format (should be checksummed)'
-        }
+        newErrors.initialLiquidity = 'Maximum liquidity is 1,000,000 USC'
       }
     }
 
@@ -424,17 +406,8 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     setSubmitting(true)
 
     try {
-      // Get the actual collateral token address based on selection
-      const getCollateralTokenAddress = () => {
-        if (paramsForm.collateralTokenId === 'CUSTOM') {
-          return paramsForm.customCollateralAddress || null
-        }
-        const token = COLLATERAL_TOKEN_OPTIONS.find(t => t.id === paramsForm.collateralTokenId)
-        if (!token || token.address === 'native') {
-          return null // Native ETC
-        }
-        return token.address
-      }
+      // USC stablecoin is the only supported collateral
+      const getCollateralTokenAddress = () => TOKENS.USC.address
 
       // Calculate trading period in seconds from resolution date
       const resolutionDate = new Date(paramsForm.resolutionDateTime)
@@ -493,18 +466,6 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
     BET_TYPES.find(b => b.id === paramsForm.betType),
     [paramsForm.betType]
   )
-
-  // Get selected collateral token info
-  const selectedCollateralToken = useMemo(() => {
-    const token = COLLATERAL_TOKEN_OPTIONS.find(t => t.id === paramsForm.collateralTokenId)
-    if (paramsForm.collateralTokenId === 'CUSTOM' && paramsForm.customCollateralAddress) {
-      return {
-        ...token,
-        displayAddress: paramsForm.customCollateralAddress
-      }
-    }
-    return token
-  }, [paramsForm.collateralTokenId, paramsForm.customCollateralAddress])
 
   // Check if current step is valid WITHOUT triggering re-render (no setErrors)
   // This is used in render for disabled state calculations
@@ -1040,7 +1001,7 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                 </h3>
                 <div className="mcm-field">
                   <label htmlFor="initialLiquidity">
-                    Initial Liquidity (ETC) <span className="mcm-required">*</span>
+                    Initial Liquidity (USC) <span className="mcm-required">*</span>
                   </label>
                   <input
                     id="initialLiquidity"
@@ -1054,55 +1015,9 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                     disabled={submitting}
                     className={errors.initialLiquidity ? 'error' : ''}
                   />
-                  <div className="mcm-hint">Min: 100 ETC, Max: 1,000,000 ETC</div>
+                  <div className="mcm-hint">Min: 100 USC, Max: 1,000,000 USC</div>
                   {errors.initialLiquidity && <div className="mcm-error">{errors.initialLiquidity}</div>}
                 </div>
-
-                <div className="mcm-field">
-                  <label htmlFor="collateralToken">
-                    Collateral Token
-                  </label>
-                  <select
-                    id="collateralToken"
-                    value={paramsForm.collateralTokenId}
-                    onChange={e => handleParamsChange('collateralTokenId', e.target.value)}
-                    disabled={submitting}
-                    className="mcm-token-select"
-                  >
-                    {COLLATERAL_TOKEN_OPTIONS.map(token => (
-                      <option key={token.id} value={token.id}>
-                        {token.icon} {token.symbol} - {token.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mcm-hint">
-                    {paramsForm.collateralTokenId === 'ETC'
-                      ? 'Native ETC will be used as collateral'
-                      : paramsForm.collateralTokenId === 'CUSTOM'
-                      ? 'Enter a custom ERC-20 token address below'
-                      : `${selectedCollateralToken?.name} from ETCswap`}
-                  </div>
-                </div>
-
-                {/* Custom token address input - only shown when CUSTOM is selected */}
-                {paramsForm.collateralTokenId === 'CUSTOM' && (
-                  <div className="mcm-field">
-                    <label htmlFor="customCollateralAddress">
-                      Custom Token Address <span className="mcm-required">*</span>
-                    </label>
-                    <input
-                      id="customCollateralAddress"
-                      type="text"
-                      value={paramsForm.customCollateralAddress}
-                      onChange={e => handleParamsChange('customCollateralAddress', e.target.value)}
-                      placeholder="0x..."
-                      disabled={submitting}
-                      className={errors.customCollateralAddress ? 'error' : ''}
-                    />
-                    <div className="mcm-hint">Enter a valid ERC-20 token address</div>
-                    {errors.customCollateralAddress && <div className="mcm-error">{errors.customCollateralAddress}</div>}
-                  </div>
-                )}
               </section>
 
               {/* Correlation Group Section */}
@@ -1319,19 +1234,12 @@ function MarketCreationModal({ isOpen, onClose, onCreate }) {
                   </div>
                   <div className="mcm-review-item">
                     <span className="mcm-review-label">Initial Liquidity</span>
-                    <span className="mcm-review-value">{paramsForm.initialLiquidity} ETC</span>
+                    <span className="mcm-review-value">{paramsForm.initialLiquidity} USC</span>
                   </div>
                   <div className="mcm-review-item">
                     <span className="mcm-review-label">Collateral</span>
                     <span className="mcm-review-value">
-                      {selectedCollateralToken && (
-                        <>
-                          <span aria-hidden="true">{selectedCollateralToken.icon}</span>{' '}
-                          {paramsForm.collateralTokenId === 'CUSTOM' && paramsForm.customCollateralAddress
-                            ? `Custom (${paramsForm.customCollateralAddress.slice(0, 6)}...${paramsForm.customCollateralAddress.slice(-4)})`
-                            : selectedCollateralToken.symbol}
-                        </>
-                      )}
+                      <span aria-hidden="true">💵</span> USC (Classic USD Stablecoin)
                     </span>
                   </div>
                   {correlationEnabled && (
