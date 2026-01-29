@@ -22,7 +22,6 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
     correlatedMarkets?.reduce((acc, m) => ({ ...acc, [m.id]: true }), {}) || {}
   )
   const [timeHorizon, setTimeHorizon] = useState('7d') // 7d, 30d, 90d, all
-  const [lastTap, setLastTap] = useState({ marketId: null, timestamp: 0 })
   const { formatPrice } = usePrice()
   const svgRef = useRef(null)
   const timelineRef = useRef(null)
@@ -403,22 +402,11 @@ function CorrelatedMarketsModal({ isOpen, onClose, market, correlatedMarkets, on
     setVisibleMarkets(prev => ({ ...prev, [marketId]: !prev[marketId] }))
   }
 
-  // Handle double tap to open market modal
+  // Handle single click to open market modal
   const handleMarketCardClick = (marketId) => {
-    const now = Date.now()
-    const DOUBLE_TAP_DELAY = 300 // milliseconds
-    
-    if (lastTap.marketId === marketId && (now - lastTap.timestamp) < DOUBLE_TAP_DELAY) {
-      // Double tap detected - open market modal
-      const selectedMarket = correlatedMarkets.find(m => m.id === marketId)
-      if (selectedMarket && onOpenMarket) {
-        onOpenMarket(selectedMarket)
-      }
-      setLastTap({ marketId: null, timestamp: 0 })
-    } else {
-      // Single tap - select the option
-      setSelectedOption(marketId)
-      setLastTap({ marketId, timestamp: now })
+    const selectedMarket = correlatedMarkets.find(m => m.id === marketId)
+    if (selectedMarket && onOpenMarket) {
+      onOpenMarket(selectedMarket)
     }
   }
 
