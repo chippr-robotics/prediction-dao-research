@@ -175,7 +175,7 @@ export function updateClearPathStatus(walletAddress, active) {
  * @returns {boolean} Demo mode status
  */
 export function getDemoMode(walletAddress) {
-  return getUserPreference(walletAddress, 'demo_mode', true, true) // Default to demo mode (mock data)
+  return getUserPreference(walletAddress, 'demo_mode', false, true) // Default to live mode (blockchain data)
 }
 
 /**
