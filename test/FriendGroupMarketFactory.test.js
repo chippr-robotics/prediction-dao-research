@@ -1,6 +1,15 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+// Resolution type enum (matches contract)
+const ResolutionType = {
+  Either: 0,
+  Initiator: 1,
+  Receiver: 2,
+  ThirdParty: 3,
+  AutoPegged: 4
+};
+
 describe("FriendGroupMarketFactory", function () {
   let friendGroupFactory;
   let marketFactory;
@@ -148,6 +157,21 @@ describe("FriendGroupMarketFactory", function () {
     await marketFactory.transferOwnership(await friendGroupFactory.getAddress());
   });
 
+  // Helper function to accept a market (activates it)
+  async function acceptMarket(marketId, participant) {
+    const market = await friendGroupFactory.getFriendMarket(marketId);
+    const stakeAmount = market.stakePerParticipant;
+    const stakeToken = market.stakeToken;
+
+    if (stakeToken === ethers.ZeroAddress) {
+      // Native token
+      await friendGroupFactory.connect(participant).acceptMarket(marketId, { value: stakeAmount });
+    } else {
+      // ERC20 token - would need approval first
+      await friendGroupFactory.connect(participant).acceptMarket(marketId);
+    }
+  }
+
   describe("Deployment", function () {
     it("Should set the right owner", async function () {
       expect(await friendGroupFactory.owner()).to.equal(owner.address);
@@ -169,80 +193,100 @@ describe("FriendGroupMarketFactory", function () {
   });
 
   describe("One vs One Markets", function () {
-    it("Should create a 1v1 market with correct fee", async function () {
+    it("Should create a 1v1 market (pending acceptance)", async function () {
       const description = "Will it rain tomorrow?";
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days
-      const fee = ethers.parseEther("0.1"); // Extra for liquidity
-      
+      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 1 day
+      const stakeAmount = ethers.parseEther("0.1");
+
       await expect(
-        friendGroupFactory.connect(addr1).createOneVsOneMarket(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
           addr2.address,
           description,
           tradingPeriod,
-          ethers.ZeroAddress,
-          0, // No pegged market
-          { value: fee }
+          ethers.ZeroAddress, // No arbitrator
+          acceptanceDeadline,
+          stakeAmount,
+          ethers.ZeroAddress, // Native token
+          ResolutionType.Either,
+          { value: stakeAmount }
         )
       ).to.emit(friendGroupFactory, "FriendMarketCreated");
-      
+
       expect(await friendGroupFactory.friendMarketCount()).to.equal(1);
     });
 
-    it("Should add both participants as members", async function () {
+    it("Should add both participants as members after acceptance", async function () {
       const description = "Bitcoin above $50k?";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const fee = ethers.parseEther("0.1");
-      
-      await friendGroupFactory.connect(addr1).createOneVsOneMarket(
+      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const stakeAmount = ethers.parseEther("0.1");
+
+      await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
         addr2.address,
         description,
         tradingPeriod,
         ethers.ZeroAddress,
-        0, // No pegged market
-        { value: fee }
+        acceptanceDeadline,
+        stakeAmount,
+        ethers.ZeroAddress,
+        ResolutionType.Either,
+        { value: stakeAmount }
       );
-      
+
+      // Initially only creator is member
       expect(await friendGroupFactory.isMember(0, addr1.address)).to.equal(true);
+      expect(await friendGroupFactory.getMemberCount(0)).to.equal(1);
+
+      // After acceptance, opponent is added
+      await acceptMarket(0, addr2);
       expect(await friendGroupFactory.isMember(0, addr2.address)).to.equal(true);
       expect(await friendGroupFactory.getMemberCount(0)).to.equal(2);
     });
 
-    it("Should allow 1v1 market creation with any liquidity amount (fees waived for members)", async function () {
+    it("Should create 1v1 market with equal stakes", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const liquidityAmount = ethers.parseEther("0.01"); // Any amount works as liquidity
-      
-      // Should succeed since fees are waived for members, value goes to liquidity
+      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const stakeAmount = ethers.parseEther("0.1");
+
       await expect(
-        friendGroupFactory.connect(addr1).createOneVsOneMarket(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
           addr2.address,
           description,
           tradingPeriod,
           ethers.ZeroAddress,
-          0,
-          { value: liquidityAmount }
+          acceptanceDeadline,
+          stakeAmount,
+          ethers.ZeroAddress,
+          ResolutionType.Either,
+          { value: stakeAmount }
         )
       ).to.emit(friendGroupFactory, "FriendMarketCreated");
-      
-      // Verify market was created with correct liquidity (should be market ID 0)
+
+      // Verify market was created with correct stake
       const market = await friendGroupFactory.getFriendMarket(0);
-      expect(market.liquidityAmount).to.equal(liquidityAmount);
+      expect(market.stakePerParticipant).to.equal(stakeAmount);
       expect(market.creationFee).to.equal(0); // Fee waived for members
     });
 
     it("Should reject 1v1 market with invalid opponent", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const fee = ethers.parseEther("0.1");
-      
+      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const stakeAmount = ethers.parseEther("0.1");
+
       await expect(
-        friendGroupFactory.connect(addr1).createOneVsOneMarket(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
           ethers.ZeroAddress,
           description,
           tradingPeriod,
           ethers.ZeroAddress,
-          0,
-          { value: fee }
+          acceptanceDeadline,
+          stakeAmount,
+          ethers.ZeroAddress,
+          ResolutionType.Either,
+          { value: stakeAmount }
         )
       ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
@@ -250,35 +294,47 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject betting against yourself", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const fee = ethers.parseEther("0.1");
-      
+      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const stakeAmount = ethers.parseEther("0.1");
+
       await expect(
-        friendGroupFactory.connect(addr1).createOneVsOneMarket(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
           addr1.address,
           description,
           tradingPeriod,
           ethers.ZeroAddress,
-          0,
-          { value: fee }
+          acceptanceDeadline,
+          stakeAmount,
+          ethers.ZeroAddress,
+          ResolutionType.Either,
+          { value: stakeAmount }
         )
       ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidOpponent");
     });
 
-    it("Should set arbitrator when provided", async function () {
+    it("Should support different resolution types", async function () {
       const description = "Who wins the game?";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const fee = ethers.parseEther("0.1");
-      
+      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const stakeAmount = ethers.parseEther("0.1");
+
+      // Test with ThirdParty resolution type
       await expect(
-        friendGroupFactory.connect(addr1).createOneVsOneMarket(
+        friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
           addr2.address,
           description,
           tradingPeriod,
-          arbitrator.address,
-          0,
-          { value: fee }
+          arbitrator.address, // Required for ThirdParty
+          acceptanceDeadline,
+          stakeAmount,
+          ethers.ZeroAddress,
+          ResolutionType.ThirdParty,
+          { value: stakeAmount }
         )
-      ).to.emit(friendGroupFactory, "ArbitratorSet");
+      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+
+      const market = await friendGroupFactory.getFriendMarket(0);
+      expect(market.arbitrator).to.equal(arbitrator.address);
     });
   });
 
