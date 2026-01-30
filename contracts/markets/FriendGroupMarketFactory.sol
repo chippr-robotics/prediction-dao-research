@@ -40,6 +40,8 @@ error TransferFailed();
 error InsufficientPayment();
 error InvalidMember();
 error InvalidOdds();
+error MissingMarketMakerRole();
+error InvalidResolutionType();
 
 /**
  * @title FriendGroupMarketFactory
@@ -68,7 +70,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         OneVsOne,           // 1v1 direct bet between two parties
         SmallGroup,         // 3-10 participants
         EventTracking,      // Tracking for competitive events/games
-        PropBet             // General proposition bet
+        PropBet,            // General proposition bet
+        Bookmaker           // Leveraged 1v1 market requiring dual roles
     }
 
     // Market status for multi-party acceptance flow
@@ -78,6 +81,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         Resolved,           // Market has been resolved
         Cancelled,          // Creator cancelled before activation
         Refunded            // Stakes returned due to deadline expiration
+    }
+
+    // Resolution type for determining who can resolve the market
+    enum ResolutionType {
+        Either,       // Either creator OR opponent can resolve (default)
+        Initiator,    // Only creator can resolve
+        Receiver,     // Only opponent can resolve
+        ThirdParty,   // Designated arbitrator resolves
+        AutoPegged    // Auto-resolves based on linked public market
     }
 
     // Acceptance record for each participant
@@ -111,7 +123,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 stakePerParticipant;   // Stake amount required from each participant
         address stakeToken;            // Token used for stakes (address(0) = native)
         uint256 tradingPeriodSeconds;  // Trading period stored for later activation
-        uint16 opponentOddsMultiplier; // Odds for 1v1: 200=2x (equal), 10000=100x. Min 200.
+        uint16 opponentOddsMultiplier; // Odds for 1v1/Bookmaker: 200=2x (equal), 10000=100x. Min 200.
+        ResolutionType resolutionType; // Who can resolve the market
     }
     
     // Friend market ID => FriendMarket
@@ -407,329 +420,18 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         emit NullificationEnforcementUpdated(_enforce);
     }
 
-    /**
-     * @notice Create a 1v1 friend market for direct betting
-     * @param opponent Address of the other party
-     * @param description Description of the bet
-     * @param tradingPeriod Duration of trading
-     * @param arbitrator Optional third-party arbitrator
-     * @param peggedPublicMarketId Optional public market ID to peg resolution to (0 = none)
-     * @return friendMarketId ID of created friend market
-     */
-    function createOneVsOneMarket(
-        address opponent,
-        string memory description,
-        uint256 tradingPeriod,
-        address arbitrator,
-        uint256 peggedPublicMarketId
-    ) external payable nonReentrant returns (uint256 friendMarketId) {
-        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
-        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
-        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
-        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
-
-        // Anti-money-laundering: Check if creator or opponent is nullified
-        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
-        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
-
-        if (opponent == address(0)) revert InvalidOpponent();
-        if (opponent == msg.sender) revert InvalidOpponent();
-        if (bytes(description).length == 0) revert InvalidDescription();
-
-        if (peggedPublicMarketId > 0) {
-            if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
-        }
-        
-        // For members, creation fee is waived (gas only), but accept any payment for liquidity
-        uint256 liquidityAmount = msg.value;
-        
-        // Create underlying market in ConditionalMarketFactory
-        uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
-        // Use default collateral token (required for CTF1155)
-        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
-        uint256 underlyingMarketId = marketFactory.deployMarketPair(
-            proposalId,
-            collateral, // ERC20 collateral for CTF
-            liquidityAmount, // All value goes to liquidity (no creation fee)
-            0.01 ether, // Small liquidity parameter
-            tradingPeriod,
-            ConditionalMarketFactory.BetType.YesNo
-        );
-        
-        // Create friend market
-        friendMarketId = friendMarketCount++;
-        
-        address[] memory members = new address[](2);
-        members[0] = msg.sender;
-        members[1] = opponent;
-        
-        friendMarkets[friendMarketId] = FriendMarket({
-            marketId: underlyingMarketId,
-            marketType: MarketType.OneVsOne,
-            creator: msg.sender,
-            members: members,
-            arbitrator: arbitrator,
-            memberLimit: maxOneVsOneMembers,
-            creationFee: 0, // Fee waived for members (gas only)
-            createdAt: block.timestamp,
-            active: true,
-            description: description,
-            peggedPublicMarketId: peggedPublicMarketId,
-            autoPegged: peggedPublicMarketId > 0,
-            paymentToken: address(0),  // Native ETC by default
-            liquidityAmount: liquidityAmount,
-            // Legacy creation - immediately active
-            status: FriendMarketStatus.Active,
-            acceptanceDeadline: 0,
-            minAcceptanceThreshold: 2,
-            stakePerParticipant: 0,
-            stakeToken: address(0),
-            tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: 200 // Default 2x (equal stakes)
-        });
-
-        memberCount[friendMarketId] = 2;
-        userMarkets[msg.sender].push(friendMarketId);
-        userMarkets[opponent].push(friendMarketId);
-
-        // Track pegging relationship
-        if (peggedPublicMarketId > 0) {
-            publicMarketToPeggedFriendMarkets[peggedPublicMarketId].push(friendMarketId);
-            emit MarketPeggedToPublic(friendMarketId, peggedPublicMarketId);
-        }
-
-        emit FriendMarketCreated(
-            friendMarketId,
-            underlyingMarketId,
-            MarketType.OneVsOne,
-            msg.sender,
-            maxOneVsOneMembers,
-            0, // No creation fee for members
-            address(0)  // Native ETC
-        );
-
-        emit MemberAdded(friendMarketId, msg.sender);
-        emit MemberAdded(friendMarketId, opponent);
-
-        if (arbitrator != address(0)) {
-            emit ArbitratorSet(friendMarketId, arbitrator);
-        }
-    }
-    
-    /**
-     * @notice Create a small group market for friend predictions
-     * @param description Description of the market
-     * @param initialMembers Initial member addresses
-     * @param memberLimit Maximum number of concurrent members
-     * @param tradingPeriod Duration of trading
-     * @param arbitrator Optional third-party arbitrator
-     * @param peggedPublicMarketId Optional public market ID to peg resolution to (0 = none)
-     * @return friendMarketId ID of created friend market
-     */
-    function createSmallGroupMarket(
-        string memory description,
-        address[] memory initialMembers,
-        uint256 memberLimit,
-        uint256 tradingPeriod,
-        address arbitrator,
-        uint256 peggedPublicMarketId
-    ) external payable nonReentrant returns (uint256 friendMarketId) {
-        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
-        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
-        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
-        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
-
-        // Anti-money-laundering: Check if creator or any member is nullified
-        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
-        FriendGroupMarketLib.checkNullificationBatch(nullifierRegistry, enforceNullification, initialMembers);
-
-        if (bytes(description).length == 0) revert InvalidDescription();
-        if (memberLimit <= 2 || memberLimit > maxSmallGroupMembers) revert InvalidLimit();
-        if (initialMembers.length == 0 || initialMembers.length > memberLimit) revert InvalidLimit();
-
-        FriendGroupMarketLib.validateMembers(initialMembers);
-
-        if (peggedPublicMarketId > 0) {
-            if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
-        }
-
-        uint256 liquidityAmount = msg.value;
-        uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
-        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
-        uint256 underlyingMarketId = marketFactory.deployMarketPair(
-            proposalId,
-            collateral, // ERC20 collateral for CTF
-            liquidityAmount,
-            0.1 ether, // Medium liquidity parameter
-            tradingPeriod,
-            ConditionalMarketFactory.BetType.YesNo
-        );
-        
-        // Create friend market
-        friendMarketId = friendMarketCount++;
-        
-        friendMarkets[friendMarketId] = FriendMarket({
-            marketId: underlyingMarketId,
-            marketType: MarketType.SmallGroup,
-            creator: msg.sender,
-            members: initialMembers,
-            arbitrator: arbitrator,
-            memberLimit: memberLimit,
-            creationFee: friendMarketFee,
-            createdAt: block.timestamp,
-            active: true,
-            description: description,
-            peggedPublicMarketId: peggedPublicMarketId,
-            autoPegged: peggedPublicMarketId > 0,
-            paymentToken: address(0),  // Native ETC by default
-            liquidityAmount: liquidityAmount,
-            // Legacy creation - immediately active
-            status: FriendMarketStatus.Active,
-            acceptanceDeadline: 0,
-            minAcceptanceThreshold: initialMembers.length,
-            stakePerParticipant: 0,
-            stakeToken: address(0),
-            tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: 200 // Default 2x (equal stakes)
-        });
-
-        memberCount[friendMarketId] = initialMembers.length;
-
-        // Add members to user markets mapping
-        for (uint256 i = 0; i < initialMembers.length; i++) {
-            userMarkets[initialMembers[i]].push(friendMarketId);
-            emit MemberAdded(friendMarketId, initialMembers[i]);
-        }
-        
-        // Track pegging relationship
-        if (peggedPublicMarketId > 0) {
-            publicMarketToPeggedFriendMarkets[peggedPublicMarketId].push(friendMarketId);
-            emit MarketPeggedToPublic(friendMarketId, peggedPublicMarketId);
-        }
-        
-        emit FriendMarketCreated(
-            friendMarketId,
-            underlyingMarketId,
-            MarketType.SmallGroup,
-            msg.sender,
-            memberLimit,
-            friendMarketFee,
-            address(0)  // Native ETC
-        );
-        
-        if (arbitrator != address(0)) {
-            emit ArbitratorSet(friendMarketId, arbitrator);
-        }
-    }
-    
-    /**
-     * @notice Create an event tracking market for competitive events/games
-     * @param description Description of the event
-     * @param players Array of player addresses
-     * @param tradingPeriod Duration of the event
-     * @param peggedPublicMarketId Optional public market ID to peg resolution to (0 = none)
-     * @return friendMarketId ID of created friend market
-     */
-    function createEventTrackingMarket(
-        string memory description,
-        address[] memory players,
-        uint256 tradingPeriod,
-        uint256 peggedPublicMarketId
-    ) external payable nonReentrant returns (uint256 friendMarketId) {
-        bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
-        if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
-        if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
-        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
-
-        // Anti-money-laundering: Check if creator or any player is nullified
-        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
-        FriendGroupMarketLib.checkNullificationBatch(nullifierRegistry, enforceNullification, players);
-
-        if (bytes(description).length == 0) revert InvalidDescription();
-        if (players.length < minEventTrackingMembers || players.length > maxEventTrackingMembers) revert InvalidLimit();
-
-        FriendGroupMarketLib.validateMembers(players);
-
-        if (peggedPublicMarketId > 0) {
-            if (peggedPublicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
-        }
-
-        uint256 liquidityAmount = msg.value;
-        uint256 proposalId = friendMarketCount + PROPOSAL_ID_OFFSET;
-        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : address(0);
-        uint256 underlyingMarketId = marketFactory.deployMarketPair(
-            proposalId,
-            collateral, // ERC20 collateral for CTF
-            liquidityAmount,
-            0.1 ether,
-            tradingPeriod,
-            ConditionalMarketFactory.BetType.WinLose
-        );
-        
-        // Create friend market
-        friendMarketId = friendMarketCount++;
-        
-        friendMarkets[friendMarketId] = FriendMarket({
-            marketId: underlyingMarketId,
-            marketType: MarketType.EventTracking,
-            creator: msg.sender,
-            members: players,
-            arbitrator: address(0), // No arbitrator for event tracking
-            memberLimit: maxEventTrackingMembers,
-            creationFee: friendMarketFee,
-            createdAt: block.timestamp,
-            active: true,
-            description: description,
-            peggedPublicMarketId: peggedPublicMarketId,
-            autoPegged: peggedPublicMarketId > 0,
-            paymentToken: address(0),  // Native ETC by default
-            liquidityAmount: liquidityAmount,
-            // Legacy creation - immediately active
-            status: FriendMarketStatus.Active,
-            acceptanceDeadline: 0,
-            minAcceptanceThreshold: players.length,
-            stakePerParticipant: 0,
-            stakeToken: address(0),
-            tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: 200 // Default 2x (equal stakes)
-        });
-
-        memberCount[friendMarketId] = players.length;
-
-        for (uint256 i = 0; i < players.length; i++) {
-            userMarkets[players[i]].push(friendMarketId);
-            emit MemberAdded(friendMarketId, players[i]);
-        }
-        
-        // Track pegging relationship
-        if (peggedPublicMarketId > 0) {
-            publicMarketToPeggedFriendMarkets[peggedPublicMarketId].push(friendMarketId);
-            emit MarketPeggedToPublic(friendMarketId, peggedPublicMarketId);
-        }
-        
-        emit FriendMarketCreated(
-            friendMarketId,
-            underlyingMarketId,
-            MarketType.EventTracking,
-            msg.sender,
-            maxEventTrackingMembers,
-            friendMarketFee,
-            address(0)  // Native ETC
-        );
-    }
-
     // ========== Multi-Party Acceptance Flow Functions ==========
 
     /**
-     * @notice Create a 1v1 market with pending acceptance and custom odds (creator stakes first)
+     * @notice Create a 1v1 market with pending acceptance (equal stakes)
      * @param opponent Address of the counterparty
      * @param description Market description
      * @param tradingPeriod Duration after activation (7-21 days)
-     * @param arbitrator Optional third-party arbitrator
+     * @param arbitrator Optional third-party arbitrator (required if resolutionType is ThirdParty)
      * @param acceptanceDeadline Unix timestamp for acceptance deadline
-     * @param opponentStakeAmount Amount opponent must stake (creator stake derived from odds)
-     * @param opponentOddsMultiplier Opponent's payout multiplier: 200=2x (equal), 10000=100x
+     * @param stakeAmount Equal stake amount for both parties
      * @param stakeToken ERC20 token address for stakes (address(0) for native)
+     * @param resolutionType Who can resolve the market
      * @return friendMarketId ID of the pending friend market
      */
     function createOneVsOneMarketPending(
@@ -738,15 +440,17 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingPeriod,
         address arbitrator,
         uint256 acceptanceDeadline,
-        uint256 opponentStakeAmount,
-        uint16 opponentOddsMultiplier,
-        address stakeToken
+        uint256 stakeAmount,
+        address stakeToken,
+        ResolutionType resolutionType
     ) external payable nonReentrant returns (uint256 friendMarketId) {
         if (opponent == address(0) || opponent == msg.sender) revert InvalidOpponent();
         if (bytes(description).length == 0) revert InvalidDescription();
         if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
-        if (opponentStakeAmount == 0) revert InvalidStake();
-        if (opponentOddsMultiplier < 200) revert InvalidOdds(); // Minimum 2x (equal stakes)
+        if (stakeAmount == 0) revert InvalidStake();
+
+        // Validate resolution type
+        if (resolutionType == ResolutionType.ThirdParty && arbitrator == address(0)) revert InvalidAddress();
 
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
         if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
@@ -757,10 +461,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
 
-        // Calculate creator's stake based on odds (creator is "insurer", stakes more)
-        // Formula: creatorStake = opponentStake × (multiplier - 100) / 100
-        uint256 creatorStake = (opponentStakeAmount * (uint256(opponentOddsMultiplier) - 100)) / 100;
-        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, creatorStake);
+        // Equal stakes for 1v1 markets
+        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, stakeAmount);
 
         // Create pending market (no underlying market yet - created on activation)
         friendMarketId = friendMarketCount++;
@@ -787,10 +489,131 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             status: FriendMarketStatus.PendingAcceptance,
             acceptanceDeadline: acceptanceDeadline,
             minAcceptanceThreshold: 2, // Both must accept for 1v1
+            stakePerParticipant: stakeAmount, // Equal stake for both parties
+            stakeToken: stakeToken,
+            tradingPeriodSeconds: tradingPeriod,
+            opponentOddsMultiplier: 200, // Equal stakes (2x)
+            resolutionType: resolutionType
+        });
+
+        // Record creator's acceptance (equal stake)
+        marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
+            participant: msg.sender,
+            stakedAmount: stakeAmount,
+            acceptedAt: block.timestamp,
+            hasAccepted: true,
+            isArbitrator: false
+        });
+
+        acceptedParticipantCount[friendMarketId] = 1;
+        marketTotalStaked[friendMarketId] = stakeAmount;
+
+        memberCount[friendMarketId] = 2;
+        userMarkets[msg.sender].push(friendMarketId);
+        userMarkets[opponent].push(friendMarketId);
+
+        emit MarketCreatedPending(
+            friendMarketId,
+            msg.sender,
+            acceptanceDeadline,
+            stakeAmount,
+            200, // Equal stakes
+            stakeToken,
+            participants,
+            arbitrator
+        );
+
+        if (arbitrator != address(0)) {
+            emit ArbitratorSet(friendMarketId, arbitrator);
+        }
+    }
+
+    /**
+     * @notice Create a Bookmaker market - leveraged 1v1 requiring both MARKET_MAKER and FRIEND_MARKET roles
+     * @dev More dispute-prone due to asymmetric stakes, hence separated from regular 1v1
+     * @param opponent Address of the counterparty (must have FRIEND_MARKET_ROLE)
+     * @param description Market description
+     * @param tradingPeriod Duration after activation (7-21 days)
+     * @param acceptanceDeadline Unix timestamp for acceptance deadline
+     * @param opponentStakeAmount Amount opponent must stake (creator stake derived from odds)
+     * @param opponentOddsMultiplier Opponent's payout multiplier: 200=2x (equal), 10000=100x
+     * @param stakeToken ERC20 token address for stakes (address(0) for native)
+     * @param resolutionType Who can resolve the market
+     * @param arbitrator Optional third-party arbitrator (required if resolutionType is ThirdParty)
+     * @return friendMarketId ID of the pending friend market
+     */
+    function createBookmakerMarket(
+        address opponent,
+        string memory description,
+        uint256 tradingPeriod,
+        uint256 acceptanceDeadline,
+        uint256 opponentStakeAmount,
+        uint16 opponentOddsMultiplier,
+        address stakeToken,
+        ResolutionType resolutionType,
+        address arbitrator
+    ) external payable nonReentrant returns (uint256 friendMarketId) {
+        if (opponent == address(0) || opponent == msg.sender) revert InvalidOpponent();
+        if (bytes(description).length == 0) revert InvalidDescription();
+        if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
+        if (opponentStakeAmount == 0) revert InvalidStake();
+        if (opponentOddsMultiplier < 200) revert InvalidOdds(); // Minimum 2x (equal stakes)
+
+        // Validate resolution type
+        if (resolutionType == ResolutionType.ThirdParty && arbitrator == address(0)) revert InvalidAddress();
+
+        // Creator must have BOTH MARKET_MAKER_ROLE and FRIEND_MARKET_ROLE
+        bytes32 friendRole = tieredRoleManager.FRIEND_MARKET_ROLE();
+        bytes32 makerRole = tieredRoleManager.MARKET_MAKER_ROLE();
+
+        if (!tieredRoleManager.hasRole(friendRole, msg.sender)) revert MembershipRequired();
+        if (!tieredRoleManager.hasRole(makerRole, msg.sender)) revert MissingMarketMakerRole();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, friendRole)) revert MembershipExpired();
+        if (!tieredRoleManager.isMembershipActive(msg.sender, makerRole)) revert MembershipExpired();
+        if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, friendRole)) revert MarketLimitReached();
+
+        // Opponent only needs FRIEND_MARKET_ROLE to accept
+        if (!tieredRoleManager.hasRole(friendRole, opponent)) revert MembershipRequired();
+
+        // Anti-money-laundering: Check if creator or opponent is nullified
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
+        FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
+
+        // Calculate creator's stake based on odds (creator is "insurer", stakes more)
+        // Formula: creatorStake = opponentStake × (multiplier - 100) / 100
+        uint256 creatorStake = (opponentStakeAmount * (uint256(opponentOddsMultiplier) - 100)) / 100;
+        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, creatorStake);
+
+        // Create pending market
+        friendMarketId = friendMarketCount++;
+
+        address[] memory participants = new address[](2);
+        participants[0] = msg.sender;
+        participants[1] = opponent;
+
+        friendMarkets[friendMarketId] = FriendMarket({
+            marketId: 0, // Not created until activated
+            marketType: MarketType.Bookmaker,
+            creator: msg.sender,
+            members: participants,
+            arbitrator: arbitrator,
+            memberLimit: maxOneVsOneMembers,
+            creationFee: 0,
+            createdAt: block.timestamp,
+            active: false, // Not active until accepted
+            description: description,
+            peggedPublicMarketId: 0,
+            autoPegged: false,
+            paymentToken: stakeToken,
+            liquidityAmount: 0,
+            status: FriendMarketStatus.PendingAcceptance,
+            acceptanceDeadline: acceptanceDeadline,
+            minAcceptanceThreshold: 2, // Both must accept for 1v1
             stakePerParticipant: opponentStakeAmount, // Opponent's required stake
             stakeToken: stakeToken,
             tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: opponentOddsMultiplier
+            opponentOddsMultiplier: opponentOddsMultiplier,
+            resolutionType: resolutionType
         });
 
         // Record creator's acceptance (creator stakes more based on odds)
@@ -901,7 +724,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             stakePerParticipant: stakeAmount,
             stakeToken: stakeToken,
             tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: 200 // Group markets use equal stakes
+            opponentOddsMultiplier: 200, // Group markets use equal stakes
+            resolutionType: ResolutionType.Either // Group markets use default resolution
         });
 
         // Record creator's acceptance
@@ -1253,7 +1077,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 acceptedCount,
         uint256 minThreshold,
         uint16 opponentOddsMultiplier,
-        string memory description
+        string memory description,
+        ResolutionType resolutionType
     ) {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
@@ -1271,7 +1096,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             acceptedParticipantCount[friendMarketId],
             market.minAcceptanceThreshold,
             market.opponentOddsMultiplier == 0 ? 200 : market.opponentOddsMultiplier,
-            market.description
+            market.description,
+            market.resolutionType
         );
     }
 
@@ -1434,7 +1260,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @notice Resolve a friend market (by arbitrator or creator)
+     * @notice Resolve a friend market based on resolution type
      * @param friendMarketId ID of the friend market
      * @param outcome True for positive outcome, false for negative
      * @dev NOTE: This simplified implementation emits events only.
@@ -1448,12 +1274,34 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!market.active) revert NotActive();
         if (market.autoPegged) revert AlreadyPegged();
 
-        bool canResolve = msg.sender == market.creator ||
+        bool canResolve = false;
+
+        // Determine resolution authority based on resolutionType
+        if (market.resolutionType == ResolutionType.Either) {
+            // Either creator or opponent can resolve (default behavior)
+            // Also allows arbitrator if set
+            canResolve = msg.sender == market.creator ||
+                         (market.members.length > 1 && msg.sender == market.members[1]) ||
                          (market.arbitrator != address(0) && msg.sender == market.arbitrator);
+        } else if (market.resolutionType == ResolutionType.Initiator) {
+            // Only creator can resolve
+            canResolve = msg.sender == market.creator;
+        } else if (market.resolutionType == ResolutionType.Receiver) {
+            // Only opponent (second member) can resolve
+            canResolve = market.members.length > 1 && msg.sender == market.members[1];
+        } else if (market.resolutionType == ResolutionType.ThirdParty) {
+            // Only designated arbitrator can resolve
+            canResolve = market.arbitrator != address(0) && msg.sender == market.arbitrator;
+        } else if (market.resolutionType == ResolutionType.AutoPegged) {
+            // Auto-pegged markets should use autoResolvePeggedMarket instead
+            revert NotAuthorized();
+        }
+
         if (!canResolve) revert NotAuthorized();
 
         market.active = false;
-        
+        market.status = FriendMarketStatus.Resolved;
+
         // Resolve underlying market
         // NOTE: In production, this would call marketFactory.resolveMarket()
         // or OracleResolver to properly resolve the underlying market and

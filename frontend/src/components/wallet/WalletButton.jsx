@@ -542,23 +542,43 @@ function WalletButton({ className = '' }) {
       const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
       const tradingPeriodSeconds = tradingPeriodDays * 24 * 60 * 60
 
-      // Parse stake amount using correct decimals for token
-      // For 1v1 with odds, stakeAmount is the OPPONENT's stake
-      const opponentStakeAmount = data.data.stakeAmount || '10'
-      const opponentStakeWei = ethers.parseUnits(opponentStakeAmount, tokenDecimals)
+      // Check if this is a bookmaker market (requires odds calculation)
+      const isBookmaker = data.marketType === 'bookmaker'
 
-      // Get odds multiplier (200 = 2x equal stakes, 10000 = 100x)
+      // Parse stake amount using correct decimals for token
+      const stakeAmountRaw = data.data.stakeAmount || '10'
+      const stakeWei = ethers.parseUnits(stakeAmountRaw, tokenDecimals)
+
+      // Get odds multiplier (only used for bookmaker markets)
+      // 200 = 2x equal stakes, 10000 = 100x
       const oddsMultiplier = parseInt(data.data.oddsMultiplier) || 200
 
-      // Calculate creator's stake based on odds
-      // Formula: creatorStake = opponentStake × (oddsMultiplier - 100) / 100
-      const creatorStakeWei = (opponentStakeWei * BigInt(oddsMultiplier - 100)) / 100n
+      // Get resolution type (0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged)
+      const resolutionType = parseInt(data.data.resolutionType) || 0
+
+      // Calculate stakes based on market type
+      let opponentStakeWei
+      let creatorStakeWei
+
+      if (isBookmaker) {
+        // Bookmaker: asymmetric stakes based on odds
+        // stakeAmount = opponent's stake, creator stakes more based on odds
+        opponentStakeWei = stakeWei
+        creatorStakeWei = (opponentStakeWei * BigInt(oddsMultiplier - 100)) / 100n
+      } else {
+        // Regular 1v1: equal stakes for both parties
+        opponentStakeWei = stakeWei
+        creatorStakeWei = stakeWei
+      }
 
       // Validate stake amount and balance before proceeding
       console.log('Stake amount validation:', {
-        opponentStakeAmount,
+        marketType: data.marketType,
+        isBookmaker,
+        stakeAmountRaw,
         opponentStakeWei: opponentStakeWei.toString(),
-        oddsMultiplier,
+        oddsMultiplier: isBookmaker ? oddsMultiplier : 'N/A (equal stakes)',
+        resolutionType,
         creatorStakeWei: creatorStakeWei.toString(),
         creatorStakeFormatted: ethers.formatUnits(creatorStakeWei, tokenDecimals),
         tokenDecimals,
@@ -736,30 +756,67 @@ function WalletButton({ className = '' }) {
       // CID reference is ~60 bytes vs 1000+ bytes for full envelope
       const gasLimit = 1000000n
       let tx
-      if (isNativeETC) {
-        tx = await friendFactory.createOneVsOneMarketPending(
-          opponent,
-          marketDescription,
-          tradingPeriodSeconds,
-          arbitrator,
-          acceptanceDeadline,
-          opponentStakeWei,
-          oddsMultiplier,
-          stakeTokenAddress,
-          { value: creatorStakeWei, gasLimit }
-        )
+
+      if (isBookmaker) {
+        // Bookmaker market: requires dual roles, supports custom odds
+        // createBookmakerMarket(opponent, description, tradingPeriod, acceptanceDeadline,
+        //   opponentStakeAmount, opponentOddsMultiplier, stakeToken, resolutionType, arbitrator)
+        if (isNativeETC) {
+          tx = await friendFactory.createBookmakerMarket(
+            opponent,
+            marketDescription,
+            tradingPeriodSeconds,
+            acceptanceDeadline,
+            opponentStakeWei,
+            oddsMultiplier,
+            stakeTokenAddress,
+            resolutionType,
+            arbitrator,
+            { value: creatorStakeWei, gasLimit }
+          )
+        } else {
+          tx = await friendFactory.createBookmakerMarket(
+            opponent,
+            marketDescription,
+            tradingPeriodSeconds,
+            acceptanceDeadline,
+            opponentStakeWei,
+            oddsMultiplier,
+            stakeTokenAddress,
+            resolutionType,
+            arbitrator,
+            { gasLimit }
+          )
+        }
       } else {
-        tx = await friendFactory.createOneVsOneMarketPending(
-          opponent,
-          marketDescription,
-          tradingPeriodSeconds,
-          arbitrator,
-          acceptanceDeadline,
-          opponentStakeWei,
-          oddsMultiplier,
-          stakeTokenAddress,
-          { gasLimit }
-        )
+        // Regular 1v1 market: equal stakes, no odds multiplier
+        // createOneVsOneMarketPending(opponent, description, tradingPeriod, arbitrator,
+        //   acceptanceDeadline, stakeAmount, stakeToken, resolutionType)
+        if (isNativeETC) {
+          tx = await friendFactory.createOneVsOneMarketPending(
+            opponent,
+            marketDescription,
+            tradingPeriodSeconds,
+            arbitrator,
+            acceptanceDeadline,
+            opponentStakeWei,
+            stakeTokenAddress,
+            resolutionType,
+            { value: creatorStakeWei, gasLimit }
+          )
+        } else {
+          tx = await friendFactory.createOneVsOneMarketPending(
+            opponent,
+            marketDescription,
+            tradingPeriodSeconds,
+            arbitrator,
+            acceptanceDeadline,
+            opponentStakeWei,
+            stakeTokenAddress,
+            resolutionType,
+            { gasLimit }
+          )
+        }
       }
 
       console.log('Friend market transaction sent:', tx.hash)
@@ -771,7 +828,9 @@ function WalletButton({ className = '' }) {
           description: data.data?.description,
           opponent: data.data?.opponent,
           stakeAmount: data.data?.stakeAmount,
-          oddsMultiplier: oddsMultiplier
+          marketType: data.marketType,
+          oddsMultiplier: isBookmaker ? oddsMultiplier : 200,
+          resolutionType: resolutionType
         }
       })
       const receipt = await tx.wait()
@@ -806,7 +865,11 @@ function WalletButton({ className = '' }) {
         isEncrypted: data.data.isEncrypted || false,
         encryptedMetadata: data.data.encryptedMetadata || null, // Store envelope for local verification
         ipfsCid: ipfsCid || null, // IPFS CID for encrypted envelope (for fetching/sharing)
-        stakeAmount: stakeAmount,
+        stakeAmount: stakeAmountRaw,
+        opponentStake: ethers.formatUnits(opponentStakeWei, tokenDecimals),
+        creatorStake: ethers.formatUnits(creatorStakeWei, tokenDecimals),
+        oddsMultiplier: isBookmaker ? oddsMultiplier : 200, // 200 = equal stakes for non-bookmaker
+        resolutionType: resolutionType,
         tradingPeriod: tradingPeriodDays.toString(),
         participants: [userAddress, opponent],
         opponent: opponent,

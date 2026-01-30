@@ -4,7 +4,7 @@
  * These addresses are deterministically deployed and should remain consistent
  * across deployments. Update these if contracts are redeployed.
  *
- * Last updated: 2026-01-26 (perpetual futures v2.1 redeployment)
+ * Last updated: 2026-01-30 (FriendGroupMarketFactory v1.1 - bookmaker + resolution types)
  */
 
 export const DEPLOYED_CONTRACTS = {
@@ -32,9 +32,9 @@ export const DEPLOYED_CONTRACTS = {
   paymentProcessor: '0x6e063138809263820F61146c34a74EB3B2629A59',
   membershipPaymentManager: '0x9CDc3D0Aff85F89C04d03b6b9E9Ba99fDf033E34',
 
-  // Market Contracts (03-deploy-markets.js)
-  ctf1155: '0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9',
-  friendGroupMarketFactory: '0x0E118DEf0946f0e7F1BEAAA385c6c37CAc6acfa7',
+  // Market Contracts (03-deploy-markets.js) - v1.1 with bookmaker + resolution types
+  ctf1155: '0x5baBA40b92EE6C9D4245DFd39f7d9Ab1Abf9E1D5',
+  friendGroupMarketFactory: '0xB32679E6B64B706Ed635c3e109f90012876bA1cF',
 
   // Perpetual Futures Contracts (v2.1 - fixed decimals + ownership)
   fundingRateEngine: '0x32AD4F7a1e05138fc0F485c786aeDB90dBE100e8',
