@@ -134,7 +134,9 @@ function FriendMarketsModal({
     peggedMarketId: '',
     // Multi-party acceptance fields
     acceptanceDeadline: getDefaultAcceptanceDeadline(),
-    minAcceptanceThreshold: '2' // Minimum participants to activate (including creator)
+    minAcceptanceThreshold: '2', // Minimum participants to activate (including creator)
+    // Leverage/odds for 1v1 markets (200 = 2x equal stakes, 10000 = 100x)
+    oddsMultiplier: 200
   })
 
   // Selected market for detail view
@@ -189,7 +191,8 @@ function FriendMarketsModal({
       arbitrator: '',
       peggedMarketId: '',
       acceptanceDeadline: getDefaultAcceptanceDeadline(),
-      minAcceptanceThreshold: '2'
+      minAcceptanceThreshold: '2',
+      oddsMultiplier: 200
     })
     setErrors({})
     setMarketLookupId('')
@@ -1215,6 +1218,65 @@ function FriendMarketsModal({
                         />
                         <span className="fm-hint">Enter a valid ERC-20 token address</span>
                         {errors.customStakeTokenAddress && <span className="fm-error">{errors.customStakeTokenAddress}</span>}
+                      </div>
+                    )}
+
+                    {/* Odds/Leverage selector - only for 1v1 markets */}
+                    {friendMarketType === 'oneVsOne' && (
+                      <div className="fm-form-group fm-form-full">
+                        <div className="fm-input-header">
+                          <label htmlFor="fm-odds">Opponent&apos;s Odds</label>
+                          <span className="fm-odds-value">{formData.oddsMultiplier / 100}x</span>
+                        </div>
+                        <input
+                          id="fm-odds"
+                          type="range"
+                          min="200"
+                          max="10000"
+                          step="100"
+                          value={formData.oddsMultiplier}
+                          onChange={(e) => handleFormChange('oddsMultiplier', parseInt(e.target.value, 10))}
+                          disabled={submitting}
+                          className="fm-odds-slider"
+                        />
+                        <div className="fm-odds-presets">
+                          {[200, 300, 500, 1000, 2000, 5000, 10000].map(odds => (
+                            <button
+                              key={odds}
+                              type="button"
+                              className={formData.oddsMultiplier === odds ? 'active' : ''}
+                              onClick={() => handleFormChange('oddsMultiplier', odds)}
+                              disabled={submitting}
+                            >
+                              {odds / 100}x
+                            </button>
+                          ))}
+                        </div>
+                        <div className="fm-odds-summary">
+                          <div className="fm-odds-row">
+                            <span>Opponent stakes:</span>
+                            <span>{formatUSD(formData.stakeAmount, selectedStakeToken?.symbol)}</span>
+                          </div>
+                          <div className="fm-odds-row">
+                            <span>You stake:</span>
+                            <span>{formatUSD(
+                              parseFloat(formData.stakeAmount || 0) * (formData.oddsMultiplier - 100) / 100,
+                              selectedStakeToken?.symbol
+                            )}</span>
+                          </div>
+                          <div className="fm-odds-row fm-odds-highlight">
+                            <span>Total pot:</span>
+                            <span>{formatUSD(
+                              parseFloat(formData.stakeAmount || 0) * formData.oddsMultiplier / 100,
+                              selectedStakeToken?.symbol
+                            )}</span>
+                          </div>
+                        </div>
+                        <span className="fm-hint">
+                          {formData.oddsMultiplier === 200
+                            ? 'Equal stakes - both sides risk the same amount'
+                            : `You're the insurer - risking more for smaller returns. Opponent risks ${formatUSD(formData.stakeAmount, selectedStakeToken?.symbol)} to win ${formatUSD(parseFloat(formData.stakeAmount || 0) * formData.oddsMultiplier / 100, selectedStakeToken?.symbol)}`}
+                        </span>
                       </div>
                     )}
 

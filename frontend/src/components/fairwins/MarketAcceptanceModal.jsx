@@ -488,12 +488,46 @@ function MarketAcceptanceModal({
                   </div>
                 )}
                 {!isArbitrator && (
-                  <div className="ma-term ma-term-highlight">
-                    <label>Your Stake</label>
-                    <span className="ma-value">
-                      {formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="ma-term ma-term-highlight">
+                      <label>Your Stake</label>
+                      <span className="ma-value">
+                        {formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}
+                      </span>
+                    </div>
+                    {/* Show odds and potential winnings for 1v1 markets with leverage */}
+                    {marketData?.opponentOddsMultiplier && marketData?.opponentOddsMultiplier !== 200 && (
+                      <>
+                        <div className="ma-term">
+                          <label>Your Odds</label>
+                          <span className="ma-value ma-odds-value">
+                            {marketData.opponentOddsMultiplier / 100}x
+                          </span>
+                        </div>
+                        <div className="ma-term ma-term-success">
+                          <label>If You Win</label>
+                          <span className="ma-value">
+                            {formatUSD(
+                              parseFloat(marketData?.stakePerParticipant || 0) * marketData.opponentOddsMultiplier / 100,
+                              marketData?.stakeTokenSymbol
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {/* For equal stakes (200 = 2x), show simplified potential winnings */}
+                    {(!marketData?.opponentOddsMultiplier || marketData?.opponentOddsMultiplier === 200) && (
+                      <div className="ma-term ma-term-success">
+                        <label>If You Win</label>
+                        <span className="ma-value">
+                          {formatUSD(
+                            parseFloat(marketData?.stakePerParticipant || 0) * 2,
+                            marketData?.stakeTokenSymbol
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
                 {isArbitrator && (
                   <div className="ma-term ma-term-info">
@@ -610,6 +644,12 @@ function MarketAcceptanceModal({
               {!isArbitrator && (
                 <p className="ma-stake-notice">
                   You are about to stake <strong>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</strong> to join this market.
+                  {marketData?.opponentOddsMultiplier && marketData?.opponentOddsMultiplier !== 200 && (
+                    <> At <strong>{marketData.opponentOddsMultiplier / 100}x odds</strong>, you could win <strong>{formatUSD(parseFloat(marketData?.stakePerParticipant || 0) * marketData.opponentOddsMultiplier / 100, marketData?.stakeTokenSymbol)}</strong>.</>
+                  )}
+                  {(!marketData?.opponentOddsMultiplier || marketData?.opponentOddsMultiplier === 200) && (
+                    <> If you win, you&apos;ll receive <strong>{formatUSD(parseFloat(marketData?.stakePerParticipant || 0) * 2, marketData?.stakeTokenSymbol)}</strong>.</>
+                  )}
                 </p>
               )}
               {isArbitrator && (
@@ -631,10 +671,21 @@ function MarketAcceptanceModal({
                   <span className="ma-address">{formatAddress(marketData?.creator)}</span>
                 </div>
                 {!isArbitrator && (
-                  <div className="ma-confirm-row">
-                    <span>Your Stake:</span>
-                    <span>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</span>
-                  </div>
+                  <>
+                    <div className="ma-confirm-row">
+                      <span>Your Stake:</span>
+                      <span>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</span>
+                    </div>
+                    <div className="ma-confirm-row">
+                      <span>Potential Win:</span>
+                      <span className="ma-potential-win">
+                        {formatUSD(
+                          parseFloat(marketData?.stakePerParticipant || 0) * (marketData?.opponentOddsMultiplier || 200) / 100,
+                          marketData?.stakeTokenSymbol
+                        )}
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
               <div className="ma-actions">

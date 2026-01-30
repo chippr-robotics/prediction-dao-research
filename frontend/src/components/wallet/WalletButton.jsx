@@ -543,44 +543,57 @@ function WalletButton({ className = '' }) {
       const tradingPeriodSeconds = tradingPeriodDays * 24 * 60 * 60
 
       // Parse stake amount using correct decimals for token
-      const stakeAmount = data.data.stakeAmount || '10'
-      const stakeAmountWei = ethers.parseUnits(stakeAmount, tokenDecimals)
+      // For 1v1 with odds, stakeAmount is the OPPONENT's stake
+      const opponentStakeAmount = data.data.stakeAmount || '10'
+      const opponentStakeWei = ethers.parseUnits(opponentStakeAmount, tokenDecimals)
+
+      // Get odds multiplier (200 = 2x equal stakes, 10000 = 100x)
+      const oddsMultiplier = parseInt(data.data.oddsMultiplier) || 200
+
+      // Calculate creator's stake based on odds
+      // Formula: creatorStake = opponentStake × (oddsMultiplier - 100) / 100
+      const creatorStakeWei = (opponentStakeWei * BigInt(oddsMultiplier - 100)) / 100n
 
       // Validate stake amount and balance before proceeding
       console.log('Stake amount validation:', {
-        stakeAmount,
-        stakeAmountWei: stakeAmountWei.toString(),
+        opponentStakeAmount,
+        opponentStakeWei: opponentStakeWei.toString(),
+        oddsMultiplier,
+        creatorStakeWei: creatorStakeWei.toString(),
+        creatorStakeFormatted: ethers.formatUnits(creatorStakeWei, tokenDecimals),
         tokenDecimals,
         isNativeETC
       })
 
-      // Check user balance for ERC20 tokens
+      // Check user balance for ERC20 tokens (creator needs to stake creatorStakeWei)
       if (!isNativeETC && stakeToken) {
         const balance = await stakeToken.balanceOf(userAddress)
         const tokenSymbol = TOKENS.USC?.symbol || 'tokens'
+        const requiredAmount = ethers.formatUnits(creatorStakeWei, tokenDecimals)
         console.log('Token balance check:', {
           balance: balance.toString(),
           balanceFormatted: ethers.formatUnits(balance, tokenDecimals),
-          required: stakeAmountWei.toString(),
-          requiredFormatted: stakeAmount
+          required: creatorStakeWei.toString(),
+          requiredFormatted: requiredAmount
         })
-        if (balance < stakeAmountWei) {
+        if (balance < creatorStakeWei) {
           throw new Error(
-            `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${stakeAmount} ${tokenSymbol}.`
+            `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${requiredAmount} ${tokenSymbol}.`
           )
         }
       } else if (isNativeETC) {
-        // Check native ETC balance
+        // Check native ETC balance (creator needs to stake creatorStakeWei)
         const balance = await activeSigner.provider.getBalance(userAddress)
+        const requiredAmount = ethers.formatEther(creatorStakeWei)
         console.log('Native ETC balance check:', {
           balance: balance.toString(),
           balanceFormatted: ethers.formatEther(balance),
-          required: stakeAmountWei.toString(),
-          requiredFormatted: stakeAmount
+          required: creatorStakeWei.toString(),
+          requiredFormatted: requiredAmount
         })
-        if (balance < stakeAmountWei) {
+        if (balance < creatorStakeWei) {
           throw new Error(
-            `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${stakeAmount} ETC.`
+            `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount} ETC.`
           )
         }
       }
@@ -628,12 +641,15 @@ function WalletButton({ className = '' }) {
       const arbitrator = data.data.arbitrator || ethers.ZeroAddress
 
       // Approve stake token for FriendGroupMarketFactory (only for ERC20 tokens, not native ETC)
+      // Creator needs to approve their stake amount (creatorStakeWei)
       if (!isNativeETC && stakeToken) {
         const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
-        if (currentAllowance < stakeAmountWei) {
+        if (currentAllowance < creatorStakeWei) {
           onProgress({ step: 'approve', message: 'Approving token spend...' })
-          console.log('Approving stake token for FriendGroupMarketFactory...')
-          const approveTx = await stakeToken.approve(friendFactoryAddress, stakeAmountWei)
+          console.log('Approving stake token for FriendGroupMarketFactory...', {
+            creatorStakeWei: creatorStakeWei.toString()
+          })
+          const approveTx = await stakeToken.approve(friendFactoryAddress, creatorStakeWei)
           onProgress({ step: 'approve', message: 'Waiting for approval confirmation...', txHash: approveTx.hash })
           savePendingTransaction({
             step: 'approve',
@@ -641,7 +657,8 @@ function WalletButton({ className = '' }) {
             data: {
               description: data.data?.description,
               opponent: data.data?.opponent,
-              stakeAmount: data.data?.stakeAmount
+              stakeAmount: data.data?.stakeAmount,
+              oddsMultiplier: oddsMultiplier
             }
           })
           await approveTx.wait()
@@ -653,7 +670,8 @@ function WalletButton({ className = '' }) {
             data: {
               description: data.data?.description,
               opponent: data.data?.opponent,
-              stakeAmount: data.data?.stakeAmount
+              stakeAmount: data.data?.stakeAmount,
+              oddsMultiplier: oddsMultiplier
             }
           })
         }
@@ -706,12 +724,14 @@ function WalletButton({ className = '' }) {
         tradingPeriodSeconds,
         arbitrator,
         acceptanceDeadline,
-        stakeAmountWei: stakeAmountWei.toString(),
+        opponentStakeWei: opponentStakeWei.toString(),
+        oddsMultiplier,
+        creatorStakeWei: creatorStakeWei.toString(),
         stakeToken: stakeTokenAddress,
         isNativeETC
       })
 
-      // For native ETC, send the stake as msg.value; for ERC20, no value needed
+      // For native ETC, send the creator's stake as msg.value; for ERC20, no value needed
       // With IPFS storage, encrypted markets now have small on-chain footprint
       // CID reference is ~60 bytes vs 1000+ bytes for full envelope
       const gasLimit = 1000000n
@@ -723,9 +743,10 @@ function WalletButton({ className = '' }) {
           tradingPeriodSeconds,
           arbitrator,
           acceptanceDeadline,
-          stakeAmountWei,
+          opponentStakeWei,
+          oddsMultiplier,
           stakeTokenAddress,
-          { value: stakeAmountWei, gasLimit }
+          { value: creatorStakeWei, gasLimit }
         )
       } else {
         tx = await friendFactory.createOneVsOneMarketPending(
@@ -734,7 +755,8 @@ function WalletButton({ className = '' }) {
           tradingPeriodSeconds,
           arbitrator,
           acceptanceDeadline,
-          stakeAmountWei,
+          opponentStakeWei,
+          oddsMultiplier,
           stakeTokenAddress,
           { gasLimit }
         )
@@ -748,7 +770,8 @@ function WalletButton({ className = '' }) {
         data: {
           description: data.data?.description,
           opponent: data.data?.opponent,
-          stakeAmount: data.data?.stakeAmount
+          stakeAmount: data.data?.stakeAmount,
+          oddsMultiplier: oddsMultiplier
         }
       })
       const receipt = await tx.wait()

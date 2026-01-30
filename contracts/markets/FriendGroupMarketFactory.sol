@@ -39,6 +39,7 @@ error NotResolved();
 error TransferFailed();
 error InsufficientPayment();
 error InvalidMember();
+error InvalidOdds();
 
 /**
  * @title FriendGroupMarketFactory
@@ -110,6 +111,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 stakePerParticipant;   // Stake amount required from each participant
         address stakeToken;            // Token used for stakes (address(0) = native)
         uint256 tradingPeriodSeconds;  // Trading period stored for later activation
+        uint16 opponentOddsMultiplier; // Odds for 1v1: 200=2x (equal), 10000=100x. Min 200.
     }
     
     // Friend market ID => FriendMarket
@@ -231,6 +233,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address indexed creator,
         uint256 acceptanceDeadline,
         uint256 stakePerParticipant,
+        uint16 opponentOddsMultiplier,
         address stakeToken,
         address[] invitedParticipants,
         address arbitrator
@@ -481,7 +484,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             minAcceptanceThreshold: 2,
             stakePerParticipant: 0,
             stakeToken: address(0),
-            tradingPeriodSeconds: tradingPeriod
+            tradingPeriodSeconds: tradingPeriod,
+            opponentOddsMultiplier: 200 // Default 2x (equal stakes)
         });
 
         memberCount[friendMarketId] = 2;
@@ -585,11 +589,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             minAcceptanceThreshold: initialMembers.length,
             stakePerParticipant: 0,
             stakeToken: address(0),
-            tradingPeriodSeconds: tradingPeriod
+            tradingPeriodSeconds: tradingPeriod,
+            opponentOddsMultiplier: 200 // Default 2x (equal stakes)
         });
 
         memberCount[friendMarketId] = initialMembers.length;
-        
+
         // Add members to user markets mapping
         for (uint256 i = 0; i < initialMembers.length; i++) {
             userMarkets[initialMembers[i]].push(friendMarketId);
@@ -685,11 +690,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             minAcceptanceThreshold: players.length,
             stakePerParticipant: 0,
             stakeToken: address(0),
-            tradingPeriodSeconds: tradingPeriod
+            tradingPeriodSeconds: tradingPeriod,
+            opponentOddsMultiplier: 200 // Default 2x (equal stakes)
         });
 
         memberCount[friendMarketId] = players.length;
-        
+
         for (uint256 i = 0; i < players.length; i++) {
             userMarkets[players[i]].push(friendMarketId);
             emit MemberAdded(friendMarketId, players[i]);
@@ -715,13 +721,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // ========== Multi-Party Acceptance Flow Functions ==========
 
     /**
-     * @notice Create a 1v1 market with pending acceptance (creator stakes first)
+     * @notice Create a 1v1 market with pending acceptance and custom odds (creator stakes first)
      * @param opponent Address of the counterparty
      * @param description Market description
      * @param tradingPeriod Duration after activation (7-21 days)
      * @param arbitrator Optional third-party arbitrator
      * @param acceptanceDeadline Unix timestamp for acceptance deadline
-     * @param stakeAmount Amount each party must stake
+     * @param opponentStakeAmount Amount opponent must stake (creator stake derived from odds)
+     * @param opponentOddsMultiplier Opponent's payout multiplier: 200=2x (equal), 10000=100x
      * @param stakeToken ERC20 token address for stakes (address(0) for native)
      * @return friendMarketId ID of the pending friend market
      */
@@ -731,13 +738,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingPeriod,
         address arbitrator,
         uint256 acceptanceDeadline,
-        uint256 stakeAmount,
+        uint256 opponentStakeAmount,
+        uint16 opponentOddsMultiplier,
         address stakeToken
     ) external payable nonReentrant returns (uint256 friendMarketId) {
         if (opponent == address(0) || opponent == msg.sender) revert InvalidOpponent();
         if (bytes(description).length == 0) revert InvalidDescription();
         if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
-        if (stakeAmount == 0) revert InvalidStake();
+        if (opponentStakeAmount == 0) revert InvalidStake();
+        if (opponentOddsMultiplier < 200) revert InvalidOdds(); // Minimum 2x (equal stakes)
 
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
         if (!tieredRoleManager.hasRole(role, msg.sender)) revert MembershipRequired();
@@ -748,7 +757,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
 
-        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, stakeAmount);
+        // Calculate creator's stake based on odds (creator is "insurer", stakes more)
+        // Formula: creatorStake = opponentStake × (multiplier - 100) / 100
+        uint256 creatorStake = (opponentStakeAmount * (uint256(opponentOddsMultiplier) - 100)) / 100;
+        FriendGroupMarketLib.collectStake(msg.sender, stakeToken, creatorStake);
 
         // Create pending market (no underlying market yet - created on activation)
         friendMarketId = friendMarketCount++;
@@ -775,22 +787,23 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             status: FriendMarketStatus.PendingAcceptance,
             acceptanceDeadline: acceptanceDeadline,
             minAcceptanceThreshold: 2, // Both must accept for 1v1
-            stakePerParticipant: stakeAmount,
+            stakePerParticipant: opponentStakeAmount, // Opponent's required stake
             stakeToken: stakeToken,
-            tradingPeriodSeconds: tradingPeriod
+            tradingPeriodSeconds: tradingPeriod,
+            opponentOddsMultiplier: opponentOddsMultiplier
         });
 
-        // Record creator's acceptance
+        // Record creator's acceptance (creator stakes more based on odds)
         marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
             participant: msg.sender,
-            stakedAmount: stakeAmount,
+            stakedAmount: creatorStake,
             acceptedAt: block.timestamp,
             hasAccepted: true,
             isArbitrator: false
         });
 
         acceptedParticipantCount[friendMarketId] = 1;
-        marketTotalStaked[friendMarketId] = stakeAmount;
+        marketTotalStaked[friendMarketId] = creatorStake;
 
         memberCount[friendMarketId] = 2;
         userMarkets[msg.sender].push(friendMarketId);
@@ -800,7 +813,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             friendMarketId,
             msg.sender,
             acceptanceDeadline,
-            stakeAmount,
+            opponentStakeAmount,
+            opponentOddsMultiplier,
             stakeToken,
             participants,
             arbitrator
@@ -886,7 +900,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             minAcceptanceThreshold: minAcceptanceThreshold,
             stakePerParticipant: stakeAmount,
             stakeToken: stakeToken,
-            tradingPeriodSeconds: tradingPeriod
+            tradingPeriodSeconds: tradingPeriod,
+            opponentOddsMultiplier: 200 // Group markets use equal stakes
         });
 
         // Record creator's acceptance
@@ -912,6 +927,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             msg.sender,
             acceptanceDeadline,
             stakeAmount,
+            200, // Group markets use equal stakes (2x)
             stakeToken,
             allParticipants,
             arbitrator
@@ -1198,6 +1214,30 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Get stake requirements for a 1v1 market with custom odds
+     * @param friendMarketId ID of the friend market
+     * @return opponentStake Amount opponent must stake
+     * @return creatorStake Amount creator staked
+     * @return totalPot Total pot if both stakes collected
+     * @return oddsMultiplier The odds multiplier (200 = 2x, 10000 = 100x)
+     */
+    function getStakeRequirements(uint256 friendMarketId) external view returns (
+        uint256 opponentStake,
+        uint256 creatorStake,
+        uint256 totalPot,
+        uint16 oddsMultiplier
+    ) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        opponentStake = market.stakePerParticipant;
+        // Treat 0 as 200 (2x) for backwards compatibility with legacy markets
+        oddsMultiplier = market.opponentOddsMultiplier == 0 ? 200 : market.opponentOddsMultiplier;
+        creatorStake = (opponentStake * (uint256(oddsMultiplier) - 100)) / 100;
+        totalPot = (opponentStake * uint256(oddsMultiplier)) / 100;
+    }
+
+    /**
      * @notice Get friend market details with acceptance info
      */
     function getFriendMarketWithStatus(uint256 friendMarketId) external view returns (
@@ -1212,6 +1252,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         address stakeToken,
         uint256 acceptedCount,
         uint256 minThreshold,
+        uint16 opponentOddsMultiplier,
         string memory description
     ) {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
@@ -1229,6 +1270,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             market.stakeToken,
             acceptedParticipantCount[friendMarketId],
             market.minAcceptanceThreshold,
+            market.opponentOddsMultiplier == 0 ? 200 : market.opponentOddsMultiplier,
             market.description
         );
     }

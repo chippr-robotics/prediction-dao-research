@@ -42,7 +42,20 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { name: 'stakeToken', type: 'address' },
       { name: 'acceptedCount', type: 'uint256' },
       { name: 'minThreshold', type: 'uint256' },
+      { name: 'opponentOddsMultiplier', type: 'uint16' },
       { name: 'description', type: 'string' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'getStakeRequirements',
+    outputs: [
+      { name: 'opponentStake', type: 'uint256' },
+      { name: 'creatorStake', type: 'uint256' },
+      { name: 'totalPot', type: 'uint256' },
+      { name: 'oddsMultiplier', type: 'uint16' }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -153,7 +166,8 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { name: 'tradingPeriod', type: 'uint256' },
       { name: 'arbitrator', type: 'address' },
       { name: 'acceptanceDeadline', type: 'uint256' },
-      { name: 'stakeAmount', type: 'uint256' },
+      { name: 'opponentStakeAmount', type: 'uint256' },
+      { name: 'opponentOddsMultiplier', type: 'uint16' },
       { name: 'stakeToken', type: 'address' }
     ],
     name: 'createOneVsOneMarketPending',
@@ -210,6 +224,7 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { indexed: true, name: 'creator', type: 'address' },
       { indexed: false, name: 'acceptanceDeadline', type: 'uint256' },
       { indexed: false, name: 'stakePerParticipant', type: 'uint256' },
+      { indexed: false, name: 'opponentOddsMultiplier', type: 'uint16' },
       { indexed: false, name: 'stakeToken', type: 'address' },
       { indexed: false, name: 'invitedParticipants', type: 'address[]' },
       { indexed: false, name: 'arbitrator', type: 'address' }
