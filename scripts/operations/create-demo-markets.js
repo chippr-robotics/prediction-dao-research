@@ -38,12 +38,20 @@ const {
 const { batchUploadMetadata, verifyPinataConnection } = require("./market-templates/ipfs");
 
 // Contract addresses (Mordor testnet)
+// These addresses match frontend/src/config/contracts.js - keep in sync!
 const CONTRACTS = {
-  conditionalMarketFactory: "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
-  ctf1155: "0xE56d9034591C6A6A5C023883354FAeB435E3b441",
-  tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
+  conditionalMarketFactory: "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",
+  ctf1155: "0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9",
+  tieredRoleManager: "0x55e6346Be542B13462De504FCC379a2477D227f0",
   usc: "0xDE093684c796204224BC081f937aa059D903c52a",
 };
+
+// OUTDATED - Do not use. Markets created here need to be cancelled when trading ends.
+// const OUTDATED_CONTRACTS = {
+//   conditionalMarketFactory: "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
+//   ctf1155: "0xE56d9034591C6A6A5C023883354FAeB435E3b441",
+//   tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
+// };
 
 // ABIs
 const FACTORY_ABI = [
@@ -112,9 +120,14 @@ async function verifyAccess(factory, wallet) {
   let hasMarketMakerRole = false;
 
   if (roleManagerAddr !== ethers.ZeroAddress) {
-    const roleManager = new ethers.Contract(roleManagerAddr, ROLE_MANAGER_ABI, ethers.provider);
-    const marketMakerRole = await roleManager.MARKET_MAKER_ROLE();
-    hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, wallet.address);
+    try {
+      const roleManager = new ethers.Contract(roleManagerAddr, ROLE_MANAGER_ABI, ethers.provider);
+      const marketMakerRole = await roleManager.MARKET_MAKER_ROLE();
+      hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, wallet.address);
+    } catch (e) {
+      // RoleManager may not be a valid contract or may not have expected interface
+      console.log(`  Note: Could not verify MARKET_MAKER_ROLE (${e.message.split('\n')[0]})`);
+    }
   }
 
   if (!isOwner && !hasMarketMakerRole) {

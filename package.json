@@ -57,6 +57,7 @@
     "@nomicfoundation/hardhat-verify": "^2.1.3",
     "@nomicfoundation/ignition-core": "^0.15.15",
     "@openzeppelin/contracts": "^5.4.0",
+    "@pinata/sdk": "^2.1.0",
     "@safe-global/safe-singleton-factory": "^2.0.0",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
