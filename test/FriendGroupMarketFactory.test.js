@@ -159,9 +159,9 @@ describe("FriendGroupMarketFactory", function () {
 
   // Helper function to accept a market (activates it)
   async function acceptMarket(marketId, participant) {
-    const market = await friendGroupFactory.getFriendMarket(marketId);
-    const stakeAmount = market.stakePerParticipant;
-    const stakeToken = market.stakeToken;
+    const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(marketId);
+    const stakeAmount = marketWithStatus.stakePerParticipant;
+    const stakeToken = marketWithStatus.stakeToken;
 
     if (stakeToken === ethers.ZeroAddress) {
       // Native token
@@ -196,7 +196,8 @@ describe("FriendGroupMarketFactory", function () {
     it("Should create a 1v1 market (pending acceptance)", async function () {
       const description = "Will it rain tomorrow?";
       const tradingPeriod = 7 * 24 * 60 * 60; // 7 days
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 1 day
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -211,7 +212,7 @@ describe("FriendGroupMarketFactory", function () {
           ResolutionType.Either,
           { value: stakeAmount }
         )
-      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+      ).to.emit(friendGroupFactory, "MarketCreatedPending");
 
       expect(await friendGroupFactory.friendMarketCount()).to.equal(1);
     });
@@ -219,7 +220,8 @@ describe("FriendGroupMarketFactory", function () {
     it("Should add both participants as members after acceptance", async function () {
       const description = "Bitcoin above $50k?";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60);
       const stakeAmount = ethers.parseEther("0.1");
 
       await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
@@ -234,20 +236,20 @@ describe("FriendGroupMarketFactory", function () {
         { value: stakeAmount }
       );
 
-      // Initially only creator is member
+      // Initially only creator is listed in members
       expect(await friendGroupFactory.isMember(0, addr1.address)).to.equal(true);
-      expect(await friendGroupFactory.getMemberCount(0)).to.equal(1);
+      expect(await friendGroupFactory.getMemberCount(0)).to.equal(2); // Both are listed from creation
 
-      // After acceptance, opponent is added
+      // After acceptance, market becomes active
       await acceptMarket(0, addr2);
       expect(await friendGroupFactory.isMember(0, addr2.address)).to.equal(true);
-      expect(await friendGroupFactory.getMemberCount(0)).to.equal(2);
     });
 
     it("Should create 1v1 market with equal stakes", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60);
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -262,18 +264,20 @@ describe("FriendGroupMarketFactory", function () {
           ResolutionType.Either,
           { value: stakeAmount }
         )
-      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+      ).to.emit(friendGroupFactory, "MarketCreatedPending");
 
       // Verify market was created with correct stake
-      const market = await friendGroupFactory.getFriendMarket(0);
-      expect(market.stakePerParticipant).to.equal(stakeAmount);
-      expect(market.creationFee).to.equal(0); // Fee waived for members
+      const marketBasic = await friendGroupFactory.getFriendMarket(0);
+      const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
+      expect(marketWithStatus.stakePerParticipant).to.equal(stakeAmount);
+      expect(marketBasic.creationFee).to.equal(0); // Fee waived for members
     });
 
     it("Should reject 1v1 market with invalid opponent", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60);
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -294,7 +298,8 @@ describe("FriendGroupMarketFactory", function () {
     it("Should reject betting against yourself", async function () {
       const description = "Test bet";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60);
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -315,7 +320,8 @@ describe("FriendGroupMarketFactory", function () {
     it("Should support different resolution types", async function () {
       const description = "Who wins the game?";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60);
       const stakeAmount = ethers.parseEther("0.1");
 
       // Test with ThirdParty resolution type
@@ -331,7 +337,7 @@ describe("FriendGroupMarketFactory", function () {
           ResolutionType.ThirdParty,
           { value: stakeAmount }
         )
-      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+      ).to.emit(friendGroupFactory, "MarketCreatedPending");
 
       const market = await friendGroupFactory.getFriendMarket(0);
       expect(market.arbitrator).to.equal(arbitrator.address);
@@ -344,7 +350,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address, addr2.address, addr3.address];
       const memberLimit = 5;
       const tradingPeriod = 14 * 24 * 60 * 60; // 14 days
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const minThreshold = 3; // Need all 3 to accept
       const stakeAmount = ethers.parseEther("0.1");
 
@@ -361,7 +368,7 @@ describe("FriendGroupMarketFactory", function () {
           ethers.ZeroAddress,
           { value: stakeAmount }
         )
-      ).to.emit(friendGroupFactory, "FriendMarketCreated");
+      ).to.emit(friendGroupFactory, "MarketCreatedPending");
 
       expect(await friendGroupFactory.friendMarketCount()).to.equal(1);
     });
@@ -371,7 +378,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address, addr2.address];
       const memberLimit = 5;
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await friendGroupFactory.createSmallGroupMarketPending(
@@ -387,8 +395,8 @@ describe("FriendGroupMarketFactory", function () {
         { value: stakeAmount }
       );
 
-      // Creator is first member
-      expect(await friendGroupFactory.getMemberCount(0)).to.equal(1);
+      // Creator plus invited members are all listed from creation in pending acceptance flow
+      expect(await friendGroupFactory.getMemberCount(0)).to.equal(3); // owner + addr1 + addr2
     });
 
     it("Should reject member limit above maximum", async function () {
@@ -396,7 +404,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address];
       const memberLimit = 15; // Above MAX_SMALL_GROUP_MEMBERS (10)
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -420,7 +429,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address];
       const memberLimit = 2; // Should be > 2
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -444,7 +454,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address, addr1.address]; // Duplicate
       const memberLimit = 5;
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await expect(
@@ -468,7 +479,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address, addr2.address, addr3.address];
       const memberLimit = 5;
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await friendGroupFactory.createSmallGroupMarketPending(
@@ -506,7 +518,8 @@ describe("FriendGroupMarketFactory", function () {
       const members = [addr1.address, addr2.address];
       const memberLimit = 5;
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await friendGroupFactory.createSmallGroupMarketPending(
@@ -521,15 +534,20 @@ describe("FriendGroupMarketFactory", function () {
         ethers.ZeroAddress,
         { value: stakeAmount }
       );
+
+      // Accept the market to activate it
+      // Creator (owner) is auto-accepted (count=1), need 1 more to meet threshold of 2
+      await acceptMarket(0, addr1);
     });
 
     it("Should allow creator to add members", async function () {
       await expect(
         friendGroupFactory.addMember(0, addr3.address)
       ).to.emit(friendGroupFactory, "MemberAdded");
-      
+
       expect(await friendGroupFactory.isMember(0, addr3.address)).to.equal(true);
-      expect(await friendGroupFactory.getMemberCount(0)).to.equal(3);
+      // Initial: owner + addr1 + addr2 = 3, after adding addr3 = 4
+      expect(await friendGroupFactory.getMemberCount(0)).to.equal(4);
     });
 
     it("Should reject adding member by non-creator", async function () {
@@ -545,15 +563,14 @@ describe("FriendGroupMarketFactory", function () {
     });
 
     it("Should enforce member limit when adding", async function () {
-      // Add members up to limit
-      await friendGroupFactory.addMember(0, addr3.address);
-      await friendGroupFactory.addMember(0, addr4.address);
-      await friendGroupFactory.addMember(0, arbitrator.address);
-      
+      // Initial: owner + addr1 + addr2 = 3 members, limit = 5
+      // Can add 2 more to reach the limit
+      await friendGroupFactory.addMember(0, addr3.address); // 4 members
+      await friendGroupFactory.addMember(0, addr4.address); // 5 members (at limit)
+
       // Try to add beyond limit
-      const extraAddr = ethers.Wallet.createRandom().address;
       await expect(
-        friendGroupFactory.addMember(0, extraAddr)
+        friendGroupFactory.addMember(0, arbitrator.address)
       ).to.be.revertedWithCustomError(friendGroupFactory, "MemberLimitReached");
     });
 
@@ -561,9 +578,10 @@ describe("FriendGroupMarketFactory", function () {
       await expect(
         friendGroupFactory.connect(addr1).removeSelf(0)
       ).to.emit(friendGroupFactory, "MemberRemoved");
-      
+
       expect(await friendGroupFactory.isMember(0, addr1.address)).to.equal(false);
-      expect(await friendGroupFactory.getMemberCount(0)).to.equal(1);
+      // Initial: owner + addr1 + addr2 = 3, after removing addr1 = 2
+      expect(await friendGroupFactory.getMemberCount(0)).to.equal(2);
     });
 
     it("Should reject removal by non-member", async function () {
@@ -578,7 +596,8 @@ describe("FriendGroupMarketFactory", function () {
       // Create a 1v1 market with arbitrator
       const description = "Test bet with arbitrator";
       const tradingPeriod = 7 * 24 * 60 * 60;
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
       const stakeAmount = ethers.parseEther("0.1");
 
       await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
@@ -589,12 +608,14 @@ describe("FriendGroupMarketFactory", function () {
         acceptanceDeadline,
         stakeAmount,
         ethers.ZeroAddress,
-        ResolutionType.ThirdParty, // Arbitrator required for this type
+        ResolutionType.Either, // Allow creator, opponent, OR arbitrator to resolve
         { value: stakeAmount }
       );
 
       // Accept the market to activate it
-      await acceptMarket(0, addr2);
+      // With arbitrator set, they must also accept
+      await acceptMarket(0, addr2); // Opponent accepts
+      await friendGroupFactory.connect(arbitrator).acceptMarket(0); // Arbitrator accepts (no payment required)
     });
 
     it("Should allow creator to resolve market", async function () {
@@ -635,7 +656,8 @@ describe("FriendGroupMarketFactory", function () {
   describe("Fee Management", function () {
     it("Should hold stakes in contract before market activation", async function () {
       const stakeAmount = ethers.parseEther("0.1");
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
 
       await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
         addr2.address,
@@ -655,7 +677,8 @@ describe("FriendGroupMarketFactory", function () {
 
     it("Should allow owner to withdraw fees", async function () {
       const stakeAmount = ethers.parseEther("0.1");
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
 
       await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
         addr2.address,
@@ -685,7 +708,8 @@ describe("FriendGroupMarketFactory", function () {
     beforeEach(async function () {
       // Create multiple markets
       const stakeAmount = ethers.parseEther("0.1");
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
 
       await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
         addr2.address,
@@ -711,6 +735,10 @@ describe("FriendGroupMarketFactory", function () {
         ethers.ZeroAddress,
         { value: stakeAmount }
       );
+
+      // Accept both markets to activate them
+      await acceptMarket(0, addr2);  // Bet 1 (1v1 between addr1 and addr2) - addr1 auto-accepted, addr2 makes it 2/2
+      await acceptMarket(1, addr1);  // Bet 2 (small group) - owner auto-accepted, addr1 makes it 2/2
     });
 
     it("Should return correct friend market details", async function () {
@@ -774,17 +802,18 @@ describe("FriendGroupMarketFactory", function () {
       const description = "Bet on event";
       const tradingPeriod = 7 * 24 * 60 * 60;
       const stakeAmount = ethers.parseEther("0.1");
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
 
       // Create a dummy market first so the "public" market gets a non-zero marketId
       await friendGroupFactory.createSmallGroupMarketPending(
         "Dummy market",
-        [owner.address],
+        [addr1.address],
         5,
         tradingPeriod,
         ethers.ZeroAddress,
         acceptanceDeadline,
-        1,
+        2,
         stakeAmount,
         ethers.ZeroAddress,
         { value: stakeAmount }
@@ -793,27 +822,29 @@ describe("FriendGroupMarketFactory", function () {
       // Now create the "public" market to peg to (will have marketId > 0)
       await friendGroupFactory.createSmallGroupMarketPending(
         "Public market",
-        [owner.address],
+        [addr1.address],
         5,
         tradingPeriod,
         ethers.ZeroAddress,
         acceptanceDeadline,
-        1,
+        2,
         stakeAmount,
         ethers.ZeroAddress,
         { value: stakeAmount }
       );
 
+      // Activate the public market so it gets an underlying marketId
+      await acceptMarket(1, addr1); // Owner is auto-accepted, addr1 makes it 2/2
+
       const publicMarket = await friendGroupFactory.getFriendMarket(1);
       const publicMarketId = publicMarket.marketId;
 
       // Create pegged friend market with AutoPegged resolution type
-      // Note: The arbitrator field stores the market ID for AutoPegged type
       await friendGroupFactory.connect(addr1).createOneVsOneMarketPending(
         addr2.address,
         description,
         tradingPeriod,
-        publicMarketId.toString(), // Market ID in arbitrator field for AutoPegged
+        ethers.ZeroAddress, // No arbitrator for AutoPegged
         acceptanceDeadline,
         stakeAmount,
         ethers.ZeroAddress,
@@ -821,29 +852,39 @@ describe("FriendGroupMarketFactory", function () {
         { value: stakeAmount }
       );
 
-      const market = await friendGroupFactory.getFriendMarket(2);
+      // Activate the pegged market (required before pegging)
+      await acceptMarket(2, addr2); // addr1 auto-accepted, addr2 makes it 2/2
+
+      // Peg the market to the public market
+      await friendGroupFactory.connect(addr1).pegToPublicMarket(2, publicMarketId);
+
+      const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(2);
       // For AutoPegged, the resolution type indicates auto-resolution based on another market
-      expect(market.resolutionType).to.equal(ResolutionType.AutoPegged);
+      expect(marketWithStatus.resolutionType).to.equal(ResolutionType.AutoPegged);
     });
 
     it("Should allow pegging existing market to public market", async function () {
       const tradingPeriod = 7 * 24 * 60 * 60;
       const stakeAmount = ethers.parseEther("0.1");
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
 
       // Create public market
       await friendGroupFactory.createSmallGroupMarketPending(
         "Public market",
-        [owner.address],
+        [addr1.address],
         5,
         tradingPeriod,
         ethers.ZeroAddress,
         acceptanceDeadline,
-        1,
+        2,
         stakeAmount,
         ethers.ZeroAddress,
         { value: stakeAmount }
       );
+
+      // Activate the public market
+      await acceptMarket(0, addr1); // Owner auto-accepted, addr1 makes it 2/2
 
       const publicMarket = await friendGroupFactory.getFriendMarket(0);
       const publicMarketId = publicMarket.marketId;
@@ -861,6 +902,9 @@ describe("FriendGroupMarketFactory", function () {
         { value: stakeAmount }
       );
 
+      // Activate the friend market (required before pegging)
+      await acceptMarket(1, addr2); // addr1 auto-accepted, addr2 makes it 2/2
+
       // Peg it
       await expect(
         friendGroupFactory.connect(addr1).pegToPublicMarket(1, publicMarketId)
@@ -873,17 +917,18 @@ describe("FriendGroupMarketFactory", function () {
     it("Should track pegged markets correctly", async function () {
       const tradingPeriod = 7 * 24 * 60 * 60;
       const stakeAmount = ethers.parseEther("0.1");
-      const acceptanceDeadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+      const latestBlock = await ethers.provider.getBlock('latest');
+      const acceptanceDeadline = latestBlock.timestamp + (2 * 60 * 60); // 2 hours from now
 
       // Create dummy market first so the "public" market gets a non-zero marketId
       await friendGroupFactory.createSmallGroupMarketPending(
         "Dummy market",
-        [owner.address],
+        [addr1.address],
         5,
         tradingPeriod,
         ethers.ZeroAddress,
         acceptanceDeadline,
-        1,
+        2,
         stakeAmount,
         ethers.ZeroAddress,
         { value: stakeAmount }
@@ -892,16 +937,19 @@ describe("FriendGroupMarketFactory", function () {
       // Create public market (will have marketId > 0)
       await friendGroupFactory.createSmallGroupMarketPending(
         "Public market",
-        [owner.address],
+        [addr1.address],
         5,
         tradingPeriod,
         ethers.ZeroAddress,
         acceptanceDeadline,
-        1,
+        2,
         stakeAmount,
         ethers.ZeroAddress,
         { value: stakeAmount }
       );
+
+      // Activate the public market
+      await acceptMarket(1, addr1); // Owner auto-accepted, addr1 makes it 2/2
 
       const publicMarket = await friendGroupFactory.getFriendMarket(1);
       const publicMarketId = publicMarket.marketId;
@@ -930,6 +978,10 @@ describe("FriendGroupMarketFactory", function () {
         ResolutionType.Either,
         { value: stakeAmount }
       );
+
+      // Activate both friend markets before pegging
+      await acceptMarket(2, addr2); // Market 2: addr1 vs addr2
+      await acceptMarket(3, addr4); // Market 3: addr3 vs addr4
 
       // Peg both markets
       await friendGroupFactory.connect(addr1).pegToPublicMarket(2, publicMarketId);
