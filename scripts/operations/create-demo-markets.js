@@ -38,12 +38,21 @@ const {
 const { batchUploadMetadata, verifyPinataConnection } = require("./market-templates/ipfs");
 
 // Contract addresses (Mordor testnet)
+// These addresses match frontend/src/config/contracts.js - keep in sync!
 const CONTRACTS = {
-  conditionalMarketFactory: "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
-  ctf1155: "0xE56d9034591C6A6A5C023883354FAeB435E3b441",
-  tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
+  conditionalMarketFactory: "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",
+  ctf1155: "0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9",
+  tieredRoleManager: "0x55e6346Be542B13462De504FCC379a2477D227f0",
   usc: "0xDE093684c796204224BC081f937aa059D903c52a",
+  marketCorrelationRegistry: "0x2a820A38997743fC3303cDcA56b996598963B909",
 };
+
+// OUTDATED - Do not use. Markets created here need to be cancelled when trading ends.
+// const OUTDATED_CONTRACTS = {
+//   conditionalMarketFactory: "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
+//   ctf1155: "0xE56d9034591C6A6A5C023883354FAeB435E3b441",
+//   tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
+// };
 
 // ABIs
 const FACTORY_ABI = [
@@ -67,6 +76,16 @@ const ERC20_ABI = [
 const ROLE_MANAGER_ABI = [
   "function MARKET_MAKER_ROLE() external view returns (bytes32)",
   "function hasRole(bytes32 role, address account) external view returns (bool)",
+];
+
+const CORRELATION_REGISTRY_ABI = [
+  "function owner() external view returns (address)",
+  "function groupCount() external view returns (uint256)",
+  "function correlationGroups(uint256 groupId) external view returns (string name, string description, address creator, uint256 createdAt, bool active)",
+  "function getMarketGroup(uint256 marketId) external view returns (uint256)",
+  "function isMarketInGroup(uint256 marketId) external view returns (bool)",
+  "function createCorrelationGroup(string name, string description, string category) external returns (uint256 groupId)",
+  "function addMarketToGroup(uint256 groupId, uint256 marketId) external",
 ];
 
 // Configuration
@@ -112,9 +131,14 @@ async function verifyAccess(factory, wallet) {
   let hasMarketMakerRole = false;
 
   if (roleManagerAddr !== ethers.ZeroAddress) {
-    const roleManager = new ethers.Contract(roleManagerAddr, ROLE_MANAGER_ABI, ethers.provider);
-    const marketMakerRole = await roleManager.MARKET_MAKER_ROLE();
-    hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, wallet.address);
+    try {
+      const roleManager = new ethers.Contract(roleManagerAddr, ROLE_MANAGER_ABI, ethers.provider);
+      const marketMakerRole = await roleManager.MARKET_MAKER_ROLE();
+      hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, wallet.address);
+    } catch (e) {
+      // RoleManager may not be a valid contract or may not have expected interface
+      console.log(`  Note: Could not verify MARKET_MAKER_ROLE (${e.message.split('\n')[0]})`);
+    }
   }
 
   if (!isOwner && !hasMarketMakerRole) {
@@ -229,6 +253,91 @@ function displayRequirements(requirements, currentUsc, currentEtc, uscDecimals) 
 }
 
 /**
+ * Register markets with correlation groups on-chain
+ * @param {Array} createdMarkets - Markets with correlationGroupId
+ * @param {ethers.Wallet} wallet - Wallet for transactions
+ * @returns {Promise<Object>} Results of correlation registration
+ */
+async function registerCorrelationGroups(createdMarkets, wallet) {
+  const registry = new ethers.Contract(
+    CONTRACTS.marketCorrelationRegistry,
+    CORRELATION_REGISTRY_ABI,
+    wallet
+  );
+
+  // Group markets by correlationGroupId
+  const marketsByGroup = {};
+  for (const market of createdMarkets) {
+    if (market.correlationGroupId) {
+      if (!marketsByGroup[market.correlationGroupId]) {
+        marketsByGroup[market.correlationGroupId] = {
+          name: market.correlationGroupName || market.correlationGroupId,
+          category: market.category,
+          markets: [],
+        };
+      }
+      marketsByGroup[market.correlationGroupId].markets.push(market);
+    }
+  }
+
+  const groupIds = Object.keys(marketsByGroup);
+  if (groupIds.length === 0) {
+    console.log("No correlation groups to register.");
+    return { created: 0, registered: 0 };
+  }
+
+  console.log(`\nRegistering ${groupIds.length} correlation groups...`);
+
+  const results = { created: 0, registered: 0, errors: [] };
+
+  for (const groupId of groupIds) {
+    const group = marketsByGroup[groupId];
+    console.log(`\n  Group: ${group.name} (${group.markets.length} markets)`);
+
+    try {
+      // Create the correlation group on-chain
+      const createTx = await registry.createCorrelationGroup(
+        group.name,
+        `Correlation group for ${group.name}`,
+        group.category
+      );
+      await createTx.wait();
+
+      // Get the new group ID from groupCount (it's groupCount - 1)
+      const newGroupCount = await registry.groupCount();
+      const onChainGroupId = newGroupCount - 1n;
+      results.created++;
+
+      console.log(`    Created on-chain group ID: ${onChainGroupId}`);
+
+      // Add each market to the group
+      for (const market of group.markets) {
+        try {
+          const addTx = await registry.addMarketToGroup(onChainGroupId, market.id);
+          await addTx.wait();
+          results.registered++;
+          console.log(`    Added market ${market.id} to group`);
+        } catch (addError) {
+          console.error(`    Failed to add market ${market.id}: ${addError.message.split("\n")[0]}`);
+          results.errors.push({ marketId: market.id, error: addError.message });
+        }
+
+        // Small delay between transactions
+        await sleep(500);
+      }
+    } catch (error) {
+      console.error(`    Failed to create group: ${error.message.split("\n")[0]}`);
+      results.errors.push({ groupId, error: error.message });
+    }
+
+    // Delay between groups
+    await sleep(1000);
+  }
+
+  return results;
+}
+
+/**
  * Main execution
  */
 async function main() {
@@ -254,12 +363,12 @@ async function main() {
   }
 
   // Load wallet
-  console.log("\n[1/7] Loading wallet...");
+  console.log("\n[1/8] Loading wallet...");
   const wallet = await loadWallet();
   console.log(`Wallet address: ${wallet.address}`);
 
   // Connect to contracts
-  console.log("\n[2/7] Connecting to contracts...");
+  console.log("\n[2/8] Connecting to contracts...");
   const factory = new ethers.Contract(CONTRACTS.conditionalMarketFactory, FACTORY_ABI, wallet);
   const usc = new ethers.Contract(CONTRACTS.usc, ERC20_ABI, wallet);
 
@@ -277,7 +386,7 @@ async function main() {
   const gasPrice = feeData.gasPrice || ethers.parseUnits("1", "gwei");
 
   // Calculate and display funding requirements
-  console.log("\n[3/7] Calculating funding requirements...");
+  console.log("\n[3/8] Calculating funding requirements...");
   const requirements = await calculateRequirements(templates, uscDecimals, gasPrice);
   const fundingStatus = displayRequirements(requirements, uscBalance, etcBalance, uscDecimals);
 
@@ -295,7 +404,7 @@ async function main() {
   const totalLiquidity = requirements.uscRequired;
 
   // Upload metadata to IPFS
-  console.log("\n[4/7] Uploading metadata to IPFS...");
+  console.log("\n[4/8] Uploading metadata to IPFS...");
   let metadataUris = [];
 
   const pinataConnected = await verifyPinataConnection();
@@ -311,7 +420,7 @@ async function main() {
   }
 
   // Approve USC spending
-  console.log("\n[5/7] Approving USC spending...");
+  console.log("\n[5/8] Approving USC spending...");
   if (!CONFIG.dryRun) {
     const currentAllowance = await usc.allowance(wallet.address, CONTRACTS.conditionalMarketFactory);
     if (currentAllowance < totalLiquidity) {
@@ -326,7 +435,7 @@ async function main() {
   }
 
   // Create markets
-  console.log("\n[6/7] Creating markets...");
+  console.log("\n[6/8] Creating markets...");
   const currentDate = new Date();
   const createdMarkets = [];
   const failedMarkets = [];
@@ -391,6 +500,8 @@ async function main() {
           question: template.question,
           category: template.category,
           txHash: tx.hash,
+          correlationGroupId: template.correlationGroupId || null,
+          correlationGroupName: template.correlationGroupName || null,
         });
       } catch (error) {
         console.error(`  Failed: ${error.message.split("\n")[0]}`);
@@ -407,8 +518,24 @@ async function main() {
     }
   }
 
+  // Register correlation groups
+  console.log("\n[7/8] Registering correlation groups...");
+  let correlationResults = { created: 0, registered: 0, errors: [] };
+  if (!CONFIG.dryRun && createdMarkets.length > 0) {
+    correlationResults = await registerCorrelationGroups(createdMarkets, wallet);
+    console.log(`\nCorrelation groups created: ${correlationResults.created}`);
+    console.log(`Markets registered to groups: ${correlationResults.registered}`);
+    if (correlationResults.errors.length > 0) {
+      console.log(`Errors: ${correlationResults.errors.length}`);
+    }
+  } else if (CONFIG.dryRun) {
+    // Count unique correlation groups for dry run
+    const uniqueGroups = new Set(createdMarkets.filter(m => m.correlationGroupId).map(m => m.correlationGroupId));
+    console.log(`[DRY RUN] Would create ${uniqueGroups.size} correlation groups`);
+  }
+
   // Summary
-  console.log("\n[7/7] Summary");
+  console.log("\n[8/8] Summary");
   console.log("=".repeat(60));
   console.log(`Total templates: ${templates.length}`);
   console.log(`Created: ${createdMarkets.length}`);

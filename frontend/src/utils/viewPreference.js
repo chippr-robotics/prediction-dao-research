@@ -11,16 +11,31 @@ export const VIEW_MODES = {
 }
 
 /**
+ * Check if device is mobile based on screen width
+ * @returns {boolean} - true if screen width <= 768px
+ */
+function isMobileDevice() {
+  if (typeof window === 'undefined') return false
+  return window.innerWidth <= 768
+}
+
+/**
  * Get the saved view preference from localStorage
- * @returns {string} - 'grid' or 'compact', defaults to 'grid'
+ * Falls back to compact on mobile, grid on desktop
+ * @returns {string} - 'grid' or 'compact'
  */
 export function getViewPreference() {
   try {
     const saved = localStorage.getItem(VIEW_PREFERENCE_KEY)
-    return saved === VIEW_MODES.COMPACT ? VIEW_MODES.COMPACT : VIEW_MODES.GRID
+    // If user has saved preference, use it
+    if (saved === VIEW_MODES.COMPACT || saved === VIEW_MODES.GRID) {
+      return saved
+    }
+    // Default: compact on mobile, grid on desktop
+    return isMobileDevice() ? VIEW_MODES.COMPACT : VIEW_MODES.GRID
   } catch (error) {
     console.error('Error reading view preference:', error)
-    return VIEW_MODES.GRID
+    return isMobileDevice() ? VIEW_MODES.COMPACT : VIEW_MODES.GRID
   }
 }
 

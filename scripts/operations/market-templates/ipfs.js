@@ -6,46 +6,59 @@ const { BET_TYPE_LABELS, CATEGORY_NAMES, getResolutionDateDisplay } = require(".
  * Handles uploading market metadata to IPFS via Pinata.
  * Follows the market-metadata-v1.json schema.
  *
- * Required environment variables:
- * - PINATA_API_KEY
- * - PINATA_SECRET_KEY
+ * Supported environment variables (in order of preference):
+ * - PINATA_JWT (recommended - JWT token from Pinata dashboard)
+ * - PINATA_API_KEY + PINATA_SECRET_KEY (legacy - API key pair)
  */
 
-// Category image CIDs (placeholder - replace with actual uploaded images)
-// These should be uploaded once and reused for all markets in each category
+// Category images uploaded to IPFS via Pinata (2026-01-29)
 const CATEGORY_IMAGES = {
-  sports: "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
-  politics: "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
-  finance: "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
-  tech: "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
-  crypto: "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
-  "pop-culture": "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
-  weather: "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
+  sports: "ipfs://bafkreick4q37qtmtev7layzljc3oh2c3ydjwzhr75e432bhf2pqnf6avqu",
+  politics: "ipfs://bafkreif4awhkoa5zbzr6nygi36tino6emw6wqz7fz3fg3ngdf5nmp2rspy",
+  finance: "ipfs://bafkreihan73g73bxjcphx4tqez3yhasdxl3nuza4myzfnhzvuggpi2m77a",
+  tech: "ipfs://bafkreieggubeqnvyhlx7hqpuupb6hhez76lupje4zzj2uy7m4c2xmy6vh4",
+  crypto: "ipfs://bafkreigr5putymjyau6mb6i7ibau46xakqixqhrflpe76u3wiwcwnq7ozu",
+  "pop-culture": "ipfs://bafkreicwpno6audhbq6rc62yi6g3vvquj4ax23pq7q7ot7jmfa3vauwoem",
+  weather: "ipfs://bafkreiea4k4ocudprnq6dc5jj4zdx25xymtj3khqpzfbsmvbhypx7cbc4y",
 };
 
 // Default placeholder image if category not found
-const DEFAULT_IMAGE = "ipfs://bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
+const DEFAULT_IMAGE = "ipfs://bafkreick4q37qtmtev7layzljc3oh2c3ydjwzhr75e432bhf2pqnf6avqu";
 
 /**
  * Initialize Pinata SDK
+ * Supports JWT (preferred) or API key/secret authentication
  * @returns {Object|null} Pinata SDK instance or null if not configured
  */
 function initPinata() {
+  const jwt = process.env.PINATA_JWT;
   const apiKey = process.env.PINATA_API_KEY;
   const secretKey = process.env.PINATA_SECRET_KEY;
 
-  if (!apiKey || !secretKey) {
-    console.warn("Pinata credentials not configured. IPFS uploads will be skipped.");
-    return null;
+  // Prefer JWT authentication
+  if (jwt) {
+    try {
+      const pinataSDK = require("@pinata/sdk");
+      return new pinataSDK({ pinataJWTKey: jwt });
+    } catch (error) {
+      console.warn("Pinata SDK not installed. Run: npm install @pinata/sdk");
+      return null;
+    }
   }
 
-  try {
-    const pinataSDK = require("@pinata/sdk");
-    return new pinataSDK(apiKey, secretKey);
-  } catch (error) {
-    console.warn("Pinata SDK not installed. Run: npm install @pinata/sdk");
-    return null;
+  // Fall back to API key/secret
+  if (apiKey && secretKey) {
+    try {
+      const pinataSDK = require("@pinata/sdk");
+      return new pinataSDK(apiKey, secretKey);
+    } catch (error) {
+      console.warn("Pinata SDK not installed. Run: npm install @pinata/sdk");
+      return null;
+    }
   }
+
+  console.warn("Pinata credentials not configured. Set PINATA_JWT or PINATA_API_KEY + PINATA_SECRET_KEY.");
+  return null;
 }
 
 /**
@@ -66,10 +79,18 @@ function buildMetadataFromTemplate(template, imageUrl, options = {}) {
   const now = new Date();
   const resolutionDate = getResolutionDateDisplay(template);
 
+  // Build description: include the question followed by context
+  // Frontend shows: name → Title, description → "Question" section
+  const fullDescription = template.description
+    ? `${template.question}\n\n${template.description}`
+    : template.question;
+
   return {
     // Required fields
+    // name: Used for card title and detail header
     name: template.question,
-    description: template.description || `Prediction market: ${template.question}`,
+    // description: Shown in "Question" section of detail view
+    description: fullDescription,
     image: imageUrl || CATEGORY_IMAGES[template.category] || DEFAULT_IMAGE,
 
     // Attributes for filtering/display
@@ -77,10 +98,6 @@ function buildMetadataFromTemplate(template, imageUrl, options = {}) {
       {
         trait_type: "Category",
         value: CATEGORY_NAMES[template.category] || template.category,
-      },
-      {
-        trait_type: "Subcategory",
-        value: template.subcategory,
       },
       {
         trait_type: "Bet Type",

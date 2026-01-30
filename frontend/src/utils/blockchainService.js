@@ -814,7 +814,7 @@ export async function fetchMarketByIdFromBlockchain(id) {
       conditionId: market.conditionId,
       passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
       failPositionId: market.failPositionId ? Number(market.failPositionId) : null,
-      // Correlation group info
+      // Correlation group info from on-chain registry
       correlationGroup: correlationInfo
     }
   } catch (error) {

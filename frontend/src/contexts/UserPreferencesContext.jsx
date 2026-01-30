@@ -21,7 +21,7 @@ export function UserPreferencesProvider({ children }) {
     recentSearches: [],
     favoriteMarkets: [],
     defaultSlippage: 0.5,
-    demoMode: true // Default to demo mode (mock data)
+    demoMode: false // Default to live mode (blockchain data)
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -35,7 +35,7 @@ export function UserPreferencesProvider({ children }) {
         recentSearches: [],
         favoriteMarkets: [],
         defaultSlippage: 0.5,
-        demoMode: true
+        demoMode: false
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +135,7 @@ export function UserPreferencesProvider({ children }) {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      demoMode: true
+      demoMode: false
     })
   }, [account])
 
