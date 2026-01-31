@@ -685,6 +685,27 @@
   word-break: break-word;
 }
 
+/* Odds and Potential Winnings Styles */
+.ma-term-success {
+  background: rgba(54, 179, 126, 0.1);
+  border: 1px solid rgba(54, 179, 126, 0.3);
+}
+
+.ma-term-success .ma-value {
+  color: #36B37E;
+  font-weight: 600;
+}
+
+.ma-odds-value {
+  color: #4C9AFF;
+  font-weight: 600;
+}
+
+.ma-potential-win {
+  color: #36B37E;
+  font-weight: 600;
+}
+
 /* Mobile Responsive */
 @media (max-width: 480px) {
   .ma-modal {

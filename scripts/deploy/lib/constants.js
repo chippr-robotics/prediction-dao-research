@@ -231,7 +231,7 @@ const SALT_PREFIXES = {
   CORE: "FairWinsDAO-v1.0-",
   RBAC: "ClearPathDAO-Modular-v1.0-",
   TIERED_ROLE_MANAGER: "ClearPathDAO-TRM-v1.1-",
-  FRIEND_MARKETS: "ClearPathDAO-FGMF-v1.0-",
+  FRIEND_MARKETS: "ClearPathDAO-FGMF-v1.1-",
   PERPETUALS: "ClearPathDAO-Perp-v1.0-",
   CORRELATION: "ClearPathDAO-MCR-v1.0-",
 };

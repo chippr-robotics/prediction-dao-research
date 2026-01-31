@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
 import { getContractAddress } from '../../config/contracts'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import TransactionProgress from './TransactionProgress'
@@ -93,6 +94,21 @@ function FriendMarketsModal({
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
 
+  // Role details for checking dual roles (required for Bookmaker)
+  const { roleDetails } = useRoleDetails()
+
+  // Check if user can create Bookmaker markets (requires both MARKET_MAKER and FRIEND_MARKET roles)
+  const hasBookmakerRoles = useMemo(() => {
+    const marketMaker = roleDetails?.MARKET_MAKER
+    const friendMarket = roleDetails?.FRIEND_MARKET
+    return (
+      marketMaker?.hasRole &&
+      marketMaker?.isActive &&
+      friendMarket?.hasRole &&
+      friendMarket?.isActive
+    )
+  }, [roleDetails])
+
   // Encryption hook for friend market privacy
   const {
     isInitialized: encryptionInitialized,
@@ -134,7 +150,11 @@ function FriendMarketsModal({
     peggedMarketId: '',
     // Multi-party acceptance fields
     acceptanceDeadline: getDefaultAcceptanceDeadline(),
-    minAcceptanceThreshold: '2' // Minimum participants to activate (including creator)
+    minAcceptanceThreshold: '2', // Minimum participants to activate (including creator)
+    // Leverage/odds for Bookmaker markets (200 = 2x equal stakes, 10000 = 100x)
+    oddsMultiplier: 200,
+    // Resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged
+    resolutionType: 0
   })
 
   // Selected market for detail view
@@ -189,7 +209,8 @@ function FriendMarketsModal({
       arbitrator: '',
       peggedMarketId: '',
       acceptanceDeadline: getDefaultAcceptanceDeadline(),
-      minAcceptanceThreshold: '2'
+      minAcceptanceThreshold: '2',
+      oddsMultiplier: 200
     })
     setErrors({})
     setMarketLookupId('')
@@ -238,7 +259,19 @@ function FriendMarketsModal({
   }
 
   const handleFormChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+
+      // Clear arbitrator field when resolution type changes to not require it
+      if (field === 'resolutionType' &&
+          value !== ResolutionType.ThirdParty &&
+          value !== ResolutionType.AutoPegged) {
+        updated.arbitrator = ''
+      }
+
+      return updated
+    })
+
     if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev }
@@ -600,11 +633,26 @@ function FriendMarketsModal({
       }
     }
 
-    if (formData.arbitrator) {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(formData.arbitrator.trim())) {
-        newErrors.arbitrator = 'Invalid arbitrator address'
-      } else if (formData.arbitrator.toLowerCase() === '0x0000000000000000000000000000000000000000') {
-        newErrors.arbitrator = 'Cannot use the zero address'
+    // Validate arbitrator/market ID based on resolution type
+    if ((friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker')) {
+      if (formData.resolutionType === ResolutionType.ThirdParty) {
+        // Arbitrator address is required for ThirdParty resolution
+        if (!formData.arbitrator || !formData.arbitrator.trim()) {
+          newErrors.arbitrator = 'Arbitrator address is required for third party resolution'
+        } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.arbitrator.trim())) {
+          newErrors.arbitrator = 'Invalid arbitrator address'
+        } else if (formData.arbitrator.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+          newErrors.arbitrator = 'Cannot use the zero address'
+        }
+      } else if (formData.resolutionType === ResolutionType.AutoPegged) {
+        // Market ID is required for AutoPegged resolution
+        if (!formData.arbitrator || !formData.arbitrator.trim()) {
+          newErrors.arbitrator = 'Linked market ID is required for auto-pegged resolution'
+        } else if (!/^\d+$/.test(formData.arbitrator.trim())) {
+          newErrors.arbitrator = 'Market ID must be a number'
+        } else if (parseInt(formData.arbitrator.trim(), 10) < 0) {
+          newErrors.arbitrator = 'Market ID must be a positive number'
+        }
       }
     }
 
@@ -1039,6 +1087,23 @@ function FriendMarketsModal({
                         <polyline points="9 18 15 12 9 6"/>
                       </svg>
                     </button>
+                    {hasBookmakerRoles && (
+                      <button
+                        className="fm-type-card fm-type-bookmaker"
+                        onClick={() => handleSelectType('bookmaker')}
+                        type="button"
+                      >
+                        <div className="fm-type-icon">&#128176;</div>
+                        <div className="fm-type-info">
+                          <h4>Bookmaker</h4>
+                          <p>Leveraged 1v1 with custom odds</p>
+                          <span className="fm-type-premium-badge">Premium</span>
+                        </div>
+                        <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -1062,6 +1127,7 @@ function FriendMarketsModal({
                       {friendMarketType === 'oneVsOne' && <><span>🎯</span> 1v1</>}
                       {friendMarketType === 'smallGroup' && <><span>👪</span> Group</>}
                       {friendMarketType === 'eventTracking' && <><span>🏆</span> Event</>}
+                      {friendMarketType === 'bookmaker' && <><span>💰</span> Bookmaker</>}
                     </div>
                   </div>
 
@@ -1218,6 +1284,92 @@ function FriendMarketsModal({
                       </div>
                     )}
 
+                    {/* Resolution Type selector - for 1v1 and Bookmaker markets */}
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-resolution-type">Who Can Resolve?</label>
+                        <select
+                          id="fm-resolution-type"
+                          value={formData.resolutionType}
+                          onChange={(e) => handleFormChange('resolutionType', parseInt(e.target.value, 10))}
+                          disabled={submitting}
+                          className="fm-select"
+                        >
+                          <option value={ResolutionType.Either}>Either Party</option>
+                          <option value={ResolutionType.Initiator}>Creator Only</option>
+                          <option value={ResolutionType.Receiver}>Opponent Only</option>
+                          <option value={ResolutionType.ThirdParty}>Third Party Arbitrator</option>
+                          <option value={ResolutionType.AutoPegged}>Linked Market (Auto)</option>
+                        </select>
+                        <span className="fm-hint">
+                          {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the market'}
+                          {formData.resolutionType === ResolutionType.Initiator && 'Only you (the creator) can resolve the market'}
+                          {formData.resolutionType === ResolutionType.Receiver && 'Only your opponent can resolve the market'}
+                          {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
+                          {formData.resolutionType === ResolutionType.AutoPegged && 'Resolution follows a linked public market'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Odds/Leverage selector - only for Bookmaker markets */}
+                    {friendMarketType === 'bookmaker' && (
+                      <div className="fm-form-group fm-form-full">
+                        <div className="fm-input-header">
+                          <label htmlFor="fm-odds">Opponent&apos;s Odds</label>
+                          <span className="fm-odds-value">{formData.oddsMultiplier / 100}x</span>
+                        </div>
+                        <input
+                          id="fm-odds"
+                          type="range"
+                          min="200"
+                          max="10000"
+                          step="100"
+                          value={formData.oddsMultiplier}
+                          onChange={(e) => handleFormChange('oddsMultiplier', parseInt(e.target.value, 10))}
+                          disabled={submitting}
+                          className="fm-odds-slider"
+                        />
+                        <div className="fm-odds-presets">
+                          {[200, 300, 500, 1000, 2000, 5000, 10000].map(odds => (
+                            <button
+                              key={odds}
+                              type="button"
+                              className={formData.oddsMultiplier === odds ? 'active' : ''}
+                              onClick={() => handleFormChange('oddsMultiplier', odds)}
+                              disabled={submitting}
+                            >
+                              {odds / 100}x
+                            </button>
+                          ))}
+                        </div>
+                        <div className="fm-odds-summary">
+                          <div className="fm-odds-row">
+                            <span>Opponent stakes:</span>
+                            <span>{formatUSD(formData.stakeAmount, selectedStakeToken?.symbol)}</span>
+                          </div>
+                          <div className="fm-odds-row">
+                            <span>You stake:</span>
+                            <span>{formatUSD(
+                              parseFloat(formData.stakeAmount || 0) * (formData.oddsMultiplier - 100) / 100,
+                              selectedStakeToken?.symbol
+                            )}</span>
+                          </div>
+                          <div className="fm-odds-row fm-odds-highlight">
+                            <span>Total pot:</span>
+                            <span>{formatUSD(
+                              parseFloat(formData.stakeAmount || 0) * formData.oddsMultiplier / 100,
+                              selectedStakeToken?.symbol
+                            )}</span>
+                          </div>
+                        </div>
+                        <span className="fm-hint">
+                          {formData.oddsMultiplier === 200
+                            ? 'Equal stakes - both sides risk the same amount'
+                            : `You're the insurer - risking more for smaller returns. Opponent risks ${formatUSD(formData.stakeAmount, selectedStakeToken?.symbol)} to win ${formatUSD(parseFloat(formData.stakeAmount || 0) * formData.oddsMultiplier / 100, selectedStakeToken?.symbol)}`}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="fm-form-group">
                       <label htmlFor="fm-end-date">
                         End Date & Time <span className="fm-required">*</span>
@@ -1276,39 +1428,54 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    <div className="fm-form-group fm-form-full">
-                      <label htmlFor="fm-arbitrator">
-                        Arbitrator (Optional)
-                      </label>
-                      <div className="fm-input-with-action">
-                        <input
-                          id="fm-arbitrator"
-                          type="text"
-                          value={formData.arbitrator}
-                          onChange={(e) => handleFormChange('arbitrator', e.target.value)}
-                          placeholder="0x... (trusted third party)"
-                          disabled={submitting}
-                          className={errors.arbitrator ? 'error' : ''}
-                        />
-                        <button
-                          type="button"
-                          className="fm-scan-btn"
-                          onClick={() => openQrScanner('arbitrator')}
-                          disabled={submitting}
-                          title="Scan QR code"
-                          aria-label="Scan QR code"
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="3" y="3" width="7" height="7"/>
-                            <rect x="14" y="3" width="7" height="7"/>
-                            <rect x="3" y="14" width="7" height="7"/>
-                            <rect x="14" y="14" width="3" height="3"/>
-                            <path d="M17 14h4v4h-4zM14 17v4h4"/>
-                          </svg>
-                        </button>
+                    {/* Arbitrator/Market ID field - only shown for ThirdParty or AutoPegged resolution */}
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                     (formData.resolutionType === ResolutionType.ThirdParty || formData.resolutionType === ResolutionType.AutoPegged) && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-arbitrator">
+                          {formData.resolutionType === ResolutionType.ThirdParty
+                            ? 'Arbitrator Address'
+                            : 'Linked Market ID'} <span className="fm-required">*</span>
+                        </label>
+                        <div className="fm-input-with-action">
+                          <input
+                            id="fm-arbitrator"
+                            type="text"
+                            value={formData.arbitrator}
+                            onChange={(e) => handleFormChange('arbitrator', e.target.value)}
+                            placeholder={formData.resolutionType === ResolutionType.ThirdParty
+                              ? '0x... (trusted third party address)'
+                              : 'Market ID to follow (e.g., 123)'}
+                            disabled={submitting}
+                            className={errors.arbitrator ? 'error' : ''}
+                          />
+                          {formData.resolutionType === ResolutionType.ThirdParty && (
+                            <button
+                              type="button"
+                              className="fm-scan-btn"
+                              onClick={() => openQrScanner('arbitrator')}
+                              disabled={submitting}
+                              title="Scan QR code"
+                              aria-label="Scan QR code"
+                            >
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                                <rect x="14" y="14" width="3" height="3"/>
+                                <path d="M17 14h4v4h-4zM14 17v4h4"/>
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                        {errors.arbitrator && <span className="fm-error">{errors.arbitrator}</span>}
+                        {formData.resolutionType === ResolutionType.AutoPegged && (
+                          <span className="fm-hint">
+                            This market will automatically resolve based on the outcome of the linked public market
+                          </span>
+                        )}
                       </div>
-                      {errors.arbitrator && <span className="fm-error">{errors.arbitrator}</span>}
-                    </div>
+                    )}
 
                     {/* Privacy / Encryption Toggle */}
                     <div className="fm-form-group fm-form-full">

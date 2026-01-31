@@ -3,6 +3,24 @@
  * For friend markets with multi-party acceptance flow
  */
 
+// Resolution type enum values
+export const ResolutionType = {
+  Either: 0,      // Either creator OR opponent can resolve (default)
+  Initiator: 1,   // Only creator can resolve
+  Receiver: 2,    // Only opponent can resolve
+  ThirdParty: 3,  // Designated arbitrator resolves
+  AutoPegged: 4   // Auto-resolves based on linked public market
+}
+
+// Market type enum values
+export const MarketType = {
+  OneVsOne: 0,
+  SmallGroup: 1,
+  EventTracking: 2,
+  PropBet: 3,
+  Bookmaker: 4
+}
+
 export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
   // View functions
   {
@@ -42,7 +60,21 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { name: 'stakeToken', type: 'address' },
       { name: 'acceptedCount', type: 'uint256' },
       { name: 'minThreshold', type: 'uint256' },
-      { name: 'description', type: 'string' }
+      { name: 'opponentOddsMultiplier', type: 'uint16' },
+      { name: 'description', type: 'string' },
+      { name: 'resolutionType', type: 'uint8' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'getStakeRequirements',
+    outputs: [
+      { name: 'opponentStake', type: 'uint256' },
+      { name: 'creatorStake', type: 'uint256' },
+      { name: 'totalPot', type: 'uint256' },
+      { name: 'oddsMultiplier', type: 'uint16' }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -154,9 +186,27 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { name: 'arbitrator', type: 'address' },
       { name: 'acceptanceDeadline', type: 'uint256' },
       { name: 'stakeAmount', type: 'uint256' },
-      { name: 'stakeToken', type: 'address' }
+      { name: 'stakeToken', type: 'address' },
+      { name: 'resolutionType', type: 'uint8' }
     ],
     name: 'createOneVsOneMarketPending',
+    outputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    stateMutability: 'payable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'opponent', type: 'address' },
+      { name: 'description', type: 'string' },
+      { name: 'tradingPeriod', type: 'uint256' },
+      { name: 'acceptanceDeadline', type: 'uint256' },
+      { name: 'opponentStakeAmount', type: 'uint256' },
+      { name: 'opponentOddsMultiplier', type: 'uint16' },
+      { name: 'stakeToken', type: 'address' },
+      { name: 'resolutionType', type: 'uint8' },
+      { name: 'arbitrator', type: 'address' }
+    ],
+    name: 'createBookmakerMarket',
     outputs: [{ name: 'friendMarketId', type: 'uint256' }],
     stateMutability: 'payable',
     type: 'function'
@@ -202,6 +252,18 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
     type: 'function'
   },
 
+  // Resolution functions
+  {
+    inputs: [
+      { name: 'friendMarketId', type: 'uint256' },
+      { name: 'outcome', type: 'bool' }
+    ],
+    name: 'resolveFriendMarket',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+
   // Events
   {
     anonymous: false,
@@ -210,6 +272,7 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { indexed: true, name: 'creator', type: 'address' },
       { indexed: false, name: 'acceptanceDeadline', type: 'uint256' },
       { indexed: false, name: 'stakePerParticipant', type: 'uint256' },
+      { indexed: false, name: 'opponentOddsMultiplier', type: 'uint16' },
       { indexed: false, name: 'stakeToken', type: 'address' },
       { indexed: false, name: 'invitedParticipants', type: 'address[]' },
       { indexed: false, name: 'arbitrator', type: 'address' }
@@ -268,6 +331,16 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { indexed: false, name: 'amount', type: 'uint256' }
     ],
     name: 'StakeRefunded',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'friendMarketId', type: 'uint256' },
+      { indexed: true, name: 'resolver', type: 'address' },
+      { indexed: false, name: 'outcome', type: 'bool' }
+    ],
+    name: 'MarketResolved',
     type: 'event'
   }
 ]
