@@ -23,8 +23,8 @@ const NULLIFIER_REGISTRY_ADDRESS = getContractAddress('nullifierRegistry') || nu
 // Role hash for NULLIFIER_ADMIN_ROLE
 const NULLIFIER_ADMIN_ROLE = ethers.keccak256(ethers.toUtf8Bytes('NULLIFIER_ADMIN_ROLE'))
 
-// Polling interval for state refresh (30 seconds)
-const REFRESH_INTERVAL = 30000
+// Polling interval for state refresh (5 minutes, reduced from 30s to minimize load)
+const REFRESH_INTERVAL = 300000
 
 /**
  * Hook for interacting with NullifierRegistry contract

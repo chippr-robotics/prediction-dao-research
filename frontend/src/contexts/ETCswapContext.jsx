@@ -7,6 +7,7 @@ import { WETC_ABI } from '../abis/WETC'
 import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
 import { QUOTER_V2_ABI } from '../abis/QuoterV2'
 import { ETCswapContext } from './ETCswapContext'
+import logger from '../utils/logger'
 
 export function ETCswapProvider({ children }) {
   // Use unified wallet management
@@ -80,17 +81,17 @@ export function ETCswapProvider({ children }) {
       ].slice(-100)) // Keep last 100 records
       
     } catch (error) {
-      console.error('Error fetching balances:', error)
+      logger.error('Error fetching balances:', error)
     } finally {
       setLoading(false)
     }
   }, [provider, address, contracts])
-  
+
   // Fetch balances on connect and periodically
   useEffect(() => {
     if (isConnected) {
       fetchBalances()
-      const interval = setInterval(fetchBalances, 30000) // Every 30 seconds
+      const interval = setInterval(fetchBalances, 300000) // Every 5 minutes (reduced from 30s to minimize load)
       return () => clearInterval(interval)
     }
   }, [isConnected, fetchBalances])

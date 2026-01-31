@@ -20,8 +20,8 @@ import { getContractAddress } from '../config/contracts'
 // Contract address from config
 const PERP_FACTORY_ADDRESS = getContractAddress('perpFactory') || null
 
-// Polling interval for state refresh (30 seconds)
-const REFRESH_INTERVAL = 30000
+// Polling interval for state refresh (5 minutes, reduced from 30s to minimize load)
+const REFRESH_INTERVAL = 300000
 
 // Market categories
 export const MarketCategory = {
