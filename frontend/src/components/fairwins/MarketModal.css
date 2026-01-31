@@ -91,34 +91,67 @@
   border-width: 0;
 }
 
-/* Panel Indicators */
+/* Panel Navigation */
 .market-modal-new .panel-indicators {
   display: flex;
   justify-content: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
 }
 
 .market-modal-new .indicator {
-  width: 6px !important;
-  height: 6px !important;
-  border-radius: 50% !important;
-  background: var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  background: transparent;
   border: none;
-  padding: 0;
+  padding: 0.25rem 0.5rem;
   cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.market-modal-new .indicator.active {
-  background: var(--brand-primary, #36B37E);
-  width: 12px !important;
-  height: 6px !important;
-  border-radius: 3px !important;
+  transition: all 0.2s ease;
+  color: var(--text-secondary, #888);
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
 }
 
 .market-modal-new .indicator:hover {
-  opacity: 0.7;
+  color: var(--text-primary, #fff);
+}
+
+.market-modal-new .indicator.active {
+  color: var(--text-primary, #fff);
+  background: var(--brand-primary, #36B37E);
+  border-radius: 8px;
+  padding: 0.25rem 0.75rem;
+}
+
+.market-modal-new .indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.market-modal-new .indicator:hover .indicator-dot {
+  background: var(--text-primary, #fff);
+}
+
+.market-modal-new .indicator.active .indicator-dot {
+  background: var(--brand-primary, #36B37E);
+  width: 12px;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.market-modal-new .indicator-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 /* Navigation Buttons */
@@ -861,40 +894,56 @@
     font-size: 0.8rem;
   }
 
-  /* Smaller navigation dots on mobile */
+  /* Smaller navigation on mobile */
   .market-modal-new .panel-indicators {
-    gap: 0.2rem;
-    padding: 0.2rem 0;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
   }
 
   .market-modal-new .indicator {
-    width: 5px !important;
-    height: 5px !important;
+    padding: 0.2rem 0.3rem;
   }
 
-  .market-modal-new .indicator.active {
-    width: 10px !important;
-    height: 5px !important;
-    border-radius: 2.5px !important;
+  .market-modal-new .indicator-dot {
+    width: 5px;
+    height: 5px;
+  }
+
+  .market-modal-new .indicator.active .indicator-dot {
+    width: 10px;
+    height: 5px;
+    border-radius: 2.5px;
+  }
+
+  .market-modal-new .indicator-label {
+    font-size: 0.65rem;
   }
 }
 
-/* Portrait mode on mobile - even smaller dots */
+/* Portrait mode on mobile - compact navigation */
 @media (max-width: 480px) and (orientation: portrait) {
   .market-modal-new .panel-indicators {
-    gap: 0.15rem;
-    padding: 0.15rem 0;
+    gap: 0.4rem;
+    padding: 0.25rem 0;
   }
 
   .market-modal-new .indicator {
-    width: 4px !important;
-    height: 4px !important;
+    padding: 0.15rem 0.25rem;
   }
 
-  .market-modal-new .indicator.active {
-    width: 8px !important;
-    height: 4px !important;
-    border-radius: 2px !important;
+  .market-modal-new .indicator-dot {
+    width: 4px;
+    height: 4px;
+  }
+
+  .market-modal-new .indicator.active .indicator-dot {
+    width: 8px;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  .market-modal-new .indicator-label {
+    font-size: 0.6rem;
   }
 }
 
@@ -957,21 +1006,29 @@
     padding: 0.625rem;
   }
 
-  /* Smaller navigation dots on shorter screens */
+  /* Smaller navigation on shorter screens */
   .market-modal-new .panel-indicators {
-    gap: 0.2rem;
-    padding: 0.15rem 0;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
   }
 
   .market-modal-new .indicator {
-    width: 5px !important;
-    height: 5px !important;
+    padding: 0.2rem 0.3rem;
   }
 
-  .market-modal-new .indicator.active {
-    width: 10px !important;
-    height: 5px !important;
-    border-radius: 2.5px !important;
+  .market-modal-new .indicator-dot {
+    width: 5px;
+    height: 5px;
+  }
+
+  .market-modal-new .indicator.active .indicator-dot {
+    width: 10px;
+    height: 5px;
+    border-radius: 2.5px;
+  }
+
+  .market-modal-new .indicator-label {
+    font-size: 0.65rem;
   }
 }
 
@@ -1061,21 +1118,29 @@
     font-size: 0.7rem;
   }
 
-  /* Even smaller navigation dots */
+  /* Even smaller navigation on very short screens */
   .market-modal-new .panel-indicators {
-    gap: 0.15rem;
-    padding: 0.1rem 0;
+    gap: 0.4rem;
+    padding: 0.2rem 0;
   }
 
   .market-modal-new .indicator {
-    width: 4px !important;
-    height: 4px !important;
+    padding: 0.15rem 0.25rem;
   }
 
-  .market-modal-new .indicator.active {
-    width: 8px !important;
-    height: 4px !important;
-    border-radius: 2px !important;
+  .market-modal-new .indicator-dot {
+    width: 4px;
+    height: 4px;
+  }
+
+  .market-modal-new .indicator.active .indicator-dot {
+    width: 8px;
+    height: 4px;
+    border-radius: 2px;
+  }
+
+  .market-modal-new .indicator-label {
+    font-size: 0.6rem;
   }
 }
 
