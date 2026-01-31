@@ -121,7 +121,10 @@
 }
 
 .market-modal-new .indicator.active {
-  color: var(--brand-primary, #36B37E);
+  color: var(--text-primary, #fff);
+  background: var(--brand-primary, #36B37E);
+  border-radius: 8px;
+  padding: 0.25rem 0.75rem;
 }
 
 .market-modal-new .indicator-dot {
