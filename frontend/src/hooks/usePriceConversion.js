@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import logger from '../utils/logger'
 
 /**
  * Hook to fetch and manage ETC/USD exchange rate
@@ -50,7 +51,7 @@ function usePriceConversion() {
         throw new Error('Invalid response format')
       }
     } catch (err) {
-      console.error('Error fetching ETC price:', err)
+      logger.error('Error fetching ETC price:', err)
       setError(err.message)
       // Set a fallback rate if fetch fails (approximate historical average)
       // Use environment variable fallback value or default to 20
@@ -65,8 +66,8 @@ function usePriceConversion() {
     // Initial fetch
     fetchEtcPrice()
 
-    // Refresh every 60 seconds
-    const interval = setInterval(fetchEtcPrice, 60000)
+    // Refresh every 5 minutes (reduced from 60s to minimize API rate limiting)
+    const interval = setInterval(fetchEtcPrice, 300000)
 
     return () => clearInterval(interval)
   }, [fetchEtcPrice])
