@@ -588,7 +588,7 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
             </div>
           </div>
           
-          {/* Panel Indicator */}
+          {/* Panel Navigation */}
           <div className="panel-indicators">
             <button
               type="button"
@@ -596,21 +596,30 @@ function MarketModal({ isOpen, onClose, market, onTrade, linkedMarkets = [] }) {
               onClick={() => setCurrentPanel(0)}
               aria-label="Go to Trading panel"
               aria-current={currentPanel === 0 ? 'true' : undefined}
-            />
+            >
+              <span className="indicator-dot"></span>
+              <span className="indicator-label">Trade</span>
+            </button>
             <button
               type="button"
               className={`indicator ${currentPanel === 1 ? 'active' : ''}`}
               onClick={() => setCurrentPanel(1)}
               aria-label="Go to Details panel"
               aria-current={currentPanel === 1 ? 'true' : undefined}
-            />
+            >
+              <span className="indicator-dot"></span>
+              <span className="indicator-label">Details</span>
+            </button>
             <button
               type="button"
               className={`indicator ${currentPanel === 2 ? 'active' : ''}`}
               onClick={() => setCurrentPanel(2)}
               aria-label="Go to Share panel"
               aria-current={currentPanel === 2 ? 'true' : undefined}
-            />
+            >
+              <span className="indicator-dot"></span>
+              <span className="indicator-label">Share</span>
+            </button>
           </div>
 
           {/* Screen reader announcement for panel changes */}
