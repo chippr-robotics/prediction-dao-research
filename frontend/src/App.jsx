@@ -173,9 +173,29 @@ function AppContent() {
           } 
         />
         
-        {/* New page routes for modals converted to pages */}
-        <Route path="/market/:id" element={<MarketPage />} />
-        <Route path="/markets/correlated/:groupId" element={<CorrelatedMarketsPage />} />
+        {/* Market routes now open modals in FairWinsAppNew */}
+        <Route
+          path="/market/:id"
+          element={
+            <FairWinsAppNew
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+            />
+          }
+        />
+        <Route
+          path="/markets/correlated/:groupId"
+          element={
+            <FairWinsAppNew
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+            />
+          }
+        />
+
+        {/* Legacy page routes - kept for backward compatibility if needed */}
+        <Route path="/market-page/:id" element={<MarketPage />} />
+        <Route path="/markets-page/correlated/:groupId" element={<CorrelatedMarketsPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/tokenmint" element={<TokenMintPage />} />
         <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams, useLocation } from 'react-router-dom'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
 import { useDataFetcher } from '../../hooks/useDataFetcher'
@@ -39,6 +39,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { showNotification } = useNotification()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const params = useParams()
+  const location = useLocation()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
   const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
@@ -53,6 +55,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
   const [showWeatherMap, setShowWeatherMap] = useState(true) // Collapsible weather map state
   const lastFocusedElementRef = useRef(null)
+  const hasProcessedMarketUrl = useRef(false) // Track if we've processed a market URL
   
   // TokenMint state - kept for TokenMintTab display
   const [tokens, setTokens] = useState([])
@@ -100,6 +103,77 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
     return () => { ignore = true }
   }, [getMarkets])
+
+  // Auto-open market modal when accessing shared market links
+  useEffect(() => {
+    // Check if we're on a market route
+    const isMarketRoute = location.pathname.startsWith('/market/')
+    const isCorrelatedMarketsRoute = location.pathname.startsWith('/markets/correlated/')
+
+    // Reset the flag when we're not on a market route
+    if (!isMarketRoute && !isCorrelatedMarketsRoute) {
+      hasProcessedMarketUrl.current = false
+      return
+    }
+
+    // Skip if already processed or markets haven't loaded yet
+    if (hasProcessedMarketUrl.current || loading || markets.length === 0) return
+
+    if (isMarketRoute && params.id) {
+      // Find and open individual market modal
+      const marketId = parseInt(params.id)
+      const market = markets.find(m => m.id === marketId)
+
+      // Debug logging
+      console.log(`[Market URL] Looking for market #${marketId}`)
+      console.log(`[Market URL] Available market IDs:`, markets.map(m => m.id).sort((a, b) => a - b))
+
+      if (market) {
+        console.log(`[Market URL] Found market #${marketId}:`, market.proposalTitle)
+        hasProcessedMarketUrl.current = true
+        setSelectedMarket(market)
+        setShowHero(true)
+        // Update URL to /app to clean up the address bar
+        navigate('/app', { replace: true })
+      } else {
+        // Market not found - provide helpful error message
+        hasProcessedMarketUrl.current = true
+        const availableIds = markets.map(m => m.id).sort((a, b) => a - b)
+        console.error(`[Market URL] Market #${marketId} not found. Available IDs:`, availableIds)
+        showNotification(
+          `Market #${marketId} not found. It may have been removed or you may not have access.`,
+          'error',
+          6000
+        )
+        navigate('/app', { replace: true })
+      }
+    } else if (isCorrelatedMarketsRoute && params.groupId) {
+      // Find and open correlated markets modal
+      const groupId = parseInt(params.groupId)
+      const correlatedMarkets = markets.filter(m => m.correlationGroup?.groupId === groupId)
+
+      console.log(`[Market URL] Looking for correlation group #${groupId}`)
+      console.log(`[Market URL] Found ${correlatedMarkets.length} correlated markets`)
+
+      if (correlatedMarkets.length > 0) {
+        // Open the first market in the group (the modal will show all correlated markets)
+        hasProcessedMarketUrl.current = true
+        setSelectedMarket(correlatedMarkets[0])
+        setShowHero(true)
+        // Update URL to /app to clean up the address bar
+        navigate('/app', { replace: true })
+      } else {
+        // Correlation group not found, navigate to main app
+        hasProcessedMarketUrl.current = true
+        showNotification(
+          `Market group #${groupId} not found. It may have been removed.`,
+          'error',
+          6000
+        )
+        navigate('/app', { replace: true })
+      }
+    }
+  }, [markets, loading, location.pathname, params.id, params.groupId, navigate, showNotification])
 
   const categories = [
     { id: 'sports', name: 'Sports', icon: '⚽' },

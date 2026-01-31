@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import './ShareModal.css'
 
 function ShareModal({ isOpen, onClose, market, marketUrl }) {
-  const [, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false)
   const qrRef = useRef(null)
 
   // Only compute url when we have data
@@ -144,13 +144,13 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
           </div>
 
           {/* Web Share API Button */}
-          <button 
+          <button
             className="share-btn-primary"
             onClick={handleNativeShare}
-            aria-label="Share market"
+            aria-label={copied ? "Link copied!" : "Share market"}
           >
-            <span className="share-icon">🍀</span>
-            <span className="share-btn-text">Share</span>
+            <span className="share-icon">{copied ? '✓' : '🍀'}</span>
+            <span className="share-btn-text">{copied ? 'Link Copied!' : 'Share'}</span>
           </button>
         </div>
 
