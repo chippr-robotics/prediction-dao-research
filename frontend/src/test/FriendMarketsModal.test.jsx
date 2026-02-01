@@ -30,7 +30,7 @@ vi.mock('../hooks', () => {
     signMessage: vi.fn().mockResolvedValue('0xmocksignature123456789'),
     getAddress: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890')
   }
-  
+
   // Access the outer scope variables
   return {
     useWallet: () => ({
@@ -42,6 +42,13 @@ vi.mock('../hooks', () => {
       signer: mockSigner,
       isCorrectNetwork: mockWeb3State.isCorrectNetwork,
       switchNetwork: vi.fn()
+    }),
+    useLazyIpfsEnvelope: (markets) => ({
+      markets: markets || [],
+      fetchEnvelope: vi.fn().mockResolvedValue(null),
+      isMarketFetching: vi.fn().mockReturnValue(false),
+      needsFetch: vi.fn().mockReturnValue(false),
+      clearEnvelope: vi.fn()
     })
   }
 })

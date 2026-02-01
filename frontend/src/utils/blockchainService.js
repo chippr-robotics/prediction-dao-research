@@ -175,21 +175,55 @@ function getBetTypeLabels(betType) {
  * @param {number} marketId - Market ID
  * @returns {Promise<Object|null>} Metadata or null
  */
-async function tryFetchMarketMetadata(contract, marketId) {
+/**
+ * Get metadata URI from contract (without fetching from IPFS)
+ * Returns only the URI for lazy loading later to avoid rate limiting
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<string|null>} Metadata URI or null
+ */
+async function tryGetMarketMetadataUri(contract, marketId) {
   try {
-    // First try to get metadata URI from contract
     const metadataUri = await contract.getMarketMetadataUri(marketId)
     if (metadataUri && metadataUri.length > 0) {
-      // Import dynamically to avoid circular dependencies
-      const { resolveUri } = await import('./ipfsService')
-      const metadata = await resolveUri(metadataUri)
-      return metadata
+      return metadataUri
     }
   } catch (error) {
     // Function may not exist or metadata not set - this is expected
     console.debug(`No metadata URI for market ${marketId}:`, error.message)
   }
   return null
+}
+
+/**
+ * Fetch and resolve market metadata from IPFS
+ * Called on-demand when viewing a specific market to avoid rate limiting
+ * @param {string} metadataUri - IPFS URI or URL to fetch
+ * @returns {Promise<Object|null>} Metadata or null
+ */
+export async function fetchMarketMetadataFromUri(metadataUri) {
+  if (!metadataUri) return null
+  try {
+    const { resolveUri } = await import('./ipfsService')
+    const metadata = await resolveUri(metadataUri)
+    return metadata
+  } catch (error) {
+    console.warn(`Failed to fetch market metadata from ${metadataUri}:`, error.message)
+    return null
+  }
+}
+
+/**
+ * Try to fetch market metadata from IPFS (for single market views)
+ * Used when viewing a specific market where we want full metadata
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Metadata or null
+ */
+async function tryFetchMarketMetadata(contract, marketId) {
+  const uri = await tryGetMarketMetadataUri(contract, marketId)
+  if (!uri) return null
+  return fetchMarketMetadataFromUri(uri)
 }
 
 /**
@@ -461,11 +495,13 @@ async function tryGetMarketCreationEvent(contract, marketId) {
  */
 async function fetchSingleMarket(contract, marketId) {
   try {
-    // Fetch market struct, prices, metadata, and creation event concurrently
-    const [market, prices, metadata, creationEvent] = await Promise.all([
+    // Fetch market struct, prices, metadata URI, and creation event concurrently
+    // NOTE: We only fetch the metadata URI here, not the actual content from IPFS
+    // Metadata is loaded lazily when viewing a specific market to avoid rate limiting
+    const [market, prices, metadataUri, creationEvent] = await Promise.all([
       contract.markets(marketId),
       tryGetPrices(contract, marketId),
-      tryFetchMarketMetadata(contract, marketId),
+      tryGetMarketMetadataUri(contract, marketId),
       tryGetMarketCreationEvent(contract, marketId)
     ])
 
@@ -484,20 +520,23 @@ async function fetchSingleMarket(contract, marketId) {
       tryGetPriceHistory(contract, marketId, parseFloat(prices.passPrice))
     ])
 
-    // Extract info from metadata or use defaults
-    const category = extractCategory(metadata)
-    const title = metadata?.name || `Market #${marketId}`
-    const description = metadata?.description || ''
+    // NOTE: Metadata is NOT fetched here to avoid IPFS rate limiting
+    // Use defaults and store URI for lazy loading when viewing the market
     const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
 
     // Build the transformed market object
+    // Metadata fields (title, description, category, etc.) will be populated
+    // when the market is viewed and metadata is fetched lazily
     return {
       id: marketId,
       proposalId: Number(market.proposalId || 0),
-      proposalTitle: title,
-      description: description,
-      category: category,
-      subcategory: metadata?.properties?.subcategory || null,
+      proposalTitle: `Market #${marketId}`,
+      description: '',
+      category: 'other',
+      subcategory: null,
+      // Store URI for lazy loading
+      metadataUri: metadataUri,
+      needsMetadataFetch: !!metadataUri,
       passTokenPrice: prices.passPrice,
       failTokenPrice: prices.failPrice,
       // Use correct decimals for collateral token (USC = 6, not 18)
@@ -521,12 +560,12 @@ async function fetchSingleMarket(contract, marketId) {
       volume24h: tradeStats.totalVolume, // Using total volume as volume24h for now
       // Price history for sparkline visualization
       priceHistory: priceHistory,
-      // Additional metadata fields
-      image: metadata?.image || null,
-      tags: metadata?.properties?.tags || [],
-      resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+      // Additional metadata fields (populated lazily when metadata is fetched)
+      image: null,
+      tags: [],
+      resolutionCriteria: '',
       // H3 index for weather markets (geographic location)
-      h3_index: metadata?.properties?.h3_index || null,
+      h3_index: null,
       // CTF fields for trading
       useCTF: market.useCTF,
       conditionId: market.conditionId,
@@ -957,32 +996,25 @@ export async function fetchFriendMarketsForUser(userAddress) {
 
           // Check if description contains encrypted metadata
           // Supports:
-          // 1. IPFS reference: "encrypted:ipfs://..." (new, preferred)
+          // 1. IPFS reference: "encrypted:ipfs://..." (new, preferred) - lazy loaded
           // 2. Inline JSON envelope (legacy, for backwards compatibility)
           let description = marketResult.description
           let metadata = null
           let isEncryptedMarket = false
           let ipfsCid = null
+          let needsIpfsFetch = false
 
           // First check for IPFS reference (new format)
+          // NOTE: We do NOT fetch the envelope here to avoid rate limiting on page load.
+          // The envelope will be fetched lazily when the user views the market.
           const ipfsRef = parseEncryptedIpfsReference(description)
           if (ipfsRef.isIpfs && ipfsRef.cid) {
-            // Preserve the CID even if fetch fails - allows UI retry logic
+            // Store the CID for lazy loading - the useLazyIpfsEnvelope hook will fetch it
             ipfsCid = ipfsRef.cid
             isEncryptedMarket = true
-            try {
-              // Fetch encrypted envelope from IPFS
-              console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, fetching CID: ${ipfsRef.cid}`)
-              const envelope = await fetchEncryptedEnvelope(ipfsRef.cid)
-              metadata = envelope
-              description = 'Encrypted Market' // Placeholder until decrypted
-              console.log(`[fetchFriendMarketsForUser] Market ${marketId} envelope fetched from IPFS, algorithm: ${envelope.algorithm}`)
-            } catch (ipfsError) {
-              console.error(`[fetchFriendMarketsForUser] Failed to fetch IPFS envelope for market ${marketId}:`, ipfsError)
-              // Keep the IPFS reference as description so user knows it's encrypted but unavailable
-              // Note: ipfsCid is preserved from before the try block to allow UI retry logic
-              description = 'Encrypted Market (IPFS fetch failed)'
-            }
+            needsIpfsFetch = true
+            description = 'Encrypted Market' // Placeholder until envelope is fetched and decrypted
+            console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, CID: ${ipfsRef.cid} (lazy load)`)
           } else {
             // Fallback: check for inline JSON envelope (legacy format)
             try {
@@ -1015,6 +1047,7 @@ export async function fetchFriendMarketsForUser(userAddress) {
             metadata: metadata,
             isEncrypted: isEncryptedMarket,
             ipfsCid: ipfsCid, // CID for IPFS-stored encrypted envelopes
+            needsIpfsFetch: needsIpfsFetch, // True if envelope needs to be fetched from IPFS
             creator: marketResult.creator,
             participants: members,
             arbitrator: hasArbitrator ? arbitrator : null,

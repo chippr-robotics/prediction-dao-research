@@ -96,3 +96,16 @@ export {
   useDecryptedMarkets,
   useLazyMarketDecryption
 } from './useEncryption'
+
+// IPFS hooks (for decentralized storage)
+export {
+  useIpfs,
+  useTokenMetadata,
+  useMarketData,
+  useMarketMetadata,
+  useIpfsByCid,
+  useBatchIpfs,
+  useIpfsCache,
+  useLazyIpfsEnvelope,
+  useLazyMarketMetadata
+} from './useIpfs'
