@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useDataFetcher } from '../../hooks/useDataFetcher'
+import { useTrendingMarkets } from '../../hooks/useInfiniteMarkets'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import LoadingScreen from '../ui/LoadingScreen'
 import CategoryTreemap from './CategoryTreemap'
@@ -994,11 +994,12 @@ function RecentActivityFeed({ markets }) {
 // ============================================================================
 
 function Dashboard() {
-  const { getMarkets } = useDataFetcher()
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true
-  const [markets, setMarkets] = useState([])
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
+
+  // Use trending markets hook with limit of 50 for dashboard analytics
+  // This avoids loading all markets and provides a representative sample
+  const { markets, isLoading: isInitialLoad } = useTrendingMarkets({ limit: 50 })
 
   const categories = useMemo(() => [
     { id: 'sports', name: 'Sports', icon: '⚽' },
@@ -1009,27 +1010,6 @@ function Dashboard() {
     { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
     { id: 'weather', name: 'Weather', icon: '🌤️' }
   ], [])
-
-  // Load markets with caching support - reloads when demoMode changes
-  useEffect(() => {
-    const loadMarkets = async () => {
-      try {
-        // Fetch with background refresh callback for stale-while-revalidate
-        const allMarkets = await getMarkets(null, {
-          onBackgroundRefresh: (freshMarkets) => {
-            console.log('Dashboard: Background refresh complete')
-            setMarkets(freshMarkets)
-          }
-        })
-        setMarkets(allMarkets)
-      } catch (loadError) {
-        console.error('Error loading markets:', loadError)
-      } finally {
-        setIsInitialLoad(false)
-      }
-    }
-    loadMarkets()
-  }, [getMarkets, demoMode])
 
   const handleMarketClick = useCallback((market) => {
     // Navigate to market - in real app would use router

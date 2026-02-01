@@ -109,3 +109,9 @@ export {
   useLazyIpfsEnvelope,
   useLazyMarketMetadata
 } from './useIpfs'
+
+// Infinite scroll market hooks
+export {
+  useInfiniteMarkets,
+  useTrendingMarkets
+} from './useInfiniteMarkets'

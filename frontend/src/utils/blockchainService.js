@@ -743,6 +743,97 @@ export async function fetchMarketsFromBlockchain() {
 }
 
 /**
+ * Fetch multiple markets by their IDs
+ * Uses lazy loading - doesn't fetch IPFS metadata, only stores URIs
+ *
+ * @param {number[]} marketIds - Array of market IDs to fetch
+ * @param {Object} options - Options
+ * @param {boolean} options.filterFriendMarkets - Filter out friend markets (default: true)
+ * @returns {Promise<Array>} Array of market objects
+ */
+export async function fetchMarketsByIds(marketIds, { filterFriendMarkets = true } = {}) {
+  try {
+    if (!marketIds || marketIds.length === 0) {
+      return []
+    }
+
+    const contract = getContract('marketFactory')
+
+    // Fetch markets concurrently
+    const marketPromises = marketIds.map(id => fetchSingleMarket(contract, id))
+    const results = await Promise.all(marketPromises)
+
+    // Filter out null results (invalid markets)
+    let markets = results.filter(market => market !== null)
+
+    // Optionally filter out friend markets
+    if (filterFriendMarkets) {
+      markets = markets.filter(market => !isMarketPrivateOrFriend(market))
+    }
+
+    // Enrich with correlation data
+    return await enrichMarketsWithCorrelationData(markets)
+  } catch (error) {
+    console.error('Error fetching markets by IDs:', error)
+    throw error
+  }
+}
+
+/**
+ * Fetch a page of active markets using pagination
+ * Returns market IDs in reverse order (newest first) when no index is available
+ *
+ * @param {Object} options - Pagination options
+ * @param {number} options.offset - Starting offset (default: 0)
+ * @param {number} options.limit - Number of markets to fetch (default: 20)
+ * @returns {Promise<Object>} { markets: Array, hasMore: boolean, total: number }
+ */
+export async function fetchActiveMarketsPaginated({ offset = 0, limit = 20 } = {}) {
+  try {
+    const contract = getContract('marketFactory')
+    const marketCount = await contract.marketCount()
+    const total = Number(marketCount)
+
+    if (total === 0) {
+      return { markets: [], hasMore: false, total: 0 }
+    }
+
+    // Generate market IDs in reverse order (newest first)
+    const startId = Math.max(0, total - 1 - offset)
+    const endId = Math.max(0, startId - limit + 1)
+
+    const marketIds = []
+    for (let id = startId; id >= endId; id--) {
+      marketIds.push(id)
+    }
+
+    // Fetch the markets
+    const markets = await fetchMarketsByIds(marketIds)
+
+    // Filter for active markets only
+    const activeMarkets = markets.filter(m => m.status === 'active')
+
+    // Note: hasMore is approximate since we don't know how many are active
+    const hasMore = endId > 0
+
+    return { markets: activeMarkets, hasMore, total }
+  } catch (error) {
+    console.error('Error fetching paginated markets:', error)
+    throw error
+  }
+}
+
+/**
+ * Get total market count from the contract
+ * @returns {Promise<number>} Total number of markets
+ */
+export async function getMarketCount() {
+  const contract = getContract('marketFactory')
+  const count = await contract.marketCount()
+  return Number(count)
+}
+
+/**
  * Fetch markets by category from the blockchain
  * Note: The actual contract doesn't store categories - this filters all markets client-side
  * @param {string} category - Market category (currently unused as contract doesn't support categories)
