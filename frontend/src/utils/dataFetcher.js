@@ -42,6 +42,36 @@ import {
   clearMarketCache
 } from './marketCache'
 
+import logger from './logger'
+
+// Request deduplication: Track in-flight requests to prevent duplicates
+const inFlightRequests = new Map()
+
+/**
+ * Deduplicate requests - returns existing promise if same request is in-flight
+ * @param {string} key - Unique key for the request
+ * @param {Function} fetcher - Function that returns a promise
+ * @returns {Promise} The deduplicated promise
+ */
+function deduplicateRequest(key, fetcher) {
+  // If request is already in-flight, return the existing promise
+  if (inFlightRequests.has(key)) {
+    logger.log(`Deduplicating request: ${key}`)
+    return inFlightRequests.get(key)
+  }
+
+  // Create new request
+  const promise = fetcher()
+    .finally(() => {
+      // Clean up after request completes (success or failure)
+      inFlightRequests.delete(key)
+    })
+
+  // Store in-flight request
+  inFlightRequests.set(key, promise)
+  return promise
+}
+
 /**
  * Fetch markets based on demo mode with caching support
  * Uses stale-while-revalidate pattern for blockchain data:
@@ -57,11 +87,11 @@ import {
  */
 export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
   const { forceRefresh = false, onBackgroundRefresh = null } = options
-  console.log('fetchMarkets called with demoMode:', demoMode, 'forceRefresh:', forceRefresh)
+  logger.log('fetchMarkets called with demoMode:', demoMode, 'forceRefresh:', forceRefresh)
 
   if (demoMode) {
     // Return mock data (no caching needed)
-    console.log('Using demo mode - returning mock markets')
+    logger.log('Using demo mode - returning mock markets')
     return getMockMarkets()
   }
 
@@ -69,19 +99,19 @@ export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
   if (!forceRefresh) {
     const cached = loadCachedMarkets()
     if (cached) {
-      console.log(`Cache hit: ${cached.markets.length} markets, age: ${Math.round(cached.age / 1000)}s, stale: ${cached.isStale}`)
+      logger.log(`Cache hit: ${cached.markets.length} markets, age: ${Math.round(cached.age / 1000)}s, stale: ${cached.isStale}`)
 
-      // If cache is stale, trigger background refresh
+      // If cache is stale, trigger background refresh (deduplicated)
       if (cached.isStale && onBackgroundRefresh) {
-        console.log('Cache is stale, triggering background refresh')
-        fetchMarketsFromBlockchain()
+        logger.log('Cache is stale, triggering background refresh')
+        deduplicateRequest('fetchMarkets:background', () => fetchMarketsFromBlockchain())
           .then(freshMarkets => {
-            console.log('Background refresh complete:', freshMarkets.length, 'markets')
+            logger.log('Background refresh complete:', freshMarkets.length, 'markets')
             cacheMarkets(freshMarkets)
             onBackgroundRefresh(freshMarkets)
           })
           .catch(error => {
-            console.warn('Background refresh failed:', error.message)
+            logger.warn('Background refresh failed:', error.message)
           })
       }
 
@@ -91,20 +121,21 @@ export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
   }
 
   try {
-    // Fetch from Mordor testnet
-    console.log('Live mode - fetching from blockchain (cache miss or refresh)')
-    const markets = await fetchMarketsFromBlockchain()
-    console.log('Fetched', markets.length, 'markets from blockchain')
+    // Fetch from Mordor testnet (with request deduplication)
+    logger.log('Live mode - fetching from blockchain (cache miss or refresh)')
+    const requestKey = forceRefresh ? 'fetchMarkets:force' : 'fetchMarkets:normal'
+    const markets = await deduplicateRequest(requestKey, () => fetchMarketsFromBlockchain())
+    logger.log('Fetched', markets.length, 'markets from blockchain')
 
     // Cache the results
     cacheMarkets(markets)
 
     return markets
   } catch (error) {
-    console.error('Failed to fetch markets from blockchain:', error)
+    logger.error('Failed to fetch markets from blockchain:', error)
     // In live mode, return empty array instead of falling back to mock data
     // This makes it clear to the user that blockchain data is not available
-    console.warn('Returning empty array - no blockchain data available')
+    logger.warn('Returning empty array - no blockchain data available')
     return []
   }
 }
@@ -126,12 +157,15 @@ export async function fetchMarketsByCategory(demoMode, category, _contracts = nu
   if (demoMode) {
     return getMockMarketsByCategory(category)
   }
-  
+
   try {
-    return await fetchMarketsByCategoryFromBlockchain(category)
+    return await deduplicateRequest(
+      `fetchMarketsByCategory:${category}`,
+      () => fetchMarketsByCategoryFromBlockchain(category)
+    )
   } catch (error) {
-    console.error('Failed to fetch markets by category from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
+    logger.error('Failed to fetch markets by category from blockchain:', error)
+    logger.warn('Falling back to mock data due to blockchain error')
     return getMockMarketsByCategory(category)
   }
 }
@@ -147,12 +181,15 @@ export async function fetchMarketById(demoMode, id, _contracts = null) {
   if (demoMode) {
     return getMockMarketById(id)
   }
-  
+
   try {
-    return await fetchMarketByIdFromBlockchain(id)
+    return await deduplicateRequest(
+      `fetchMarketById:${id}`,
+      () => fetchMarketByIdFromBlockchain(id)
+    )
   } catch (error) {
-    console.error('Failed to fetch market by ID from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
+    logger.error('Failed to fetch market by ID from blockchain:', error)
+    logger.warn('Falling back to mock data due to blockchain error')
     return getMockMarketById(id)
   }
 }
@@ -167,12 +204,15 @@ export async function fetchProposals(demoMode, _contracts = null) {
   if (demoMode) {
     return getMockProposals()
   }
-  
+
   try {
-    return await fetchProposalsFromBlockchain()
+    return await deduplicateRequest(
+      'fetchProposals',
+      () => fetchProposalsFromBlockchain()
+    )
   } catch (error) {
-    console.error('Failed to fetch proposals from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
+    logger.error('Failed to fetch proposals from blockchain:', error)
+    logger.warn('Falling back to mock data due to blockchain error')
     return getMockProposals()
   }
 }
@@ -188,12 +228,15 @@ export async function fetchPositions(demoMode, userAddress, _contracts = null) {
   if (demoMode) {
     return getMockPositions()
   }
-  
+
   try {
-    return await fetchPositionsFromBlockchain(userAddress)
+    return await deduplicateRequest(
+      `fetchPositions:${userAddress}`,
+      () => fetchPositionsFromBlockchain(userAddress)
+    )
   } catch (error) {
-    console.error('Failed to fetch positions from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
+    logger.error('Failed to fetch positions from blockchain:', error)
+    logger.warn('Falling back to mock data due to blockchain error')
     return getMockPositions()
   }
 }
@@ -208,12 +251,15 @@ export async function fetchWelfareMetrics(demoMode, _contracts = null) {
   if (demoMode) {
     return getMockWelfareMetrics()
   }
-  
+
   try {
-    return await fetchWelfareMetricsFromBlockchain()
+    return await deduplicateRequest(
+      'fetchWelfareMetrics',
+      () => fetchWelfareMetricsFromBlockchain()
+    )
   } catch (error) {
-    console.error('Failed to fetch welfare metrics from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
+    logger.error('Failed to fetch welfare metrics from blockchain:', error)
+    logger.warn('Falling back to mock data due to blockchain error')
     return getMockWelfareMetrics()
   }
 }
@@ -228,12 +274,15 @@ export async function fetchCategories(demoMode, _contracts = null) {
   if (demoMode) {
     return getMockCategories()
   }
-  
+
   try {
-    return await fetchCategoriesFromBlockchain()
+    return await deduplicateRequest(
+      'fetchCategories',
+      () => fetchCategoriesFromBlockchain()
+    )
   } catch (error) {
-    console.error('Failed to fetch categories from blockchain:', error)
-    console.warn('Falling back to mock data due to blockchain error')
+    logger.error('Failed to fetch categories from blockchain:', error)
+    logger.warn('Falling back to mock data due to blockchain error')
     return getMockCategories()
   }
 }
@@ -252,6 +301,6 @@ export async function fetchMarketsByCorrelationGroup(demoMode, correlationGroupI
   
   // Note: Correlation groups are currently a frontend-only feature
   // When implemented on-chain, this should fetch from blockchain
-  console.warn('Correlation groups not yet implemented on blockchain. Using mock data.')
+  logger.warn('Correlation groups not yet implemented on blockchain. Using mock data.')
   return getMockMarketsByCorrelationGroup(correlationGroupId)
 }

@@ -4,8 +4,8 @@ import { useWeb3 } from './useWeb3'
 import { MINIMAL_ROLE_MANAGER_ABI, MEMBERSHIP_TIERS, TIER_NAMES } from '../abis/MinimalRoleManager'
 import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
 
-// Refresh interval for contract state (30 seconds)
-export const CONTRACT_STATE_REFRESH_INTERVAL = 30000
+// Refresh interval for contract state (5 minutes, reduced from 30s to minimize load)
+export const CONTRACT_STATE_REFRESH_INTERVAL = 300000
 
 /**
  * Get the role manager contract address

@@ -25,8 +25,8 @@ const FAIRWINS_TOKEN_ADDRESS = DEPLOYED_CONTRACTS.fairWinsToken
 // Address(0) represents ETH in the contract
 const ETH_ADDRESS = ethers.ZeroAddress
 
-// Polling interval for state refresh (30 seconds)
-const REFRESH_INTERVAL = 30000
+// Polling interval for state refresh (5 minutes, reduced from 30s to minimize load)
+const REFRESH_INTERVAL = 300000
 
 /**
  * Hook for interacting with TreasuryVault contract
