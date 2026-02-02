@@ -759,15 +759,152 @@ export async function fetchMarketsFromBlockchain() {
 }
 
 /**
+ * Fetch markets using batched Multicall3 for core data
+ * Much faster than individual fetches - 2 RPC calls instead of 2N
+ *
+ * @param {number[]} marketIds - Market IDs to fetch
+ * @param {ethers.Contract} contract - Market factory contract
+ * @returns {Promise<Array>} Array of market objects
+ */
+async function fetchMarketsByIdsBatched(marketIds, contract) {
+  const multicall = getMulticall3Contract()
+  const factoryAddress = getContractAddress('marketFactory')
+
+  // Build calls for both markets() and getPrices() for all IDs
+  const marketCalls = marketIds.map(id => ({
+    target: factoryAddress,
+    allowFailure: true,
+    callData: contract.interface.encodeFunctionData('markets', [id])
+  }))
+
+  const priceCalls = marketIds.map(id => ({
+    target: factoryAddress,
+    allowFailure: true,
+    callData: contract.interface.encodeFunctionData('getPrices', [id])
+  }))
+
+  // Execute both batches in parallel (2 RPC calls total)
+  logger.debug(`Batching ${marketIds.length} markets() + ${marketIds.length} getPrices() calls via Multicall3`)
+  const [marketResults, priceResults] = await Promise.all([
+    multicall.aggregate3(marketCalls),
+    multicall.aggregate3(priceCalls)
+  ])
+
+  // Build core data map
+  const coreDataMap = new Map()
+
+  for (let i = 0; i < marketIds.length; i++) {
+    const marketId = marketIds[i]
+    const marketResult = marketResults[i]
+    const priceResult = priceResults[i]
+
+    let market = null
+    let prices = { passPrice: '0.5', failPrice: '0.5' }
+
+    // Decode market struct
+    if (marketResult.success && marketResult.returnData !== '0x') {
+      try {
+        const decoded = contract.interface.decodeFunctionResult('markets', marketResult.returnData)
+        market = decoded[0] || decoded
+      } catch (e) {
+        logger.debug(`Failed to decode market ${marketId}:`, e.message)
+      }
+    }
+
+    // Decode prices
+    if (priceResult.success && priceResult.returnData !== '0x') {
+      try {
+        const decoded = contract.interface.decodeFunctionResult('getPrices', priceResult.returnData)
+        prices = {
+          passPrice: ethers.formatEther(decoded[0]),
+          failPrice: ethers.formatEther(decoded[1])
+        }
+      } catch (e) {
+        logger.debug(`Failed to decode prices for market ${marketId}:`, e.message)
+      }
+    }
+
+    if (market) {
+      coreDataMap.set(marketId, { market, prices })
+    }
+  }
+
+  if (coreDataMap.size === 0) {
+    throw new Error('Batch fetch returned no data')
+  }
+
+  // Get collateral token decimals (cached after first call)
+  let collateralDecimals = 6 // Default for USC
+  const firstMarket = coreDataMap.values().next().value
+  if (firstMarket?.market?.collateralToken) {
+    collateralDecimals = await getTokenDecimals(firstMarket.market.collateralToken)
+  }
+
+  // Build market objects from batched data
+  const markets = []
+
+  for (const [marketId, { market, prices }] of coreDataMap) {
+    // Validate market
+    if (!isValidMarket(market)) {
+      continue
+    }
+
+    const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
+
+    markets.push({
+      id: marketId,
+      proposalId: Number(market.proposalId || 0),
+      proposalTitle: `Market #${marketId}`,
+      description: '',
+      category: 'other',
+      subcategory: null,
+      metadataUri: null, // Will be fetched lazily
+      needsMetadataFetch: true,
+      passTokenPrice: prices.passPrice,
+      failTokenPrice: prices.failPrice,
+      totalLiquidity: market.totalLiquidity ? ethers.formatUnits(market.totalLiquidity, collateralDecimals) : '0',
+      liquidityParameter: market.liquidityParameter ? ethers.formatUnits(market.liquidityParameter, collateralDecimals) : '0',
+      collateralDecimals: collateralDecimals,
+      tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
+      status: getMarketStatus(Number(market.status)),
+      betType: Number(market.betType || 0),
+      betTypeLabels: betTypeLabels,
+      collateralToken: market.collateralToken,
+      passToken: market.passToken,
+      failToken: market.failToken,
+      resolved: market.resolved,
+      creator: null, // Skip creation event fetch for speed
+      creationTime: null,
+      tradesCount: 0, // Skip trade stats for initial load
+      uniqueTraders: 0,
+      volume24h: '0',
+      priceHistory: [], // Skip price history for initial load
+      image: null,
+      tags: [],
+      resolutionCriteria: '',
+      h3_index: null,
+      useCTF: market.useCTF,
+      conditionId: market.conditionId,
+      passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
+      failPositionId: market.failPositionId ? Number(market.failPositionId) : null
+    })
+  }
+
+  logger.debug(`Batched fetch returned ${markets.length} valid markets`)
+  return markets
+}
+
+/**
  * Fetch multiple markets by their IDs
- * Uses lazy loading - doesn't fetch IPFS metadata, only stores URIs
+ * Uses batched Multicall3 for core data, lazy loading for metadata
  *
  * @param {number[]} marketIds - Array of market IDs to fetch
  * @param {Object} options - Options
  * @param {boolean} options.filterFriendMarkets - Filter out friend markets (default: true)
+ * @param {boolean} options.useBatching - Use Multicall3 batching (default: true)
  * @returns {Promise<Array>} Array of market objects
  */
-export async function fetchMarketsByIds(marketIds, { filterFriendMarkets = true } = {}) {
+export async function fetchMarketsByIds(marketIds, { filterFriendMarkets = true, useBatching = true } = {}) {
   try {
     if (!marketIds || marketIds.length === 0) {
       return []
@@ -775,7 +912,26 @@ export async function fetchMarketsByIds(marketIds, { filterFriendMarkets = true 
 
     const contract = getContract('marketFactory')
 
-    // Fetch markets concurrently
+    // Try batched approach first for better performance
+    if (useBatching) {
+      try {
+        const markets = await fetchMarketsByIdsBatched(marketIds, contract)
+
+        // Filter out null results and friend markets
+        let filtered = markets.filter(market => market !== null)
+        if (filterFriendMarkets) {
+          filtered = filtered.filter(market => !isMarketPrivateOrFriend(market))
+        }
+
+        // Enrich with correlation data
+        return await enrichMarketsWithCorrelationData(filtered)
+      } catch (batchError) {
+        logger.debug('Batch fetch failed, falling back to individual fetches:', batchError.message)
+        // Fall through to individual fetch
+      }
+    }
+
+    // Fallback: Fetch markets individually (original approach)
     const marketPromises = marketIds.map(id => fetchSingleMarket(contract, id))
     const results = await Promise.all(marketPromises)
 
