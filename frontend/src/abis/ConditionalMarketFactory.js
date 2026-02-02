@@ -201,6 +201,18 @@ export const MARKET_FACTORY_ABI = [
     "anonymous": false,
     "inputs": [
       {"indexed": true, "name": "marketId", "type": "uint256"},
+      {"indexed": true, "name": "seller", "type": "address"},
+      {"indexed": true, "name": "sellPass", "type": "bool"},
+      {"indexed": false, "name": "tokenAmount", "type": "uint256"},
+      {"indexed": false, "name": "collateralAmount", "type": "uint256"}
+    ],
+    "name": "TokensSold",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "marketId", "type": "uint256"},
       {"indexed": true, "name": "proposalId", "type": "uint256"},
       {"indexed": false, "name": "passValue", "type": "uint256"},
       {"indexed": false, "name": "failValue", "type": "uint256"},

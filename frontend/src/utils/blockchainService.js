@@ -15,10 +15,12 @@ import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
+import { MULTICALL3_ABI } from '../abis/Multicall3'
 import {
   parseEncryptedIpfsReference,
   fetchEncryptedEnvelope
 } from './ipfsService'
+import { logger } from './logger'
 
 // Constants for friend market detection
 const FRIEND_MARKET_PROPOSAL_MIN = 1_000_000
@@ -175,21 +177,55 @@ function getBetTypeLabels(betType) {
  * @param {number} marketId - Market ID
  * @returns {Promise<Object|null>} Metadata or null
  */
-async function tryFetchMarketMetadata(contract, marketId) {
+/**
+ * Get metadata URI from contract (without fetching from IPFS)
+ * Returns only the URI for lazy loading later to avoid rate limiting
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<string|null>} Metadata URI or null
+ */
+async function tryGetMarketMetadataUri(contract, marketId) {
   try {
-    // First try to get metadata URI from contract
     const metadataUri = await contract.getMarketMetadataUri(marketId)
     if (metadataUri && metadataUri.length > 0) {
-      // Import dynamically to avoid circular dependencies
-      const { resolveUri } = await import('./ipfsService')
-      const metadata = await resolveUri(metadataUri)
-      return metadata
+      return metadataUri
     }
   } catch (error) {
     // Function may not exist or metadata not set - this is expected
     console.debug(`No metadata URI for market ${marketId}:`, error.message)
   }
   return null
+}
+
+/**
+ * Fetch and resolve market metadata from IPFS
+ * Called on-demand when viewing a specific market to avoid rate limiting
+ * @param {string} metadataUri - IPFS URI or URL to fetch
+ * @returns {Promise<Object|null>} Metadata or null
+ */
+export async function fetchMarketMetadataFromUri(metadataUri) {
+  if (!metadataUri) return null
+  try {
+    const { resolveUri } = await import('./ipfsService')
+    const metadata = await resolveUri(metadataUri)
+    return metadata
+  } catch (error) {
+    console.warn(`Failed to fetch market metadata from ${metadataUri}:`, error.message)
+    return null
+  }
+}
+
+/**
+ * Try to fetch market metadata from IPFS (for single market views)
+ * Used when viewing a specific market where we want full metadata
+ * @param {ethers.Contract} contract - Market factory contract
+ * @param {number} marketId - Market ID
+ * @returns {Promise<Object|null>} Metadata or null
+ */
+async function tryFetchMarketMetadata(contract, marketId) {
+  const uri = await tryGetMarketMetadataUri(contract, marketId)
+  if (!uri) return null
+  return fetchMarketMetadataFromUri(uri)
 }
 
 /**
@@ -257,8 +293,11 @@ function extractCategory(metadata) {
   return 'other'
 }
 
+// Cache for token decimals to avoid repeated RPC calls
+const tokenDecimalsCache = new Map()
+
 /**
- * Get token decimals for a collateral token
+ * Get token decimals for a collateral token (cached)
  * @param {string} tokenAddress - Token contract address
  * @returns {Promise<number>} Number of decimals (defaults to 18)
  */
@@ -267,12 +306,23 @@ async function getTokenDecimals(tokenAddress) {
     if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
       return 18
     }
+
+    // Check cache first
+    const normalizedAddress = tokenAddress.toLowerCase()
+    if (tokenDecimalsCache.has(normalizedAddress)) {
+      return tokenDecimalsCache.get(normalizedAddress)
+    }
+
     const provider = getProvider()
     const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider)
     const decimals = await tokenContract.decimals()
-    return Number(decimals)
+    const result = Number(decimals)
+
+    // Cache the result
+    tokenDecimalsCache.set(normalizedAddress, result)
+    return result
   } catch (error) {
-    console.debug(`Could not get decimals for token ${tokenAddress}:`, error.message)
+    logger.debug(`Could not get decimals for token ${tokenAddress}:`, error.message)
     return 18 // Default to 18 decimals
   }
 }
@@ -461,11 +511,13 @@ async function tryGetMarketCreationEvent(contract, marketId) {
  */
 async function fetchSingleMarket(contract, marketId) {
   try {
-    // Fetch market struct, prices, metadata, and creation event concurrently
-    const [market, prices, metadata, creationEvent] = await Promise.all([
+    // Fetch market struct, prices, metadata URI, and creation event concurrently
+    // NOTE: We only fetch the metadata URI here, not the actual content from IPFS
+    // Metadata is loaded lazily when viewing a specific market to avoid rate limiting
+    const [market, prices, metadataUri, creationEvent] = await Promise.all([
       contract.markets(marketId),
       tryGetPrices(contract, marketId),
-      tryFetchMarketMetadata(contract, marketId),
+      tryGetMarketMetadataUri(contract, marketId),
       tryGetMarketCreationEvent(contract, marketId)
     ])
 
@@ -484,20 +536,23 @@ async function fetchSingleMarket(contract, marketId) {
       tryGetPriceHistory(contract, marketId, parseFloat(prices.passPrice))
     ])
 
-    // Extract info from metadata or use defaults
-    const category = extractCategory(metadata)
-    const title = metadata?.name || `Market #${marketId}`
-    const description = metadata?.description || ''
+    // NOTE: Metadata is NOT fetched here to avoid IPFS rate limiting
+    // Use defaults and store URI for lazy loading when viewing the market
     const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
 
     // Build the transformed market object
+    // Metadata fields (title, description, category, etc.) will be populated
+    // when the market is viewed and metadata is fetched lazily
     return {
       id: marketId,
       proposalId: Number(market.proposalId || 0),
-      proposalTitle: title,
-      description: description,
-      category: category,
-      subcategory: metadata?.properties?.subcategory || null,
+      proposalTitle: `Market #${marketId}`,
+      description: '',
+      category: 'other',
+      subcategory: null,
+      // Store URI for lazy loading
+      metadataUri: metadataUri,
+      needsMetadataFetch: !!metadataUri,
       passTokenPrice: prices.passPrice,
       failTokenPrice: prices.failPrice,
       // Use correct decimals for collateral token (USC = 6, not 18)
@@ -521,12 +576,12 @@ async function fetchSingleMarket(contract, marketId) {
       volume24h: tradeStats.totalVolume, // Using total volume as volume24h for now
       // Price history for sparkline visualization
       priceHistory: priceHistory,
-      // Additional metadata fields
-      image: metadata?.image || null,
-      tags: metadata?.properties?.tags || [],
-      resolutionCriteria: metadata?.properties?.resolution_criteria || '',
+      // Additional metadata fields (populated lazily when metadata is fetched)
+      image: null,
+      tags: [],
+      resolutionCriteria: '',
       // H3 index for weather markets (geographic location)
-      h3_index: metadata?.properties?.h3_index || null,
+      h3_index: null,
       // CTF fields for trading
       useCTF: market.useCTF,
       conditionId: market.conditionId,
@@ -701,6 +756,253 @@ export async function fetchMarketsFromBlockchain() {
     })
     throw error
   }
+}
+
+/**
+ * Fetch markets using batched Multicall3 for core data
+ * Much faster than individual fetches - 2 RPC calls instead of 2N
+ *
+ * @param {number[]} marketIds - Market IDs to fetch
+ * @param {ethers.Contract} contract - Market factory contract
+ * @returns {Promise<Array>} Array of market objects
+ */
+async function fetchMarketsByIdsBatched(marketIds, contract) {
+  const multicall = getMulticall3Contract()
+  const factoryAddress = getContractAddress('marketFactory')
+
+  // Build calls for both markets() and getPrices() for all IDs
+  const marketCalls = marketIds.map(id => ({
+    target: factoryAddress,
+    allowFailure: true,
+    callData: contract.interface.encodeFunctionData('markets', [id])
+  }))
+
+  const priceCalls = marketIds.map(id => ({
+    target: factoryAddress,
+    allowFailure: true,
+    callData: contract.interface.encodeFunctionData('getPrices', [id])
+  }))
+
+  // Execute both batches in parallel (2 RPC calls total)
+  logger.debug(`Batching ${marketIds.length} markets() + ${marketIds.length} getPrices() calls via Multicall3`)
+  const [marketResults, priceResults] = await Promise.all([
+    multicall.aggregate3(marketCalls),
+    multicall.aggregate3(priceCalls)
+  ])
+
+  // Build core data map
+  const coreDataMap = new Map()
+
+  for (let i = 0; i < marketIds.length; i++) {
+    const marketId = marketIds[i]
+    const marketResult = marketResults[i]
+    const priceResult = priceResults[i]
+
+    let market = null
+    let prices = { passPrice: '0.5', failPrice: '0.5' }
+
+    // Decode market struct
+    if (marketResult.success && marketResult.returnData !== '0x') {
+      try {
+        const decoded = contract.interface.decodeFunctionResult('markets', marketResult.returnData)
+        market = decoded[0] || decoded
+      } catch (e) {
+        logger.debug(`Failed to decode market ${marketId}:`, e.message)
+      }
+    }
+
+    // Decode prices
+    if (priceResult.success && priceResult.returnData !== '0x') {
+      try {
+        const decoded = contract.interface.decodeFunctionResult('getPrices', priceResult.returnData)
+        prices = {
+          passPrice: ethers.formatEther(decoded[0]),
+          failPrice: ethers.formatEther(decoded[1])
+        }
+      } catch (e) {
+        logger.debug(`Failed to decode prices for market ${marketId}:`, e.message)
+      }
+    }
+
+    if (market) {
+      coreDataMap.set(marketId, { market, prices })
+    }
+  }
+
+  if (coreDataMap.size === 0) {
+    throw new Error('Batch fetch returned no data')
+  }
+
+  // Get collateral token decimals (cached after first call)
+  let collateralDecimals = 6 // Default for USC
+  const firstMarket = coreDataMap.values().next().value
+  if (firstMarket?.market?.collateralToken) {
+    collateralDecimals = await getTokenDecimals(firstMarket.market.collateralToken)
+  }
+
+  // Build market objects from batched data
+  const markets = []
+
+  for (const [marketId, { market, prices }] of coreDataMap) {
+    // Validate market
+    if (!isValidMarket(market)) {
+      continue
+    }
+
+    const betTypeLabels = getBetTypeLabels(Number(market.betType || 0))
+
+    markets.push({
+      id: marketId,
+      proposalId: Number(market.proposalId || 0),
+      proposalTitle: `Market #${marketId}`,
+      description: '',
+      category: 'other',
+      subcategory: null,
+      metadataUri: null, // Will be fetched lazily
+      needsMetadataFetch: true,
+      passTokenPrice: prices.passPrice,
+      failTokenPrice: prices.failPrice,
+      totalLiquidity: market.totalLiquidity ? ethers.formatUnits(market.totalLiquidity, collateralDecimals) : '0',
+      liquidityParameter: market.liquidityParameter ? ethers.formatUnits(market.liquidityParameter, collateralDecimals) : '0',
+      collateralDecimals: collateralDecimals,
+      tradingEndTime: market.tradingEndTime ? new Date(Number(market.tradingEndTime) * 1000).toISOString() : new Date().toISOString(),
+      status: getMarketStatus(Number(market.status)),
+      betType: Number(market.betType || 0),
+      betTypeLabels: betTypeLabels,
+      collateralToken: market.collateralToken,
+      passToken: market.passToken,
+      failToken: market.failToken,
+      resolved: market.resolved,
+      creator: null, // Skip creation event fetch for speed
+      creationTime: null,
+      tradesCount: 0, // Skip trade stats for initial load
+      uniqueTraders: 0,
+      volume24h: '0',
+      priceHistory: [], // Skip price history for initial load
+      image: null,
+      tags: [],
+      resolutionCriteria: '',
+      h3_index: null,
+      useCTF: market.useCTF,
+      conditionId: market.conditionId,
+      passPositionId: market.passPositionId ? Number(market.passPositionId) : null,
+      failPositionId: market.failPositionId ? Number(market.failPositionId) : null
+    })
+  }
+
+  logger.debug(`Batched fetch returned ${markets.length} valid markets`)
+  return markets
+}
+
+/**
+ * Fetch multiple markets by their IDs
+ * Uses batched Multicall3 for core data, lazy loading for metadata
+ *
+ * @param {number[]} marketIds - Array of market IDs to fetch
+ * @param {Object} options - Options
+ * @param {boolean} options.filterFriendMarkets - Filter out friend markets (default: true)
+ * @param {boolean} options.useBatching - Use Multicall3 batching (default: true)
+ * @returns {Promise<Array>} Array of market objects
+ */
+export async function fetchMarketsByIds(marketIds, { filterFriendMarkets = true, useBatching = true } = {}) {
+  try {
+    if (!marketIds || marketIds.length === 0) {
+      return []
+    }
+
+    const contract = getContract('marketFactory')
+
+    // Try batched approach first for better performance
+    if (useBatching) {
+      try {
+        const markets = await fetchMarketsByIdsBatched(marketIds, contract)
+
+        // Filter out null results and friend markets
+        let filtered = markets.filter(market => market !== null)
+        if (filterFriendMarkets) {
+          filtered = filtered.filter(market => !isMarketPrivateOrFriend(market))
+        }
+
+        // Enrich with correlation data
+        return await enrichMarketsWithCorrelationData(filtered)
+      } catch (batchError) {
+        logger.debug('Batch fetch failed, falling back to individual fetches:', batchError.message)
+        // Fall through to individual fetch
+      }
+    }
+
+    // Fallback: Fetch markets individually (original approach)
+    const marketPromises = marketIds.map(id => fetchSingleMarket(contract, id))
+    const results = await Promise.all(marketPromises)
+
+    // Filter out null results (invalid markets)
+    let markets = results.filter(market => market !== null)
+
+    // Optionally filter out friend markets
+    if (filterFriendMarkets) {
+      markets = markets.filter(market => !isMarketPrivateOrFriend(market))
+    }
+
+    // Enrich with correlation data
+    return await enrichMarketsWithCorrelationData(markets)
+  } catch (error) {
+    console.error('Error fetching markets by IDs:', error)
+    throw error
+  }
+}
+
+/**
+ * Fetch a page of active markets using pagination
+ * Returns market IDs in reverse order (newest first) when no index is available
+ *
+ * @param {Object} options - Pagination options
+ * @param {number} options.offset - Starting offset (default: 0)
+ * @param {number} options.limit - Number of markets to fetch (default: 20)
+ * @returns {Promise<Object>} { markets: Array, hasMore: boolean, total: number }
+ */
+export async function fetchActiveMarketsPaginated({ offset = 0, limit = 20 } = {}) {
+  try {
+    const contract = getContract('marketFactory')
+    const marketCount = await contract.marketCount()
+    const total = Number(marketCount)
+
+    if (total === 0) {
+      return { markets: [], hasMore: false, total: 0 }
+    }
+
+    // Generate market IDs in reverse order (newest first)
+    const startId = Math.max(0, total - 1 - offset)
+    const endId = Math.max(0, startId - limit + 1)
+
+    const marketIds = []
+    for (let id = startId; id >= endId; id--) {
+      marketIds.push(id)
+    }
+
+    // Fetch the markets
+    const markets = await fetchMarketsByIds(marketIds)
+
+    // Filter for active markets only
+    const activeMarkets = markets.filter(m => m.status === 'active')
+
+    // Note: hasMore is approximate since we don't know how many are active
+    const hasMore = endId > 0
+
+    return { markets: activeMarkets, hasMore, total }
+  } catch (error) {
+    console.error('Error fetching paginated markets:', error)
+    throw error
+  }
+}
+
+/**
+ * Get total market count from the contract
+ * @returns {Promise<number>} Total number of markets
+ */
+export async function getMarketCount() {
+  const contract = getContract('marketFactory')
+  const count = await contract.marketCount()
+  return Number(count)
 }
 
 /**
@@ -957,32 +1259,25 @@ export async function fetchFriendMarketsForUser(userAddress) {
 
           // Check if description contains encrypted metadata
           // Supports:
-          // 1. IPFS reference: "encrypted:ipfs://..." (new, preferred)
+          // 1. IPFS reference: "encrypted:ipfs://..." (new, preferred) - lazy loaded
           // 2. Inline JSON envelope (legacy, for backwards compatibility)
           let description = marketResult.description
           let metadata = null
           let isEncryptedMarket = false
           let ipfsCid = null
+          let needsIpfsFetch = false
 
           // First check for IPFS reference (new format)
+          // NOTE: We do NOT fetch the envelope here to avoid rate limiting on page load.
+          // The envelope will be fetched lazily when the user views the market.
           const ipfsRef = parseEncryptedIpfsReference(description)
           if (ipfsRef.isIpfs && ipfsRef.cid) {
-            // Preserve the CID even if fetch fails - allows UI retry logic
+            // Store the CID for lazy loading - the useLazyIpfsEnvelope hook will fetch it
             ipfsCid = ipfsRef.cid
             isEncryptedMarket = true
-            try {
-              // Fetch encrypted envelope from IPFS
-              console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, fetching CID: ${ipfsRef.cid}`)
-              const envelope = await fetchEncryptedEnvelope(ipfsRef.cid)
-              metadata = envelope
-              description = 'Encrypted Market' // Placeholder until decrypted
-              console.log(`[fetchFriendMarketsForUser] Market ${marketId} envelope fetched from IPFS, algorithm: ${envelope.algorithm}`)
-            } catch (ipfsError) {
-              console.error(`[fetchFriendMarketsForUser] Failed to fetch IPFS envelope for market ${marketId}:`, ipfsError)
-              // Keep the IPFS reference as description so user knows it's encrypted but unavailable
-              // Note: ipfsCid is preserved from before the try block to allow UI retry logic
-              description = 'Encrypted Market (IPFS fetch failed)'
-            }
+            needsIpfsFetch = true
+            description = 'Encrypted Market' // Placeholder until envelope is fetched and decrypted
+            console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, CID: ${ipfsRef.cid} (lazy load)`)
           } else {
             // Fallback: check for inline JSON envelope (legacy format)
             try {
@@ -1015,6 +1310,7 @@ export async function fetchFriendMarketsForUser(userAddress) {
             metadata: metadata,
             isEncrypted: isEncryptedMarket,
             ipfsCid: ipfsCid, // CID for IPFS-stored encrypted envelopes
+            needsIpfsFetch: needsIpfsFetch, // True if envelope needs to be fetched from IPFS
             creator: marketResult.creator,
             participants: members,
             arbitrator: hasArbitrator ? arbitrator : null,
@@ -2399,6 +2695,260 @@ export async function fetchMarketsInCorrelationGroup(groupId) {
   } catch (error) {
     console.error('Error fetching markets in correlation group:', error)
     return []
+  }
+}
+
+// ============================================================================
+// MULTICALL3 BATCHED FETCHING
+// ============================================================================
+
+/**
+ * Get Multicall3 contract instance for batching RPC calls
+ * @returns {ethers.Contract} Multicall3 contract
+ */
+function getMulticall3Contract() {
+  const provider = new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+  return new ethers.Contract(ETCSWAP_ADDRESSES.MULTICALL_V3, MULTICALL3_ABI, provider)
+}
+
+/**
+ * Batch fetch market categories from the correlation registry
+ * Uses Multicall3 to minimize RPC calls
+ *
+ * @param {number[]} marketIds - Array of market IDs to fetch categories for
+ * @returns {Promise<Map<number, string>>} Map of marketId → category
+ */
+export async function batchFetchMarketCategories(marketIds) {
+  if (!marketIds || marketIds.length === 0) {
+    return new Map()
+  }
+
+  const registryAddress = getContractAddress('marketCorrelationRegistry')
+  if (!registryAddress || registryAddress === ethers.ZeroAddress) {
+    logger.debug('Correlation registry not deployed, returning empty category map')
+    return new Map()
+  }
+
+  try {
+    const multicall = getMulticall3Contract()
+    const registry = getContract('marketCorrelationRegistry')
+
+    // Step 1: Batch check if markets are in groups and get their group IDs
+    const groupIdCalls = marketIds.map(id => ({
+      target: registryAddress,
+      allowFailure: true,
+      callData: registry.interface.encodeFunctionData('getMarketGroup', [id])
+    }))
+
+    logger.debug(`Batching ${groupIdCalls.length} getMarketGroup calls`)
+    const groupIdResults = await multicall.aggregate3(groupIdCalls)
+
+    // Decode group IDs, handling failures
+    const marketGroupMap = new Map() // marketId → groupId
+    const uniqueGroupIds = new Set()
+
+    for (let i = 0; i < marketIds.length; i++) {
+      const result = groupIdResults[i]
+      if (result.success && result.returnData !== '0x') {
+        try {
+          const decoded = registry.interface.decodeFunctionResult('getMarketGroup', result.returnData)
+          const groupId = Number(decoded[0])
+          // Group ID 0 means not in a group
+          if (groupId > 0) {
+            marketGroupMap.set(marketIds[i], groupId)
+            uniqueGroupIds.add(groupId)
+          }
+        } catch {
+          // Decode failed, market not in group
+        }
+      }
+    }
+
+    logger.debug(`Found ${uniqueGroupIds.size} unique groups for ${marketIds.length} markets`)
+
+    // Step 2: Batch fetch categories for unique group IDs
+    const groupIdArray = Array.from(uniqueGroupIds)
+    const groupCategoryMap = new Map() // groupId → category
+
+    if (groupIdArray.length > 0) {
+      const categoryCalls = groupIdArray.map(groupId => ({
+        target: registryAddress,
+        allowFailure: true,
+        callData: registry.interface.encodeFunctionData('groupCategory', [groupId])
+      }))
+
+      logger.debug(`Batching ${categoryCalls.length} groupCategory calls`)
+      const categoryResults = await multicall.aggregate3(categoryCalls)
+
+      for (let i = 0; i < groupIdArray.length; i++) {
+        const result = categoryResults[i]
+        if (result.success && result.returnData !== '0x') {
+          try {
+            const decoded = registry.interface.decodeFunctionResult('groupCategory', result.returnData)
+            const category = decoded[0]
+            if (category) {
+              groupCategoryMap.set(groupIdArray[i], category.toLowerCase())
+            }
+          } catch {
+            // Decode failed
+          }
+        }
+      }
+    }
+
+    // Step 3: Build final marketId → category map
+    const categoryMap = new Map()
+    for (const [marketId, groupId] of marketGroupMap.entries()) {
+      const category = groupCategoryMap.get(groupId) || 'other'
+      categoryMap.set(marketId, category)
+    }
+
+    // Markets not in any group get 'other'
+    for (const marketId of marketIds) {
+      if (!categoryMap.has(marketId)) {
+        categoryMap.set(marketId, 'other')
+      }
+    }
+
+    logger.debug(`Built category map for ${categoryMap.size} markets`)
+    return categoryMap
+  } catch (error) {
+    logger.debug('Failed to batch fetch market categories:', error.message)
+    // Return empty map, caller should fall back to individual fetches
+    return new Map()
+  }
+}
+
+/**
+ * Batch fetch market statuses using Multicall3
+ *
+ * @param {number[]} marketIds - Array of market IDs
+ * @returns {Promise<Map<number, number>>} Map of marketId → status
+ */
+export async function batchFetchMarketStatuses(marketIds) {
+  if (!marketIds || marketIds.length === 0) {
+    return new Map()
+  }
+
+  try {
+    const multicall = getMulticall3Contract()
+    const factoryAddress = getContractAddress('marketFactory')
+    const factory = getContract('marketFactory')
+
+    const statusCalls = marketIds.map(id => ({
+      target: factoryAddress,
+      allowFailure: true,
+      callData: factory.interface.encodeFunctionData('markets', [id])
+    }))
+
+    logger.debug(`Batching ${statusCalls.length} market status calls`)
+    const results = await multicall.aggregate3(statusCalls)
+
+    const statusMap = new Map()
+    for (let i = 0; i < marketIds.length; i++) {
+      const result = results[i]
+      if (result.success && result.returnData !== '0x') {
+        try {
+          const decoded = factory.interface.decodeFunctionResult('markets', result.returnData)
+          // Market struct has status as one of its fields
+          // The exact position depends on the struct definition
+          const status = Number(decoded.status || decoded[5] || 0)
+          statusMap.set(marketIds[i], status)
+        } catch {
+          statusMap.set(marketIds[i], 0)
+        }
+      } else {
+        statusMap.set(marketIds[i], 0)
+      }
+    }
+
+    return statusMap
+  } catch (error) {
+    logger.debug('Failed to batch fetch market statuses:', error.message)
+    return new Map()
+  }
+}
+
+/**
+ * Batch fetch core market data using Multicall3
+ * Fetches market structs and prices in 2 batched calls instead of 2N individual calls
+ *
+ * @param {number[]} marketIds - Array of market IDs
+ * @returns {Promise<Map<number, Object>>} Map of marketId → { market, prices }
+ */
+export async function batchFetchMarketCoreData(marketIds) {
+  if (!marketIds || marketIds.length === 0) {
+    return new Map()
+  }
+
+  try {
+    const multicall = getMulticall3Contract()
+    const factoryAddress = getContractAddress('marketFactory')
+    const factory = getContract('marketFactory')
+
+    // Build calls for both markets() and getPrices() for all IDs
+    const marketCalls = marketIds.map(id => ({
+      target: factoryAddress,
+      allowFailure: true,
+      callData: factory.interface.encodeFunctionData('markets', [id])
+    }))
+
+    const priceCalls = marketIds.map(id => ({
+      target: factoryAddress,
+      allowFailure: true,
+      callData: factory.interface.encodeFunctionData('getPrices', [id])
+    }))
+
+    // Execute both batches in parallel
+    logger.debug(`Batching ${marketIds.length} markets() and ${marketIds.length} getPrices() calls`)
+    const [marketResults, priceResults] = await Promise.all([
+      multicall.aggregate3(marketCalls),
+      multicall.aggregate3(priceCalls)
+    ])
+
+    const dataMap = new Map()
+
+    for (let i = 0; i < marketIds.length; i++) {
+      const marketId = marketIds[i]
+      const marketResult = marketResults[i]
+      const priceResult = priceResults[i]
+
+      let market = null
+      let prices = { passPrice: '0.5', failPrice: '0.5' }
+
+      // Decode market struct
+      if (marketResult.success && marketResult.returnData !== '0x') {
+        try {
+          const decoded = factory.interface.decodeFunctionResult('markets', marketResult.returnData)
+          market = decoded[0] || decoded
+        } catch (e) {
+          logger.debug(`Failed to decode market ${marketId}:`, e.message)
+        }
+      }
+
+      // Decode prices
+      if (priceResult.success && priceResult.returnData !== '0x') {
+        try {
+          const decoded = factory.interface.decodeFunctionResult('getPrices', priceResult.returnData)
+          prices = {
+            passPrice: ethers.formatEther(decoded[0]),
+            failPrice: ethers.formatEther(decoded[1])
+          }
+        } catch (e) {
+          logger.debug(`Failed to decode prices for market ${marketId}:`, e.message)
+        }
+      }
+
+      if (market) {
+        dataMap.set(marketId, { market, prices })
+      }
+    }
+
+    logger.debug(`Batch fetched core data for ${dataMap.size}/${marketIds.length} markets`)
+    return dataMap
+  } catch (error) {
+    logger.debug('Failed to batch fetch market core data:', error.message)
+    return new Map()
   }
 }
 

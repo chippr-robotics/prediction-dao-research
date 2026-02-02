@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
-import { useWallet, useWeb3 } from '../../hooks'
+import { useWallet, useWeb3, useLazyIpfsEnvelope } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
@@ -116,17 +116,32 @@ function FriendMarketsModal({
     createEncrypted
   } = useEncryption()
 
+  // Lazy load IPFS envelopes - only fetches when user views a market
+  // This prevents hitting rate limits on page load
+  const {
+    markets: activeMarketsWithEnvelopes,
+    fetchEnvelope: fetchActiveEnvelope,
+    isMarketFetching: isActiveEnvelopeFetching,
+    needsFetch: activeNeedsFetch
+  } = useLazyIpfsEnvelope(activeMarkets)
+  const {
+    markets: pastMarketsWithEnvelopes,
+    fetchEnvelope: fetchPastEnvelope,
+    isMarketFetching: isPastEnvelopeFetching,
+    needsFetch: pastNeedsFetch
+  } = useLazyIpfsEnvelope(pastMarkets)
+
   // Lazy decrypt markets for display - only decrypts when user clicks on a market
   const {
     markets: lazyActiveMarkets,
     decryptMarket: decryptActiveMarket,
     isMarketDecrypting: isActiveMarketDecrypting
-  } = useLazyMarketDecryption(activeMarkets)
+  } = useLazyMarketDecryption(activeMarketsWithEnvelopes)
   const {
     markets: lazyPastMarkets,
     decryptMarket: decryptPastMarket,
     isMarketDecrypting: isPastMarketDecrypting
-  } = useLazyMarketDecryption(pastMarkets)
+  } = useLazyMarketDecryption(pastMarketsWithEnvelopes)
 
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
@@ -842,9 +857,18 @@ function FriendMarketsModal({
     setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
   }
 
-  const handleMarketSelect = (market) => {
+  const handleMarketSelect = (market, isActiveMarket = true) => {
     // Just select the market - decryption happens when user clicks "Click to decrypt"
     setSelectedMarket(market)
+
+    // If this market needs its IPFS envelope fetched, trigger the fetch
+    if (market.needsIpfsFetch && market.ipfsCid) {
+      if (isActiveMarket) {
+        fetchActiveEnvelope(market.id)
+      } else {
+        fetchPastEnvelope(market.id)
+      }
+    }
   }
 
   const handleBackToList = () => {
@@ -2031,7 +2055,7 @@ function FriendMarketsModal({
                     <div className="fm-markets-list">
                       <MarketsCompactTable
                         markets={userPastMarkets}
-                        onSelect={handleMarketSelect}
+                        onSelect={(market) => handleMarketSelect(market, false)}
                         formatDate={formatDate}
                         formatAddress={formatAddress}
                         getTypeLabel={getTypeLabel}

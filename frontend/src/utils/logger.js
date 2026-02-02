@@ -64,7 +64,17 @@ const logger = {
     if (isDev) {
       console.groupEnd()
     }
+  },
+
+  /**
+   * Debug logs (dev mode only) - alias for log with "debug" semantics
+   */
+  debug: (...args) => {
+    if (isDev) {
+      console.debug(...args)
+    }
   }
 }
 
+export { logger }
 export default logger
