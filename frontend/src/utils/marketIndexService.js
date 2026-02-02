@@ -10,6 +10,10 @@ import { ethers } from 'ethers'
 import { getContractAddress, NETWORK_CONFIG } from '../config/contracts'
 import { MARKET_FACTORY_ABI, MarketStatus } from '../abis/ConditionalMarketFactory'
 import { logger } from './logger'
+import { batchFetchMarketCategories } from './blockchainService'
+
+// Valid category names
+const VALID_CATEGORIES = ['sports', 'politics', 'finance', 'tech', 'crypto', 'pop-culture', 'weather', 'other']
 
 // Cache configuration
 const INDEX_CACHE_KEY = 'market_trending_index'
@@ -279,14 +283,45 @@ export async function buildTrendingIndex({ daysBack = 7, onProgress } = {}) {
         return b - a
       })
 
-    // Build the index data
+    if (onProgress) onProgress(96)
+    indexBuildProgress = 96
+
+    // NEW: Build category index using batched multicall
+    logger.debug(`Building category index for ${trendingMarketIds.length} active markets`)
+    const categoryMap = await batchFetchMarketCategories(trendingMarketIds)
+
+    // Build category → marketIds mapping, sorted by activity within each category
+    const categoryIndex = {}
+    for (const cat of VALID_CATEGORIES) {
+      categoryIndex[cat] = []
+    }
+
+    for (const marketId of trendingMarketIds) {
+      const category = categoryMap.get(marketId) || 'other'
+      const normalizedCat = VALID_CATEGORIES.includes(category) ? category : 'other'
+      categoryIndex[normalizedCat].push(marketId)
+    }
+
+    // Log category distribution
+    const categoryStats = Object.entries(categoryIndex)
+      .filter(([, ids]) => ids.length > 0)
+      .map(([cat, ids]) => `${cat}: ${ids.length}`)
+    logger.debug(`Category distribution: ${categoryStats.join(', ')}`)
+
+    if (onProgress) onProgress(98)
+    indexBuildProgress = 98
+
+    // Build the index data with category index
     indexData = {
       trendingMarketIds,
       interactionCounts: Object.fromEntries(interactionCounts),
       lastActivity: Object.fromEntries(lastActivity),
       totalMarkets,
       builtAt: Date.now(),
-      blockRange: { from: fromBlock, to: currentBlock }
+      blockRange: { from: fromBlock, to: currentBlock },
+      // NEW: Category index
+      categoryIndex,
+      marketCategories: Object.fromEntries(categoryMap)
     }
 
     // Cache the result
@@ -295,7 +330,7 @@ export async function buildTrendingIndex({ daysBack = 7, onProgress } = {}) {
     if (onProgress) onProgress(100)
     indexBuildProgress = 100
 
-    logger.debug(`Built trending index with ${trendingMarketIds.length} active markets`)
+    logger.debug(`Built trending index with ${trendingMarketIds.length} active markets and category index`)
 
     return indexData
   } catch (error) {
@@ -395,20 +430,64 @@ export async function getTrendingMarketIds({ offset = 0, limit = 20, requireInde
 }
 
 /**
- * Get market IDs for a specific category
- * Requires full market data to filter by category
+ * Get market IDs for a specific category from the category index
+ * Uses pre-built category index for fast lookups
+ *
+ * @param {string} category - Category to filter by (e.g., 'sports', 'politics')
+ * @param {Object} options - Pagination options
+ * @param {number} options.offset - Starting offset (default: 0)
+ * @param {number} options.limit - Number of markets to return (default: 20)
+ * @returns {Object} { marketIds: number[], hasMore: boolean, fromIndex: boolean }
+ */
+export function getCategoryMarketIds(category, { offset = 0, limit = 20 } = {}) {
+  // Check if category index is available
+  if (!indexData?.categoryIndex) {
+    logger.debug('Category index not available yet')
+    return { marketIds: [], hasMore: false, fromIndex: false }
+  }
+
+  const normalizedCategory = category?.toLowerCase() || 'other'
+  const categoryIds = indexData.categoryIndex[normalizedCategory] || []
+
+  if (categoryIds.length === 0) {
+    logger.debug(`No markets found for category: ${normalizedCategory}`)
+    return { marketIds: [], hasMore: false, fromIndex: true }
+  }
+
+  const marketIds = categoryIds.slice(offset, offset + limit)
+  const hasMore = offset + limit < categoryIds.length
+
+  logger.debug(`getCategoryMarketIds(${normalizedCategory}): returning ${marketIds.length} of ${categoryIds.length} markets`)
+
+  return { marketIds, hasMore, fromIndex: true }
+}
+
+/**
+ * Check if category index is ready
+ * @returns {boolean} True if category index has been built
+ */
+export function isCategoryIndexReady() {
+  return indexData?.categoryIndex !== null && indexData?.categoryIndex !== undefined
+}
+
+/**
+ * Get market IDs for a specific category (async version with fallback)
+ * Falls back to trending order if category index not ready
  *
  * @param {string} category - Category to filter by
  * @param {number} offset - Starting offset
  * @param {number} limit - Number of markets to return
- * @returns {Promise<Object>} { marketIds: number[], hasMore: boolean }
+ * @returns {Promise<Object>} { marketIds: number[], hasMore: boolean, fromIndex: boolean }
  */
 export async function getMarketIdsByCategory(category, { offset = 0, limit = 20 } = {}) {
-  // Categories require metadata which we don't have in the index
-  // This function exists for API compatibility - actual filtering
-  // happens in the component layer after fetching market data
+  // Try to use category index first
+  const result = getCategoryMarketIds(category, { offset, limit })
+  if (result.fromIndex) {
+    return result
+  }
 
-  // Return trending order - let the component layer filter by category
+  // Fallback: return trending order - let the component layer filter by category
+  logger.debug('Category index not ready, falling back to trending order')
   return getTrendingMarketIds({ offset, limit })
 }
 

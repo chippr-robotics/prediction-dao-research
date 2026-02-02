@@ -22,6 +22,8 @@ import {
 import {
   buildIndexInBackground,
   getTrendingMarketIds,
+  getCategoryMarketIds,
+  isCategoryIndexReady,
   isIndexReady,
   isIndexBuilding,
   getIndexBuildProgress,
@@ -82,10 +84,12 @@ export function useInfiniteMarkets({
   const [indexReady, setIndexReady] = useState(isIndexReady())
   const [indexProgress, setIndexProgress] = useState(getIndexBuildProgress())
 
-  // Refs
+  // Refs - use refs for guards to avoid dependency loops
   const offsetRef = useRef(0)
   const loadedIdsRef = useRef(new Set())
   const initialLoadDone = useRef(false)
+  const isLoadingRef = useRef(false)
+  const isLoadingMoreRef = useRef(false)
 
   /**
    * Load initial page of markets
@@ -93,7 +97,9 @@ export function useInfiniteMarkets({
    * For category views, fetches additional pages until we have enough markets
    */
   const loadInitialPage = useCallback(async () => {
-    if (isLoading) return
+    // Use ref to check loading to avoid dependency on state
+    if (isLoadingRef.current) return
+    isLoadingRef.current = true
 
     setIsLoading(true)
     setError(null)
@@ -113,6 +119,32 @@ export function useInfiniteMarkets({
       }
 
       const needsCategoryFill = isFilteringByCategory(category)
+
+      // OPTIMIZATION: Use category index when available for category views
+      if (needsCategoryFill && isCategoryIndexReady()) {
+        logger.debug(`Using category index for ${category}`)
+        const { marketIds, hasMore: more, fromIndex } = getCategoryMarketIds(category, {
+          offset: 0,
+          limit: pageSize
+        })
+
+        if (fromIndex && marketIds.length > 0) {
+          // Category index available - fetch only needed markets
+          const fetchedMarkets = await fetchMarketsByIds(marketIds)
+          fetchedMarkets.forEach(m => loadedIdsRef.current.add(m.id))
+
+          setMarkets(fetchedMarkets)
+          setHasMore(more)
+          offsetRef.current = pageSize
+
+          initialLoadDone.current = true
+          setIsLoading(false)
+          isLoadingRef.current = false
+          return
+        }
+      }
+
+      // Fallback: fetch all and filter client-side (when index not ready)
       let allFiltered = []
       let currentOffset = 0
       let hasMorePages = true
@@ -181,17 +213,19 @@ export function useInfiniteMarkets({
       logger.debug('Failed to load initial markets:', err)
       setError(err.message || 'Failed to load markets')
     } finally {
+      isLoadingRef.current = false
       setIsLoading(false)
     }
-  }, [demoMode, category, pageSize, isLoading])
+  }, [demoMode, category, pageSize])
 
   /**
    * Load more markets (infinite scroll)
    * For category views, fetches additional pages until we have enough new markets
    */
   const loadMore = useCallback(async () => {
-    if (isLoadingMore || !hasMore || isLoading) return
-
+    // Use refs to check loading to avoid dependency on state
+    if (isLoadingMoreRef.current || !hasMore || isLoadingRef.current) return
+    isLoadingMoreRef.current = true
     setIsLoadingMore(true)
 
     try {
@@ -208,6 +242,31 @@ export function useInfiniteMarkets({
       }
 
       const needsCategoryFill = isFilteringByCategory(category)
+
+      // OPTIMIZATION: Use category index when available for category views
+      if (needsCategoryFill && isCategoryIndexReady()) {
+        logger.debug(`Using category index for loadMore: ${category}`)
+        const { marketIds, hasMore: more, fromIndex } = getCategoryMarketIds(category, {
+          offset: offsetRef.current,
+          limit: pageSize
+        })
+
+        if (fromIndex) {
+          if (marketIds.length > 0) {
+            const fetchedMarkets = await fetchMarketsByIds(marketIds)
+            fetchedMarkets.forEach(m => loadedIdsRef.current.add(m.id))
+            setMarkets(prev => [...prev, ...fetchedMarkets])
+          }
+          offsetRef.current += pageSize
+          setHasMore(more)
+
+          isLoadingMoreRef.current = false
+          setIsLoadingMore(false)
+          return
+        }
+      }
+
+      // Fallback: fetch all and filter client-side
       let newFiltered = []
       let currentOffset = offsetRef.current
       let hasMorePages = true
@@ -262,9 +321,10 @@ export function useInfiniteMarkets({
       logger.debug('Failed to load more markets:', err)
       setError(err.message || 'Failed to load more markets')
     } finally {
+      isLoadingMoreRef.current = false
       setIsLoadingMore(false)
     }
-  }, [demoMode, category, pageSize, hasMore, isLoading, isLoadingMore])
+  }, [demoMode, category, pageSize, hasMore])
 
   /**
    * Refresh markets (force reload)
@@ -309,12 +369,29 @@ export function useInfiniteMarkets({
     }
   }, [indexReady, markets.length])
 
-  // Initial load effect
+  // Track previous category to detect changes
+  const prevCategoryRef = useRef(category)
+
+  // Combined load effect - handles both initial load and category changes
   useEffect(() => {
-    if (autoLoad && !initialLoadDone.current) {
+    const categoryChanged = prevCategoryRef.current !== category
+    prevCategoryRef.current = category
+
+    if (!autoLoad) return
+
+    // Load on category change or initial mount
+    if (categoryChanged || !initialLoadDone.current) {
+      // Reset state for new category
+      if (categoryChanged) {
+        initialLoadDone.current = false
+        loadedIdsRef.current = new Set()
+        offsetRef.current = 0
+        setMarkets([])
+        setHasMore(true)
+      }
       loadInitialPage()
     }
-  }, [autoLoad, loadInitialPage])
+  }, [autoLoad, category, loadInitialPage])
 
   // Subscribe to index ready events
   useEffect(() => {
@@ -331,15 +408,6 @@ export function useInfiniteMarkets({
       resortByTrending()
     }
   }, [indexReady, resortByTrending])
-
-  // Re-load when category changes
-  useEffect(() => {
-    if (initialLoadDone.current) {
-      // Reset and reload with new category
-      initialLoadDone.current = false
-      loadInitialPage()
-    }
-  }, [category, loadInitialPage])
 
   // Memoize return value
   return useMemo(() => ({

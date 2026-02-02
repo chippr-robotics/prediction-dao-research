@@ -15,10 +15,12 @@ import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
+import { MULTICALL3_ABI } from '../abis/Multicall3'
 import {
   parseEncryptedIpfsReference,
   fetchEncryptedEnvelope
 } from './ipfsService'
+import { logger } from './logger'
 
 // Constants for friend market detection
 const FRIEND_MARKET_PROPOSAL_MIN = 1_000_000
@@ -291,8 +293,11 @@ function extractCategory(metadata) {
   return 'other'
 }
 
+// Cache for token decimals to avoid repeated RPC calls
+const tokenDecimalsCache = new Map()
+
 /**
- * Get token decimals for a collateral token
+ * Get token decimals for a collateral token (cached)
  * @param {string} tokenAddress - Token contract address
  * @returns {Promise<number>} Number of decimals (defaults to 18)
  */
@@ -301,12 +306,23 @@ async function getTokenDecimals(tokenAddress) {
     if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
       return 18
     }
+
+    // Check cache first
+    const normalizedAddress = tokenAddress.toLowerCase()
+    if (tokenDecimalsCache.has(normalizedAddress)) {
+      return tokenDecimalsCache.get(normalizedAddress)
+    }
+
     const provider = getProvider()
     const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider)
     const decimals = await tokenContract.decimals()
-    return Number(decimals)
+    const result = Number(decimals)
+
+    // Cache the result
+    tokenDecimalsCache.set(normalizedAddress, result)
+    return result
   } catch (error) {
-    console.debug(`Could not get decimals for token ${tokenAddress}:`, error.message)
+    logger.debug(`Could not get decimals for token ${tokenAddress}:`, error.message)
     return 18 // Default to 18 decimals
   }
 }
@@ -2523,6 +2539,260 @@ export async function fetchMarketsInCorrelationGroup(groupId) {
   } catch (error) {
     console.error('Error fetching markets in correlation group:', error)
     return []
+  }
+}
+
+// ============================================================================
+// MULTICALL3 BATCHED FETCHING
+// ============================================================================
+
+/**
+ * Get Multicall3 contract instance for batching RPC calls
+ * @returns {ethers.Contract} Multicall3 contract
+ */
+function getMulticall3Contract() {
+  const provider = new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+  return new ethers.Contract(ETCSWAP_ADDRESSES.MULTICALL_V3, MULTICALL3_ABI, provider)
+}
+
+/**
+ * Batch fetch market categories from the correlation registry
+ * Uses Multicall3 to minimize RPC calls
+ *
+ * @param {number[]} marketIds - Array of market IDs to fetch categories for
+ * @returns {Promise<Map<number, string>>} Map of marketId → category
+ */
+export async function batchFetchMarketCategories(marketIds) {
+  if (!marketIds || marketIds.length === 0) {
+    return new Map()
+  }
+
+  const registryAddress = getContractAddress('marketCorrelationRegistry')
+  if (!registryAddress || registryAddress === ethers.ZeroAddress) {
+    logger.debug('Correlation registry not deployed, returning empty category map')
+    return new Map()
+  }
+
+  try {
+    const multicall = getMulticall3Contract()
+    const registry = getContract('marketCorrelationRegistry')
+
+    // Step 1: Batch check if markets are in groups and get their group IDs
+    const groupIdCalls = marketIds.map(id => ({
+      target: registryAddress,
+      allowFailure: true,
+      callData: registry.interface.encodeFunctionData('getMarketGroup', [id])
+    }))
+
+    logger.debug(`Batching ${groupIdCalls.length} getMarketGroup calls`)
+    const groupIdResults = await multicall.aggregate3(groupIdCalls)
+
+    // Decode group IDs, handling failures
+    const marketGroupMap = new Map() // marketId → groupId
+    const uniqueGroupIds = new Set()
+
+    for (let i = 0; i < marketIds.length; i++) {
+      const result = groupIdResults[i]
+      if (result.success && result.returnData !== '0x') {
+        try {
+          const decoded = registry.interface.decodeFunctionResult('getMarketGroup', result.returnData)
+          const groupId = Number(decoded[0])
+          // Group ID 0 means not in a group
+          if (groupId > 0) {
+            marketGroupMap.set(marketIds[i], groupId)
+            uniqueGroupIds.add(groupId)
+          }
+        } catch {
+          // Decode failed, market not in group
+        }
+      }
+    }
+
+    logger.debug(`Found ${uniqueGroupIds.size} unique groups for ${marketIds.length} markets`)
+
+    // Step 2: Batch fetch categories for unique group IDs
+    const groupIdArray = Array.from(uniqueGroupIds)
+    const groupCategoryMap = new Map() // groupId → category
+
+    if (groupIdArray.length > 0) {
+      const categoryCalls = groupIdArray.map(groupId => ({
+        target: registryAddress,
+        allowFailure: true,
+        callData: registry.interface.encodeFunctionData('groupCategory', [groupId])
+      }))
+
+      logger.debug(`Batching ${categoryCalls.length} groupCategory calls`)
+      const categoryResults = await multicall.aggregate3(categoryCalls)
+
+      for (let i = 0; i < groupIdArray.length; i++) {
+        const result = categoryResults[i]
+        if (result.success && result.returnData !== '0x') {
+          try {
+            const decoded = registry.interface.decodeFunctionResult('groupCategory', result.returnData)
+            const category = decoded[0]
+            if (category) {
+              groupCategoryMap.set(groupIdArray[i], category.toLowerCase())
+            }
+          } catch {
+            // Decode failed
+          }
+        }
+      }
+    }
+
+    // Step 3: Build final marketId → category map
+    const categoryMap = new Map()
+    for (const [marketId, groupId] of marketGroupMap.entries()) {
+      const category = groupCategoryMap.get(groupId) || 'other'
+      categoryMap.set(marketId, category)
+    }
+
+    // Markets not in any group get 'other'
+    for (const marketId of marketIds) {
+      if (!categoryMap.has(marketId)) {
+        categoryMap.set(marketId, 'other')
+      }
+    }
+
+    logger.debug(`Built category map for ${categoryMap.size} markets`)
+    return categoryMap
+  } catch (error) {
+    logger.debug('Failed to batch fetch market categories:', error.message)
+    // Return empty map, caller should fall back to individual fetches
+    return new Map()
+  }
+}
+
+/**
+ * Batch fetch market statuses using Multicall3
+ *
+ * @param {number[]} marketIds - Array of market IDs
+ * @returns {Promise<Map<number, number>>} Map of marketId → status
+ */
+export async function batchFetchMarketStatuses(marketIds) {
+  if (!marketIds || marketIds.length === 0) {
+    return new Map()
+  }
+
+  try {
+    const multicall = getMulticall3Contract()
+    const factoryAddress = getContractAddress('marketFactory')
+    const factory = getContract('marketFactory')
+
+    const statusCalls = marketIds.map(id => ({
+      target: factoryAddress,
+      allowFailure: true,
+      callData: factory.interface.encodeFunctionData('markets', [id])
+    }))
+
+    logger.debug(`Batching ${statusCalls.length} market status calls`)
+    const results = await multicall.aggregate3(statusCalls)
+
+    const statusMap = new Map()
+    for (let i = 0; i < marketIds.length; i++) {
+      const result = results[i]
+      if (result.success && result.returnData !== '0x') {
+        try {
+          const decoded = factory.interface.decodeFunctionResult('markets', result.returnData)
+          // Market struct has status as one of its fields
+          // The exact position depends on the struct definition
+          const status = Number(decoded.status || decoded[5] || 0)
+          statusMap.set(marketIds[i], status)
+        } catch {
+          statusMap.set(marketIds[i], 0)
+        }
+      } else {
+        statusMap.set(marketIds[i], 0)
+      }
+    }
+
+    return statusMap
+  } catch (error) {
+    logger.debug('Failed to batch fetch market statuses:', error.message)
+    return new Map()
+  }
+}
+
+/**
+ * Batch fetch core market data using Multicall3
+ * Fetches market structs and prices in 2 batched calls instead of 2N individual calls
+ *
+ * @param {number[]} marketIds - Array of market IDs
+ * @returns {Promise<Map<number, Object>>} Map of marketId → { market, prices }
+ */
+export async function batchFetchMarketCoreData(marketIds) {
+  if (!marketIds || marketIds.length === 0) {
+    return new Map()
+  }
+
+  try {
+    const multicall = getMulticall3Contract()
+    const factoryAddress = getContractAddress('marketFactory')
+    const factory = getContract('marketFactory')
+
+    // Build calls for both markets() and getPrices() for all IDs
+    const marketCalls = marketIds.map(id => ({
+      target: factoryAddress,
+      allowFailure: true,
+      callData: factory.interface.encodeFunctionData('markets', [id])
+    }))
+
+    const priceCalls = marketIds.map(id => ({
+      target: factoryAddress,
+      allowFailure: true,
+      callData: factory.interface.encodeFunctionData('getPrices', [id])
+    }))
+
+    // Execute both batches in parallel
+    logger.debug(`Batching ${marketIds.length} markets() and ${marketIds.length} getPrices() calls`)
+    const [marketResults, priceResults] = await Promise.all([
+      multicall.aggregate3(marketCalls),
+      multicall.aggregate3(priceCalls)
+    ])
+
+    const dataMap = new Map()
+
+    for (let i = 0; i < marketIds.length; i++) {
+      const marketId = marketIds[i]
+      const marketResult = marketResults[i]
+      const priceResult = priceResults[i]
+
+      let market = null
+      let prices = { passPrice: '0.5', failPrice: '0.5' }
+
+      // Decode market struct
+      if (marketResult.success && marketResult.returnData !== '0x') {
+        try {
+          const decoded = factory.interface.decodeFunctionResult('markets', marketResult.returnData)
+          market = decoded[0] || decoded
+        } catch (e) {
+          logger.debug(`Failed to decode market ${marketId}:`, e.message)
+        }
+      }
+
+      // Decode prices
+      if (priceResult.success && priceResult.returnData !== '0x') {
+        try {
+          const decoded = factory.interface.decodeFunctionResult('getPrices', priceResult.returnData)
+          prices = {
+            passPrice: ethers.formatEther(decoded[0]),
+            failPrice: ethers.formatEther(decoded[1])
+          }
+        } catch (e) {
+          logger.debug(`Failed to decode prices for market ${marketId}:`, e.message)
+        }
+      }
+
+      if (market) {
+        dataMap.set(marketId, { market, prices })
+      }
+    }
+
+    logger.debug(`Batch fetched core data for ${dataMap.size}/${marketIds.length} markets`)
+    return dataMap
+  } catch (error) {
+    logger.debug('Failed to batch fetch market core data:', error.message)
+    return new Map()
   }
 }
 

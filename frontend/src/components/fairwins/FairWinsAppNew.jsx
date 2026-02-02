@@ -56,38 +56,41 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [tokens, setTokens] = useState([])
   const [tokenLoading, setTokenLoading] = useState(false)
 
+  // Category definitions - needed before hook calls that depend on them
+  const categories = [
+    { id: 'sports', name: 'Sports', icon: '⚽' },
+    { id: 'politics', name: 'Politics', icon: '🏛️' },
+    { id: 'finance', name: 'Finance', icon: '💰' },
+    { id: 'tech', name: 'Tech', icon: '💻' },
+    { id: 'crypto', name: 'Crypto', icon: '₿' },
+    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
+    { id: 'weather', name: 'Weather', icon: '🌤️' }
+  ]
+
   // Check which view type we're on
   const isTrendingView = selectedCategory === 'trending'
   const isCategoryView = categories.some(c => c.id === selectedCategory)
 
-  // Infinite scroll markets for trending view
+  // Determine effective category for the hook
+  // - Trending view: null (show all categories, sorted by activity)
+  // - Category view: the selected category (e.g., 'sports')
+  // - Other views: null (hook won't auto-load)
+  const effectiveCategory = isTrendingView ? null : (isCategoryView ? selectedCategory : null)
+
+  // Single infinite scroll hook instance - handles both trending and category views
   const {
-    markets: trendingInfiniteMarkets,
-    isLoading: trendingLoading,
-    isLoadingMore: trendingLoadingMore,
-    hasMore: trendingHasMore,
+    markets: infiniteMarkets,
+    isLoading: marketsLoading,
+    isLoadingMore,
+    hasMore,
     isIndexReady,
     indexProgress,
-    loadMore: loadMoreTrending,
-    refresh: refreshTrendingMarkets
+    loadMore,
+    refresh: refreshMarkets
   } = useInfiniteMarkets({
-    category: null, // Trending shows all categories
+    category: effectiveCategory,
     pageSize: 20,
-    autoLoad: isTrendingView
-  })
-
-  // Infinite scroll markets for category views (sports, politics, etc.)
-  const {
-    markets: categoryInfiniteMarkets,
-    isLoading: categoryLoading,
-    isLoadingMore: categoryLoadingMore,
-    hasMore: categoryHasMore,
-    loadMore: loadMoreCategory,
-    refresh: refreshCategoryMarkets
-  } = useInfiniteMarkets({
-    category: isCategoryView ? selectedCategory : null,
-    pageSize: 20,
-    autoLoad: isCategoryView
+    autoLoad: isTrendingView || isCategoryView
   })
 
   // Handle URL query parameters for category
@@ -115,25 +118,13 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       return
     }
 
-    // Use the appropriate loading state
-    if (isTrendingView) {
-      setLoading(trendingLoading)
-    } else if (isCategoryView) {
-      setLoading(categoryLoading)
+    // Use the markets loading state for trending and category views
+    if (isTrendingView || isCategoryView) {
+      setLoading(marketsLoading)
     } else {
       setLoading(false)
     }
-  }, [selectedCategory, isTrendingView, isCategoryView, trendingLoading, categoryLoading])
-
-  const categories = [
-    { id: 'sports', name: 'Sports', icon: '⚽' },
-    { id: 'politics', name: 'Politics', icon: '🏛️' },
-    { id: 'finance', name: 'Finance', icon: '💰' },
-    { id: 'tech', name: 'Tech', icon: '💻' },
-    { id: 'crypto', name: 'Crypto', icon: '₿' },
-    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
-    { id: 'weather', name: 'Weather', icon: '🌤️' }
-  ]
+  }, [selectedCategory, isTrendingView, isCategoryView, marketsLoading])
 
   const handleCategoryChange = (categoryId) => {
     // Handle special navigation categories
@@ -251,13 +242,11 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
       console.log('Transaction receipt:', receipt)
 
-      // Refresh market data based on current view
+      // Refresh market data
       // Note: We don't set loading=true here to keep the modal open during refresh
       try {
-        if (isTrendingView) {
-          await refreshTrendingMarkets()
-        } else if (isCategoryView) {
-          await refreshCategoryMarkets()
+        if (isTrendingView || isCategoryView) {
+          await refreshMarkets()
         }
         // Note: selectedMarket will be updated via the hook's state change
       } catch (refreshError) {
@@ -395,26 +384,14 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     })
   }, [roles, ROLES])
 
-  // Memoize trending markets to avoid recalculation on every render
-  const trendingMarkets = useMemo(() => {
-    return trendingInfiniteMarkets
-  }, [trendingInfiniteMarkets])
+  // Markets from the infinite scroll hook (used for both trending and category views)
+  const displayMarkets = infiniteMarkets
 
-  // Memoize category-filtered markets - now uses infinite scroll data
-  const categoryFilteredMarkets = useMemo(() => {
-    // categoryInfiniteMarkets is already filtered by category
-    return categoryInfiniteMarkets
-  }, [categoryInfiniteMarkets])
+  // For backwards compatibility with existing code that uses categoryFilteredMarkets
+  const categoryFilteredMarkets = displayMarkets
 
-  // Combined markets list for modals (to find correlated markets across views)
-  const allLoadedMarkets = useMemo(() => {
-    const combined = new Map()
-    // Add trending markets
-    trendingInfiniteMarkets.forEach(m => combined.set(m.id, m))
-    // Add category markets (may overlap)
-    categoryInfiniteMarkets.forEach(m => combined.set(m.id, m))
-    return Array.from(combined.values())
-  }, [trendingInfiniteMarkets, categoryInfiniteMarkets])
+  // Combined markets list for modals (same as displayMarkets since we use single hook)
+  const allLoadedMarkets = displayMarkets
 
   // Apply subcategory filtering
   const subcategoryFilteredMarkets = useMemo(() => {
@@ -604,7 +581,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                     <div className="grid-header">
                       <h2>🔥 Trending Markets</h2>
                       <span className="market-count">
-                        ({trendingMarkets.length} markets{trendingHasMore ? '+' : ''})
+                        ({displayMarkets.length} markets{hasMore ? '+' : ''})
                       </span>
                       {/* Index building indicator */}
                       {!isIndexReady && indexProgress > 0 && indexProgress < 100 && (
@@ -625,19 +602,19 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                   </div>
                   {viewMode === VIEW_MODES.GRID ? (
                     <MarketGrid
-                      markets={trendingMarkets}
+                      markets={displayMarkets}
                       onMarketClick={handleMarketClick}
                       selectedMarketId={selectedMarket?.id}
-                      loading={trendingLoading}
-                      onLoadMore={loadMoreTrending}
-                      hasMore={trendingHasMore}
-                      isLoadingMore={trendingLoadingMore}
+                      loading={marketsLoading}
+                      onLoadMore={loadMore}
+                      hasMore={hasMore}
+                      isLoadingMore={isLoadingMore}
                     />
                   ) : (
                     <CompactMarketView
-                      markets={trendingMarkets}
+                      markets={displayMarkets}
                       onMarketClick={handleMarketClick}
-                      loading={trendingLoading}
+                      loading={marketsLoading}
                       selectedCategory={selectedCategory}
                     />
                   )}
@@ -762,16 +739,16 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                       markets={getFilteredAndSortedMarkets()}
                       onMarketClick={handleMarketClick}
                       selectedMarketId={selectedMarket?.id}
-                      loading={categoryLoading}
-                      onLoadMore={loadMoreCategory}
-                      hasMore={categoryHasMore}
-                      isLoadingMore={categoryLoadingMore}
+                      loading={marketsLoading}
+                      onLoadMore={loadMore}
+                      hasMore={hasMore}
+                      isLoadingMore={isLoadingMore}
                     />
                   ) : (
                     <CompactMarketView
                       markets={getFilteredAndSortedMarkets()}
                       onMarketClick={handleMarketClick}
-                      loading={categoryLoading}
+                      loading={marketsLoading}
                       selectedCategory={selectedCategory}
                     />
                   )}
