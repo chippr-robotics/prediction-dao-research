@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useRoles } from '../../hooks/useRoles'
-import { useDataFetcher } from '../../hooks/useDataFetcher'
+import { useInfiniteMarkets } from '../../hooks/useInfiniteMarkets'
 import useFuseSearch from '../../hooks/useFuseSearch'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
@@ -34,13 +34,11 @@ import './FairWinsAppNew.css'
 function FairWinsAppNew({ onConnect, onDisconnect }) {
   const { account, isConnected } = useWeb3()
   const { roles, ROLES } = useRoles()
-  const { getMarkets } = useDataFetcher()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('dashboard')
-  const [markets, setMarkets] = useState([])
   const [selectedMarket, setSelectedMarket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('endTime') // 'endTime', 'marketValue', 'volume24h', 'activity', 'popularity', 'probability', 'category'
@@ -58,6 +56,43 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [tokens, setTokens] = useState([])
   const [tokenLoading, setTokenLoading] = useState(false)
 
+  // Category definitions - needed before hook calls that depend on them
+  const categories = [
+    { id: 'sports', name: 'Sports', icon: '⚽' },
+    { id: 'politics', name: 'Politics', icon: '🏛️' },
+    { id: 'finance', name: 'Finance', icon: '💰' },
+    { id: 'tech', name: 'Tech', icon: '💻' },
+    { id: 'crypto', name: 'Crypto', icon: '₿' },
+    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
+    { id: 'weather', name: 'Weather', icon: '🌤️' }
+  ]
+
+  // Check which view type we're on
+  const isTrendingView = selectedCategory === 'trending'
+  const isCategoryView = categories.some(c => c.id === selectedCategory)
+
+  // Determine effective category for the hook
+  // - Trending view: null (show all categories, sorted by activity)
+  // - Category view: the selected category (e.g., 'sports')
+  // - Other views: null (hook won't auto-load)
+  const effectiveCategory = isTrendingView ? null : (isCategoryView ? selectedCategory : null)
+
+  // Single infinite scroll hook instance - handles both trending and category views
+  const {
+    markets: infiniteMarkets,
+    isLoading: marketsLoading,
+    isLoadingMore,
+    hasMore,
+    isIndexReady,
+    indexProgress,
+    loadMore,
+    refresh: refreshMarkets
+  } = useInfiniteMarkets({
+    category: effectiveCategory,
+    pageSize: 20,
+    autoLoad: isTrendingView || isCategoryView
+  })
+
   // Handle URL query parameters for category
   useEffect(() => {
     let ignore = false
@@ -74,42 +109,22 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     return () => { ignore = true }
   }, [searchParams, selectedCategory])
 
-  // Load markets on mount
+  // Update loading state based on current view
   useEffect(() => {
-    let ignore = false
-
-    const loadMarkets = async () => {
-      try {
-        if (!ignore) {
-          setLoading(true)
-        }
-        const allMarkets = await getMarkets()
-        if (!ignore) {
-          setMarkets(allMarkets)
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error('Error loading markets:', error)
-        if (!ignore) {
-          setLoading(false)
-        }
-      }
+    // Skip loading for special views that don't need markets
+    const skipCategories = ['dashboard', 'swap', 'tokenmint', 'clearpath', 'perpetuals', 'all-table']
+    if (skipCategories.includes(selectedCategory)) {
+      setLoading(false)
+      return
     }
 
-    loadMarkets()
-
-    return () => { ignore = true }
-  }, [getMarkets])
-
-  const categories = [
-    { id: 'sports', name: 'Sports', icon: '⚽' },
-    { id: 'politics', name: 'Politics', icon: '🏛️' },
-    { id: 'finance', name: 'Finance', icon: '💰' },
-    { id: 'tech', name: 'Tech', icon: '💻' },
-    { id: 'crypto', name: 'Crypto', icon: '₿' },
-    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
-    { id: 'weather', name: 'Weather', icon: '🌤️' }
-  ]
+    // Use the markets loading state for trending and category views
+    if (isTrendingView || isCategoryView) {
+      setLoading(marketsLoading)
+    } else {
+      setLoading(false)
+    }
+  }, [selectedCategory, isTrendingView, isCategoryView, marketsLoading])
 
   const handleCategoryChange = (categoryId) => {
     // Handle special navigation categories
@@ -227,19 +242,13 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
       console.log('Transaction receipt:', receipt)
 
-      // Refresh market data and update selectedMarket with fresh data
+      // Refresh market data
       // Note: We don't set loading=true here to keep the modal open during refresh
       try {
-        const allMarkets = await getMarkets()
-        setMarkets(allMarkets)
-
-        // Update selectedMarket with the refreshed data if one is selected
-        if (selectedMarket) {
-          const updatedMarket = allMarkets.find(m => m.id === selectedMarket.id)
-          if (updatedMarket) {
-            setSelectedMarket(updatedMarket)
-          }
+        if (isTrendingView || isCategoryView) {
+          await refreshMarkets()
         }
+        // Note: selectedMarket will be updated via the hook's state change
       } catch (refreshError) {
         console.error('Error refreshing markets:', refreshError)
       }
@@ -295,12 +304,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
   const handleScanMarket = (marketId) => {
     // Navigate directly to market page
-    const market = markets.find(m => m.id === parseInt(marketId))
-    if (market) {
-      navigate(`/market/${marketId}`)
-    } else {
-      alert(`Market with ID ${marketId} not found`)
-    }
+    // Just navigate - market will be loaded on the detail page
+    navigate(`/market/${marketId}`)
   }
 
   // Load user tokens when account changes
@@ -379,21 +384,14 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     })
   }, [roles, ROLES])
 
-  // Memoize trending markets to avoid recalculation on every render
-  const trendingMarkets = useMemo(() => {
-    const getSafeLiquidity = (value) => {
-      const parsed = parseFloat(value)
-      return Number.isNaN(parsed) ? 0 : parsed
-    }
-    return [...markets].sort((a, b) => {
-      return getSafeLiquidity(b.totalLiquidity) - getSafeLiquidity(a.totalLiquidity)
-    })
-  }, [markets])
+  // Markets from the infinite scroll hook (used for both trending and category views)
+  const displayMarkets = infiniteMarkets
 
-  // Memoize category-filtered markets
-  const categoryFilteredMarkets = useMemo(() => {
-    return markets.filter(m => m.category === selectedCategory)
-  }, [markets, selectedCategory])
+  // For backwards compatibility with existing code that uses categoryFilteredMarkets
+  const categoryFilteredMarkets = displayMarkets
+
+  // Combined markets list for modals (same as displayMarkets since we use single hook)
+  const allLoadedMarkets = displayMarkets
 
   // Apply subcategory filtering
   const subcategoryFilteredMarkets = useMemo(() => {
@@ -523,7 +521,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             onClose={handleCloseHero}
             market={selectedMarket}
             correlatedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
-              ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
+              ? allLoadedMarkets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
               : []}
             onOpenMarket={handleOpenIndividualMarket}
           />
@@ -535,7 +533,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             market={selectedMarket}
             onTrade={handleTrade}
             linkedMarkets={selectedMarket?.correlationGroup?.groupId !== undefined
-              ? markets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
+              ? allLoadedMarkets.filter(m => m.correlationGroup?.groupId === selectedMarket.correlationGroup.groupId)
               : []
             }
           />
@@ -565,8 +563,8 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                 />
               ) : selectedCategory === 'all-table' ? (
                 /* All Markets Table View - Power User Screen */
-                <MarketsTable 
-                  markets={markets}
+                <MarketsTable
+                  markets={allLoadedMarkets}
                   onMarketClick={handleMarketClick}
                 />
               ) : selectedCategory === 'swap' ? (
@@ -577,32 +575,46 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                   <BalanceChart />
                 </div>
               ) : selectedCategory === 'trending' ? (
-                /* Trending View - Show all markets sorted by activity */
+                /* Trending View - Show all markets sorted by activity with infinite scroll */
                 <div className="grid-view-container">
                   <div className="grid-controls">
                     <div className="grid-header">
                       <h2>🔥 Trending Markets</h2>
                       <span className="market-count">
-                        ({trendingMarkets.length} markets)
+                        ({displayMarkets.length} markets{hasMore ? '+' : ''})
                       </span>
+                      {/* Index building indicator */}
+                      {!isIndexReady && indexProgress > 0 && indexProgress < 100 && (
+                        <span className="index-status building">
+                          Building trending index... {indexProgress}%
+                        </span>
+                      )}
+                      {isIndexReady && (
+                        <span className="index-status ready">
+                          Sorted by activity
+                        </span>
+                      )}
                     </div>
-                    <ViewToggle 
+                    <ViewToggle
                       currentView={viewMode}
                       onViewChange={handleViewChange}
                     />
                   </div>
                   {viewMode === VIEW_MODES.GRID ? (
-                    <MarketGrid 
-                      markets={trendingMarkets}
+                    <MarketGrid
+                      markets={displayMarkets}
                       onMarketClick={handleMarketClick}
                       selectedMarketId={selectedMarket?.id}
-                      loading={loading}
+                      loading={marketsLoading}
+                      onLoadMore={loadMore}
+                      hasMore={hasMore}
+                      isLoadingMore={isLoadingMore}
                     />
                   ) : (
-                    <CompactMarketView 
-                      markets={trendingMarkets}
+                    <CompactMarketView
+                      markets={displayMarkets}
                       onMarketClick={handleMarketClick}
-                      loading={loading}
+                      loading={marketsLoading}
                       selectedCategory={selectedCategory}
                     />
                   )}
@@ -723,17 +735,20 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
                 )}
               </div>
                   {viewMode === VIEW_MODES.GRID ? (
-                    <MarketGrid 
+                    <MarketGrid
                       markets={getFilteredAndSortedMarkets()}
                       onMarketClick={handleMarketClick}
                       selectedMarketId={selectedMarket?.id}
-                      loading={loading}
+                      loading={marketsLoading}
+                      onLoadMore={loadMore}
+                      hasMore={hasMore}
+                      isLoadingMore={isLoadingMore}
                     />
                   ) : (
-                    <CompactMarketView 
+                    <CompactMarketView
                       markets={getFilteredAndSortedMarkets()}
                       onMarketClick={handleMarketClick}
-                      loading={loading}
+                      loading={marketsLoading}
                       selectedCategory={selectedCategory}
                     />
                   )}

@@ -1,9 +1,19 @@
 import { useMemo } from 'react'
 import ModernMarketCard from './ModernMarketCard'
 import { useMarketNullification } from '../../hooks/useMarketNullification'
+import { InfiniteScroll } from '../ui/InfiniteScroll'
 import './MarketGrid.css'
 
-function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = false }) {
+function MarketGrid({
+  markets = [],
+  onMarketClick,
+  selectedMarketId,
+  loading = false,
+  // Infinite scroll props
+  onLoadMore = null,
+  hasMore = false,
+  isLoadingMore = false
+}) {
   // Get nullification filtering functionality
   const { filterMarkets, isLoading: nullificationLoading } = useMarketNullification()
 
@@ -39,7 +49,7 @@ function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = f
   // Determine how many cards are in the first row based on grid layout (typically 3 on desktop)
   const firstRowCount = 0 // disable first row expand for now
 
-  return (
+  const gridContent = (
     <div
       className="market-grid"
       role="grid"
@@ -59,6 +69,21 @@ function MarketGrid({ markets = [], onMarketClick, selectedMarketId, loading = f
       ))}
     </div>
   )
+
+  // Wrap in InfiniteScroll if pagination is enabled
+  if (onLoadMore) {
+    return (
+      <InfiniteScroll
+        onLoadMore={onLoadMore}
+        hasMore={hasMore}
+        isLoading={isLoadingMore}
+      >
+        {gridContent}
+      </InfiniteScroll>
+    )
+  }
+
+  return gridContent
 }
 
 export default MarketGrid
