@@ -97,6 +97,9 @@ export {
   useLazyMarketDecryption
 } from './useEncryption'
 
+// Friend market notification hooks
+export { useFriendMarketNotifications } from './useFriendMarketNotifications'
+
 // IPFS hooks (for decentralized storage)
 export {
   useIpfs,
