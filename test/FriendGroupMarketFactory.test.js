@@ -7,7 +7,8 @@ const ResolutionType = {
   Initiator: 1,
   Receiver: 2,
   ThirdParty: 3,
-  AutoPegged: 4
+  AutoPegged: 4,
+  PolymarketOracle: 5
 };
 
 describe("FriendGroupMarketFactory", function () {

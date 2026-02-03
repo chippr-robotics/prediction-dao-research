@@ -10,6 +10,7 @@ import "../security/RagequitModule.sol";
 import "../security/NullifierRegistry.sol";
 import "../access/TieredRoleManager.sol";
 import "../access/MembershipPaymentManager.sol";
+import "../oracles/PolymarketOracleAdapter.sol";
 
 // Custom errors (stake/nullification errors from library, reused here)
 error InvalidAddress();
@@ -42,6 +43,10 @@ error InvalidMember();
 error InvalidOdds();
 error MissingMarketMakerRole();
 error InvalidResolutionType();
+error PolymarketAdapterNotSet();
+error InvalidConditionId();
+error PolymarketNotResolved();
+error AlreadyPeggedToPolymarket();
 
 /**
  * @title FriendGroupMarketFactory
@@ -85,11 +90,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
 
     // Resolution type for determining who can resolve the market
     enum ResolutionType {
-        Either,       // Either creator OR opponent can resolve (default)
-        Initiator,    // Only creator can resolve
-        Receiver,     // Only opponent can resolve
-        ThirdParty,   // Designated arbitrator resolves
-        AutoPegged    // Auto-resolves based on linked public market
+        Either,           // Either creator OR opponent can resolve (default)
+        Initiator,        // Only creator can resolve
+        Receiver,         // Only opponent can resolve
+        ThirdParty,       // Designated arbitrator resolves
+        AutoPegged,       // Auto-resolves based on linked public market
+        PolymarketOracle  // Resolves based on Polymarket market outcome
     }
 
     // Acceptance record for each participant
@@ -125,6 +131,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 tradingPeriodSeconds;  // Trading period stored for later activation
         uint16 opponentOddsMultiplier; // Odds for 1v1/Bookmaker: 200=2x (equal), 10000=100x. Min 200.
         ResolutionType resolutionType; // Who can resolve the market
+        bytes32 polymarketConditionId; // Polymarket condition ID for PolymarketOracle resolution
     }
     
     // Friend market ID => FriendMarket
@@ -188,7 +195,13 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     
     // Reference to membership payment manager for ERC20 handling
     MembershipPaymentManager public paymentManager;
-    
+
+    // Reference to Polymarket oracle adapter for cross-platform resolution
+    PolymarketOracleAdapter public polymarketAdapter;
+
+    // Track Polymarket condition to friend market mappings
+    mapping(bytes32 => uint256[]) public polymarketConditionToFriendMarkets;
+
     // Accepted payment tokens for market creation and liquidity (address => isAccepted)
     mapping(address => bool) public acceptedPaymentTokens;
     
@@ -290,6 +303,21 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 indexed friendMarketId,
         address indexed participant,
         uint256 amount
+    );
+
+    event PolymarketAdapterUpdated(address indexed adapter);
+
+    event MarketPeggedToPolymarket(
+        uint256 indexed friendMarketId,
+        bytes32 indexed conditionId
+    );
+
+    event PolymarketMarketResolved(
+        uint256 indexed friendMarketId,
+        bytes32 indexed conditionId,
+        uint256 passNumerator,
+        uint256 failNumerator,
+        bool outcome
     );
     
     constructor(
@@ -420,6 +448,17 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         emit NullificationEnforcementUpdated(_enforce);
     }
 
+    /**
+     * @notice Set the Polymarket oracle adapter contract (only owner)
+     * @dev Required for resolving markets based on Polymarket outcomes
+     * @param _polymarketAdapter Address of the PolymarketOracleAdapter contract
+     */
+    function setPolymarketAdapter(address _polymarketAdapter) external onlyOwner {
+        if (_polymarketAdapter == address(0)) revert InvalidAddress();
+        polymarketAdapter = PolymarketOracleAdapter(_polymarketAdapter);
+        emit PolymarketAdapterUpdated(_polymarketAdapter);
+    }
+
     // ========== Multi-Party Acceptance Flow Functions ==========
 
     /**
@@ -493,7 +532,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             stakeToken: stakeToken,
             tradingPeriodSeconds: tradingPeriod,
             opponentOddsMultiplier: 200, // Equal stakes (2x)
-            resolutionType: resolutionType
+            resolutionType: resolutionType,
+            polymarketConditionId: bytes32(0) // Set later via pegToPolymarketCondition
         });
 
         // Record creator's acceptance (equal stake)
@@ -613,7 +653,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             stakeToken: stakeToken,
             tradingPeriodSeconds: tradingPeriod,
             opponentOddsMultiplier: opponentOddsMultiplier,
-            resolutionType: resolutionType
+            resolutionType: resolutionType,
+            polymarketConditionId: bytes32(0) // Set later via pegToPolymarketCondition
         });
 
         // Record creator's acceptance (creator stakes more based on odds)
@@ -725,7 +766,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             stakeToken: stakeToken,
             tradingPeriodSeconds: tradingPeriod,
             opponentOddsMultiplier: 200, // Group markets use equal stakes
-            resolutionType: ResolutionType.Either // Group markets use default resolution
+            resolutionType: ResolutionType.Either, // Group markets use default resolution
+            polymarketConditionId: bytes32(0) // Set later via pegToPolymarketCondition
         });
 
         // Record creator's acceptance
@@ -1236,27 +1278,169 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
 
         ConditionalMarketFactory.Market memory publicMarket = marketFactory.getMarket(publicMarketId);
         if (!publicMarket.resolved) revert NotResolved();
-        
+
         uint256[] storage peggedMarkets = publicMarketToPeggedFriendMarkets[publicMarketId];
-        
+
         for (uint256 i = 0; i < peggedMarkets.length; i++) {
             uint256 friendMarketId = peggedMarkets[i];
             FriendMarket storage market = friendMarkets[friendMarketId];
-            
+
             if (market.active && market.autoPegged) {
                 market.active = false;
-                
+
                 emit PeggedMarketAutoResolved(
                     friendMarketId,
                     publicMarketId,
                     publicMarket.passValue,
                     publicMarket.failValue
                 );
-                
+
                 bool outcome = publicMarket.passValue > publicMarket.failValue;
                 emit MarketResolved(friendMarketId, msg.sender, outcome);
             }
         }
+    }
+
+    // ========== Polymarket Oracle Integration Functions ==========
+
+    /**
+     * @notice Peg a friend market to a Polymarket condition for oracle resolution
+     * @dev This allows the friend market to be resolved based on Polymarket's outcome
+     * @param friendMarketId ID of the friend market
+     * @param conditionId Polymarket condition ID (from their CTF)
+     */
+    function pegToPolymarketCondition(uint256 friendMarketId, bytes32 conditionId) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        if (address(polymarketAdapter) == address(0)) revert PolymarketAdapterNotSet();
+        if (conditionId == bytes32(0)) revert InvalidConditionId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+        if (!market.active) revert NotActive();
+        if (msg.sender != market.creator) revert NotAuthorized();
+        if (market.polymarketConditionId != bytes32(0)) revert AlreadyPeggedToPolymarket();
+        if (market.autoPegged) revert AlreadyPegged(); // Can't use both public market and Polymarket pegging
+
+        // Link in the adapter (validates condition exists)
+        polymarketAdapter.linkMarketToPolymarket(friendMarketId, conditionId);
+
+        market.polymarketConditionId = conditionId;
+        market.resolutionType = ResolutionType.PolymarketOracle;
+
+        polymarketConditionToFriendMarkets[conditionId].push(friendMarketId);
+
+        emit MarketPeggedToPolymarket(friendMarketId, conditionId);
+    }
+
+    /**
+     * @notice Resolve a friend market based on its linked Polymarket condition
+     * @param friendMarketId ID of the friend market
+     */
+    function resolveFromPolymarket(uint256 friendMarketId) external nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        if (address(polymarketAdapter) == address(0)) revert PolymarketAdapterNotSet();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+        if (!market.active) revert NotActive();
+        if (market.polymarketConditionId == bytes32(0)) revert InvalidConditionId();
+        if (market.resolutionType != ResolutionType.PolymarketOracle) revert InvalidResolutionType();
+
+        // Fetch resolution from Polymarket via adapter
+        (
+            uint256 passNumerator,
+            uint256 failNumerator,
+            uint256 denominator,
+            bool resolved
+        ) = polymarketAdapter.getResolutionForMarket(friendMarketId);
+
+        if (!resolved) revert PolymarketNotResolved();
+
+        // Determine outcome
+        bool outcome;
+        if (passNumerator == failNumerator) {
+            // Tie - default to fail (conservative approach)
+            outcome = false;
+        } else {
+            outcome = passNumerator > failNumerator;
+        }
+
+        // Resolve the market
+        market.active = false;
+        market.status = FriendMarketStatus.Resolved;
+
+        emit PolymarketMarketResolved(
+            friendMarketId,
+            market.polymarketConditionId,
+            passNumerator,
+            failNumerator,
+            outcome
+        );
+        emit MarketResolved(friendMarketId, msg.sender, outcome);
+    }
+
+    /**
+     * @notice Batch resolve all friend markets pegged to a Polymarket condition
+     * @param conditionId The Polymarket condition ID
+     */
+    function batchResolveFromPolymarket(bytes32 conditionId) external nonReentrant {
+        if (address(polymarketAdapter) == address(0)) revert PolymarketAdapterNotSet();
+        if (conditionId == bytes32(0)) revert InvalidConditionId();
+
+        // Check if condition is resolved
+        if (!polymarketAdapter.isConditionResolved(conditionId)) revert PolymarketNotResolved();
+
+        // Fetch resolution data
+        (uint256 passNumerator, uint256 failNumerator, ) = polymarketAdapter.fetchResolution(conditionId);
+
+        // Determine outcome
+        bool outcome = passNumerator > failNumerator;
+
+        uint256[] storage peggedMarkets = polymarketConditionToFriendMarkets[conditionId];
+
+        for (uint256 i = 0; i < peggedMarkets.length; i++) {
+            uint256 friendMarketId = peggedMarkets[i];
+            FriendMarket storage market = friendMarkets[friendMarketId];
+
+            if (market.active && market.resolutionType == ResolutionType.PolymarketOracle) {
+                market.active = false;
+                market.status = FriendMarketStatus.Resolved;
+
+                emit PolymarketMarketResolved(
+                    friendMarketId,
+                    conditionId,
+                    passNumerator,
+                    failNumerator,
+                    outcome
+                );
+                emit MarketResolved(friendMarketId, msg.sender, outcome);
+            }
+        }
+    }
+
+    /**
+     * @notice Get all friend markets linked to a Polymarket condition
+     * @param conditionId The Polymarket condition ID
+     * @return Array of friend market IDs
+     */
+    function getFriendMarketsForPolymarketCondition(bytes32 conditionId) external view returns (uint256[] memory) {
+        return polymarketConditionToFriendMarkets[conditionId];
+    }
+
+    /**
+     * @notice Check if a friend market is pegged to Polymarket
+     * @param friendMarketId ID of the friend market
+     */
+    function isPeggedToPolymarket(uint256 friendMarketId) external view returns (bool) {
+        if (friendMarketId >= friendMarketCount) return false;
+        return friendMarkets[friendMarketId].polymarketConditionId != bytes32(0);
+    }
+
+    /**
+     * @notice Get Polymarket condition ID for a friend market
+     * @param friendMarketId ID of the friend market
+     */
+    function getPolymarketConditionId(uint256 friendMarketId) external view returns (bytes32) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        return friendMarkets[friendMarketId].polymarketConditionId;
     }
     
     /**
@@ -1294,6 +1478,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             canResolve = market.arbitrator != address(0) && msg.sender == market.arbitrator;
         } else if (market.resolutionType == ResolutionType.AutoPegged) {
             // Auto-pegged markets should use autoResolvePeggedMarket instead
+            revert NotAuthorized();
+        } else if (market.resolutionType == ResolutionType.PolymarketOracle) {
+            // Polymarket-pegged markets should use resolveFromPolymarket instead
             revert NotAuthorized();
         }
 
