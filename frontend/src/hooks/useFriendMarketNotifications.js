@@ -36,8 +36,8 @@ export function useFriendMarketNotifications(markets, account) {
     return getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
   })
 
-  // Track previous account to detect changes
-  const [prevAccount, setPrevAccount] = useState(account)
+  // Track previous account to detect changes (initialized to current account to prevent mount trigger)
+  const prevAccountRef = useRef(account)
 
   // Use ref for markets to avoid callback recreation
   const marketsRef = useRef(markets)
@@ -54,8 +54,8 @@ export function useFriendMarketNotifications(markets, account) {
 
   // Reload state when account changes (but not on mount)
   useEffect(() => {
-    if (account !== prevAccount) {
-      setPrevAccount(account)
+    if (account !== prevAccountRef.current) {
+      prevAccountRef.current = account
       if (account) {
         const savedState = getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
         setState(savedState)
@@ -63,7 +63,7 @@ export function useFriendMarketNotifications(markets, account) {
         setState(getDefaultState())
       }
     }
-  }, [account, prevAccount])
+  }, [account])
 
   // Calculate unread markets
   const { unreadCount, unreadMarketIds } = useMemo(() => {
@@ -72,6 +72,8 @@ export function useFriendMarketNotifications(markets, account) {
     }
 
     const unread = []
+    // eslint-disable-next-line react-hooks/purity -- Date.now() is calculated once per render to check market expiration
+    const now = Date.now() // Calculate once outside the loop
 
     for (const market of markets) {
       const marketId = String(market.id)
@@ -80,7 +82,7 @@ export function useFriendMarketNotifications(markets, account) {
       // Skip expired pending invitations - they're not actionable
       if (market.status === 'pending_acceptance' &&
           market.acceptanceDeadline &&
-          market.acceptanceDeadline < Date.now()) {
+          market.acceptanceDeadline < now) {
         continue
       }
 

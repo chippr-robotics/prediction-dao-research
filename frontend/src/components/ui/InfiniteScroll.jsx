@@ -15,7 +15,7 @@
  * @param {string} props.className - Additional CSS classes
  */
 
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect } from 'react'
 import styles from './InfiniteScroll.module.css'
 
 export function InfiniteScroll({
