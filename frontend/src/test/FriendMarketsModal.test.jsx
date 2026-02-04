@@ -49,6 +49,12 @@ vi.mock('../hooks', () => {
       isMarketFetching: vi.fn().mockReturnValue(false),
       needsFetch: vi.fn().mockReturnValue(false),
       clearEnvelope: vi.fn()
+    }),
+    useFriendMarketNotifications: () => ({
+      unreadCount: 0,
+      unreadMarketIds: [],
+      markMarketAsRead: vi.fn(),
+      isMarketUnread: vi.fn().mockReturnValue(false)
     })
   }
 })

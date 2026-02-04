@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   getUserPreference,
   saveUserPreference
@@ -36,6 +36,15 @@ export function useFriendMarketNotifications(markets, account) {
     return getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
   })
 
+  // Track previous account to detect changes
+  const [prevAccount, setPrevAccount] = useState(account)
+
+  // Use ref for markets to avoid callback recreation
+  const marketsRef = useRef(markets)
+  useEffect(() => {
+    marketsRef.current = markets
+  }, [markets])
+
   // Persist state changes to localStorage
   useEffect(() => {
     if (account && state) {
@@ -43,15 +52,18 @@ export function useFriendMarketNotifications(markets, account) {
     }
   }, [account, state])
 
-  // Reload state when account changes
+  // Reload state when account changes (but not on mount)
   useEffect(() => {
-    if (account) {
-      const savedState = getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
-      setState(savedState)
-    } else {
-      setState(getDefaultState())
+    if (account !== prevAccount) {
+      setPrevAccount(account)
+      if (account) {
+        const savedState = getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
+        setState(savedState)
+      } else {
+        setState(getDefaultState())
+      }
     }
-  }, [account])
+  }, [account, prevAccount])
 
   // Calculate unread markets
   const { unreadCount, unreadMarketIds } = useMemo(() => {
@@ -86,7 +98,7 @@ export function useFriendMarketNotifications(markets, account) {
 
       // Acceptance count changed (for pending markets)
       if (market.status === 'pending_acceptance') {
-        const currentCount = market.acceptedCount || market.acceptedParticipantCount || 0
+        const currentCount = market.acceptedCount || 0
         const seenCount = seen.acceptedCount || 0
         if (currentCount > seenCount) {
           unread.push(marketId)
@@ -105,7 +117,7 @@ export function useFriendMarketNotifications(markets, account) {
   const markMarketAsRead = useCallback((marketId) => {
     if (!account) return
 
-    const market = markets?.find(m => String(m.id) === String(marketId))
+    const market = marketsRef.current?.find(m => String(m.id) === String(marketId))
     if (!market) return
 
     setState(prev => ({
@@ -114,12 +126,12 @@ export function useFriendMarketNotifications(markets, account) {
         ...prev.seenMarkets,
         [String(marketId)]: {
           status: market.status,
-          acceptedCount: market.acceptedCount || market.acceptedParticipantCount || 0,
+          acceptedCount: market.acceptedCount || 0,
           seenAt: Date.now()
         }
       }
     }))
-  }, [account, markets])
+  }, [account])
 
   // Check if specific market is unread
   const isMarketUnread = useCallback((marketId) => {

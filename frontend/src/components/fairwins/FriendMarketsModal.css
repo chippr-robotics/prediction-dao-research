@@ -2353,6 +2353,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .fm-tab-badge-unread {
+    animation: none;
+  }
+}
+
 /* Unread row indicator for table rows */
 .fm-table-row.fm-unread {
   position: relative;

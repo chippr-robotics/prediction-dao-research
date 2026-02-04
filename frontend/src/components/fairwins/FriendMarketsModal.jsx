@@ -1084,7 +1084,12 @@ function FriendMarketsModal({
             </svg>
             <span>Active</span>
             {unreadCount > 0 && (
-              <span className="fm-tab-badge fm-tab-badge-unread">{unreadCount}</span>
+              <span
+                className="fm-tab-badge fm-tab-badge-unread"
+                aria-label={`${unreadCount} unread markets`}
+              >
+                {unreadCount}
+              </span>
             )}
           </button>
           <button
