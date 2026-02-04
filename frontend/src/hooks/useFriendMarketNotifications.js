@@ -72,7 +72,7 @@ export function useFriendMarketNotifications(markets, account) {
     }
 
     const unread = []
-    // eslint-disable-next-line react-hooks/purity -- Date.now() is intentionally used to check expiration on each render
+    // eslint-disable-next-line react-hooks/purity -- Date.now() is calculated once per render to check market expiration
     const now = Date.now() // Calculate once outside the loop
 
     for (const market of markets) {

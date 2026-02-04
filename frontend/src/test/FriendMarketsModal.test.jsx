@@ -359,10 +359,11 @@ describe('FriendMarketsModal', () => {
 
     it('should show unread markets count badge', () => {
       // Set up unread notifications
+      const unreadMarkets = ['market-1', 'market-2']
       mockNotificationState.unreadCount = 2
-      mockNotificationState.unreadMarketIds = ['market-1', 'market-2']
+      mockNotificationState.unreadMarketIds = unreadMarkets
       mockNotificationState.isMarketUnread = vi.fn((id) => 
-        ['market-1', 'market-2'].includes(id)
+        unreadMarkets.includes(id)
       )
       
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
