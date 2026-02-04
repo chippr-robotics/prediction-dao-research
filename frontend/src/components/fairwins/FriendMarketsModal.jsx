@@ -121,14 +121,14 @@ function FriendMarketsModal({
   const {
     markets: activeMarketsWithEnvelopes,
     fetchEnvelope: fetchActiveEnvelope,
-    isMarketFetching: isActiveEnvelopeFetching,
-    needsFetch: activeNeedsFetch
+    isMarketFetching: _isActiveEnvelopeFetching,
+    needsFetch: _activeNeedsFetch
   } = useLazyIpfsEnvelope(activeMarkets)
   const {
     markets: pastMarketsWithEnvelopes,
     fetchEnvelope: fetchPastEnvelope,
-    isMarketFetching: isPastEnvelopeFetching,
-    needsFetch: pastNeedsFetch
+    isMarketFetching: _isPastEnvelopeFetching,
+    needsFetch: _pastNeedsFetch
   } = useLazyIpfsEnvelope(pastMarkets)
 
   // Lazy decrypt markets for display - only decrypts when user clicks on a market

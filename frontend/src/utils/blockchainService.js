@@ -17,8 +17,7 @@ import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegist
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { MULTICALL3_ABI } from '../abis/Multicall3'
 import {
-  parseEncryptedIpfsReference,
-  fetchEncryptedEnvelope
+  parseEncryptedIpfsReference
 } from './ipfsService'
 import { logger } from './logger'
 
