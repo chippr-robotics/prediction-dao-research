@@ -8,6 +8,7 @@ import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { getViewPreference, setViewPreference, VIEW_MODES } from '../../utils/viewPreference'
 import { buyMarketShares } from '../../utils/blockchainService'
+import { getUserPreference, saveUserPreference, getGlobalPreference, saveGlobalPreference } from '../../utils/userStorage'
 import SidebarNav from './SidebarNav'
 import HeaderBar from './HeaderBar'
 import MarketHeroCard from './MarketHeroCard'
@@ -25,6 +26,7 @@ import ClearPathTab from './ClearPathTab'
 import CorrelatedMarketsModal from './CorrelatedMarketsModal'
 import MarketModal from './MarketModal'
 import PerpetualFuturesModal from './PerpetualFuturesModal'
+import OnboardingTutorial from './OnboardingTutorial'
 import WeatherMarketMap from './WeatherMarketMap'
 import SearchBar from '../ui/SearchBar'
 import SubcategoryFilter from './SubcategoryFilter'
@@ -52,7 +54,9 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
   const [showFilters, setShowFilters] = useState(false) // Collapsible filters state
   const [showPerpetualsModal, setShowPerpetualsModal] = useState(false) // Perpetual futures modal state
   const [showWeatherMap, setShowWeatherMap] = useState(true) // Collapsible weather map state
+  const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false) // Onboarding tutorial state
   const lastFocusedElementRef = useRef(null)
+  const hasCheckedOnboarding = useRef(false) // Track if we've checked onboarding status
   const hasProcessedMarketUrl = useRef(false) // Track if we've processed a market URL
   
   // TokenMint state - kept for TokenMintTab display
@@ -128,6 +132,63 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
       setLoading(false)
     }
   }, [selectedCategory, isTrendingView, isCategoryView, marketsLoading])
+
+  // Check if onboarding tutorial should be shown
+  useEffect(() => {
+    // Only check once per session
+    if (hasCheckedOnboarding.current) return
+
+    // Wait for initial loading to complete
+    if (loading) return
+
+    hasCheckedOnboarding.current = true
+
+    // Check if user has completed the tutorial
+    let hasSeenTutorial = false
+
+    if (account) {
+      // Check per-wallet preference
+      hasSeenTutorial = getUserPreference(account, 'onboarding_tutorial_completed', false, true)
+    } else {
+      // Check global preference for non-connected users
+      hasSeenTutorial = getGlobalPreference('onboarding_tutorial_completed_global', false)
+    }
+
+    if (!hasSeenTutorial) {
+      // Small delay to let the UI settle before showing tutorial
+      const timer = setTimeout(() => {
+        setShowOnboardingTutorial(true)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [loading, account])
+
+  // Handlers for onboarding tutorial
+  const handleOnboardingDismiss = useCallback((dontShowAgain) => {
+    setShowOnboardingTutorial(false)
+
+    if (dontShowAgain) {
+      if (account) {
+        saveUserPreference(account, 'onboarding_tutorial_completed', true, true)
+      } else {
+        saveGlobalPreference('onboarding_tutorial_completed_global', true)
+      }
+    }
+  }, [account])
+
+  const handleOnboardingComplete = useCallback((dontShowAgain) => {
+    setShowOnboardingTutorial(false)
+
+    // Always save completion when user completes the full tutorial
+    if (account) {
+      saveUserPreference(account, 'onboarding_tutorial_completed', true, true)
+    } else {
+      saveGlobalPreference('onboarding_tutorial_completed_global', true)
+    }
+
+    // Show a welcome notification
+    showNotification('Welcome to FairWins! Start exploring prediction markets.', 'success', 4000)
+  }, [account, showNotification])
 
   // Auto-open market modal when accessing shared market links
   useEffect(() => {
@@ -616,6 +677,13 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
           <PerpetualFuturesModal
             isOpen={showPerpetualsModal}
             onClose={() => setShowPerpetualsModal(false)}
+          />
+
+          {/* Onboarding Tutorial Modal */}
+          <OnboardingTutorial
+            isOpen={showOnboardingTutorial}
+            onDismiss={handleOnboardingDismiss}
+            onComplete={handleOnboardingComplete}
           />
 
           {/* Primary Grid View - Always visible unless hero is open */}
