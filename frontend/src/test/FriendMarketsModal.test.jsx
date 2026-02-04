@@ -22,6 +22,11 @@ let mockWalletState = {
 let mockWeb3State = {
   isCorrectNetwork: true
 }
+let mockNotificationState = {
+  unreadCount: 0,
+  unreadMarketIds: [],
+  isMarketUnread: vi.fn().mockReturnValue(false)
+}
 
 // Mock the hooks module directly
 vi.mock('../hooks', () => {
@@ -51,10 +56,10 @@ vi.mock('../hooks', () => {
       clearEnvelope: vi.fn()
     }),
     useFriendMarketNotifications: () => ({
-      unreadCount: 0,
-      unreadMarketIds: [],
+      unreadCount: mockNotificationState.unreadCount,
+      unreadMarketIds: mockNotificationState.unreadMarketIds,
       markMarketAsRead: vi.fn(),
-      isMarketUnread: vi.fn().mockReturnValue(false)
+      isMarketUnread: mockNotificationState.isMarketUnread
     })
   }
 })
@@ -268,6 +273,9 @@ describe('FriendMarketsModal', () => {
     mockWalletState.isConnected = true
     mockWalletState.account = '0x1234567890123456789012345678901234567890'
     mockWeb3State.isCorrectNetwork = true
+    mockNotificationState.unreadCount = 0
+    mockNotificationState.unreadMarketIds = []
+    mockNotificationState.isMarketUnread = vi.fn().mockReturnValue(false)
     
     // Mock window.ethereum to avoid provider creation errors
     // This prevents the WalletContext from trying to create providers during tests
@@ -349,10 +357,18 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByRole('tab', { name: /past/i })).toHaveAttribute('aria-selected', 'true')
     })
 
-    it('should show active markets count badge', () => {
+    it('should show unread markets count badge', () => {
+      // Set up unread notifications
+      mockNotificationState.unreadCount = 2
+      mockNotificationState.unreadMarketIds = ['market-1', 'market-2']
+      mockNotificationState.isMarketUnread = vi.fn((id) => 
+        ['market-1', 'market-2'].includes(id)
+      )
+      
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      // Both mock markets have the connected user as a participant
+      // Should show unread count badge
       expect(screen.getByText('2')).toBeInTheDocument()
+      expect(screen.getByLabelText('2 unread markets')).toBeInTheDocument()
     })
   })
 
