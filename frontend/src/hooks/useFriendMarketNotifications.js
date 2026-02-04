@@ -36,8 +36,8 @@ export function useFriendMarketNotifications(markets, account) {
     return getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
   })
 
-  // Track previous account to detect changes
-  const [prevAccount, setPrevAccount] = useState(account)
+  // Track previous account to detect changes (initialized to current account to prevent mount trigger)
+  const prevAccountRef = useRef(account)
 
   // Use ref for markets to avoid callback recreation
   const marketsRef = useRef(markets)
@@ -54,8 +54,8 @@ export function useFriendMarketNotifications(markets, account) {
 
   // Reload state when account changes (but not on mount)
   useEffect(() => {
-    if (account !== prevAccount) {
-      setPrevAccount(account)
+    if (account !== prevAccountRef.current) {
+      prevAccountRef.current = account
       if (account) {
         const savedState = getUserPreference(account, STORAGE_KEY, getDefaultState(), true)
         setState(savedState)
@@ -63,7 +63,7 @@ export function useFriendMarketNotifications(markets, account) {
         setState(getDefaultState())
       }
     }
-  }, [account, prevAccount])
+  }, [account])
 
   // Calculate unread markets
   const { unreadCount, unreadMarketIds } = useMemo(() => {
