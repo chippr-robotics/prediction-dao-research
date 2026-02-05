@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
-import { useWallet, useWeb3, useLazyIpfsEnvelope } from '../../hooks'
+import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { TOKENS } from '../../constants/etcswap'
@@ -121,14 +121,14 @@ function FriendMarketsModal({
   const {
     markets: activeMarketsWithEnvelopes,
     fetchEnvelope: fetchActiveEnvelope,
-    isMarketFetching: isActiveEnvelopeFetching,
-    needsFetch: activeNeedsFetch
+    isMarketFetching: _isActiveEnvelopeFetching,
+    needsFetch: _activeNeedsFetch
   } = useLazyIpfsEnvelope(activeMarkets)
   const {
     markets: pastMarketsWithEnvelopes,
     fetchEnvelope: fetchPastEnvelope,
-    isMarketFetching: isPastEnvelopeFetching,
-    needsFetch: pastNeedsFetch
+    isMarketFetching: _isPastEnvelopeFetching,
+    needsFetch: _pastNeedsFetch
   } = useLazyIpfsEnvelope(pastMarkets)
 
   // Lazy decrypt markets for display - only decrypts when user clicks on a market
@@ -405,6 +405,9 @@ function FriendMarketsModal({
 
   // Market acceptance handlers
   const handleOpenAcceptanceModal = (market) => {
+    // Mark this market as read (clears unread indicator)
+    markMarketAsRead(market.id)
+
     // Transform market data to match what MarketAcceptanceModal expects
     const marketData = {
       id: market.id,
@@ -861,6 +864,9 @@ function FriendMarketsModal({
     // Just select the market - decryption happens when user clicks "Click to decrypt"
     setSelectedMarket(market)
 
+    // Mark this market as read (clears unread indicator)
+    markMarketAsRead(market.id)
+
     // If this market needs its IPFS envelope fetched, trigger the fetch
     if (market.needsIpfsFetch && market.ipfsCid) {
       if (isActiveMarket) {
@@ -926,6 +932,7 @@ function FriendMarketsModal({
       case 'resolved': return 'status-resolved'
       case 'won': return 'status-won'
       case 'lost': return 'status-lost'
+      case 'expired': return 'status-expired'
       default: return 'status-default'
     }
   }
@@ -950,6 +957,16 @@ function FriendMarketsModal({
            market.creator?.toLowerCase() === userAddr
   }, [account])
 
+  // Helper to check if a pending market invitation has expired
+  const isExpiredInvitation = useCallback((market) => {
+    if (market.status !== 'pending_acceptance') return false
+    if (!market.acceptanceDeadline) return false
+    const deadline = typeof market.acceptanceDeadline === 'number'
+      ? market.acceptanceDeadline
+      : new Date(market.acceptanceDeadline).getTime()
+    return deadline < Date.now()
+  }, [])
+
   // Filter markets where user is participating
   // Note: Show markets even if canView is false (encrypted), as long as user is a participant
   // They should see these markets with "encrypted" placeholder to prompt acceptance
@@ -959,16 +976,43 @@ function FriendMarketsModal({
     )
   }, [lazyActiveMarkets, isUserInMarket])
 
-  // Filter pending markets awaiting acceptance
+  // Filter pending markets awaiting acceptance (exclude expired)
   const userPendingMarkets = useMemo(() => {
     return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status === 'pending_acceptance'
+      isUserInMarket(m) && m.status === 'pending_acceptance' && !isExpiredInvitation(m)
     )
-  }, [lazyActiveMarkets, isUserInMarket])
+  }, [lazyActiveMarkets, isUserInMarket, isExpiredInvitation])
+
+  // Filter expired pending invitations (show in past tab)
+  const userExpiredMarkets = useMemo(() => {
+    return lazyActiveMarkets.filter(m =>
+      isUserInMarket(m) && m.status === 'pending_acceptance' && isExpiredInvitation(m)
+    )
+  }, [lazyActiveMarkets, isUserInMarket, isExpiredInvitation])
+
+  // Combine active + pending markets for notification tracking
+  const allUserMarkets = useMemo(() =>
+    [...userActiveMarkets, ...userPendingMarkets],
+    [userActiveMarkets, userPendingMarkets]
+  )
+
+  // Track unread/unseen markets for badge counter
+  const {
+    unreadCount,
+    markMarketAsRead,
+    isMarketUnread
+  } = useFriendMarketNotifications(allUserMarkets, account)
 
   const userPastMarkets = useMemo(() => {
-    return lazyPastMarkets.filter(m => isUserInMarket(m))
-  }, [lazyPastMarkets, isUserInMarket])
+    // Include both completed past markets and expired pending invitations
+    const pastFromLazy = lazyPastMarkets.filter(m => isUserInMarket(m))
+    // Add expired invitations with a flag indicating they're expired
+    const expiredWithFlag = userExpiredMarkets.map(m => ({
+      ...m,
+      isExpiredInvitation: true
+    }))
+    return [...expiredWithFlag, ...pastFromLazy]
+  }, [lazyPastMarkets, isUserInMarket, userExpiredMarkets])
 
   // Get current market state from lazy arrays (always up-to-date after decryption)
   const currentMarket = useMemo(() => {
@@ -1039,8 +1083,13 @@ function FriendMarketsModal({
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
             <span>Active</span>
-            {(userActiveMarkets.length + userPendingMarkets.length) > 0 && (
-              <span className="fm-tab-badge">{userActiveMarkets.length + userPendingMarkets.length}</span>
+            {unreadCount > 0 && (
+              <span
+                className="fm-tab-badge fm-tab-badge-unread"
+                aria-label={`${unreadCount} unread markets`}
+              >
+                {unreadCount}
+              </span>
             )}
           </button>
           <button
@@ -1910,8 +1959,9 @@ function FriendMarketsModal({
                         {userPendingMarkets.map((market, index) => {
                           const isCreator = isCreatorOfPendingMarket(market)
                           const canAccept = canUserAcceptMarket(market)
+                          const isUnread = isMarketUnread(market.id)
                           return (
-                          <div key={`pending-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`} className="fm-pending-card">
+                          <div key={`pending-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`} className={`fm-pending-card ${isUnread ? 'fm-unread' : ''}`}>
                             <div className="fm-pending-header">
                               <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
                               <span className={`fm-pending-badge ${isCreator ? 'fm-badge-consideration' : ''}`}>
@@ -2015,6 +2065,7 @@ function FriendMarketsModal({
                           getTypeLabel={getTypeLabel}
                           getStatusClass={getStatusClass}
                           isMarketDecrypting={isActiveMarketDecrypting}
+                          isMarketUnread={isMarketUnread}
                         />
                       </div>
                     </>
@@ -2236,7 +2287,8 @@ function MarketsCompactTable({
   getTypeLabel,
   getStatusClass,
   isPast = false,
-  isMarketDecrypting = () => false
+  isMarketDecrypting = () => false,
+  isMarketUnread = () => false
 }) {
   return (
     <table className="fm-table" role="table">
@@ -2253,12 +2305,13 @@ function MarketsCompactTable({
         {markets.map((market, index) => {
           const isDecrypting = isMarketDecrypting(market.id)
           const needsUnlock = market.encryptionStatus === 'encrypted' && market.canView && !isDecrypting
+          const isUnread = isMarketUnread(market.id)
 
           return (
             <tr
               key={`market-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`}
               onClick={() => onSelect(market)}
-              className={`fm-table-row ${isDecrypting ? 'decrypting' : ''}`}
+              className={`fm-table-row ${isDecrypting ? 'decrypting' : ''} ${isUnread ? 'fm-unread' : ''}`}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
@@ -2303,8 +2356,8 @@ function MarketsCompactTable({
                 }
               </td>
               <td>
-                <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
-                  {market.status}
+                <span className={`fm-status-badge ${getStatusClass(market.isExpiredInvitation ? 'expired' : market.status)}`}>
+                  {market.isExpiredInvitation ? 'Expired' : market.status}
                 </span>
               </td>
             </tr>

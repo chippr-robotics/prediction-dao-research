@@ -2334,3 +2334,68 @@
     font-size: 0.75rem;
   }
 }
+
+/* ===== Unread/Unseen Market Indicators ===== */
+
+/* Unread badge pulse animation */
+.fm-tab-badge-unread {
+  animation: fmBadgePulse 2s ease-in-out infinite;
+}
+
+@keyframes fmBadgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(54, 179, 126, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(54, 179, 126, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-tab-badge-unread {
+    animation: none;
+  }
+}
+
+/* Unread row indicator for table rows */
+.fm-table-row.fm-unread {
+  position: relative;
+  background: rgba(54, 179, 126, 0.08);
+}
+
+.fm-table-row.fm-unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #36B37E;
+  border-radius: 0 2px 2px 0;
+}
+
+/* Unread indicator for pending cards */
+.fm-pending-card.fm-unread {
+  position: relative;
+  background: rgba(54, 179, 126, 0.08);
+  border-color: rgba(54, 179, 126, 0.3);
+}
+
+.fm-pending-card.fm-unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #36B37E;
+  border-radius: 4px 0 0 4px;
+}
+
+/* Expired status badge */
+.fm-status-badge.status-expired {
+  background: rgba(255, 86, 48, 0.15);
+  color: #FF5630;
+}
