@@ -135,6 +135,9 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
 
   // Check if onboarding tutorial should be shown
   useEffect(() => {
+    // Skip onboarding in Cypress E2E tests
+    if (window.Cypress) return
+
     // Only check once per session
     if (hasCheckedOnboarding.current) return
 
