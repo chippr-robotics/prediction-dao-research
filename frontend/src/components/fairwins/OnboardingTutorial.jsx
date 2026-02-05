@@ -370,20 +370,18 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
 
   if (!isOpen) return null
 
-  const step = TUTORIAL_STEPS[currentStep]
-
   return (
     <div
       className="onboarding-backdrop"
       onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="onboarding-title"
     >
       <div
         className="onboarding-modal"
         ref={modalRef}
         tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -422,7 +420,7 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
                 aria-hidden={index !== currentStep}
               >
                 <div className="step-icon">{s.icon}</div>
-                <h2 id="onboarding-title" className="step-title">{s.title}</h2>
+                <h2 id={index === currentStep ? 'onboarding-title' : undefined} className="step-title">{s.title}</h2>
                 <p className="step-subtitle">{s.subtitle}</p>
                 <div className="step-content">{s.content}</div>
               </div>
@@ -431,14 +429,12 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
         </div>
 
         {/* Step dots */}
-        <div className="onboarding-dots" role="tablist" aria-label="Tutorial steps">
+        <div className="onboarding-dots" aria-label="Tutorial steps">
           {TUTORIAL_STEPS.map((s, index) => (
             <button
               key={s.id}
               className={`dot ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
               onClick={() => goToStep(index)}
-              role="tab"
-              aria-selected={index === currentStep}
               aria-label={`Go to step ${index + 1}: ${s.title}`}
             />
           ))}
@@ -452,7 +448,6 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
               checked={dontShowAgain}
               onChange={(e) => setDontShowAgain(e.target.checked)}
             />
-            <span className="checkmark"></span>
             <span>Don't show this again</span>
           </label>
 
