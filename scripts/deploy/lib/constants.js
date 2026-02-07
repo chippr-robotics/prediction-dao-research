@@ -5,7 +5,8 @@
  * Update this file when addresses or configurations change.
  */
 
-const { ethers } = require("hardhat");
+import hre from "hardhat";
+const { ethers } = hre;
 
 // =============================================================================
 // FACTORY ADDRESSES
@@ -15,7 +16,7 @@ const { ethers } = require("hardhat");
  * Safe Singleton Factory address - same on all EVM networks
  * Used for deterministic CREATE2 deployments
  */
-const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
+export const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 
 // =============================================================================
 // TOKEN ADDRESSES
@@ -24,7 +25,7 @@ const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 /**
  * Token addresses by network
  */
-const TOKENS = {
+export const TOKENS = {
   mordor: {
     USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // USC Stablecoin (6 decimals)
     WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC
@@ -47,7 +48,7 @@ const TOKENS = {
  * Pre-computed role hashes for access control
  * These match the keccak256 hashes used in the smart contracts
  */
-const ROLE_HASHES = {
+export const ROLE_HASHES = {
   ADMIN_ROLE: ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE")),
   MARKET_MAKER_ROLE: ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE")),
   FRIEND_MARKET_ROLE: ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE")),
@@ -63,7 +64,7 @@ const ROLE_HASHES = {
 /**
  * Membership tier enum values
  */
-const MembershipTier = {
+export const MembershipTier = {
   NONE: 0,
   BRONZE: 1,
   SILVER: 2,
@@ -74,7 +75,7 @@ const MembershipTier = {
 /**
  * Friend Market tier configurations
  */
-const FRIEND_MARKET_TIERS = [
+export const FRIEND_MARKET_TIERS = [
   {
     tier: MembershipTier.BRONZE,
     name: "Friend Market Bronze",
@@ -148,7 +149,7 @@ const FRIEND_MARKET_TIERS = [
 /**
  * Market Maker tier configurations
  */
-const MARKET_MAKER_TIERS = [
+export const MARKET_MAKER_TIERS = [
   {
     tier: MembershipTier.BRONZE,
     name: "Market Maker Bronze",
@@ -227,7 +228,7 @@ const MARKET_MAKER_TIERS = [
  * Salt prefixes for deterministic deployment
  * Each prefix should be unique per deployment version
  */
-const SALT_PREFIXES = {
+export const SALT_PREFIXES = {
   CORE: "FairWinsDAO-v1.0-",
   RBAC: "ClearPathDAO-Modular-v1.0-",
   TIERED_ROLE_MANAGER: "ClearPathDAO-TRM-v1.1-",
@@ -243,7 +244,7 @@ const SALT_PREFIXES = {
 /**
  * Network-specific configurations
  */
-const NETWORK_CONFIG = {
+export const NETWORK_CONFIG = {
   mordor: {
     chainId: 63,
     name: "Mordor Testnet",
@@ -271,46 +272,15 @@ const NETWORK_CONFIG = {
 /**
  * EIP-3860 (Shanghai) limits initcode size to 49152 bytes
  */
-const DEFAULT_MAX_INITCODE_BYTES = 49_152;
+export const DEFAULT_MAX_INITCODE_BYTES = 49_152;
 
 /**
  * EIP-170 limits deployed/runtime code size to 24,576 bytes
  */
-const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
+export const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 
 // =============================================================================
 // MAINNET CHAIN IDS (for safety checks)
 // =============================================================================
 
-const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Ethereum Classic Mainnet
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-module.exports = {
-  // Factory
-  SINGLETON_FACTORY_ADDRESS,
-
-  // Tokens
-  TOKENS,
-
-  // Roles
-  ROLE_HASHES,
-
-  // Tiers
-  MembershipTier,
-  FRIEND_MARKET_TIERS,
-  MARKET_MAKER_TIERS,
-
-  // Salts
-  SALT_PREFIXES,
-
-  // Networks
-  NETWORK_CONFIG,
-
-  // Limits
-  DEFAULT_MAX_INITCODE_BYTES,
-  DEFAULT_MAX_RUNTIME_BYTES,
-  MAINNET_CHAIN_IDS,
-};
+export const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Ethereum Classic Mainnet
