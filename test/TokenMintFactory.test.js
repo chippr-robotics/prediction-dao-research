@@ -1,13 +1,17 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("TokenMintFactory", function () {
+  let ethers;
   let tokenMintFactory;
   let roleManager;
   let owner, user1, user2;
-  const TOKENMINT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("TOKENMINT_ROLE"));
+  let TOKENMINT_ROLE;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
+    TOKENMINT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("TOKENMINT_ROLE"));
     [owner, user1, user2] = await ethers.getSigners();
 
     // Deploy RoleManager

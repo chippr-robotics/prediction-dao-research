@@ -1,12 +1,19 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
+
+let ethers;
+let time;
+let loadFixture;
 
 /**
  * Deployment fixture for Perpetual Futures system
  * Sets up all contracts and test accounts for integration testing
  */
 async function deployPerpetualFuturesFixture() {
+  const connection = await hre.network.connect();
+  ethers = connection.ethers;
+  time = connection.networkHelpers.time;
+  loadFixture = connection.networkHelpers.loadFixture;
   const [owner, trader1, trader2, trader3, liquidator, feeRecipient, priceUpdater] = await ethers.getSigners();
 
   // Deploy mock ERC20 token for collateral (USC stablecoin)

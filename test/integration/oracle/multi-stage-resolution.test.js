@@ -1,7 +1,9 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
-const { deploySystemFixture } = require("../fixtures/deploySystem");
+import { expect } from "chai";
+import hre from "hardhat";
+import { deploySystemFixture } from "../fixtures/deploySystem.js";
+
+let time;
+let loadFixture;
 
 /**
  * Integration tests for Multi-Stage Oracle Resolution
@@ -12,12 +14,22 @@ const { deploySystemFixture } = require("../fixtures/deploySystem");
  * - Final settlement with bond distribution
  */
 describe("Integration: Multi-Stage Oracle Resolution", function () {
+  let ethers;
+
   // Increase timeout for integration tests
   this.timeout(120000);
 
+  before(async function () {
+    const connection = await hre.network.connect();
+    loadFixture = connection.networkHelpers.loadFixture;
+  });
+
   describe("Happy Path: Unchallenged Resolution", function () {
     it("Should complete oracle resolution without challenge", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const connection = await hre.network.connect();
+      ethers = connection.ethers;
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
@@ -95,7 +107,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
   describe("Challenge Workflow: Successful Challenge", function () {
     it("Should handle challenge and award bonds to challenger", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner, reporter, challenger } = accounts;
 
@@ -182,7 +195,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should reject challenge after challenge period expires", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { reporter, challenger } = accounts;
 
@@ -225,7 +239,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
   describe("Dispute Escalation Workflow", function () {
     it("Should escalate to UMA dispute resolution", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner, reporter, challenger } = accounts;
 
@@ -293,7 +308,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should reject escalation if not in challenge stage", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner } = accounts;
 
@@ -310,7 +326,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
   describe("Bond Management and Access Control", function () {
     it("Should require correct bond amounts", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { reporter, challenger } = accounts;
 
@@ -357,7 +374,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should enforce designated reporter access", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { challenger } = accounts;
 
@@ -380,7 +398,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should enforce owner-only finalization", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { reporter } = accounts;
 
@@ -411,7 +430,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
   describe("Multiple Resolutions in Parallel", function () {
     it("Should handle multiple proposals at different stages", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner, reporter, challenger } = accounts;
 
@@ -510,7 +530,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
   describe("Edge Cases and Error Conditions", function () {
     it("Should prevent double reporting", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { reporter } = accounts;
 
@@ -544,7 +565,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should prevent double finalization", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner, reporter } = accounts;
 
@@ -575,7 +597,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should accept empty evidence (evidence validation is off-chain)", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { reporter } = accounts;
 
@@ -601,7 +624,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
 
   describe("Query Functions and State Verification", function () {
     it("Should return correct resolution details at each stage", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { owner, reporter, challenger } = accounts;
 
@@ -660,7 +684,8 @@ describe("Integration: Multi-Stage Oracle Resolution", function () {
     });
 
     it("Should return detailed report and challenge information", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { oracleResolver } = contracts;
       const { reporter, challenger } = accounts;
 

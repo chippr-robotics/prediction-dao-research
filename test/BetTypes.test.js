@@ -1,8 +1,9 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { BetType } = require("./constants/BetType");
+import { expect } from "chai";
+import hre from "hardhat";
+import { BetType } from "./constants/BetType.js";
 
 describe("ConditionalMarketFactory - Bet Types", function () {
+  let ethers;
   let marketFactory;
   let ctf1155;
   let collateralToken;
@@ -10,6 +11,8 @@ describe("ConditionalMarketFactory - Bet Types", function () {
   let addr1;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, addr1] = await ethers.getSigners();
     
     // Deploy CTF1155

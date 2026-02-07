@@ -16,13 +16,17 @@
  *   2. Keystore must exist: npm run floppy:create
  *   3. Wallet must have sufficient USC for purchase and ETC for gas
  */
-const { ethers } = require('ethers');
-const fs = require('fs');
-const path = require('path');
+import { ethers } from 'ethers';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Import keystore functions
-const { decryptMnemonic } = require('./floppy-key/keystore');
-const CONFIG = require('./floppy-key/config');
+import { decryptMnemonic } from './floppy-key/keystore.js';
+import CONFIG from './floppy-key/config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load .env manually
 const envPath = path.join(__dirname, '..', '..', '.env');

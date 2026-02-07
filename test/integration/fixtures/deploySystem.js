@@ -1,12 +1,15 @@
-const { ethers } = require("hardhat");
-
 /**
  * Comprehensive deployment fixture for integration tests
  * Deploys and configures the entire Prediction DAO system
- * 
+ *
+ * @param {Object} connection - Network connection passed by loadFixture (Hardhat 3 pattern)
  * @returns {Object} System contracts, test accounts, and constants
  */
-async function deploySystemFixture() {
+export async function deploySystemFixture(connection) {
+  // Get ethers and networkHelpers from connection (Hardhat 3 pattern)
+  const { ethers, networkHelpers } = connection;
+  const time = networkHelpers.time;
+
   // Get signers for different roles
   const [
     owner,
@@ -207,8 +210,9 @@ async function deploySystemFixture() {
       TRADE_AMOUNT: ethers.parseEther("100"),
       ORACLE_BOND: ethers.parseEther("100"),
       CHALLENGE_BOND: ethers.parseEther("150")
-    }
+    },
+    time,
+    ethers
   };
 }
 
-module.exports = { deploySystemFixture };

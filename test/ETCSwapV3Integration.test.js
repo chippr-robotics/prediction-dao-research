@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("ETCSwapV3Integration", function () {
+    let ethers;
     let integration;
     let factory;
     let swapRouter;
@@ -10,6 +11,8 @@ describe("ETCSwapV3Integration", function () {
     let passToken, failToken, collateralToken;
 
     beforeEach(async function () {
+        const connection = await hre.network.connect();
+        ethers = connection.ethers;
         [owner, user1, user2] = await ethers.getSigners();
 
         // Deploy mock Uniswap V3 contracts

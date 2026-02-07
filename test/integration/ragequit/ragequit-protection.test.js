@@ -1,28 +1,40 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
-const { deploySystemFixture } = require("../fixtures/deploySystem");
-const {
+import { expect } from "chai";
+import hre from "hardhat";
+import { deploySystemFixture } from "../fixtures/deploySystem.js";
+import {
   submitAndActivateProposal,
   createProposalData
-} = require("../helpers");
+} from "../helpers/index.js";
+
+let time;
+let loadFixture;
 
 /**
  * Integration tests for Ragequit Protection mechanisms
  * Tests complete end-to-end flows for token holder exit, proportional share calculation,
  * and treasury withdrawal.
- * 
+ *
  * Note: Console.log statements are intentionally included for integration test visibility
  * and debugging. They provide step-by-step workflow tracking for complex multi-contract flows.
  */
 describe("Integration: Ragequit Protection Flow", function () {
+  let ethers;
+
   // Increase timeout for integration tests
   this.timeout(120000);
+
+  before(async function () {
+    const connection = await hre.network.connect();
+    loadFixture = connection.networkHelpers.loadFixture;
+  });
 
   describe("Complete Ragequit Lifecycle", function () {
     it("Should allow token holder to ragequit with proportional treasury share", async function () {
       // Setup: Load the complete system fixture
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const connection = await hre.network.connect();
+      ethers = connection.ethers;
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         proposalRegistry, 
         ragequitModule,
@@ -155,7 +167,8 @@ describe("Integration: Ragequit Protection Flow", function () {
     });
 
     it("Should handle multiple token holders ragequitting", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken
@@ -219,7 +232,8 @@ describe("Integration: Ragequit Protection Flow", function () {
     });
 
     it("Should prevent ragequit after proposal execution", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken
@@ -266,7 +280,8 @@ describe("Integration: Ragequit Protection Flow", function () {
     });
 
     it("Should prevent ineligible users from ragequitting", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken
@@ -311,7 +326,8 @@ describe("Integration: Ragequit Protection Flow", function () {
     });
 
     it("Should prevent ragequit after window closes", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken
@@ -362,7 +378,8 @@ describe("Integration: Ragequit Protection Flow", function () {
     });
 
     it("Should calculate proportional treasury share correctly", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken
@@ -422,7 +439,8 @@ describe("Integration: Ragequit Protection Flow", function () {
 
   describe("Edge Cases and Error Handling", function () {
     it("Should reject double ragequit from same user", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken
@@ -475,7 +493,8 @@ describe("Integration: Ragequit Protection Flow", function () {
     });
 
     it("Should handle zero treasury balance gracefully", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { 
         ragequitModule,
         governanceToken

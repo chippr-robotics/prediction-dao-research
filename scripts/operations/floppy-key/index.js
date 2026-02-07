@@ -3,12 +3,16 @@
  * Floppy Disk Keystore Manager CLI
  * Manages encrypted mnemonic storage on floppy disk
  */
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
-const { execSync } = require('child_process');
-const { encryptMnemonic, decryptMnemonic } = require('./keystore');
-const CONFIG = require('./config');
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+import { encryptMnemonic, decryptMnemonic } from './keystore.js';
+import CONFIG from './config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const KEYSTORE_PATH = path.join(
   CONFIG.MOUNT_POINT,

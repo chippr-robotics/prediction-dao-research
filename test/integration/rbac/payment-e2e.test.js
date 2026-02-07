@@ -1,14 +1,17 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("Real Payments Processing - E2E Tests", function () {
+  let ethers;
   let roleManager, tieredRoleManager, paymentManager;
   let mockUSDC, mockDAI;
   let owner, treasury, alice, bob, charlie;
-  
+
   let MARKET_MAKER_ROLE, CLEARPATH_USER_ROLE, TOKENMINT_ROLE;
 
   before(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, treasury, alice, bob, charlie] = await ethers.getSigners();
     
     // Deploy mock stablecoins

@@ -17,19 +17,18 @@
  *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network mordor
  */
 
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
+import hre from "hardhat";
 
-const {
+import {
   SALT_PREFIXES,
   TOKENS,
   ROLE_HASHES,
   MembershipTier,
   FRIEND_MARKET_TIERS,
   MARKET_MAKER_TIERS,
-} = require("./lib/constants");
+} from "./lib/constants.js";
 
-const {
+import {
   generateSalt,
   deployDeterministic,
   ensureSingletonFactory,
@@ -38,9 +37,11 @@ const {
   getDeploymentFilename,
   loadDeployment,
   configureTier,
-} = require("./lib/helpers");
+} from "./lib/helpers.js";
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
   console.log("=".repeat(60));
   console.log("02 - Modular RBAC System Deployment");
   console.log("=".repeat(60));

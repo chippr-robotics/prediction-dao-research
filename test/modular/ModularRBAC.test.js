@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("Modular RBAC System Tests", function () {
+  let ethers;
   let roleManagerCore;
   let tierRegistry;
   let membershipManager;
@@ -19,6 +20,8 @@ describe("Modular RBAC System Tests", function () {
   const MembershipTier = { NONE: 0, BRONZE: 1, SILVER: 2, GOLD: 3, PLATINUM: 4 };
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, treasury, user1, user2] = await ethers.getSigners();
 
     // Deploy mock ERC20 token
@@ -242,6 +245,7 @@ describe("Modular RBAC System Tests", function () {
 });
 
 describe("ConditionalMarketFactory with RoleManagerCore", function () {
+  let ethers;
   let marketFactory;
   let roleManagerCore;
   let ctf1155;
@@ -251,6 +255,8 @@ describe("ConditionalMarketFactory with RoleManagerCore", function () {
   const BetType = { PassFail: 0, YesNo: 1, MultiOutcome: 2 };
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, marketMaker] = await ethers.getSigners();
 
     // Deploy CTF1155

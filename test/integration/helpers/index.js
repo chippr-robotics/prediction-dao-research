@@ -1,5 +1,11 @@
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
-const { ethers } = require("hardhat");
+import hre from "hardhat";
+import { ZeroAddress, parseEther, toUtf8Bytes } from "ethers";
+
+// Helper to get networkHelpers.time from Hardhat 3 connection
+async function getTime() {
+  const { networkHelpers } = await hre.network.connect();
+  return networkHelpers.time;
+}
 
 /**
  * Helper function to submit and activate a proposal
@@ -8,7 +14,7 @@ const { ethers } = require("hardhat");
  * @param {Object} proposalData - Proposal parameters
  * @returns {BigInt} proposalId
  */
-async function submitAndActivateProposal(contracts, accounts, proposalData) {
+export async function submitAndActivateProposal(contracts, accounts, proposalData) {
   const { proposalRegistry, marketFactory, futarchyGovernor } = contracts;
   const { proposer, owner } = accounts;
 
@@ -20,7 +26,7 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
       proposalData.fundingAmount,
       proposalData.recipient,
       proposalData.metricId,
-      proposalData.token || ethers.ZeroAddress,
+      proposalData.token || ZeroAddress,
       proposalData.startDate || 0,
       proposalData.deadline,
       { value: proposalData.bond }
@@ -34,10 +40,11 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
       return false;
     }
   });
-  
+
   const proposalId = event ? proposalRegistry.interface.parseLog(event).args.proposalId : 0n;
 
   // Wait for review period to end (7 days)
+  const time = await getTime();
   await time.increase(7 * 24 * 3600 + 1); // 7 days + 1 second
 
   await proposalRegistry
@@ -49,8 +56,8 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
     .connect(owner)
     .createGovernanceProposal(
       proposalId,
-      ethers.parseEther("1000"), // 1000 ETH liquidity
-      ethers.parseEther("100"), // liquidity parameter
+      parseEther("1000"), // 1000 ETH liquidity
+      parseEther("100"), // liquidity parameter
       10 * 24 * 3600 // 10 days trading period
     );
 
@@ -64,11 +71,11 @@ async function submitAndActivateProposal(contracts, accounts, proposalData) {
  * @param {Array} trades - Array of trade objects {signer, buyPass, amount}
  * @param {BigInt} marketId - Market identifier
  */
-async function executeTrades(marketFactory, collateralToken, trades, marketId) {
+export async function executeTrades(marketFactory, collateralToken, trades, marketId) {
   for (const trade of trades) {
     // Approve collateral token transfer
     await collateralToken.connect(trade.signer).approve(await marketFactory.getAddress(), trade.amount);
-    
+
     // Execute buy with ERC20 collateral (no ETH value)
     await marketFactory
       .connect(trade.signer)
@@ -85,25 +92,26 @@ async function executeTrades(marketFactory, collateralToken, trades, marketId) {
  * @param {BigInt} failValue - Welfare metric value if proposal fails
  * @param {String} evidence - Evidence string or IPFS hash
  */
-async function completeOracleResolution(oracleResolver, accounts, proposalId, passValue, failValue, evidence) {
+export async function completeOracleResolution(oracleResolver, accounts, proposalId, passValue, failValue, evidence) {
   const { owner, reporter } = accounts;
 
   const reporterBond = await oracleResolver.REPORTER_BOND();
-  
+
   // Reporter submits the report
   await oracleResolver
     .connect(reporter)
     .submitReport(
-      proposalId, 
-      passValue, 
+      proposalId,
+      passValue,
       failValue,
-      ethers.toUtf8Bytes(evidence || "Integration test evidence"),
+      toUtf8Bytes(evidence || "Integration test evidence"),
       { value: reporterBond }
     );
 
   // Wait for challenge period to pass (2 days)
   const challengePeriod = await oracleResolver.CHALLENGE_PERIOD();
-  await time.increase(challengePeriod + 1n);
+  const time = await getTime();
+  await time.increase(Number(challengePeriod) + 1);
 
   // Owner finalizes the resolution
   await oracleResolver
@@ -121,16 +129,16 @@ async function completeOracleResolution(oracleResolver, accounts, proposalId, pa
  * @param {String} evidence - Evidence string or IPFS hash
  * @returns {Object} Transaction receipt
  */
-async function submitOracleReport(oracleResolver, reporter, proposalId, passValue, failValue, evidence) {
+export async function submitOracleReport(oracleResolver, reporter, proposalId, passValue, failValue, evidence) {
   const reporterBond = await oracleResolver.REPORTER_BOND();
-  
+
   return await oracleResolver
     .connect(reporter)
     .submitReport(
       proposalId,
       passValue,
       failValue,
-      ethers.toUtf8Bytes(evidence || "Oracle report evidence"),
+      toUtf8Bytes(evidence || "Oracle report evidence"),
       { value: reporterBond }
     );
 }
@@ -145,16 +153,16 @@ async function submitOracleReport(oracleResolver, reporter, proposalId, passValu
  * @param {String} counterEvidence - Counter-evidence
  * @returns {Object} Transaction receipt
  */
-async function challengeOracleReport(oracleResolver, challenger, proposalId, counterPassValue, counterFailValue, counterEvidence) {
+export async function challengeOracleReport(oracleResolver, challenger, proposalId, counterPassValue, counterFailValue, counterEvidence) {
   const challengerBond = await oracleResolver.CHALLENGER_BOND();
-  
+
   return await oracleResolver
     .connect(challenger)
     .challengeReport(
       proposalId,
       counterPassValue,
       counterFailValue,
-      ethers.toUtf8Bytes(counterEvidence || "Challenge evidence"),
+      toUtf8Bytes(counterEvidence || "Challenge evidence"),
       { value: challengerBond }
     );
 }
@@ -168,10 +176,10 @@ async function challengeOracleReport(oracleResolver, challenger, proposalId, cou
  * @param {Object} challengeValues - Challenge values {passValue, failValue, evidence}
  * @returns {Object} Final resolution values
  */
-async function completeOracleResolutionWithChallenge(
-  oracleResolver, 
-  accounts, 
-  proposalId, 
+export async function completeOracleResolutionWithChallenge(
+  oracleResolver,
+  accounts,
+  proposalId,
   reportValues,
   challengeValues
 ) {
@@ -211,7 +219,8 @@ async function completeOracleResolutionWithChallenge(
  * @param {Number} daysFromNow - Number of days in the future
  * @returns {Number} Unix timestamp
  */
-async function getFutureTimestamp(daysFromNow) {
+export async function getFutureTimestamp(daysFromNow) {
+  const time = await getTime();
   const currentTime = await time.latest();
   return currentTime + (daysFromNow * 24 * 3600);
 }
@@ -220,7 +229,8 @@ async function getFutureTimestamp(daysFromNow) {
  * Advance time by specified number of days
  * @param {Number} days - Number of days to advance
  */
-async function advanceDays(days) {
+export async function advanceDays(days) {
+  const time = await getTime();
   await time.increase(days * 24 * 3600);
 }
 
@@ -229,17 +239,17 @@ async function advanceDays(days) {
  * @param {Object} overrides - Properties to override defaults
  * @returns {Object} Proposal data
  */
-async function createProposalData(overrides = {}) {
+export async function createProposalData(overrides = {}) {
   const defaults = {
     title: "Integration Test Proposal",
     description: "Testing complete flow",
-    fundingAmount: ethers.parseEther("1000"),
+    fundingAmount: parseEther("1000"),
     recipient: null, // Must be provided
     metricId: 0,
-    token: ethers.ZeroAddress,
+    token: ZeroAddress,
     startDate: 0,
     deadline: await getFutureTimestamp(90),
-    bond: ethers.parseEther("50")
+    bond: parseEther("50")
   };
 
   return { ...defaults, ...overrides };
@@ -249,7 +259,7 @@ async function createProposalData(overrides = {}) {
  * Wait for market trading period to end
  * @param {Number} tradingPeriodDays - Trading period in days (default 14)
  */
-async function waitForTradingPeriodEnd(tradingPeriodDays = 14) {
+export async function waitForTradingPeriodEnd(tradingPeriodDays = 14) {
   await advanceDays(tradingPeriodDays);
 }
 
@@ -259,7 +269,7 @@ async function waitForTradingPeriodEnd(tradingPeriodDays = 14) {
  * @param {BigInt} proposalId - Proposal identifier
  * @param {Number} expectedStatus - Expected status code
  */
-async function verifyProposalState(proposalRegistry, proposalId, expectedStatus) {
+export async function verifyProposalState(proposalRegistry, proposalId, expectedStatus) {
   const proposal = await proposalRegistry.getProposal(proposalId);
   return proposal.status === expectedStatus;
 }
@@ -271,11 +281,11 @@ async function verifyProposalState(proposalRegistry, proposalId, expectedStatus)
  * @param {Array} amounts - Array of amounts (as strings or BigInt)
  * @returns {Array} Array of trade objects
  */
-function createTradeConfigs(traders, directions, amounts) {
+export function createTradeConfigs(traders, directions, amounts) {
   return traders.map((trader, index) => ({
     signer: trader,
     buyPass: directions[index],
-    amount: typeof amounts[index] === 'string' ? ethers.parseEther(amounts[index]) : amounts[index]
+    amount: typeof amounts[index] === 'string' ? parseEther(amounts[index]) : amounts[index]
   }));
 }
 
@@ -290,42 +300,27 @@ function createTradeConfigs(traders, directions, amounts) {
  * @param {String} evidence - Evidence for oracle
  * @returns {BigInt} governanceProposalId
  */
-async function advanceProposalToExecution(futarchyGovernor, oracleResolver, accounts, proposalId, passValue, failValue, evidence) {
+export async function advanceProposalToExecution(futarchyGovernor, oracleResolver, accounts, proposalId, passValue, failValue, evidence) {
   const { owner, reporter } = accounts;
-  
+
   // Get governance proposal ID (it's always proposalId = governanceProposalId for first proposal)
   const governanceProposalId = 0n;
-  
+
   // Wait for trading period to end (10 days)
+  const time = await getTime();
   await time.increase(10 * 24 * 3600 + 1);
-  
+
   // Move to resolution phase
   await futarchyGovernor.connect(owner).moveToResolution(governanceProposalId);
-  
+
   // Complete oracle resolution
   await completeOracleResolution(oracleResolver, accounts, proposalId, passValue, failValue, evidence);
-  
+
   // Finalize proposal (sets execution phase)
   await futarchyGovernor.connect(owner).finalizeProposal(governanceProposalId);
-  
+
   // Wait for timelock (2 days minimum)
   await time.increase(2 * 24 * 3600 + 1);
-  
+
   return governanceProposalId;
 }
-
-module.exports = {
-  submitAndActivateProposal,
-  executeTrades,
-  completeOracleResolution,
-  submitOracleReport,
-  challengeOracleReport,
-  completeOracleResolutionWithChallenge,
-  getFutureTimestamp,
-  advanceDays,
-  createProposalData,
-  waitForTradingPeriodEnd,
-  verifyProposalState,
-  createTradeConfigs,
-  advanceProposalToExecution
-};

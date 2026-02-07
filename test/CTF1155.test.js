@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("CTF1155 - Conditional Token Framework", function () {
+    let ethers;
     let ctf1155;
     let collateralToken;
     let owner, oracle, user1, user2;
@@ -9,6 +10,8 @@ describe("CTF1155 - Conditional Token Framework", function () {
     let conditionId;
 
     beforeEach(async function () {
+        const connection = await hre.network.connect();
+        ethers = connection.ethers;
         [owner, oracle, user1, user2] = await ethers.getSigners();
 
         // Deploy CTF1155

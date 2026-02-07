@@ -1,7 +1,7 @@
 /**
  * Configuration for floppy disk keystore
  */
-module.exports = {
+export default {
   // Floppy device path
   DEVICE: process.env.FLOPPY_DEVICE || '/dev/sde',
 

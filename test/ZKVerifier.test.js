@@ -1,10 +1,11 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("ZKVerifier - Unit Tests", function () {
+  let ethers;
   let zkVerifier;
   let owner, admin, user1;
-  
+
   // Sample verification key components for testing
   // These are valid BN128 curve points for testing
   // Point at infinity and simple valid points
@@ -15,8 +16,10 @@ describe("ZKVerifier - Unit Tests", function () {
     delta: [[0, 0], [0, 0]],
     gammaABC: [[0, 0], [0, 0], [0, 0]]
   };
-  
+
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, admin, user1] = await ethers.getSigners();
     
     const ZKVerifier = await ethers.getContractFactory("ZKVerifier");

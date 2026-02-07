@@ -15,24 +15,25 @@
  *   npx hardhat run scripts/deploy/05-configure.js --network mordor
  */
 
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
+import hre from "hardhat";
 
-const {
+import {
   TOKENS,
   ROLE_HASHES,
   MembershipTier,
   FRIEND_MARKET_TIERS,
   MARKET_MAKER_TIERS,
-} = require("./lib/constants");
+} from "./lib/constants.js";
 
-const {
+import {
   loadDeployment,
   getDeploymentFilename,
   configureTier,
-} = require("./lib/helpers");
+} from "./lib/helpers.js";
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
   console.log("=".repeat(60));
   console.log("05 - Post-Deployment Configuration");
   console.log("=".repeat(60));

@@ -1,6 +1,6 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { BetType } = require("./constants/BetType");
+import { expect } from "chai";
+import hre from "hardhat";
+import { BetType } from "./constants/BetType.js";
 
 describe("ConditionalMarketFactory", function () {
   let marketFactory;
@@ -8,23 +8,26 @@ describe("ConditionalMarketFactory", function () {
   let collateralToken;
   let owner;
   let addr1;
+  let ethers;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, addr1] = await ethers.getSigners();
-    
+
     // Deploy CTF1155
     const CTF1155 = await ethers.getContractFactory("CTF1155");
     ctf1155 = await CTF1155.deploy();
     await ctf1155.waitForDeployment();
-    
+
     // Deploy ConditionalMarketFactory
     const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
     marketFactory = await ConditionalMarketFactory.deploy();
     await marketFactory.initialize(owner.address);
-    
+
     // Set CTF1155
     await marketFactory.setCTF1155(await ctf1155.getAddress());
-    
+
     // Deploy mock ERC20 collateral token
     const MockERC20 = await ethers.getContractFactory("ConditionalToken");
     collateralToken = await MockERC20.deploy("Collateral", "COL");
@@ -471,15 +474,15 @@ describe("ConditionalMarketFactory", function () {
 
     beforeEach(async function () {
       [owner, addr1, marketMaker] = await ethers.getSigners();
-      
+
       // Deploy role manager
       const TieredRoleManager = await ethers.getContractFactory("TieredRoleManager");
       roleManager = await TieredRoleManager.deploy();
       await roleManager.waitForDeployment();
-      
+
       // Initialize role metadata (required to set isPremium flags)
       await roleManager.initializeRoleMetadata();
-      
+
       // Set up Market Maker tier metadata (Bronze tier)
       const MARKET_MAKER_ROLE = ethers.id("MARKET_MAKER_ROLE");
       await roleManager.setTierMetadata(
@@ -501,10 +504,10 @@ describe("ConditionalMarketFactory", function () {
         },
         true // isActive
       );
-      
+
       // Set role manager in market factory
       await marketFactory.setRoleManager(await roleManager.getAddress());
-      
+
       // Grant MARKET_MAKER_ROLE to marketMaker
       await roleManager.connect(marketMaker).purchaseRoleWithTier(
         MARKET_MAKER_ROLE,
@@ -538,7 +541,7 @@ describe("ConditionalMarketFactory", function () {
       const ConditionalMarketFactory = await ethers.getContractFactory("ConditionalMarketFactory");
       const newMarketFactory = await ConditionalMarketFactory.deploy();
       await newMarketFactory.initialize(owner.address);
-      
+
       // Set CTF1155
       await newMarketFactory.setCTF1155(await ctf1155.getAddress());
 

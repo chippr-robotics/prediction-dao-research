@@ -1,20 +1,32 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
-const { deploySystemFixture } = require("../fixtures/deploySystem");
-const {
+import { expect } from "chai";
+import hre from "hardhat";
+import { deploySystemFixture } from "../fixtures/deploySystem.js";
+import {
   submitAndActivateProposal,
   createProposalData,
   getFutureTimestamp,
   advanceDays
-} = require("../helpers");
+} from "../helpers/index.js";
+
+let time;
+let loadFixture;
 
 describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
+  let ethers;
+
   this.timeout(120000); // 2 minutes for complex flows
+
+  before(async function () {
+    const connection = await hre.network.connect();
+    loadFixture = connection.networkHelpers.loadFixture;
+  });
 
   describe("Complete Privacy Flow: Encrypted Position Submission", function () {
     it("Should handle complete encrypted position submission workflow", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const connection = await hre.network.connect();
+      ethers = connection.ethers;
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator, proposalRegistry, futarchyGovernor, marketFactory } = contracts;
       const { owner, proposer1, trader1, trader2, trader3 } = accounts;
 
@@ -134,7 +146,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
     });
 
     it("Should handle batch position submission efficiently", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator, proposalRegistry, futarchyGovernor, marketFactory } = contracts;
       const { owner, proposer1, trader1 } = accounts;
 
@@ -204,7 +217,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
   describe("Complete Privacy Flow: Key-Change Messages", function () {
     it("Should allow trader to change keys and invalidate previous positions", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator, proposalRegistry, futarchyGovernor, marketFactory } = contracts;
       const { owner, proposer1, trader1 } = accounts;
 
@@ -306,7 +320,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
     });
 
     it("Should support multiple key changes", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator } = contracts;
       const { trader1 } = accounts;
 
@@ -338,7 +353,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
   describe("Complete Privacy Flow: Batch Processing", function () {
     it("Should process positions in batches for gas efficiency", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator, proposalRegistry, futarchyGovernor, marketFactory } = contracts;
       const { owner, proposer1, trader1, trader2 } = accounts;
 
@@ -442,7 +458,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
     });
 
     it("Should handle epoch-based batch processing", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator, proposalRegistry, futarchyGovernor, marketFactory } = contracts;
       const { owner, proposer1, trader1, trader2, trader3 } = accounts;
 
@@ -535,7 +552,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
   describe("End-to-End: Privacy-Preserving Market Trading", function () {
     it("Should complete full privacy-preserving market lifecycle", async function () {
-      const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, constants, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const {
         privacyCoordinator,
         proposalRegistry,
@@ -703,7 +721,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
 
   describe("Error Handling and Edge Cases", function () {
     it("Should reject position submission without public key", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator } = contracts;
       const { trader1 } = accounts;
 
@@ -716,7 +735,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
     });
 
     it("Should reject empty proof submission", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator } = contracts;
       const { trader1 } = accounts;
 
@@ -731,7 +751,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
     });
 
     it("Should reject batch that exceeds maximum size", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator } = contracts;
       const { trader1 } = accounts;
 
@@ -757,7 +778,8 @@ describe("Integration: Privacy-Preserving Trading Lifecycle", function () {
     });
 
     it("Should handle processing of invalid position IDs gracefully", async function () {
-      const { contracts, accounts } = await loadFixture(deploySystemFixture);
+      const { contracts, accounts, time: fixtureTime } = await loadFixture(deploySystemFixture);
+      time = fixtureTime;
       const { privacyCoordinator } = contracts;
       const { owner, trader1 } = accounts;
 

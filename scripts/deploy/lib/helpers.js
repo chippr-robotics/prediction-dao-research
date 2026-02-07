@@ -4,17 +4,17 @@
  * This file contains all shared helper functions used across deployment scripts.
  */
 
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
-const { getSingletonFactoryInfo } = require("@safe-global/safe-singleton-factory");
-const fs = require("fs");
-const path = require("path");
+import hre from "hardhat";
+const { ethers } = hre;
+import { getSingletonFactoryInfo } from "@safe-global/safe-singleton-factory";
+import fs from "fs";
+import path from "path";
 
-const {
+import {
   SINGLETON_FACTORY_ADDRESS,
   DEFAULT_MAX_INITCODE_BYTES,
   DEFAULT_MAX_RUNTIME_BYTES,
-} = require("./constants");
+} from "./constants.js";
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -24,7 +24,7 @@ const {
  * Sleep for a specified number of milliseconds
  * @param {number} ms - Milliseconds to sleep
  */
-function sleep(ms) {
+export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -33,7 +33,7 @@ function sleep(ms) {
  * @param {string} hex - Hex string
  * @returns {number} Byte length
  */
-function hexByteLength(hex) {
+export function hexByteLength(hex) {
   if (!hex) return 0;
   const s = String(hex);
   const normalized = s.startsWith("0x") ? s.slice(2) : s;
@@ -45,7 +45,7 @@ function hexByteLength(hex) {
  * @param {string} identifier - Salt identifier
  * @returns {string} 32-byte hex salt
  */
-function generateSalt(identifier) {
+export function generateSalt(identifier) {
   return ethers.id(identifier);
 }
 
@@ -56,7 +56,7 @@ function generateSalt(identifier) {
 /**
  * Check if error indicates contract is already verified
  */
-function isLikelyAlreadyVerifiedError(message) {
+export function isLikelyAlreadyVerifiedError(message) {
   const m = (message || "").toLowerCase();
   return (
     m.includes("already verified") ||
@@ -68,7 +68,7 @@ function isLikelyAlreadyVerifiedError(message) {
 /**
  * Check if error indicates contract is not yet indexed
  */
-function isLikelyNotIndexedYetError(message) {
+export function isLikelyNotIndexedYetError(message) {
   const m = (message || "").toLowerCase();
   return (
     m.includes("contract not found") ||
@@ -138,7 +138,7 @@ function findBuildInfoContainingContract(contractName) {
 /**
  * Export Solc Standard JSON input for manual Blockscout verification
  */
-function exportSolcStandardJsonInput(contractName) {
+export function exportSolcStandardJsonInput(contractName) {
   const found = findBuildInfoContainingContract(contractName);
   if (!found?.buildInfo?.input) return null;
 
@@ -159,7 +159,7 @@ function exportSolcStandardJsonInput(contractName) {
  * @param {Array} [params.constructorArguments] - Constructor arguments
  * @returns {Object} Verification result
  */
-async function verifyOnBlockscout({ name, address, contract, constructorArguments }) {
+export async function verifyOnBlockscout({ name, address, contract, constructorArguments }) {
   const verifyEnabled = (process.env.VERIFY ?? "true").toLowerCase() !== "false";
   const verifyStrict = (process.env.VERIFY_STRICT ?? "false").toLowerCase() === "true";
 
@@ -241,7 +241,7 @@ async function verifyOnBlockscout({ name, address, contract, constructorArgument
  * @param {Object} deployer - Ethers signer
  * @returns {Object} Contract instance, address, and deployment status
  */
-async function deployDeterministic(contractName, constructorArgs, salt, deployer) {
+export async function deployDeterministic(contractName, constructorArgs, salt, deployer) {
   console.log(`\nDeploying ${contractName} deterministically...`);
 
   // Diagnostics: show runtime code size
@@ -386,7 +386,7 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
  * Ensure Safe Singleton Factory is available on the network
  * Auto-deploys on local networks if needed
  */
-async function ensureSingletonFactory() {
+export async function ensureSingletonFactory() {
   const network = await ethers.provider.getNetwork();
   const factoryInfo = getSingletonFactoryInfo(Number(network.chainId));
 
@@ -454,7 +454,7 @@ async function ensureSingletonFactory() {
 /**
  * Try to initialize a contract if it has an initialize function
  */
-async function tryInitialize(name, contract, deployer) {
+export async function tryInitialize(name, contract, deployer) {
   if (!contract || typeof contract.initialize !== "function") return;
   try {
     const tx = await contract.initialize(deployer.address);
@@ -473,7 +473,7 @@ async function tryInitialize(name, contract, deployer) {
 /**
  * Try to set role manager on a contract
  */
-async function trySetRoleManager(name, contract, roleManagerAddress) {
+export async function trySetRoleManager(name, contract, roleManagerAddress) {
   if (!contract || typeof contract.setRoleManager !== "function") return;
 
   try {
@@ -501,7 +501,7 @@ async function trySetRoleManager(name, contract, roleManagerAddress) {
 /**
  * Safely transfer ownership if contract is owned by expected address
  */
-async function safeTransferOwnership(name, contract, from, to) {
+export async function safeTransferOwnership(name, contract, from, to) {
   if (!contract || typeof contract.transferOwnership !== "function") return;
   if (typeof contract.owner !== "function") return;
 
@@ -531,7 +531,7 @@ async function safeTransferOwnership(name, contract, from, to) {
 /**
  * Save deployment information to JSON file
  */
-function saveDeployment(filename, deploymentInfo) {
+export function saveDeployment(filename, deploymentInfo) {
   const deploymentsDir = path.join(process.cwd(), "deployments");
   if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
 
@@ -544,7 +544,7 @@ function saveDeployment(filename, deploymentInfo) {
 /**
  * Load deployment information from JSON file
  */
-function loadDeployment(filename) {
+export function loadDeployment(filename) {
   const deploymentsDir = path.join(process.cwd(), "deployments");
   const filePath = path.join(deploymentsDir, filename);
 
@@ -558,7 +558,7 @@ function loadDeployment(filename) {
 /**
  * Get deployment filename for network
  */
-function getDeploymentFilename(network, suffix = "deployment") {
+export function getDeploymentFilename(network, suffix = "deployment") {
   const chainId = network.chainId ? Number(network.chainId) : "unknown";
   return `${hre.network.name}-chain${chainId}-${suffix}.json`;
 }
@@ -570,7 +570,7 @@ function getDeploymentFilename(network, suffix = "deployment") {
 /**
  * Configure a tier on TieredRoleManager
  */
-async function configureTier(contract, role, tierConfig, roleLabel) {
+export async function configureTier(contract, role, tierConfig, roleLabel) {
   const tierNames = ["NONE", "BRONZE", "SILVER", "GOLD", "PLATINUM"];
   const tierName = tierNames[tierConfig.tier];
 
@@ -607,37 +607,3 @@ async function configureTier(contract, role, tierConfig, roleLabel) {
     return false;
   }
 }
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
-
-module.exports = {
-  // Utilities
-  sleep,
-  hexByteLength,
-  generateSalt,
-
-  // Verification
-  verifyOnBlockscout,
-  exportSolcStandardJsonInput,
-  isLikelyAlreadyVerifiedError,
-  isLikelyNotIndexedYetError,
-
-  // Deployment
-  deployDeterministic,
-  ensureSingletonFactory,
-
-  // Initialization
-  tryInitialize,
-  trySetRoleManager,
-  safeTransferOwnership,
-
-  // Files
-  saveDeployment,
-  loadDeployment,
-  getDeploymentFilename,
-
-  // Configuration
-  configureTier,
-};

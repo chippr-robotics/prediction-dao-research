@@ -13,14 +13,13 @@
  *   npx hardhat run scripts/deploy/04-deploy-registries.js --network mordor
  */
 
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
+import hre from "hardhat";
 
-const {
+import {
   SALT_PREFIXES,
-} = require("./lib/constants");
+} from "./lib/constants.js";
 
-const {
+import {
   generateSalt,
   deployDeterministic,
   ensureSingletonFactory,
@@ -29,9 +28,11 @@ const {
   loadDeployment,
   verifyOnBlockscout,
   tryInitialize,
-} = require("./lib/helpers");
+} from "./lib/helpers.js";
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
   console.log("=".repeat(60));
   console.log("04 - Additional Registries Deployment");
   console.log("=".repeat(60));
