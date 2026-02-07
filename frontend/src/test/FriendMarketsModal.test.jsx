@@ -362,20 +362,27 @@ describe('FriendMarketsModal', () => {
       const unreadMarkets = ['market-1', 'market-2']
       mockNotificationState.unreadCount = 2
       mockNotificationState.unreadMarketIds = unreadMarkets
-      mockNotificationState.isMarketUnread = vi.fn((id) => 
+      mockNotificationState.isMarketUnread = vi.fn((id) =>
         unreadMarkets.includes(id)
       )
-      
+
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      // Should show unread count badge
-      expect(screen.getByText('2')).toBeInTheDocument()
-      expect(screen.getByLabelText('2 unread markets')).toBeInTheDocument()
+      // Should show unread count badge (use aria-label for specificity)
+      const badge = screen.getByLabelText('2 unread markets')
+      expect(badge).toBeInTheDocument()
+      expect(badge).toHaveTextContent('2')
     })
   })
 
+  // Helper: switch to manual creation mode (modal defaults to guided mode)
+  const switchToManualMode = async () => {
+    await userEvent.click(screen.getByRole('radio', { name: /manual/i }))
+  }
+
   describe('Create Tab - Type Selection', () => {
-    it('should display market type selection by default', () => {
+    it('should display market type selection in manual mode', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       expect(screen.getByText('Choose Market Type')).toBeInTheDocument()
       expect(screen.getByText('1 vs 1')).toBeInTheDocument()
@@ -383,8 +390,9 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByText('Event Tracking')).toBeInTheDocument()
     })
 
-    it('should display type descriptions', () => {
+    it('should display type descriptions', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       expect(screen.getByText('Head-to-head bet with a friend')).toBeInTheDocument()
       expect(screen.getByText('Pool predictions with 2-10 friends')).toBeInTheDocument()
@@ -393,6 +401,7 @@ describe('FriendMarketsModal', () => {
 
     it('should navigate to form when 1v1 type is selected', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       expect(screen.getByText("What's the bet?")).toBeInTheDocument()
@@ -401,6 +410,7 @@ describe('FriendMarketsModal', () => {
 
     it('should navigate to form when Small Group type is selected', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('Small Group'))
       expect(screen.getByText("What's the bet?")).toBeInTheDocument()
@@ -409,16 +419,26 @@ describe('FriendMarketsModal', () => {
 
     it('should navigate to form when Event Tracking type is selected', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('Event Tracking'))
       expect(screen.getByText("What's the bet?")).toBeInTheDocument()
       expect(screen.getByLabelText(/member addresses/i)).toBeInTheDocument()
+    })
+
+    it('should default to guided mode with interactive builder', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      // Guided mode shows the interactive wizard
+      expect(screen.getByText('What kind of bet?')).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /guided/i })).toHaveAttribute('aria-checked', 'true')
     })
   })
 
   describe('Create Tab - Form', () => {
     it('should have a back button to return to type selection', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.click(screen.getByText('Back'))
@@ -428,6 +448,7 @@ describe('FriendMarketsModal', () => {
 
     it('should display type badge in form header', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       // The badge contains the type icon and label
@@ -436,6 +457,7 @@ describe('FriendMarketsModal', () => {
 
     it('should validate required fields', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.click(screen.getByRole('button', { name: /create market/i }))
@@ -447,6 +469,7 @@ describe('FriendMarketsModal', () => {
 
     it('should validate description minimum length', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Short')
@@ -459,6 +482,7 @@ describe('FriendMarketsModal', () => {
 
     it('should validate opponent address for 1v1', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -472,6 +496,7 @@ describe('FriendMarketsModal', () => {
 
     it('should not allow betting against yourself', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -489,6 +514,7 @@ describe('FriendMarketsModal', () => {
 
     it('should have stake input with default value', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       // Use more specific label to avoid matching "Stake Token" dropdown
@@ -501,6 +527,7 @@ describe('FriendMarketsModal', () => {
 
     it('should validate member addresses for group markets', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('Small Group'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'BTC will reach $100k by end of year')
@@ -516,6 +543,7 @@ describe('FriendMarketsModal', () => {
 
     it('should validate minimum members for event tracking', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('Event Tracking'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Who will win the tournament')
@@ -533,6 +561,7 @@ describe('FriendMarketsModal', () => {
     it('should submit form with valid data', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -552,6 +581,7 @@ describe('FriendMarketsModal', () => {
     it('should show success state with QR code after creation', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -571,6 +601,7 @@ describe('FriendMarketsModal', () => {
     it('should have Create Another button in success state', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -588,6 +619,7 @@ describe('FriendMarketsModal', () => {
     it('should return to type selection when Create Another is clicked', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -603,12 +635,14 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByRole('button', { name: /create another/i }))
 
-      expect(screen.getByText('Choose Market Type')).toBeInTheDocument()
+      // After "Create Another", returns to guided mode (default)
+      expect(screen.getByText('What kind of bet?')).toBeInTheDocument()
     })
 
     it('should have Copy Link button in success state', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -789,6 +823,7 @@ describe('FriendMarketsModal', () => {
     it('should have create button enabled when wallet is connected and on correct network', async () => {
       // Default state is connected with correct network
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       // Button should be enabled (not disabled) when wallet is connected
@@ -799,6 +834,7 @@ describe('FriendMarketsModal', () => {
     it('should show validation errors when form is submitted with invalid data', async () => {
       // When connected, validation errors should be displayed
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       // Leave description empty and try to submit
@@ -850,6 +886,7 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} pendingTransaction={pendingTransaction} />
       )
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
 
@@ -876,6 +913,7 @@ describe('FriendMarketsModal', () => {
           onClearPendingTransaction={onClearPendingTransaction}
         />
       )
+      await switchToManualMode()
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.click(screen.getByText('Start Fresh'))

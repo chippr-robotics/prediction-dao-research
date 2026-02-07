@@ -148,6 +148,12 @@ function InteractiveAgreementBuilder({
     return STAKE_TOKEN_OPTIONS.find(t => t.id === data.stakeTokenId) || STAKE_TOKEN_OPTIONS[0]
   }, [data.stakeTokenId])
 
+  // Compute datetime min values once on mount (lazy state initializer avoids impure render calls)
+  const [dateTimeMins] = useState(() => ({
+    endDateTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    acceptDeadline: new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)
+  }))
+
   const updateData = useCallback((field, value) => {
     setData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) {
@@ -666,7 +672,7 @@ function InteractiveAgreementBuilder({
             className={`iab-input iab-datetime ${errors.endDateTime ? 'iab-input-error' : ''}`}
             value={data.endDateTime}
             onChange={(e) => updateData('endDateTime', e.target.value)}
-            min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+            min={dateTimeMins.endDateTime}
           />
           {errors.endDateTime && <span className="iab-error">{errors.endDateTime}</span>}
         </div>
@@ -679,7 +685,7 @@ function InteractiveAgreementBuilder({
             className={`iab-input iab-datetime ${errors.acceptanceDeadline ? 'iab-input-error' : ''}`}
             value={data.acceptanceDeadline}
             onChange={(e) => updateData('acceptanceDeadline', e.target.value)}
-            min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+            min={dateTimeMins.acceptDeadline}
           />
           {errors.acceptanceDeadline && <span className="iab-error">{errors.acceptanceDeadline}</span>}
         </div>

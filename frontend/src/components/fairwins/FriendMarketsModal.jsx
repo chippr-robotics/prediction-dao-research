@@ -884,6 +884,7 @@ function FriendMarketsModal({
 
   const handleCreateAnother = () => {
     setCreationStep('type')
+    setCreationMode('guided')
     setFriendMarketType(null)
     setCreatedMarket(null)
     resetForm()
@@ -966,6 +967,14 @@ function FriendMarketsModal({
       default: return 'status-default'
     }
   }
+
+  // Memoize datetime min/max values to avoid impure Date.now() calls in render
+  const dateTimeBounds = useMemo(() => ({
+    minEnd: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    maxEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    minAccept: new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16),
+    maxAccept: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+  }), [])
 
   // Get selected stake token info for display
   const selectedStakeToken = useMemo(() => {
@@ -1527,8 +1536,8 @@ function FriendMarketsModal({
                         type="datetime-local"
                         value={formData.endDateTime}
                         onChange={(e) => handleFormChange('endDateTime', e.target.value)}
-                        min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-                        max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        min={dateTimeBounds.minEnd}
+                        max={dateTimeBounds.maxEnd}
                         disabled={submitting}
                         className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
                       />
@@ -1546,8 +1555,8 @@ function FriendMarketsModal({
                         type="datetime-local"
                         value={formData.acceptanceDeadline}
                         onChange={(e) => handleFormChange('acceptanceDeadline', e.target.value)}
-                        min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
-                        max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        min={dateTimeBounds.minAccept}
+                        max={dateTimeBounds.maxAccept}
                         disabled={submitting}
                         className={`fm-datetime-input ${errors.acceptanceDeadline ? 'error' : ''}`}
                       />
