@@ -2,13 +2,13 @@
  * Ethereum-style keystore for mnemonic phrases
  * Adapts the Web3 Secret Storage Definition for mnemonic storage
  */
-const crypto = require('crypto');
-const { scrypt } = require('ethereum-cryptography/scrypt');
-const { keccak256 } = require('ethereum-cryptography/keccak');
-const { validateMnemonic } = require('ethereum-cryptography/bip39');
-const { wordlist } = require('ethereum-cryptography/bip39/wordlists/english');
-const { bytesToHex, hexToBytes, utf8ToBytes } = require('ethereum-cryptography/utils');
-const CONFIG = require('./config');
+import crypto from 'crypto';
+import { scrypt } from 'ethereum-cryptography/scrypt.js';
+import { keccak256 } from 'ethereum-cryptography/keccak.js';
+import { validateMnemonic } from 'ethereum-cryptography/bip39/index.js';
+import { wordlist } from 'ethereum-cryptography/bip39/wordlists/english.js';
+import { bytesToHex, hexToBytes, utf8ToBytes } from 'ethereum-cryptography/utils.js';
+import CONFIG from './config.js';
 
 /**
  * Encrypt a mnemonic phrase to keystore format
@@ -16,7 +16,7 @@ const CONFIG = require('./config');
  * @param {string} password - Encryption password
  * @returns {Promise<object>} Encrypted keystore JSON object
  */
-async function encryptMnemonic(mnemonic, password) {
+export async function encryptMnemonic(mnemonic, password) {
   // Normalize and validate mnemonic
   const normalizedMnemonic = mnemonic.trim().toLowerCase().replace(/\s+/g, ' ');
   const words = normalizedMnemonic.split(' ');
@@ -91,7 +91,7 @@ async function encryptMnemonic(mnemonic, password) {
  * @param {string} password - Decryption password
  * @returns {Promise<string>} Decrypted mnemonic phrase
  */
-async function decryptMnemonic(keystore, password) {
+export async function decryptMnemonic(keystore, password) {
   if (keystore.version !== 3) {
     throw new Error('Unsupported keystore version');
   }
@@ -170,8 +170,3 @@ function constantTimeCompare(a, b) {
   }
   return result === 0;
 }
-
-module.exports = {
-  encryptMnemonic,
-  decryptMnemonic
-};

@@ -1,20 +1,29 @@
-require("@nomicfoundation/hardhat-toolbox");
-require("dotenv").config();
+import { defineConfig } from "hardhat/config";
+import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import "dotenv/config";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import { execSync } from "child_process";
+import { keccak256, HDNodeWallet } from "ethers";
 
-const { subtask } = require("hardhat/config");
+// Floppy keystore configuration
+const FLOPPY_CONFIG = {
+  MOUNT_POINT: process.env.FLOPPY_MOUNT || '/mnt/floppy',
+  KEYSTORE_DIR: '.keystore',
+};
 
-// Floppy keystore loader for secure key storage
-// Usage: npm run floppy:mount && npm run floppy:create (one-time setup)
-const {
-  getFloppyPrivateKeys,
-  isFloppyMounted,
-  keystoreExists,
-  adminKeystoreExists,
-  CONFIG: FLOPPY_CONFIG
-} = require('./scripts/operations/floppy-key/loader');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+/**
+ * Check if floppy is mounted
+ */
+function isFloppyMounted() {
+  try {
+    execSync(`mountpoint -q "${FLOPPY_CONFIG.MOUNT_POINT}"`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Synchronously decrypt a keystore file
@@ -57,7 +66,6 @@ function decryptKeystoreSync(keystorePath, password) {
         .digest();
     } else {
       // Mnemonic keystore uses keccak256(derivedKey[16:32] || ciphertext)
-      const { keccak256 } = require('ethers');
       const macInput = Buffer.concat([
         Buffer.from(derivedKey.slice(16, 32)),
         ciphertext
@@ -140,7 +148,6 @@ function loadFloppyKeysSync(allowFallback = false) {
     if (decrypted) {
       try {
         const mnemonic = decrypted.toString('utf8');
-        const { HDNodeWallet } = require('ethers');
         // Derive first account using path parameter directly
         const wallet = HDNodeWallet.fromPhrase(mnemonic, undefined, "m/44'/60'/0'/0/0");
         console.log('[Floppy] Loaded mnemonic wallet:', wallet.address);
@@ -162,52 +169,11 @@ function loadFloppyKeysSync(allowFallback = false) {
 
 // Load keys from floppy at config time (synchronous)
 // SECURITY: allowFallback=true enables PRIVATE_KEY env var when floppy unavailable
-// Load floppy keys WITH fallback for deployment when password mismatch
 const floppyKeys = loadFloppyKeysSync(true);
-const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require("hardhat/builtin-tasks/task-names");
 
-subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async (args, hre, runSuper) => {
-  const solcBuild = await runSuper(args);
+export default defineConfig({
+  plugins: [hardhatToolboxMochaEthers],
 
-  const isCodespaces = Boolean(process.env.CODESPACES || process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN);
-  const forceSolcJs =
-    (process.env.FORCE_SOLCJS ?? "").toLowerCase() === "true" ||
-    (isCodespaces && (process.env.FORCE_NATIVE_SOLC ?? "").toLowerCase() !== "true");
-
-  if (!forceSolcJs) {
-    return solcBuild;
-  }
-
-  let solcjsPath;
-  try {
-    solcjsPath = require.resolve("solc/soljson.js");
-  } catch (e) {
-    throw new Error(
-      "solc-js not found. Run `npm install` (or `npm i -D solc@0.8.24`) and retry."
-    );
-  }
-
-  let longVersion = solcBuild.longVersion;
-  try {
-    // eslint-disable-next-line global-require
-    const solc = require("solc");
-    if (typeof solc.version === "function") {
-      longVersion = solc.version();
-    }
-  } catch {
-    // ignore
-  }
-
-  return {
-    version: solcBuild.version,
-    longVersion,
-    compilerPath: solcjsPath,
-    isSolcJs: true,
-  };
-});
-
-/** @type import('hardhat/config').HardhatUserConfig */
-module.exports = {
   solidity: {
     version: "0.8.24",
     settings: {
@@ -218,13 +184,14 @@ module.exports = {
       viaIR: true,
     },
   },
+
   networks: {
     hardhat: {
       chainId: 1337,
       allowUnlimitedContractSize: true,
       accounts: {
         count: 20, // More accounts for integration tests
-        accountsBalance: "100000000000000000000000", // 100,000 ETH each - increased to handle bond-heavy tests
+        accountsBalance: "100000000000000000000000", // 100,000 ETH each
       },
       mining: {
         auto: true,
@@ -241,47 +208,31 @@ module.exports = {
       // Mount floppy and set FLOPPY_KEYSTORE_PASSWORD to use
       accounts: floppyKeys,
     },
-    // Example: Mainnet with floppy keystore (uncomment when ready to use)
-    // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)
-    // "mainnet-floppy": {
-    //   url: process.env.MAINNET_RPC_URL || "https://eth.llamarpc.com",
-    //   chainId: 1,
-    //   accounts: async () => {
-    //     if (!isFloppyMounted() || !keystoreExists()) {
-    //       throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
-    //     }
-    //     return getFloppyPrivateKeys({ count: 5 });
-    //   },
-    // },
-    // Mordor testnet with floppy keystore
-    // Note: Use `mordor` network for regular testing, or set PRIVATE_KEY env var
-    // "mordor-floppy": {
-    //   url: "https://rpc.mordor.etccooperative.org",
-    //   chainId: 63,
-    //   // accounts must be synchronous or use lazyFunction helper
-    //   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-    // },
   },
+
   paths: {
     sources: "./contracts",
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
   },
+
   mocha: {
     timeout: 120000, // 2 minutes for integration tests
   },
+
   gasReporter: {
-    enabled: process.env.REPORT_GAS ? true : false,
+    enabled: Boolean(process.env.REPORT_GAS),
     currency: "USD",
     outputFile: process.env.REPORT_GAS ? "gas-report.txt" : undefined,
-    noColors: process.env.REPORT_GAS ? true : false,
+    noColors: Boolean(process.env.REPORT_GAS),
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
   },
+
   etherscan: {
     apiKey: {
       'mordor': 'empty'
-   },
+    },
     customChains: [
       {
         network: "mordor",
@@ -293,4 +244,4 @@ module.exports = {
       }
     ]
   }
-};
+});

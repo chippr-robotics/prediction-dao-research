@@ -2,11 +2,14 @@
  * Hardhat configuration loader for floppy keystore
  * Use this to load mnemonic from floppy disk in hardhat.config.js
  */
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
-const { decryptMnemonic } = require('./keystore');
-const CONFIG = require('./config');
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
+import { execSync } from 'child_process';
+import crypto from 'crypto';
+import { HDNodeWallet } from 'ethers';
+import { decryptMnemonic } from './keystore.js';
+import CONFIG from './config.js';
 
 const KEYSTORE_PATH = path.join(
   CONFIG.MOUNT_POINT,
@@ -20,9 +23,8 @@ let cachedMnemonic = null;
 /**
  * Check if floppy is mounted
  */
-function isFloppyMounted() {
+export function isFloppyMounted() {
   try {
-    const { execSync } = require('child_process');
     execSync(`mountpoint -q "${CONFIG.MOUNT_POINT}"`, { stdio: 'ignore' });
     return true;
   } catch {
@@ -33,7 +35,7 @@ function isFloppyMounted() {
 /**
  * Check if keystore exists
  */
-function keystoreExists() {
+export function keystoreExists() {
   return fs.existsSync(KEYSTORE_PATH);
 }
 
@@ -84,7 +86,7 @@ function promptPasswordSync(prompt) {
  * @returns {Promise<string>} The decrypted mnemonic
  * @throws {Error} If floppy not mounted or keystore not found
  */
-async function loadMnemonicFromFloppy() {
+export async function loadMnemonicFromFloppy() {
   // Return cached mnemonic if available
   if (cachedMnemonic) {
     return cachedMnemonic;
@@ -137,7 +139,7 @@ async function loadMnemonicFromFloppy() {
  * @param {string} options.path - Derivation path (default: "m/44'/60'/0'/0")
  * @returns {object} Hardhat accounts config
  */
-function getFloppyAccounts(options = {}) {
+export function getFloppyAccounts(options = {}) {
   const {
     count = 10,
     initialIndex = 0,
@@ -164,16 +166,13 @@ function getFloppyAccounts(options = {}) {
  * @param {number} options.initialIndex - Starting index (default: 0)
  * @returns {Promise<string[]>} Array of private keys
  */
-async function getFloppyPrivateKeys(options = {}) {
+export async function getFloppyPrivateKeys(options = {}) {
   const {
     count = 10,
     initialIndex = 0
   } = options;
 
   const mnemonic = await loadMnemonicFromFloppy();
-
-  // Use ethers to derive private keys from mnemonic
-  const { HDNodeWallet } = require('ethers');
 
   const keys = [];
   const masterNode = HDNodeWallet.fromPhrase(mnemonic);
@@ -189,8 +188,9 @@ async function getFloppyPrivateKeys(options = {}) {
 /**
  * Clear cached mnemonic (call on process exit)
  */
-function clearCache() {
+export function clearCache() {
   cachedMnemonic = null;
+  cachedAdminKey = null;
 }
 
 // Clear cache on process exit
@@ -218,7 +218,7 @@ let cachedAdminKey = null;
 /**
  * Check if admin keystore exists
  */
-function adminKeystoreExists() {
+export function adminKeystoreExists() {
   return fs.existsSync(ADMIN_KEYSTORE_PATH);
 }
 
@@ -226,7 +226,7 @@ function adminKeystoreExists() {
  * Load admin private key from floppy keystore
  * @returns {Promise<string>} The decrypted private key (with 0x prefix)
  */
-async function loadAdminKeyFromFloppy() {
+export async function loadAdminKeyFromFloppy() {
   if (cachedAdminKey) {
     return cachedAdminKey;
   }
@@ -254,7 +254,6 @@ async function loadAdminKeyFromFloppy() {
   }
 
   // Decrypt the admin key
-  const crypto = require('crypto');
   const { crypto: cryptoParams } = keystore;
 
   const salt = Buffer.from(cryptoParams.kdfparams.salt, 'hex');
@@ -304,29 +303,10 @@ async function loadAdminKeyFromFloppy() {
  * Get admin private key for hardhat config
  * Returns array with single private key
  */
-async function getAdminPrivateKey() {
+export async function getAdminPrivateKey() {
   const key = await loadAdminKeyFromFloppy();
   return [key];
 }
 
-// Update clear cache to also clear admin key
-const originalClearCache = clearCache;
-function clearCacheAll() {
-  cachedMnemonic = null;
-  cachedAdminKey = null;
-}
-
-module.exports = {
-  loadMnemonicFromFloppy,
-  getFloppyAccounts,
-  getFloppyPrivateKeys,
-  isFloppyMounted,
-  keystoreExists,
-  clearCache: clearCacheAll,
-  CONFIG,
-  // Admin key exports
-  loadAdminKeyFromFloppy,
-  adminKeystoreExists,
-  getAdminPrivateKey,
-  ADMIN_KEYSTORE_PATH
-};
+// Re-export CONFIG for backwards compatibility
+export { CONFIG, ADMIN_KEYSTORE_PATH };
