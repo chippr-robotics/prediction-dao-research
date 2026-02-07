@@ -10,6 +10,7 @@ import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType } from '../../abis/Frie
 import QRScanner from '../ui/QRScanner'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import TransactionProgress from './TransactionProgress'
+import InteractiveAgreementBuilder from './InteractiveAgreementBuilder'
 import './FriendMarketsModal.css'
 
 // Stake token options derived from ETCswap tokens
@@ -151,6 +152,9 @@ function FriendMarketsModal({
   const [friendMarketType, setFriendMarketType] = useState(null)
   const [createdMarket, setCreatedMarket] = useState(null)
 
+  // Creation mode: 'guided' (interactive wizard) or 'manual' (traditional form)
+  const [creationMode, setCreationMode] = useState('guided')
+
   // Form data
   const [formData, setFormData] = useState({
     description: '',
@@ -239,6 +243,7 @@ function FriendMarketsModal({
     if (isOpen) {
       setActiveTab('create')
       setCreationStep('type')
+      setCreationMode('guided')
       setFriendMarketType(null)
       setCreatedMarket(null)
       setSelectedMarket(null)
@@ -690,6 +695,31 @@ function FriendMarketsModal({
     resetForm()
   }
 
+  // Handler for when the interactive agreement builder completes
+  const handleBuilderComplete = useCallback((builderData) => {
+    // Transfer builder data to the existing form data and trigger submit
+    setFriendMarketType(builderData.marketType)
+    setFormData(prev => ({
+      ...prev,
+      description: builderData.description,
+      opponent: builderData.opponent || '',
+      members: builderData.members || '',
+      memberLimit: builderData.memberLimit || '5',
+      stakeAmount: builderData.stakeAmount,
+      stakeTokenId: builderData.stakeTokenId,
+      customStakeTokenAddress: builderData.customStakeTokenAddress || '',
+      endDateTime: builderData.endDateTime,
+      acceptanceDeadline: builderData.acceptanceDeadline,
+      minAcceptanceThreshold: builderData.minAcceptanceThreshold || '2',
+      resolutionType: builderData.resolutionType,
+      arbitrator: builderData.arbitrator || ''
+    }))
+    setEnableEncryption(builderData.enableEncryption)
+    // Switch to manual form view so the existing submit logic runs
+    setCreationMode('manual')
+    setCreationStep('form')
+  }, [])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -1113,8 +1143,53 @@ function FriendMarketsModal({
           {/* Create Tab */}
           {activeTab === 'create' && (
             <div id="panel-create" role="tabpanel" className="fm-panel">
-              {/* Type Selection Step */}
-              {creationStep === 'type' && (
+              {/* Mode toggle: Guided vs Manual */}
+              {creationStep !== 'success' && (
+                <div className="fm-mode-toggle" role="radiogroup" aria-label="Creation mode">
+                  <button
+                    type="button"
+                    className={`fm-mode-option ${creationMode === 'guided' ? 'fm-mode-active' : ''}`}
+                    onClick={() => { setCreationMode('guided'); setCreationStep('type'); setFriendMarketType(null); resetForm() }}
+                    role="radio"
+                    aria-checked={creationMode === 'guided'}
+                    disabled={submitting}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    Guided
+                  </button>
+                  <button
+                    type="button"
+                    className={`fm-mode-option ${creationMode === 'manual' ? 'fm-mode-active' : ''}`}
+                    onClick={() => { setCreationMode('manual'); setCreationStep('type'); setFriendMarketType(null); resetForm() }}
+                    role="radio"
+                    aria-checked={creationMode === 'manual'}
+                    disabled={submitting}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="16 18 22 12 16 6"/>
+                      <polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    Manual
+                  </button>
+                </div>
+              )}
+
+              {/* Guided Interactive Agreement Builder */}
+              {creationMode === 'guided' && creationStep !== 'success' && (
+                <InteractiveAgreementBuilder
+                  account={account}
+                  onComplete={handleBuilderComplete}
+                  onCancel={() => { setCreationMode('manual'); setCreationStep('type') }}
+                  hasBookmakerRoles={hasBookmakerRoles}
+                  submitting={submitting}
+                />
+              )}
+
+              {/* Manual Mode: Type Selection Step */}
+              {creationMode === 'manual' && creationStep === 'type' && (
                 <div className="fm-type-selection">
                   <h3 className="fm-section-title">Choose Market Type</h3>
                   <div className="fm-type-grid">
@@ -1181,8 +1256,8 @@ function FriendMarketsModal({
                 </div>
               )}
 
-              {/* Form Step */}
-              {creationStep === 'form' && (
+              {/* Form Step (manual mode only) */}
+              {creationMode === 'manual' && creationStep === 'form' && (
                 <form className="fm-form" onSubmit={handleSubmit}>
                   <div className="fm-form-header">
                     <button
