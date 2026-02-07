@@ -1,5 +1,5 @@
-const { ethers } = require("hardhat");
-const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
+import hre from "hardhat";
+import { loadMnemonicFromFloppy } from "./floppy-key/loader.js";
 
 /**
  * Purchase MARKET_MAKER_ROLE membership using USC
@@ -20,9 +20,6 @@ const CONTRACTS = {
   usc: "0xDE093684c796204224BC081f937aa059D903c52a",
   conditionalMarketFactory: "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
 };
-
-// Role hash
-const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
 
 // Tier prices in USC (6 decimals)
 const TIER_PRICES = {
@@ -72,6 +69,12 @@ const ERC20_ABI = [
 ];
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
+
+  // Role hash
+  const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
+
   console.log("=".repeat(60));
   console.log("Purchase MARKET_MAKER_ROLE Membership");
   console.log("=".repeat(60));

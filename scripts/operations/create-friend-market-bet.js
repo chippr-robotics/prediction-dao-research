@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-const { ethers } = require("hardhat");
-const fs = require("fs");
-const path = require("path");
-const { loadMnemonicFromFloppy, keystoreExists, CONFIG } = require("./floppy-key/loader");
+import hre from "hardhat";
+import fs from "fs";
+import path from "path";
+import { loadMnemonicFromFloppy, keystoreExists, CONFIG } from "./floppy-key/loader.js";
 
 /**
  * Create a 1v1 Friend Market Bet using the floppy wallet
@@ -26,16 +26,6 @@ const CONTRACTS = {
   tierRegistryAdapter: "0x8e3A4C65a6C22d88515FD356cB00732adac4f4d7",
   tierRegistry: "0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d",
   roleManagerCore: "0x888332df7621EC341131d85e2228f00407777dD7",
-};
-
-// Bet parameters (customize these)
-const BET_CONFIG = {
-  opponent: "0x52502d049571C7893447b86c4d8B38e6184bF6e1", // Use deployer as opponent for test
-  description: "Will ETC price be above $30 by end of January 2026?",
-  tradingPeriodDays: 14, // 14 day trading period
-  arbitrator: ethers.ZeroAddress, // No arbitrator (creator can resolve)
-  peggedPublicMarketId: 0, // Not pegged to any public market
-  liquidityETC: "0.01", // 0.01 ETC liquidity
 };
 
 // Minimal ABIs
@@ -74,6 +64,19 @@ function tierName(tier) {
 }
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
+
+  // Bet parameters (customize these)
+  const BET_CONFIG = {
+    opponent: "0x52502d049571C7893447b86c4d8B38e6184bF6e1", // Use deployer as opponent for test
+    description: "Will ETC price be above $30 by end of January 2026?",
+    tradingPeriodDays: 14, // 14 day trading period
+    arbitrator: ethers.ZeroAddress, // No arbitrator (creator can resolve)
+    peggedPublicMarketId: 0, // Not pegged to any public market
+    liquidityETC: "0.01", // 0.01 ETC liquidity
+  };
+
   console.log("=".repeat(60));
   console.log("Create Friend Market Bet");
   console.log("=".repeat(60));

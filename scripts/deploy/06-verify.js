@@ -16,19 +16,18 @@
  *   npx hardhat run scripts/deploy/06-verify.js --network mordor
  */
 
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
+import hre from "hardhat";
 
-const {
+import {
   TOKENS,
   ROLE_HASHES,
   MembershipTier,
-} = require("./lib/constants");
+} from "./lib/constants.js";
 
-const {
+import {
   loadDeployment,
   getDeploymentFilename,
-} = require("./lib/helpers");
+} from "./lib/helpers.js";
 
 // Verification result tracking
 let passCount = 0;
@@ -50,18 +49,22 @@ function warn(message) {
   warnCount++;
 }
 
-async function verifyDeployed(address, name) {
-  const code = await ethers.provider.getCode(address);
-  if (code !== "0x") {
-    pass(`${name} deployed at ${address}`);
-    return true;
-  } else {
-    fail(`${name} NOT deployed at ${address}`);
-    return false;
-  }
-}
+// Note: verifyDeployed is now defined inside main() to access ethers from connection
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
+
+  async function verifyDeployed(address, name) {
+    const code = await ethers.provider.getCode(address);
+    if (code !== "0x") {
+      pass(`${name} deployed at ${address}`);
+      return true;
+    } else {
+      fail(`${name} NOT deployed at ${address}`);
+      return false;
+    }
+  }
   console.log("=".repeat(60));
   console.log("06 - Deployment Verification");
   console.log("=".repeat(60));
