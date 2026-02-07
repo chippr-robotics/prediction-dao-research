@@ -47,6 +47,12 @@
   ],
   "author": "",
   "license": "Apache-2.0",
+  "overrides": {
+    "axios": "1.13.4",
+    "diff": "8.0.3",
+    "tmp": "0.2.4",
+    "lodash-es": "4.17.23"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.0",
     "@nomicfoundation/hardhat-ethers-chai-matchers": "^3.0.0",
