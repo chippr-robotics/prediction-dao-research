@@ -179,7 +179,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     }
   }, [account])
 
-  const handleOnboardingComplete = useCallback((dontShowAgain) => {
+  const handleOnboardingComplete = useCallback(() => {
     setShowOnboardingTutorial(false)
 
     // Always save completion when user completes the full tutorial

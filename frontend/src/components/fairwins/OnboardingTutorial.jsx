@@ -285,32 +285,7 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
     }
   }, [isOpen])
 
-  // Keyboard navigation
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        handleSkip()
-      } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
-        if (!isLastStep) goToNext()
-        else handleComplete()
-      } else if (e.key === 'ArrowLeft') {
-        if (!isFirstStep) goToPrev()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, currentStep, isLastStep, isFirstStep])
-
-  // Focus management
-  useEffect(() => {
-    if (isOpen && modalRef.current) {
-      modalRef.current.focus()
-    }
-  }, [isOpen])
-
+  // Navigation callbacks - defined before useEffect that uses them
   const goToNext = useCallback(() => {
     if (isAnimating || isLastStep) return
     setIsAnimating(true)
@@ -332,6 +307,40 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
     setTimeout(() => setIsAnimating(false), 300)
   }, [isAnimating, currentStep])
 
+  const handleSkip = useCallback(() => {
+    onDismiss?.(dontShowAgain)
+  }, [onDismiss, dontShowAgain])
+
+  const handleComplete = useCallback(() => {
+    onComplete?.(dontShowAgain)
+  }, [onComplete, dontShowAgain])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        handleSkip()
+      } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        if (!isLastStep) goToNext()
+        else handleComplete()
+      } else if (e.key === 'ArrowLeft') {
+        if (!isFirstStep) goToPrev()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isLastStep, isFirstStep, goToNext, goToPrev, handleSkip, handleComplete])
+
+  // Focus management
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      modalRef.current.focus()
+    }
+  }, [isOpen])
+
   // Touch handlers for swipe
   const handleTouchStart = (e) => {
     touchStartX.current = e.touches[0].clientX
@@ -352,14 +361,6 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
         goToPrev()
       }
     }
-  }
-
-  const handleSkip = () => {
-    onDismiss?.(dontShowAgain)
-  }
-
-  const handleComplete = () => {
-    onComplete?.(dontShowAgain)
   }
 
   const handleBackdropClick = (e) => {
