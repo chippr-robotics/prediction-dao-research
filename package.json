@@ -70,7 +70,6 @@
     "ethereum-cryptography": "^2.2.1",
     "ethers": "^6.16.0",
     "hardhat": "^3.1.7",
-    "hardhat-gas-reporter": "^2.3.0",
     "mocha": "^11.0.0",
     "solc": "0.8.24",
     "ts-node": "^10.9.2",

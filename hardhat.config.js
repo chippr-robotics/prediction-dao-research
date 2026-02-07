@@ -187,8 +187,10 @@ export default defineConfig({
 
   networks: {
     hardhat: {
+      type: "edr-simulated",
       chainId: 1337,
       allowUnlimitedContractSize: true,
+      allowBlocksWithSameTimestamp: true,
       accounts: {
         count: 20, // More accounts for integration tests
         accountsBalance: "100000000000000000000000", // 100,000 ETH each
@@ -199,9 +201,11 @@ export default defineConfig({
       },
     },
     localhost: {
+      type: "http",
       url: "http://127.0.0.1:8545",
     },
     mordor: {
+      type: "http",
       url: "https://rpc.mordor.etccooperative.org",
       chainId: 63,
       // SECURITY: Keys loaded from floppy disk only - no PRIVATE_KEY env var fallback
@@ -221,13 +225,7 @@ export default defineConfig({
     timeout: 120000, // 2 minutes for integration tests
   },
 
-  gasReporter: {
-    enabled: Boolean(process.env.REPORT_GAS),
-    currency: "USD",
-    outputFile: process.env.REPORT_GAS ? "gas-report.txt" : undefined,
-    noColors: Boolean(process.env.REPORT_GAS),
-    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
-  },
+  // Note: Hardhat 3 has built-in gas reporting via Mocha reporter
 
   etherscan: {
     apiKey: {
