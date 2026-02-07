@@ -1,10 +1,10 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { BetType } from "./constants/BetType.js";
 
 describe("Batch Operations", function () {
   let ethers;
+  let time;
   let marketFactory;
   let privacyCoordinator;
   let ctf1155;
@@ -16,6 +16,7 @@ describe("Batch Operations", function () {
   beforeEach(async function () {
     const connection = await hre.network.connect();
     ethers = connection.ethers;
+    time = connection.networkHelpers.time;
     [owner, addr1, addr2] = await ethers.getSigners();
     
     // Deploy CTF1155

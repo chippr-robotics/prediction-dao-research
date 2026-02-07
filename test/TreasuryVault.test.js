@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("TreasuryVault - Unit Tests", function () {
   let ethers;
+  let time;
   let treasuryVault;
   let mockToken;
   let owner, spender1, spender2, guardian, user1, user2;
@@ -11,6 +11,7 @@ describe("TreasuryVault - Unit Tests", function () {
   beforeEach(async function () {
     const connection = await hre.network.connect();
     ethers = connection.ethers;
+    time = connection.networkHelpers.time;
     [owner, spender1, spender2, guardian, user1, user2] = await ethers.getSigners();
 
     // Deploy TreasuryVault directly (not using clone pattern in tests)

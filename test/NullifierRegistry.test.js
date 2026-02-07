@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { anyValue } from "@nomicfoundation/hardhat-ethers-chai-matchers/withArgs";
 
 describe("NullifierRegistry", function () {
   let ethers;

@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("RoleManager - Unit Tests", function () {
   let ethers;
+  let time;
   let roleManager;
   let owner, coreAdmin, opsAdmin, guardian, user1, user2, user3, committee1, committee2;
 
@@ -20,6 +20,7 @@ describe("RoleManager - Unit Tests", function () {
   beforeEach(async function () {
     const connection = await hre.network.connect();
     ethers = connection.ethers;
+    time = connection.networkHelpers.time;
     [owner, coreAdmin, opsAdmin, guardian, user1, user2, user3, committee1, committee2] = await ethers.getSigners();
     
     const RoleManager = await ethers.getContractFactory("RoleManager");

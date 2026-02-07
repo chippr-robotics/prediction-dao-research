@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { mine } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("TraditionalGovernor", function () {
   let ethers;
+  let mine;
   let traditionalGovernor;
   let proposalRegistry;
   let governanceToken;
@@ -15,6 +15,7 @@ describe("TraditionalGovernor", function () {
   beforeEach(async function () {
     const connection = await hre.network.connect();
     ethers = connection.ethers;
+    mine = connection.networkHelpers.mine;
     [owner, addr1, addr2, addr3] = await ethers.getSigners();
     
     // Deploy mock governance token
