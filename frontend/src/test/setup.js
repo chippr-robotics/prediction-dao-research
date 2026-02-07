@@ -6,6 +6,29 @@ import * as matchers from 'vitest-axe/matchers'
 // Extend expect with axe matchers
 expect.extend(matchers)
 
+// Mock ResizeObserver globally as a proper class
+class MockResizeObserver {
+  constructor(callback) {
+    this.callback = callback
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = MockResizeObserver
+
+// Mock IntersectionObserver globally as a proper class
+class MockIntersectionObserver {
+  constructor(callback) {
+    this.callback = callback
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() { return [] }
+}
+global.IntersectionObserver = MockIntersectionObserver
+
 // Cleanup after each test
 afterEach(() => {
   cleanup()
