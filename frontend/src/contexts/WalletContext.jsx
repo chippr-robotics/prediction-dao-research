@@ -61,7 +61,7 @@ export function WalletProvider({ children }) {
           console.error('Error creating provider/signer from walletClient:', error)
 
           // Fallback to window.ethereum if walletClient approach fails
-          if (window.ethereum) {
+          if (typeof window !== 'undefined' && window.ethereum) {
             try {
               const fallbackProvider = new ethers.BrowserProvider(window.ethereum)
               const fallbackSigner = await fallbackProvider.getSigner()
@@ -78,7 +78,7 @@ export function WalletProvider({ children }) {
             setSigner(null)
           }
         }
-      } else if (isConnected && window.ethereum) {
+      } else if (isConnected && typeof window !== 'undefined' && window.ethereum) {
         // If walletClient is not available yet, try window.ethereum directly
         try {
           const ethersProvider = new ethers.BrowserProvider(window.ethereum)
