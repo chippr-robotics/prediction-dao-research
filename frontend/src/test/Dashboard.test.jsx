@@ -6,12 +6,7 @@ import { getMockMarkets } from '../utils/mockDataLoader'
 import { useDataFetcher } from '../hooks/useDataFetcher'
 import { UserPreferencesContext } from '../contexts'
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn()
-}))
+// Note: ResizeObserver and IntersectionObserver are mocked globally in setup.js
 
 // Mock the hooks and utilities
 vi.mock('../hooks/useWeb3')
