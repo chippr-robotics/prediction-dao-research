@@ -1,14 +1,15 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("TieredRoleManager - Unit Tests", function () {
+  let ethers;
   let tieredRoleManager;
   let owner, user1, user2, user3;
-  
+
   // Role constants
   let MARKET_MAKER_ROLE, CLEARPATH_USER_ROLE, TOKENMINT_ROLE;
-  
+
   // Tier enum values
   const Tier = {
     NONE: 0,
@@ -19,6 +20,8 @@ describe("TieredRoleManager - Unit Tests", function () {
   };
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, user1, user2, user3] = await ethers.getSigners();
     
     const TieredRoleManager = await ethers.getContractFactory("TieredRoleManager");

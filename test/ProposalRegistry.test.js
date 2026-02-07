@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("ProposalRegistry", function () {
+  let ethers;
   let proposalRegistry;
   let owner;
   let proposer;
@@ -44,9 +45,11 @@ describe("ProposalRegistry", function () {
   };
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     BOND_AMOUNT = ethers.parseEther("50");
     [owner, proposer, recipient] = await ethers.getSigners();
-    
+
     const ProposalRegistry = await ethers.getContractFactory("ProposalRegistry");
     proposalRegistry = await ProposalRegistry.deploy();
     await proposalRegistry.initialize(owner.address);
@@ -116,15 +119,15 @@ describe("ProposalRegistry", function () {
     it("Should reject submission with deadline before start date", async function () {
       const futureStart = await getFutureTimestamp(30);
       const deadline = futureStart - 1; // Clearly before start date
-      
+
       // This test may hit "Deadline must be in future" first if blockchain time has advanced
       // The key point is that deadline < startDate is invalid
       await expect(
-        submitTestProposal({ 
+        submitTestProposal({
           startDate: futureStart,
           executionDeadline: deadline
         })
-      ).to.be.reverted; // Accept either error message
+      ).to.be.revert(ethers); // Accept any revert in Hardhat 3
     });
 
 
@@ -198,7 +201,7 @@ describe("ProposalRegistry", function () {
 
     it("Should allow proposer to cancel during review", async function () {
       const initialBalance = await ethers.provider.getBalance(proposer.address);
-      
+
       await expect(
         proposalRegistry.connect(proposer).cancelProposal(0)
       ).to.emit(proposalRegistry, "ProposalCancelled").withArgs(0);
@@ -209,11 +212,11 @@ describe("ProposalRegistry", function () {
 
     it("Should return bond on cancellation", async function () {
       const initialBalance = await ethers.provider.getBalance(proposer.address);
-      
+
       const tx = await proposalRegistry.connect(proposer).cancelProposal(0);
       const receipt = await tx.wait();
       const gasUsed = receipt.gasUsed * receipt.gasPrice;
-      
+
       const finalBalance = await ethers.provider.getBalance(proposer.address);
       expect(finalBalance).to.be.closeTo(
         initialBalance + BOND_AMOUNT - gasUsed,

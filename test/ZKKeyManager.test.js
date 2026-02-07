@@ -1,12 +1,15 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("ZKKeyManager - Unit Tests", function () {
+  let ethers;
   let zkKeyManager;
   let owner, admin, user1, user2, user3;
-  
+
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, admin, user1, user2, user3] = await ethers.getSigners();
     
     const ZKKeyManager = await ethers.getContractFactory("ZKKeyManager");

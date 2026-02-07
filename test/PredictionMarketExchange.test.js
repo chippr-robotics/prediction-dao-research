@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("PredictionMarketExchange", function () {
+    let ethers;
     let exchange;
     let ctf1155;
     let collateralToken;
@@ -10,6 +11,8 @@ describe("PredictionMarketExchange", function () {
     let makerTokenId, takerTokenId;
 
     beforeEach(async function () {
+        const connection = await hre.network.connect();
+        ethers = connection.ethers;
         [owner, feeRecipient, maker, taker, oracle] = await ethers.getSigners();
 
         // Deploy CTF1155

@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("FutarchyGovernor", function () {
+  let ethers;
   let futarchyGovernor;
   let welfareRegistry;
   let proposalRegistry;
@@ -14,6 +15,8 @@ describe("FutarchyGovernor", function () {
   let addr1;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, addr1] = await ethers.getSigners();
     
     // Deploy mock tokens

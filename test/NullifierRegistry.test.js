@@ -1,8 +1,9 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
+import { expect } from "chai";
+import hre from "hardhat";
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 
 describe("NullifierRegistry", function () {
+  let ethers;
   let nullifierRegistry;
   let roleManager;
   let owner;
@@ -23,11 +24,15 @@ describe("NullifierRegistry", function () {
     return "0x" + stripped.padStart(512, "0");
   };
 
-  // Test market hash
-  const testMarketHash = ethers.keccak256(ethers.toUtf8Bytes("test_market_1"));
-  const testMarketHash2 = ethers.keccak256(ethers.toUtf8Bytes("test_market_2"));
+  // Test market hash - computed inside beforeEach after ethers is available
+  let testMarketHash;
+  let testMarketHash2;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
+    testMarketHash = ethers.keccak256(ethers.toUtf8Bytes("test_market_1"));
+    testMarketHash2 = ethers.keccak256(ethers.toUtf8Bytes("test_market_2"));
     [owner, admin, nullifierAdmin, user1, user2] = await ethers.getSigners();
 
     // Deploy MinimalRoleManager

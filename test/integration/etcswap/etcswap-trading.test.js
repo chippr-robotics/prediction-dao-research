@@ -1,11 +1,10 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { BetType } = require("../../constants/BetType");
+import { expect } from "chai";
+import hre from "hardhat";
+import { BetType } from "../../constants/BetType.js";
 
 /**
  * Integration tests for ETCSwap v3 trading through ConditionalMarketFactory
- * 
+ *
  * Tests the complete flow:
  * 1. Deploy market with conditional tokens
  * 2. Set up ETCSwap v3 integration
@@ -15,8 +14,15 @@ const { BetType } = require("../../constants/BetType");
  * 6. Verify correct behavior
  */
 
+let loadFixture;
+
 describe("Integration: ETCSwap V3 Trading", function () {
+    let ethers;
+
     async function deployETCSwapFixture() {
+        const connection = await hre.network.connect();
+        ethers = connection.ethers;
+        loadFixture = connection.networkHelpers.loadFixture;
         const [owner, liquidityProvider, trader1, trader2] = await ethers.getSigners();
 
         // Deploy mock Uniswap V3 infrastructure

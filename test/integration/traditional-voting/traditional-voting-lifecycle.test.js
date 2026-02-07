@@ -1,8 +1,9 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { mine } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
+import { mine } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Integration: Traditional Voting Lifecycle", function () {
+  let ethers;
   let traditionalGovernor;
   let proposalRegistry;
   let governanceToken;
@@ -14,6 +15,8 @@ describe("Integration: Traditional Voting Lifecycle", function () {
   let recipient;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, proposer, voter1, voter2, voter3, recipient] = await ethers.getSigners();
     
     // Ensure proposer has enough ETH for bond payments (50 ETH per proposal + gas)

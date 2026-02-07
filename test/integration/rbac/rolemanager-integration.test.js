@@ -1,13 +1,14 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("RoleManager - Integration Tests", function () {
+  let ethers;
   let roleManager;
   let owner, coreAdmin1, coreAdmin2, coreAdmin3;
   let opsAdmin1;
   let guardian1;
   let user1, user2;
-  
+
   // Role constants
   let DEFAULT_ADMIN_ROLE;
   let CORE_SYSTEM_ADMIN_ROLE;
@@ -18,7 +19,9 @@ describe("RoleManager - Integration Tests", function () {
   let TOKENMINT_ROLE;
 
   beforeEach(async function () {
-    [owner, coreAdmin1, coreAdmin2, coreAdmin3, opsAdmin1, 
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
+    [owner, coreAdmin1, coreAdmin2, coreAdmin3, opsAdmin1,
      guardian1, user1, user2] = await ethers.getSigners();
     
     const RoleManager = await ethers.getContractFactory("RoleManager");

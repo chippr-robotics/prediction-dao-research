@@ -1,13 +1,16 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("MetadataRegistry", function () {
+  let ethers;
   let metadataRegistry;
   let owner;
   let authorizedUpdater;
   let unauthorizedUser;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, authorizedUpdater, unauthorizedUser] = await ethers.getSigners();
 
     const MetadataRegistry = await ethers.getContractFactory("MetadataRegistry");

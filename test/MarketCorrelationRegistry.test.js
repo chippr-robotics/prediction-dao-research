@@ -1,14 +1,17 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
+import { expect } from "chai";
+import hre from "hardhat";
+import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 
 describe("MarketCorrelationRegistry", function () {
+  let ethers;
   let registry;
   let owner;
   let addr1;
   let addr2;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, addr1, addr2] = await ethers.getSigners();
     
     const MarketCorrelationRegistry = await ethers.getContractFactory("MarketCorrelationRegistry");

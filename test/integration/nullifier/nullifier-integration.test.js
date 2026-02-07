@@ -1,5 +1,5 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 /**
  * Integration Tests for Nullifier System
@@ -11,6 +11,7 @@ const { ethers } = require("hardhat");
  * 4. Address nullification affecting user operations
  */
 describe("Nullifier Integration Tests", function () {
+  let ethers;
   let nullifierRegistry;
   let marketFactory;
   let roleManager;
@@ -32,6 +33,8 @@ describe("Nullifier Integration Tests", function () {
   };
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, nullifierAdmin, marketMaker, trader, blockedUser] = await ethers.getSigners();
 
     // Deploy MinimalRoleManager

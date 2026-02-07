@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("Perpetual Futures System", function () {
+  let ethers;
   let owner, trader1, trader2, liquidator, feeRecipient;
   let fundingRateEngine, perpFactory, perpMarket;
   let mockCollateralToken;
@@ -9,6 +10,8 @@ describe("Perpetual Futures System", function () {
   const LEVERAGE_PRECISION = 10000n;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, trader1, trader2, liquidator, feeRecipient] = await ethers.getSigners();
 
     // Deploy mock ERC20 token for collateral

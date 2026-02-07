@@ -1,22 +1,25 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("MembershipPaymentManager - Unit Tests", function () {
+  let ethers;
   let paymentManager;
   let mockToken1, mockToken2;
   let owner, treasury, paymentAdmin, pricingAdmin, treasuryAdmin, buyer1, buyer2, recipient1, recipient2;
-  
+
   // Role constants
   let DEFAULT_ADMIN_ROLE;
   let PAYMENT_ADMIN_ROLE;
   let PRICING_ADMIN_ROLE;
   let TREASURY_ADMIN_ROLE;
-  
+
   // Test role identifiers
   let MARKET_MAKER_ROLE;
   let CLEARPATH_USER_ROLE;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, treasury, paymentAdmin, pricingAdmin, treasuryAdmin, buyer1, buyer2, recipient1, recipient2] = await ethers.getSigners();
     
     // Deploy mock ERC20 tokens

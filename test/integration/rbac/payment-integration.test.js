@@ -1,20 +1,24 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("RoleManager + MembershipPaymentManager Integration Tests", function () {
+  let ethers;
+  let time;
   let roleManager;
   let tieredRoleManager;
   let paymentManager;
   let mockToken;
   let owner, treasury, buyer1, buyer2, recipient1;
-  
+
   // Role constants
   let MARKET_MAKER_ROLE;
   let CLEARPATH_USER_ROLE;
   let TOKENMINT_ROLE;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
+    time = connection.networkHelpers.time;
     [owner, treasury, buyer1, buyer2, recipient1] = await ethers.getSigners();
     
     // Deploy mock ERC20 token (simulating USDC stablecoin)

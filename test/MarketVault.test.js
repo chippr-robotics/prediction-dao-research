@@ -1,12 +1,15 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("MarketVault - Unit Tests", function () {
+  let ethers;
   let marketVault;
   let mockToken;
   let owner, factory, manager1, manager2, user1, user2;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, factory, manager1, manager2, user1, user2] = await ethers.getSigners();
 
     // Deploy MarketVault directly (not using clone pattern in tests)
