@@ -95,10 +95,9 @@ describe("UMAOracleAdapter", function () {
 
   describe("Condition Creation", function () {
     const description = "Lakers will win the 2025 NBA Finals";
-    const futureDeadline = () => Math.floor(Date.now() / 1000) + 86400;
 
     it("Should create a condition", async function () {
-      const deadline = futureDeadline();
+      const deadline = (await time.latest()) + 86400;
 
       const tx = await umaAdapter.createCondition(description, deadline);
       const receipt = await tx.wait();
@@ -116,14 +115,14 @@ describe("UMAOracleAdapter", function () {
     });
 
     it("Should revert for deadline in past", async function () {
-      const pastDeadline = Math.floor(Date.now() / 1000) - 3600;
+      const pastDeadline = (await time.latest()) - 3600;
       await expect(
         umaAdapter.createCondition(description, pastDeadline)
       ).to.be.revertedWithCustomError(umaAdapter, "DeadlineInPast");
     });
 
     it("Should return condition details", async function () {
-      const deadline = futureDeadline();
+      const deadline = (await time.latest()) + 86400;
       const tx = await umaAdapter.createCondition(description, deadline);
       const receipt = await tx.wait();
 

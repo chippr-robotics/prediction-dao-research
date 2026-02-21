@@ -110,9 +110,9 @@ describe("ChainlinkOracleAdapter", function () {
 
   describe("Condition Creation", function () {
     const targetPrice = 5000_00000000n; // $5000
-    const deadline = Math.floor(Date.now() / 1000) + 86400; // 1 day from now
 
     it("Should create an ABOVE condition", async function () {
+      const deadline = (await time.latest()) + 86400; // 1 day from now
       const tx = await chainlinkAdapter.createCondition(
         mockEthFeed.target,
         targetPrice,
@@ -136,6 +136,7 @@ describe("ChainlinkOracleAdapter", function () {
     });
 
     it("Should create a BELOW condition", async function () {
+      const deadline = (await time.latest()) + 86400;
       const tx = await chainlinkAdapter.createCondition(
         mockEthFeed.target,
         targetPrice,
@@ -157,6 +158,7 @@ describe("ChainlinkOracleAdapter", function () {
     });
 
     it("Should revert for unsupported feed", async function () {
+      const deadline = (await time.latest()) + 86400;
       await expect(
         chainlinkAdapter.createCondition(user1.address, targetPrice, 0, deadline, "Test")
       ).to.be.revertedWithCustomError(chainlinkAdapter, "FeedNotSupported");
@@ -170,12 +172,14 @@ describe("ChainlinkOracleAdapter", function () {
     });
 
     it("Should revert for zero target price", async function () {
+      const deadline = (await time.latest()) + 86400;
       await expect(
         chainlinkAdapter.createCondition(mockEthFeed.target, 0, 0, deadline, "Test")
       ).to.be.revertedWithCustomError(chainlinkAdapter, "InvalidTargetPrice");
     });
 
     it("Should return condition details", async function () {
+      const deadline = (await time.latest()) + 86400;
       const tx = await chainlinkAdapter.createCondition(
         mockEthFeed.target,
         targetPrice,
