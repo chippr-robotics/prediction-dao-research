@@ -58,6 +58,9 @@ error NotPendingResolution();
 error NotChallenged();
 error InvalidChallengePeriod();
 error InvalidChallengeBond();
+error ClaimTimeoutNotExpired();
+error InvalidClaimTimeout();
+error TreasuryNotSet();
 
 /**
  * @title FriendGroupMarketFactory
@@ -248,6 +251,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     uint256 public challengePeriod = 24 hours;  // How long before resolution finalizes
     uint256 public challengeBond = 0.1 ether;   // Bond required to challenge
 
+    // ========== Claim Timeout ==========
+
+    // Time window for winners to claim (default 90 days)
+    uint256 public claimTimeout = 90 days;
+
+    // Treasury address for unclaimed funds
+    address public treasury;
+
     // Accepted payment tokens for market creation and liquidity (address => isAccepted)
     mapping(address => bool) public acceptedPaymentTokens;
     
@@ -403,6 +414,16 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     event ChallengePeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
     event ChallengeBondUpdated(uint256 oldBond, uint256 newBond);
 
+    // Claim timeout events
+    event UnclaimedFundsSwept(
+        uint256 indexed friendMarketId,
+        uint256 amount,
+        address token,
+        address treasury
+    );
+    event ClaimTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
+    event TreasuryUpdated(address oldTreasury, address newTreasury);
+
     constructor(
         address _marketFactory,
         address payable _ragequitModule,
@@ -550,6 +571,28 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 oldBond = challengeBond;
         challengeBond = _challengeBond;
         emit ChallengeBondUpdated(oldBond, _challengeBond);
+    }
+
+    /**
+     * @notice Set the treasury address for unclaimed funds
+     * @param _treasury New treasury address
+     */
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert InvalidAddress();
+        address oldTreasury = treasury;
+        treasury = _treasury;
+        emit TreasuryUpdated(oldTreasury, _treasury);
+    }
+
+    /**
+     * @notice Update the claim timeout duration
+     * @param _claimTimeout New claim timeout in seconds (min 7 days, max 365 days)
+     */
+    function setClaimTimeout(uint256 _claimTimeout) external onlyOwner {
+        if (_claimTimeout < 7 days || _claimTimeout > 365 days) revert InvalidClaimTimeout();
+        uint256 oldTimeout = claimTimeout;
+        claimTimeout = _claimTimeout;
+        emit ClaimTimeoutUpdated(oldTimeout, _claimTimeout);
     }
 
     /**
@@ -1821,6 +1864,82 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function isWagerClaimed(uint256 friendMarketId) external view returns (bool) {
         return winningsClaimed[friendMarketId];
+    }
+
+    /**
+     * @notice Sweep unclaimed funds to treasury after claim timeout expires
+     * @dev Anyone can call this after the timeout period for resolved, unclaimed wagers
+     * @param friendMarketId ID of the resolved friend market
+     */
+    function sweepUnclaimedFunds(uint256 friendMarketId) external nonReentrant {
+        if (treasury == address(0)) revert TreasuryNotSet();
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be resolved
+        if (market.status != FriendMarketStatus.Resolved) revert WagerNotResolved();
+
+        // Must not already be claimed
+        if (winningsClaimed[friendMarketId]) revert AlreadyClaimed();
+
+        // Must be past claim timeout
+        uint256 resolvedTime = resolvedAt[friendMarketId];
+        if (block.timestamp < resolvedTime + claimTimeout) revert ClaimTimeoutNotExpired();
+
+        // Mark as claimed (funds swept)
+        winningsClaimed[friendMarketId] = true;
+
+        // Calculate total pot
+        uint256 totalPot = marketTotalStaked[friendMarketId];
+
+        // Transfer to treasury
+        address token = market.stakeToken;
+        if (token == address(0)) {
+            // Native token
+            (bool success, ) = payable(treasury).call{value: totalPot}("");
+            if (!success) revert TransferFailed();
+        } else {
+            // ERC20 token
+            (bool success, bytes memory returnData) = token.call(
+                abi.encodeWithSelector(IERC20.transfer.selector, treasury, totalPot)
+            );
+            if (!success) revert TransferFailed();
+            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
+        }
+
+        emit UnclaimedFundsSwept(friendMarketId, totalPot, token, treasury);
+    }
+
+    /**
+     * @notice Check if unclaimed funds can be swept for a market
+     * @param friendMarketId ID of the friend market
+     * @return canSweep Whether the funds can be swept
+     * @return timeUntilSweep Seconds until sweep is allowed (0 if already allowed)
+     */
+    function canSweepUnclaimedFunds(uint256 friendMarketId) external view returns (
+        bool canSweep,
+        uint256 timeUntilSweep
+    ) {
+        if (friendMarketId >= friendMarketCount) {
+            return (false, 0);
+        }
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be resolved and not claimed
+        if (market.status != FriendMarketStatus.Resolved || winningsClaimed[friendMarketId]) {
+            return (false, 0);
+        }
+
+        uint256 resolvedTime = resolvedAt[friendMarketId];
+        uint256 sweepTime = resolvedTime + claimTimeout;
+
+        if (block.timestamp >= sweepTime) {
+            return (true, 0);
+        } else {
+            return (false, sweepTime - block.timestamp);
+        }
     }
 
     /**
