@@ -47,6 +47,9 @@ error PolymarketAdapterNotSet();
 error InvalidConditionId();
 error PolymarketNotResolved();
 error AlreadyPeggedToPolymarket();
+error NotWinner();
+error AlreadyClaimed();
+error WagerNotResolved();
 
 /**
  * @title FriendGroupMarketFactory
@@ -202,6 +205,20 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Track Polymarket condition to friend market mappings
     mapping(bytes32 => uint256[]) public polymarketConditionToFriendMarkets;
 
+    // ========== Claim Tracking ==========
+
+    // Track whether winnings have been claimed for a market
+    mapping(uint256 => bool) public winningsClaimed;
+
+    // Track the outcome of resolved markets (true = creator wins, false = opponent wins)
+    mapping(uint256 => bool) public wagerOutcome;
+
+    // Track the winner address for resolved markets
+    mapping(uint256 => address) public wagerWinner;
+
+    // Track when market was resolved (for future timeout features)
+    mapping(uint256 => uint256) public resolvedAt;
+
     // Accepted payment tokens for market creation and liquidity (address => isAccepted)
     mapping(address => bool) public acceptedPaymentTokens;
     
@@ -319,7 +336,14 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 failNumerator,
         bool outcome
     );
-    
+
+    event WinningsClaimed(
+        uint256 indexed friendMarketId,
+        address indexed winner,
+        uint256 amount,
+        address token
+    );
+
     constructor(
         address _marketFactory,
         address payable _ragequitModule,
@@ -1253,19 +1277,29 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
 
         ConditionalMarketFactory.Market memory publicMarket = marketFactory.getMarket(market.peggedPublicMarketId);
         if (!publicMarket.resolved) revert NotResolved();
-        
+
+        // Determine outcome
+        bool outcome = publicMarket.passValue > publicMarket.failValue;
+
         // Resolve friend market based on public market outcome
         market.active = false;
-        
+        market.status = FriendMarketStatus.Resolved;
+
+        // Track resolution outcome and winner
+        wagerOutcome[friendMarketId] = outcome;
+        resolvedAt[friendMarketId] = block.timestamp;
+        if (outcome) {
+            wagerWinner[friendMarketId] = market.creator;
+        } else if (market.members.length > 1) {
+            wagerWinner[friendMarketId] = market.members[1];
+        }
+
         emit PeggedMarketAutoResolved(
             friendMarketId,
             market.peggedPublicMarketId,
             publicMarket.passValue,
             publicMarket.failValue
         );
-        
-        // Also emit standard resolution event
-        bool outcome = publicMarket.passValue > publicMarket.failValue;
         emit MarketResolved(friendMarketId, msg.sender, outcome);
     }
     
@@ -1280,6 +1314,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!publicMarket.resolved) revert NotResolved();
 
         uint256[] storage peggedMarkets = publicMarketToPeggedFriendMarkets[publicMarketId];
+        bool outcome = publicMarket.passValue > publicMarket.failValue;
 
         for (uint256 i = 0; i < peggedMarkets.length; i++) {
             uint256 friendMarketId = peggedMarkets[i];
@@ -1287,6 +1322,16 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
 
             if (market.active && market.autoPegged) {
                 market.active = false;
+                market.status = FriendMarketStatus.Resolved;
+
+                // Track resolution outcome and winner
+                wagerOutcome[friendMarketId] = outcome;
+                resolvedAt[friendMarketId] = block.timestamp;
+                if (outcome) {
+                    wagerWinner[friendMarketId] = market.creator;
+                } else if (market.members.length > 1) {
+                    wagerWinner[friendMarketId] = market.members[1];
+                }
 
                 emit PeggedMarketAutoResolved(
                     friendMarketId,
@@ -1294,8 +1339,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
                     publicMarket.passValue,
                     publicMarket.failValue
                 );
-
-                bool outcome = publicMarket.passValue > publicMarket.failValue;
                 emit MarketResolved(friendMarketId, msg.sender, outcome);
             }
         }
@@ -1367,6 +1410,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         market.active = false;
         market.status = FriendMarketStatus.Resolved;
 
+        // Track resolution outcome and winner
+        wagerOutcome[friendMarketId] = outcome;
+        resolvedAt[friendMarketId] = block.timestamp;
+        if (outcome) {
+            wagerWinner[friendMarketId] = market.creator;
+        } else if (market.members.length > 1) {
+            wagerWinner[friendMarketId] = market.members[1];
+        }
+
         emit PolymarketMarketResolved(
             friendMarketId,
             market.polymarketConditionId,
@@ -1403,6 +1455,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             if (market.active && market.resolutionType == ResolutionType.PolymarketOracle) {
                 market.active = false;
                 market.status = FriendMarketStatus.Resolved;
+
+                // Track resolution outcome and winner
+                wagerOutcome[friendMarketId] = outcome;
+                resolvedAt[friendMarketId] = block.timestamp;
+                if (outcome) {
+                    wagerWinner[friendMarketId] = market.creator;
+                } else if (market.members.length > 1) {
+                    wagerWinner[friendMarketId] = market.members[1];
+                }
 
                 emit PolymarketMarketResolved(
                     friendMarketId,
@@ -1489,14 +1550,102 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         market.active = false;
         market.status = FriendMarketStatus.Resolved;
 
-        // Resolve underlying market
-        // NOTE: In production, this would call marketFactory.resolveMarket()
-        // or OracleResolver to properly resolve the underlying market and
-        // enable participants to redeem their tokens based on the outcome.
-        // Current implementation emits events for tracking purposes only.
+        // Track resolution outcome and winner
+        wagerOutcome[friendMarketId] = outcome;
+        resolvedAt[friendMarketId] = block.timestamp;
+
+        // Determine winner based on outcome
+        // outcome = true means creator wins, false means opponent wins
+        if (outcome) {
+            wagerWinner[friendMarketId] = market.creator;
+        } else if (market.members.length > 1) {
+            wagerWinner[friendMarketId] = market.members[1];
+        }
+
         emit MarketResolved(friendMarketId, msg.sender, outcome);
     }
-    
+
+    // ========== Claim Functions ==========
+
+    /**
+     * @notice Claim winnings from a resolved wager
+     * @dev Transfers all staked funds to the winner
+     * @param friendMarketId ID of the resolved friend market
+     */
+    function claimWinnings(uint256 friendMarketId) external nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be resolved
+        if (market.status != FriendMarketStatus.Resolved) revert WagerNotResolved();
+
+        // Must be the winner
+        address winner = wagerWinner[friendMarketId];
+        if (msg.sender != winner) revert NotWinner();
+
+        // Must not already be claimed
+        if (winningsClaimed[friendMarketId]) revert AlreadyClaimed();
+
+        // Mark as claimed
+        winningsClaimed[friendMarketId] = true;
+
+        // Calculate total pot
+        uint256 totalPot = marketTotalStaked[friendMarketId];
+
+        // Transfer winnings
+        address token = market.stakeToken;
+        if (token == address(0)) {
+            // Native token
+            (bool success, ) = payable(winner).call{value: totalPot}("");
+            if (!success) revert TransferFailed();
+        } else {
+            // ERC20 token
+            (bool success, bytes memory returnData) = token.call(
+                abi.encodeWithSelector(IERC20.transfer.selector, winner, totalPot)
+            );
+            if (!success) revert TransferFailed();
+            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
+        }
+
+        emit WinningsClaimed(friendMarketId, winner, totalPot, token);
+    }
+
+    /**
+     * @notice Check if a wager has been claimed
+     * @param friendMarketId ID of the friend market
+     */
+    function isWagerClaimed(uint256 friendMarketId) external view returns (bool) {
+        return winningsClaimed[friendMarketId];
+    }
+
+    /**
+     * @notice Get wager resolution details
+     * @param friendMarketId ID of the friend market
+     * @return winner The winner's address (zero if not resolved)
+     * @return outcome The resolution outcome (true = creator wins)
+     * @return claimed Whether winnings have been claimed
+     * @return resolvedTimestamp When the wager was resolved
+     * @return totalPot Total amount to be claimed
+     */
+    function getWagerResolution(uint256 friendMarketId) external view returns (
+        address winner,
+        bool outcome,
+        bool claimed,
+        uint256 resolvedTimestamp,
+        uint256 totalPot
+    ) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        return (
+            wagerWinner[friendMarketId],
+            wagerOutcome[friendMarketId],
+            winningsClaimed[friendMarketId],
+            resolvedAt[friendMarketId],
+            marketTotalStaked[friendMarketId]
+        );
+    }
+
     /**
      * @notice Withdraw accumulated fees (owner only)
      */
