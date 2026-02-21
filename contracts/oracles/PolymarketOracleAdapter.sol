@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../interfaces/IPolymarketOracle.sol";
+import "./IOracleAdapter.sol";
 
 /**
  * @title PolymarketOracleAdapter
@@ -28,7 +29,7 @@ import "../interfaces/IPolymarketOracle.sol";
  * 2. When Polymarket resolves, anyone can call resolveFromPolymarket()
  * 3. Adapter fetches resolution data and resolves the private market
  */
-contract PolymarketOracleAdapter is Ownable, ReentrancyGuard {
+contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
 
     /// @notice Address of the Polymarket CTF contract (on same network)
     address public polymarketCTF;
@@ -333,16 +334,17 @@ contract PolymarketOracleAdapter is Ownable, ReentrancyGuard {
     /**
      * @notice Check if a condition is resolved (from cache or CTF)
      * @param conditionId The condition ID to check
+     * @return resolved True if the condition has been resolved
      */
-    function isConditionResolved(bytes32 conditionId) external view returns (bool) {
+    function isConditionResolved(bytes32 conditionId) external view override returns (bool resolved) {
         // Check cache first
         if (resolutionCache[conditionId].resolved) {
             return true;
         }
 
         // Check CTF
-        try IPolymarketOracle(polymarketCTF).isResolved(conditionId) returns (bool resolved) {
-            return resolved;
+        try IPolymarketOracle(polymarketCTF).isResolved(conditionId) returns (bool isResolved) {
+            return isResolved;
         } catch {
             return false;
         }
@@ -398,5 +400,91 @@ contract PolymarketOracleAdapter is Ownable, ReentrancyGuard {
             return (false, true);
         }
         return (passNumerator > failNumerator, false);
+    }
+
+    // ========== IOracleAdapter Implementation ==========
+
+    /**
+     * @notice Returns the oracle type
+     * @return The oracle type as "Polymarket"
+     */
+    function oracleType() external pure override returns (string memory) {
+        return "Polymarket";
+    }
+
+    /**
+     * @notice Check if a condition ID is supported (has been linked or cached)
+     * @param conditionId The condition to check
+     * @return supported True if condition is known to this adapter
+     */
+    function isConditionSupported(bytes32 conditionId) external view override returns (bool supported) {
+        // Check if we have cached resolution or if it exists in CTF
+        if (resolutionCache[conditionId].cachedAt > 0) {
+            return true;
+        }
+        // Try to check existence in primary CTF
+        try IPolymarketOracle(polymarketCTF).getCondition(conditionId) returns (
+            address, bytes32, uint256 outcomeSlotCount, bool
+        ) {
+            return outcomeSlotCount > 0;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * @notice Get the outcome of a resolved condition
+     * @param conditionId The condition to query
+     * @return outcome True if YES/PASS won
+     * @return confidence Always 10000 (100%) for Polymarket
+     * @return resolvedAt Timestamp when cached
+     */
+    function getOutcome(bytes32 conditionId) external view override returns (
+        bool outcome,
+        uint256 confidence,
+        uint256 resolvedAt
+    ) {
+        CachedResolution storage cached = resolutionCache[conditionId];
+        if (cached.resolved) {
+            return (
+                cached.passNumerator > cached.failNumerator,
+                10000, // 100% confidence for resolved conditions
+                cached.cachedAt
+            );
+        }
+
+        // Fetch from CTF if not cached
+        try IPolymarketOracle(polymarketCTF).isResolved(conditionId) returns (bool isResolved) {
+            if (!isResolved) {
+                return (false, 0, 0);
+            }
+            uint256[] memory payouts = IPolymarketOracle(polymarketCTF).getPayoutNumerators(conditionId);
+            if (payouts.length >= 2) {
+                return (
+                    payouts[0] > payouts[1],
+                    10000,
+                    block.timestamp
+                );
+            }
+        } catch {
+            // Fall through
+        }
+        return (false, 0, 0);
+    }
+
+    /**
+     * @notice Get metadata about a condition
+     * @param conditionId The condition to query
+     * @return description Empty string (Polymarket doesn't store on-chain descriptions)
+     * @return expectedResolutionTime Always 0 (not tracked on-chain)
+     */
+    function getConditionMetadata(bytes32 conditionId) external view override returns (
+        string memory description,
+        uint256 expectedResolutionTime
+    ) {
+        // Polymarket doesn't store descriptions on-chain
+        // Return empty values - off-chain services should be used for metadata
+        conditionId; // silence unused warning
+        return ("", 0);
     }
 }
