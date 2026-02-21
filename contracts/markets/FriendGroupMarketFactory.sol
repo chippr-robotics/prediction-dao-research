@@ -50,6 +50,14 @@ error AlreadyPeggedToPolymarket();
 error NotWinner();
 error AlreadyClaimed();
 error WagerNotResolved();
+error NotInChallengePeriod();
+error ChallengePeriodNotExpired();
+error AlreadyChallenged();
+error InsufficientChallengeBond();
+error NotPendingResolution();
+error NotChallenged();
+error InvalidChallengePeriod();
+error InvalidChallengeBond();
 
 /**
  * @title FriendGroupMarketFactory
@@ -86,6 +94,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     enum FriendMarketStatus {
         PendingAcceptance,  // Waiting for participants to accept
         Active,             // All required parties accepted, market live
+        PendingResolution,  // Manual resolution proposed, waiting for challenge period
+        Challenged,         // Resolution is being disputed
         Resolved,           // Market has been resolved
         Cancelled,          // Creator cancelled before activation
         Refunded            // Stakes returned due to deadline expiration
@@ -219,6 +229,25 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Track when market was resolved (for future timeout features)
     mapping(uint256 => uint256) public resolvedAt;
 
+    // ========== Challenge System ==========
+
+    // Struct to track pending resolution proposals
+    struct PendingResolutionData {
+        bool proposedOutcome;      // The proposed outcome (true = creator wins)
+        address proposer;          // Who proposed the resolution
+        uint256 proposedAt;        // Timestamp of proposal
+        uint256 challengeDeadline; // When challenge period ends
+        address challenger;        // Who challenged (address(0) if none)
+        uint256 challengeBondPaid; // Bond paid by challenger
+    }
+
+    // Track pending resolutions (friendMarketId => PendingResolutionData)
+    mapping(uint256 => PendingResolutionData) public pendingResolutions;
+
+    // Challenge configuration
+    uint256 public challengePeriod = 24 hours;  // How long before resolution finalizes
+    uint256 public challengeBond = 0.1 ether;   // Bond required to challenge
+
     // Accepted payment tokens for market creation and liquidity (address => isAccepted)
     mapping(address => bool) public acceptedPaymentTokens;
     
@@ -343,6 +372,36 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 amount,
         address token
     );
+
+    // Challenge system events
+    event ResolutionProposed(
+        uint256 indexed friendMarketId,
+        address indexed proposer,
+        bool proposedOutcome,
+        uint256 challengeDeadline
+    );
+
+    event ResolutionChallenged(
+        uint256 indexed friendMarketId,
+        address indexed challenger,
+        uint256 bondAmount
+    );
+
+    event ResolutionFinalized(
+        uint256 indexed friendMarketId,
+        bool outcome
+    );
+
+    event DisputeResolved(
+        uint256 indexed friendMarketId,
+        address indexed resolver,
+        bool outcome,
+        address bondRecipient,
+        uint256 bondAmount
+    );
+
+    event ChallengePeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
+    event ChallengeBondUpdated(uint256 oldBond, uint256 newBond);
 
     constructor(
         address _marketFactory,
@@ -470,6 +529,27 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (_enforce && address(nullifierRegistry) == address(0)) revert InvalidAddress();
         enforceNullification = _enforce;
         emit NullificationEnforcementUpdated(_enforce);
+    }
+
+    /**
+     * @notice Update the challenge period duration
+     * @param _challengePeriod New challenge period in seconds (min 1 hour, max 7 days)
+     */
+    function setChallengePeriod(uint256 _challengePeriod) external onlyOwner {
+        if (_challengePeriod < 1 hours || _challengePeriod > 7 days) revert InvalidChallengePeriod();
+        uint256 oldPeriod = challengePeriod;
+        challengePeriod = _challengePeriod;
+        emit ChallengePeriodUpdated(oldPeriod, _challengePeriod);
+    }
+
+    /**
+     * @notice Update the challenge bond amount
+     * @param _challengeBond New challenge bond amount (can be 0 for no bond)
+     */
+    function setChallengeBond(uint256 _challengeBond) external onlyOwner {
+        uint256 oldBond = challengeBond;
+        challengeBond = _challengeBond;
+        emit ChallengeBondUpdated(oldBond, _challengeBond);
     }
 
     /**
@@ -1513,6 +1593,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      * resolve the underlying ConditionalMarketFactory market and enable
      * token redemption based on the outcome.
      */
+    /**
+     * @notice Propose a resolution for a friend market (starts challenge period)
+     * @dev For manual resolutions, this starts a challenge period before finalization
+     * @param friendMarketId ID of the friend market
+     * @param outcome The proposed outcome (true = creator wins, false = opponent wins)
+     */
     function resolveFriendMarket(uint256 friendMarketId, bool outcome) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
@@ -1547,21 +1633,139 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
 
         if (!canResolve) revert NotAuthorized();
 
+        // Start challenge period instead of immediate resolution
         market.active = false;
+        market.status = FriendMarketStatus.PendingResolution;
+
+        uint256 deadline = block.timestamp + challengePeriod;
+        pendingResolutions[friendMarketId] = PendingResolutionData({
+            proposedOutcome: outcome,
+            proposer: msg.sender,
+            proposedAt: block.timestamp,
+            challengeDeadline: deadline,
+            challenger: address(0),
+            challengeBondPaid: 0
+        });
+
+        emit ResolutionProposed(friendMarketId, msg.sender, outcome, deadline);
+    }
+
+    /**
+     * @notice Challenge a pending resolution
+     * @dev Either party can challenge by posting a bond. Requires arbitrator to resolve.
+     * @param friendMarketId ID of the friend market with pending resolution
+     */
+    function challengeResolution(uint256 friendMarketId) external payable {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        if (market.status != FriendMarketStatus.PendingResolution) revert NotPendingResolution();
+
+        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
+        if (block.timestamp >= pending.challengeDeadline) revert ChallengePeriodNotExpired();
+        if (pending.challenger != address(0)) revert AlreadyChallenged();
+
+        // Challenger must be a market participant (not the proposer)
+        bool isParticipant = msg.sender == market.creator ||
+                             (market.members.length > 1 && msg.sender == market.members[1]);
+        if (!isParticipant) revert NotAuthorized();
+        if (msg.sender == pending.proposer) revert NotAuthorized();
+
+        // Require challenge bond
+        if (msg.value < challengeBond) revert InsufficientChallengeBond();
+
+        // Record challenge
+        pending.challenger = msg.sender;
+        pending.challengeBondPaid = msg.value;
+        market.status = FriendMarketStatus.Challenged;
+
+        emit ResolutionChallenged(friendMarketId, msg.sender, msg.value);
+    }
+
+    /**
+     * @notice Finalize a pending resolution after challenge period expires
+     * @dev Can only be called if no challenge was made and period has expired
+     * @param friendMarketId ID of the friend market
+     */
+    function finalizeResolution(uint256 friendMarketId) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        if (market.status != FriendMarketStatus.PendingResolution) revert NotPendingResolution();
+
+        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
+        if (block.timestamp < pending.challengeDeadline) revert NotInChallengePeriod();
+
+        // Finalize the resolution
+        bool outcome = pending.proposedOutcome;
         market.status = FriendMarketStatus.Resolved;
 
         // Track resolution outcome and winner
         wagerOutcome[friendMarketId] = outcome;
         resolvedAt[friendMarketId] = block.timestamp;
 
-        // Determine winner based on outcome
-        // outcome = true means creator wins, false means opponent wins
         if (outcome) {
             wagerWinner[friendMarketId] = market.creator;
         } else if (market.members.length > 1) {
             wagerWinner[friendMarketId] = market.members[1];
         }
 
+        emit ResolutionFinalized(friendMarketId, outcome);
+        emit MarketResolved(friendMarketId, pending.proposer, outcome);
+    }
+
+    /**
+     * @notice Resolve a disputed/challenged resolution
+     * @dev Only callable by arbitrator when market is in Challenged state
+     * @param friendMarketId ID of the friend market
+     * @param outcome The final outcome decided by arbitrator
+     */
+    function resolveDispute(uint256 friendMarketId, bool outcome) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        if (market.status != FriendMarketStatus.Challenged) revert NotChallenged();
+
+        // Only arbitrator can resolve disputes
+        // For markets without arbitrator, owner acts as fallback arbitrator
+        bool canResolveDispute = (market.arbitrator != address(0) && msg.sender == market.arbitrator) ||
+                                  (market.arbitrator == address(0) && msg.sender == owner());
+        if (!canResolveDispute) revert NotAuthorized();
+
+        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
+
+        // Determine who gets the challenge bond
+        // If arbitrator agrees with proposer, challenger loses bond
+        // If arbitrator agrees with challenger, proposer implicitly "loses" (but didn't post bond)
+        address bondRecipient;
+        uint256 bondAmount = pending.challengeBondPaid;
+
+        if (outcome == pending.proposedOutcome) {
+            // Proposer was correct - bond goes to proposer
+            bondRecipient = pending.proposer;
+        } else {
+            // Challenger was correct - return bond to challenger
+            bondRecipient = pending.challenger;
+        }
+
+        // Finalize market
+        market.status = FriendMarketStatus.Resolved;
+        wagerOutcome[friendMarketId] = outcome;
+        resolvedAt[friendMarketId] = block.timestamp;
+
+        if (outcome) {
+            wagerWinner[friendMarketId] = market.creator;
+        } else if (market.members.length > 1) {
+            wagerWinner[friendMarketId] = market.members[1];
+        }
+
+        // Transfer bond to recipient
+        if (bondAmount > 0) {
+            (bool success, ) = payable(bondRecipient).call{value: bondAmount}("");
+            if (!success) revert TransferFailed();
+        }
+
+        emit DisputeResolved(friendMarketId, msg.sender, outcome, bondRecipient, bondAmount);
         emit MarketResolved(friendMarketId, msg.sender, outcome);
     }
 
@@ -1644,6 +1848,64 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
             resolvedAt[friendMarketId],
             marketTotalStaked[friendMarketId]
         );
+    }
+
+    /**
+     * @notice Get pending resolution details for a market
+     * @param friendMarketId ID of the friend market
+     * @return proposedOutcome The proposed outcome
+     * @return proposer Address that proposed the resolution
+     * @return proposedAt Timestamp when resolution was proposed
+     * @return challengeDeadline When challenge period ends
+     * @return challenger Address that challenged (zero if none)
+     * @return challengeBondPaid Amount of challenge bond paid
+     */
+    function getPendingResolution(uint256 friendMarketId) external view returns (
+        bool proposedOutcome,
+        address proposer,
+        uint256 proposedAt,
+        uint256 challengeDeadline,
+        address challenger,
+        uint256 challengeBondPaid
+    ) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
+        return (
+            pending.proposedOutcome,
+            pending.proposer,
+            pending.proposedAt,
+            pending.challengeDeadline,
+            pending.challenger,
+            pending.challengeBondPaid
+        );
+    }
+
+    /**
+     * @notice Check if a market can be finalized (challenge period expired, not challenged)
+     * @param friendMarketId ID of the friend market
+     * @return canFinalize Whether the market can be finalized
+     * @return timeRemaining Seconds until challenge period expires (0 if expired)
+     */
+    function canFinalizeResolution(uint256 friendMarketId) external view returns (
+        bool canFinalize,
+        uint256 timeRemaining
+    ) {
+        if (friendMarketId >= friendMarketCount) {
+            return (false, 0);
+        }
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+        if (market.status != FriendMarketStatus.PendingResolution) {
+            return (false, 0);
+        }
+
+        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
+        if (block.timestamp >= pending.challengeDeadline) {
+            return (true, 0);
+        } else {
+            return (false, pending.challengeDeadline - block.timestamp);
+        }
     }
 
     /**

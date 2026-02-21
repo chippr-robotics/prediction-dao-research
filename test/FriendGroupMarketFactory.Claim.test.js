@@ -1,5 +1,8 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { time } = require("@nomicfoundation/hardhat-network-helpers");
+
+const ONE_DAY = 86400;
 
 // Resolution type enum (matches contract)
 const ResolutionType = {
@@ -197,14 +200,23 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
     return 0;
   }
 
+  // Helper to resolve and finalize a market (handles challenge period)
+  async function resolveAndFinalizeMarket(marketId, resolver, outcome) {
+    await friendGroupFactory.connect(resolver).resolveFriendMarket(marketId, outcome);
+    // Fast forward past challenge period
+    await time.increase(ONE_DAY + 1);
+    // Finalize
+    await friendGroupFactory.finalizeResolution(marketId);
+  }
+
   describe("Successful Claim Scenarios", function () {
     it("Should allow creator to claim winnings when they win (native token)", async function () {
       await createAndActivateNativeMarket();
       const stakeAmount = ethers.parseEther("0.5");
       const totalPot = stakeAmount * 2n;
 
-      // Resolve in favor of creator (outcome = true)
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      // Resolve and finalize (handles challenge period)
+      await resolveAndFinalizeMarket(0, addr1, true);
 
       // Check winner is set correctly
       const [winner, outcome, claimed, resolvedAt, pot] = await friendGroupFactory.getWagerResolution(0);
@@ -239,8 +251,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       const stakeAmount = ethers.parseEther("0.5");
       const totalPot = stakeAmount * 2n;
 
-      // Resolve in favor of opponent (outcome = false)
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, false);
+      // Resolve and finalize (opponent wins)
+      await resolveAndFinalizeMarket(0, addr1, false);
 
       // Check winner is set correctly
       const [winner, outcome, claimed, , pot] = await friendGroupFactory.getWagerResolution(0);
@@ -271,8 +283,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       const stakeAmount = ethers.parseEther("100");
       const totalPot = stakeAmount * 2n;
 
-      // Resolve in favor of creator
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      // Resolve and finalize
+      await resolveAndFinalizeMarket(0, addr1, true);
 
       // Get token balance before claim
       const balanceBefore = await stakeToken.balanceOf(addr1.address);
@@ -313,8 +325,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       await acceptMarket(0, addr2);
       await friendGroupFactory.connect(arbitrator).acceptMarket(0);
 
-      // Arbitrator resolves in favor of opponent
-      await friendGroupFactory.connect(arbitrator).resolveFriendMarket(0, false);
+      // Arbitrator resolves and finalize
+      await resolveAndFinalizeMarket(0, arbitrator, false);
 
       // Opponent claims
       const totalPot = stakeAmount * 2n;
@@ -371,8 +383,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
     it("Should revert with NotWinner for loser trying to claim", async function () {
       await createAndActivateNativeMarket();
 
-      // Resolve in favor of creator
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      // Resolve and finalize in favor of creator
+      await resolveAndFinalizeMarket(0, addr1, true);
 
       // Opponent (loser) tries to claim
       await expect(
@@ -383,8 +395,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
     it("Should revert with NotWinner for unrelated party trying to claim", async function () {
       await createAndActivateNativeMarket();
 
-      // Resolve market
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      // Resolve and finalize market
+      await resolveAndFinalizeMarket(0, addr1, true);
 
       // Random person tries to claim
       await expect(
@@ -395,8 +407,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
     it("Should revert with AlreadyClaimed for double claim attempt", async function () {
       await createAndActivateNativeMarket();
 
-      // Resolve and claim
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      // Resolve, finalize and claim
+      await resolveAndFinalizeMarket(0, addr1, true);
       await friendGroupFactory.connect(addr1).claimWinnings(0);
 
       // Try to claim again
@@ -422,7 +434,7 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
 
     it("Should return correct details for resolved unclaimed market", async function () {
       await createAndActivateNativeMarket();
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      await resolveAndFinalizeMarket(0, addr1, true);
 
       const [winner, outcome, claimed, resolvedAt, totalPot] =
         await friendGroupFactory.getWagerResolution(0);
@@ -436,7 +448,7 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
 
     it("Should return correct details for resolved and claimed market", async function () {
       await createAndActivateNativeMarket();
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      await resolveAndFinalizeMarket(0, addr1, true);
       await friendGroupFactory.connect(addr1).claimWinnings(0);
 
       const [winner, outcome, claimed, resolvedAt, totalPot] =
@@ -454,7 +466,7 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
 
       expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(false);
 
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      await resolveAndFinalizeMarket(0, addr1, true);
       expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(false);
 
       await friendGroupFactory.connect(addr1).claimWinnings(0);
@@ -488,9 +500,16 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       );
       await acceptMarket(1, addr2);
 
-      // Resolve both - creator wins first, opponent wins second
+      // Resolve both - propose resolutions
       await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
       await friendGroupFactory.connect(addr2).resolveFriendMarket(1, false);
+
+      // Fast forward past challenge period
+      await time.increase(ONE_DAY + 1);
+
+      // Finalize both
+      await friendGroupFactory.finalizeResolution(0);
+      await friendGroupFactory.finalizeResolution(1);
 
       // Both can claim independently
       await expect(friendGroupFactory.connect(addr1).claimWinnings(0))
@@ -517,7 +536,7 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       const stakeAmount = ethers.parseEther("0.5");
       const totalPot = stakeAmount * 2n;
 
-      await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
+      await resolveAndFinalizeMarket(0, addr1, true);
 
       // Get contract balance before claim
       const contractBalanceBefore = await ethers.provider.getBalance(

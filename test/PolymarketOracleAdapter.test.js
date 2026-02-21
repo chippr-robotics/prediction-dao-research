@@ -583,7 +583,7 @@ describe("FriendGroupMarketFactory - Polymarket Integration", function () {
       await friendGroupFactory.connect(addr2).resolveFromPolymarket(marketId);
 
       const marketStatus = await friendGroupFactory.getFriendMarketWithStatus(marketId);
-      expect(marketStatus.status).to.equal(2); // FriendMarketStatus.Resolved = 2
+      expect(marketStatus.status).to.equal(4); // FriendMarketStatus.Resolved = 4 (after PendingResolution, Challenged)
     });
 
     it("Should emit PolymarketMarketResolved event", async function () {
@@ -677,8 +677,8 @@ describe("FriendGroupMarketFactory - Polymarket Integration", function () {
       const market0 = await friendGroupFactory.getFriendMarketWithStatus(0);
       const market1 = await friendGroupFactory.getFriendMarketWithStatus(1);
 
-      expect(market0.status).to.equal(2); // FriendMarketStatus.Resolved = 2
-      expect(market1.status).to.equal(2); // FriendMarketStatus.Resolved = 2
+      expect(market0.status).to.equal(4); // FriendMarketStatus.Resolved = 4
+      expect(market1.status).to.equal(4); // FriendMarketStatus.Resolved = 4
     });
 
     it("Should return list of friend markets for Polymarket condition", async function () {
