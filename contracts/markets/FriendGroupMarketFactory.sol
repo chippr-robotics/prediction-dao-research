@@ -61,6 +61,13 @@ error InvalidChallengeBond();
 error ClaimTimeoutNotExpired();
 error InvalidClaimTimeout();
 error TreasuryNotSet();
+error OracleTimeoutNotExpired();
+error NotOraclePegged();
+error InvalidOracleTimeout();
+error AlreadyTimedOut();
+error NotTimedOut();
+error RefundNotInitiated();
+error RefundAlreadyAccepted();
 
 /**
  * @title FriendGroupMarketFactory
@@ -101,7 +108,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         Challenged,         // Resolution is being disputed
         Resolved,           // Market has been resolved
         Cancelled,          // Creator cancelled before activation
-        Refunded            // Stakes returned due to deadline expiration
+        Refunded,           // Stakes returned due to deadline expiration
+        OracleTimedOut      // Oracle-pegged market timed out, awaiting refund/manual resolution
     }
 
     // Resolution type for determining who can resolve the market
@@ -258,6 +266,20 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
 
     // Treasury address for unclaimed funds
     address public treasury;
+
+    // ========== Oracle Timeout ==========
+
+    // Time after expected resolution before timeout can be triggered (default 30 days)
+    uint256 public oracleTimeout = 30 days;
+
+    // Expected resolution time for oracle-pegged markets (marketId => timestamp)
+    mapping(uint256 => uint256) public expectedResolutionTime;
+
+    // Track refund acceptance for oracle timeout (marketId => address => accepted)
+    mapping(uint256 => mapping(address => bool)) public refundAccepted;
+
+    // Track number of refund acceptances per market
+    mapping(uint256 => uint256) public refundAcceptanceCount;
 
     // Accepted payment tokens for market creation and liquidity (address => isAccepted)
     mapping(address => bool) public acceptedPaymentTokens;
@@ -423,6 +445,27 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     );
     event ClaimTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
+
+    // Oracle timeout events
+    event OracleTimeoutTriggered(
+        uint256 indexed friendMarketId,
+        uint256 expectedTime,
+        uint256 actualTime
+    );
+    event MutualRefundInitiated(
+        uint256 indexed friendMarketId,
+        address indexed initiator
+    );
+    event RefundAccepted(
+        uint256 indexed friendMarketId,
+        address indexed participant
+    );
+    event MutualRefundCompleted(
+        uint256 indexed friendMarketId,
+        uint256 totalRefunded
+    );
+    event OracleTimeoutUpdated(uint256 oldTimeout, uint256 newTimeout);
+    event ExpectedResolutionTimeSet(uint256 indexed friendMarketId, uint256 expectedTime);
 
     constructor(
         address _marketFactory,
@@ -593,6 +636,17 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 oldTimeout = claimTimeout;
         claimTimeout = _claimTimeout;
         emit ClaimTimeoutUpdated(oldTimeout, _claimTimeout);
+    }
+
+    /**
+     * @notice Update the oracle timeout duration
+     * @param _oracleTimeout New oracle timeout in seconds (min 7 days, max 180 days)
+     */
+    function setOracleTimeout(uint256 _oracleTimeout) external onlyOwner {
+        if (_oracleTimeout < 7 days || _oracleTimeout > 180 days) revert InvalidOracleTimeout();
+        uint256 oldTimeout = oracleTimeout;
+        oracleTimeout = _oracleTimeout;
+        emit OracleTimeoutUpdated(oldTimeout, _oracleTimeout);
     }
 
     /**
@@ -1940,6 +1994,250 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         } else {
             return (false, sweepTime - block.timestamp);
         }
+    }
+
+    // ========== Oracle Timeout Functions ==========
+
+    /**
+     * @notice Set the expected resolution time for an oracle-pegged market
+     * @dev Only callable by market creator for AutoPegged or PolymarketOracle markets
+     * @param friendMarketId ID of the friend market
+     * @param timestamp Expected timestamp when oracle should resolve
+     */
+    function setExpectedResolutionTime(uint256 friendMarketId, uint256 timestamp) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Only creator can set expected resolution time
+        if (msg.sender != market.creator) revert NotAuthorized();
+
+        // Must be an oracle-pegged market
+        if (market.resolutionType != ResolutionType.AutoPegged &&
+            market.resolutionType != ResolutionType.PolymarketOracle) {
+            revert NotOraclePegged();
+        }
+
+        // Must be active
+        if (market.status != FriendMarketStatus.Active) revert NotActive();
+
+        // Timestamp must be in the future
+        if (timestamp <= block.timestamp) revert InvalidMarketId();
+
+        expectedResolutionTime[friendMarketId] = timestamp;
+        emit ExpectedResolutionTimeSet(friendMarketId, timestamp);
+    }
+
+    /**
+     * @notice Trigger oracle timeout for a market that hasn't resolved
+     * @dev Can only be called after expected resolution + oracleTimeout period
+     * @param friendMarketId ID of the friend market
+     */
+    function triggerOracleTimeout(uint256 friendMarketId) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be an oracle-pegged market
+        if (market.resolutionType != ResolutionType.AutoPegged &&
+            market.resolutionType != ResolutionType.PolymarketOracle) {
+            revert NotOraclePegged();
+        }
+
+        // Must be active (not already resolved or timed out)
+        if (market.status != FriendMarketStatus.Active) revert NotActive();
+
+        // Must have expected resolution time set
+        uint256 expectedTime = expectedResolutionTime[friendMarketId];
+        if (expectedTime == 0) revert InvalidMarketId();
+
+        // Must be past timeout period
+        if (block.timestamp < expectedTime + oracleTimeout) revert OracleTimeoutNotExpired();
+
+        // Transition to timed out state
+        market.active = false;
+        market.status = FriendMarketStatus.OracleTimedOut;
+
+        emit OracleTimeoutTriggered(friendMarketId, expectedTime, block.timestamp);
+    }
+
+    /**
+     * @notice Accept mutual refund for a timed-out oracle market
+     * @dev Both parties must accept for refund to complete
+     * @param friendMarketId ID of the friend market
+     */
+    function acceptMutualRefund(uint256 friendMarketId) external nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be timed out
+        if (market.status != FriendMarketStatus.OracleTimedOut) revert NotTimedOut();
+
+        // Must be a participant
+        bool isCreator = msg.sender == market.creator;
+        bool isOpponent = market.members.length > 1 && msg.sender == market.members[1];
+        if (!isCreator && !isOpponent) revert NotAuthorized();
+
+        // Must not have already accepted
+        if (refundAccepted[friendMarketId][msg.sender]) revert RefundAlreadyAccepted();
+
+        // Record acceptance
+        refundAccepted[friendMarketId][msg.sender] = true;
+        refundAcceptanceCount[friendMarketId]++;
+
+        emit RefundAccepted(friendMarketId, msg.sender);
+
+        // Check if all parties have accepted (for 1v1, need 2 acceptances)
+        uint256 requiredAcceptances = market.members.length > 1 ? 2 : 1;
+        if (refundAcceptanceCount[friendMarketId] >= requiredAcceptances) {
+            _executeRefund(friendMarketId);
+        }
+    }
+
+    /**
+     * @notice Force manual resolution for a timed-out oracle market
+     * @dev Only arbitrator (or owner as fallback) can force resolution
+     * @param friendMarketId ID of the friend market
+     * @param outcome The resolution outcome (true = creator wins)
+     */
+    function forceOracleResolution(uint256 friendMarketId, bool outcome) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be timed out
+        if (market.status != FriendMarketStatus.OracleTimedOut) revert NotTimedOut();
+
+        // Only arbitrator (or owner as fallback) can force resolution
+        bool canForce = (market.arbitrator != address(0) && msg.sender == market.arbitrator) ||
+                        (market.arbitrator == address(0) && msg.sender == owner());
+        if (!canForce) revert NotAuthorized();
+
+        // Resolve the market
+        market.status = FriendMarketStatus.Resolved;
+        wagerOutcome[friendMarketId] = outcome;
+        resolvedAt[friendMarketId] = block.timestamp;
+
+        if (outcome) {
+            wagerWinner[friendMarketId] = market.creator;
+        } else if (market.members.length > 1) {
+            wagerWinner[friendMarketId] = market.members[1];
+        }
+
+        emit MarketResolved(friendMarketId, msg.sender, outcome);
+    }
+
+    /**
+     * @dev Internal function to execute refund for all parties
+     */
+    function _executeRefund(uint256 friendMarketId) internal {
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Mark as refunded
+        market.status = FriendMarketStatus.Refunded;
+        winningsClaimed[friendMarketId] = true; // Prevent further claims
+
+        // Refund each participant their stake
+        address token = market.stakeToken;
+        uint256 stakePerPerson = market.stakePerParticipant;
+        uint256 totalRefunded = 0;
+
+        // Refund creator
+        if (stakePerPerson > 0) {
+            _transferStake(token, market.creator, stakePerPerson);
+            totalRefunded += stakePerPerson;
+        }
+
+        // Refund opponent (if exists)
+        if (market.members.length > 1) {
+            _transferStake(token, market.members[1], stakePerPerson);
+            totalRefunded += stakePerPerson;
+        }
+
+        emit MutualRefundCompleted(friendMarketId, totalRefunded);
+    }
+
+    /**
+     * @dev Internal helper to transfer stake back to participant
+     */
+    function _transferStake(address token, address recipient, uint256 amount) internal {
+        if (token == address(0)) {
+            // Native token
+            (bool success, ) = payable(recipient).call{value: amount}("");
+            if (!success) revert TransferFailed();
+        } else {
+            // ERC20 token
+            (bool success, bytes memory returnData) = token.call(
+                abi.encodeWithSelector(IERC20.transfer.selector, recipient, amount)
+            );
+            if (!success) revert TransferFailed();
+            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
+        }
+    }
+
+    /**
+     * @notice Check if oracle timeout can be triggered
+     * @param friendMarketId ID of the friend market
+     * @return canTrigger Whether timeout can be triggered
+     * @return timeRemaining Seconds until timeout can be triggered (0 if ready)
+     */
+    function canTriggerOracleTimeout(uint256 friendMarketId) external view returns (
+        bool canTrigger,
+        uint256 timeRemaining
+    ) {
+        if (friendMarketId >= friendMarketCount) {
+            return (false, 0);
+        }
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        // Must be oracle-pegged and active
+        if ((market.resolutionType != ResolutionType.AutoPegged &&
+             market.resolutionType != ResolutionType.PolymarketOracle) ||
+            market.status != FriendMarketStatus.Active) {
+            return (false, 0);
+        }
+
+        uint256 expectedTime = expectedResolutionTime[friendMarketId];
+        if (expectedTime == 0) {
+            return (false, 0);
+        }
+
+        uint256 timeoutTime = expectedTime + oracleTimeout;
+        if (block.timestamp >= timeoutTime) {
+            return (true, 0);
+        } else {
+            return (false, timeoutTime - block.timestamp);
+        }
+    }
+
+    /**
+     * @notice Get oracle timeout status for a market
+     * @param friendMarketId ID of the friend market
+     * @return isTimedOut Whether the market is in timed out state
+     * @return expectedTime Expected resolution timestamp
+     * @return creatorAccepted Whether creator accepted refund
+     * @return opponentAccepted Whether opponent accepted refund
+     */
+    function getOracleTimeoutStatus(uint256 friendMarketId) external view returns (
+        bool isTimedOut,
+        uint256 expectedTime,
+        bool creatorAccepted,
+        bool opponentAccepted
+    ) {
+        if (friendMarketId >= friendMarketCount) {
+            return (false, 0, false, false);
+        }
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+
+        return (
+            market.status == FriendMarketStatus.OracleTimedOut,
+            expectedResolutionTime[friendMarketId],
+            refundAccepted[friendMarketId][market.creator],
+            market.members.length > 1 ? refundAccepted[friendMarketId][market.members[1]] : false
+        );
     }
 
     /**
