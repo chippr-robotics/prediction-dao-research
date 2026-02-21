@@ -11,6 +11,8 @@ import "../security/NullifierRegistry.sol";
 import "../access/TieredRoleManager.sol";
 import "../access/MembershipPaymentManager.sol";
 import "../oracles/PolymarketOracleAdapter.sol";
+import "../oracles/OracleRegistry.sol";
+import "../oracles/IOracleAdapter.sol";
 
 // Custom errors (stake/nullification errors from library, reused here)
 error InvalidAddress();
@@ -44,6 +46,9 @@ error InvalidOdds();
 error MissingMarketMakerRole();
 error InvalidResolutionType();
 error PolymarketAdapterNotSet();
+error OracleRegistryNotSet();
+error OracleConditionNotResolved();
+error AlreadyPeggedToOracle();
 error InvalidConditionId();
 error PolymarketNotResolved();
 error AlreadyPeggedToPolymarket();
@@ -278,6 +283,15 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Track refund acceptance for oracle timeout (marketId => address => accepted)
     mapping(uint256 => mapping(address => bool)) public refundAccepted;
 
+    // ========== Multi-Oracle Registry ==========
+
+    // Reference to OracleRegistry for multi-oracle resolution
+    OracleRegistry public oracleRegistry;
+
+    // Track oracle condition for markets (marketId => oracleId => conditionId)
+    mapping(uint256 => bytes32) public marketOracleId;
+    mapping(uint256 => bytes32) public marketOracleCondition;
+
     // Track number of refund acceptances per market
     mapping(uint256 => uint256) public refundAcceptanceCount;
 
@@ -385,6 +399,18 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     );
 
     event PolymarketAdapterUpdated(address indexed adapter);
+    event OracleRegistryUpdated(address indexed registry);
+    event MarketPeggedToOracle(
+        uint256 indexed friendMarketId,
+        bytes32 indexed oracleId,
+        bytes32 indexed conditionId
+    );
+    event OracleMarketResolved(
+        uint256 indexed friendMarketId,
+        bytes32 indexed oracleId,
+        bytes32 conditionId,
+        bool outcome
+    );
 
     event MarketPeggedToPolymarket(
         uint256 indexed friendMarketId,
@@ -658,6 +684,17 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (_polymarketAdapter == address(0)) revert InvalidAddress();
         polymarketAdapter = PolymarketOracleAdapter(_polymarketAdapter);
         emit PolymarketAdapterUpdated(_polymarketAdapter);
+    }
+
+    /**
+     * @notice Set the OracleRegistry contract (only owner)
+     * @dev Enables multi-oracle resolution via Chainlink, UMA, etc.
+     * @param _oracleRegistry Address of the OracleRegistry contract
+     */
+    function setOracleRegistry(address _oracleRegistry) external onlyOwner {
+        if (_oracleRegistry == address(0)) revert InvalidAddress();
+        oracleRegistry = OracleRegistry(_oracleRegistry);
+        emit OracleRegistryUpdated(_oracleRegistry);
     }
 
     // ========== Multi-Party Acceptance Flow Functions ==========
@@ -2323,6 +2360,131 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         } else {
             return (false, pending.challengeDeadline - block.timestamp);
         }
+    }
+
+    // ========== Multi-Oracle Registry Functions ==========
+
+    /**
+     * @notice Peg a friend market to any oracle condition via OracleRegistry
+     * @param friendMarketId ID of the friend market
+     * @param oracleId The oracle identifier in the registry (e.g., keccak256("CHAINLINK"))
+     * @param conditionId The condition ID from the oracle adapter
+     */
+    function pegToOracleCondition(
+        uint256 friendMarketId,
+        bytes32 oracleId,
+        bytes32 conditionId
+    ) external {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        if (address(oracleRegistry) == address(0)) revert OracleRegistryNotSet();
+        if (conditionId == bytes32(0)) revert InvalidConditionId();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+        if (!market.active) revert NotActive();
+        if (msg.sender != market.creator) revert NotAuthorized();
+        if (marketOracleCondition[friendMarketId] != bytes32(0)) revert AlreadyPeggedToOracle();
+        if (market.polymarketConditionId != bytes32(0)) revert AlreadyPeggedToPolymarket();
+        if (market.autoPegged) revert AlreadyPegged();
+
+        // Verify oracle and condition exist
+        address adapter = oracleRegistry.getAdapter(oracleId);
+        if (adapter == address(0)) revert InvalidAddress();
+        if (!IOracleAdapter(adapter).isConditionSupported(conditionId)) revert InvalidConditionId();
+
+        // Store oracle info
+        marketOracleId[friendMarketId] = oracleId;
+        marketOracleCondition[friendMarketId] = conditionId;
+        market.resolutionType = ResolutionType.PolymarketOracle; // Reuse oracle type
+
+        emit MarketPeggedToOracle(friendMarketId, oracleId, conditionId);
+    }
+
+    /**
+     * @notice Resolve a friend market from its linked oracle condition
+     * @param friendMarketId ID of the friend market
+     */
+    function resolveFromOracle(uint256 friendMarketId) external nonReentrant {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        if (address(oracleRegistry) == address(0)) revert OracleRegistryNotSet();
+
+        FriendMarket storage market = friendMarkets[friendMarketId];
+        if (!market.active) revert NotActive();
+
+        bytes32 oracleId = marketOracleId[friendMarketId];
+        bytes32 conditionId = marketOracleCondition[friendMarketId];
+        if (conditionId == bytes32(0)) revert InvalidConditionId();
+
+        // Get outcome from registry
+        (bool outcome, uint256 confidence) = oracleRegistry.resolveCondition(oracleId, conditionId);
+        if (confidence == 0) revert OracleConditionNotResolved();
+
+        // Apply resolution
+        market.active = false;
+        market.status = FriendMarketStatus.Resolved;
+
+        wagerOutcome[friendMarketId] = outcome;
+        resolvedAt[friendMarketId] = block.timestamp;
+
+        // Determine winner based on outcome
+        if (outcome) {
+            wagerWinner[friendMarketId] = market.creator;
+        } else if (market.members.length > 1) {
+            wagerWinner[friendMarketId] = market.members[1];
+        }
+
+        emit OracleMarketResolved(friendMarketId, oracleId, conditionId, outcome);
+        emit MarketResolved(friendMarketId, msg.sender, outcome);
+    }
+
+    /**
+     * @notice Check if a friend market is pegged to an oracle
+     * @param friendMarketId ID of the friend market
+     */
+    function isPeggedToOracle(uint256 friendMarketId) external view returns (bool) {
+        if (friendMarketId >= friendMarketCount) return false;
+        return marketOracleCondition[friendMarketId] != bytes32(0);
+    }
+
+    /**
+     * @notice Get oracle info for a friend market
+     * @param friendMarketId ID of the friend market
+     * @return oracleId The oracle identifier
+     * @return conditionId The condition ID
+     */
+    function getOracleInfo(uint256 friendMarketId) external view returns (
+        bytes32 oracleId,
+        bytes32 conditionId
+    ) {
+        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
+        return (marketOracleId[friendMarketId], marketOracleCondition[friendMarketId]);
+    }
+
+    /**
+     * @notice Check if an oracle condition is resolved and get the outcome
+     * @param friendMarketId ID of the friend market
+     * @return canResolve True if condition is resolved
+     * @return outcome The outcome if resolved
+     */
+    function checkOracleResolution(uint256 friendMarketId) external view returns (
+        bool canResolve,
+        bool outcome
+    ) {
+        if (friendMarketId >= friendMarketCount) return (false, false);
+        if (address(oracleRegistry) == address(0)) return (false, false);
+
+        bytes32 oracleId = marketOracleId[friendMarketId];
+        bytes32 conditionId = marketOracleCondition[friendMarketId];
+        if (conditionId == bytes32(0)) return (false, false);
+
+        address adapter = oracleRegistry.getAdapter(oracleId);
+        if (adapter == address(0)) return (false, false);
+
+        if (!IOracleAdapter(adapter).isConditionResolved(conditionId)) {
+            return (false, false);
+        }
+
+        (bool result, , ) = IOracleAdapter(adapter).getOutcome(conditionId);
+        return (true, result);
     }
 
     /**
