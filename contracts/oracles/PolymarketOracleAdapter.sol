@@ -413,6 +413,41 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Check if Polymarket oracle is available on this network
+     * @dev Returns true if the Polymarket CTF contract is deployed and responding
+     * @return available True if oracle can be used for resolution
+     */
+    function isAvailable() external view override returns (bool available) {
+        // Check if CTF address is set
+        if (polymarketCTF == address(0)) return false;
+
+        // Check if the contract has code deployed
+        uint256 size;
+        address ctf = polymarketCTF;
+        assembly {
+            size := extcodesize(ctf)
+        }
+        if (size == 0) return false;
+
+        // Try to call isResolved with a zero conditionId to verify it's the right contract
+        // This will return false (not resolved) but proves the contract is present
+        try IPolymarketOracle(polymarketCTF).isResolved(bytes32(0)) returns (bool) {
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * @notice Get the chain ID this adapter is configured for
+     * @dev Polymarket is deployed on Polygon (chainId 137)
+     * @return chainId Current chain ID
+     */
+    function getConfiguredChainId() external view override returns (uint256 chainId) {
+        return block.chainid;
+    }
+
+    /**
      * @notice Check if a condition ID is supported (has been linked or cached)
      * @param conditionId The condition to check
      * @return supported True if condition is known to this adapter

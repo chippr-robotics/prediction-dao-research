@@ -306,6 +306,41 @@ contract UMAOracleAdapter is IOracleAdapter, Ownable {
     }
 
     /**
+     * @notice Check if UMA oracle is available on this network
+     * @dev Returns true if the UMA oracle contract is deployed and responding
+     * @return available True if oracle can be used for resolution
+     */
+    function isAvailable() external view override returns (bool available) {
+        // Check if UMA oracle address is set and has code
+        if (address(umaOracle) == address(0)) return false;
+
+        // Check if the contract has code deployed
+        uint256 size;
+        address oracleAddr = address(umaOracle);
+        assembly {
+            size := extcodesize(oracleAddr)
+        }
+        if (size == 0) return false;
+
+        // Try to call a view function to verify it's the right contract
+        // isAssertionSettled with zero assertionId will return false but proves contract exists
+        try umaOracle.isAssertionSettled(bytes32(0)) returns (bool) {
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * @notice Get the chain ID this adapter is configured for
+     * @dev UMA contracts are deployed on specific chains
+     * @return chainId Current chain ID
+     */
+    function getConfiguredChainId() external view override returns (uint256 chainId) {
+        return block.chainid;
+    }
+
+    /**
      * @notice Check if a condition is supported
      */
     function isConditionSupported(bytes32 conditionId) external view override returns (bool supported) {

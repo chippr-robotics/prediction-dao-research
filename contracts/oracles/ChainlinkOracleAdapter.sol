@@ -244,6 +244,39 @@ contract ChainlinkOracleAdapter is IOracleAdapter, Ownable {
     }
 
     /**
+     * @notice Check if Chainlink oracle is available on this network
+     * @dev Returns true if at least one price feed is configured
+     * @return available True if oracle can be used for resolution
+     */
+    function isAvailable() external view override returns (bool available) {
+        // Chainlink is available if we have at least one supported feed
+        // and that feed is responding (has valid data)
+        if (feedList.length == 0) return false;
+
+        // Check if at least one feed is working
+        for (uint256 i = 0; i < feedList.length; i++) {
+            try IChainlinkAggregator(feedList[i]).latestRoundData() returns (
+                uint80, int256 price, uint256, uint256 updatedAt, uint80
+            ) {
+                if (price > 0 && block.timestamp - updatedAt <= stalenessThreshold) {
+                    return true;
+                }
+            } catch {
+                // Feed not responding, try next
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @notice Get the chain ID this adapter is configured for
+     * @return chainId Current chain ID (Chainlink feeds are chain-specific)
+     */
+    function getConfiguredChainId() external view override returns (uint256 chainId) {
+        return block.chainid;
+    }
+
+    /**
      * @notice Check if a condition is supported
      */
     function isConditionSupported(bytes32 conditionId) external view override returns (bool supported) {

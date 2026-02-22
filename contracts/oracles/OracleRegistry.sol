@@ -10,6 +10,7 @@ error AdapterNotRegistered();
 error InvalidAdapter();
 error NoAdaptersFound();
 error ConditionNotResolved();
+error OracleNotAvailable();
 
 /**
  * @title OracleRegistry
@@ -265,5 +266,148 @@ contract OracleRegistry is Ownable {
         oracleType = IOracleAdapter(adapter).oracleType();
         isVerified = verifiedAdapters[adapter];
         isActive = activeAdapters[adapter];
+    }
+
+    // ========== Network Availability Functions ==========
+
+    /**
+     * @notice Check if an oracle is available for resolution on the current network
+     * @dev External oracles like Polymarket/UMA may not be deployed on all networks
+     * @param oracleId The oracle ID to check
+     * @return available True if the oracle can resolve conditions on this network
+     */
+    function isOracleAvailable(bytes32 oracleId) external view returns (bool available) {
+        address adapter = adapters[oracleId];
+        if (adapter == address(0)) return false;
+        if (!activeAdapters[adapter]) return false;
+
+        // Check if the adapter reports availability
+        try IOracleAdapter(adapter).isAvailable() returns (bool isAvail) {
+            return isAvail;
+        } catch {
+            // If the adapter doesn't implement isAvailable, assume available
+            return true;
+        }
+    }
+
+    /**
+     * @notice Get all available oracles on the current network
+     * @return availableOracleIds Array of oracle IDs that are available
+     * @return availableAdapters Array of corresponding adapter addresses
+     */
+    function getAvailableOracles() external view returns (
+        bytes32[] memory availableOracleIds,
+        address[] memory availableAdapters
+    ) {
+        // First pass: count available adapters
+        uint256 count = 0;
+        for (uint256 i = 0; i < registeredOracleIds.length; i++) {
+            bytes32 oracleId = registeredOracleIds[i];
+            address adapter = adapters[oracleId];
+            if (adapter != address(0) && activeAdapters[adapter]) {
+                try IOracleAdapter(adapter).isAvailable() returns (bool isAvail) {
+                    if (isAvail) count++;
+                } catch {
+                    count++; // Assume available if method not implemented
+                }
+            }
+        }
+
+        // Second pass: collect available oracles
+        availableOracleIds = new bytes32[](count);
+        availableAdapters = new address[](count);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < registeredOracleIds.length; i++) {
+            bytes32 oracleId = registeredOracleIds[i];
+            address adapter = adapters[oracleId];
+            if (adapter != address(0) && activeAdapters[adapter]) {
+                bool isAvail = true;
+                try IOracleAdapter(adapter).isAvailable() returns (bool avail) {
+                    isAvail = avail;
+                } catch {}
+
+                if (isAvail) {
+                    availableOracleIds[index] = oracleId;
+                    availableAdapters[index] = adapter;
+                    index++;
+                }
+            }
+        }
+    }
+
+    /**
+     * @notice Get network info for all registered oracles
+     * @return oracleIds Array of oracle IDs
+     * @return oracleTypes Array of oracle type strings
+     * @return availabilities Array of availability status
+     * @return chainIds Array of configured chain IDs (0 = chain-agnostic)
+     */
+    function getNetworkOracleStatus() external view returns (
+        bytes32[] memory oracleIds,
+        string[] memory oracleTypes,
+        bool[] memory availabilities,
+        uint256[] memory chainIds
+    ) {
+        uint256 length = registeredOracleIds.length;
+        oracleIds = new bytes32[](length);
+        oracleTypes = new string[](length);
+        availabilities = new bool[](length);
+        chainIds = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            bytes32 oracleId = registeredOracleIds[i];
+            address adapter = adapters[oracleId];
+
+            oracleIds[i] = oracleId;
+
+            if (adapter != address(0)) {
+                oracleTypes[i] = IOracleAdapter(adapter).oracleType();
+
+                // Check availability
+                try IOracleAdapter(adapter).isAvailable() returns (bool avail) {
+                    availabilities[i] = avail && activeAdapters[adapter];
+                } catch {
+                    availabilities[i] = activeAdapters[adapter];
+                }
+
+                // Get configured chain ID
+                try IOracleAdapter(adapter).getConfiguredChainId() returns (uint256 chainId) {
+                    chainIds[i] = chainId;
+                } catch {
+                    chainIds[i] = 0; // Chain-agnostic
+                }
+            }
+        }
+    }
+
+    /**
+     * @notice Resolve a condition, but only if the oracle is available
+     * @dev Reverts with OracleNotAvailable if the oracle cannot resolve on this network
+     * @param oracleId The oracle ID to use
+     * @param conditionId The condition to resolve
+     * @return outcome The resolution outcome
+     * @return confidence The confidence level
+     */
+    function resolveConditionIfAvailable(
+        bytes32 oracleId,
+        bytes32 conditionId
+    ) external view returns (bool outcome, uint256 confidence) {
+        address adapter = adapters[oracleId];
+        if (adapter == address(0)) revert AdapterNotRegistered();
+        if (!activeAdapters[adapter]) revert AdapterNotRegistered();
+
+        // Check availability
+        try IOracleAdapter(adapter).isAvailable() returns (bool isAvail) {
+            if (!isAvail) revert OracleNotAvailable();
+        } catch {
+            // If isAvailable not implemented, proceed
+        }
+
+        if (!IOracleAdapter(adapter).isConditionResolved(conditionId)) {
+            revert ConditionNotResolved();
+        }
+
+        (outcome, confidence, ) = IOracleAdapter(adapter).getOutcome(conditionId);
     }
 }

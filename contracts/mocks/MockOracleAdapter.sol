@@ -9,6 +9,8 @@ import "../oracles/IOracleAdapter.sol";
  */
 contract MockOracleAdapter is IOracleAdapter {
     string private _oracleType;
+    bool private _isAvailable = true;
+    uint256 private _chainId;
 
     // Condition ID => supported
     mapping(bytes32 => bool) public conditionSupported;
@@ -33,12 +35,21 @@ contract MockOracleAdapter is IOracleAdapter {
 
     constructor(string memory oracleTypeName) {
         _oracleType = oracleTypeName;
+        _chainId = block.chainid;
     }
 
     // ========== IOracleAdapter Implementation ==========
 
     function oracleType() external view override returns (string memory) {
         return _oracleType;
+    }
+
+    function isAvailable() external view override returns (bool available) {
+        return _isAvailable;
+    }
+
+    function getConfiguredChainId() external view override returns (uint256 chainId) {
+        return _chainId;
     }
 
     function isConditionSupported(bytes32 conditionId) external view override returns (bool supported) {
@@ -103,5 +114,13 @@ contract MockOracleAdapter is IOracleAdapter {
             description: description,
             expectedResolutionTime: expectedResolutionTime
         });
+    }
+
+    function setAvailable(bool available) external {
+        _isAvailable = available;
+    }
+
+    function setChainId(uint256 newChainId) external {
+        _chainId = newChainId;
     }
 }

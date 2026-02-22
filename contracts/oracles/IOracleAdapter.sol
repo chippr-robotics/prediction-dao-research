@@ -14,6 +14,19 @@ interface IOracleAdapter {
     function oracleType() external view returns (string memory);
 
     /**
+     * @notice Check if the oracle is available on the current network
+     * @dev Returns false if external oracle contracts are not deployed or not configured
+     * @return available True if the oracle can be used for resolution on this network
+     */
+    function isAvailable() external view returns (bool available);
+
+    /**
+     * @notice Get the chain ID this adapter is configured for
+     * @return chainId The chain ID, or 0 if chain-agnostic
+     */
+    function getConfiguredChainId() external view returns (uint256 chainId);
+
+    /**
      * @notice Check if a condition ID is supported by this adapter
      * @param conditionId The unique identifier for the condition
      * @return supported True if this adapter can handle the condition
