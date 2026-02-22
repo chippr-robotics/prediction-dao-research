@@ -7,7 +7,8 @@ const ResolutionType = {
   Initiator: 1,
   Receiver: 2,
   ThirdParty: 3,
-  AutoPegged: 4
+  AutoPegged: 4,
+  PolymarketOracle: 5
 };
 
 describe("FriendGroupMarketFactory", function () {
@@ -619,21 +620,21 @@ describe("FriendGroupMarketFactory", function () {
     });
 
     it("Should allow creator to resolve market", async function () {
+      // Resolution now starts a challenge period (emits ResolutionProposed)
       await expect(
         friendGroupFactory.connect(addr1).resolveFriendMarket(0, true)
-      ).to.emit(friendGroupFactory, "MarketResolved")
-        .withArgs(0, addr1.address, true);
-      
+      ).to.emit(friendGroupFactory, "ResolutionProposed");
+
       const market = await friendGroupFactory.getFriendMarket(0);
       expect(market.active).to.equal(false);
     });
 
     it("Should allow arbitrator to resolve market", async function () {
+      // Resolution now starts a challenge period (emits ResolutionProposed)
       await expect(
         friendGroupFactory.connect(arbitrator).resolveFriendMarket(0, false)
-      ).to.emit(friendGroupFactory, "MarketResolved")
-        .withArgs(0, arbitrator.address, false);
-      
+      ).to.emit(friendGroupFactory, "ResolutionProposed");
+
       const market = await friendGroupFactory.getFriendMarket(0);
       expect(market.active).to.equal(false);
     });
