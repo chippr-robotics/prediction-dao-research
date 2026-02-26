@@ -199,7 +199,7 @@ describe('TokenMintButton Component', () => {
 
       await waitFor(() => {
         // Market creation is now handled by WalletButton
-        expect(screen.queryByText('Create New Market')).not.toBeInTheDocument()
+        expect(screen.queryByText('Create Prediction Market')).not.toBeInTheDocument()
       })
     })
 

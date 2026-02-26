@@ -306,12 +306,12 @@ describe('FriendMarketsModal', () => {
   describe('Header', () => {
     it('should display modal title', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.getByText('Friend Markets')).toBeInTheDocument()
+      expect(screen.getByText('Wagers')).toBeInTheDocument()
     })
 
     it('should display subtitle', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.getByText('Private prediction markets with friends')).toBeInTheDocument()
+      expect(screen.getByText('Private wagers with friends')).toBeInTheDocument()
     })
 
     it('should have a close button', () => {
