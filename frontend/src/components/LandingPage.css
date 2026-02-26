@@ -86,7 +86,7 @@
 
 .platform-cards-compact {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
 }
 
@@ -1019,7 +1019,7 @@
   margin-bottom: 2rem;
 }
 
-.footer-section h4 {
+.footer-section h3 {
   color: #2D7A4F;
   font-size: 1.125rem;
   font-weight: 600;

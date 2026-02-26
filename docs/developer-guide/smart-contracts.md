@@ -1,24 +1,49 @@
 # Smart Contracts
 
-Overview of the smart contracts in the Prediction DAO system.
+Overview of the smart contracts powering the FairWins P2P wager platform and ClearPath governance system.
 
 ## Contract Architecture
 
-The system consists of seven main contracts that work together to implement futarchy governance:
+The system has two main contract groups: the **P2P Wager** contracts (FairWins) and the **Governance** contracts (ClearPath), sharing common infrastructure.
 
 ```mermaid
 graph TD
-    A[FutarchyGovernor] --> B[WelfareMetricRegistry]
-    A --> C[ProposalRegistry]
-    A --> D[ConditionalMarketFactory]
-    A --> E[PrivacyCoordinator]
-    A --> F[OracleResolver]
-    A --> G[RagequitModule]
+    subgraph FairWins [FairWins - P2P Wagers]
+        H[FriendGroupMarketFactory] --> D[ConditionalMarketFactory]
+        H --> F[OracleResolver]
+        H --> I[CTF1155]
+    end
+    subgraph ClearPath [ClearPath - Governance]
+        A[FutarchyGovernor] --> B[WelfareMetricRegistry]
+        A --> C[ProposalRegistry]
+        A --> D
+        A --> E[PrivacyCoordinator]
+        A --> F
+        A --> G[RagequitModule]
+    end
     E --> D
     F --> D
 ```
 
-## Core Contracts
+## P2P Wager Contracts
+
+### FriendGroupMarketFactory.sol
+
+**Purpose**: Creates and manages private P2P wager markets between trusted parties
+
+**Key Responsibilities**:
+
+- Wager creation with configurable binary outcome types
+- Stake escrow and management
+- Oracle source selection (Polymarket, Chainlink, UMA, manual)
+- Invite link / QR code generation
+- Resolution and payout settlement
+
+This is the primary entry point for the FairWins platform. See [contracts/README.md](../../contracts/README.md) for the full contract directory structure.
+
+---
+
+## Governance Contracts
 
 ### FutarchyGovernor.sol
 

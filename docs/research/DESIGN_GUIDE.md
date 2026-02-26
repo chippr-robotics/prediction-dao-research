@@ -1,17 +1,17 @@
-# ClearPath & FairWins Design Guide
+# FairWins & ClearPath Design Guide
 
 ## Brand Identity
 
 ### Platform Suite Overview
-ClearPath & FairWins is a dual-platform suite for prediction markets and futarchy-based governance. The brand emphasizes:
-- **Clarity**: Simple, transparent decision-making
-- **Trust**: Institutional-grade reliability
-- **Intelligence**: Data-driven collective wisdom
-- **Accessibility**: Open participation with privacy protection
+FairWins & ClearPath is a dual-platform suite for peer-to-peer wagers and futarchy-based governance. The brand emphasizes:
+- **Trust**: Trustless escrow — no need to trust the other party
+- **Simplicity**: Create a wager, share a link, oracle resolves it
+- **Fairness**: Transparent, oracle-driven resolution
+- **Accessibility**: Private wagers with friends, no intermediary
 
 ### Brand Positioning
+- **FairWins**: Social, direct, trustless — private wagers between friends
 - **ClearPath**: Professional, institutional, trustworthy — for serious governance
-- **FairWins**: Open, flexible, accessible — for everyone's predictions
 
 ---
 
@@ -739,12 +739,12 @@ Landing pages and marketing content use light backgrounds for:
 **Example**: "Institutional-grade governance through prediction markets"
 
 ### FairWins Voice
-- **Accessible**: Friendly, inviting
-- **Empowering**: "Anyone can" messaging
-- **Fair**: Emphasize equality and transparency
-- **Engaging**: More casual, energetic
+- **Direct**: Peer-to-peer, no middleman
+- **Social**: Challenge friends, settle debates
+- **Trustless**: Oracles resolve it, escrow holds the stakes
+- **Engaging**: Casual, energetic, fun
 
-**Example**: "Create, join, and resolve prediction markets on any topic"
+**Example**: "Bet your friend. Oracle resolves it. Winner takes all."
 
 ### Shared Principles
 - Be concise — respect users' time
@@ -810,11 +810,11 @@ Users should always know where they are and what's happening:
 - Highlight **privacy features** prominently
 
 ### FairWins Design Patterns
-- Emphasize **market odds** and probabilities
-- Use **charts** to show market movement
-- Display **liquidity** and volume metrics
-- Show **creator controls** clearly
-- Make **resolution criteria** obvious
+- Emphasize **wager status** (active, pending, resolved, won, lost)
+- Show **stake amounts** and oracle source prominently
+- Display **participant info** (1v1, invite status)
+- Make **QR code / invite sharing** frictionless
+- Show **oracle resolution criteria** clearly
 
 ---
 
@@ -872,6 +872,6 @@ Users should always know where they are and what's happening:
 
 ---
 
-**Last Updated**: December 2024
-**Version**: 1.0
+**Last Updated**: February 2026
+**Version**: 2.0 (P2P Wager Pivot)
 **Maintainer**: ChipprRobotics Design Team
