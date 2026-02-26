@@ -32,7 +32,9 @@
     "floppy:info": "node ./scripts/operations/floppy-key/index.js info",
     "floppy:store-admin": "node ./scripts/operations/floppy-key/store-admin-key.js",
     "purchase:friend-market": "npx hardhat run ./scripts/operations/purchase-friend-market-membership.js --network mordor",
-    "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor"
+    "create:friend-bet": "npx hardhat run ./scripts/operations/create-friend-market-bet.js --network mordor",
+    "deploy:tokenmint": "hardhat run scripts/deploy/deploy-tokenmint-standalone.js --network localhost",
+    "deploy:tokenmint:mordor": "hardhat run scripts/deploy/deploy-tokenmint-standalone.js --network mordor"
   },
   "keywords": [
     "futarchy",
