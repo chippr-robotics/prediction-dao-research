@@ -89,7 +89,9 @@ function FriendMarketsModal({
   activeMarkets = [],
   pastMarkets = [],
   pendingTransaction = null,
-  onClearPendingTransaction = () => {}
+  onClearPendingTransaction = () => {},
+  initialTab = null,
+  initialType = null
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
@@ -237,15 +239,20 @@ function FriendMarketsModal({
   // Reset modal state when opened
   useEffect(() => {
     if (isOpen) {
-      setActiveTab('create')
-      setCreationStep('type')
-      setFriendMarketType(null)
+      setActiveTab(initialTab || 'create')
+      if (initialType) {
+        setFriendMarketType(initialType)
+        setCreationStep('form')
+      } else {
+        setCreationStep('type')
+        setFriendMarketType(null)
+      }
       setCreatedMarket(null)
       setSelectedMarket(null)
       setErrors({})
       resetForm()
     }
-  }, [isOpen, resetForm])
+  }, [isOpen, resetForm, initialTab, initialType])
 
   const handleClose = useCallback(() => {
     if (!submitting) {

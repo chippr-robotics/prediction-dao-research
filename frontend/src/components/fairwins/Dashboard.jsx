@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useWallet } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
+import FriendMarketsModal from './FriendMarketsModal'
+import MyMarketsModal from './MyMarketsModal'
 import './Dashboard.css'
 
 // ============================================================================
@@ -278,6 +280,11 @@ function Dashboard() {
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true
 
+  // Modal state
+  const [showCreateWager, setShowCreateWager] = useState(false)
+  const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'smallGroup'
+  const [showMyWagers, setShowMyWagers] = useState(false)
+
   // Mock wager data for demo mode
   const mockWagers = useMemo(() => {
     if (!demoMode) return []
@@ -340,11 +347,30 @@ function Dashboard() {
   )
 
   const handleQuickAction = useCallback((actionId) => {
-    console.log('Quick action:', actionId)
+    switch (actionId) {
+      case 'create-1v1':
+        setCreateWagerType('oneVsOne')
+        setShowCreateWager(true)
+        break
+      case 'create-group':
+        setCreateWagerType('smallGroup')
+        setShowCreateWager(true)
+        break
+      case 'my-wagers':
+        setShowMyWagers(true)
+        break
+      case 'scan-qr':
+        // Open creation modal on create tab (QR scanner is available there)
+        setCreateWagerType(null)
+        setShowCreateWager(true)
+        break
+      default:
+        break
+    }
   }, [])
 
-  const handleWagerClick = useCallback((wager) => {
-    console.log('Navigate to wager:', wager.id)
+  const handleWagerClick = useCallback(() => {
+    setShowMyWagers(true)
   }, [])
 
   // Not connected state
@@ -434,6 +460,23 @@ function Dashboard() {
       <section className="dashboard-section">
         <OracleInfoPanel isConnected={isConnected} />
       </section>
+
+      {/* Create Wager Modal */}
+      <FriendMarketsModal
+        isOpen={showCreateWager}
+        onClose={() => {
+          setShowCreateWager(false)
+          setCreateWagerType(null)
+        }}
+        initialTab="create"
+        initialType={createWagerType}
+      />
+
+      {/* My Wagers Modal */}
+      <MyMarketsModal
+        isOpen={showMyWagers}
+        onClose={() => setShowMyWagers(false)}
+      />
     </div>
   )
 }
