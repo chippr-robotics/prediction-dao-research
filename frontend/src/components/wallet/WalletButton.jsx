@@ -1423,9 +1423,9 @@ function WalletButton({ className = '' }) {
                 />
               </div>
 
-              {/* Friend Markets Section */}
+              {/* Wagers Section - Unified */}
               <div className="dropdown-section">
-                <span className="wallet-section-title">Friend Markets</span>
+                <span className="wallet-section-title">Wagers</span>
                 {hasRole(ROLES.FRIEND_MARKET) ? (
                   <button
                     onClick={handleOpenFriendMarket}
@@ -1433,11 +1433,11 @@ function WalletButton({ className = '' }) {
                     role="menuitem"
                   >
                     <span aria-hidden="true">🎯</span>
-                    <span>My Friend Markets</span>
+                    <span>Create Wager</span>
                   </button>
                 ) : (
                   <div className="friend-market-promo">
-                    <p className="promo-text">Create private prediction markets with friends!</p>
+                    <p className="promo-text">Create private wagers with friends!</p>
                     <button
                       onClick={() => handleOpenPurchaseModal()}
                       className="action-button purchase-access-btn"
@@ -1448,45 +1448,23 @@ function WalletButton({ className = '' }) {
                     </button>
                   </div>
                 )}
-              </div>
-
-              {/* Create Market Section */}
-              <div className="dropdown-section">
-                <span className="wallet-section-title">Prediction Markets</span>
-                {hasRole(ROLES.MARKET_MAKER) ? (
+                {hasRole(ROLES.MARKET_MAKER) && (
                   <button
                     onClick={handleOpenMarketCreation}
                     className="action-button create-market-btn"
                     role="menuitem"
                   >
                     <span aria-hidden="true">📊</span>
-                    <span>Create New Market</span>
+                    <span>Create Prediction Market</span>
                   </button>
-                ) : (
-                  <div className="create-market-promo">
-                    <p className="promo-text">Create prediction markets with liquidity pools!</p>
-                    <button
-                      onClick={() => handleOpenPurchaseModal()}
-                      className="action-button purchase-access-btn"
-                      role="menuitem"
-                    >
-                      <span aria-hidden="true">🔓</span>
-                      <span>Get Market Maker Access</span>
-                    </button>
-                  </div>
                 )}
-              </div>
-
-              {/* My Markets Section */}
-              <div className="dropdown-section">
-                <span className="wallet-section-title">My Markets</span>
                 <button
                   onClick={handleOpenMyMarkets}
                   className="action-button my-markets-btn"
                   role="menuitem"
                 >
-                  <span aria-hidden="true">&#128202;</span>
-                  <span>View My Markets</span>
+                  <span aria-hidden="true">📋</span>
+                  <span>My Wagers</span>
                 </button>
               </div>
 
@@ -1559,14 +1537,14 @@ function WalletButton({ className = '' }) {
         </>
       )}
 
-      {/* My Markets Modal */}
+      {/* My Wagers Modal */}
       <MyMarketsModal
         isOpen={showMyMarketsModal}
         onClose={() => setShowMyMarketsModal(false)}
         friendMarkets={friendMarkets}
       />
 
-      {/* Friend Market Creation Modal */}
+      {/* Create Wager Modal */}
       <FriendMarketsModal
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
