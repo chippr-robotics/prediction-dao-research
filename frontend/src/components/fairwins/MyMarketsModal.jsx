@@ -449,9 +449,9 @@ function MyMarketsModal({
           <div className="mm-header-content">
             <div className="mm-brand">
               <span className="mm-brand-icon">&#128202;</span>
-              <h2 id="my-markets-modal-title">My Markets</h2>
+              <h2 id="my-markets-modal-title">My Wagers</h2>
             </div>
-            <p className="mm-subtitle">Manage your prediction markets and positions</p>
+            <p className="mm-subtitle">Manage your wagers and positions</p>
           </div>
           <button
             className="mm-close-btn"

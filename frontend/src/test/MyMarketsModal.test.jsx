@@ -135,7 +135,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      expect(screen.getByText('My Markets')).toBeInTheDocument()
+      expect(screen.getByText('My Wagers')).toBeInTheDocument()
     })
 
     it('should display subtitle', async () => {
@@ -145,7 +145,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      expect(screen.getByText('Manage your prediction markets and positions')).toBeInTheDocument()
+      expect(screen.getByText('Manage your wagers and positions')).toBeInTheDocument()
     })
 
     it('should have close button', async () => {
@@ -475,10 +475,10 @@ describe('MyMarketsModal', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('My Markets')).toBeInTheDocument()
+        expect(screen.getByText('My Wagers')).toBeInTheDocument()
       })
 
-      const title = screen.getByText('My Markets')
+      const title = screen.getByText('My Wagers')
       await user.click(title)
 
       expect(mockOnClose).not.toHaveBeenCalled()
