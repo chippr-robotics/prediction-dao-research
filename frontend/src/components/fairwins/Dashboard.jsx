@@ -4,6 +4,15 @@ import { useUserPreferences } from '../../hooks/useUserPreferences'
 import './Dashboard.css'
 
 // ============================================================================
+// DEMO DATA CONSTANTS (computed once at module load, not during render)
+// ============================================================================
+
+const DEMO_END_30D = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+const DEMO_END_14D = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+const DEMO_END_45D = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString()
+const DEMO_END_PAST = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -279,7 +288,7 @@ function Dashboard() {
         stakeToken: 'USC',
         type: '1v1',
         oracle: 'Chainlink',
-        endTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: DEMO_END_30D,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12']
       },
       {
@@ -290,7 +299,7 @@ function Dashboard() {
         stakeToken: 'USC',
         type: '1v1',
         oracle: 'Polymarket',
-        endTime: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: DEMO_END_14D,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12']
       },
       {
@@ -301,7 +310,7 @@ function Dashboard() {
         stakeToken: 'USC',
         type: 'Group',
         oracle: 'Manual',
-        endTime: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: DEMO_END_45D,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12', '0x9876543210fedcba9876543210fedcba98765432']
       },
       {
@@ -312,7 +321,7 @@ function Dashboard() {
         stakeToken: 'USC',
         type: '1v1',
         oracle: 'Chainlink',
-        endTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        endTime: DEMO_END_PAST,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xfedcba0987654321fedcba0987654321fedcba09']
       }
     ]
