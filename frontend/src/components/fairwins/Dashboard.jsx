@@ -238,13 +238,15 @@ function HowItWorksGuide() {
 // ORACLE INFO PANEL
 // ============================================================================
 
-function OracleInfoPanel() {
+function OracleInfoPanel({ isConnected }) {
   const oracles = [
-    { name: 'Polymarket', description: 'Peg wagers to Polymarket event outcomes', status: 'available', icon: '\uD83C\uDFAF' },
-    { name: 'Chainlink', description: 'Price feed-based resolution', status: 'available', icon: '\uD83D\uDD17' },
-    { name: 'UMA', description: 'Custom truth assertions', status: 'available', icon: '\u2696\uFE0F' },
-    { name: 'Manual', description: 'Creator-resolved with challenge period', status: 'available', icon: '\u270B' }
+    { name: 'Polymarket', description: 'Peg wagers to Polymarket event outcomes', icon: '\uD83C\uDFAF' },
+    { name: 'Chainlink', description: 'Price feed-based resolution', icon: '\uD83D\uDD17' },
+    { name: 'UMA', description: 'Custom truth assertions', icon: '\u2696\uFE0F' },
+    { name: 'Manual', description: 'Creator-resolved with challenge period', icon: '\u270B' }
   ]
+
+  const status = isConnected ? 'available' : 'offline'
 
   return (
     <div className="oracle-info-panel">
@@ -257,8 +259,8 @@ function OracleInfoPanel() {
               <span className="oracle-name">{oracle.name}</span>
               <span className="oracle-description">{oracle.description}</span>
             </div>
-            <span className={`oracle-status ${oracle.status}`}>
-              {oracle.status === 'available' ? 'Available' : 'Offline'}
+            <span className={`oracle-status ${status}`}>
+              {isConnected ? 'Available' : 'Not Connected'}
             </span>
           </div>
         ))}
@@ -361,7 +363,7 @@ function Dashboard() {
           <HowItWorksGuide />
         </section>
         <section className="dashboard-section">
-          <OracleInfoPanel />
+          <OracleInfoPanel isConnected={isConnected} />
         </section>
       </div>
     )
@@ -430,7 +432,7 @@ function Dashboard() {
 
       {/* Oracle Info */}
       <section className="dashboard-section">
-        <OracleInfoPanel />
+        <OracleInfoPanel isConnected={isConnected} />
       </section>
     </div>
   )
