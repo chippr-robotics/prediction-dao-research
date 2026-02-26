@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import './SidebarNav.css'
 
@@ -16,18 +16,20 @@ import otherMarketsIcon from '../../assets/other_markets_no_text.svg'
 import allMarketsIcon from '../../assets/all_markets_no_text.svg'
 
 const CATEGORIES = [
+  // P2P Wager Management
   { id: 'dashboard', name: 'My Wagers', icon: dashboardIcon },
-  { id: 'trending', name: 'Trending', icon: trendingIcon },
-  { id: 'sports', name: 'Sports', icon: sportsIcon },
-  { id: 'politics', name: 'Politics', icon: politicsIcon },
-  { id: 'finance', name: 'Finance', icon: financeIcon },
-  { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
-  { id: 'tech', name: 'Tech', icon: techIcon },
-  { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon },
-  { id: 'weather', name: 'Weather', icon: weatherIcon },
-  { id: 'other', name: 'Other Markets', icon: otherMarketsIcon },
-  { id: 'perpetuals', name: 'Perpetuals', icon: '\uD83D\uDCC8', isEmoji: true },
-  { id: 'all-table', name: 'All Markets Table', icon: allMarketsIcon, powerUser: true }
+  // Browse Markets (for finding events to wager on)
+  { id: 'trending', name: 'Trending', icon: trendingIcon, section: 'browse' },
+  { id: 'sports', name: 'Sports', icon: sportsIcon, section: 'browse' },
+  { id: 'crypto', name: 'Crypto', icon: cryptoIcon, section: 'browse' },
+  { id: 'politics', name: 'Politics', icon: politicsIcon, section: 'browse' },
+  { id: 'finance', name: 'Finance', icon: financeIcon, section: 'browse' },
+  { id: 'tech', name: 'Tech', icon: techIcon, section: 'browse' },
+  { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon, section: 'browse' },
+  { id: 'weather', name: 'Weather', icon: weatherIcon, section: 'browse' },
+  { id: 'other', name: 'Other Markets', icon: otherMarketsIcon, section: 'browse' },
+  { id: 'perpetuals', name: 'Perpetuals', icon: '\uD83D\uDCC8', isEmoji: true, section: 'browse' },
+  { id: 'all-table', name: 'All Markets Table', icon: allMarketsIcon, powerUser: true, section: 'browse' }
 ]
 
 function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange, userRoles = [] }) {
@@ -123,27 +125,33 @@ function SidebarNav({ selectedCategory = 'dashboard', onCategoryChange, userRole
       </div>
 
       <nav className="category-list">
-        {visibleCategories.map((category) => (
-          <button
-            key={category.id}
-            className={`category-item ${selectedCategory === category.id ? 'active' : ''}`}
-            onClick={() => handleCategoryClick(category.id)}
-            onKeyDown={(e) => handleKeyDown(e, category.id)}
-            aria-current={selectedCategory === category.id ? 'page' : undefined}
-            aria-label={`View ${category.name}`}
-            title={!isExpanded ? category.name : ''}
-          >
-            <span className="category-icon" aria-hidden="true">
-              {category.isEmoji ? (
-                <span className="category-emoji">{category.icon}</span>
-              ) : typeof category.icon === 'string' && category.icon.endsWith('.svg') ? (
-                <img src={category.icon} alt="" className="category-icon-img" />
-              ) : (
-                category.icon
-              )}
-            </span>
-            {isExpanded && <span className="category-name">{category.name}</span>}
-          </button>
+        {visibleCategories.map((category, index) => (
+          <React.Fragment key={category.id}>
+            {index > 0 && category.section === 'browse' && visibleCategories[index - 1]?.section !== 'browse' && (
+              <div className="sidebar-divider" aria-hidden="true">
+                {isExpanded && <span className="divider-label">Browse Markets</span>}
+              </div>
+            )}
+            <button
+              className={`category-item ${selectedCategory === category.id ? 'active' : ''}`}
+              onClick={() => handleCategoryClick(category.id)}
+              onKeyDown={(e) => handleKeyDown(e, category.id)}
+              aria-current={selectedCategory === category.id ? 'page' : undefined}
+              aria-label={`View ${category.name}`}
+              title={!isExpanded ? category.name : ''}
+            >
+              <span className="category-icon" aria-hidden="true">
+                {category.isEmoji ? (
+                  <span className="category-emoji">{category.icon}</span>
+                ) : typeof category.icon === 'string' && category.icon.endsWith('.svg') ? (
+                  <img src={category.icon} alt="" className="category-icon-img" />
+                ) : (
+                  category.icon
+                )}
+              </span>
+              {isExpanded && <span className="category-name">{category.name}</span>}
+            </button>
+          </React.Fragment>
         ))}
       </nav>
     </aside>

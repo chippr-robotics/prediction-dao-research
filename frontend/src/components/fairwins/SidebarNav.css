@@ -92,6 +92,27 @@
   padding: 0 0.5rem;
 }
 
+/* Section divider between wager management and browse categories */
+.sidebar-divider {
+  margin: 0.5rem 0;
+  padding: 0 1rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.sidebar-nav.collapsed .sidebar-divider {
+  padding: 0 0.5rem;
+}
+
+.divider-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #636e72);
+  padding-top: 0.5rem;
+}
+
 .category-item {
   display: flex;
   align-items: center;

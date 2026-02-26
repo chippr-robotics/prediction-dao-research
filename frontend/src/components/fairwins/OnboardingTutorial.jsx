@@ -38,101 +38,9 @@ const TUTORIAL_STEPS = [
     )
   },
   {
-    id: 'markets',
-    title: 'How Prediction Markets Work',
-    subtitle: 'Prices reflect probability',
-    icon: (
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M3 3v18h18"/>
-        <path d="M18 17V9"/>
-        <path d="M13 17V5"/>
-        <path d="M8 17v-3"/>
-      </svg>
-    ),
-    content: (
-      <>
-        <p>
-          Each market has a <strong>current price</strong> between $0.00 and $1.00 that reflects
-          the crowd's estimated probability of an event occurring.
-        </p>
-        <div className="tutorial-example">
-          <div className="example-market">
-            <span className="example-title">"Will Team A win the championship?"</span>
-            <div className="example-prices">
-              <div className="price-item yes">
-                <span className="price-label">YES</span>
-                <span className="price-value">$0.65</span>
-                <span className="price-meaning">65% likely</span>
-              </div>
-              <div className="price-item no">
-                <span className="price-label">NO</span>
-                <span className="price-value">$0.35</span>
-                <span className="price-meaning">35% likely</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <p className="tutorial-note">
-          Prices update in real-time as traders buy and sell based on new information.
-        </p>
-      </>
-    )
-  },
-  {
-    id: 'cards',
-    title: 'Reading Market Cards',
-    subtitle: 'Understanding the interface',
-    icon: (
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="3" y="3" width="18" height="18" rx="2"/>
-        <path d="M3 9h18"/>
-        <path d="M9 21V9"/>
-      </svg>
-    ),
-    content: (
-      <>
-        <div className="tutorial-card-anatomy">
-          <div className="anatomy-card">
-            <div className="anatomy-header">
-              <span className="anatomy-category">🏀 Sports</span>
-              <span className="anatomy-time">3d 12h</span>
-            </div>
-            <div className="anatomy-title">Will the Lakers win tonight?</div>
-            <div className="anatomy-gauge">
-              <div className="gauge-bar" style={{ width: '72%' }}></div>
-              <span className="gauge-label">72%</span>
-            </div>
-            <div className="anatomy-stats">
-              <span>Vol: 15.2K</span>
-              <span>Traders: 234</span>
-            </div>
-          </div>
-          <div className="anatomy-labels">
-            <div className="anatomy-label" style={{ top: '5%' }}>
-              <span className="label-line"></span>
-              <span className="label-text">Category & time remaining</span>
-            </div>
-            <div className="anatomy-label" style={{ top: '30%' }}>
-              <span className="label-line"></span>
-              <span className="label-text">Market question</span>
-            </div>
-            <div className="anatomy-label" style={{ top: '55%' }}>
-              <span className="label-line"></span>
-              <span className="label-text">Current YES probability</span>
-            </div>
-            <div className="anatomy-label" style={{ top: '80%' }}>
-              <span className="label-line"></span>
-              <span className="label-text">Trading volume & activity</span>
-            </div>
-          </div>
-        </div>
-      </>
-    )
-  },
-  {
-    id: 'trading',
-    title: 'Placing Your First Trade',
-    subtitle: 'It only takes a few clicks',
+    id: 'create-wager',
+    title: 'Creating a Wager',
+    subtitle: 'Set the terms and stake',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2v20"/>
@@ -145,71 +53,164 @@ const TUTORIAL_STEPS = [
           <li>
             <span className="step-number">1</span>
             <div className="step-content">
-              <strong>Click a market card</strong>
-              <span>Opens the trading modal</span>
+              <strong>Pick your topic</strong>
+              <span>Any event with a clear outcome</span>
             </div>
           </li>
           <li>
             <span className="step-number">2</span>
             <div className="step-content">
-              <strong>Choose YES or NO</strong>
-              <span>Based on your prediction</span>
+              <strong>Set the stake</strong>
+              <span>Choose the token and amount to wager</span>
             </div>
           </li>
           <li>
             <span className="step-number">3</span>
             <div className="step-content">
-              <strong>Enter your amount</strong>
-              <span>Or use quick buttons (5, 25, 100, 500)</span>
+              <strong>Choose an oracle</strong>
+              <span>Polymarket, Chainlink, UMA, or manual resolution</span>
             </div>
           </li>
           <li>
             <span className="step-number">4</span>
             <div className="step-content">
-              <strong>Review & confirm</strong>
-              <span>Check shares and potential payout</span>
+              <strong>Share the invite</strong>
+              <span>Send a QR code or link to your friend</span>
             </div>
           </li>
         </ol>
         <div className="tutorial-tip">
-          <span className="tip-icon">⚡</span>
-          <span>Use <strong>Market Orders</strong> for instant execution, or <strong>Limit Orders</strong> to set your own price.</span>
+          <span className="tip-icon">&#9889;</span>
+          <span>Both stakes are <strong>locked in escrow</strong> until the outcome is determined. No trust required.</span>
         </div>
       </>
     )
   },
   {
-    id: 'positions',
-    title: 'Managing Your Positions',
-    subtitle: 'Track and close your trades',
+    id: 'wager-cards',
+    title: 'Reading Wager Cards',
+    subtitle: 'Understanding the dashboard',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M21 12a9 9 0 1 1-9-9"/>
-        <path d="M21 3v6h-6"/>
-        <path d="M12 12l3-3"/>
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18"/>
+        <path d="M9 21V9"/>
+      </svg>
+    ),
+    content: (
+      <>
+        <div className="tutorial-card-anatomy">
+          <div className="anatomy-card">
+            <div className="anatomy-header">
+              <span className="anatomy-category">Active</span>
+              <span className="anatomy-time">14d 6h</span>
+            </div>
+            <div className="anatomy-title">Will BTC hit $100k by March?</div>
+            <div className="anatomy-stats">
+              <span>50 USC</span>
+              <span>1v1 &bull; Chainlink</span>
+            </div>
+          </div>
+          <div className="anatomy-labels">
+            <div className="anatomy-label" style={{ top: '5%' }}>
+              <span className="label-line"></span>
+              <span className="label-text">Status &amp; time remaining</span>
+            </div>
+            <div className="anatomy-label" style={{ top: '35%' }}>
+              <span className="label-line"></span>
+              <span className="label-text">Wager description</span>
+            </div>
+            <div className="anatomy-label" style={{ top: '70%' }}>
+              <span className="label-line"></span>
+              <span className="label-text">Stake amount, type &amp; oracle</span>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  },
+  {
+    id: 'oracles',
+    title: 'Oracle Resolution',
+    subtitle: 'How wagers get settled',
+    icon: (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
       </svg>
     ),
     content: (
       <>
         <p>
-          After trading, you can <strong>track your positions</strong> from the Dashboard.
-          Watch your potential profit/loss update in real-time.
+          Wagers resolve automatically using <strong>trusted oracle sources</strong>,
+          so there's no arguing about results.
+        </p>
+        <div className="tutorial-next-steps">
+          <div className="next-step-item">
+            <span className="next-icon">&#127919;</span>
+            <div className="next-content">
+              <strong>Polymarket</strong>
+              <span>Peg to real-world event outcomes</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#128279;</span>
+            <div className="next-content">
+              <strong>Chainlink</strong>
+              <span>Price feeds for crypto wagers</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#9878;&#65039;</span>
+            <div className="next-content">
+              <strong>UMA</strong>
+              <span>Custom truth assertions</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#9995;</span>
+            <div className="next-content">
+              <strong>Manual + Challenge</strong>
+              <span>Creator resolves, 24h dispute window</span>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  },
+  {
+    id: 'tracking',
+    title: 'Tracking Your Wagers',
+    subtitle: 'Manage active and past bets',
+    icon: (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+    ),
+    content: (
+      <>
+        <p>
+          Your dashboard shows all wagers at a glance. Track status updates
+          and claim winnings when wagers resolve.
         </p>
         <div className="tutorial-positions-preview">
           <div className="position-row winning">
-            <div className="position-market">Lakers win tonight</div>
-            <div className="position-shares">50 YES @ $0.65</div>
-            <div className="position-pnl positive">+$12.50</div>
+            <div className="position-market">BTC above $100k</div>
+            <div className="position-shares">50 USC staked</div>
+            <div className="position-pnl positive">Won &mdash; Claim 100 USC</div>
           </div>
           <div className="position-row losing">
-            <div className="position-market">BTC above $100k</div>
-            <div className="position-shares">30 NO @ $0.40</div>
-            <div className="position-pnl negative">-$3.20</div>
+            <div className="position-market">Snow in Austin</div>
+            <div className="position-shares">10 USC staked</div>
+            <div className="position-pnl negative">Active &mdash; 12d left</div>
           </div>
         </div>
         <div className="tutorial-highlight-box">
-          <span className="highlight-icon">📊</span>
-          <span>You can <strong>sell anytime</strong> before the market settles to lock in profits or cut losses.</span>
+          <span className="highlight-icon">&#128274;</span>
+          <span>Stakes stay <strong>locked in escrow</strong> until resolution. Unclaimed winnings return after 90 days.</span>
         </div>
       </>
     )
@@ -231,31 +232,31 @@ const TUTORIAL_STEPS = [
         </p>
         <div className="tutorial-next-steps">
           <div className="next-step-item">
-            <span className="next-icon">📈</span>
+            <span className="next-icon">&#128101;</span>
             <div className="next-content">
-              <strong>Trending Markets</strong>
-              <span>See what's hot right now</span>
+              <strong>Create a 1v1 Wager</strong>
+              <span>Challenge a friend to a direct bet</span>
             </div>
           </div>
           <div className="next-step-item">
-            <span className="next-icon">👥</span>
+            <span className="next-icon">&#128244;</span>
             <div className="next-content">
-              <strong>Friend Markets</strong>
-              <span>Create private bets with friends</span>
+              <strong>Scan a QR Code</strong>
+              <span>Accept a wager from a friend</span>
             </div>
           </div>
           <div className="next-step-item">
-            <span className="next-icon">⚡</span>
+            <span className="next-icon">&#127942;</span>
             <div className="next-content">
-              <strong>Perpetual Futures</strong>
-              <span>Advanced leveraged trading</span>
+              <strong>Explore Oracle Sources</strong>
+              <span>See how wagers get resolved</span>
             </div>
           </div>
           <div className="next-step-item">
-            <span className="next-icon">🏛️</span>
+            <span className="next-icon">&#128200;</span>
             <div className="next-content">
-              <strong>ClearPath DAO</strong>
-              <span>Participate in governance</span>
+              <strong>Browse Markets</strong>
+              <span>Find events to wager on</span>
             </div>
           </div>
         </div>
