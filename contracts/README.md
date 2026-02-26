@@ -1,6 +1,6 @@
 # Smart Contracts Directory Structure
 
-This directory contains all Solidity smart contracts for the FairWins prediction market platform, organized by functional domain.
+This directory contains all Solidity smart contracts for the FairWins P2P wager platform and ClearPath governance system, organized by functional domain.
 
 ## Directory Layout
 
@@ -25,9 +25,21 @@ contracts/
 
 ## Folder Descriptions
 
-### `core/` - Core Governance Contracts
+### `markets/` - P2P Wager & Market Contracts
 
-The foundational contracts that orchestrate the DAO and governance system.
+The primary contracts for creating and managing P2P wagers and prediction markets. **FriendGroupMarketFactory** is the main entry point for the FairWins P2P wager platform.
+
+| Contract | Description |
+|----------|-------------|
+| `FriendGroupMarketFactory.sol` | **Primary** — P2P wager creation between trusted parties with oracle integration |
+| `ConditionalMarketFactory.sol` | Creates binary outcome markets using Gnosis CTF |
+| `PredictionMarketExchange.sol` | EIP-712 order book exchange for market positions |
+| `MarketCorrelationRegistry.sol` | Groups related markets for correlation analysis |
+| `CTF1155.sol` | ERC-1155 conditional tokens for wager/market positions |
+
+### `core/` - Governance Contracts (ClearPath)
+
+The foundational contracts that orchestrate the ClearPath DAO governance system.
 
 | Contract | Description |
 |----------|-------------|
@@ -36,18 +48,6 @@ The foundational contracts that orchestrate the DAO and governance system.
 | `DAOFactory.sol` | Factory for deploying new DAO instances |
 | `ProposalRegistry.sol` | Permissionless proposal submission and management |
 | `WelfareMetricRegistry.sol` | On-chain storage of protocol success metrics |
-
-### `markets/` - Prediction Market Contracts
-
-Contracts for creating and managing prediction markets.
-
-| Contract | Description |
-|----------|-------------|
-| `ConditionalMarketFactory.sol` | Creates pass/fail prediction markets using Gnosis CTF |
-| `FriendGroupMarketFactory.sol` | Small-scale markets between trusted parties |
-| `PredictionMarketExchange.sol` | EIP-712 order book exchange for market positions |
-| `MarketCorrelationRegistry.sol` | Groups related markets for correlation analysis |
-| `CTF1155.sol` | ERC-1155 conditional tokens for market positions |
 
 ### `access/` - Access Control Contracts
 
@@ -183,20 +183,20 @@ Solidity contracts used for fuzz testing with tools like Echidna.
 ## Dependency Graph
 
 ```
-                    ┌─────────────────┐
-                    │   core/         │
-                    │ FutarchyGovernor│
-                    └────────┬────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-        ▼                    ▼                    ▼
+┌─────────────────┐          ┌─────────────────┐
+│   markets/      │          │   core/         │
+│ FriendGroup     │          │ FutarchyGovernor│
+│ MarketFactory   │          │ (ClearPath)     │
+└────────┬────────┘          └────────┬────────┘
+         │                            │
+         │    ┌───────────────────────┤
+         │    │                       │
+         ▼    ▼                       ▼
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
 │   markets/    │   │   privacy/    │   │   oracles/    │
 │ Conditional   │   │ Privacy       │   │ Oracle        │
 │ MarketFactory │   │ Coordinator   │   │ Resolver      │
 └───────┬───────┘   └───────────────┘   └───────────────┘
-        │
         │
         ▼
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐

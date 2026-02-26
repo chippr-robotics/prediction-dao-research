@@ -1,6 +1,66 @@
 # Architecture Overview
 
-## System Architecture
+This document covers the two main system architectures: the **P2P Wager System** (FairWins) and the **Governance System** (ClearPath).
+
+## P2P Wager Architecture (FairWins)
+
+The primary user-facing system. For a detailed assessment, see [P2P Wager Platform Assessment](../architecture/P2P_WAGER_PLATFORM_ASSESSMENT.md) and [Implementation Plan](../architecture/IMPLEMENTATION_PLAN.md).
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  FriendGroupMarketFactory                        │
+│              (P2P Wager Coordination Layer)                      │
+│                                                                   │
+│  - Wager Creation & Invite Links                                 │
+│  - Stake Escrow Management                                       │
+│  - Oracle Source Selection                                       │
+│  - Resolution & Payout                                           │
+└───────────┬─────────────────────────────────────────────────────┘
+            │
+            │ Coordinates
+            │
+    ┌───────┴──────────┬──────────────┬────────────────┐
+    │                  │              │                │
+    ▼                  ▼              ▼                ▼
+┌─────────┐    ┌──────────────┐  ┌────────────┐  ┌──────────┐
+│ Oracle  │    │  Conditional │  │  CTF1155   │  │ Tiered   │
+│Resolver │    │  Market      │  │ Conditional│  │ Role     │
+│         │    │  Factory     │  │ Tokens     │  │ Manager  │
+└─────────┘    └──────────────┘  └────────────┘  └──────────┘
+```
+
+### P2P Wager Lifecycle
+
+```
+1. CREATE WAGER
+   Creator → FriendGroupMarketFactory
+   - Define topic and binary outcome type
+   - Set stake amount and token
+   - Select oracle source (Polymarket, Chainlink, UMA, manual)
+   - Generate invite link / QR code
+
+2. ACCEPT WAGER
+   Counterparty → FriendGroupMarketFactory
+   - Accept via invite link
+   - Match stake deposited to escrow
+   - Both stakes locked in contract
+
+3. RESOLUTION
+   Oracle → OracleResolver → FriendGroupMarketFactory
+   - Polymarket: Peg to existing market outcome
+   - Chainlink: Price feed comparison at deadline
+   - UMA: Custom assertion with dispute window
+   - Manual: Creator resolves, 24h challenge period
+
+4. SETTLEMENT
+   FriendGroupMarketFactory → Winner
+   - Winner claims combined stake
+   - Unclaimed winnings return after 90 days
+```
+
+---
+
+## Governance Architecture (ClearPath)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33,9 +93,7 @@
 └─────────┘                                    └──────────────┘
 ```
 
-## Component Interactions
-
-### Proposal Lifecycle
+### Proposal Lifecycle (ClearPath)
 
 ```
 1. SUBMISSION
