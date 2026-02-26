@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 import SidebarNav from '../components/fairwins/SidebarNav'
+import { useIsMobile } from '../hooks/useMediaQuery'
 
 // Mock the useIsMobile hook
 vi.mock('../hooks/useMediaQuery', () => ({
@@ -20,7 +21,7 @@ describe('SidebarNav Component', () => {
     it('renders sidebar navigation', () => {
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
       // aside element has complementary role by default
-      expect(screen.getByRole('complementary', { name: /market categories/i })).toBeInTheDocument()
+      expect(screen.getByRole('complementary', { name: /navigation/i })).toBeInTheDocument()
     })
 
     it('renders toggle button', () => {
@@ -28,11 +29,11 @@ describe('SidebarNav Component', () => {
       expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument()
     })
 
-    it('renders all category buttons', () => {
+    it('renders the My Wagers category button', () => {
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
       const categoryButtons = screen.getAllByRole('button')
-      // Should have toggle button + 12 category buttons (including "Weather", "Perpetuals" and "All Markets Table")
-      expect(categoryButtons.length).toBe(13)
+      // Should have toggle button + 1 category button (My Wagers / dashboard)
+      expect(categoryButtons.length).toBe(2)
     })
 
     it('starts in collapsed state by default', () => {
@@ -46,36 +47,36 @@ describe('SidebarNav Component', () => {
     it('expands sidebar when toggle button is clicked', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const toggleButton = screen.getByRole('button', { name: /expand sidebar/i })
       await user.click(toggleButton)
-      
+
       expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: /categories/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /navigation/i })).toBeInTheDocument()
     })
 
     it('collapses sidebar when toggle button is clicked again', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const expandButton = screen.getByRole('button', { name: /expand sidebar/i })
       await user.click(expandButton)
-      
+
       const collapseButton = screen.getByRole('button', { name: /collapse sidebar/i })
       await user.click(collapseButton)
-      
+
       expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: /categories/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /navigation/i })).not.toBeInTheDocument()
     })
 
     it('toggle button is keyboard accessible', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const toggleButton = screen.getByRole('button', { name: /expand sidebar/i })
       toggleButton.focus()
       expect(toggleButton).toHaveFocus()
-      
+
       await user.keyboard('{Enter}')
       expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument()
     })
@@ -83,42 +84,42 @@ describe('SidebarNav Component', () => {
     it('toggle button responds to Space key', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const toggleButton = screen.getByRole('button', { name: /expand sidebar/i })
       toggleButton.focus()
-      
+
       await user.keyboard(' ')
       expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument()
     })
   })
 
   describe('Category Selection', () => {
-    it('calls onCategoryChange when a category is clicked', async () => {
+    it('calls onCategoryChange when My Wagers is clicked', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
-      const sportsButton = screen.getByRole('button', { name: /view sports/i })
-      await user.click(sportsButton)
-      
-      expect(mockOnCategoryChange).toHaveBeenCalledWith('sports')
+
+      const dashboardButton = screen.getByRole('button', { name: /view my wagers/i })
+      await user.click(dashboardButton)
+
+      expect(mockOnCategoryChange).toHaveBeenCalledWith('dashboard')
     })
 
     it('highlights selected category', () => {
-      render(<SidebarNav selectedCategory="sports" onCategoryChange={mockOnCategoryChange} />)
-      
-      const sportsButton = screen.getByRole('button', { name: /view sports/i })
-      expect(sportsButton).toHaveAttribute('aria-current', 'page')
+      render(<SidebarNav selectedCategory="dashboard" onCategoryChange={mockOnCategoryChange} />)
+
+      const dashboardButton = screen.getByRole('button', { name: /view my wagers/i })
+      expect(dashboardButton).toHaveAttribute('aria-current', 'page')
     })
 
     it('category buttons are keyboard accessible', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
-      const financeButton = screen.getByRole('button', { name: /view finance/i })
-      financeButton.focus()
-      
+
+      const dashboardButton = screen.getByRole('button', { name: /view my wagers/i })
+      dashboardButton.focus()
+
       await user.keyboard('{Enter}')
-      expect(mockOnCategoryChange).toHaveBeenCalledWith('finance')
+      expect(mockOnCategoryChange).toHaveBeenCalledWith('dashboard')
     })
   })
 
@@ -132,24 +133,24 @@ describe('SidebarNav Component', () => {
     it('has no accessibility violations in expanded state', async () => {
       const user = userEvent.setup()
       const { container } = render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const toggleButton = screen.getByRole('button', { name: /expand sidebar/i })
       await user.click(toggleButton)
-      
+
       const results = await axe(container)
       expect(results).toHaveNoViolations()
     })
 
     it('provides tooltips for collapsed category items', () => {
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
-      const sportsButton = screen.getByRole('button', { name: /view sports/i })
-      expect(sportsButton).toHaveAttribute('title', 'Sports')
+
+      const dashboardButton = screen.getByRole('button', { name: /view my wagers/i })
+      expect(dashboardButton).toHaveAttribute('title', 'My Wagers')
     })
 
     it('toggle button has proper ARIA attributes', () => {
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const toggleButton = screen.getByRole('button', { name: /expand sidebar/i })
       expect(toggleButton).toHaveAttribute('aria-expanded', 'false')
       expect(toggleButton).toHaveAttribute('aria-label', 'Expand sidebar')
@@ -160,30 +161,42 @@ describe('SidebarNav Component', () => {
     it('does not expand on mouse hover', async () => {
       const user = userEvent.setup()
       const { container } = render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       const sidebar = container.querySelector('aside')
       await user.hover(sidebar)
-      
+
       // Sidebar should remain collapsed
       expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: /categories/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /navigation/i })).not.toBeInTheDocument()
     })
 
     it('maintains expanded state after category selection', async () => {
       const user = userEvent.setup()
       render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
-      
+
       // Expand sidebar
       const toggleButton = screen.getByRole('button', { name: /expand sidebar/i })
       await user.click(toggleButton)
-      
+
       // Select a category
-      const sportsButton = screen.getByRole('button', { name: /view sports/i })
-      await user.click(sportsButton)
-      
+      const dashboardButton = screen.getByRole('button', { name: /view my wagers/i })
+      await user.click(dashboardButton)
+
       // Sidebar should still be expanded
       expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: /categories/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /navigation/i })).toBeInTheDocument()
+    })
+  })
+
+  describe('Mobile Rendering', () => {
+    it('returns null on mobile (no bottom nav)', () => {
+      vi.mocked(useIsMobile).mockReturnValue(true)
+
+      const { container } = render(<SidebarNav onCategoryChange={mockOnCategoryChange} />)
+      expect(container.innerHTML).toBe('')
+
+      // Reset to desktop
+      vi.mocked(useIsMobile).mockReturnValue(false)
     })
   })
 })
