@@ -13,7 +13,7 @@ const TUTORIAL_STEPS = [
   {
     id: 'welcome',
     title: 'Welcome to FairWins',
-    subtitle: 'Your gateway to prediction markets',
+    subtitle: 'Private wagers between friends',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -24,15 +24,15 @@ const TUTORIAL_STEPS = [
     content: (
       <>
         <p>
-          FairWins lets you <strong>trade on the outcome of real-world events</strong> using
-          prediction markets. Make predictions on sports, politics, crypto, and more.
+          FairWins lets you <strong>create private wagers with friends</strong> that automatically
+          resolve using trusted oracles like Polymarket, Chainlink, and UMA.
         </p>
         <div className="tutorial-highlight-box">
           <span className="highlight-icon">💡</span>
-          <span>Think an event will happen? Buy <strong>YES</strong>. Think it won't? Buy <strong>NO</strong>.</span>
+          <span>Create a wager, share via <strong>QR code</strong>, and let the smart contract handle stakes and payouts.</span>
         </div>
         <p className="tutorial-note">
-          If you're right, your shares pay out $1 each. If you're wrong, they're worth $0.
+          All stakes are held in escrow until the outcome is determined. No trust required.
         </p>
       </>
     )
@@ -217,7 +217,7 @@ const TUTORIAL_STEPS = [
   {
     id: 'ready',
     title: "You're Ready!",
-    subtitle: 'Start exploring prediction markets',
+    subtitle: 'Start creating wagers with friends',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -227,7 +227,7 @@ const TUTORIAL_STEPS = [
     content: (
       <>
         <p>
-          You now know the basics of prediction markets. Here's what to explore next:
+          You now know the basics. Here's what to explore next:
         </p>
         <div className="tutorial-next-steps">
           <div className="next-step-item">

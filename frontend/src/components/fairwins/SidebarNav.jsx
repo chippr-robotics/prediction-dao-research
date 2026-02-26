@@ -16,17 +16,17 @@ import otherMarketsIcon from '../../assets/other_markets_no_text.svg'
 import allMarketsIcon from '../../assets/all_markets_no_text.svg'
 
 const CATEGORIES = [
-  { id: 'dashboard', name: 'Dashboard', icon: dashboardIcon },
+  { id: 'dashboard', name: 'My Wagers', icon: dashboardIcon },
   { id: 'trending', name: 'Trending', icon: trendingIcon },
-  { id: 'perpetuals', name: 'Perpetuals', icon: '📈', isEmoji: true },
-  { id: 'politics', name: 'Politics', icon: politicsIcon },
   { id: 'sports', name: 'Sports', icon: sportsIcon },
+  { id: 'politics', name: 'Politics', icon: politicsIcon },
   { id: 'finance', name: 'Finance', icon: financeIcon },
+  { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
   { id: 'tech', name: 'Tech', icon: techIcon },
   { id: 'pop-culture', name: 'Pop Culture', icon: popCultureIcon },
-  { id: 'crypto', name: 'Crypto', icon: cryptoIcon },
   { id: 'weather', name: 'Weather', icon: weatherIcon },
   { id: 'other', name: 'Other Markets', icon: otherMarketsIcon },
+  { id: 'perpetuals', name: 'Perpetuals', icon: '\uD83D\uDCC8', isEmoji: true },
   { id: 'all-table', name: 'All Markets Table', icon: allMarketsIcon, powerUser: true }
 ]
 

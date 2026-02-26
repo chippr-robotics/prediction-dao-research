@@ -190,7 +190,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
     }
 
     // Show a welcome notification
-    showNotification('Welcome to FairWins! Start exploring prediction markets.', 'success', 4000)
+    showNotification('Welcome to FairWins! Create your first P2P wager.', 'success', 4000)
   }, [account, showNotification])
 
   // Auto-open market modal when accessing shared market links

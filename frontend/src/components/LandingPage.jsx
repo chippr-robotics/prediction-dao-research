@@ -7,8 +7,8 @@ function LandingPage() {
   const navigate = useNavigate()
   const [logoErrors, setLogoErrors] = useState({ fairwins: false })
 
-  const handleBrowseMarkets = () => {
-    navigate('/fairwins')
+  const handleGetStarted = () => {
+    navigate('/app')
   }
 
   const handleLogoError = (platform) => {
@@ -23,19 +23,17 @@ function LandingPage() {
       {/* Hero Split Section - 66% Left / 33% Right */}
       <section className="hero-split-section" id="hero">
         <div className="hero-container">
-          {/* Left Column (66%) - FairWins Hero */}
+          {/* Left Column (66%) - Hero Content */}
           <div className="hero-left">
-            {/* FairWins Hero Content */}
             <div className="platforms-compact">
-              <h2 className="section-title-compact">Harness the Wisdom of the Crowd</h2>
+              <h2 className="section-title-compact">Private Wagers Between Friends</h2>
               <div className="platform-cards-compact">
-                {/* FairWins Main Card */}
                 <div className="platform-card-compact fairwins">
                   <div className="platform-card-header-compact">
                  {!logoErrors.fairwins ? (
-                    <img 
-                      src="/assets/logo_fairwins.svg" 
-                      alt="FairWins" 
+                    <img
+                      src="/assets/logo_fairwins.svg"
+                      alt="FairWins"
                       className="platform-logo-compact"
                       width="48"
                       height="48"
@@ -46,17 +44,18 @@ function LandingPage() {
                   )}
                     <div>
                       <h3>FairWins</h3>
-                      <p className="platform-tagline-compact">Prediction Markets for Everyone</p>
+                      <p className="platform-tagline-compact">P2P Wager Management Layer</p>
                     </div>
                   </div>
                   <p className="platform-description-compact">
-                    Tap into collective intelligence through prediction markets. When people put money behind their predictions, the crowd becomes remarkably accurate.
+                    Create private wagers with friends that automatically resolve using trusted oracles.
+                    FairWins handles the stakes, disputes, and payouts—so you can focus on the bet.
                   </p>
                   <ul className="platform-features-compact">
-                    <li>✓ Create markets on any topic</li>
-                    <li>✓ Trade on collective predictions</li>
-                    <li>✓ Earn from accurate forecasts</li>
-                    <li>✓ Transparent on-chain resolution</li>
+                    <li>&#10003; 1v1 and group wagers with friends</li>
+                    <li>&#10003; Auto-resolve via Polymarket, Chainlink, UMA</li>
+                    <li>&#10003; QR code sharing for instant invites</li>
+                    <li>&#10003; Built-in dispute resolution and escrow</li>
                   </ul>
                 </div>
               </div>
@@ -66,20 +65,21 @@ function LandingPage() {
           {/* Right Column (33%) - CTA Sidebar */}
           <div className="hero-right">
             <div className="cta-sidebar">
-              <button 
-                onClick={handleBrowseMarkets} 
+              <button
+                onClick={handleGetStarted}
                 className="cta-button-sidebar primary"
               >
                 <span className="button-icon" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <line x1="3" y1="9" x2="21" y2="9" />
-                    <line x1="9" y1="21" x2="9" y2="9" />
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                 </span>
-                Explore Markets
+                Create a Wager
               </button>
-              
+
               {/* Social Media Links */}
               <div className="social-links">
                 <a href="https://x.com/fairwins_app" target="_blank" rel="noopener noreferrer" className="social-link" aria-label="Twitter/X">
@@ -113,10 +113,10 @@ function LandingPage() {
         </div>
       </section>
 
-                  {/* Why Prediction Markets Work - Full Width Section */}
+      {/* How P2P Wagers Work Section */}
       <section className="enterprise-full-width" id="features">
         <div className="container">
-          <h2 className="section-title">Why Prediction Markets Work</h2>
+          <h2 className="section-title">Why Private P2P Wagers</h2>
           <div className="features-grid">
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
@@ -127,18 +127,8 @@ function LandingPage() {
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <h3>Aggregated Knowledge</h3>
-              <p>Markets collect information from diverse participants with different perspectives and expertise</p>
-            </div>
-            <div className="feature-card">
-              <div className="feature-icon" aria-hidden="true">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="12" y1="1" x2="12" y2="23" />
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-              </div>
-              <h3>Financial Incentives</h3>
-              <p>Real money rewards accurate predictions, ensuring informed participants have stronger influence</p>
+              <h3>Bet With Friends</h3>
+              <p>Create private 1v1 or group wagers with people you know. No public order books, no anonymous counterparties.</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
@@ -147,17 +137,18 @@ function LandingPage() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               </div>
-              <h3>Transparent Outcomes</h3>
-              <p>All trades and resolutions are visible on-chain for complete accountability</p>
+              <h3>Trustless Escrow</h3>
+              <p>Stakes are locked in smart contracts until resolution. No one can run off with the money.</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
                 </svg>
               </div>
-              <h3>Price Discovery</h3>
-              <p>Market prices continuously reflect the collective probability assessment of outcomes</p>
+              <h3>Oracle-Backed Resolution</h3>
+              <p>Wagers auto-resolve via Polymarket outcomes, Chainlink price feeds, or UMA assertions. No arguing about results.</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
@@ -165,19 +156,29 @@ function LandingPage() {
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <h3>Anti-Manipulation</h3>
-              <p>MACI-style privacy mechanisms protect against collusion and vote buying</p>
+              <h3>Dispute Protection</h3>
+              <p>24-hour challenge period on manual resolutions. Escalate disputes to neutral arbitration if needed.</p>
             </div>
             <div className="feature-card">
               <div className="feature-icon" aria-hidden="true">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
                 </svg>
               </div>
-              <h3>Global Participation</h3>
-              <p>Anyone can contribute their knowledge, democratizing expertise and predictions</p>
+              <h3>Share via QR Code</h3>
+              <p>Generate a QR code or deep link after creating a wager. Your friend scans it to accept the bet instantly.</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon" aria-hidden="true">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <h3>Flexible Stakes</h3>
+              <p>Wager with stablecoins, ETC, or custom tokens. Set your own stake amounts and acceptance deadlines.</p>
             </div>
           </div>
         </div>
@@ -186,98 +187,94 @@ function LandingPage() {
       {/* How It Works Section */}
       <section className="how-it-works-section" id="how-it-works">
         <div className="container">
-          <h2 className="section-title">How the Wisdom of the Crowd Works</h2>
+          <h2 className="section-title">How It Works</h2>
           <p className="section-intro">
-            Prediction markets harness collective intelligence by aggregating diverse knowledge and rewarding accuracy
+            Create a wager, share it, and let the smart contract handle the rest
           </p>
           <div className="steps-grid">
             <div className="step-card">
               <div className="step-number">1</div>
-              <h3>Market Creation</h3>
+              <h3>Create Your Wager</h3>
               <p>
-                Anyone can create a prediction market about future outcomes—from elections and sports 
-                to company performance and scientific discoveries. Clear resolution criteria ensure fair settlement.
+                Pick a topic, set your stake, and choose how the wager resolves.
+                Link it to a Polymarket outcome, Chainlink price feed, or resolve it manually with your friends.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">2</div>
-              <h3>Information Aggregation</h3>
+              <h3>Share the Invite</h3>
               <p>
-                Participants with knowledge, research, or insights trade based on their predictions. 
-                The market price naturally gravitates toward the collective probability assessment.
+                Get a QR code or shareable link. Send it to your friend or group.
+                They review the terms and stake their side of the bet. Both stakes are locked in escrow.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">3</div>
-              <h3>Financial Incentives</h3>
+              <h3>Wait for the Outcome</h3>
               <p>
-                Traders buy outcome tokens at current market prices. Those who predict correctly 
-                earn profits, while incorrect predictions result in losses. This aligns incentives with accuracy.
+                The wager is live. Track it in your dashboard.
+                When the event happens, the oracle reports the result automatically, or the creator resolves it manually.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">4</div>
-              <h3>Price Discovery</h3>
+              <h3>Challenge Period</h3>
               <p>
-                As new information emerges, prices update in real-time. The market price represents 
-                the crowd's best estimate of the probability that an outcome will occur.
+                For manual resolutions, there's a 24-hour window where either party can dispute the result.
+                This keeps things fair without needing to trust a single person.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">5</div>
-              <h3>Market Resolution</h3>
+              <h3>Claim Your Winnings</h3>
               <p>
-                When the outcome is determined, an oracle reports the result. There's a challenge 
-                period for disputes, ensuring accurate resolution before markets settle.
+                Once resolved and undisputed, the winner claims the full pot from the smart contract.
+                If unclaimed after 90 days, funds return to the treasury as a safety net.
               </p>
             </div>
             <div className="step-card">
               <div className="step-number">6</div>
-              <h3>Settlement & Rewards</h3>
+              <h3>Oracle Timeout Safety</h3>
               <p>
-                Winners redeem their tokens for their share of the pool plus earnings from those 
-                who predicted incorrectly. Accurate forecasters are rewarded, incentivizing expertise.
+                If an external oracle stalls for 30+ days, both parties can trigger a mutual refund.
+                No one gets stuck waiting forever.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why Different Section */}
+      {/* Oracle Sources Section */}
       <section className="comparison-section">
         <div className="container">
-          <h2 className="section-title">Why Prediction Markets Beat Traditional Polling</h2>
+          <h2 className="section-title">Multi-Oracle Resolution</h2>
           <div className="comparison-grid">
             <div className="comparison-card">
-              <h3>💰 Skin in the Game</h3>
+              <h3>Polymarket</h3>
               <p>
-                Unlike surveys where responses have no consequences, prediction markets require 
-                real financial commitment. This filters out noise and rewards those with genuine 
-                knowledge and conviction.
+                Peg your wager to any Polymarket outcome. When the Polymarket event resolves,
+                your friend wager resolves automatically. Covers elections, sports, world events, and more.
               </p>
             </div>
             <div className="comparison-card">
-              <h3>🎯 Incentivized Accuracy</h3>
+              <h3>Chainlink Price Feeds</h3>
               <p>
-                Polls ask "what do you think?" with no reward for being right. Prediction markets 
-                reward accurate forecasts with real profits, ensuring participants research thoroughly 
-                and predict honestly.
+                Set price-based wagers like "Will BTC be above $100k by June?"
+                Chainlink's decentralized price feeds provide tamper-proof price data for settlement.
               </p>
             </div>
             <div className="comparison-card">
-              <h3>📊 Continuous Updates</h3>
+              <h3>UMA Optimistic Oracle</h3>
               <p>
-                Traditional polls are snapshots in time. Prediction markets update continuously as 
-                new information emerges, providing real-time probability assessments that evolve 
-                with events.
+                For custom claims that don't fit standard feeds. Assert any truth statement
+                and let UMA's dispute mechanism ensure honest resolution.
               </p>
             </div>
             <div className="comparison-card">
-              <h3>🌐 Self-Weighted Expertise</h3>
+              <h3>Manual + Challenge</h3>
               <p>
-                Polls give everyone equal weight. Markets naturally weight expertise—informed 
-                participants trade more and with higher stakes, while casual observers contribute 
-                less to price formation.
+                The creator resolves the wager, and the counterparty gets a 24-hour window
+                to challenge. Simple and trust-minimized for casual bets between friends.
               </p>
             </div>
           </div>
@@ -287,185 +284,47 @@ function LandingPage() {
       {/* Use Cases Section */}
       <section className="use-cases-section" id="use-cases">
         <div className="container">
-          <h2 className="section-title">Real-World Applications</h2>
+          <h2 className="section-title">What People Bet On</h2>
           <p className="section-intro">
-            See how FairWins prediction markets work in different scenarios
+            Any event with a clear outcome can be a wager
           </p>
           <div className="use-cases-grid">
             <div className="use-case-card">
-              <div className="use-case-icon">🗳️</div>
-              <h3>Election Forecasting</h3>
+              <div className="use-case-icon">&#127944;</div>
+              <h3>Sports Bets</h3>
               <p className="use-case-description">
-                <strong>The Scenario:</strong> A presidential election is approaching and people want 
-                to track the probability of different outcomes more accurately than traditional polls.
+                <strong>The Setup:</strong> You and your buddy disagree about who wins the Super Bowl.
+                Create a 1v1 wager pegged to a Polymarket event.
               </p>
               <p className="use-case-description">
-                <strong>How It Works:</strong> Traders buy tokens representing different candidates. 
-                As new polls, debates, and events occur, prices update in real-time to reflect the 
-                collective probability assessment. The market price becomes the best predictor.
-              </p>
-              <p className="use-case-outcome">
-                <strong>The Result:</strong> More accurate forecasts than polls alone, as participants 
-                with insider knowledge or superior analysis are rewarded for their contributions.
+                <strong>How It Plays Out:</strong> Both of you stake $50 in USC. When the game
+                is over and Polymarket resolves, the winner's contract balance updates automatically.
+                Claim your $100 with one click.
               </p>
             </div>
             <div className="use-case-card">
-              <div className="use-case-icon">🏈</div>
-              <h3>Sports Predictions</h3>
+              <div className="use-case-icon">&#128200;</div>
+              <h3>Price Predictions</h3>
               <p className="use-case-description">
-                <strong>The Scenario:</strong> A group of friends wants to predict championship outcomes, 
-                player performance, or season records with skin in the game.
+                <strong>The Setup:</strong> Your group chat is arguing about whether ETH will hit $5k.
+                Create a group wager with a Chainlink price feed as the oracle.
               </p>
               <p className="use-case-description">
-                <strong>How It Works:</strong> Create private or public markets for specific outcomes. 
-                Participants trade based on their knowledge of teams, players, and statistics. Accurate 
-                predictions earn rewards from those who predicted incorrectly.
-              </p>
-              <p className="use-case-outcome">
-                <strong>The Result:</strong> Engaging competition that rewards sports knowledge and 
-                analytical skills, with transparent on-chain settlement.
+                <strong>How It Plays Out:</strong> Everyone stakes in. When the deadline hits,
+                Chainlink's price feed settles it. No screenshots of CoinGecko needed.
               </p>
             </div>
             <div className="use-case-card">
-              <div className="use-case-icon">📈</div>
-              <h3>Financial Forecasting</h3>
+              <div className="use-case-icon">&#127922;</div>
+              <h3>Anything Else</h3>
               <p className="use-case-description">
-                <strong>The Scenario:</strong> Investors want to predict economic indicators, company 
-                performance, or market movements through crowdsourced analysis.
+                <strong>The Setup:</strong> Will your coworker finish the marathon? Will it snow on
+                Christmas? Use manual resolution with challenge period for any custom bet.
               </p>
               <p className="use-case-description">
-                <strong>How It Works:</strong> Markets are created for specific predictions like "Will 
-                unemployment drop below 4%?" or "Will Company X beat earnings estimates?" Traders 
-                aggregate diverse financial expertise through their trading activity.
+                <strong>How It Plays Out:</strong> The creator resolves it, the other side has 24 hours
+                to dispute if they disagree. Stakes stay locked until everyone agrees.
               </p>
-              <p className="use-case-outcome">
-                <strong>The Result:</strong> Sophisticated forecasts that incorporate signals from 
-                many analysts, often outperforming individual expert predictions.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ClearPath Add-on Section */}
-      <section className="understanding-section">
-        <div className="container">
-          <h2 className="section-title">ClearPath: DAO Governance Add-on</h2>
-          <p className="section-intro">
-            Optional enterprise-grade governance features for institutional decision-making
-          </p>
-          <div className="understanding-content">
-            <div className="understanding-text">
-              <h3>Two Governance Modes for Your Organization</h3>
-              <p>
-                ClearPath is an optional add-on that transforms FairWins into a complete DAO governance 
-                platform. Choose between traditional democratic voting or futarchy-based prediction markets, 
-                depending on your organization's needs.
-              </p>
-              <h4>Traditional Voting Mode</h4>
-              <p>
-                Familiar democratic governance where token holders vote directly on proposals. Each token 
-                equals one vote, with configurable quorum requirements and simple majority approval. 
-                Proposals pass based on For/Against votes with a default 40% quorum threshold. Includes 
-                timelock periods for execution safety and transparent on-chain tracking of all votes.
-              </p>
-              <h4>Futarchy Mode: "Vote on Values, Bet on Beliefs"</h4>
-              <p>
-                An innovative approach that separates values from predictions. The DAO democratically 
-                decides what success metrics matter (treasury growth, user adoption, project milestones). 
-                Then, anyone can trade on prediction markets about which proposals will achieve those goals. 
-                This harnesses global expertise while letting the organization maintain control over its values.
-              </p>
-            </div>
-            <div className="understanding-visual">
-              <div className="visual-box vote">
-                <h4>Traditional Voting</h4>
-                <ul>
-                  <li>1 token = 1 vote</li>
-                  <li>For/Against/Abstain options</li>
-                  <li>Quorum requirements</li>
-                  <li>Timelock execution</li>
-                  <li>Simple majority wins</li>
-                </ul>
-              </div>
-              <div className="visual-arrow">OR</div>
-              <div className="visual-box bet">
-                <h4>Futarchy Markets</h4>
-                <ul>
-                  <li>Define success metrics</li>
-                  <li>Open prediction markets</li>
-                  <li>Trade on proposal outcomes</li>
-                  <li>Market confidence determines approval</li>
-                  <li>Rewards accurate predictions</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          <div className="clearpath-features">
-            <h3>Enterprise Features</h3>
-            <div className="features-grid">
-              <div className="feature-item">
-                <strong>Treasury Management:</strong> Shared pool governance with proposal-based spending
-              </div>
-              <div className="feature-item">
-                <strong>Role-Based Access:</strong> Control who can submit proposals and vote
-              </div>
-              <div className="feature-item">
-                <strong>Minority Protection:</strong> Ragequit functionality lets members exit with their share
-              </div>
-              <div className="feature-item">
-                <strong>Privacy Mechanisms:</strong> MACI-style anti-collusion for sensitive decisions
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* TokenMint Add-on Section */}
-      <section className="tokenmint-section">
-        <div className="container">
-          <h2 className="section-title">TokenMint: Enterprise Tokenization Add-on</h2>
-          <p className="section-intro">
-            Define, generate, and deploy digital assets with clarity and confidence
-          </p>
-          <div className="tokenmint-content">
-            <div className="tokenmint-description">
-              <p>
-                TokenMint is a tokenization add-on that streamlines how organizations design, configure, and launch 
-                digital assets at scale. Built around the Token Taxonomy Framework, TokenMint allows institutions to 
-                model token standards that reflect real-world assets and intellectual property, then automatically 
-                assembles secure, production-ready smart contracts using modular components. The platform simplifies 
-                the path from asset definition to on-chain deployment, making it easier for enterprises to tokenize 
-                traditional assets and intangible rights while maintaining consistency, compliance awareness, and 
-                technical rigor.
-              </p>
-              <div className="tokenmint-features-grid">
-                <div className="tokenmint-feature">
-                  <h4>🏗️ Token Taxonomy Framework</h4>
-                  <p>Model token standards that reflect real-world assets and intellectual property with structured definitions</p>
-                </div>
-                <div className="tokenmint-feature">
-                  <h4>🔧 Modular Components</h4>
-                  <p>Automatically assemble secure, production-ready smart contracts using tested modular building blocks</p>
-                </div>
-                <div className="tokenmint-feature">
-                  <h4>📜 Compliance Awareness</h4>
-                  <p>Maintain consistency and compliance awareness throughout the tokenization lifecycle</p>
-                </div>
-                <div className="tokenmint-feature">
-                  <h4>🚀 Simplified Deployment</h4>
-                  <p>Streamlined path from asset definition to on-chain deployment with technical rigor</p>
-                </div>
-              </div>
-            </div>
-            <div className="tokenmint-use-cases">
-              <h3>Common Use Cases</h3>
-              <ul>
-                <li><strong>Real-World Asset Tokenization:</strong> Model and deploy tokens representing physical assets like real estate, commodities, or equipment</li>
-                <li><strong>Intellectual Property Rights:</strong> Tokenize patents, copyrights, trademarks, and other intangible assets</li>
-                <li><strong>Enterprise Digital Assets:</strong> Create custom tokens for loyalty programs, carbon credits, or supply chain tracking</li>
-                <li><strong>Governance & Utility Tokens:</strong> Deploy voting tokens for ClearPath governance or utility tokens for platform access</li>
-              </ul>
             </div>
           </div>
         </div>
@@ -474,10 +333,10 @@ function LandingPage() {
       {/* CTA Section */}
       <section className="cta-section">
         <div className="container">
-          <h2>Ready to Get Started?</h2>
-          <p>Choose your platform to begin</p>
-          <button onClick={() => navigate('/select')} className="cta-button large">
-            Choose Platform
+          <h2>Ready to Make a Bet?</h2>
+          <p>Create your first wager in under a minute</p>
+          <button onClick={handleGetStarted} className="cta-button large">
+            Get Started
           </button>
         </div>
       </section>
@@ -488,14 +347,14 @@ function LandingPage() {
           <div className="footer-content">
             <div className="footer-section">
               <h3>FairWins</h3>
-              <p>Prediction markets platform with optional DAO governance</p>
+              <p>P2P wager management layer with multi-oracle resolution</p>
             </div>
             <div className="footer-section">
-              <h3>Technology</h3>
+              <h3>Oracles</h3>
               <ul>
-                <li><a href="https://blog.zkga.me/nightmarket" target="_blank" rel="noopener noreferrer">Nightmarket Privacy</a></li>
-                <li><a href="https://github.com/privacy-scaling-explorations/maci" target="_blank" rel="noopener noreferrer">MACI Anti-Collusion</a></li>
-                <li><a href="https://docs.gnosis.io/conditionaltokens/" target="_blank" rel="noopener noreferrer">Gnosis Conditional Tokens</a></li>
+                <li><a href="https://polymarket.com" target="_blank" rel="noopener noreferrer">Polymarket</a></li>
+                <li><a href="https://chain.link" target="_blank" rel="noopener noreferrer">Chainlink</a></li>
+                <li><a href="https://uma.xyz" target="_blank" rel="noopener noreferrer">UMA Protocol</a></li>
               </ul>
             </div>
             <div className="footer-section">

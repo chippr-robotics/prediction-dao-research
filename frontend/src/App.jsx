@@ -129,9 +129,9 @@ function AppContent() {
           path="/" 
           element={<LandingPage />} 
         />
-        <Route 
-          path="/select" 
-          element={<PlatformSelector />} 
+        <Route
+          path="/select"
+          element={<Navigate to="/app" replace />}
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />

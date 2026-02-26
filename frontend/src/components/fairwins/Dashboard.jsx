@@ -1,29 +1,15 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useTrendingMarkets } from '../../hooks/useInfiniteMarkets'
+import { useState, useMemo, useCallback } from 'react'
+import { useWallet } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import LoadingScreen from '../ui/LoadingScreen'
-import CategoryTreemap from './CategoryTreemap'
-import * as d3 from 'd3'
 import './Dashboard.css'
 
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
-const formatNumber = (num) => {
-  const n = parseFloat(num)
-  if (Number.isNaN(n) || n == null) return '0'
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
-  return parseFloat(n.toFixed(2)).toString()
-}
-
-const formatETC = (num) => {
-  const n = parseFloat(num)
-  if (Number.isNaN(n) || n == null) return '0 ETC'
-  if (n >= 1000000) return `${(n / 1000000).toFixed(2)}M ETC`
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K ETC`
-  return `${n.toFixed(0)} ETC`
+const formatAddress = (addr) => {
+  if (!addr) return ''
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
 
 const getTimeRemaining = (endTime) => {
@@ -37,954 +23,237 @@ const getTimeRemaining = (endTime) => {
   return `${hours}h`
 }
 
-// Stable random generator for consistent mock data
-const stableRandom = (seed) => {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
+// ============================================================================
+// STATUS BADGE COMPONENT
+// ============================================================================
 
-// Get category icon emoji
-const getCategoryIcon = (category) => {
-  const icons = {
-    sports: '⚽',
-    politics: '🏛️',
-    finance: '💰',
-    tech: '💻',
-    crypto: '₿',
-    'pop-culture': '🎬'
+function StatusBadge({ status }) {
+  const statusConfig = {
+    pending_acceptance: { label: 'Pending', className: 'status-pending' },
+    active: { label: 'Active', className: 'status-active' },
+    pending_resolution: { label: 'Resolving', className: 'status-resolving' },
+    disputed: { label: 'Disputed', className: 'status-disputed' },
+    resolved: { label: 'Resolved', className: 'status-resolved' },
+    expired: { label: 'Expired', className: 'status-expired' },
+    cancelled: { label: 'Cancelled', className: 'status-expired' }
   }
-  return icons[category] || '📊'
-}
 
-// ============================================================================
-// CATEGORY DISTRIBUTION CHART (Donut with labels)
-// ============================================================================
-
-function CategoryDonutChart({ markets, categories }) {
-  const svgRef = useRef()
-  const containerRef = useRef()
-
-  useEffect(() => {
-    if (!markets?.length || !containerRef.current) return
-
-    const renderChart = () => {
-      const container = containerRef.current
-      if (!container) return
-      
-      const width = container.clientWidth
-      const height = 280
-      const margin = 20
-      const radius = Math.min(width * 0.4, height) / 2 - margin
-
-      d3.select(svgRef.current).selectAll('*').remove()
-
-      const svg = d3.select(svgRef.current)
-        .attr('width', width)
-        .attr('height', height)
-
-      // Count markets by category
-      const categoryData = categories.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        icon: cat.icon,
-        count: markets.filter(m => m.category === cat.id).length,
-        liquidity: markets
-          .filter(m => m.category === cat.id)
-          .reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0)
-      })).filter(d => d.count > 0)
-
-      const colorScale = d3.scaleOrdinal()
-        .domain(categoryData.map(d => d.id))
-        .range(['#00b894', '#0984e3', '#e17055', '#fdcb6e', '#a29bfe', '#fd79a8'])
-
-      const pie = d3.pie()
-        .value(d => d.liquidity)
-        .sort(null)
-        .padAngle(0.02)
-
-      const arc = d3.arc()
-        .innerRadius(radius * 0.55)
-        .outerRadius(radius)
-
-      const hoverArc = d3.arc()
-        .innerRadius(radius * 0.55)
-        .outerRadius(radius + 8)
-
-      const g = svg.append('g')
-        .attr('transform', `translate(${width * 0.35}, ${height / 2})`)
-
-      // Draw arcs
-      const arcs = g.selectAll('.arc')
-        .data(pie(categoryData))
-        .join('g')
-        .attr('class', 'arc')
-
-      arcs.append('path')
-        .attr('d', arc)
-        .attr('fill', d => colorScale(d.data.id))
-        .attr('stroke', 'var(--bg-primary)')
-        .attr('stroke-width', 2)
-        .style('cursor', 'pointer')
-        .on('mouseenter', function() {
-          d3.select(this)
-            .transition()
-            .duration(200)
-            .attr('d', hoverArc)
-        })
-        .on('mouseleave', function() {
-          d3.select(this)
-            .transition()
-            .duration(200)
-            .attr('d', arc)
-        })
-
-      // Center text
-      const totalLiquidity = categoryData.reduce((sum, d) => sum + d.liquidity, 0)
-      
-      g.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('dy', '-0.3em')
-        .attr('fill', 'var(--text-primary)')
-        .attr('font-size', '1.5rem')
-        .attr('font-weight', '700')
-        .text(formatNumber(totalLiquidity))
-
-      g.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('dy', '1.2em')
-        .attr('fill', 'var(--text-secondary)')
-        .attr('font-size', '0.75rem')
-        .text('Total Liquidity')
-
-      // Legend on the right
-      const legend = svg.append('g')
-        .attr('transform', `translate(${width * 0.62}, ${height / 2 - (categoryData.length * 28) / 2})`)
-
-      const legendItems = legend.selectAll('.legend-item')
-        .data(categoryData)
-        .join('g')
-        .attr('class', 'legend-item')
-        .attr('transform', (d, i) => `translate(0, ${i * 28})`)
-
-      legendItems.append('rect')
-        .attr('width', 14)
-        .attr('height', 14)
-        .attr('rx', 3)
-        .attr('fill', d => colorScale(d.id))
-
-      legendItems.append('text')
-        .attr('x', 22)
-        .attr('y', 11)
-        .attr('fill', 'var(--text-primary)')
-        .attr('font-size', '0.85rem')
-        .text(d => `${d.icon} ${d.name}`)
-
-      legendItems.append('text')
-        .attr('x', 22)
-        .attr('y', 24)
-        .attr('fill', 'var(--text-secondary)')
-        .attr('font-size', '0.7rem')
-        .text(d => `${d.count} markets · ${formatETC(d.liquidity)}`)
-    }
-
-    renderChart()
-
-    const resizeObserver = new ResizeObserver(() => renderChart())
-    resizeObserver.observe(containerRef.current)
-
-    return () => resizeObserver.disconnect()
-  }, [markets, categories])
+  const config = statusConfig[status] || { label: status, className: '' }
 
   return (
-    <div ref={containerRef} className="chart-container">
-      <svg ref={svgRef} />
-    </div>
+    <span className={`wager-status-badge ${config.className}`}>
+      {config.label}
+    </span>
   )
 }
 
 // ============================================================================
-// MARKET ACTIVITY HEATMAP (7 days x 24 hours)
+// QUICK ACTION CARDS
 // ============================================================================
 
-function ActivityHeatmap({ markets }) {
-  const svgRef = useRef()
-  const containerRef = useRef()
-
-  useEffect(() => {
-    if (!containerRef.current) return
-
-    const renderChart = () => {
-      const container = containerRef.current
-      if (!container) return
-      
-      const width = container.clientWidth
-      const height = 200
-      const margin = { top: 30, right: 20, bottom: 30, left: 50 }
-
-      d3.select(svgRef.current).selectAll('*').remove()
-
-      const svg = d3.select(svgRef.current)
-        .attr('width', width)
-        .attr('height', height)
-
-      // Generate mock activity data (7 days x 24 hours)
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-      const hours = Array.from({ length: 24 }, (_, i) => i)
-      
-      const dateSeed = new Date().toDateString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-      
-      const data = []
-      days.forEach((day, dayIdx) => {
-        hours.forEach(hour => {
-          // Higher activity during market hours and weekdays
-          const baseActivity = stableRandom(dateSeed + dayIdx * 24 + hour) * 100
-          const hourBonus = (hour >= 9 && hour <= 17) ? 30 : 0
-          const dayBonus = (dayIdx >= 1 && dayIdx <= 5) ? 20 : 0
-          data.push({
-            day,
-            dayIdx,
-            hour,
-            value: Math.min(100, baseActivity + hourBonus + dayBonus)
-          })
-        })
-      })
-
-      const cellWidth = (width - margin.left - margin.right) / 24
-      const cellHeight = (height - margin.top - margin.bottom) / 7
-
-      const colorScale = d3.scaleSequential()
-        .domain([0, 100])
-        .interpolator(d3.interpolateRgbBasis(['#1a1a2e', '#16213e', '#0f3460', '#00b894']))
-
-      const g = svg.append('g')
-        .attr('transform', `translate(${margin.left}, ${margin.top})`)
-
-      // Draw cells
-      g.selectAll('rect')
-        .data(data)
-        .join('rect')
-        .attr('x', d => d.hour * cellWidth)
-        .attr('y', d => d.dayIdx * cellHeight)
-        .attr('width', cellWidth - 2)
-        .attr('height', cellHeight - 2)
-        .attr('rx', 3)
-        .attr('fill', d => colorScale(d.value))
-        .style('cursor', 'pointer')
-        .append('title')
-        .text(d => `${d.day} ${d.hour}:00 - Activity: ${Math.round(d.value)}%`)
-
-      // Y axis (days)
-      svg.append('g')
-        .attr('transform', `translate(${margin.left - 5}, ${margin.top})`)
-        .selectAll('text')
-        .data(days)
-        .join('text')
-        .attr('x', 0)
-        .attr('y', (d, i) => i * cellHeight + cellHeight / 2)
-        .attr('text-anchor', 'end')
-        .attr('dominant-baseline', 'middle')
-        .attr('fill', 'var(--text-secondary)')
-        .attr('font-size', '0.7rem')
-        .text(d => d)
-
-      // X axis (hours)
-      svg.append('g')
-        .attr('transform', `translate(${margin.left}, ${margin.top - 8})`)
-        .selectAll('text')
-        .data([0, 6, 12, 18, 23])
-        .join('text')
-        .attr('x', d => d * cellWidth + cellWidth / 2)
-        .attr('y', 0)
-        .attr('text-anchor', 'middle')
-        .attr('fill', 'var(--text-secondary)')
-        .attr('font-size', '0.7rem')
-        .text(d => `${d}:00`)
+function QuickActions({ onAction }) {
+  const actions = [
+    {
+      id: 'create-1v1',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+      title: 'New 1v1 Wager',
+      description: 'Challenge a friend to a direct bet'
+    },
+    {
+      id: 'create-group',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <line x1="23" y1="11" x2="17" y2="11" />
+          <line x1="20" y1="8" x2="20" y2="14" />
+        </svg>
+      ),
+      title: 'Group Wager',
+      description: 'Create a pool for 3-10 friends'
+    },
+    {
+      id: 'scan-qr',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+        </svg>
+      ),
+      title: 'Scan QR Code',
+      description: 'Accept a wager from a friend'
+    },
+    {
+      id: 'my-wagers',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      ),
+      title: 'My Wagers',
+      description: 'View active and past wagers'
     }
-
-    renderChart()
-
-    const resizeObserver = new ResizeObserver(() => renderChart())
-    resizeObserver.observe(containerRef.current)
-
-    return () => resizeObserver.disconnect()
-  }, [markets])
+  ]
 
   return (
-    <div ref={containerRef} className="chart-container heatmap-container">
-      <svg ref={svgRef} />
-    </div>
-  )
-}
-
-// ============================================================================
-// LIQUIDITY FLOW STREAM GRAPH
-// ============================================================================
-
-function LiquidityStreamChart({ markets, categories }) {
-  const svgRef = useRef()
-  const containerRef = useRef()
-
-  useEffect(() => {
-    if (!markets?.length || !containerRef.current) return
-
-    const renderChart = () => {
-      const container = containerRef.current
-      if (!container) return
-      
-      const width = container.clientWidth
-      const height = 220
-      const margin = { top: 20, right: 20, bottom: 30, left: 50 }
-
-      d3.select(svgRef.current).selectAll('*').remove()
-
-      const svg = d3.select(svgRef.current)
-        .attr('width', width)
-        .attr('height', height)
-
-      // Generate 30 days of mock liquidity data per category
-      const dateSeed = new Date().toDateString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-      const days = 30
-      
-      const data = []
-      for (let i = 0; i < days; i++) {
-        const point = { date: new Date(Date.now() - (days - 1 - i) * 86400000) }
-        categories.forEach((cat, catIdx) => {
-          const baseLiquidity = markets
-            .filter(m => m.category === cat.id)
-            .reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0)
-          // Add some variation
-          const variation = stableRandom(dateSeed + i * 6 + catIdx) * 0.3 - 0.15
-          point[cat.id] = Math.max(0, baseLiquidity * (0.7 + i / days * 0.3 + variation))
-        })
-        data.push(point)
-      }
-
-      const keys = categories.map(c => c.id)
-      
-      const stack = d3.stack()
-        .keys(keys)
-        .offset(d3.stackOffsetWiggle)
-
-      const series = stack(data)
-
-      const xScale = d3.scaleTime()
-        .domain(d3.extent(data, d => d.date))
-        .range([margin.left, width - margin.right])
-
-      const yScale = d3.scaleLinear()
-        .domain([
-          d3.min(series, s => d3.min(s, d => d[0])),
-          d3.max(series, s => d3.max(s, d => d[1]))
-        ])
-        .range([height - margin.bottom, margin.top])
-
-      const colorScale = d3.scaleOrdinal()
-        .domain(keys)
-        .range(['#00b894', '#0984e3', '#e17055', '#fdcb6e', '#a29bfe', '#fd79a8'])
-
-      const area = d3.area()
-        .x(d => xScale(d.data.date))
-        .y0(d => yScale(d[0]))
-        .y1(d => yScale(d[1]))
-        .curve(d3.curveBasis)
-
-      const g = svg.append('g')
-
-      g.selectAll('path')
-        .data(series)
-        .join('path')
-        .attr('fill', d => colorScale(d.key))
-        .attr('fill-opacity', 0.8)
-        .attr('d', area)
-        .append('title')
-        .text(d => categories.find(c => c.id === d.key)?.name)
-
-      // X axis
-      svg.append('g')
-        .attr('transform', `translate(0, ${height - margin.bottom})`)
-        .call(d3.axisBottom(xScale).ticks(6).tickFormat(d3.timeFormat('%b %d')))
-        .selectAll('text')
-        .attr('fill', 'var(--text-secondary)')
-        .attr('font-size', '0.7rem')
-
-      svg.selectAll('.domain, .tick line').attr('stroke', 'var(--border-color)')
-    }
-
-    renderChart()
-
-    const resizeObserver = new ResizeObserver(() => renderChart())
-    resizeObserver.observe(containerRef.current)
-
-    return () => resizeObserver.disconnect()
-  }, [markets, categories])
-
-  return (
-    <div ref={containerRef} className="chart-container">
-      <svg ref={svgRef} />
-    </div>
-  )
-}
-
-// ============================================================================
-// MARKET HEALTH GAUGE
-// ============================================================================
-
-// Health score calculation constants
-const LIQUIDITY_NORMALIZATION_FACTOR = 200 // ETC - used to normalize liquidity to 100 scale
-const EXPECTED_CATEGORY_COUNT = 6 // Number of market categories
-const HEALTH_WEIGHT_ACTIVE = 40 // Weight for active markets percentage (out of 100)
-const HEALTH_WEIGHT_LIQUIDITY = 0.35 // Weight for liquidity score
-const HEALTH_WEIGHT_DIVERSITY = 0.25 // Weight for category diversity
-
-function MarketHealthGauge({ markets }) {
-  const svgRef = useRef()
-  const containerRef = useRef()
-
-  const healthScore = useMemo(() => {
-    if (!markets?.length) return 0
-    
-    // Calculate health based on various factors
-    const activeMarkets = markets.filter(m => m.status === 'Active').length
-    const avgLiquidity = markets.reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0) / markets.length
-    const liquidityScore = Math.min(100, avgLiquidity / LIQUIDITY_NORMALIZATION_FACTOR)
-    const diversityScore = new Set(markets.map(m => m.category)).size / EXPECTED_CATEGORY_COUNT * 100
-    
-    return Math.round(
-      (activeMarkets / markets.length * HEALTH_WEIGHT_ACTIVE) + 
-      (liquidityScore * HEALTH_WEIGHT_LIQUIDITY) + 
-      (diversityScore * HEALTH_WEIGHT_DIVERSITY)
-    )
-  }, [markets])
-
-  useEffect(() => {
-    if (!containerRef.current) return
-
-    const renderChart = () => {
-      const container = containerRef.current
-      if (!container) return
-      
-      const width = container.clientWidth
-      const height = 180
-      const margin = 20
-      const radius = Math.min(width, height * 1.5) / 2 - margin
-
-      d3.select(svgRef.current).selectAll('*').remove()
-
-      const svg = d3.select(svgRef.current)
-        .attr('width', width)
-        .attr('height', height)
-
-      const centerX = width / 2
-      const centerY = height - 30
-
-      // Background arc
-      const backgroundArc = d3.arc()
-        .innerRadius(radius - 20)
-        .outerRadius(radius)
-        .startAngle(-Math.PI / 2)
-        .endAngle(Math.PI / 2)
-
-      svg.append('path')
-        .attr('d', backgroundArc)
-        .attr('transform', `translate(${centerX}, ${centerY})`)
-        .attr('fill', 'var(--border-color)')
-
-      // Score arc with gradient color
-      const getScoreColor = (score) => {
-        if (score >= 80) return '#00b894'
-        if (score >= 60) return '#00cec9'
-        if (score >= 40) return '#fdcb6e'
-        return '#e17055'
-      }
-
-      const scoreArc = d3.arc()
-        .innerRadius(radius - 20)
-        .outerRadius(radius)
-        .startAngle(-Math.PI / 2)
-        .endAngle(-Math.PI / 2 + (Math.PI * healthScore / 100))
-        .cornerRadius(4)
-
-      svg.append('path')
-        .attr('d', scoreArc)
-        .attr('transform', `translate(${centerX}, ${centerY})`)
-        .attr('fill', getScoreColor(healthScore))
-
-      // Score text
-      svg.append('text')
-        .attr('x', centerX)
-        .attr('y', centerY - 25)
-        .attr('text-anchor', 'middle')
-        .attr('fill', getScoreColor(healthScore))
-        .attr('font-size', '2.5rem')
-        .attr('font-weight', '700')
-        .text(healthScore)
-
-      svg.append('text')
-        .attr('x', centerX)
-        .attr('y', centerY - 5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', 'var(--text-secondary)')
-        .attr('font-size', '0.75rem')
-        .text('Health Score')
-
-      // Scale markers
-      const markers = [0, 25, 50, 75, 100]
-      markers.forEach(value => {
-        const angle = -Math.PI / 2 + (Math.PI * value / 100)
-        const x = centerX + Math.cos(angle) * (radius + 12)
-        const y = centerY + Math.sin(angle) * (radius + 12)
-        
-        svg.append('text')
-          .attr('x', x)
-          .attr('y', y)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'middle')
-          .attr('fill', 'var(--text-muted)')
-          .attr('font-size', '0.65rem')
-          .text(value)
-      })
-    }
-
-    renderChart()
-
-    const resizeObserver = new ResizeObserver(() => renderChart())
-    resizeObserver.observe(containerRef.current)
-
-    return () => resizeObserver.disconnect()
-  }, [healthScore])
-
-  return (
-    <div ref={containerRef} className="chart-container gauge-container">
-      <svg ref={svgRef} />
-    </div>
-  )
-}
-
-// ============================================================================
-// PRICE MOMENTUM BARS
-// ============================================================================
-
-function PriceMomentumChart({ markets }) {
-  const svgRef = useRef()
-  const containerRef = useRef()
-
-  const topMarkets = useMemo(() => {
-    if (!markets?.length) return []
-    
-    return [...markets]
-      .map(m => ({
-        ...m,
-        momentum: (parseFloat(m.passTokenPrice) - 0.5) * 100, // -50 to +50 scale
-        liquidity: parseFloat(m.totalLiquidity || 0)
-      }))
-      .sort((a, b) => b.liquidity - a.liquidity)
-      .slice(0, 8)
-  }, [markets])
-
-  useEffect(() => {
-    if (!topMarkets?.length || !containerRef.current) return
-
-    const renderChart = () => {
-      const container = containerRef.current
-      if (!container) return
-      
-      const width = container.clientWidth
-      const height = 280
-      const margin = { top: 20, right: 60, bottom: 20, left: 140 }
-
-      d3.select(svgRef.current).selectAll('*').remove()
-
-      const svg = d3.select(svgRef.current)
-        .attr('width', width)
-        .attr('height', height)
-
-      const xScale = d3.scaleLinear()
-        .domain([-50, 50])
-        .range([margin.left, width - margin.right])
-
-      const yScale = d3.scaleBand()
-        .domain(topMarkets.map((_, i) => i))
-        .range([margin.top, height - margin.bottom])
-        .padding(0.25)
-
-      const g = svg.append('g')
-
-      // Center line
-      g.append('line')
-        .attr('x1', xScale(0))
-        .attr('x2', xScale(0))
-        .attr('y1', margin.top)
-        .attr('y2', height - margin.bottom)
-        .attr('stroke', 'var(--border-color)')
-        .attr('stroke-width', 2)
-
-      // Bars
-      g.selectAll('.momentum-bar')
-        .data(topMarkets)
-        .join('rect')
-        .attr('class', 'momentum-bar')
-        .attr('x', d => d.momentum >= 0 ? xScale(0) : xScale(d.momentum))
-        .attr('y', (d, i) => yScale(i))
-        .attr('width', d => Math.abs(xScale(d.momentum) - xScale(0)))
-        .attr('height', yScale.bandwidth())
-        .attr('rx', 4)
-        .attr('fill', d => d.momentum >= 0 ? '#00b894' : '#e17055')
-        .attr('fill-opacity', 0.8)
-
-      // Market labels
-      g.selectAll('.market-label')
-        .data(topMarkets)
-        .join('text')
-        .attr('class', 'market-label')
-        .attr('x', margin.left - 8)
-        .attr('y', (d, i) => yScale(i) + yScale.bandwidth() / 2)
-        .attr('text-anchor', 'end')
-        .attr('dominant-baseline', 'middle')
-        .attr('fill', 'var(--text-primary)')
-        .attr('font-size', '0.7rem')
-        .text(d => {
-          const title = d.proposalTitle || ''
-          return title.length > 20 ? title.substring(0, 20) + '...' : title
-        })
-
-      // Percentage labels
-      g.selectAll('.pct-label')
-        .data(topMarkets)
-        .join('text')
-        .attr('class', 'pct-label')
-        .attr('x', d => d.momentum >= 0 ? xScale(d.momentum) + 8 : xScale(d.momentum) - 8)
-        .attr('y', (d, i) => yScale(i) + yScale.bandwidth() / 2)
-        .attr('text-anchor', d => d.momentum >= 0 ? 'start' : 'end')
-        .attr('dominant-baseline', 'middle')
-        .attr('fill', d => d.momentum >= 0 ? '#00b894' : '#e17055')
-        .attr('font-size', '0.75rem')
-        .attr('font-weight', '600')
-        .text(d => `${Math.round(parseFloat(d.passTokenPrice) * 100)}%`)
-
-      // Axis labels
-      svg.append('text')
-        .attr('x', xScale(-25))
-        .attr('y', height - 5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#e17055')
-        .attr('font-size', '0.7rem')
-        .text('← Bearish')
-
-      svg.append('text')
-        .attr('x', xScale(25))
-        .attr('y', height - 5)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#00b894')
-        .attr('font-size', '0.7rem')
-        .text('Bullish →')
-    }
-
-    renderChart()
-
-    const resizeObserver = new ResizeObserver(() => renderChart())
-    resizeObserver.observe(containerRef.current)
-
-    return () => resizeObserver.disconnect()
-  }, [topMarkets])
-
-  return (
-    <div ref={containerRef} className="chart-container momentum-container">
-      <svg ref={svgRef} />
-    </div>
-  )
-}
-
-// ============================================================================
-// VOLUME SPARKLINES GRID
-// ============================================================================
-
-function VolumeSparklines({ markets, categories }) {
-  const containerRef = useRef()
-
-  const categoryVolumes = useMemo(() => {
-    const dateSeed = new Date().toDateString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    
-    return categories.map((cat, catIdx) => {
-      const catMarkets = markets.filter(m => m.category === cat.id)
-      const baseLiquidity = catMarkets.reduce((sum, m) => sum + parseFloat(m.totalLiquidity || 0), 0)
-      
-      // Generate 14 days of volume data
-      const data = Array.from({ length: 14 }, (_, i) => {
-        const variation = stableRandom(dateSeed + catIdx * 14 + i) * 0.4 - 0.2
-        return baseLiquidity * 0.1 * (0.8 + variation + i * 0.02)
-      })
-      
-      return {
-        ...cat,
-        data,
-        total: baseLiquidity,
-        change: ((data[data.length - 1] - data[0]) / data[0] * 100).toFixed(1)
-      }
-    })
-  }, [markets, categories])
-
-  return (
-    <div ref={containerRef} className="sparklines-grid">
-      {categoryVolumes.map(cat => (
-        <SparklineCard key={cat.id} category={cat} />
+    <div className="quick-actions-grid">
+      {actions.map(action => (
+        <button
+          key={action.id}
+          className="quick-action-card"
+          onClick={() => onAction(action.id)}
+          aria-label={action.title}
+        >
+          <div className="quick-action-icon" aria-hidden="true">
+            {action.icon}
+          </div>
+          <div className="quick-action-content">
+            <h4>{action.title}</h4>
+            <p>{action.description}</p>
+          </div>
+        </button>
       ))}
     </div>
   )
 }
 
-function SparklineCard({ category }) {
-  const svgRef = useRef()
-
-  useEffect(() => {
-    if (!category.data?.length) return
-
-    const width = 120
-    const height = 40
-
-    d3.select(svgRef.current).selectAll('*').remove()
-
-    const svg = d3.select(svgRef.current)
-      .attr('width', width)
-      .attr('height', height)
-
-    const xScale = d3.scaleLinear()
-      .domain([0, category.data.length - 1])
-      .range([0, width])
-
-    const yScale = d3.scaleLinear()
-      .domain([d3.min(category.data) * 0.9, d3.max(category.data) * 1.1])
-      .range([height - 4, 4])
-
-    const line = d3.line()
-      .x((d, i) => xScale(i))
-      .y(d => yScale(d))
-      .curve(d3.curveMonotoneX)
-
-    const area = d3.area()
-      .x((d, i) => xScale(i))
-      .y0(height)
-      .y1(d => yScale(d))
-      .curve(d3.curveMonotoneX)
-
-    const isPositive = parseFloat(category.change) >= 0
-
-    svg.append('path')
-      .datum(category.data)
-      .attr('d', area)
-      .attr('fill', isPositive ? 'rgba(0, 184, 148, 0.15)' : 'rgba(225, 112, 85, 0.15)')
-
-    svg.append('path')
-      .datum(category.data)
-      .attr('d', line)
-      .attr('fill', 'none')
-      .attr('stroke', isPositive ? '#00b894' : '#e17055')
-      .attr('stroke-width', 2)
-
-    // End dot
-    svg.append('circle')
-      .attr('cx', xScale(category.data.length - 1))
-      .attr('cy', yScale(category.data[category.data.length - 1]))
-      .attr('r', 3)
-      .attr('fill', isPositive ? '#00b894' : '#e17055')
-
-  }, [category])
-
-  const isPositive = parseFloat(category.change) >= 0
-
-  return (
-    <div className="sparkline-card">
-      <div className="sparkline-header">
-        <span className="sparkline-icon">{category.icon}</span>
-        <span className="sparkline-name">{category.name}</span>
-      </div>
-      <svg ref={svgRef} className="sparkline-svg" />
-      <div className="sparkline-footer">
-        <span className="sparkline-total">{formatETC(category.total)}</span>
-        <span className={`sparkline-change ${isPositive ? 'positive' : 'negative'}`}>
-          {isPositive ? '↑' : '↓'} {Math.abs(parseFloat(category.change))}%
-        </span>
-      </div>
-    </div>
-  )
-}
-
 // ============================================================================
-// MARKET CRAWLER (Scrolling Ticker)
+// WAGER CARD COMPONENT
 // ============================================================================
 
-function MarketCrawler({ markets }) {
-  const [isPaused, setIsPaused] = useState(false)
-
-  const latestMarkets = useMemo(() => {
-    if (!markets?.length) return []
-    
-    // Get latest active markets sorted by trading end time (latest ending first)
-    return [...markets]
-      .filter(m => m.status === 'Active')
-      .sort((a, b) => new Date(b.tradingEndTime) - new Date(a.tradingEndTime))
-      .slice(0, 12)
-  }, [markets])
-
-  // Duplicate markets for seamless infinite scroll
-  const allMarkets = [...latestMarkets, ...latestMarkets]
-
-  const handleFocus = () => setIsPaused(true)
-  const handleBlur = () => setIsPaused(false)
-
+function WagerCard({ wager, onClick }) {
   return (
-    <div 
-      className="market-crawler"
-      role="region"
-      aria-label="Latest markets ticker"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+    <div
+      className="wager-card"
+      onClick={() => onClick?.(wager)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick?.(wager)}
     >
-      <div className={`crawler-track ${isPaused ? 'paused' : ''}`}>
-        {allMarkets.map((market, index) => {
-          const passPrice = parseFloat(market.passTokenPrice) || 0
-          const isHighConfidence = passPrice > 0.7 || passPrice < 0.3
-          
-          return (
-            <div 
-              key={`${market.id}-${index}`} 
-              className="crawler-item"
-              tabIndex={0}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              role="article"
-              aria-label={`${market.proposalTitle}, ${Math.round(passPrice * 100)}% YES probability`}
-            >
-              <span className="crawler-icon" aria-hidden="true">{getCategoryIcon(market.category)}</span>
-              <span className="crawler-title">{market.proposalTitle}</span>
-              <span className={`crawler-price ${isHighConfidence ? 'high-confidence' : ''}`}>
-                {Math.round(passPrice * 100)}% YES
-              </span>
-              <span className="crawler-separator" aria-hidden="true">•</span>
-            </div>
-          )
-        })}
+      <div className="wager-card-header">
+        <StatusBadge status={wager.status} />
+        <span className="wager-time">{getTimeRemaining(wager.endTime)}</span>
+      </div>
+      <h4 className="wager-card-title">{wager.description}</h4>
+      <div className="wager-card-details">
+        <div className="wager-detail">
+          <span className="wager-detail-label">Stake</span>
+          <span className="wager-detail-value">{wager.stakeAmount} {wager.stakeToken}</span>
+        </div>
+        <div className="wager-detail">
+          <span className="wager-detail-label">Type</span>
+          <span className="wager-detail-value">{wager.type}</span>
+        </div>
+        <div className="wager-detail">
+          <span className="wager-detail-label">Oracle</span>
+          <span className="wager-detail-value">{wager.oracle}</span>
+        </div>
+      </div>
+      <div className="wager-card-participants">
+        {wager.participants.map((p, i) => (
+          <span key={i} className="participant-badge" title={p}>
+            {formatAddress(p)}
+          </span>
+        ))}
       </div>
     </div>
   )
 }
 
 // ============================================================================
-// TRENDING MARKETS LIST
+// HOW IT WORKS GUIDE
 // ============================================================================
 
-function TrendingMarketsList({ markets, onMarketClick }) {
-  const trendingMarkets = useMemo(() => {
-    if (!markets?.length) return []
-    
-    return [...markets]
-      .filter(m => m.status === 'Active')
-      .sort((a, b) => parseFloat(b.totalLiquidity) - parseFloat(a.totalLiquidity))
-      .slice(0, 5)
-  }, [markets])
+function HowItWorksGuide() {
+  const [isExpanded, setIsExpanded] = useState(false)
 
   return (
-    <div className="trending-list">
-      {trendingMarkets.map((market, index) => {
-        const passPrice = parseFloat(market.passTokenPrice) || 0
-        const isHighConfidence = passPrice > 0.7 || passPrice < 0.3
-        
-        return (
-          <div 
-            key={market.id} 
-            className="trending-item"
-            onClick={() => onMarketClick?.(market)}
-            role="button"
-            tabIndex={0}
-            onKeyPress={(e) => e.key === 'Enter' && onMarketClick?.(market)}
-          >
-            <div className="trending-rank">#{index + 1}</div>
-            <div className="trending-content">
-              <div className="trending-title">
-                <span className="trending-category-icon">{getCategoryIcon(market.category)}</span>
-                {market.proposalTitle}
-              </div>
-              <div className="trending-meta">
-                <span className="trending-liquidity">{formatETC(market.totalLiquidity)}</span>
-                <span className="trending-time">⏱ {getTimeRemaining(market.tradingEndTime)}</span>
-              </div>
-            </div>
-            <div className={`trending-price ${isHighConfidence ? 'high-confidence' : ''}`}>
-              <span className="price-value">{Math.round(passPrice * 100)}%</span>
-              <span className="price-label">YES</span>
+    <div className="how-it-works-card">
+      <button
+        className="how-it-works-toggle"
+        onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+      >
+        <h3>How P2P Wagers Work</h3>
+        <span className="toggle-chevron" aria-hidden="true">{isExpanded ? '\u25B2' : '\u25BC'}</span>
+      </button>
+      {isExpanded && (
+        <div className="how-it-works-steps">
+          <div className="how-step">
+            <div className="how-step-number">1</div>
+            <div className="how-step-content">
+              <strong>Create a wager</strong>
+              <p>Pick your topic, set the stake, and choose an oracle for resolution (Polymarket, Chainlink, UMA, or manual).</p>
             </div>
           </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ============================================================================
-// RECENT ACTIVITY FEED
-// ============================================================================
-
-function RecentActivityFeed({ markets }) {
-  const activities = useMemo(() => {
-    const dateSeed = new Date().toDateString().split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    
-    const types = ['trade', 'create', 'resolve', 'liquidity']
-    const users = ['0x1a2b...3c4d', '0x5e6f...7g8h', '0x9i0j...k1l2', '0xm3n4...o5p6', '0xq7r8...s9t0']
-    
-    return markets.slice(0, 8).map((market, i) => {
-      const typeIdx = Math.floor(stableRandom(dateSeed + i) * types.length)
-      const userIdx = Math.floor(stableRandom(dateSeed + i + 100) * users.length)
-      const amount = Math.floor(stableRandom(dateSeed + i + 200) * 900) + 100
-      const minutesAgo = Math.floor(stableRandom(dateSeed + i + 300) * 120) + 1
-      
-      return {
-        id: i,
-        type: types[typeIdx],
-        market: market.proposalTitle,
-        user: users[userIdx],
-        amount: `${amount} ETC`,
-        time: minutesAgo < 60 ? `${minutesAgo}m ago` : `${Math.floor(minutesAgo / 60)}h ago`
-      }
-    })
-  }, [markets])
-
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'trade': return '💱'
-      case 'create': return '✨'
-      case 'resolve': return '✅'
-      case 'liquidity': return '💧'
-      default: return '📊'
-    }
-  }
-
-  const getActivityLabel = (type) => {
-    switch (type) {
-      case 'trade': return 'Trade'
-      case 'create': return 'Market Created'
-      case 'resolve': return 'Market Resolved'
-      case 'liquidity': return 'Liquidity Added'
-      default: return 'Activity'
-    }
-  }
-
-  return (
-    <div className="activity-feed">
-      {activities.map(activity => (
-        <div key={activity.id} className="activity-feed-item">
-          <div className="activity-feed-icon">{getActivityIcon(activity.type)}</div>
-          <div className="activity-feed-content">
-            <div className="activity-feed-header">
-              <span className="activity-feed-type">{getActivityLabel(activity.type)}</span>
-              <span className="activity-feed-time">{activity.time}</span>
+          <div className="how-step">
+            <div className="how-step-number">2</div>
+            <div className="how-step-content">
+              <strong>Share the invite</strong>
+              <p>Send the QR code or deep link to your friend. They review the terms and stake their side.</p>
             </div>
-            <div className="activity-feed-market">{activity.market}</div>
-            <div className="activity-feed-details">
-              <span className="activity-feed-user">{activity.user}</span>
-              <span className="activity-feed-amount">{activity.amount}</span>
+          </div>
+          <div className="how-step">
+            <div className="how-step-number">3</div>
+            <div className="how-step-content">
+              <strong>Auto-resolution</strong>
+              <p>The oracle resolves the outcome. Manual resolutions include a 24-hour challenge window.</p>
+            </div>
+          </div>
+          <div className="how-step">
+            <div className="how-step-number">4</div>
+            <div className="how-step-content">
+              <strong>Claim winnings</strong>
+              <p>Winner claims the pot from the smart contract. Unclaimed funds return after 90 days.</p>
             </div>
           </div>
         </div>
-      ))}
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// ORACLE INFO PANEL
+// ============================================================================
+
+function OracleInfoPanel() {
+  const oracles = [
+    { name: 'Polymarket', description: 'Peg wagers to Polymarket event outcomes', status: 'available', icon: '\uD83C\uDFAF' },
+    { name: 'Chainlink', description: 'Price feed-based resolution', status: 'available', icon: '\uD83D\uDD17' },
+    { name: 'UMA', description: 'Custom truth assertions', status: 'available', icon: '\u2696\uFE0F' },
+    { name: 'Manual', description: 'Creator-resolved with challenge period', status: 'available', icon: '\u270B' }
+  ]
+
+  return (
+    <div className="oracle-info-panel">
+      <h3>Oracle Sources</h3>
+      <div className="oracle-list">
+        {oracles.map(oracle => (
+          <div key={oracle.name} className="oracle-item">
+            <span className="oracle-icon" aria-hidden="true">{oracle.icon}</span>
+            <div className="oracle-content">
+              <span className="oracle-name">{oracle.name}</span>
+              <span className="oracle-description">{oracle.description}</span>
+            </div>
+            <span className={`oracle-status ${oracle.status}`}>
+              {oracle.status === 'available' ? 'Available' : 'Offline'}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -994,106 +263,97 @@ function RecentActivityFeed({ markets }) {
 // ============================================================================
 
 function Dashboard() {
+  const { isConnected, account } = useWallet()
   const { preferences } = useUserPreferences()
   const demoMode = preferences?.demoMode ?? true
 
-  // Use trending markets hook with limit of 50 for dashboard analytics
-  // This avoids loading all markets and provides a representative sample
-  const { markets, isLoading: isInitialLoad } = useTrendingMarkets({ limit: 50 })
+  // Mock wager data for demo mode
+  const mockWagers = useMemo(() => {
+    if (!demoMode) return []
+    return [
+      {
+        id: 1,
+        description: 'Will BTC be above $100k by March 2026?',
+        status: 'active',
+        stakeAmount: '50',
+        stakeToken: 'USC',
+        type: '1v1',
+        oracle: 'Chainlink',
+        endTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12']
+      },
+      {
+        id: 2,
+        description: 'Super Bowl LX winner - Chiefs or 49ers?',
+        status: 'pending_acceptance',
+        stakeAmount: '25',
+        stakeToken: 'USC',
+        type: '1v1',
+        oracle: 'Polymarket',
+        endTime: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12']
+      },
+      {
+        id: 3,
+        description: 'Will it snow in Austin before April?',
+        status: 'active',
+        stakeAmount: '10',
+        stakeToken: 'USC',
+        type: 'Group',
+        oracle: 'Manual',
+        endTime: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12', '0x9876543210fedcba9876543210fedcba98765432']
+      },
+      {
+        id: 4,
+        description: 'ETH merge anniversary price prediction',
+        status: 'resolved',
+        stakeAmount: '100',
+        stakeToken: 'USC',
+        type: '1v1',
+        oracle: 'Chainlink',
+        endTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xfedcba0987654321fedcba0987654321fedcba09']
+      }
+    ]
+  }, [demoMode])
 
-  const categories = useMemo(() => [
-    { id: 'sports', name: 'Sports', icon: '⚽' },
-    { id: 'politics', name: 'Politics', icon: '🏛️' },
-    { id: 'finance', name: 'Finance', icon: '💰' },
-    { id: 'tech', name: 'Tech', icon: '💻' },
-    { id: 'crypto', name: 'Crypto', icon: '₿' },
-    { id: 'pop-culture', name: 'Pop Culture', icon: '🎬' },
-    { id: 'weather', name: 'Weather', icon: '🌤️' }
-  ], [])
+  const activeWagers = useMemo(() =>
+    mockWagers.filter(w => w.status === 'active' || w.status === 'pending_acceptance'),
+    [mockWagers]
+  )
 
-  const handleMarketClick = useCallback((market) => {
-    // Navigate to market - in real app would use router
-    console.log('Navigate to market:', market.id)
+  const pastWagers = useMemo(() =>
+    mockWagers.filter(w => w.status === 'resolved' || w.status === 'expired' || w.status === 'cancelled'),
+    [mockWagers]
+  )
+
+  const handleQuickAction = useCallback((actionId) => {
+    console.log('Quick action:', actionId)
   }, [])
 
-  // Show skeleton during initial load
-  if (isInitialLoad && markets.length === 0) {
-    return (
-      <div className="dashboard-container" aria-busy="true" aria-label="Loading dashboard">
-        {/* Skeleton Header */}
-        <header className="dashboard-header">
-          <div className="header-content">
-            <div className="header-title-row">
-              <div className="skeleton-text skeleton-title" />
-            </div>
-            <div className="skeleton-text skeleton-subtitle" />
-          </div>
-        </header>
+  const handleWagerClick = useCallback((wager) => {
+    console.log('Navigate to wager:', wager.id)
+  }, [])
 
-        {/* Skeleton Charts */}
-        <section className="charts-section">
-          <div className="charts-row">
-            <div className="chart-card wide">
-              <div className="chart-header">
-                <div className="skeleton-text skeleton-heading" />
-              </div>
-              <div className="skeleton-chart" />
-            </div>
-            <div className="chart-card">
-              <div className="chart-header">
-                <div className="skeleton-text skeleton-heading" />
-              </div>
-              <div className="skeleton-chart" />
-            </div>
-          </div>
-
-          <div className="bottom-grid">
-            <div className="bottom-card">
-              <div className="skeleton-text skeleton-heading" style={{ marginBottom: '1rem' }} />
-              <div className="skeleton-list">
-                <div className="skeleton-list-item" />
-                <div className="skeleton-list-item" />
-                <div className="skeleton-list-item" />
-              </div>
-            </div>
-            <div className="bottom-card">
-              <div className="skeleton-text skeleton-heading" style={{ marginBottom: '1rem' }} />
-              <div className="skeleton-list">
-                <div className="skeleton-list-item" />
-                <div className="skeleton-list-item" />
-                <div className="skeleton-list-item" />
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    )
-  }
-
-  // Show empty state when no markets in live mode
-  if (!demoMode && markets.length === 0) {
+  // Not connected state
+  if (!isConnected && !demoMode) {
     return (
       <div className="dashboard-container">
         <header className="dashboard-header">
           <div className="header-content">
             <div className="header-title-row">
-              <h1>Market Overview</h1>
-              <span className="live-mode-badge">🌐 Live Mode</span>
+              <h1>P2P Wagers</h1>
             </div>
-            <p className="dashboard-subtitle">
-              Connected to Mordor Testnet
-            </p>
+            <p className="dashboard-subtitle">Connect your wallet to create and manage wagers</p>
           </div>
         </header>
-        <div className="empty-state">
-          <div className="empty-state-icon">📊</div>
-          <h2>No Markets Found</h2>
-          <p>There are no prediction markets deployed on the blockchain yet.</p>
-          <p className="empty-state-hint">
-            Switch to Demo Mode to explore the platform with sample data, 
-            or create a new market to get started.
-          </p>
-        </div>
+        <section className="dashboard-section">
+          <HowItWorksGuide />
+        </section>
+        <section className="dashboard-section">
+          <OracleInfoPanel />
+        </section>
       </div>
     )
   }
@@ -1104,100 +364,64 @@ function Dashboard() {
       <header className="dashboard-header">
         <div className="header-content">
           <div className="header-title-row">
-            <h1>Market Overview</h1>
-            {demoMode && <span className="demo-mode-badge">🎭 Demo Mode</span>}
+            <h1>Your Wagers</h1>
+            {demoMode && <span className="demo-mode-badge">Demo Mode</span>}
           </div>
           <p className="dashboard-subtitle">
-            {demoMode 
-              ? 'Viewing sample market data' 
-              : 'Real-time insights across all prediction markets'}
+            {isConnected
+              ? `Connected: ${formatAddress(account)}`
+              : 'Viewing sample data - connect your wallet to create wagers'}
           </p>
         </div>
       </header>
 
-      
-      {/* Market Crawler - Latest Markets Ticker */}
-      <MarketCrawler markets={markets} />
+      {/* Quick Actions */}
+      <section className="dashboard-section">
+        <QuickActions onAction={handleQuickAction} />
+      </section>
 
-      {/* Main Charts Grid */}
-      <section className="charts-section">
-        <div className="charts-row">
-          {/* Market Distribution */}
-          <div className="chart-card wide">
-            <div className="chart-header">
-              <h3 className="chart-title">Market Distribution by Category</h3>
-              <span className="chart-subtitle">Liquidity allocation across categories</span>
-            </div>
-            <CategoryDonutChart markets={markets} categories={categories} />
-          </div>
+      {/* How It Works (collapsible) */}
+      <section className="dashboard-section">
+        <HowItWorksGuide />
+      </section>
 
-          {/* Market Categories Treemap */}
-          <div className="chart-card">
-            <div className="chart-header">
-              <h3 className="chart-title">Market Categories</h3>
-              <span className="chart-subtitle">Distribution by category and time status</span>
-            </div>
-            <CategoryTreemap markets={markets} categories={categories} />
-          </div>
+      {/* Active Wagers */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3>Active Wagers</h3>
+          <span className="section-count">{activeWagers.length}</span>
         </div>
-
-        {/* Activity Section - Moved up */}
-        <div className="bottom-grid">
-          {/* Trending Markets */}
-          <div className="bottom-card">
-            <div className="bottom-header">
-              <h3>🔥 Trending Markets</h3>
-              <button className="view-all-btn">View All →</button>
-            </div>
-            <TrendingMarketsList markets={markets} onMarketClick={handleMarketClick} />
+        {activeWagers.length > 0 ? (
+          <div className="wagers-grid">
+            {activeWagers.map(wager => (
+              <WagerCard key={wager.id} wager={wager} onClick={handleWagerClick} />
+            ))}
           </div>
-
-          {/* Recent Activity */}
-          <div className="bottom-card">
-            <div className="bottom-header">
-              <h3>⚡ Recent Activity</h3>
-            </div>
-            <RecentActivityFeed markets={markets} />
+        ) : (
+          <div className="empty-state compact">
+            <p>No active wagers yet. Create one to get started.</p>
           </div>
-        </div>
+        )}
+      </section>
 
-        {/* Volume Sparklines */}
-        <div className="chart-card full-width">
-          <div className="chart-header">
-            <h3 className="chart-title">Category Performance</h3>
-            <span className="chart-subtitle">14-day volume trends by category</span>
+      {/* Past Wagers */}
+      {pastWagers.length > 0 && (
+        <section className="dashboard-section">
+          <div className="section-header">
+            <h3>Past Wagers</h3>
+            <span className="section-count">{pastWagers.length}</span>
           </div>
-          <VolumeSparklines markets={markets} categories={categories} />
-        </div>
+          <div className="wagers-grid">
+            {pastWagers.map(wager => (
+              <WagerCard key={wager.id} wager={wager} onClick={handleWagerClick} />
+            ))}
+          </div>
+        </section>
+      )}
 
-        <div className="charts-row">
-          {/* Liquidity Flow */}
-          <div className="chart-card wide">
-            <div className="chart-header">
-              <h3 className="chart-title">Liquidity Flow</h3>
-              <span className="chart-subtitle">30-day liquidity distribution</span>
-            </div>
-            <LiquidityStreamChart markets={markets} categories={categories} />
-          </div>
-
-          {/* Activity Heatmap */}
-          <div className="chart-card">
-            <div className="chart-header">
-              <h3 className="chart-title">Trading Activity</h3>
-              <span className="chart-subtitle">Weekly activity patterns</span>
-            </div>
-            <ActivityHeatmap markets={markets} />
-          </div>
-        </div>
-
-        {/* Price Momentum */}
-        <div className="chart-card full-width">
-          <div className="chart-header">
-            <h3 className="chart-title">Market Sentiment</h3>
-            <span className="chart-subtitle">Top markets by liquidity with YES probability</span>
-          </div>
-          <PriceMomentumChart markets={markets} />
-        </div>
+      {/* Oracle Info */}
+      <section className="dashboard-section">
+        <OracleInfoPanel />
       </section>
     </div>
   )

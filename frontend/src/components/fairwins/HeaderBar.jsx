@@ -28,7 +28,7 @@ function HeaderBar() {
             </div>
             <div className="brand-text">
               <h1>FairWins</h1>
-              <p className="tagline">Prediction Markets</p>
+              <p className="tagline">P2P Wagers</p>
             </div>
           </div>
         </div>

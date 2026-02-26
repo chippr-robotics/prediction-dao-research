@@ -1,234 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import Dashboard from '../components/fairwins/Dashboard'
-import { useWeb3 } from '../hooks/useWeb3'
-import { getMockMarkets } from '../utils/mockDataLoader'
-import { useDataFetcher } from '../hooks/useDataFetcher'
-import { UserPreferencesContext } from '../contexts'
-
-// Note: ResizeObserver and IntersectionObserver are mocked globally in setup.js
-
-// Mock the hooks and utilities
-vi.mock('../hooks/useWeb3')
-vi.mock('../utils/mockDataLoader')
-vi.mock('../hooks/useDataFetcher')
-vi.mock('../hooks/useInfiniteMarkets', () => ({
-  useTrendingMarkets: () => ({
-    markets: [
-      {
-        id: 0,
-        proposalTitle: 'Test Market 1',
-        category: 'sports',
-        passTokenPrice: '0.55',
-        failTokenPrice: '0.45',
-        totalLiquidity: '10000',
-        tradingEndTime: new Date(Date.now() + 86400000).toISOString(),
-        status: 'Active',
-        volume24h: '1000',
-        tradesCount: 50,
-        uniqueTraders: 25
-      },
-      {
-        id: 1,
-        proposalTitle: 'Test Market 2',
-        category: 'politics',
-        passTokenPrice: '0.42',
-        failTokenPrice: '0.58',
-        totalLiquidity: '15000',
-        tradingEndTime: new Date(Date.now() + 172800000).toISOString(),
-        status: 'Active',
-        volume24h: '1500',
-        tradesCount: 75,
-        uniqueTraders: 35
-      }
-    ],
-    isLoading: false,
-    error: null
-  }),
-  useInfiniteMarkets: () => ({
-    markets: [],
-    isLoading: false,
-    isLoadingMore: false,
-    hasMore: false,
-    isIndexReady: true,
-    indexProgress: 100,
-    loadMore: vi.fn(),
-    refresh: vi.fn(),
-    totalLoaded: 0
-  })
-}))
-
-// Mock D3 to avoid rendering issues in test environment
-vi.mock('d3', () => {
-  const createChainableMock = () => {
-    vi.fn(() => chainable)
-    const chainable = {
-      attr: vi.fn(() => chainable),
-      append: vi.fn(() => chainable),
-      selectAll: vi.fn(() => chainable),
-      data: vi.fn(() => chainable),
-      join: vi.fn(() => chainable),
-      on: vi.fn(() => chainable),
-      text: vi.fn(() => chainable),
-      call: vi.fn(() => chainable),
-      remove: vi.fn(() => chainable),
-      transition: vi.fn(() => chainable),
-      duration: vi.fn(() => chainable),
-      select: vi.fn(() => chainable),
-      style: vi.fn(() => chainable),
-      datum: vi.fn(() => chainable),
-      enter: vi.fn(() => chainable),
-      exit: vi.fn(() => chainable),
-      merge: vi.fn(() => chainable),
-      classed: vi.fn(() => chainable),
-      each: vi.fn(() => chainable)
-    }
-    return chainable
-  }
-
-  const mockAxis = () => {
-    const fn = vi.fn()
-    fn.ticks = vi.fn(() => fn)
-    fn.tickFormat = vi.fn(() => fn)
-    fn.tickSize = vi.fn(() => fn)
-    return fn
-  }
-
-  const mockScale = () => {
-    const scale = vi.fn((x) => x)  // Make it callable
-    scale.domain = vi.fn(() => scale)
-    scale.range = vi.fn(() => scale)
-    scale.padding = vi.fn(() => scale)
-    scale.bandwidth = vi.fn(() => 20)
-    scale.call = vi.fn(() => scale)
-    return scale
-  }
-
-  const mockHierarchy = (data) => {
-    const node = {
-      data,
-      sum: vi.fn(function() { return this }),
-      sort: vi.fn(function() { return this }),
-      descendants: vi.fn(() => []),
-      leaves: vi.fn(() => [])
-    }
-    return node
-  }
-
-  const mockTreemap = () => {
-    const fn = vi.fn((root) => root)
-    fn.size = vi.fn(() => fn)
-    fn.paddingOuter = vi.fn(() => fn)
-    fn.paddingTop = vi.fn(() => fn)
-    fn.paddingInner = vi.fn(() => fn)
-    fn.round = vi.fn(() => fn)
-    return fn
-  }
-
-  return {
-    select: vi.fn(() => createChainableMock()),
-  scaleOrdinal: vi.fn(mockScale),
-  scaleLinear: vi.fn(mockScale),
-  scaleTime: vi.fn(mockScale),
-  scaleBand: vi.fn(mockScale),
-  scaleSequential: vi.fn(() => ({
-    domain: vi.fn(function() { return this }),
-    interpolator: vi.fn(function() { return this })
-  })),
-  pie: vi.fn(() => {
-    const fn = vi.fn(() => [])
-    fn.value = vi.fn(() => fn)
-    fn.sort = vi.fn(() => fn)
-    fn.padAngle = vi.fn(() => fn)
-    return fn
-  }),
-  arc: vi.fn(() => {
-    const fn = vi.fn(() => '')
-    fn.innerRadius = vi.fn(() => fn)
-    fn.outerRadius = vi.fn(() => fn)
-    fn.cornerRadius = vi.fn(() => fn)
-    fn.startAngle = vi.fn(() => fn)
-    fn.endAngle = vi.fn(() => fn)
-    return fn
-  }),
-  stack: vi.fn(() => {
-    const fn = vi.fn(() => [])
-    fn.keys = vi.fn(() => fn)
-    fn.offset = vi.fn(() => fn)
-    return fn
-  }),
-  area: vi.fn(() => {
-    const fn = vi.fn(() => '')
-    fn.x = vi.fn(() => fn)
-    fn.y0 = vi.fn(() => fn)
-    fn.y1 = vi.fn(() => fn)
-    fn.curve = vi.fn(() => fn)
-    return fn
-  }),
-  line: vi.fn(() => {
-    const fn = vi.fn(() => '')
-    fn.x = vi.fn(() => fn)
-    fn.y = vi.fn(() => fn)
-    fn.curve = vi.fn(() => fn)
-    return fn
-  }),
-  axisBottom: vi.fn(mockAxis),
-  axisLeft: vi.fn(mockAxis),
-  timeFormat: vi.fn(() => vi.fn()),
-  extent: vi.fn(() => [0, 100]),
-  min: vi.fn(() => 0),
-  max: vi.fn(() => 100),
-  interpolateRgbBasis: vi.fn(() => vi.fn()),
-  stackOffsetWiggle: vi.fn(),
-  curveBasis: vi.fn(),
-  curveMonotoneX: vi.fn(),
-  hierarchy: vi.fn(mockHierarchy),
-  treemap: vi.fn(mockTreemap)
-  }
-})
+import { UserPreferencesContext, WalletContext } from '../contexts'
 
 describe('Dashboard Component', () => {
-  const mockMarkets = [
-    {
-      id: 0,
-      proposalTitle: 'Test Market 1',
-      category: 'sports',
-      passTokenPrice: '0.55',
-      failTokenPrice: '0.45',
-      totalLiquidity: '10000',
-      tradingEndTime: new Date(Date.now() + 86400000).toISOString(),
-      status: 'Active',
-      volume24h: '1000',
-      tradesCount: 50,
-      uniqueTraders: 25
-    },
-    {
-      id: 1,
-      proposalTitle: 'Test Market 2',
-      category: 'politics',
-      passTokenPrice: '0.42',
-      failTokenPrice: '0.58',
-      totalLiquidity: '15000',
-      tradingEndTime: new Date(Date.now() + 172800000).toISOString(),
-      status: 'Active',
-      volume24h: '1500',
-      tradesCount: 75,
-      uniqueTraders: 35
-    },
-    {
-      id: 2,
-      proposalTitle: 'Test Market 3',
-      category: 'finance',
-      passTokenPrice: '0.68',
-      failTokenPrice: '0.32',
-      totalLiquidity: '20000',
-      tradingEndTime: new Date(Date.now() + 259200000).toISOString(),
-      status: 'Active',
-      volume24h: '2000',
-      tradesCount: 100,
-      uniqueTraders: 45
-    }
-  ]
+  const defaultWalletContext = {
+    account: '0x1234567890abcdef1234567890abcdef12345678',
+    isConnected: true,
+    provider: null,
+    signer: null,
+    chainId: 63,
+    connectWallet: vi.fn(),
+    disconnectWallet: vi.fn(),
+    switchNetwork: vi.fn(),
+    isCorrectNetwork: true,
+    networkError: null,
+    isConnecting: false,
+    balance: '0'
+  }
 
   const defaultPreferencesContext = {
     preferences: {
@@ -250,227 +39,150 @@ describe('Dashboard Component', () => {
   }
 
   const renderWithProviders = (component, options = {}) => {
-    const { preferencesContext = defaultPreferencesContext } = options
+    const {
+      walletContext = defaultWalletContext,
+      preferencesContext = defaultPreferencesContext
+    } = options
 
     return render(
-      <UserPreferencesContext.Provider value={preferencesContext}>
-        {component}
-      </UserPreferencesContext.Provider>
+      <WalletContext.Provider value={walletContext}>
+        <UserPreferencesContext.Provider value={preferencesContext}>
+          {component}
+        </UserPreferencesContext.Provider>
+      </WalletContext.Provider>
     )
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
-    
-    // Setup default mock implementations
-    useWeb3.mockReturnValue({
-      account: '0x1234567890abcdef1234567890abcdef12345678',
-      isConnected: true
-    })
-    
-    getMockMarkets.mockReturnValue(mockMarkets)
-    
-    // Mock useDataFetcher to return the getMarkets function
-    useDataFetcher.mockReturnValue({
-      demoMode: true,
-      getMarkets: vi.fn(async () => mockMarkets),
-      getMarketsByCategory: vi.fn(async (category) => 
-        mockMarkets.filter(m => m.category === category)
-      ),
-      getMarketById: vi.fn(async (id) => 
-        mockMarkets.find(m => m.id === id)
-      ),
-      getProposals: vi.fn(async () => []),
-      getPositions: vi.fn(async () => []),
-      getWelfareMetrics: vi.fn(async () => []),
-      getCategories: vi.fn(async () => ['sports', 'politics', 'finance']),
-      getMarketsByCorrelationGroup: vi.fn(async () => [])
-    })
   })
 
   describe('Rendering', () => {
-    // Note: Loading state test removed because with mocked async data,
-    // loading happens too fast to catch in tests
-    
-    it('should render dashboard header after loading', async () => {
+    it('should render dashboard header', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Market Overview')).toBeInTheDocument()
-      })
+      expect(screen.getByText('Your Wagers')).toBeInTheDocument()
     })
 
-    it('should render subtitle', async () => {
+    it('should show demo mode badge in demo mode', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        // In demo mode, subtitle shows "Viewing sample market data"
-        expect(screen.getByText('Viewing sample market data')).toBeInTheDocument()
-      })
+      expect(screen.getByText('Demo Mode')).toBeInTheDocument()
+    })
+
+    it('should show connected wallet address', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText(/Connected: 0x1234\.\.\.5678/)).toBeInTheDocument()
     })
   })
 
-  describe('Chart Sections', () => {
-    it('should render market distribution chart section', async () => {
+  describe('Quick Actions', () => {
+    it('should render all quick action cards', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Market Distribution by Category')).toBeInTheDocument()
-      })
+      expect(screen.getByText('New 1v1 Wager')).toBeInTheDocument()
+      expect(screen.getByText('Group Wager')).toBeInTheDocument()
+      expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
+      expect(screen.getByText('My Wagers')).toBeInTheDocument()
     })
 
-    it('should render market categories section', async () => {
+    it('should have quick action descriptions', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Market Categories')).toBeInTheDocument()
-      })
-    })
-
-    it('should render category performance section', async () => {
-      renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Category Performance')).toBeInTheDocument()
-      })
-    })
-
-    it('should render liquidity flow section', async () => {
-      renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Liquidity Flow')).toBeInTheDocument()
-      })
-    })
-
-    it('should render trading activity section', async () => {
-      renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Trading Activity')).toBeInTheDocument()
-      })
-    })
-
-    it('should render market sentiment section', async () => {
-      renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Market Sentiment')).toBeInTheDocument()
-      })
+      expect(screen.getByText('Challenge a friend to a direct bet')).toBeInTheDocument()
+      expect(screen.getByText('Create a pool for 3-10 friends')).toBeInTheDocument()
     })
   })
 
-  describe('Bottom Section', () => {
-    it('should render trending markets section', async () => {
+  describe('How It Works', () => {
+    it('should render collapsible how-it-works section', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Trending Markets/)).toBeInTheDocument()
-      })
+      expect(screen.getByText('How P2P Wagers Work')).toBeInTheDocument()
     })
 
-    it('should render recent activity section', async () => {
+    it('should expand how-it-works when clicked', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText(/Recent Activity/)).toBeInTheDocument()
-      })
-    })
-
-    it('should display View All button in trending section', async () => {
-      renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('View All →')).toBeInTheDocument()
-      })
+      const toggle = screen.getByText('How P2P Wagers Work')
+      fireEvent.click(toggle)
+      expect(screen.getByText('Create a wager')).toBeInTheDocument()
+      expect(screen.getByText('Share the invite')).toBeInTheDocument()
+      expect(screen.getByText('Auto-resolution')).toBeInTheDocument()
+      expect(screen.getByText('Claim winnings')).toBeInTheDocument()
     })
   })
 
-  describe('Data Loading', () => {
-    it('should load markets via useTrendingMarkets hook', async () => {
-      // Dashboard uses useTrendingMarkets instead of getMarkets
-      // The hook is mocked at module level
+  describe('Active Wagers', () => {
+    it('should render active wagers section in demo mode', () => {
       renderWithProviders(<Dashboard />)
-
-      await waitFor(() => {
-        // Dashboard should render with markets from the hook
-        expect(screen.getByText('Market Overview')).toBeInTheDocument()
-      })
+      expect(screen.getByText('Active Wagers')).toBeInTheDocument()
     })
 
-    it('should handle empty markets gracefully', async () => {
-      // Note: useTrendingMarkets is mocked at module level with sample data
-      // Empty markets case is handled by the component's conditional rendering
+    it('should display demo wager cards', () => {
       renderWithProviders(<Dashboard />)
-
-      await waitFor(() => {
-        expect(screen.getByText('Market Overview')).toBeInTheDocument()
-      })
+      expect(screen.getByText('Will BTC be above $100k by March 2026?')).toBeInTheDocument()
     })
 
-    it('should handle loading errors gracefully', async () => {
-      // Note: Error handling is managed by useTrendingMarkets hook
-      // which is mocked at module level - component should still render
+    it('should show wager status badges', () => {
       renderWithProviders(<Dashboard />)
+      const activeBadges = screen.getAllByText('Active')
+      expect(activeBadges.length).toBeGreaterThan(0)
+    })
+  })
 
-      await waitFor(() => {
-        expect(screen.getByText('Market Overview')).toBeInTheDocument()
+  describe('Past Wagers', () => {
+    it('should render past wagers section when there are resolved wagers', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('Past Wagers')).toBeInTheDocument()
+    })
+
+    it('should display resolved wager', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('ETH merge anniversary price prediction')).toBeInTheDocument()
+    })
+  })
+
+  describe('Oracle Info', () => {
+    it('should render oracle sources panel', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('Oracle Sources')).toBeInTheDocument()
+    })
+
+    it('should display all oracle options', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.getByText('Peg wagers to Polymarket event outcomes')).toBeInTheDocument()
+      expect(screen.getByText('Price feed-based resolution')).toBeInTheDocument()
+      expect(screen.getByText('Custom truth assertions')).toBeInTheDocument()
+      expect(screen.getByText('Creator-resolved with challenge period')).toBeInTheDocument()
+    })
+  })
+
+  describe('Not Connected State', () => {
+    it('should show connect prompt when not connected and not demo mode', () => {
+      renderWithProviders(<Dashboard />, {
+        walletContext: { ...defaultWalletContext, isConnected: false, account: null },
+        preferencesContext: {
+          ...defaultPreferencesContext,
+          preferences: { ...defaultPreferencesContext.preferences, demoMode: false }
+        }
       })
+      expect(screen.getByText('Connect your wallet to create and manage wagers')).toBeInTheDocument()
     })
   })
 
   describe('Accessibility', () => {
-    it('should have proper heading hierarchy', async () => {
+    it('should have proper heading hierarchy', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        const h1 = screen.getByRole('heading', { level: 1 })
-        expect(h1).toHaveTextContent('Market Overview')
-      })
+      const h1 = screen.getByRole('heading', { level: 1 })
+      expect(h1).toHaveTextContent('Your Wagers')
     })
 
-    it('should have accessible trending market items', async () => {
+    it('should have accessible quick action buttons', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        const trendingItems = screen.queryAllByRole('button')
-        expect(trendingItems.length).toBeGreaterThan(0)
-      })
+      const buttons = screen.getAllByRole('button')
+      expect(buttons.length).toBeGreaterThan(0)
     })
-  })
 
-  describe('Responsive Design', () => {
-    it('should render all sections on desktop', async () => {
+    it('should have aria-expanded on how-it-works toggle', () => {
       renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Market Distribution by Category')).toBeInTheDocument()
-        expect(screen.getByText('Market Categories')).toBeInTheDocument()
-        expect(screen.getByText('Category Performance')).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Categories', () => {
-    it('should initialize with predefined categories', async () => {
-      renderWithProviders(<Dashboard />)
-
-      await waitFor(() => {
-        // Dashboard should render with categories from useTrendingMarkets
-        expect(screen.getByText('Market Distribution by Category')).toBeInTheDocument()
-      })
-    })
-  })
-
-  describe('Metrics Calculation', () => {
-    it('should handle markets with missing data', async () => {
-      // Note: Dashboard now uses useTrendingMarkets which is mocked at module level
-      // Markets with missing data should render without errors
-      renderWithProviders(<Dashboard />)
-      
-      await waitFor(() => {
-        expect(screen.getByText('Market Overview')).toBeInTheDocument()
-      })
+      const toggle = screen.getByRole('button', { name: /How P2P Wagers Work/i })
+        || screen.getByText('How P2P Wagers Work').closest('button')
+      expect(toggle).toHaveAttribute('aria-expanded')
     })
   })
 })
