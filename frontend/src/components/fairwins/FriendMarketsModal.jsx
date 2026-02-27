@@ -4,6 +4,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
+import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
 import { TOKENS } from '../../constants/etcswap'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType } from '../../abis/FriendGroupMarketFactory'
@@ -95,6 +96,10 @@ function FriendMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+
+  // Built-in market creation handler used when no external onCreate is provided
+  const { createFriendMarket } = useFriendMarketCreation()
+  const handleCreate = onCreate || createFriendMarket
 
   // Role details for checking dual roles (required for Bookmaker)
   const { roleDetails } = useRoleDetails()
@@ -802,7 +807,7 @@ function FriendMarketsModal({
         }
       }
 
-      const result = await onCreate(submitData, signer)
+      const result = await handleCreate(submitData, signer)
 
       // Calculate acceptance deadline info
       const acceptanceDeadline = new Date(formData.acceptanceDeadline)
