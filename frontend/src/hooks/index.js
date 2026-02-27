@@ -97,6 +97,9 @@ export {
   useLazyMarketDecryption
 } from './useEncryption'
 
+// Friend market creation hook
+export { useFriendMarketCreation } from './useFriendMarketCreation'
+
 // Friend market notification hooks
 export { useFriendMarketNotifications } from './useFriendMarketNotifications'
 
