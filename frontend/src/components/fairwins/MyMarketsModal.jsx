@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ethers } from 'ethers'
 import { useWallet, useWeb3, useDataFetcher } from '../../hooks'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
@@ -345,12 +346,27 @@ function MyMarketsModal({
     setSelectedMarket(null)
   }
 
-  // Check if market can be resolved
+  // Check if market can be resolved (contract requires market.active == true, i.e. ACTIVE status)
   const canResolve = (market) => {
     if (!account) return false
-    const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
     const status = market.computedStatus || MarketStatus.ACTIVE
-    return isCreator && status === MarketStatus.PENDING_RESOLUTION
+    if (status !== MarketStatus.ACTIVE) return false
+
+    const userAddr = account.toLowerCase()
+    const isCreator = market.creator?.toLowerCase() === userAddr
+    const isOpponent = market.participants?.length > 1 &&
+      market.participants[1]?.toLowerCase() === userAddr
+    const isArbitrator = market.arbitrator &&
+      market.arbitrator !== ethers.ZeroAddress &&
+      market.arbitrator.toLowerCase() === userAddr
+
+    // Resolution authority depends on resolutionType
+    const resType = market.resolutionType ?? 0
+    if (resType === 0) return isCreator || isOpponent || isArbitrator // Either
+    if (resType === 1) return isCreator // Initiator
+    if (resType === 2) return isOpponent // Receiver
+    if (resType === 3) return isArbitrator // ThirdParty
+    return false
   }
 
   // Check if user can open dispute
@@ -1285,6 +1301,7 @@ function ResolutionModal({
   market,
   onClose,
   onResolved,
+  signer,
   isCorrectNetwork,
   switchNetwork
 }) {
@@ -1292,6 +1309,7 @@ function ResolutionModal({
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [txHash, setTxHash] = useState(null)
   const [step, setStep] = useState('select') // 'select', 'confirm', 'success'
 
   const outcomes = market.marketType === 'friend'
@@ -1309,23 +1327,61 @@ function ResolutionModal({
       return
     }
 
+    if (!signer) {
+      setError('Please connect your wallet to resolve this market.')
+      return
+    }
+
     setSubmitting(true)
     setError(null)
 
     try {
-      // TODO: Implement actual contract call for resolution
-      // For now, simulate the resolution
-      console.log('Resolving market:', {
+      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+      const friendFactory = new ethers.Contract(
+        friendFactoryAddress,
+        FRIEND_GROUP_MARKET_FACTORY_ABI,
+        signer
+      )
+
+      // outcome: true = first option wins (Pass/Yes), false = second option wins (Fail/No)
+      const outcomeBool = selectedOutcome === outcomes[0]
+
+      console.log('Resolving market on-chain:', {
         marketId: market.id,
-        outcome: selectedOutcome,
+        outcome: outcomeBool,
+        selectedOutcome,
         notes: resolutionNotes
       })
 
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const tx = await friendFactory.resolveFriendMarket(
+        market.id,
+        outcomeBool,
+        { gasLimit: 500000n }
+      )
+      setTxHash(tx.hash)
+
+      const receipt = await tx.wait()
+
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted on-chain. Resolution failed.')
+      }
+      if (!receipt) {
+        throw new Error('Transaction was dropped or replaced. Please try again.')
+      }
+
+      console.log('Market resolution proposed:', receipt)
       setStep('success')
     } catch (err) {
       console.error('Error resolving market:', err)
-      setError(err.message || 'Failed to resolve market. Please try again.')
+      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+        setError('Transaction was rejected in your wallet.')
+      } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
+        setError('This market is not active. It may have already been resolved or is still pending acceptance.')
+      } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
+        setError('You are not authorized to resolve this market based on its resolution type.')
+      } else {
+        setError(err.reason || err.shortMessage || err.message || 'Failed to resolve market. Please try again.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -1483,14 +1539,21 @@ function ResolutionModal({
           {step === 'success' && (
             <div className="mm-success-state">
               <div className="mm-success-icon">&#9989;</div>
-              <h4>Market Resolved!</h4>
+              <h4>Resolution Proposed!</h4>
               <p>
-                The market has been resolved with outcome: <strong>{selectedOutcome}</strong>
+                Resolution proposed with outcome: <strong>{selectedOutcome}</strong>
               </p>
               <p className="mm-success-hint">
-                Participants will be notified and can claim their winnings or open a dispute
-                within the dispute window.
+                The other party has a 24-hour challenge window to dispute this resolution.
+                If unchallenged, the resolution will be finalized automatically.
               </p>
+              {txHash && (
+                <p className="mm-success-hint">
+                  <a href={`https://etc-mordor.blockscout.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer">
+                    View transaction
+                  </a>
+                </p>
+              )}
               <button
                 type="button"
                 className="mm-btn-primary"

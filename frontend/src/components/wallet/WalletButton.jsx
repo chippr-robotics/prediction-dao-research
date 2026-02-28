@@ -835,6 +835,17 @@ function WalletButton({ className = '' }) {
       })
       const receipt = await tx.wait()
       console.log('Friend market created:', receipt)
+
+      // Validate transaction was successful
+      if (receipt && receipt.status === 0) {
+        clearPendingTransaction()
+        throw new Error('Transaction reverted on-chain. The wager was not created. Check your parameters and try again.')
+      }
+      if (!receipt) {
+        clearPendingTransaction()
+        throw new Error('Transaction was dropped or replaced. Please try again.')
+      }
+
       onProgress({ step: 'complete', message: 'Market created successfully!', txHash: receipt.hash })
       // Clear pending state on success
       clearPendingTransaction()
@@ -900,6 +911,12 @@ function WalletButton({ className = '' }) {
       }
     } catch (error) {
       console.error('Error creating friend market:', error)
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        throw new Error('Transaction was rejected in your wallet.')
+      }
+      if (error.code === 'INSUFFICIENT_FUNDS') {
+        throw new Error('Insufficient funds to cover the stake and gas fees.')
+      }
       throw error
     }
   }
@@ -1193,6 +1210,15 @@ function WalletButton({ className = '' }) {
       reportProgress(currentStep, totalSteps, 'Waiting for market confirmation...', 'confirming')
       const receipt = await tx.wait()
       console.log('Market created:', receipt)
+
+      // Validate transaction was successful
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted on-chain. The market was not created.')
+      }
+      if (!receipt) {
+        throw new Error('Transaction was dropped or replaced. Please try again.')
+      }
+
       reportProgress(currentStep, totalSteps, 'Market created successfully', 'completed')
 
       // Extract market ID from event logs
