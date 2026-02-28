@@ -461,6 +461,17 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       })
       const receipt = await tx.wait()
       console.log('Friend market created:', receipt)
+
+      // Validate transaction was successful (receipt.status === 1 means success)
+      if (receipt && receipt.status === 0) {
+        clearPendingTransaction()
+        throw new Error('Transaction reverted on-chain. The wager was not created. Check your parameters and try again.')
+      }
+      if (!receipt) {
+        clearPendingTransaction()
+        throw new Error('Transaction was dropped or replaced. Please try again.')
+      }
+
       onProgress({ step: 'complete', message: 'Market created successfully!', txHash: receipt.hash })
       clearPendingTransaction()
 
@@ -521,6 +532,36 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
     } catch (error) {
       console.error('Error creating friend market:', error)
+
+      // Parse contract revert reasons for user-friendly messages
+      const reason = error.reason || error.shortMessage || ''
+      const errorData = error.data || error.error?.data || ''
+
+      if (reason.includes('MembershipRequired') || errorData.includes('MembershipRequired')) {
+        throw new Error('You do not have the required Friend Market role. Please purchase access first.')
+      }
+      if (reason.includes('MembershipExpired') || errorData.includes('MembershipExpired')) {
+        throw new Error('Your Friend Market membership has expired. Please renew to create wagers.')
+      }
+      if (reason.includes('MarketLimitReached') || errorData.includes('MarketLimitReached')) {
+        throw new Error('You have reached your wager creation limit for this period.')
+      }
+      if (reason.includes('InvalidDeadline') || errorData.includes('InvalidDeadline')) {
+        throw new Error('Invalid acceptance deadline. Must be between 1 hour and 30 days from now.')
+      }
+      if (reason.includes('InvalidStake') || errorData.includes('InvalidStake')) {
+        throw new Error('Invalid stake amount. Stake must be greater than zero.')
+      }
+      if (reason.includes('InvalidOpponent') || errorData.includes('InvalidOpponent')) {
+        throw new Error('Invalid opponent address. Cannot wager against yourself or the zero address.')
+      }
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        throw new Error('Transaction was rejected in your wallet.')
+      }
+      if (error.code === 'INSUFFICIENT_FUNDS' || reason.includes('insufficient funds')) {
+        throw new Error('Insufficient funds to cover the stake and gas fees.')
+      }
+
       throw error
     }
   }, [signer, onMarketCreated])

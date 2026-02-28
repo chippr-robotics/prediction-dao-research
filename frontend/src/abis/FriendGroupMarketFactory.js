@@ -263,6 +263,55 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
     stateMutability: 'nonpayable',
     type: 'function'
   },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'challengeResolution',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'finalizeResolution',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'claimWinnings',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'challengePeriod',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [],
+    name: 'challengeBond',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'wagerWinner',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'friendMarketId', type: 'uint256' }],
+    name: 'winningsClaimed',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
 
   // Events
   {
@@ -341,6 +390,47 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
       { indexed: false, name: 'outcome', type: 'bool' }
     ],
     name: 'MarketResolved',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'friendMarketId', type: 'uint256' },
+      { indexed: true, name: 'proposer', type: 'address' },
+      { indexed: false, name: 'proposedOutcome', type: 'bool' },
+      { indexed: false, name: 'challengeDeadline', type: 'uint256' }
+    ],
+    name: 'ResolutionProposed',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'friendMarketId', type: 'uint256' },
+      { indexed: true, name: 'challenger', type: 'address' },
+      { indexed: false, name: 'bondAmount', type: 'uint256' }
+    ],
+    name: 'ResolutionChallenged',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'friendMarketId', type: 'uint256' },
+      { indexed: false, name: 'outcome', type: 'bool' }
+    ],
+    name: 'ResolutionFinalized',
+    type: 'event'
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'friendMarketId', type: 'uint256' },
+      { indexed: true, name: 'winner', type: 'address' },
+      { indexed: false, name: 'amount', type: 'uint256' },
+      { indexed: false, name: 'token', type: 'address' }
+    ],
+    name: 'WinningsClaimed',
     type: 'event'
   }
 ]

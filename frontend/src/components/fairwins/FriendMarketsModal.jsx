@@ -214,6 +214,12 @@ function FriendMarketsModal({
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareMarketData, setShareMarketData] = useState(null)
 
+  // Resolution state
+  const [resolvingMarket, setResolvingMarket] = useState(null)
+  const [resolveStep, setResolveStep] = useState('select') // 'select', 'confirm', 'submitting', 'success'
+  const [resolveError, setResolveError] = useState(null)
+  const [resolveTxHash, setResolveTxHash] = useState(null)
+
   // Encryption state
   const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
 
@@ -892,6 +898,70 @@ function FriendMarketsModal({
   const handleBackToList = () => {
     setSelectedMarket(null)
   }
+
+  // Resolve state object to pass down to MarketDetailView
+  const resolveStateObj = useMemo(() => ({
+    step: resolveStep,
+    marketId: resolvingMarket?.id,
+    txHash: resolveTxHash,
+    error: resolveError
+  }), [resolveStep, resolvingMarket, resolveTxHash, resolveError])
+
+  // Handle market resolution
+  const handleResolveMarket = useCallback(async (market, outcomeBool) => {
+    if (!signer) {
+      setResolveError('Please connect your wallet to resolve this market.')
+      return
+    }
+    if (!isCorrectNetwork) {
+      setResolveError('Please switch to the correct network.')
+      return
+    }
+
+    setResolvingMarket(market)
+    setResolveStep('submitting')
+    setResolveError(null)
+
+    try {
+      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+      const friendFactory = new ethers.Contract(
+        friendFactoryAddress,
+        FRIEND_GROUP_MARKET_FACTORY_ABI,
+        signer
+      )
+
+      console.log('Resolving market on-chain:', { marketId: market.id, outcome: outcomeBool })
+
+      const tx = await friendFactory.resolveFriendMarket(
+        market.id,
+        outcomeBool,
+        { gasLimit: 500000n }
+      )
+      setResolveTxHash(tx.hash)
+
+      const receipt = await tx.wait()
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted on-chain.')
+      }
+      if (!receipt) {
+        throw new Error('Transaction was dropped. Please try again.')
+      }
+
+      setResolveStep('success')
+    } catch (err) {
+      console.error('Error resolving market:', err)
+      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
+        setResolveError('Transaction rejected in wallet.')
+      } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
+        setResolveError('Market is not active. It may already be resolved or still pending acceptance.')
+      } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
+        setResolveError('You are not authorized to resolve this market.')
+      } else {
+        setResolveError(err.reason || err.shortMessage || err.message || 'Failed to resolve.')
+      }
+      setResolveStep('confirm')
+    }
+  }, [signer, isCorrectNetwork])
 
   // Generate market acceptance URL for QR code
   const getMarketUrl = (market) => {
@@ -1957,6 +2027,8 @@ function FriendMarketsModal({
                     decryptFn(currentMarket.id).catch(err => console.error('Decrypt failed:', err))
                   }}
                   isDecrypting={isActiveMarketDecrypting(currentMarket.id) || isPastMarketDecrypting(currentMarket.id)}
+                  onResolve={handleResolveMarket}
+                  resolveState={resolveStateObj}
                 />
               ) : (
                 <>
@@ -2105,6 +2177,8 @@ function FriendMarketsModal({
                     decryptFn(currentMarket.id).catch(err => console.error('Decrypt failed:', err))
                   }}
                   isDecrypting={isActiveMarketDecrypting(currentMarket.id) || isPastMarketDecrypting(currentMarket.id)}
+                  onResolve={handleResolveMarket}
+                  resolveState={resolveStateObj}
                 />
               ) : (
                 <>
@@ -2383,6 +2457,56 @@ function MarketsCompactTable({
 /**
  * Market detail view component
  */
+/**
+ * Inline resolve controls for market detail view
+ */
+function ResolveInline({ market, onResolve, resolveState }) {
+  const [showChoices, setShowChoices] = useState(false)
+
+  if (resolveState?.marketId === market.id && resolveState?.step === 'success') {
+    return (
+      <div className="fm-resolve-inline">
+        <span>Resolution proposed!</span>
+        {resolveState.txHash && (
+          <a href={`https://etc-mordor.blockscout.com/tx/${resolveState.txHash}`} target="_blank" rel="noopener noreferrer">
+            View tx
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  if (resolveState?.marketId === market.id && resolveState?.step === 'submitting') {
+    return <button type="button" className="fm-btn-primary" disabled>Resolving...</button>
+  }
+
+  if (!showChoices) {
+    return (
+      <button type="button" className="fm-btn-primary" onClick={() => setShowChoices(true)}>
+        Resolve Market
+      </button>
+    )
+  }
+
+  return (
+    <div className="fm-resolve-inline">
+      {resolveState?.error && resolveState?.marketId === market.id && (
+        <div className="fm-error-text">{resolveState.error}</div>
+      )}
+      <span>Resolve as:</span>
+      <button type="button" className="fm-btn-primary" onClick={() => onResolve(market, true)}>
+        Pass
+      </button>
+      <button type="button" className="fm-btn-secondary" onClick={() => onResolve(market, false)}>
+        Fail
+      </button>
+      <button type="button" className="fm-btn-link" onClick={() => setShowChoices(false)}>
+        Cancel
+      </button>
+    </div>
+  )
+}
+
 function MarketDetailView({
   market,
   onBack,
@@ -2392,10 +2516,25 @@ function MarketDetailView({
   getStatusClass,
   account,
   onDecrypt,
-  isDecrypting = false
+  isDecrypting = false,
+  onResolve,
+  resolveState
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
+  const isOpponent = market.participants?.length > 1 &&
+    market.participants[1]?.toLowerCase() === account?.toLowerCase()
   const marketUrl = `${window.location.origin}/friend-market/${market.id}`
+
+  // Check if current user can resolve based on resolution type
+  const canResolve = (() => {
+    if (market.status !== 'active') return false
+    const resType = market.resolutionType ?? 0
+    if (resType === 0) return isCreator || isOpponent // Either
+    if (resType === 1) return isCreator // Initiator
+    if (resType === 2) return isOpponent // Receiver
+    // ThirdParty/AutoPegged not handled in this view
+    return false
+  })()
 
   return (
     <div className="fm-detail">
@@ -2617,10 +2756,12 @@ function MarketDetailView({
           </svg>
           Copy Link
         </button>
-        {isCreator && market.status === 'active' && (
-          <button type="button" className="fm-btn-primary">
-            Resolve Market
-          </button>
+        {canResolve && onResolve && (
+          <ResolveInline
+            market={market}
+            onResolve={onResolve}
+            resolveState={resolveState}
+          />
         )}
       </div>
     </div>

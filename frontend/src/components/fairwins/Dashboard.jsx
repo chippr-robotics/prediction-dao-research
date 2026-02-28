@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
+import QRScanner from '../ui/QRScanner'
 import './Dashboard.css'
 
 // ============================================================================
@@ -278,12 +280,14 @@ function OracleInfoPanel({ isConnected }) {
 function Dashboard() {
   const { isConnected, account } = useWallet()
   const { preferences } = useUserPreferences()
+  const navigate = useNavigate()
   const demoMode = preferences?.demoMode ?? true
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'smallGroup'
   const [showMyWagers, setShowMyWagers] = useState(false)
+  const [showQrScanner, setShowQrScanner] = useState(false)
 
   // Mock wager data for demo mode
   const mockWagers = useMemo(() => {
@@ -360,9 +364,7 @@ function Dashboard() {
         setShowMyWagers(true)
         break
       case 'scan-qr':
-        // Open creation modal on create tab (QR scanner is available there)
-        setCreateWagerType(null)
-        setShowCreateWager(true)
+        setShowQrScanner(true)
         break
       default:
         break
@@ -372,6 +374,45 @@ function Dashboard() {
   const handleWagerClick = useCallback(() => {
     setShowMyWagers(true)
   }, [])
+
+  const handleQrScanSuccess = useCallback((decodedText) => {
+    setShowQrScanner(false)
+
+    // Try to extract a market ID or navigate to the scanned URL
+    try {
+      const url = new URL(decodedText)
+      const trustedOrigins = [window.location.origin]
+      const isFromTrustedSource = trustedOrigins.some(origin => url.origin === origin)
+
+      if (isFromTrustedSource) {
+        // Navigate to the path from the trusted URL
+        navigate(url.pathname + url.search)
+      } else {
+        // Extract market ID from path (e.g., /market/123 or /friend-market/preview?id=123)
+        const marketIdMatch = url.pathname.match(/\/market\/(\d+)/)
+        const idParam = url.searchParams.get('id')
+
+        if (marketIdMatch) {
+          navigate(`/market/${marketIdMatch[1]}`)
+        } else if (idParam) {
+          navigate(`/market/${idParam}`)
+        } else {
+          // For external URLs, confirm before navigating
+          const proceed = window.confirm(
+            'This QR code contains a URL from an external source. Open it?'
+          )
+          if (proceed) {
+            window.open(decodedText, '_blank', 'noopener,noreferrer')
+          }
+        }
+      }
+    } catch {
+      // Not a URL — check if it's a raw market ID (numeric)
+      if (/^\d+$/.test(decodedText.trim())) {
+        navigate(`/market/${decodedText.trim()}`)
+      }
+    }
+  }, [navigate])
 
   // Not connected state
   if (!isConnected && !demoMode) {
@@ -476,6 +517,13 @@ function Dashboard() {
       <MyMarketsModal
         isOpen={showMyWagers}
         onClose={() => setShowMyWagers(false)}
+      />
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
+        onScanSuccess={handleQrScanSuccess}
       />
     </div>
   )
