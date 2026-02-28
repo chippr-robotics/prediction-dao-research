@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext } from '../contexts'
 
@@ -45,11 +46,13 @@ describe('Dashboard Component', () => {
     } = options
 
     return render(
-      <WalletContext.Provider value={walletContext}>
-        <UserPreferencesContext.Provider value={preferencesContext}>
-          {component}
-        </UserPreferencesContext.Provider>
-      </WalletContext.Provider>
+      <MemoryRouter>
+        <WalletContext.Provider value={walletContext}>
+          <UserPreferencesContext.Provider value={preferencesContext}>
+            {component}
+          </UserPreferencesContext.Provider>
+        </WalletContext.Provider>
+      </MemoryRouter>
     )
   }
 
