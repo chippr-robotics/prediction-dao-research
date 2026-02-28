@@ -864,7 +864,10 @@ function FriendMarketsModal({
       console.error('Error creating friend market:', error)
       const errorMessage = error.message || 'Failed to create market. Please try again.'
       setErrors({ submit: errorMessage })
-      setTxProgress(prev => ({ ...prev, error: errorMessage }))
+      // Reset step to 'idle' so the error banner is visible
+      // (TransactionProgress unmounts when submitting=false, and
+      // the error banner only shows when txProgress.step === 'idle')
+      setTxProgress({ step: 'idle', message: '', txHash: null, error: errorMessage })
     } finally {
       setSubmitting(false)
     }

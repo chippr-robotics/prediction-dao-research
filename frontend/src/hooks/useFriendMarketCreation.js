@@ -412,21 +412,68 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         isNativeETC
       })
 
-      const gasLimit = 1000000n
       let tx
+
+      // Build the common tx overrides
+      const txOverrides = isNativeETC ? { value: creatorStakeWei } : {}
+
+      // Simulate the call first to catch reverts BEFORE the wallet prompts
+      // This gives the user an immediate error instead of signing a doomed transaction
+      try {
+        onProgress({ step: 'create', message: 'Validating transaction...' })
+        if (isBookmaker) {
+          await friendFactory.createBookmakerMarket.staticCall(
+            opponent, marketDescription, tradingPeriodSeconds, acceptanceDeadline,
+            opponentStakeWei, oddsMultiplier, stakeTokenAddress, resolutionType, arbitrator,
+            txOverrides
+          )
+        } else {
+          await friendFactory.createOneVsOneMarketPending.staticCall(
+            opponent, marketDescription, tradingPeriodSeconds, arbitrator,
+            acceptanceDeadline, opponentStakeWei, stakeTokenAddress, resolutionType,
+            txOverrides
+          )
+        }
+        console.log('Static call simulation passed - transaction should succeed')
+      } catch (simError) {
+        console.error('Transaction simulation failed:', simError)
+        // Parse the revert reason for a user-friendly message
+        const revertReason = simError.reason || simError.shortMessage || simError.message || ''
+        if (revertReason.includes('InvalidDeadline')) {
+          throw new Error('Invalid acceptance deadline. Must be between 1 hour and 30 days from now.')
+        }
+        if (revertReason.includes('MembershipRequired')) {
+          throw new Error('You do not have the required Friend Market role. Please purchase access first.')
+        }
+        if (revertReason.includes('MembershipExpired')) {
+          throw new Error('Your Friend Market membership has expired. Please renew to create wagers.')
+        }
+        if (revertReason.includes('MarketLimitReached')) {
+          throw new Error('You have reached your wager creation limit for this period.')
+        }
+        if (revertReason.includes('InvalidStake')) {
+          throw new Error('Invalid stake amount. Stake must be greater than zero.')
+        }
+        if (revertReason.includes('InvalidOpponent')) {
+          throw new Error('Invalid opponent address. Cannot wager against yourself or the zero address.')
+        }
+        throw new Error(`Transaction will fail: ${revertReason || 'Unknown contract error. Check your parameters.'}`)
+      }
+
+      // Simulation passed - now send the actual transaction
+      onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
 
       if (isBookmaker) {
         if (isNativeETC) {
           tx = await friendFactory.createBookmakerMarket(
             opponent, marketDescription, tradingPeriodSeconds, acceptanceDeadline,
             opponentStakeWei, oddsMultiplier, stakeTokenAddress, resolutionType, arbitrator,
-            { value: creatorStakeWei, gasLimit }
+            { value: creatorStakeWei }
           )
         } else {
           tx = await friendFactory.createBookmakerMarket(
             opponent, marketDescription, tradingPeriodSeconds, acceptanceDeadline,
-            opponentStakeWei, oddsMultiplier, stakeTokenAddress, resolutionType, arbitrator,
-            { gasLimit }
+            opponentStakeWei, oddsMultiplier, stakeTokenAddress, resolutionType, arbitrator
           )
         }
       } else {
@@ -434,13 +481,12 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           tx = await friendFactory.createOneVsOneMarketPending(
             opponent, marketDescription, tradingPeriodSeconds, arbitrator,
             acceptanceDeadline, opponentStakeWei, stakeTokenAddress, resolutionType,
-            { value: creatorStakeWei, gasLimit }
+            { value: creatorStakeWei }
           )
         } else {
           tx = await friendFactory.createOneVsOneMarketPending(
             opponent, marketDescription, tradingPeriodSeconds, arbitrator,
-            acceptanceDeadline, opponentStakeWei, stakeTokenAddress, resolutionType,
-            { gasLimit }
+            acceptanceDeadline, opponentStakeWei, stakeTokenAddress, resolutionType
           )
         }
       }
