@@ -156,15 +156,18 @@ describe('Dashboard Component', () => {
   })
 
   describe('Not Connected State', () => {
-    it('should show connect prompt when not connected and not demo mode', () => {
-      renderWithProviders(<Dashboard />, {
+    it('should show welcome view when not connected and not demo mode', () => {
+      const mockConnect = vi.fn()
+      renderWithProviders(<Dashboard onConnect={mockConnect} />, {
         walletContext: { ...defaultWalletContext, isConnected: false, account: null },
         preferencesContext: {
           ...defaultPreferencesContext,
           preferences: { ...defaultPreferencesContext.preferences, demoMode: false }
         }
       })
-      expect(screen.getByText('Connect your wallet to create and manage wagers')).toBeInTheDocument()
+      expect(screen.getByText('Create a wagerwith a friend')).toBeInTheDocument()
+      expect(screen.getByText('How it works')).toBeInTheDocument()
+      expect(screen.getByText('Pick your truth source')).toBeInTheDocument()
     })
   })
 

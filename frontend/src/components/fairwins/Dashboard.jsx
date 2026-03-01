@@ -240,7 +240,7 @@ function HowItWorksGuide() {
 }
 
 // ============================================================================
-// ORACLE INFO PANEL
+// ORACLE INFO PANEL (used in connected dashboard view)
 // ============================================================================
 
 function OracleInfoPanel({ isConnected }) {
@@ -275,10 +275,160 @@ function OracleInfoPanel({ isConnected }) {
 }
 
 // ============================================================================
+// WELCOME VIEW (shown when wallet is not connected)
+// ============================================================================
+
+function WelcomeView({ onConnect }) {
+  return (
+    <div className="welcome-view">
+      {/* Hero prompt */}
+      <section className="welcome-hero">
+        <div className="welcome-hero-badge">
+          <span className="welcome-hero-badge-dot" />
+          Ethereum Classic
+        </div>
+        <h1 className="welcome-hero-title">
+          Create a wager<br />with a friend
+        </h1>
+        <p className="welcome-hero-subtitle">
+          Connect your wallet to create trustless P2P bets. Pick a topic, set the stakes, choose an oracle, and share the invite.
+        </p>
+        <button className="welcome-connect-btn" onClick={onConnect}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2" y="6" width="20" height="14" rx="2" />
+            <path d="M22 10H2" />
+            <path d="M6 2v4" />
+            <path d="M18 2v4" />
+          </svg>
+          <span>Connect Wallet</span>
+        </button>
+      </section>
+
+      {/* How it works - visual steps */}
+      <section className="welcome-steps">
+        <h2 className="welcome-section-label">How it works</h2>
+        <div className="welcome-steps-grid">
+          <div className="welcome-step-card">
+            <div className="welcome-step-number">1</div>
+            <div className="welcome-step-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </div>
+            <h3>Create</h3>
+            <p>Pick a topic, set the stake amount, and choose how the outcome gets decided.</p>
+          </div>
+          <div className="welcome-step-card">
+            <div className="welcome-step-number">2</div>
+            <div className="welcome-step-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </svg>
+            </div>
+            <h3>Share</h3>
+            <p>Send a QR code or link to your friend. They review the terms and stake their side.</p>
+          </div>
+          <div className="welcome-step-card">
+            <div className="welcome-step-number">3</div>
+            <div className="welcome-step-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <h3>Settle</h3>
+            <p>The oracle resolves the result. The winner claims the pot from the smart contract.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Oracle options - informational, not status */}
+      <section className="welcome-oracles">
+        <h2 className="welcome-section-label">Pick your truth source</h2>
+        <div className="welcome-oracle-grid">
+          <div className="welcome-oracle-card">
+            <div className="welcome-oracle-accent welcome-oracle-accent-polymarket" />
+            <h3>Polymarket</h3>
+            <p>Peg your wager to any Polymarket event. Elections, sports, world events.</p>
+            <span className="welcome-oracle-tag">Events &amp; outcomes</span>
+          </div>
+          <div className="welcome-oracle-card">
+            <div className="welcome-oracle-accent welcome-oracle-accent-chainlink" />
+            <h3>Chainlink</h3>
+            <p>Decentralized price feeds for crypto, forex, and commodities.</p>
+            <span className="welcome-oracle-tag">Price predictions</span>
+          </div>
+          <div className="welcome-oracle-card">
+            <div className="welcome-oracle-accent welcome-oracle-accent-uma" />
+            <h3>UMA Optimistic</h3>
+            <p>Assert any claim and let UMA's dispute mechanism ensure honest resolution.</p>
+            <span className="welcome-oracle-tag">Custom claims</span>
+          </div>
+          <div className="welcome-oracle-card">
+            <div className="welcome-oracle-accent welcome-oracle-accent-manual" />
+            <h3>Manual + Challenge</h3>
+            <p>Creator resolves it. The other side gets 24 hours to dispute.</p>
+            <span className="welcome-oracle-tag">Casual bets</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Example wager preview */}
+      <section className="welcome-preview">
+        <h2 className="welcome-section-label">What a wager looks like</h2>
+        <div className="welcome-preview-card">
+          <div className="welcome-preview-header">
+            <span className="welcome-preview-live" />
+            <span className="welcome-preview-label">Example Wager</span>
+            <span className="welcome-preview-type">1v1</span>
+          </div>
+          <div className="welcome-preview-question">Will BTC close above $100k on March 1?</div>
+          <div className="welcome-preview-stakes">
+            <div className="welcome-preview-side">
+              <span className="welcome-preview-side-label">You stake</span>
+              <span className="welcome-preview-side-value">0.5 ETC</span>
+            </div>
+            <div className="welcome-preview-vs">VS</div>
+            <div className="welcome-preview-side">
+              <span className="welcome-preview-side-label">They stake</span>
+              <span className="welcome-preview-side-value">0.5 ETC</span>
+            </div>
+          </div>
+          <div className="welcome-preview-footer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            Resolves via Chainlink Price Feed
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom CTA */}
+      <section className="welcome-bottom-cta">
+        <p>Ready to make your first wager?</p>
+        <button className="welcome-connect-btn" onClick={onConnect}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2" y="6" width="20" height="14" rx="2" />
+            <path d="M22 10H2" />
+            <path d="M6 2v4" />
+            <path d="M18 2v4" />
+          </svg>
+          <span>Connect Wallet to Start</span>
+        </button>
+      </section>
+    </div>
+  )
+}
+
+// ============================================================================
 // MAIN DASHBOARD COMPONENT
 // ============================================================================
 
-function Dashboard() {
+function Dashboard({ onConnect }) {
   const { isConnected, account } = useWallet()
   const { preferences } = useUserPreferences()
   const navigate = useNavigate()
@@ -489,24 +639,11 @@ function Dashboard() {
     }
   }, [navigate])
 
-  // Not connected state
+  // Not connected state — show welcome/onboarding view
   if (!isConnected && !demoMode) {
     return (
       <div className="dashboard-container">
-        <header className="dashboard-header">
-          <div className="header-content">
-            <div className="header-title-row">
-              <h1>P2P Wagers</h1>
-            </div>
-            <p className="dashboard-subtitle">Connect your wallet to create and manage wagers</p>
-          </div>
-        </header>
-        <section className="dashboard-section">
-          <HowItWorksGuide />
-        </section>
-        <section className="dashboard-section">
-          <OracleInfoPanel isConnected={isConnected} />
-        </section>
+        <WelcomeView onConnect={onConnect} />
       </div>
     )
   }
