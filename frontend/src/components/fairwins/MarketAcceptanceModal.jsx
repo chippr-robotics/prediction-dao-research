@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption } from '../../hooks/useEncryption'
 import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import './MarketAcceptanceModal.css'
 
 // Helper to format stake amount as USD (rounded to nearest cent)
@@ -20,14 +21,38 @@ const formatUSD = (amount, symbol) => {
   return `${num} ${symbol || 'tokens'}`
 }
 
+// Helper to get human-readable resolution type label
+const getResolutionLabel = (resolutionType) => {
+  switch (resolutionType) {
+    case 0: return 'Either Party'
+    case 1: return 'Creator Only'
+    case 2: return 'Opponent Only'
+    case 3: return 'Third Party Arbitrator'
+    case 4: return 'Linked Wager (Auto)'
+    default: return 'Either Party'
+  }
+}
+
+// Helper to get human-readable wager type label
+const getWagerTypeLabel = (marketType) => {
+  switch (marketType) {
+    case 'oneVsOne': return '1v1'
+    case 'smallGroup': return 'Group'
+    case 'eventTracking': return 'Event'
+    case 'bookmaker': return 'Bookmaker'
+    case 'propBet': return 'Prop Bet'
+    default: return marketType || 'Friend Wager'
+  }
+}
+
 /**
  * MarketAcceptanceModal Component
  *
- * Displays market terms for counterparty/arbitrator to review and accept.
+ * Displays offer terms for counterparty/arbitrator to review and accept.
  * Accessible via QR code scan or deep link.
  *
  * Features:
- * - Market terms display
+ * - Offer terms display with full details
  * - Time remaining countdown
  * - Acceptance progress
  * - Accept/Decline actions
@@ -43,7 +68,7 @@ function MarketAcceptanceModal({
   contractABI
 }) {
   const { isConnected, account } = useWallet()
-  const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { signer, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const {
     decryptMetadata,
     canUserDecrypt,
@@ -57,7 +82,7 @@ function MarketAcceptanceModal({
   const [txHash, setTxHash] = useState(null)
   const [timeRemaining, setTimeRemaining] = useState(0)
 
-  // Decryption state for encrypted markets
+  // Decryption state for encrypted wagers
   const [decryptedDescription, setDecryptedDescription] = useState(null)
   const [isDecrypting, setIsDecrypting] = useState(false)
   const [decryptionError, setDecryptionError] = useState(null)
@@ -68,7 +93,7 @@ function MarketAcceptanceModal({
     p => p.toLowerCase() === account?.toLowerCase()
   )
   const isCreator = marketData?.creator?.toLowerCase() === account?.toLowerCase()
-  // Creator's acceptance is automatically recorded at market creation
+  // Creator's acceptance is automatically recorded at creation
   const hasAlreadyAccepted = isCreator || marketData?.acceptances?.[account?.toLowerCase()]?.hasAccepted
 
   // Calculate time remaining
@@ -86,19 +111,16 @@ function MarketAcceptanceModal({
     return () => clearInterval(interval)
   }, [marketData?.acceptanceDeadline])
 
-  // Attempt to decrypt encrypted market description
+  // Attempt to decrypt encrypted wager description
   useEffect(() => {
     const tryDecrypt = async () => {
-      // Only try if market is encrypted and we have the raw description
       if (!marketData?.isEncrypted || !marketData?.rawDescription) {
         return
       }
 
-      // Reset decryption state
       setDecryptedDescription(null)
       setDecryptionError(null)
 
-      // Check if user is a participant who can decrypt
       if (!account) {
         setDecryptionError('Connect wallet to view encrypted content')
         return
@@ -107,22 +129,20 @@ function MarketAcceptanceModal({
       try {
         const envelope = JSON.parse(marketData.rawDescription)
 
-        // Check if user can decrypt
         if (!canUserDecrypt(envelope)) {
-          setDecryptionError('You are not a participant in this encrypted market')
+          setDecryptionError('You are not a participant in this encrypted wager')
           return
         }
 
-        // Try to decrypt if keys are initialized
         if (encryptionInitialized) {
           setIsDecrypting(true)
           const decrypted = await decryptMetadata(envelope)
-          setDecryptedDescription(decrypted.description || decrypted.name || 'Market Details')
+          setDecryptedDescription(decrypted.description || decrypted.name || 'Wager Details')
           setIsDecrypting(false)
         }
       } catch (err) {
-        console.error('Failed to decrypt market:', err)
-        setDecryptionError('Failed to decrypt market content')
+        console.error('Failed to decrypt wager:', err)
+        setDecryptionError('Failed to decrypt wager content')
         setIsDecrypting(false)
       }
     }
@@ -138,16 +158,15 @@ function MarketAcceptanceModal({
       setIsDecrypting(true)
       setDecryptionError(null)
 
-      // Initialize keys if needed (may prompt user to sign)
       if (!encryptionInitialized) {
         await initializeKeys()
       }
 
       const envelope = JSON.parse(marketData.rawDescription)
       const decrypted = await decryptMetadata(envelope)
-      setDecryptedDescription(decrypted.description || decrypted.name || 'Market Details')
+      setDecryptedDescription(decrypted.description || decrypted.name || 'Wager Details')
     } catch (err) {
-      console.error('Failed to decrypt market:', err)
+      console.error('Failed to decrypt wager:', err)
       setDecryptionError(err.message || 'Failed to decrypt')
     } finally {
       setIsDecrypting(false)
@@ -199,7 +218,7 @@ function MarketAcceptanceModal({
     try {
       // Check deadline hasn't passed BEFORE calling contract
       if (marketData?.acceptanceDeadline && Date.now() >= marketData.acceptanceDeadline) {
-        throw new Error('The acceptance deadline has passed. This market can no longer be accepted.')
+        throw new Error('The acceptance deadline has passed. This offer can no longer be accepted.')
       }
 
       const contract = new ethers.Contract(
@@ -243,7 +262,7 @@ function MarketAcceptanceModal({
           })
           if (balance < stakeAmount) {
             throw new Error(
-              `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${ethers.formatUnits(stakeAmount, 18)} ETC.`
+              `Insufficient balance. You have ${ethers.formatEther(balance)} but need ${ethers.formatUnits(stakeAmount, 18)} ${marketData?.stakeTokenSymbol || 'tokens'}.`
             )
           }
           tx = await contract.acceptMarket(marketId, { value: stakeAmount })
@@ -312,20 +331,20 @@ function MarketAcceptanceModal({
       if (onAccepted) onAccepted(marketId)
 
     } catch (err) {
-      console.error('Error accepting market:', err)
+      console.error('Error accepting offer:', err)
 
       // Decode known FriendGroupMarketFactory error selectors
       const errorSelectors = {
-        '0x06417a60': 'Invalid market ID - the market does not exist',
-        '0x7dc6505a': 'Market is not pending - it may have already been activated or cancelled',
-        '0x70f65caa': 'Acceptance deadline has passed - the market has expired',
-        '0x1aa8064c': 'Already accepted - you have already accepted this market',
-        '0x779a6f41': 'Not invited - you are not a participant in this market',
+        '0x06417a60': 'Invalid wager ID - the wager does not exist',
+        '0x7dc6505a': 'Wager is not pending - it may have already been activated or cancelled',
+        '0x70f65caa': 'Acceptance deadline has passed - the offer has expired',
+        '0x1aa8064c': 'Already accepted - you have already accepted this offer',
+        '0x779a6f41': 'Not invited - you are not a participant in this wager',
         '0x90b8ec18': 'Transfer failed - check your token balance and approval',
-        '0xcd1c8867': 'Insufficient payment - not enough ETC/tokens sent'
+        '0xcd1c8867': 'Insufficient payment - not enough tokens sent'
       }
 
-      let errorMessage = err.reason || err.message || 'Failed to accept market'
+      let errorMessage = err.reason || err.message || 'Failed to accept offer'
 
       // Try to decode error data if available
       if (err.data) {
@@ -337,7 +356,6 @@ function MarketAcceptanceModal({
 
       // Check for common error patterns in the message
       if (errorMessage.includes('missing revert data') || errorMessage.includes('unknown custom error')) {
-        // Check if there's error data in the transaction info
         const txData = err.transaction?.data || err.info?.error?.data
         if (txData) {
           const selector = typeof txData === 'string' ? txData.slice(0, 10) : null
@@ -370,6 +388,11 @@ function MarketAcceptanceModal({
   const isExpired = timeRemaining <= 0
   const canAccept = isConnected && !hasAlreadyAccepted && !isExpired && (isParticipant || isArbitrator)
 
+  // Calculate total pot for display
+  const participantCount = marketData?.participants?.length || 0
+  const stakePerPerson = parseFloat(marketData?.stakePerParticipant || 0)
+  const totalPot = stakePerPerson * participantCount
+
   return (
     <div
       className="ma-modal-backdrop"
@@ -381,7 +404,7 @@ function MarketAcceptanceModal({
       <div className="ma-modal">
         <header className="ma-header">
           <h2 id="ma-title">
-            {isArbitrator ? 'Accept Arbitrator Role' : 'Review Market Offer'}
+            {isArbitrator ? 'Accept Arbitrator Role' : 'Review Offer'}
           </h2>
           <button
             className="ma-close-btn"
@@ -397,7 +420,7 @@ function MarketAcceptanceModal({
         <div className="ma-content">
           {step === 'review' && (
             <>
-              {/* Market Details */}
+              {/* Wager Description */}
               <div className="ma-market-info">
                 {marketData?.isEncrypted ? (
                   <div className="ma-encrypted-section">
@@ -406,9 +429,8 @@ function MarketAcceptanceModal({
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0110 0v4"/>
                       </svg>
-                      <span>Private Market</span>
+                      <span>Private Wager</span>
                     </div>
-                    {/* Show decrypted description if available */}
                     {decryptedDescription ? (
                       <h3 className="ma-description">{decryptedDescription}</h3>
                     ) : isDecrypting || encryptionInitializing ? (
@@ -431,17 +453,17 @@ function MarketAcceptanceModal({
                       </div>
                     ) : (isParticipant || isArbitrator) ? (
                       <div className="ma-decrypt-prompt">
-                        <p>Sign a message to decrypt and view the market details</p>
+                        <p>Sign a message to decrypt and view the wager details</p>
                         <button
                           type="button"
                           className="ma-btn-decrypt"
                           onClick={handleDecrypt}
                         >
-                          Unlock Market Details
+                          Unlock Wager Details
                         </button>
                       </div>
                     ) : (
-                      <p className="ma-encrypted-hint">Only participants can view encrypted market details</p>
+                      <p className="ma-encrypted-hint">Only participants can view encrypted wager details</p>
                     )}
                   </div>
                 ) : (
@@ -453,89 +475,110 @@ function MarketAcceptanceModal({
                 </div>
               </div>
 
-              {/* Terms Grid */}
-              <div className="ma-terms-grid">
-                <div className="ma-term">
-                  <label>Market Type</label>
-                  <span className="ma-value">{marketData?.marketType || 'Friend Market'}</span>
-                </div>
-                <div className="ma-term">
-                  <label>Created By</label>
-                  <span className="ma-value ma-address">
-                    {formatAddress(marketData?.creator)}
-                  </span>
-                </div>
-                <div className="ma-term">
-                  <label>Participants</label>
-                  <span className="ma-value">{marketData?.participants?.length || 0}</span>
-                </div>
-                <div className="ma-term">
-                  <label>Accepted</label>
-                  <span className="ma-value">
-                    {marketData?.acceptedCount || 0} / {marketData?.minAcceptanceThreshold || 2}
-                  </span>
-                </div>
-                {marketData?.estimatedMarketEndDate && (
-                  <div className="ma-term">
-                    <label>Market Ends</label>
-                    <span className="ma-value">
-                      {new Date(marketData.estimatedMarketEndDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })}
+              {/* Offer Details Section */}
+              <div className="ma-offer-details">
+                <h4>Offer Details</h4>
+                <div className="ma-details-list">
+                  <div className="ma-detail-row">
+                    <span className="ma-detail-label">Wager Type</span>
+                    <span className="ma-detail-value">{getWagerTypeLabel(marketData?.marketType)}</span>
+                  </div>
+                  <div className="ma-detail-row">
+                    <span className="ma-detail-label">Created By</span>
+                    <span className="ma-detail-value ma-address">{formatAddress(marketData?.creator)}</span>
+                  </div>
+                  <div className="ma-detail-row">
+                    <span className="ma-detail-label">Resolution</span>
+                    <span className="ma-detail-value">{getResolutionLabel(marketData?.resolutionType)}</span>
+                  </div>
+                  {marketData?.arbitrator && (
+                    <div className="ma-detail-row">
+                      <span className="ma-detail-label">Arbitrator</span>
+                      <span className="ma-detail-value ma-address">{formatAddress(marketData.arbitrator)}</span>
+                    </div>
+                  )}
+                  <div className="ma-detail-row">
+                    <span className="ma-detail-label">Token</span>
+                    <span className="ma-detail-value">{marketData?.stakeTokenSymbol || 'tokens'}</span>
+                  </div>
+                  <div className="ma-detail-row">
+                    <span className="ma-detail-label">Participants</span>
+                    <span className="ma-detail-value">
+                      {marketData?.acceptedCount || 0} / {participantCount} accepted
                     </span>
                   </div>
-                )}
-                {!isArbitrator && (
-                  <>
-                    <div className="ma-term ma-term-highlight">
-                      <label>Your Stake</label>
-                      <span className="ma-value">
+                  {marketData?.estimatedMarketEndDate && (
+                    <div className="ma-detail-row">
+                      <span className="ma-detail-label">Wager Ends</span>
+                      <span className="ma-detail-value">
+                        {new Date(marketData.estimatedMarketEndDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Financial Summary */}
+              {!isArbitrator && (
+                <div className="ma-financial-summary">
+                  <h4>What You Are Agreeing To</h4>
+                  <div className="ma-financial-grid">
+                    <div className="ma-financial-item ma-financial-stake">
+                      <span className="ma-financial-label">Your Stake</span>
+                      <span className="ma-financial-value">
                         {formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}
                       </span>
                     </div>
-                    {/* Show odds and potential winnings for 1v1 markets with leverage */}
                     {marketData?.opponentOddsMultiplier && marketData?.opponentOddsMultiplier !== 200 && (
-                      <>
-                        <div className="ma-term">
-                          <label>Your Odds</label>
-                          <span className="ma-value ma-odds-value">
-                            {marketData.opponentOddsMultiplier / 100}x
-                          </span>
-                        </div>
-                        <div className="ma-term ma-term-success">
-                          <label>If You Win</label>
-                          <span className="ma-value">
-                            {formatUSD(
-                              parseFloat(marketData?.stakePerParticipant || 0) * marketData.opponentOddsMultiplier / 100,
-                              marketData?.stakeTokenSymbol
-                            )}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    {/* For equal stakes (200 = 2x), show simplified potential winnings */}
-                    {(!marketData?.opponentOddsMultiplier || marketData?.opponentOddsMultiplier === 200) && (
-                      <div className="ma-term ma-term-success">
-                        <label>If You Win</label>
-                        <span className="ma-value">
-                          {formatUSD(
-                            parseFloat(marketData?.stakePerParticipant || 0) * 2,
-                            marketData?.stakeTokenSymbol
-                          )}
+                      <div className="ma-financial-item">
+                        <span className="ma-financial-label">Your Odds</span>
+                        <span className="ma-financial-value ma-odds-value">
+                          {marketData.opponentOddsMultiplier / 100}x
                         </span>
                       </div>
                     )}
-                  </>
-                )}
-                {isArbitrator && (
+                    <div className="ma-financial-item ma-financial-win">
+                      <span className="ma-financial-label">If You Win</span>
+                      <span className="ma-financial-value">
+                        {formatUSD(
+                          stakePerPerson * ((marketData?.opponentOddsMultiplier || 200) / 100),
+                          marketData?.stakeTokenSymbol
+                        )}
+                      </span>
+                    </div>
+                    <div className="ma-financial-item ma-financial-lose">
+                      <span className="ma-financial-label">If You Lose</span>
+                      <span className="ma-financial-value">
+                        -{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}
+                      </span>
+                    </div>
+                    {participantCount > 2 && (
+                      <div className="ma-financial-item">
+                        <span className="ma-financial-label">Total Pot</span>
+                        <span className="ma-financial-value">
+                          {formatUSD(totalPot, marketData?.stakeTokenSymbol)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {isArbitrator && (
+                <div className="ma-financial-summary">
+                  <h4>What You Are Agreeing To</h4>
                   <div className="ma-term ma-term-info">
                     <label>Role</label>
                     <span className="ma-value">Arbitrator (No Stake Required)</span>
                   </div>
-                )}
-              </div>
+                  <p className="ma-arbitrator-note">
+                    You will be responsible for fairly resolving this wager when participants cannot agree.
+                  </p>
+                </div>
+              )}
 
               {/* Participants List */}
               <div className="ma-participants">
@@ -543,14 +586,14 @@ function MarketAcceptanceModal({
                 <ul className="ma-participants-list">
                   {marketData?.participants?.map((p, i) => {
                     const isAccepted = marketData?.acceptances?.[p.toLowerCase()]?.hasAccepted
-                    const isCreator = p.toLowerCase() === marketData?.creator?.toLowerCase()
+                    const isCreatorAddr = p.toLowerCase() === marketData?.creator?.toLowerCase()
                     const isYou = p.toLowerCase() === account?.toLowerCase()
 
                     return (
                       <li key={i} className={isAccepted ? 'accepted' : 'pending'}>
                         <span className="ma-participant-addr">
                           {formatAddress(p)}
-                          {isCreator && <span className="ma-badge creator">Creator</span>}
+                          {isCreatorAddr && <span className="ma-badge creator">Creator</span>}
                           {isYou && <span className="ma-badge you">You</span>}
                         </span>
                         <span className="ma-participant-status">
@@ -584,7 +627,7 @@ function MarketAcceptanceModal({
               {!isParticipant && !isArbitrator && (
                 <div className="ma-not-invited">
                   <span>&#9888;</span>
-                  You are not invited to this market
+                  You are not invited to this wager
                 </div>
               )}
 
@@ -624,26 +667,26 @@ function MarketAcceptanceModal({
                 <ul className="ma-safety-list">
                   <li>
                     <span className="ma-check-icon">&#10004;</span>
-                    <span><strong>Only accept markets from people you know and trust.</strong> Never accept invitations from strangers.</span>
+                    <span><strong>Only accept offers from people you know and trust.</strong> Never accept invitations from strangers.</span>
                   </li>
                   <li>
                     <span className="ma-check-icon">&#10004;</span>
-                    <span><strong>This action is permanent and cannot be undone.</strong> Your stake will be locked until the market resolves.</span>
+                    <span><strong>This action is permanent and cannot be undone.</strong> Your stake will be locked until the wager resolves.</span>
                   </li>
                   <li>
                     <span className="ma-check-icon">&#10004;</span>
-                    <span><strong>Do not include personal information (PII)</strong> in any market descriptions or communications.</span>
+                    <span><strong>Do not include personal information (PII)</strong> in any wager descriptions or communications.</span>
                   </li>
                   <li>
                     <span className="ma-check-icon">&#10004;</span>
-                    <span><strong>Verify the market terms carefully</strong> before accepting. You are agreeing to these exact terms.</span>
+                    <span><strong>Verify the offer terms carefully</strong> before accepting. You are agreeing to these exact terms.</span>
                   </li>
                 </ul>
               </div>
 
               {!isArbitrator && (
                 <p className="ma-stake-notice">
-                  You are about to stake <strong>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</strong> to join this market.
+                  You are about to stake <strong>{formatUSD(marketData?.stakePerParticipant, marketData?.stakeTokenSymbol)}</strong> to join this wager.
                   {marketData?.opponentOddsMultiplier && marketData?.opponentOddsMultiplier !== 200 && (
                     <> At <strong>{marketData.opponentOddsMultiplier / 100}x odds</strong>, you could win <strong>{formatUSD(parseFloat(marketData?.stakePerParticipant || 0) * marketData.opponentOddsMultiplier / 100, marketData?.stakeTokenSymbol)}</strong>.</>
                   )}
@@ -654,13 +697,13 @@ function MarketAcceptanceModal({
               )}
               {isArbitrator && (
                 <p className="ma-stake-notice">
-                  You are accepting the role of arbitrator for this market.
+                  You are accepting the role of arbitrator for this wager.
                   You will be responsible for resolving disputes fairly.
                 </p>
               )}
               <div className="ma-confirm-details">
                 <div className="ma-confirm-row">
-                  <span>Market:</span>
+                  <span>Wager:</span>
                   <span>
                     {(decryptedDescription || marketData?.description)?.slice(0, 50)}
                     {(decryptedDescription || marketData?.description)?.length > 50 ? '...' : ''}
@@ -669,6 +712,10 @@ function MarketAcceptanceModal({
                 <div className="ma-confirm-row">
                   <span>Created By:</span>
                   <span className="ma-address">{formatAddress(marketData?.creator)}</span>
+                </div>
+                <div className="ma-confirm-row">
+                  <span>Resolution:</span>
+                  <span>{getResolutionLabel(marketData?.resolutionType)}</span>
                 </div>
                 {!isArbitrator && (
                   <>
@@ -713,12 +760,12 @@ function MarketAcceptanceModal({
               <h3>Offer Accepted!</h3>
               <p>
                 {isArbitrator
-                  ? 'You are now the arbitrator for this market.'
-                  : 'Your stake has been deposited. The market will activate when all participants have accepted the offer.'}
+                  ? 'You are now the arbitrator for this wager.'
+                  : 'Your stake has been deposited. The wager will activate when all participants have accepted the offer.'}
               </p>
               {txHash && (
                 <a
-                  href={`https://blockscout.com/etc/mordor/tx/${txHash}`}
+                  href={getTransactionUrl(chainId, txHash)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ma-tx-link"

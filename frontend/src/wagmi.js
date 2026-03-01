@@ -116,7 +116,7 @@ export const config = createConfig({
       projectId: walletConnectProjectId,
       metadata: {
         name: 'Prediction DAO',
-        description: 'Decentralized prediction markets on Ethereum Classic',
+        description: 'Decentralized prediction markets and wagers',
         url: appUrl,
         icons: [`${appUrl}/assets/fairwins_no-text_logo.svg`]
       },

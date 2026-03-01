@@ -18,8 +18,8 @@ const STEP_CONFIGS = {
   friend_market: [
     { id: 'verify', label: 'Verify Role', description: 'Checking membership status' },
     { id: 'approve', label: 'Approve Token', description: 'Approving token spend', optional: true },
-    { id: 'create', label: 'Create Market', description: 'Confirm transaction in wallet' },
-    { id: 'complete', label: 'Complete', description: 'Market created successfully' }
+    { id: 'create', label: 'Create Wager', description: 'Confirm transaction in wallet' },
+    { id: 'complete', label: 'Complete', description: 'Wager created successfully' }
   ],
   accept_market: [
     { id: 'verify', label: 'Verify', description: 'Checking invitation' },
