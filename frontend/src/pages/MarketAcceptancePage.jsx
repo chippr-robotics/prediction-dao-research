@@ -6,6 +6,7 @@ import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { getContractAddress } from '../config/contracts'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
+import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import './MarketAcceptancePage.css'
 
 /**
@@ -246,7 +247,7 @@ function MarketAcceptancePage() {
               marketType: 'unknown',
               status: 'pending_acceptance',
               acceptanceDeadline: urlDeadline ? Number(urlDeadline) : Date.now() + 86400000,
-              minAcceptanceThreshold: 2,
+              minAcceptanceThreshold: WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
               stakePerParticipant: urlStake,
               stakeToken: null,
               stakeTokenSymbol: urlToken || 'tokens',

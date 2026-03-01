@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption } from '../../hooks/useEncryption'
 import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './MarketAcceptanceModal.css'
 
@@ -545,7 +546,7 @@ function MarketAcceptanceModal({
                       <span className="ma-financial-label">If You Win</span>
                       <span className="ma-financial-value">
                         {formatUSD(
-                          stakePerPerson * ((marketData?.opponentOddsMultiplier || 200) / 100),
+                          stakePerPerson * ((marketData?.opponentOddsMultiplier || WAGER_DEFAULTS.ODDS_MULTIPLIER) / 100),
                           marketData?.stakeTokenSymbol
                         )}
                       </span>
@@ -727,7 +728,7 @@ function MarketAcceptanceModal({
                       <span>Potential Win:</span>
                       <span className="ma-potential-win">
                         {formatUSD(
-                          parseFloat(marketData?.stakePerParticipant || 0) * (marketData?.opponentOddsMultiplier || 200) / 100,
+                          parseFloat(marketData?.stakePerParticipant || 0) * (marketData?.opponentOddsMultiplier || WAGER_DEFAULTS.ODDS_MULTIPLIER) / 100,
                           marketData?.stakeTokenSymbol
                         )}
                       </span>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { WAGER_DEFAULTS, WagerStatus, ORACLE_SOURCES } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import QRScanner from '../ui/QRScanner'
@@ -43,13 +44,13 @@ const getTimeRemaining = (endTime) => {
 
 function StatusBadge({ status }) {
   const statusConfig = {
-    pending_acceptance: { label: 'Pending', className: 'status-pending' },
-    active: { label: 'Active', className: 'status-active' },
-    pending_resolution: { label: 'Resolving', className: 'status-resolving' },
-    disputed: { label: 'Disputed', className: 'status-disputed' },
-    resolved: { label: 'Resolved', className: 'status-resolved' },
-    expired: { label: 'Expired', className: 'status-expired' },
-    cancelled: { label: 'Cancelled', className: 'status-expired' }
+    [WagerStatus.PENDING_ACCEPTANCE]: { label: 'Pending', className: 'status-pending' },
+    [WagerStatus.ACTIVE]: { label: 'Active', className: 'status-active' },
+    [WagerStatus.PENDING_RESOLUTION]: { label: 'Resolving', className: 'status-resolving' },
+    [WagerStatus.DISPUTED]: { label: 'Disputed', className: 'status-disputed' },
+    [WagerStatus.RESOLVED]: { label: 'Resolved', className: 'status-resolved' },
+    [WagerStatus.EXPIRED]: { label: 'Expired', className: 'status-expired' },
+    [WagerStatus.CANCELLED]: { label: 'Cancelled', className: 'status-expired' }
   }
 
   const config = statusConfig[status] || { label: status, className: '' }
@@ -244,20 +245,13 @@ function HowItWorksGuide() {
 // ============================================================================
 
 function OracleInfoPanel({ isConnected }) {
-  const oracles = [
-    { name: 'Polymarket', description: 'Peg wagers to Polymarket event outcomes', icon: '\uD83C\uDFAF' },
-    { name: 'Chainlink', description: 'Price feed-based resolution', icon: '\uD83D\uDD17' },
-    { name: 'UMA', description: 'Custom truth assertions', icon: '\u2696\uFE0F' },
-    { name: 'Manual', description: 'Creator-resolved with challenge period', icon: '\u270B' }
-  ]
-
   const status = isConnected ? 'available' : 'offline'
 
   return (
     <div className="oracle-info-panel">
       <h3>Oracle Sources</h3>
       <div className="oracle-list">
-        {oracles.map(oracle => (
+        {ORACLE_SOURCES.map(oracle => (
           <div key={oracle.name} className="oracle-item">
             <span className="oracle-icon" aria-hidden="true">{oracle.icon}</span>
             <div className="oracle-content">
@@ -479,7 +473,7 @@ function Dashboard({ onConnect }) {
     return friendMarkets.map(m => ({
       id: m.id,
       description: m.description,
-      status: m.status === 'pending' ? 'pending_acceptance' : m.status,
+      status: m.status === 'pending' ? WagerStatus.PENDING_ACCEPTANCE : m.status,
       stakeAmount: m.stakeAmount,
       stakeToken: m.stakeTokenSymbol || 'ETC',
       type: m.type === 'oneVsOne' ? '1v1' : m.type === 'smallGroup' ? 'Group' : m.type,
@@ -521,9 +515,9 @@ function Dashboard({ onConnect }) {
       {
         id: 1,
         description: 'Will BTC be above $100k by March 2026?',
-        status: 'active',
+        status: WagerStatus.ACTIVE,
         stakeAmount: '50',
-        stakeToken: 'USC',
+        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: '1v1',
         oracle: 'Chainlink',
         endTime: DEMO_END_30D,
@@ -532,9 +526,9 @@ function Dashboard({ onConnect }) {
       {
         id: 2,
         description: 'Super Bowl LX winner - Chiefs or 49ers?',
-        status: 'pending_acceptance',
+        status: WagerStatus.PENDING_ACCEPTANCE,
         stakeAmount: '25',
-        stakeToken: 'USC',
+        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: '1v1',
         oracle: 'Polymarket',
         endTime: DEMO_END_14D,
@@ -543,9 +537,9 @@ function Dashboard({ onConnect }) {
       {
         id: 3,
         description: 'Will it snow in Austin before April?',
-        status: 'active',
-        stakeAmount: '10',
-        stakeToken: 'USC',
+        status: WagerStatus.ACTIVE,
+        stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
+        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: 'Group',
         oracle: 'Manual',
         endTime: DEMO_END_45D,
@@ -554,9 +548,9 @@ function Dashboard({ onConnect }) {
       {
         id: 4,
         description: 'ETH merge anniversary price prediction',
-        status: 'resolved',
+        status: WagerStatus.RESOLVED,
         stakeAmount: '100',
-        stakeToken: 'USC',
+        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: '1v1',
         oracle: 'Chainlink',
         endTime: DEMO_END_PAST,
@@ -567,12 +561,12 @@ function Dashboard({ onConnect }) {
 
   const activeWagers = useMemo(() => {
     const wagers = demoMode ? mockWagers : liveWagers
-    return wagers.filter(w => w.status === 'active' || w.status === 'pending_acceptance')
+    return wagers.filter(w => w.status === WagerStatus.ACTIVE || w.status === WagerStatus.PENDING_ACCEPTANCE)
   }, [demoMode, mockWagers, liveWagers])
 
   const pastWagers = useMemo(() => {
     const wagers = demoMode ? mockWagers : liveWagers
-    return wagers.filter(w => w.status === 'resolved' || w.status === 'expired' || w.status === 'cancelled')
+    return wagers.filter(w => w.status === WagerStatus.RESOLVED || w.status === WagerStatus.EXPIRED || w.status === WagerStatus.CANCELLED)
   }, [demoMode, mockWagers, liveWagers])
 
   const handleQuickAction = useCallback((actionId) => {

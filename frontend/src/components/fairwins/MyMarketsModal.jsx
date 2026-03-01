@@ -1,33 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3, useDataFetcher } from '../../hooks'
+import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './MyMarketsModal.css'
-
-/**
- * Market Status Constants
- */
-const MarketStatus = {
-  PENDING_ACCEPTANCE: 'pending_acceptance',
-  ACTIVE: 'active',
-  PENDING_RESOLUTION: 'pending_resolution',
-  DISPUTED: 'disputed',
-  RESOLVED: 'resolved',
-  EXPIRED: 'expired',
-  CANCELLED: 'cancelled'
-}
-
-/**
- * Dispute Status Constants
- */
-const DisputeStatus = {
-  NONE: 'none',
-  OPENED: 'opened',
-  ESCALATED: 'escalated',
-  RESOLVED: 'resolved'
-}
 
 /**
  * MyMarketsModal Component
@@ -427,7 +405,7 @@ function MyMarketsModal({
       acceptanceDeadline: typeof market.acceptanceDeadline === 'number'
         ? market.acceptanceDeadline
         : market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime() : null,
-      minAcceptanceThreshold: market.minAcceptanceThreshold || 2,
+      minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
       stakePerParticipant: market.stakeAmount,
       stakeToken: market.stakeTokenAddress || null,
       stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',

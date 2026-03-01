@@ -5,6 +5,7 @@ import { getContractAddress } from '../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { ERC20_ABI } from '../abis/ConditionalMarketFactory'
 import { ETCSWAP_ADDRESSES, TOKENS } from '../constants/etcswap'
+import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import {
   getUserTierOnChain,
   hasRoleOnChain,
@@ -229,11 +230,11 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const isBookmaker = data.marketType === 'bookmaker'
 
       // Parse stake amount using correct decimals for token
-      const stakeAmountRaw = data.data.stakeAmount || '10'
+      const stakeAmountRaw = data.data.stakeAmount || WAGER_DEFAULTS.STAKE_AMOUNT
       const stakeWei = ethers.parseUnits(stakeAmountRaw, tokenDecimals)
 
       // Get odds multiplier (only used for bookmaker markets)
-      const oddsMultiplier = parseInt(data.data.oddsMultiplier) || 200
+      const oddsMultiplier = parseInt(data.data.oddsMultiplier) || WAGER_DEFAULTS.ODDS_MULTIPLIER
 
       // Get resolution type
       const resolutionType = parseInt(data.data.resolutionType) || 0
@@ -501,7 +502,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           opponent: data.data?.opponent,
           stakeAmount: data.data?.stakeAmount,
           marketType: data.marketType,
-          oddsMultiplier: isBookmaker ? oddsMultiplier : 200,
+          oddsMultiplier: isBookmaker ? oddsMultiplier : WAGER_DEFAULTS.ODDS_MULTIPLIER,
           resolutionType: resolutionType
         }
       })
@@ -550,7 +551,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         stakeAmount: stakeAmountRaw,
         opponentStake: ethers.formatUnits(opponentStakeWei, tokenDecimals),
         creatorStake: ethers.formatUnits(creatorStakeWei, tokenDecimals),
-        oddsMultiplier: isBookmaker ? oddsMultiplier : 200,
+        oddsMultiplier: isBookmaker ? oddsMultiplier : WAGER_DEFAULTS.ODDS_MULTIPLIER,
         resolutionType: resolutionType,
         tradingPeriod: tradingPeriodDays.toString(),
         participants: [userAddress, opponent],
