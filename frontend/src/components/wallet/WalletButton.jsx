@@ -13,6 +13,7 @@ import { getContractAddress } from '../../config/contracts'
 import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import {
   isCorrelationRegistryDeployed,
   createCorrelationGroup,
@@ -553,12 +554,12 @@ function WalletButton({ className = '' }) {
       const isBookmaker = data.marketType === 'bookmaker'
 
       // Parse stake amount using correct decimals for token
-      const stakeAmountRaw = data.data.stakeAmount || '10'
+      const stakeAmountRaw = data.data.stakeAmount || WAGER_DEFAULTS.STAKE_AMOUNT
       const stakeWei = ethers.parseUnits(stakeAmountRaw, tokenDecimals)
 
       // Get odds multiplier (only used for bookmaker markets)
       // 200 = 2x equal stakes, 10000 = 100x
-      const oddsMultiplier = parseInt(data.data.oddsMultiplier) || 200
+      const oddsMultiplier = parseInt(data.data.oddsMultiplier) || WAGER_DEFAULTS.ODDS_MULTIPLIER
 
       // Get resolution type (0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged)
       const resolutionType = parseInt(data.data.resolutionType) || 0
@@ -836,7 +837,7 @@ function WalletButton({ className = '' }) {
           opponent: data.data?.opponent,
           stakeAmount: data.data?.stakeAmount,
           marketType: data.marketType,
-          oddsMultiplier: isBookmaker ? oddsMultiplier : 200,
+          oddsMultiplier: isBookmaker ? oddsMultiplier : WAGER_DEFAULTS.ODDS_MULTIPLIER,
           resolutionType: resolutionType
         }
       })
@@ -886,7 +887,7 @@ function WalletButton({ className = '' }) {
         stakeAmount: stakeAmountRaw,
         opponentStake: ethers.formatUnits(opponentStakeWei, tokenDecimals),
         creatorStake: ethers.formatUnits(creatorStakeWei, tokenDecimals),
-        oddsMultiplier: isBookmaker ? oddsMultiplier : 200, // 200 = equal stakes for non-bookmaker
+        oddsMultiplier: isBookmaker ? oddsMultiplier : WAGER_DEFAULTS.ODDS_MULTIPLIER, // 200 = equal stakes for non-bookmaker
         resolutionType: resolutionType,
         tradingPeriod: tradingPeriodDays.toString(),
         participants: [userAddress, opponent],

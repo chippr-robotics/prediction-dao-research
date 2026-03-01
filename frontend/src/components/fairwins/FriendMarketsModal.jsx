@@ -6,6 +6,11 @@ import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
 import { TOKENS } from '../../constants/etcswap'
+import {
+  WAGER_DEFAULTS,
+  getDefaultEndDateTime,
+  getDefaultAcceptanceDeadline
+} from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
@@ -20,21 +25,6 @@ const STAKE_TOKEN_OPTIONS = [
   { id: 'ETC', ...TOKENS.ETC },
   { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
 ]
-
-// Helper to get default end date (7 days from now)
-const getDefaultEndDateTime = () => {
-  const date = new Date()
-  date.setDate(date.getDate() + 7)
-  // Format as YYYY-MM-DDTHH:mm for datetime-local input
-  return date.toISOString().slice(0, 16)
-}
-
-// Helper to get default acceptance deadline (48 hours from now)
-const getDefaultAcceptanceDeadline = () => {
-  const date = new Date()
-  date.setHours(date.getHours() + 48)
-  return date.toISOString().slice(0, 16)
-}
 
 // Helper to format stake amount as USD (rounded to nearest cent)
 const formatUSD = (amount, symbol) => {
@@ -163,20 +153,20 @@ function FriendMarketsModal({
     description: '',
     opponent: '',
     members: '',
-    memberLimit: '5',
+    memberLimit: WAGER_DEFAULTS.MEMBER_LIMIT,
     endDateTime: getDefaultEndDateTime(),
-    stakeAmount: '10',
-    stakeTokenId: 'USC', // Default to USC stablecoin
+    stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
+    stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
     peggedMarketId: '',
     // Multi-party acceptance fields
     acceptanceDeadline: getDefaultAcceptanceDeadline(),
-    minAcceptanceThreshold: '2', // Minimum participants to activate (including creator)
+    minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
     // Leverage/odds for Bookmaker markets (200 = 2x equal stakes, 10000 = 100x)
-    oddsMultiplier: 200,
+    oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER,
     // Resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged
-    resolutionType: 0
+    resolutionType: WAGER_DEFAULTS.RESOLUTION_TYPE
   })
 
   // Selected market for detail view
@@ -229,16 +219,16 @@ function FriendMarketsModal({
       description: '',
       opponent: '',
       members: '',
-      memberLimit: '5',
+      memberLimit: WAGER_DEFAULTS.MEMBER_LIMIT,
       endDateTime: getDefaultEndDateTime(),
-      stakeAmount: '10',
-      stakeTokenId: 'USC',
+      stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
+      stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
       customStakeTokenAddress: '',
       arbitrator: '',
       peggedMarketId: '',
       acceptanceDeadline: getDefaultAcceptanceDeadline(),
-      minAcceptanceThreshold: '2',
-      oddsMultiplier: 200
+      minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
+      oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER
     })
     setErrors({})
     setMarketLookupId('')
@@ -438,7 +428,7 @@ function FriendMarketsModal({
       acceptanceDeadline: typeof market.acceptanceDeadline === 'number'
         ? market.acceptanceDeadline
         : new Date(market.acceptanceDeadline).getTime(),
-      minAcceptanceThreshold: market.minAcceptanceThreshold || 2,
+      minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
       stakePerParticipant: market.stakeAmount,
       stakeToken: market.stakeTokenAddress || null,
       stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
@@ -818,8 +808,8 @@ function FriendMarketsModal({
       // Calculate acceptance deadline info
       const acceptanceDeadline = new Date(formData.acceptanceDeadline)
       const minThreshold = friendMarketType === 'oneVsOne'
-        ? 2
-        : parseInt(formData.minAcceptanceThreshold, 10) || 2
+        ? WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
+        : parseInt(formData.minAcceptanceThreshold, 10) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
 
       // Created market with acceptance flow fields
       const newMarket = {
@@ -2061,12 +2051,12 @@ function FriendMarketsModal({
                                 <div
                                   className="fm-progress-fill"
                                   style={{
-                                    width: `${((market.acceptedCount || 0) / (market.minAcceptanceThreshold || 2)) * 100}%`
+                                    width: `${((market.acceptedCount || 0) / (market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD)) * 100}%`
                                   }}
                                 />
                               </div>
                               <span className="fm-progress-text">
-                                {market.acceptedCount || 0}/{market.minAcceptanceThreshold || 2} accepted
+                                {market.acceptedCount || 0}/{market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD} accepted
                               </span>
                             </div>
                             <div className="fm-pending-info">

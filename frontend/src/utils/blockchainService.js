@@ -13,6 +13,7 @@ import { WELFARE_METRIC_REGISTRY_ABI } from '../abis/WelfareMetricRegistry'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
+import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import { MARKET_CORRELATION_REGISTRY_ABI } from '../abis/MarketCorrelationRegistry'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { MULTICALL3_ABI } from '../abis/Multicall3'
@@ -1315,8 +1316,8 @@ export async function fetchFriendMarketsForUser(userAddress) {
             arbitrator: hasArbitrator ? arbitrator : null,
             type: marketTypes[Number(marketResult.marketType)] || 'oneVsOne',
             status: statusNames[Number(marketResult.status)] || 'pending_acceptance',
-            acceptanceDeadline: acceptanceDeadlineMs > 0 ? acceptanceDeadlineMs : now.getTime() + 48 * 60 * 60 * 1000,
-            minAcceptanceThreshold: Number(marketResult.minThreshold) || 2,
+            acceptanceDeadline: acceptanceDeadlineMs > 0 ? acceptanceDeadlineMs : now.getTime() + WAGER_DEFAULTS.ACCEPTANCE_DEADLINE_HOURS * 60 * 60 * 1000,
+            minAcceptanceThreshold: Number(marketResult.minThreshold) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
             stakeAmount: stakeAmountFormatted,
             stakeTokenAddress: stakeToken,
             stakeTokenSymbol: isUSC ? 'USC' : 'ETC',

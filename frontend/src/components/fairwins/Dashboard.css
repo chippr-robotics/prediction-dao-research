@@ -7,8 +7,7 @@
   max-width: min(1200px, 100vw);
   width: 100%;
   margin: 0 auto;
-  min-height: calc(100vh - 70px);
-  height: auto;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
