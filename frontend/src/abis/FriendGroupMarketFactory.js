@@ -123,9 +123,23 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
     type: 'function'
   },
   {
-    inputs: [{ name: 'user', type: 'address' }],
-    name: 'getUserMarkets',
+    inputs: [],
+    name: 'getMyMarkets',
     outputs: [{ name: '', type: 'uint256[]' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'ids', type: 'uint256[]' }],
+    name: 'getFriendMarketsBatch',
+    outputs: [
+      { name: 'statuses', type: 'uint8[]' },
+      { name: 'creators', type: 'address[]' },
+      { name: 'stakeTokens', type: 'address[]' },
+      { name: 'stakeAmounts', type: 'uint256[]' },
+      { name: 'acceptedCounts', type: 'uint256[]' },
+      { name: 'acceptanceDeadlines', type: 'uint256[]' }
+    ],
     stateMutability: 'view',
     type: 'function'
   },
@@ -314,6 +328,15 @@ export const FRIEND_GROUP_MARKET_FACTORY_ABI = [
   },
 
   // Events
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'friendMarketId', type: 'uint256' },
+      { indexed: true, name: 'member', type: 'address' }
+    ],
+    name: 'MemberAdded',
+    type: 'event'
+  },
   {
     anonymous: false,
     inputs: [

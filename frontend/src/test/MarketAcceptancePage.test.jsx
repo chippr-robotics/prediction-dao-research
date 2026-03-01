@@ -105,7 +105,7 @@ describe('MarketAcceptancePage', () => {
       renderWithRouter('')
 
       await waitFor(() => {
-        expect(screen.getByText('No market ID provided')).toBeInTheDocument()
+        expect(screen.getByText('No wager ID provided')).toBeInTheDocument()
       })
     })
 
@@ -133,7 +133,7 @@ describe('MarketAcceptancePage', () => {
 
       // Either loading or connect wallet message should appear
       await waitFor(() => {
-        const hasLoading = screen.queryByText('Loading market details...')
+        const hasLoading = screen.queryByText('Loading offer details...')
         const hasConnectPrompt = screen.queryByText(/connect your wallet/i)
         expect(hasLoading || hasConnectPrompt).toBeTruthy()
       })
@@ -145,8 +145,8 @@ describe('MarketAcceptancePage', () => {
       renderWithRouter('')
 
       await waitFor(() => {
-        expect(screen.getByText('Unable to Load Market')).toBeInTheDocument()
-        expect(screen.getByText('No market ID provided')).toBeInTheDocument()
+        expect(screen.getByText('Unable to Load Offer')).toBeInTheDocument()
+        expect(screen.getByText('No wager ID provided')).toBeInTheDocument()
       })
     })
 
@@ -173,7 +173,7 @@ describe('MarketAcceptancePage', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('market-description')).toHaveTextContent(
-          'Connect wallet to view full market details'
+          'Connect wallet to view full offer details'
         )
       })
     })

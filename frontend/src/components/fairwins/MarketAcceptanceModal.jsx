@@ -5,6 +5,7 @@ import { useEncryption } from '../../hooks/useEncryption'
 import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
+import { getContractAddress } from '../../config/contracts'
 import './MarketAcceptanceModal.css'
 
 // Helper to format stake amount as USD (rounded to nearest cent)
@@ -229,9 +230,10 @@ function MarketAcceptanceModal({
       )
 
       let tx
+      let txOverrides = {}
+
       if (isArbitrator) {
-        // Arbitrators don't stake
-        tx = await contract.acceptMarket(marketId)
+        // Arbitrators don't stake - no special overrides needed
       } else {
         // CRITICAL: Fetch the actual on-chain stake value - don't rely on formatted data
         // The contract will use the raw on-chain value for the transfer, so we must match it
@@ -266,7 +268,7 @@ function MarketAcceptanceModal({
               `Insufficient balance. You have ${ethers.formatEther(balance)} but need ${ethers.formatUnits(stakeAmount, 18)} ${marketData?.stakeTokenSymbol || 'tokens'}.`
             )
           }
-          tx = await contract.acceptMarket(marketId, { value: stakeAmount })
+          txOverrides = { value: stakeAmount }
         } else {
           // ERC20 token - check balance and approval
           const tokenContract = new ethers.Contract(
@@ -320,10 +322,65 @@ function MarketAcceptanceModal({
 
           // Use higher gas limit for acceptMarket + activation flow
           // The full flow (stake collection + market activation + deployMarketPair) needs ~1M gas
-          console.log('Calling acceptMarket with gas limit 1200000...')
-          tx = await contract.acceptMarket(marketId, { gasLimit: 1200000 })
+          txOverrides = { gasLimit: 1200000 }
         }
       }
+
+      // Pre-flight check: detect proposalId collisions that would cause activation
+      // to revert. This is more reliable than staticCall on chains where eth_call
+      // may not fully propagate cross-contract revert reasons (e.g. ETC Mordor).
+      console.log('Running pre-flight activation check...')
+      try {
+        const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
+        const currentAccepted = Number(acceptanceStatus.accepted)
+        const required = Number(acceptanceStatus.required)
+        const arbitratorRequired = acceptanceStatus.arbitratorRequired
+        const arbitratorAccepted = acceptanceStatus.arbitratorAccepted
+
+        // Will this acceptance trigger market activation?
+        // Activation triggers when accepted >= required AND arbitrator is OK
+        const willTriggerActivation = !isArbitrator
+          && (currentAccepted + 1) >= required
+          && (arbitratorAccepted || !arbitratorRequired)
+
+        if (willTriggerActivation) {
+          // Check if the proposalId already exists in ConditionalMarketFactory.
+          // The deployed contract uses: proposalId = friendMarketId + 10_000_000_000
+          const PROPOSAL_ID_OFFSET = 10_000_000_000n
+          const proposalId = BigInt(marketId) + PROPOSAL_ID_OFFSET
+
+          const cmfAddress = getContractAddress('marketFactory')
+          if (cmfAddress) {
+            const cmf = new ethers.Contract(
+              cmfAddress,
+              ['function hasMarketForProposal(uint256 proposalId) view returns (bool)'],
+              signer.provider
+            )
+            const exists = await cmf.hasMarketForProposal(proposalId)
+            if (exists) {
+              throw new Error(
+                'This wager cannot be activated because a market with the same internal ID already exists from a previous contract deployment. ' +
+                'The wager contract needs to be redeployed to resolve this conflict. Please contact the administrator.'
+              )
+            }
+          }
+          console.log('Activation pre-check passed: proposalId is available')
+        } else {
+          console.log('Acceptance will not trigger activation yet (accepted:', currentAccepted, '/', required, ')')
+        }
+      } catch (preflight) {
+        // If this is our own thrown error (proposalId collision), re-throw it
+        if (preflight.message?.includes('cannot be activated')) {
+          throw preflight
+        }
+        // For other pre-check errors (network issues, etc.), log and continue
+        // The actual transaction will catch any real issues
+        console.warn('Pre-flight check failed (non-fatal):', preflight.message)
+      }
+
+      // Send the transaction
+      console.log('Sending acceptMarket transaction...')
+      tx = await contract.acceptMarket(marketId, txOverrides)
 
       setTxHash(tx.hash)
       await tx.wait()
@@ -345,7 +402,25 @@ function MarketAcceptanceModal({
         '0xcd1c8867': 'Insufficient payment - not enough tokens sent'
       }
 
+      // Known revert reason strings from downstream contracts
+      const knownRevertReasons = {
+        'Market already exists': 'This wager cannot be activated because of a conflict with a previous deployment. The contract needs to be redeployed to fix this.',
+        'Requires owner or MARKET_MAKER_ROLE': 'The wager contract is not authorized to create markets. Please contact the administrator.',
+        'Market creation limit exceeded': 'The market creation limit has been reached. Please try again later.',
+        'Invalid trading period': 'The trading period for this wager is outside the allowed range.',
+        'CTF1155 not set': 'The market system is not fully configured. Please contact the administrator.',
+        'CTF requires ERC20 collateral': 'This wager requires an ERC20 token for collateral, but native currency was configured.'
+      }
+
       let errorMessage = err.reason || err.message || 'Failed to accept offer'
+
+      // Check for known revert reason strings (from staticCall or revert data)
+      for (const [pattern, friendlyMessage] of Object.entries(knownRevertReasons)) {
+        if (errorMessage.includes(pattern)) {
+          errorMessage = friendlyMessage
+          break
+        }
+      }
 
       // Try to decode error data if available
       if (err.data) {
@@ -366,6 +441,12 @@ function MarketAcceptanceModal({
         } else {
           errorMessage = 'Transaction failed. Please check your balance and allowance, then try again.'
         }
+      }
+
+      // Strip verbose ethers v6 error details for cleaner UI display
+      if (errorMessage.includes('transaction execution reverted')) {
+        // The detailed ethers error is too verbose for the UI; use a friendlier version
+        errorMessage = 'Transaction reverted on-chain. The wager acceptance could not be completed. Please try again or contact support if the issue persists.'
       }
 
       setError(errorMessage)

@@ -159,13 +159,14 @@ describe('MarketAcceptanceModal', () => {
     it('should display participant count', () => {
       render(<MarketAcceptanceModal {...defaultProps} />)
 
-      expect(screen.getByText('2')).toBeInTheDocument()
+      // Participant count shown as "X / Y accepted"
+      expect(screen.getByText(/2 accepted/)).toBeInTheDocument()
     })
 
     it('should display acceptance progress', () => {
       render(<MarketAcceptanceModal {...defaultProps} />)
 
-      expect(screen.getByText('1 / 2')).toBeInTheDocument()
+      expect(screen.getByText('1 / 2 accepted')).toBeInTheDocument()
     })
 
     it('should display market type', () => {
@@ -178,7 +179,7 @@ describe('MarketAcceptanceModal', () => {
       const marketData = createMockMarketData({ isEncrypted: true })
       render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
 
-      expect(screen.getByText('Private Market')).toBeInTheDocument()
+      expect(screen.getByText('Private Wager')).toBeInTheDocument()
     })
 
     it('should show decrypt prompt for encrypted markets when user can decrypt', () => {
@@ -195,7 +196,7 @@ describe('MarketAcceptanceModal', () => {
       })
       render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
 
-      expect(screen.getByText('Unlock Market Details')).toBeInTheDocument()
+      expect(screen.getByText('Unlock Wager Details')).toBeInTheDocument()
     })
 
     it('should display stake with non-stablecoin symbol', () => {
@@ -294,7 +295,7 @@ describe('MarketAcceptanceModal', () => {
 
       render(<MarketAcceptanceModal {...defaultProps} />)
 
-      expect(screen.getByText(/You are not invited to this market/)).toBeInTheDocument()
+      expect(screen.getByText(/You are not invited to this wager/)).toBeInTheDocument()
     })
   })
 
@@ -302,7 +303,7 @@ describe('MarketAcceptanceModal', () => {
     it('should show review step initially', () => {
       render(<MarketAcceptanceModal {...defaultProps} />)
 
-      expect(screen.getByText('Review Market Offer')).toBeInTheDocument()
+      expect(screen.getByText('Review Offer')).toBeInTheDocument()
       expect(screen.getByText('Accept Offer')).toBeInTheDocument()
     })
 
@@ -333,7 +334,7 @@ describe('MarketAcceptanceModal', () => {
       expect(screen.getByText('Confirm Offer Acceptance')).toBeInTheDocument()
 
       await userEvent.click(screen.getByText('Back'))
-      expect(screen.getByText('Review Market Offer')).toBeInTheDocument()
+      expect(screen.getByText('Review Offer')).toBeInTheDocument()
     })
 
     it('should display safety warning in confirm step', async () => {
@@ -342,7 +343,7 @@ describe('MarketAcceptanceModal', () => {
       await userEvent.click(screen.getByText('Accept Offer'))
 
       expect(screen.getByText('Important Safety Information')).toBeInTheDocument()
-      expect(screen.getByText(/Only accept markets from people you know/)).toBeInTheDocument()
+      expect(screen.getByText(/Only accept offers from people you know/)).toBeInTheDocument()
     })
 
     it('should call onClose when Decline Offer is clicked', async () => {

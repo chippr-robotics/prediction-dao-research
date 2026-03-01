@@ -1149,8 +1149,225 @@ export async function fetchProposalsFromBlockchain() {
   }
 }
 
+// --- Event-based market index cache ---
+const MARKET_INDEX_PREFIX = 'friendMarketIndex_'
+const MARKET_CACHE_PREFIX = 'friendMarketCache_'
+
 /**
- * Fetch friend markets for a user from the blockchain
+ * Load cached market index for a user (market IDs + last indexed block)
+ */
+function loadMarketIndex(userAddress) {
+  try {
+    const key = MARKET_INDEX_PREFIX + userAddress.toLowerCase()
+    const stored = localStorage.getItem(key)
+    if (!stored) return { marketIds: [], lastBlock: 0 }
+    return JSON.parse(stored)
+  } catch {
+    return { marketIds: [], lastBlock: 0 }
+  }
+}
+
+/**
+ * Save market index to localStorage
+ */
+function saveMarketIndex(userAddress, index) {
+  try {
+    const key = MARKET_INDEX_PREFIX + userAddress.toLowerCase()
+    localStorage.setItem(key, JSON.stringify(index))
+  } catch (e) {
+    console.warn('[MarketIndex] Failed to save index:', e)
+  }
+}
+
+/**
+ * Load cached market details
+ */
+function loadMarketCache(userAddress) {
+  try {
+    const key = MARKET_CACHE_PREFIX + userAddress.toLowerCase()
+    const stored = localStorage.getItem(key)
+    if (!stored) return {}
+    return JSON.parse(stored)
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Save market details cache
+ */
+function saveMarketCache(userAddress, cache) {
+  try {
+    const key = MARKET_CACHE_PREFIX + userAddress.toLowerCase()
+    localStorage.setItem(key, JSON.stringify(cache))
+  } catch (e) {
+    console.warn('[MarketIndex] Failed to save cache:', e)
+  }
+}
+
+/**
+ * Discover market IDs for a user via MemberAdded events (indexed by member address).
+ * Uses incremental block scanning with a cached watermark.
+ */
+async function discoverMarketIds(contract, userAddress, provider) {
+  const index = loadMarketIndex(userAddress)
+  const currentBlock = await provider.getBlockNumber()
+
+  // If we have a cached index and it's recent, just return it
+  if (index.lastBlock >= currentBlock) {
+    console.log(`[MarketIndex] Index up to date at block ${index.lastBlock}, ${index.marketIds.length} markets`)
+    return index.marketIds
+  }
+
+  // Scan from last indexed block + 1 (or contract deployment block)
+  const fromBlock = index.lastBlock > 0 ? index.lastBlock + 1 : 0
+  console.log(`[MarketIndex] Scanning MemberAdded events from block ${fromBlock} to ${currentBlock}`)
+
+  // Query MemberAdded events where member = userAddress (indexed topic)
+  const memberAddedFilter = contract.filters.MemberAdded(null, userAddress)
+
+  // Scan in chunks to avoid RPC limits (10k blocks per query)
+  const CHUNK_SIZE = 10000
+  const newMarketIds = new Set(index.marketIds.map(id => id.toString()))
+  let scanFrom = fromBlock
+
+  while (scanFrom <= currentBlock) {
+    const scanTo = Math.min(scanFrom + CHUNK_SIZE - 1, currentBlock)
+    try {
+      const events = await contract.queryFilter(memberAddedFilter, scanFrom, scanTo)
+      for (const event of events) {
+        const marketId = event.args.friendMarketId.toString()
+        newMarketIds.add(marketId)
+      }
+    } catch (err) {
+      console.warn(`[MarketIndex] Error scanning blocks ${scanFrom}-${scanTo}:`, err.message)
+      // On error, try smaller chunks
+      if (CHUNK_SIZE > 1000) {
+        const smallChunk = 1000
+        for (let s = scanFrom; s <= scanTo; s += smallChunk) {
+          const e = Math.min(s + smallChunk - 1, scanTo)
+          try {
+            const events = await contract.queryFilter(memberAddedFilter, s, e)
+            for (const event of events) {
+              newMarketIds.add(event.args.friendMarketId.toString())
+            }
+          } catch {
+            console.warn(`[MarketIndex] Skipping blocks ${s}-${e}`)
+          }
+        }
+      }
+    }
+    scanFrom = scanTo + 1
+  }
+
+  const allIds = Array.from(newMarketIds)
+  saveMarketIndex(userAddress, { marketIds: allIds, lastBlock: currentBlock })
+  console.log(`[MarketIndex] Index updated: ${allIds.length} markets (scanned ${fromBlock}-${currentBlock})`)
+  return allIds
+}
+
+/**
+ * Process raw market data into the standard market object format
+ */
+function processMarketResult(marketId, marketResult, acceptanceStatus, acceptances) {
+  const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
+  const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
+
+  const stakeToken = marketResult.stakeToken
+  const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
+  const tokenDecimals = isUSC ? 6 : 18
+  const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
+
+  const arbitrator = marketResult.arbitrator
+  const hasArbitrator = arbitrator && arbitrator !== ethers.ZeroAddress
+
+  // Safely parse timestamps
+  const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
+  const tradingEndTimeMs = Number(marketResult.tradingEndTime || 0) * 1000
+
+  const now = new Date()
+  const defaultEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+  let endDateStr
+  try {
+    if (tradingEndTimeMs > 0) {
+      const endDate = new Date(tradingEndTimeMs)
+      endDateStr = !isNaN(endDate.getTime()) ? endDate.toISOString() : defaultEndDate.toISOString()
+    } else {
+      endDateStr = defaultEndDate.toISOString()
+    }
+  } catch {
+    endDateStr = defaultEndDate.toISOString()
+  }
+
+  // Check for encrypted metadata
+  let description = marketResult.description
+  let metadata = null
+  let isEncryptedMarket = false
+  let ipfsCid = null
+  let needsIpfsFetch = false
+
+  const ipfsRef = parseEncryptedIpfsReference(description)
+  if (ipfsRef.isIpfs && ipfsRef.cid) {
+    ipfsCid = ipfsRef.cid
+    isEncryptedMarket = true
+    needsIpfsFetch = true
+    description = 'Encrypted Market'
+  } else {
+    try {
+      const parsed = JSON.parse(description)
+      const isV1Envelope = parsed?.version === '1.0' &&
+          parsed?.algorithm === 'x25519-chacha20poly1305' &&
+          parsed?.content?.ciphertext &&
+          Array.isArray(parsed?.keys)
+      const isV2Envelope = parsed?.version === '2.0' &&
+          parsed?.algorithm === 'xwing-chacha20poly1305' &&
+          parsed?.content?.ciphertext &&
+          Array.isArray(parsed?.keys)
+
+      if (isV1Envelope || isV2Envelope) {
+        metadata = parsed
+        isEncryptedMarket = true
+        description = 'Encrypted Market'
+      }
+    } catch {
+      // Not JSON, keep as plain description
+    }
+  }
+
+  const members = marketResult.members || []
+
+  return {
+    id: marketId.toString(),
+    description,
+    metadata,
+    isEncrypted: isEncryptedMarket,
+    ipfsCid,
+    needsIpfsFetch,
+    creator: marketResult.creator,
+    participants: members,
+    arbitrator: hasArbitrator ? arbitrator : null,
+    type: marketTypes[Number(marketResult.marketType)] || 'oneVsOne',
+    status: statusNames[Number(marketResult.status)] || 'pending_acceptance',
+    acceptanceDeadline: acceptanceDeadlineMs > 0 ? acceptanceDeadlineMs : now.getTime() + WAGER_DEFAULTS.ACCEPTANCE_DEADLINE_HOURS * 60 * 60 * 1000,
+    minAcceptanceThreshold: Number(marketResult.minThreshold) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
+    stakeAmount: stakeAmountFormatted,
+    stakeTokenAddress: stakeToken,
+    stakeTokenSymbol: isUSC ? 'USC' : 'ETC',
+    acceptances,
+    acceptedCount: Number(acceptanceStatus.accepted),
+    endDate: endDateStr,
+    createdAt: now.toISOString()
+  }
+}
+
+/**
+ * Fetch friend markets for a user from the blockchain.
+ *
+ * Uses event-based discovery (MemberAdded events) with incremental block scanning
+ * instead of the old getUserMarkets() approach. This preserves privacy (no public
+ * mapping of user -> markets) and optimizes lookups via cached block watermarks.
+ *
  * @param {string} userAddress - User's wallet address
  * @returns {Promise<Array>} Array of friend market objects
  */
@@ -1179,162 +1396,96 @@ export async function fetchFriendMarketsForUser(userAddress) {
       provider
     )
 
-    // Get market IDs for the user
-    const marketIds = await contract.getUserMarkets(userAddress)
+    // Step 1: Discover market IDs via events (incremental, cached)
+    const marketIds = await discoverMarketIds(contract, userAddress, provider)
     console.log(`[fetchFriendMarketsForUser] Found ${marketIds.length} markets for ${userAddress}`)
 
     if (marketIds.length === 0) {
       return []
     }
 
-    // Fetch details for each market
-    const markets = await Promise.all(
-      marketIds.map(async (marketId) => {
+    // Step 2: Load cached market details and determine which need refreshing
+    const detailCache = loadMarketCache(userAddress)
+    const terminalStatuses = new Set(['resolved', 'cancelled', 'refunded'])
+    const idsToFetch = [] // Markets that need fresh data from chain
+    const cachedMarkets = [] // Markets we can serve from cache
+
+    for (const id of marketIds) {
+      const cached = detailCache[id]
+      if (cached && terminalStatuses.has(cached.status)) {
+        // Terminal state markets don't change - serve from cache
+        cachedMarkets.push(cached)
+      } else {
+        idsToFetch.push(id)
+      }
+    }
+
+    console.log(`[fetchFriendMarketsForUser] ${cachedMarkets.length} cached (terminal), ${idsToFetch.length} need refresh`)
+
+    // Step 3: Fetch fresh data for non-terminal markets in parallel
+    const freshMarkets = await Promise.all(
+      idsToFetch.map(async (marketId) => {
         try {
-          const marketResult = await contract.getFriendMarketWithStatus(marketId)
-          const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
+          const [marketResult, acceptanceStatus] = await Promise.all([
+            contract.getFriendMarketWithStatus(marketId),
+            contract.getAcceptanceStatus(marketId)
+          ])
 
-          console.log(`[fetchFriendMarketsForUser] Market ${marketId} raw data:`, {
-            description: marketResult.description,
-            creator: marketResult.creator,
-            status: Number(marketResult.status),
-            members: marketResult.members,
-            acceptanceDeadline: marketResult.acceptanceDeadline?.toString(),
-            tradingEndTime: marketResult.tradingEndTime?.toString(),
-            stakePerParticipant: marketResult.stakePerParticipant?.toString()
-          })
-
-          // Map market type enum to string
-          const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
-          const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
-
-          // Determine token decimals first (before fetching acceptances)
-          // USC has 6 decimals, most others have 18
+          // Determine token decimals for formatting
           const stakeToken = marketResult.stakeToken
           const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
           const tokenDecimals = isUSC ? 6 : 18
 
-          // Fetch acceptances for participants
-          const acceptances = {}
+          // Fetch acceptances for participants in parallel
           const members = marketResult.members || []
+          const acceptances = {}
 
-          for (const member of members) {
-            try {
-              const record = await contract.getParticipantAcceptance(marketId, member)
-              acceptances[member.toLowerCase()] = {
-                hasAccepted: record.hasAccepted,
-                stakedAmount: ethers.formatUnits(record.stakedAmount, tokenDecimals),
-                isArbitrator: record.isArbitrator
+          const acceptanceResults = await Promise.all(
+            members.map(async (member) => {
+              try {
+                const record = await contract.getParticipantAcceptance(marketId, member)
+                return {
+                  address: member.toLowerCase(),
+                  hasAccepted: record.hasAccepted,
+                  stakedAmount: ethers.formatUnits(record.stakedAmount, tokenDecimals),
+                  isArbitrator: record.isArbitrator
+                }
+              } catch {
+                return null
               }
-            } catch {
-              // Member not found, skip
-            }
-          }
+            })
+          )
 
-          const arbitrator = marketResult.arbitrator
-          const hasArbitrator = arbitrator && arbitrator !== ethers.ZeroAddress
-
-          // Safely parse timestamps - handle 0 or invalid values
-          const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
-          const tradingEndTimeMs = Number(marketResult.tradingEndTime) * 1000
-
-          // Create safe date strings - use fallbacks for invalid dates
-          const now = new Date()
-          const defaultEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
-
-          let endDateStr
-          try {
-            if (tradingEndTimeMs > 0) {
-              const endDate = new Date(tradingEndTimeMs)
-              endDateStr = !isNaN(endDate.getTime()) ? endDate.toISOString() : defaultEndDate.toISOString()
-            } else {
-              endDateStr = defaultEndDate.toISOString()
-            }
-          } catch {
-            endDateStr = defaultEndDate.toISOString()
-          }
-
-          // stakeToken, isUSC, and tokenDecimals are already defined above for acceptances
-          const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
-
-          // Check if description contains encrypted metadata
-          // Supports:
-          // 1. IPFS reference: "encrypted:ipfs://..." (new, preferred) - lazy loaded
-          // 2. Inline JSON envelope (legacy, for backwards compatibility)
-          let description = marketResult.description
-          let metadata = null
-          let isEncryptedMarket = false
-          let ipfsCid = null
-          let needsIpfsFetch = false
-
-          // First check for IPFS reference (new format)
-          // NOTE: We do NOT fetch the envelope here to avoid rate limiting on page load.
-          // The envelope will be fetched lazily when the user views the market.
-          const ipfsRef = parseEncryptedIpfsReference(description)
-          if (ipfsRef.isIpfs && ipfsRef.cid) {
-            // Store the CID for lazy loading - the useLazyIpfsEnvelope hook will fetch it
-            ipfsCid = ipfsRef.cid
-            isEncryptedMarket = true
-            needsIpfsFetch = true
-            description = 'Encrypted Market' // Placeholder until envelope is fetched and decrypted
-            console.log(`[fetchFriendMarketsForUser] Market ${marketId} has IPFS encrypted metadata, CID: ${ipfsRef.cid} (lazy load)`)
-          } else {
-            // Fallback: check for inline JSON envelope (legacy format)
-            try {
-              const parsed = JSON.parse(description)
-              // Check if it matches encrypted envelope format (v1.0 or v2.0)
-              const isV1Envelope = parsed?.version === '1.0' &&
-                  parsed?.algorithm === 'x25519-chacha20poly1305' &&
-                  parsed?.content?.ciphertext &&
-                  Array.isArray(parsed?.keys)
-              const isV2Envelope = parsed?.version === '2.0' &&
-                  parsed?.algorithm === 'xwing-chacha20poly1305' &&
-                  parsed?.content?.ciphertext &&
-                  Array.isArray(parsed?.keys)
-
-              if (isV1Envelope || isV2Envelope) {
-                // This is an encrypted envelope - store in metadata for decryption hook
-                metadata = parsed
-                isEncryptedMarket = true
-                description = 'Encrypted Market' // Placeholder until decrypted
-                console.log(`[fetchFriendMarketsForUser] Market ${marketId} has inline encrypted metadata (${parsed.algorithm})`)
+          for (const result of acceptanceResults) {
+            if (result) {
+              acceptances[result.address] = {
+                hasAccepted: result.hasAccepted,
+                stakedAmount: result.stakedAmount,
+                isArbitrator: result.isArbitrator
               }
-            } catch {
-              // Not JSON, keep as plain description
             }
           }
 
-          return {
-            id: marketId.toString(),
-            description: description,
-            metadata: metadata,
-            isEncrypted: isEncryptedMarket,
-            ipfsCid: ipfsCid, // CID for IPFS-stored encrypted envelopes
-            needsIpfsFetch: needsIpfsFetch, // True if envelope needs to be fetched from IPFS
-            creator: marketResult.creator,
-            participants: members,
-            arbitrator: hasArbitrator ? arbitrator : null,
-            type: marketTypes[Number(marketResult.marketType)] || 'oneVsOne',
-            status: statusNames[Number(marketResult.status)] || 'pending_acceptance',
-            acceptanceDeadline: acceptanceDeadlineMs > 0 ? acceptanceDeadlineMs : now.getTime() + WAGER_DEFAULTS.ACCEPTANCE_DEADLINE_HOURS * 60 * 60 * 1000,
-            minAcceptanceThreshold: Number(marketResult.minThreshold) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
-            stakeAmount: stakeAmountFormatted,
-            stakeTokenAddress: stakeToken,
-            stakeTokenSymbol: isUSC ? 'USC' : 'ETC',
-            acceptances,
-            acceptedCount: Number(acceptanceStatus.accepted),
-            endDate: endDateStr,
-            createdAt: now.toISOString() // Contract doesn't store creation time
-          }
+          return processMarketResult(marketId, marketResult, acceptanceStatus, acceptances)
         } catch (err) {
           console.error(`Error fetching market ${marketId}:`, err)
-          return null
+          // Fall back to cached version if available
+          return detailCache[marketId] || null
         }
       })
     )
 
-    // Filter out null results
-    return markets.filter(m => m !== null)
+    // Step 4: Merge results and update cache
+    const allMarkets = [...cachedMarkets, ...freshMarkets.filter(m => m !== null)]
+
+    // Update the detail cache with fresh data
+    const updatedCache = { ...detailCache }
+    for (const market of allMarkets) {
+      updatedCache[market.id] = market
+    }
+    saveMarketCache(userAddress, updatedCache)
+
+    return allMarkets
   } catch (error) {
     console.error('Error fetching friend markets from blockchain:', error)
     throw error

@@ -377,7 +377,7 @@ describe('FriendMarketsModal', () => {
     it('should display market type selection by default', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      expect(screen.getByText('Choose Market Type')).toBeInTheDocument()
+      expect(screen.getByText('Choose Wager Type')).toBeInTheDocument()
       expect(screen.getByText('1 vs 1')).toBeInTheDocument()
       expect(screen.getByText('Small Group')).toBeInTheDocument()
       expect(screen.getByText('Event Tracking')).toBeInTheDocument()
@@ -423,7 +423,7 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.click(screen.getByText('Back'))
 
-      expect(screen.getByText('Choose Market Type')).toBeInTheDocument()
+      expect(screen.getByText('Choose Wager Type')).toBeInTheDocument()
     })
 
     it('should display type badge in form header', async () => {
@@ -438,7 +438,7 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
       await userEvent.click(screen.getByText('1 vs 1'))
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/description is required/i)).toBeInTheDocument()
@@ -450,7 +450,7 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Short')
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/at least 10 characters/i)).toBeInTheDocument()
@@ -463,7 +463,7 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
       await userEvent.type(screen.getByLabelText(/opponent address/i), 'invalid-address')
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/invalid ethereum address/i)).toBeInTheDocument()
@@ -480,7 +480,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0x1234567890123456789012345678901234567890'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/cannot bet against yourself/i)).toBeInTheDocument()
@@ -506,7 +506,7 @@ describe('FriendMarketsModal', () => {
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'BTC will reach $100k by end of year')
       // Need at least 2 members to pass minimum count check and hit address validation
       await userEvent.type(screen.getByLabelText(/member addresses/i), '0xinvalid, 0xalsobad')
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         // Error message includes the truncated address
@@ -523,7 +523,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/member addresses/i),
         '0xabcdef1234567890123456789012345678901234, 0x9876543210987654321098765432109876543210'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText(/at least 3 members required/i)).toBeInTheDocument()
@@ -540,7 +540,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(onCreate).toHaveBeenCalled()
@@ -559,7 +559,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText('Market Created!')).toBeInTheDocument()
@@ -578,7 +578,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /create another/i })).toBeInTheDocument()
@@ -595,7 +595,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByText('Market Created!')).toBeInTheDocument()
@@ -603,7 +603,7 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByRole('button', { name: /create another/i }))
 
-      expect(screen.getByText('Choose Market Type')).toBeInTheDocument()
+      expect(screen.getByText('Choose Wager Type')).toBeInTheDocument()
     })
 
     it('should have Copy Link button in success state', async () => {
@@ -616,7 +616,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /copy link/i })).toBeInTheDocument()
@@ -792,7 +792,7 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByText('1 vs 1'))
       // Button should be enabled (not disabled) when wallet is connected
-      const createButton = screen.getByRole('button', { name: /create market/i })
+      const createButton = screen.getByRole('button', { name: /create wager/i })
       expect(createButton).not.toBeDisabled()
     })
 
@@ -802,7 +802,7 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByText('1 vs 1'))
       // Leave description empty and try to submit
-      await userEvent.click(screen.getByRole('button', { name: /create market/i }))
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
         // Should show validation error
