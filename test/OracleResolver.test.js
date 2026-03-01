@@ -1,13 +1,16 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("OracleResolver", function () {
+  let ethers;
   let oracleResolver;
   let owner;
   let reporter;
   let challenger;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, reporter, challenger] = await ethers.getSigners();
     
     const OracleResolver = await ethers.getContractFactory("OracleResolver");

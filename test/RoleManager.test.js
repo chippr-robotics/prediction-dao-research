@@ -1,11 +1,12 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { time } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("RoleManager - Unit Tests", function () {
+  let ethers;
+  let time;
   let roleManager;
   let owner, coreAdmin, opsAdmin, guardian, user1, user2, user3, committee1, committee2;
-  
+
   // Role constants
   let DEFAULT_ADMIN_ROLE;
   let CORE_SYSTEM_ADMIN_ROLE;
@@ -17,6 +18,9 @@ describe("RoleManager - Unit Tests", function () {
   let OVERSIGHT_COMMITTEE_ROLE;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
+    time = connection.networkHelpers.time;
     [owner, coreAdmin, opsAdmin, guardian, user1, user2, user3, committee1, committee2] = await ethers.getSigners();
     
     const RoleManager = await ethers.getContractFactory("RoleManager");

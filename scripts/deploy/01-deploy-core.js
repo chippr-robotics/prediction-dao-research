@@ -26,16 +26,15 @@
  *   INIT=true|false        - Auto-initialize contracts (default: true)
  */
 
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
+import hre from "hardhat";
 
-const {
+import {
   SINGLETON_FACTORY_ADDRESS,
   SALT_PREFIXES,
   MAINNET_CHAIN_IDS,
-} = require("./lib/constants");
+} from "./lib/constants.js";
 
-const {
+import {
   generateSalt,
   deployDeterministic,
   ensureSingletonFactory,
@@ -45,9 +44,11 @@ const {
   verifyOnBlockscout,
   saveDeployment,
   getDeploymentFilename,
-} = require("./lib/helpers");
+} from "./lib/helpers.js";
 
 async function main() {
+  const connection = await hre.network.connect();
+  const { ethers } = connection;
   console.log("=".repeat(60));
   console.log("01 - Core Contract Deployment");
   console.log("=".repeat(60));

@@ -2,7 +2,7 @@
  * BetType enum constants for testing
  * Must match the Solidity enum order in ConditionalMarketFactory.sol
  */
-const BetType = {
+export const BetType = {
   YesNo: 0,
   PassFail: 1,
   AboveBelow: 2,
@@ -14,5 +14,3 @@ const BetType = {
   WinLose: 8,
   UpDown: 9
 };
-
-module.exports = { BetType };

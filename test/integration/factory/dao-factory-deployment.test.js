@@ -1,6 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
+import { expect } from "chai";
+import hre from "hardhat";
+
+let ethers;
+let loadFixture;
 
 /**
  * Integration tests for DAO Factory Deployment and Configuration
@@ -14,6 +16,9 @@ describe("Integration: DAO Factory Deployment", function () {
    * Deploy a fresh DAOFactory for testing
    */
   async function deployDAOFactoryFixture() {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
+    loadFixture = connection.networkHelpers.loadFixture;
     const [
       owner,
       platformAdmin,

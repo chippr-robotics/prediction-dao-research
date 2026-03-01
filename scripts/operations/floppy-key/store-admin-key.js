@@ -6,10 +6,11 @@
  *   ADMIN_PRIVATE_KEY="0x..." FLOPPY_KEYSTORE_PASSWORD="password" node scripts/operations/floppy-key/store-admin-key.js
  */
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const CONFIG = require('./config');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { ethers } from 'ethers';
+import CONFIG from './config.js';
 
 const ADMIN_KEYSTORE_FILENAME = 'admin-keystore.json';
 
@@ -114,7 +115,6 @@ async function storeAdminKey() {
   };
 
   // Derive address from private key for reference
-  const { ethers } = require('ethers');
   const wallet = new ethers.Wallet(privateKey);
   keystore.address = wallet.address;
 

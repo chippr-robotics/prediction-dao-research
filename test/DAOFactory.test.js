@@ -1,9 +1,10 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 // Tests for DAOFactory using EIP-1167 Minimal Proxy Pattern
 // The factory now uses clones to stay under the 24KB contract size limit
 describe("DAOFactory", function () {
+  let ethers;
   let daoFactory;
   let owner;
   let addr1;
@@ -11,6 +12,8 @@ describe("DAOFactory", function () {
   let addr3;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, addr1, addr2, addr3] = await ethers.getSigners();
 
     const WelfareMetricRegistry = await ethers.getContractFactory("WelfareMetricRegistry");
@@ -293,4 +296,4 @@ describe("DAOFactory", function () {
 });
 
 // Helper for testing
-const anyValue = ethers.anyValue || (() => true);
+const anyValue = () => true;

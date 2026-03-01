@@ -1,5 +1,5 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 // Resolution type enum (matches contract)
 const ResolutionType = {
@@ -12,6 +12,7 @@ const ResolutionType = {
 };
 
 describe("FriendGroupMarketFactory", function () {
+  let ethers;
   let friendGroupFactory;
   let marketFactory;
   let ragequitModule;
@@ -25,6 +26,8 @@ describe("FriendGroupMarketFactory", function () {
   let arbitrator;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, addr1, addr2, addr3, addr4, arbitrator] = await ethers.getSigners();
     
     // Deploy CTF1155 (required for ConditionalMarketFactory)

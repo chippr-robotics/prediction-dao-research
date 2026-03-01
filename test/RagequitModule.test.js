@@ -1,7 +1,8 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
 
 describe("RagequitModule", function () {
+  let ethers;
   let ragequitModule;
   let governanceToken;
   let treasuryVault;
@@ -10,6 +11,8 @@ describe("RagequitModule", function () {
   let user2;
 
   beforeEach(async function () {
+    const connection = await hre.network.connect();
+    ethers = connection.ethers;
     [owner, user1, user2, treasuryVault] = await ethers.getSigners();
     
     // Deploy mock ERC20 token

@@ -1,13 +1,20 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers");
-const { BetType } = require("../../constants/BetType");
+import { expect } from "chai";
+import hre from "hardhat";
+import { BetType } from "../../constants/BetType.js";
+
+let ethers;
+let time;
+let loadFixture;
 
 /**
  * Simplified deployment fixture for FairWins standalone markets
  * Unlike governance proposals, FairWins markets are standalone predictions
  */
 async function deployFairWinsFixture() {
+  const connection = await hre.network.connect();
+  ethers = connection.ethers;
+  time = connection.networkHelpers.time;
+  loadFixture = connection.networkHelpers.loadFixture;
   const [owner, reporter, trader1, trader2, feeRecipient] = await ethers.getSigners();
 
   // Ensure reporter has enough ETH for bond/report payments (100 ETH per report + gas)

@@ -1,8 +1,7 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-const { deploySystemFixture } = require("../fixtures/deploySystem");
-const {
+import { expect } from "chai";
+import hre from "hardhat";
+import { deploySystemFixture } from "../fixtures/deploySystem.js";
+import {
   submitAndActivateProposal,
   executeTrades,
   completeOracleResolution,
@@ -10,19 +9,30 @@ const {
   waitForTradingPeriodEnd,
   createTradeConfigs,
   advanceProposalToExecution
-} = require("../helpers");
+} from "../helpers/index.js";
+
+let loadFixture;
 
 /**
  * Integration tests for complete proposal lifecycle
  * Tests the full end-to-end flow from proposal submission to execution
  */
 describe("Integration: Complete Proposal Lifecycle", function () {
+  let ethers;
+
   // Increase timeout for integration tests
   this.timeout(120000);
+
+  before(async function () {
+    const connection = await hre.network.connect();
+    loadFixture = connection.networkHelpers.loadFixture;
+  });
 
   describe("Happy Path: Successful Proposal Execution", function () {
     it("Should complete entire proposal lifecycle successfully", async function () {
       // Setup: Load the complete system fixture
+      const connection = await hre.network.connect();
+      ethers = connection.ethers;
       const { contracts, accounts, constants } = await loadFixture(deploySystemFixture);
       const { 
         futarchyGovernor,
