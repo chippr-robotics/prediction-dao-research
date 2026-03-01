@@ -1336,7 +1336,7 @@ export async function fetchFriendMarketsForUser(userAddress) {
     return markets.filter(m => m !== null)
   } catch (error) {
     console.error('Error fetching friend markets from blockchain:', error)
-    return []
+    throw error
   }
 }
 
