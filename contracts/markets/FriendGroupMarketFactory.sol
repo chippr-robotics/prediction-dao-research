@@ -1245,7 +1245,9 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         uint256 totalStaked = marketTotalStaked[friendMarketId];
 
         // Deploy underlying market in ConditionalMarketFactory
-        uint256 proposalId = friendMarketId + PROPOSAL_ID_OFFSET;
+        // Use hash-based proposalId to avoid collisions between factory deployments.
+        // Including address(this) ensures each factory instance generates unique IDs.
+        uint256 proposalId = uint256(keccak256(abi.encodePacked(address(this), friendMarketId)));
         address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : market.stakeToken;
 
         // Approve collateral transfer to ConditionalMarketFactory
