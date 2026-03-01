@@ -694,7 +694,7 @@ function FairWinsAppNew({ onConnect, onDisconnect }) {
             <>
               {selectedCategory === 'dashboard' ? (
                 /* Dashboard View - Landing Page */
-                <Dashboard />
+                <Dashboard onConnect={onConnect} />
               ) : selectedCategory === 'clearpath' ? (
                 /* ClearPath View - DAO Governance */
                 <ClearPathTab />
