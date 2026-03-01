@@ -139,32 +139,39 @@ function WalletButton({ className = '' }) {
   useEffect(() => {
     if (!address || !isConnected) return
 
-    const fetchBlockchainMarkets = async () => {
+    let cancelled = false
+
+    const fetchBlockchainMarkets = async (attempt = 0) => {
       try {
-        console.log('[WalletButton] Fetching friend markets from blockchain for:', address)
+        console.log('[WalletButton] Fetching friend markets from blockchain for:', address, `(attempt ${attempt + 1})`)
         const blockchainMarkets = await fetchFriendMarketsForUser(address)
         console.log('[WalletButton] Fetched friend markets:', blockchainMarkets.length)
 
-        if (blockchainMarkets.length > 0) {
-          // Use blockchain as source of truth - deduplicate by id
-          // Add uniqueId combining contract address and id for stable React keys
-          const marketsWithUniqueIds = blockchainMarkets.map(m => ({
-            ...m,
-            uniqueId: `${m.contractAddress || 'unknown'}-${m.id}`
-          }))
+        if (cancelled) return
 
-          setFriendMarkets(() => {
-            // Prefer blockchain data over localStorage
-            saveFriendMarketsToStorage(marketsWithUniqueIds)
-            return marketsWithUniqueIds
-          })
-        }
+        // Always update state with blockchain data (source of truth)
+        // This ensures stale localStorage data is replaced even when user has 0 markets
+        const marketsWithUniqueIds = blockchainMarkets.map(m => ({
+          ...m,
+          uniqueId: `${m.contractAddress || 'unknown'}-${m.id}`
+        }))
+
+        setFriendMarkets(marketsWithUniqueIds)
+        saveFriendMarketsToStorage(marketsWithUniqueIds)
       } catch (error) {
         console.error('[WalletButton] Error fetching friend markets from blockchain:', error)
+        // Retry with exponential backoff (up to 3 attempts)
+        if (!cancelled && attempt < 2) {
+          const delay = (attempt + 1) * 2000
+          console.log(`[WalletButton] Retrying in ${delay}ms...`)
+          setTimeout(() => fetchBlockchainMarkets(attempt + 1), delay)
+        }
+        // On final failure, keep existing state (localStorage cache) as fallback
       }
     }
 
     fetchBlockchainMarkets()
+    return () => { cancelled = true }
   }, [address, isConnected])
 
   // Filter friend markets into active and past based on end date and user

@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import QRScanner from '../ui/QRScanner'
+import { fetchFriendMarketsForUser } from '../../utils/blockchainService'
 import './Dashboard.css'
 
 // ============================================================================
@@ -289,6 +290,80 @@ function Dashboard() {
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
 
+  // Friend markets state (live blockchain data)
+  const [friendMarkets, setFriendMarkets] = useState([])
+  const [wagersLoading, setWagersLoading] = useState(false)
+
+  // Fetch friend markets from blockchain when connected and in live mode
+  useEffect(() => {
+    if (!account || !isConnected || demoMode) return
+
+    let cancelled = false
+
+    const fetchMarkets = async (attempt = 0) => {
+      setWagersLoading(true)
+      try {
+        const markets = await fetchFriendMarketsForUser(account)
+        if (!cancelled) {
+          setFriendMarkets(markets)
+          setWagersLoading(false)
+        }
+      } catch (error) {
+        console.error('[Dashboard] Error fetching friend markets:', error)
+        if (!cancelled && attempt < 2) {
+          const delay = (attempt + 1) * 2000
+          setTimeout(() => fetchMarkets(attempt + 1), delay)
+        } else if (!cancelled) {
+          setWagersLoading(false)
+        }
+      }
+    }
+
+    fetchMarkets()
+    return () => { cancelled = true }
+  }, [account, isConnected, demoMode])
+
+  // Transform friend markets into wager card format for live mode display
+  const liveWagers = useMemo(() => {
+    if (demoMode) return []
+    return friendMarkets.map(m => ({
+      id: m.id,
+      description: m.description,
+      status: m.status === 'pending' ? 'pending_acceptance' : m.status,
+      stakeAmount: m.stakeAmount,
+      stakeToken: m.stakeTokenSymbol || 'ETC',
+      type: m.type === 'oneVsOne' ? '1v1' : m.type === 'smallGroup' ? 'Group' : m.type,
+      oracle: m.arbitrator ? 'Third Party' : 'Manual',
+      endTime: m.endDate,
+      participants: m.participants || []
+    }))
+  }, [friendMarkets, demoMode])
+
+  // Split friend markets into active/past for modals
+  const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
+    const now = new Date()
+    const userAddr = account?.toLowerCase()
+
+    const userMarkets = friendMarkets.filter(m =>
+      m.creator?.toLowerCase() === userAddr ||
+      m.participants?.some(p => p.toLowerCase() === userAddr)
+    )
+
+    const isPastMarket = (m) => {
+      const endDate = new Date(m.endDate)
+      const status = m.status?.toLowerCase()
+      return endDate <= now ||
+             status === 'resolved' ||
+             status === 'cancelled' ||
+             status === 'canceled'
+    }
+
+    return {
+      activeFriendMarkets: userMarkets.filter(m => !isPastMarket(m)),
+      pastFriendMarkets: userMarkets.filter(m => isPastMarket(m))
+    }
+  }, [friendMarkets, account])
+
   // Mock wager data for demo mode
   const mockWagers = useMemo(() => {
     if (!demoMode) return []
@@ -340,15 +415,15 @@ function Dashboard() {
     ]
   }, [demoMode])
 
-  const activeWagers = useMemo(() =>
-    mockWagers.filter(w => w.status === 'active' || w.status === 'pending_acceptance'),
-    [mockWagers]
-  )
+  const activeWagers = useMemo(() => {
+    const wagers = demoMode ? mockWagers : liveWagers
+    return wagers.filter(w => w.status === 'active' || w.status === 'pending_acceptance')
+  }, [demoMode, mockWagers, liveWagers])
 
-  const pastWagers = useMemo(() =>
-    mockWagers.filter(w => w.status === 'resolved' || w.status === 'expired' || w.status === 'cancelled'),
-    [mockWagers]
-  )
+  const pastWagers = useMemo(() => {
+    const wagers = demoMode ? mockWagers : liveWagers
+    return wagers.filter(w => w.status === 'resolved' || w.status === 'expired' || w.status === 'cancelled')
+  }, [demoMode, mockWagers, liveWagers])
 
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
@@ -469,7 +544,11 @@ function Dashboard() {
           <h3>Active Wagers</h3>
           <span className="section-count">{activeWagers.length}</span>
         </div>
-        {activeWagers.length > 0 ? (
+        {wagersLoading && !demoMode ? (
+          <div className="empty-state compact">
+            <p>Loading wagers...</p>
+          </div>
+        ) : activeWagers.length > 0 ? (
           <div className="wagers-grid">
             {activeWagers.map(wager => (
               <WagerCard key={wager.id} wager={wager} onClick={handleWagerClick} />
@@ -511,12 +590,15 @@ function Dashboard() {
         }}
         initialTab="create"
         initialType={createWagerType}
+        activeMarkets={activeFriendMarkets}
+        pastMarkets={pastFriendMarkets}
       />
 
       {/* My Wagers Modal */}
       <MyMarketsModal
         isOpen={showMyWagers}
         onClose={() => setShowMyWagers(false)}
+        friendMarkets={friendMarkets}
       />
 
       {/* QR Scanner Modal */}
