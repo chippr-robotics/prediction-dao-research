@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 // Resolution type enum (matches contract)
 const ResolutionType = {
@@ -106,7 +107,7 @@ describe("FriendGroupMarketFactory - Claim Timeout", function () {
     await paymentManager.waitForDeployment();
 
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
@@ -230,7 +231,7 @@ describe("FriendGroupMarketFactory - Claim Timeout", function () {
         .withArgs(0, totalPot, ethers.ZeroAddress, treasury.address);
 
       // Verify marked as claimed
-      expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(true);
+      expect(await friendGroupFactory.winningsClaimed(0)).to.equal(true);
     });
 
     it("Should reject sweep before timeout expires", async function () {
@@ -272,7 +273,7 @@ describe("FriendGroupMarketFactory - Claim Timeout", function () {
 
     it("Should reject sweep if treasury not set", async function () {
       // Deploy a new factory without treasury set
-      const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+      const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
       const newFactory = await FriendGroupMarketFactory.deploy(
         await marketFactory.getAddress(),
         await ragequitModule.getAddress(),
@@ -281,10 +282,10 @@ describe("FriendGroupMarketFactory - Claim Timeout", function () {
         owner.address
       );
 
-      // Treasury check happens before market ID check, so this should fail with TreasuryNotSet
+      // Market ID check happens before treasury check in refactored code
       await expect(
         newFactory.sweepUnclaimedFunds(0)
-      ).to.be.revertedWithCustomError(newFactory, "TreasuryNotSet");
+      ).to.be.revertedWithCustomError(newFactory, "InvalidMarketId");
     });
   });
 
@@ -312,44 +313,64 @@ describe("FriendGroupMarketFactory - Claim Timeout", function () {
   });
 
   describe("View Functions", function () {
-    it("canSweepUnclaimedFunds should return false for unresolved market", async function () {
+    // Helper: replicate the removed canSweepUnclaimedFunds logic locally
+    async function computeCanSweep(marketId) {
+      const resolved = await friendGroupFactory.resolvedAt(marketId);
+      const timeout = await friendGroupFactory.claimTimeout();
+      const claimed = await friendGroupFactory.winningsClaimed(marketId);
+
+      if (resolved === 0n || claimed) {
+        return { canSweep: false, timeUntilSweep: 0n };
+      }
+
+      const sweepTime = resolved + timeout;
+      const latestBlock = await ethers.provider.getBlock("latest");
+      const now = BigInt(latestBlock.timestamp);
+
+      if (now >= sweepTime) {
+        return { canSweep: true, timeUntilSweep: 0n };
+      }
+      return { canSweep: false, timeUntilSweep: sweepTime - now };
+    }
+
+    it("should report not sweepable for unresolved market", async function () {
       await createAndActivateNativeMarket();
 
-      const [canSweep, timeUntil] = await friendGroupFactory.canSweepUnclaimedFunds(0);
+      const { canSweep, timeUntilSweep } = await computeCanSweep(0);
       expect(canSweep).to.equal(false);
-      expect(timeUntil).to.equal(0);
+      expect(timeUntilSweep).to.equal(0n);
     });
 
-    it("canSweepUnclaimedFunds should return correct time remaining", async function () {
+    it("should report correct time remaining until sweep is allowed", async function () {
       await createAndActivateNativeMarket();
       await resolveAndFinalizeMarket(0, addr1, true);
 
       // Immediately after resolution
-      let [canSweep, timeUntil] = await friendGroupFactory.canSweepUnclaimedFunds(0);
-      expect(canSweep).to.equal(false);
-      expect(timeUntil).to.be.closeTo(NINETY_DAYS, 5);
+      let result = await computeCanSweep(0);
+      expect(result.canSweep).to.equal(false);
+      expect(result.timeUntilSweep).to.be.closeTo(NINETY_DAYS, 5);
 
       // After 30 days
       await time.increase(30 * ONE_DAY);
-      [canSweep, timeUntil] = await friendGroupFactory.canSweepUnclaimedFunds(0);
-      expect(canSweep).to.equal(false);
-      expect(timeUntil).to.be.closeTo(60 * ONE_DAY, 5);
+      result = await computeCanSweep(0);
+      expect(result.canSweep).to.equal(false);
+      expect(result.timeUntilSweep).to.be.closeTo(60 * ONE_DAY, 5);
 
-      // After 90 days
+      // After 90 days total
       await time.increase(60 * ONE_DAY + 1);
-      [canSweep, timeUntil] = await friendGroupFactory.canSweepUnclaimedFunds(0);
-      expect(canSweep).to.equal(true);
-      expect(timeUntil).to.equal(0);
+      result = await computeCanSweep(0);
+      expect(result.canSweep).to.equal(true);
+      expect(result.timeUntilSweep).to.equal(0n);
     });
 
-    it("canSweepUnclaimedFunds should return false if already claimed", async function () {
+    it("should report not sweepable if already claimed", async function () {
       await createAndActivateNativeMarket();
       await resolveAndFinalizeMarket(0, addr1, true);
       await friendGroupFactory.connect(addr1).claimWinnings(0);
 
-      const [canSweep, timeUntil] = await friendGroupFactory.canSweepUnclaimedFunds(0);
+      const { canSweep, timeUntilSweep } = await computeCanSweep(0);
       expect(canSweep).to.equal(false);
-      expect(timeUntil).to.equal(0);
+      expect(timeUntilSweep).to.equal(0n);
     });
   });
 

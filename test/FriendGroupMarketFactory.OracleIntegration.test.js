@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 /**
  * Oracle Integration Tests for FriendGroupMarketFactory
@@ -91,7 +92,7 @@ describe("FriendGroupMarketFactory - Oracle Integration", function () {
     await paymentManager.waitForDeployment();
 
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
@@ -207,7 +208,7 @@ describe("FriendGroupMarketFactory - Oracle Integration", function () {
       ).to.emit(friendGroupFactory, "MarketPeggedToOracle")
         .withArgs(0, CHAINLINK_ORACLE_ID, conditionId);
 
-      expect(await friendGroupFactory.isPeggedToOracle(0)).to.be.true;
+      expect(await friendGroupFactory.marketOracleCondition(0)).to.not.equal(ethers.ZeroHash);
     });
 
     it("Should revert when pegging inactive market", async function () {
@@ -322,9 +323,12 @@ describe("FriendGroupMarketFactory - Oracle Integration", function () {
       const market = await friendGroupFactory.friendMarkets(0);
       expect(market.status).to.equal(4); // Resolved
 
-      const [winner, outcome] = await friendGroupFactory.getWagerResolution(0);
-      expect(outcome).to.be.true;
+      const winner = await friendGroupFactory.wagerWinner(0);
       expect(winner).to.equal(creator.address);
+
+      // Verify oracle outcome was true via adapter
+      const [oracleOutcome] = await chainlinkAdapter.getOutcome(conditionId);
+      expect(oracleOutcome).to.be.true;
     });
 
     it("Should resolve when oracle condition resolves false", async function () {
@@ -334,9 +338,12 @@ describe("FriendGroupMarketFactory - Oracle Integration", function () {
 
       await friendGroupFactory.resolveFromOracle(0);
 
-      const [winner, outcome] = await friendGroupFactory.getWagerResolution(0);
-      expect(outcome).to.be.false;
+      const winner = await friendGroupFactory.wagerWinner(0);
       expect(winner).to.equal(opponent.address);
+
+      // Verify oracle outcome was false via adapter
+      const [oracleOutcome] = await chainlinkAdapter.getOutcome(conditionId);
+      expect(oracleOutcome).to.be.false;
     });
 
     it("Should revert when oracle condition not resolved", async function () {
@@ -395,26 +402,30 @@ describe("FriendGroupMarketFactory - Oracle Integration", function () {
     });
 
     it("Should return oracle info", async function () {
-      const [oracleId, returnedConditionId] = await friendGroupFactory.getOracleInfo(0);
+      const oracleId = await friendGroupFactory.marketOracleId(0);
+      const returnedConditionId = await friendGroupFactory.marketOracleCondition(0);
       expect(oracleId).to.equal(CHAINLINK_ORACLE_ID);
       expect(returnedConditionId).to.equal(conditionId);
     });
 
     it("Should check oracle resolution status", async function () {
-      let [canResolve, outcome] = await friendGroupFactory.checkOracleResolution(0);
-      expect(canResolve).to.be.false;
+      // Before resolution: adapter reports condition not resolved
+      let isResolved = await chainlinkAdapter.isConditionResolved(conditionId);
+      expect(isResolved).to.be.false;
 
       await time.increase(TRADING_PERIOD + 1);
       await mockChainlinkFeed.updateAnswer(6000_00000000n);
       await chainlinkAdapter.resolveCondition(conditionId);
 
-      [canResolve, outcome] = await friendGroupFactory.checkOracleResolution(0);
-      expect(canResolve).to.be.true;
+      // After resolution: adapter reports condition resolved with outcome
+      isResolved = await chainlinkAdapter.isConditionResolved(conditionId);
+      expect(isResolved).to.be.true;
+      const [outcome] = await chainlinkAdapter.getOutcome(conditionId);
       expect(outcome).to.be.true;
     });
 
     it("Should report market as pegged", async function () {
-      expect(await friendGroupFactory.isPeggedToOracle(0)).to.be.true;
+      expect(await friendGroupFactory.marketOracleCondition(0)).to.not.equal(ethers.ZeroHash);
     });
 
     it("Should report unpegged market correctly", async function () {
@@ -431,7 +442,7 @@ describe("FriendGroupMarketFactory - Oracle Integration", function () {
         { value: STAKE_AMOUNT }
       );
 
-      expect(await friendGroupFactory.isPeggedToOracle(1)).to.be.false;
+      expect(await friendGroupFactory.marketOracleCondition(1)).to.equal(ethers.ZeroHash);
     });
   });
 });

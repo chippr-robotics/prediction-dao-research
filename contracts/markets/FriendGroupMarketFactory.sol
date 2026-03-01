@@ -6,6 +6,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./ConditionalMarketFactory.sol";
 import "./FriendGroupMarketLib.sol";
+import "./FriendGroupMarketTypes.sol";
+import "./FriendGroupResolutionLib.sol";
+import "./FriendGroupClaimsLib.sol";
+import "./FriendGroupCreationLib.sol";
 import "../security/RagequitModule.sol";
 import "../security/NullifierRegistry.sol";
 import "../access/TieredRoleManager.sol";
@@ -14,65 +18,8 @@ import "../oracles/PolymarketOracleAdapter.sol";
 import "../oracles/OracleRegistry.sol";
 import "../oracles/IOracleAdapter.sol";
 
-// Custom errors (stake/nullification errors from library, reused here)
-error InvalidAddress();
-error InvalidMarketId();
-error InvalidOpponent();
-error InvalidDescription();
-error InvalidDeadline();
-error InvalidStake();
-error InvalidLimit();
-error InvalidThreshold();
-error NotAuthorized();
-error MembershipRequired();
-error MembershipExpired();
-error MarketLimitReached();
-error MemberLimitReached();
-error NotPending();
-error NotActive();
-error AlreadyAccepted();
-error AlreadyMember();
-error NotMember();
-error NotInvited();
-error DeadlinePassed();
-error DeadlineNotPassed();
-error AlreadyPegged();
-error NotPegged();
-error NotResolved();
-error TransferFailed();
-error InsufficientPayment();
-error InvalidMember();
-error InvalidOdds();
-error MissingMarketMakerRole();
-error InvalidResolutionType();
-error PolymarketAdapterNotSet();
-error OracleRegistryNotSet();
-error OracleConditionNotResolved();
-error AlreadyPeggedToOracle();
-error InvalidConditionId();
-error PolymarketNotResolved();
-error AlreadyPeggedToPolymarket();
-error NotWinner();
-error AlreadyClaimed();
-error WagerNotResolved();
-error NotInChallengePeriod();
-error ChallengePeriodNotExpired();
-error AlreadyChallenged();
-error InsufficientChallengeBond();
-error NotPendingResolution();
-error NotChallenged();
-error InvalidChallengePeriod();
-error InvalidChallengeBond();
-error ClaimTimeoutNotExpired();
-error InvalidClaimTimeout();
-error TreasuryNotSet();
-error OracleTimeoutNotExpired();
-error NotOraclePegged();
-error InvalidOracleTimeout();
-error AlreadyTimedOut();
-error NotTimedOut();
-error RefundNotInitiated();
-error RefundAlreadyAccepted();
+// Custom errors are declared in IFriendGroupErrors (FriendGroupMarketTypes.sol).
+// The contract inherits the interface so all error selectors appear in its ABI.
 
 /**
  * @title FriendGroupMarketFactory
@@ -94,75 +41,8 @@ error RefundAlreadyAccepted();
  * 3. Small group predictions with arbitrator
  * 4. Friend group contests and competitions
  */
-contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
-    
-    // Market type to distinguish friend markets from public markets
-    enum MarketType {
-        OneVsOne,           // 1v1 direct bet between two parties
-        SmallGroup,         // 3-10 participants
-        EventTracking,      // Tracking for competitive events/games
-        PropBet,            // General proposition bet
-        Bookmaker           // Leveraged 1v1 market requiring dual roles
-    }
+contract FriendGroupMarketFactory is IFriendGroupErrors, Ownable, ReentrancyGuard {
 
-    // Market status for multi-party acceptance flow
-    enum FriendMarketStatus {
-        PendingAcceptance,  // Waiting for participants to accept
-        Active,             // All required parties accepted, market live
-        PendingResolution,  // Manual resolution proposed, waiting for challenge period
-        Challenged,         // Resolution is being disputed
-        Resolved,           // Market has been resolved
-        Cancelled,          // Creator cancelled before activation
-        Refunded,           // Stakes returned due to deadline expiration
-        OracleTimedOut      // Oracle-pegged market timed out, awaiting refund/manual resolution
-    }
-
-    // Resolution type for determining who can resolve the market
-    enum ResolutionType {
-        Either,           // Either creator OR opponent can resolve (default)
-        Initiator,        // Only creator can resolve
-        Receiver,         // Only opponent can resolve
-        ThirdParty,       // Designated arbitrator resolves
-        AutoPegged,       // Auto-resolves based on linked public market
-        PolymarketOracle  // Resolves based on Polymarket market outcome
-    }
-
-    // Acceptance record for each participant
-    struct AcceptanceRecord {
-        address participant;
-        uint256 stakedAmount;
-        uint256 acceptedAt;
-        bool hasAccepted;
-        bool isArbitrator;      // Arbitrators don't stake
-    }
-    
-    struct FriendMarket {
-        uint256 marketId;              // ID in ConditionalMarketFactory
-        MarketType marketType;
-        address creator;
-        address[] members;             // Limited participant list
-        address arbitrator;            // Optional third-party for resolution
-        uint256 memberLimit;           // Max concurrent members
-        uint256 creationFee;           // Reduced fee for friend markets
-        uint256 createdAt;
-        bool active;
-        string description;
-        uint256 peggedPublicMarketId;  // Public market ID to peg resolution to (0 = none)
-        bool autoPegged;               // Whether resolution is pegged to public market
-        address paymentToken;          // ERC20 token used (address(0) = native ETC)
-        uint256 liquidityAmount;       // Initial liquidity in payment token
-        // Multi-party acceptance flow fields
-        FriendMarketStatus status;     // Current market status
-        uint256 acceptanceDeadline;    // Unix timestamp for acceptance deadline
-        uint256 minAcceptanceThreshold; // Minimum participants needed to activate
-        uint256 stakePerParticipant;   // Stake amount required from each participant
-        address stakeToken;            // Token used for stakes (address(0) = native)
-        uint256 tradingPeriodSeconds;  // Trading period stored for later activation
-        uint16 opponentOddsMultiplier; // Odds for 1v1/Bookmaker: 200=2x (equal), 10000=100x. Min 200.
-        ResolutionType resolutionType; // Who can resolve the market
-        bytes32 polymarketConditionId; // Polymarket condition ID for PolymarketOracle resolution
-    }
-    
     // Friend market ID => FriendMarket
     mapping(uint256 => FriendMarket) public friendMarkets;
     
@@ -209,10 +89,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     uint256 public friendMarketFee = 0.1 ether;    // Reduced fee for friend markets
     uint256 public oneVsOneFee = 0.05 ether;       // Even lower for 1v1
     
-    // Proposal ID offset to avoid collision with public markets
-    // Using 10 billion to allow for massive scale (10B public markets before collision)
-    uint256 public constant PROPOSAL_ID_OFFSET = 10_000_000_000;
-    
     // Member limits (updateable by managers)
     uint256 public maxSmallGroupMembers = 10;
     uint256 public maxOneVsOneMembers = 2;
@@ -246,16 +122,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) public resolvedAt;
 
     // ========== Challenge System ==========
-
-    // Struct to track pending resolution proposals
-    struct PendingResolutionData {
-        bool proposedOutcome;      // The proposed outcome (true = creator wins)
-        address proposer;          // Who proposed the resolution
-        uint256 proposedAt;        // Timestamp of proposal
-        uint256 challengeDeadline; // When challenge period ends
-        address challenger;        // Who challenged (address(0) if none)
-        uint256 challengeBondPaid; // Bond paid by challenger
-    }
 
     // Track pending resolutions (friendMarketId => PendingResolutionData)
     mapping(uint256 => PendingResolutionData) public pendingResolutions;
@@ -725,8 +591,6 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (bytes(description).length == 0) revert InvalidDescription();
         if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
         if (stakeAmount == 0) revert InvalidStake();
-
-        // Validate resolution type
         if (resolutionType == ResolutionType.ThirdParty && arbitrator == address(0)) revert InvalidAddress();
 
         bytes32 role = tieredRoleManager.FRIEND_MARKET_ROLE();
@@ -734,80 +598,28 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
-        // Anti-money-laundering: Check if creator or opponent is nullified
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
-
-        // Equal stakes for 1v1 markets
         FriendGroupMarketLib.collectStake(msg.sender, stakeToken, stakeAmount);
 
-        // Create pending market (no underlying market yet - created on activation)
         friendMarketId = friendMarketCount++;
-
         address[] memory participants = new address[](2);
         participants[0] = msg.sender;
         participants[1] = opponent;
 
-        friendMarkets[friendMarketId] = FriendMarket({
-            marketId: 0, // Not created until activated
-            marketType: MarketType.OneVsOne,
-            creator: msg.sender,
-            members: participants,
-            arbitrator: arbitrator,
-            memberLimit: maxOneVsOneMembers,
-            creationFee: 0,
-            createdAt: block.timestamp,
-            active: false, // Not active until accepted
-            description: description,
-            peggedPublicMarketId: 0,
-            autoPegged: false,
-            paymentToken: stakeToken,
-            liquidityAmount: 0,
-            status: FriendMarketStatus.PendingAcceptance,
-            acceptanceDeadline: acceptanceDeadline,
-            minAcceptanceThreshold: 2, // Both must accept for 1v1
-            stakePerParticipant: stakeAmount, // Equal stake for both parties
-            stakeToken: stakeToken,
-            tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: 200, // Equal stakes (2x)
-            resolutionType: resolutionType,
-            polymarketConditionId: bytes32(0) // Set later via pegToPolymarketCondition
-        });
-
-        // Record creator's acceptance (equal stake)
-        marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
-            participant: msg.sender,
-            stakedAmount: stakeAmount,
-            acceptedAt: block.timestamp,
-            hasAccepted: true,
-            isArbitrator: false
-        });
+        FriendGroupCreationLib.initializeMarket(
+            friendMarkets[friendMarketId],
+            marketAcceptances[friendMarketId][msg.sender],
+            friendMarketId, MarketType.OneVsOne, msg.sender, participants,
+            arbitrator, maxOneVsOneMembers, description, acceptanceDeadline,
+            2, stakeAmount, stakeToken, tradingPeriod, 200, resolutionType, stakeAmount
+        );
 
         acceptedParticipantCount[friendMarketId] = 1;
         marketTotalStaked[friendMarketId] = stakeAmount;
-
         memberCount[friendMarketId] = 2;
         userMarkets[msg.sender].push(friendMarketId);
         userMarkets[opponent].push(friendMarketId);
-
-        // Emit MemberAdded for each participant (enables event-based market discovery)
-        emit MemberAdded(friendMarketId, msg.sender);
-        emit MemberAdded(friendMarketId, opponent);
-
-        emit MarketCreatedPending(
-            friendMarketId,
-            msg.sender,
-            acceptanceDeadline,
-            stakeAmount,
-            200, // Equal stakes
-            stakeToken,
-            participants,
-            arbitrator
-        );
-
-        if (arbitrator != address(0)) {
-            emit ArbitratorSet(friendMarketId, arbitrator);
-        }
     }
 
     /**
@@ -839,100 +651,43 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (bytes(description).length == 0) revert InvalidDescription();
         if (acceptanceDeadline <= block.timestamp + 1 hours || acceptanceDeadline >= block.timestamp + 30 days) revert InvalidDeadline();
         if (opponentStakeAmount == 0) revert InvalidStake();
-        if (opponentOddsMultiplier < 200) revert InvalidOdds(); // Minimum 2x (equal stakes)
-
-        // Validate resolution type
+        if (opponentOddsMultiplier < 200) revert InvalidOdds();
         if (resolutionType == ResolutionType.ThirdParty && arbitrator == address(0)) revert InvalidAddress();
 
-        // Creator must have BOTH MARKET_MAKER_ROLE and FRIEND_MARKET_ROLE
         bytes32 friendRole = tieredRoleManager.FRIEND_MARKET_ROLE();
         bytes32 makerRole = tieredRoleManager.MARKET_MAKER_ROLE();
-
         if (!tieredRoleManager.hasRole(friendRole, msg.sender)) revert MembershipRequired();
         if (!tieredRoleManager.hasRole(makerRole, msg.sender)) revert MissingMarketMakerRole();
         if (!tieredRoleManager.isMembershipActive(msg.sender, friendRole)) revert MembershipExpired();
         if (!tieredRoleManager.isMembershipActive(msg.sender, makerRole)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, friendRole)) revert MarketLimitReached();
-
-        // Opponent only needs FRIEND_MARKET_ROLE to accept
         if (!tieredRoleManager.hasRole(friendRole, opponent)) revert MembershipRequired();
 
-        // Anti-money-laundering: Check if creator or opponent is nullified
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, opponent);
 
-        // Calculate creator's stake based on odds (creator is "insurer", stakes more)
-        // Formula: creatorStake = opponentStake × (multiplier - 100) / 100
         uint256 creatorStake = (opponentStakeAmount * (uint256(opponentOddsMultiplier) - 100)) / 100;
         FriendGroupMarketLib.collectStake(msg.sender, stakeToken, creatorStake);
 
-        // Create pending market
         friendMarketId = friendMarketCount++;
-
         address[] memory participants = new address[](2);
         participants[0] = msg.sender;
         participants[1] = opponent;
 
-        friendMarkets[friendMarketId] = FriendMarket({
-            marketId: 0, // Not created until activated
-            marketType: MarketType.Bookmaker,
-            creator: msg.sender,
-            members: participants,
-            arbitrator: arbitrator,
-            memberLimit: maxOneVsOneMembers,
-            creationFee: 0,
-            createdAt: block.timestamp,
-            active: false, // Not active until accepted
-            description: description,
-            peggedPublicMarketId: 0,
-            autoPegged: false,
-            paymentToken: stakeToken,
-            liquidityAmount: 0,
-            status: FriendMarketStatus.PendingAcceptance,
-            acceptanceDeadline: acceptanceDeadline,
-            minAcceptanceThreshold: 2, // Both must accept for 1v1
-            stakePerParticipant: opponentStakeAmount, // Opponent's required stake
-            stakeToken: stakeToken,
-            tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: opponentOddsMultiplier,
-            resolutionType: resolutionType,
-            polymarketConditionId: bytes32(0) // Set later via pegToPolymarketCondition
-        });
-
-        // Record creator's acceptance (creator stakes more based on odds)
-        marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
-            participant: msg.sender,
-            stakedAmount: creatorStake,
-            acceptedAt: block.timestamp,
-            hasAccepted: true,
-            isArbitrator: false
-        });
+        FriendGroupCreationLib.initializeMarket(
+            friendMarkets[friendMarketId],
+            marketAcceptances[friendMarketId][msg.sender],
+            friendMarketId, MarketType.Bookmaker, msg.sender, participants,
+            arbitrator, maxOneVsOneMembers, description, acceptanceDeadline,
+            2, opponentStakeAmount, stakeToken, tradingPeriod,
+            opponentOddsMultiplier, resolutionType, creatorStake
+        );
 
         acceptedParticipantCount[friendMarketId] = 1;
         marketTotalStaked[friendMarketId] = creatorStake;
-
         memberCount[friendMarketId] = 2;
         userMarkets[msg.sender].push(friendMarketId);
         userMarkets[opponent].push(friendMarketId);
-
-        // Emit MemberAdded for each participant (enables event-based market discovery)
-        emit MemberAdded(friendMarketId, msg.sender);
-        emit MemberAdded(friendMarketId, opponent);
-
-        emit MarketCreatedPending(
-            friendMarketId,
-            msg.sender,
-            acceptanceDeadline,
-            opponentStakeAmount,
-            opponentOddsMultiplier,
-            stakeToken,
-            participants,
-            arbitrator
-        );
-
-        if (arbitrator != address(0)) {
-            emit ArbitratorSet(friendMarketId, arbitrator);
-        }
     }
 
     /**
@@ -974,80 +729,32 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!tieredRoleManager.isMembershipActive(msg.sender, role)) revert MembershipExpired();
         if (!tieredRoleManager.checkMarketCreationLimitFor(msg.sender, role)) revert MarketLimitReached();
 
-        // Anti-money-laundering: Check if creator or any invited member is nullified
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
         FriendGroupMarketLib.checkNullificationBatch(nullifierRegistry, enforceNullification, invitedMembers);
-
         FriendGroupMarketLib.collectStake(msg.sender, stakeToken, stakeAmount);
 
-        // Build full participant list (creator + invited)
         address[] memory allParticipants = new address[](invitedMembers.length + 1);
         allParticipants[0] = msg.sender;
         for (uint256 i = 0; i < invitedMembers.length; i++) {
             allParticipants[i + 1] = invitedMembers[i];
         }
 
-        // Create pending market
         friendMarketId = friendMarketCount++;
 
-        friendMarkets[friendMarketId] = FriendMarket({
-            marketId: 0,
-            marketType: MarketType.SmallGroup,
-            creator: msg.sender,
-            members: allParticipants,
-            arbitrator: arbitrator,
-            memberLimit: memberLimit,
-            creationFee: 0,
-            createdAt: block.timestamp,
-            active: false,
-            description: description,
-            peggedPublicMarketId: 0,
-            autoPegged: false,
-            paymentToken: stakeToken,
-            liquidityAmount: 0,
-            status: FriendMarketStatus.PendingAcceptance,
-            acceptanceDeadline: acceptanceDeadline,
-            minAcceptanceThreshold: minAcceptanceThreshold,
-            stakePerParticipant: stakeAmount,
-            stakeToken: stakeToken,
-            tradingPeriodSeconds: tradingPeriod,
-            opponentOddsMultiplier: 200, // Group markets use equal stakes
-            resolutionType: ResolutionType.Either, // Group markets use default resolution
-            polymarketConditionId: bytes32(0) // Set later via pegToPolymarketCondition
-        });
-
-        // Record creator's acceptance
-        marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
-            participant: msg.sender,
-            stakedAmount: stakeAmount,
-            acceptedAt: block.timestamp,
-            hasAccepted: true,
-            isArbitrator: false
-        });
+        FriendGroupCreationLib.initializeMarket(
+            friendMarkets[friendMarketId],
+            marketAcceptances[friendMarketId][msg.sender],
+            friendMarketId, MarketType.SmallGroup, msg.sender, allParticipants,
+            arbitrator, memberLimit, description, acceptanceDeadline,
+            minAcceptanceThreshold, stakeAmount, stakeToken, tradingPeriod,
+            200, ResolutionType.Either, stakeAmount
+        );
 
         acceptedParticipantCount[friendMarketId] = 1;
         marketTotalStaked[friendMarketId] = stakeAmount;
         memberCount[friendMarketId] = allParticipants.length;
-
-        // Add all participants to user markets and emit MemberAdded for event-based discovery
         for (uint256 i = 0; i < allParticipants.length; i++) {
             userMarkets[allParticipants[i]].push(friendMarketId);
-            emit MemberAdded(friendMarketId, allParticipants[i]);
-        }
-
-        emit MarketCreatedPending(
-            friendMarketId,
-            msg.sender,
-            acceptanceDeadline,
-            stakeAmount,
-            200, // Group markets use equal stakes (2x)
-            stakeToken,
-            allParticipants,
-            arbitrator
-        );
-
-        if (arbitrator != address(0)) {
-            emit ArbitratorSet(friendMarketId, arbitrator);
         }
     }
 
@@ -1058,104 +765,50 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function addMember(uint256 friendMarketId, address newMember) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (msg.sender != market.creator) revert NotAuthorized();
-        if (newMember == address(0)) revert InvalidMember();
-        if (memberCount[friendMarketId] >= market.memberLimit) revert MemberLimitReached();
-
-        // Anti-money-laundering: Check if new member is nullified
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, newMember);
-
-        for (uint256 i = 0; i < market.members.length; i++) {
-            if (market.members[i] == newMember) revert AlreadyMember();
-        }
-
-        market.members.push(newMember);
+        FriendGroupCreationLib.validateAddMember(
+            friendMarkets[friendMarketId], memberCount[friendMarketId], msg.sender, newMember
+        );
+        friendMarkets[friendMarketId].members.push(newMember);
         memberCount[friendMarketId]++;
         userMarkets[newMember].push(friendMarketId);
-
         emit MemberAdded(friendMarketId, newMember);
     }
 
     function removeSelf(uint256 friendMarketId) external nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-
-        bool found = false;
-        for (uint256 i = 0; i < market.members.length; i++) {
-            if (market.members[i] == msg.sender) {
-                market.members[i] = market.members[market.members.length - 1];
-                market.members.pop();
-                memberCount[friendMarketId]--;
-                found = true;
-                break;
-            }
-        }
-
-        if (!found) revert NotMember();
-        emit MemberRemoved(friendMarketId, msg.sender);
+        FriendGroupCreationLib.executeRemoveSelf(friendMarkets[friendMarketId], friendMarketId, msg.sender);
+        memberCount[friendMarketId]--;
     }
 
     function acceptMarket(uint256 friendMarketId) external payable nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        if (market.status != FriendMarketStatus.PendingAcceptance) revert NotPending();
-        if (block.timestamp >= market.acceptanceDeadline) revert DeadlinePassed();
-        if (marketAcceptances[friendMarketId][msg.sender].hasAccepted) revert AlreadyAccepted();
-
-        // Anti-money-laundering: Check if accepting participant is nullified
         FriendGroupMarketLib.checkNullification(nullifierRegistry, enforceNullification, msg.sender);
 
-        bool isInvited = false;
-        bool isArbitrator = market.arbitrator == msg.sender;
+        (, bool isArbitrator) = FriendGroupCreationLib.validateAcceptance(
+            friendMarkets[friendMarketId],
+            marketAcceptances[friendMarketId][msg.sender].hasAccepted,
+            msg.sender
+        );
 
-        for (uint256 i = 0; i < market.members.length; i++) {
-            if (market.members[i] == msg.sender) {
-                isInvited = true;
-                break;
-            }
-        }
-
-        if (!isInvited && !isArbitrator) revert NotInvited();
-
+        FriendMarket storage market = friendMarkets[friendMarketId];
         if (isArbitrator) {
-            // Arbitrators don't stake
             marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
-                participant: msg.sender,
-                stakedAmount: 0,
-                acceptedAt: block.timestamp,
-                hasAccepted: true,
-                isArbitrator: true
+                participant: msg.sender, stakedAmount: 0,
+                acceptedAt: block.timestamp, hasAccepted: true, isArbitrator: true
             });
-
             emit ArbitratorAccepted(friendMarketId, msg.sender, block.timestamp);
         } else {
-            // Collect stake from participant
             FriendGroupMarketLib.collectStake(msg.sender, market.stakeToken, market.stakePerParticipant);
-
             marketAcceptances[friendMarketId][msg.sender] = AcceptanceRecord({
-                participant: msg.sender,
-                stakedAmount: market.stakePerParticipant,
-                acceptedAt: block.timestamp,
-                hasAccepted: true,
-                isArbitrator: false
+                participant: msg.sender, stakedAmount: market.stakePerParticipant,
+                acceptedAt: block.timestamp, hasAccepted: true, isArbitrator: false
             });
-
             acceptedParticipantCount[friendMarketId]++;
             marketTotalStaked[friendMarketId] += market.stakePerParticipant;
-
-            emit ParticipantAccepted(
-                friendMarketId,
-                msg.sender,
-                market.stakePerParticipant,
-                block.timestamp
-            );
+            emit ParticipantAccepted(friendMarketId, msg.sender, market.stakePerParticipant, block.timestamp);
         }
 
-        // Check if market should activate
         _checkAndActivateMarket(friendMarketId);
     }
 
@@ -1179,110 +832,49 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     function processExpiredDeadline(uint256 friendMarketId) external nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
-
-        if (market.status != FriendMarketStatus.PendingAcceptance) revert NotPending();
-        if (block.timestamp < market.acceptanceDeadline) revert DeadlineNotPassed();
-
         uint256 accepted = acceptedParticipantCount[friendMarketId];
-        uint256 required = market.minAcceptanceThreshold;
+        bool arbAccepted = market.arbitrator == address(0) ||
+            marketAcceptances[friendMarketId][market.arbitrator].hasAccepted;
 
-        // Check if arbitrator acceptance is also required and met
-        bool arbitratorOk = true;
-        if (market.arbitrator != address(0)) {
-            arbitratorOk = marketAcceptances[friendMarketId][market.arbitrator].hasAccepted;
-        }
+        bool shouldActivate = FriendGroupCreationLib.processExpiredDeadline(
+            market, friendMarketId, accepted, arbAccepted
+        );
 
-        if (accepted >= required && arbitratorOk) {
-            // Threshold met - activate market
+        if (shouldActivate) {
             _activateMarket(friendMarketId);
         } else {
-            // Threshold not met - refund all
-            market.status = FriendMarketStatus.Refunded;
-            _refundAllStakesInternal(friendMarketId);
-
-            emit AcceptanceDeadlinePassed(friendMarketId, market.acceptanceDeadline, accepted, required);
+            FriendGroupCreationLib.refundAllStakes(market, marketAcceptances, friendMarketId);
+            marketTotalStaked[friendMarketId] = 0;
         }
     }
 
     // ========== Internal Helper Functions for Acceptance Flow ==========
 
-    /**
-     * @notice Refund all stakes for a market (uses library for individual refunds)
-     */
     function _refundAllStakesInternal(uint256 friendMarketId) internal {
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        for (uint256 i = 0; i < market.members.length; i++) {
-            address participant = market.members[i];
-            AcceptanceRecord storage record = marketAcceptances[friendMarketId][participant];
-
-            if (record.hasAccepted && record.stakedAmount > 0) {
-                FriendGroupMarketLib.refundStake(participant, market.stakeToken, record.stakedAmount);
-                emit StakeRefunded(friendMarketId, participant, record.stakedAmount);
-            }
-        }
-
+        FriendGroupCreationLib.refundAllStakes(
+            friendMarkets[friendMarketId], marketAcceptances, friendMarketId
+        );
         marketTotalStaked[friendMarketId] = 0;
     }
 
-    /**
-     * @notice Check if market should activate and do so if conditions are met
-     */
     function _checkAndActivateMarket(uint256 friendMarketId) internal {
         FriendMarket storage market = friendMarkets[friendMarketId];
-
         uint256 accepted = acceptedParticipantCount[friendMarketId];
-        uint256 required = market.minAcceptanceThreshold;
+        bool arbitratorOk = market.arbitrator == address(0) ||
+            marketAcceptances[friendMarketId][market.arbitrator].hasAccepted;
 
-        // Check if arbitrator acceptance is required and met
-        bool arbitratorOk = true;
-        if (market.arbitrator != address(0)) {
-            arbitratorOk = marketAcceptances[friendMarketId][market.arbitrator].hasAccepted;
-        }
-
-        if (accepted >= required && arbitratorOk) {
+        if (accepted >= market.minAcceptanceThreshold && arbitratorOk) {
             _activateMarket(friendMarketId);
         }
     }
 
-    /**
-     * @notice Activate a pending market by deploying the underlying market
-     */
     function _activateMarket(uint256 friendMarketId) internal {
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        uint256 totalStaked = marketTotalStaked[friendMarketId];
-
-        // Deploy underlying market in ConditionalMarketFactory
-        // Use hash-based proposalId to avoid collisions between factory deployments.
-        // Including address(this) ensures each factory instance generates unique IDs.
-        uint256 proposalId = uint256(keccak256(abi.encodePacked(address(this), friendMarketId)));
-        address collateral = defaultCollateralToken != address(0) ? defaultCollateralToken : market.stakeToken;
-
-        // Approve collateral transfer to ConditionalMarketFactory
-        if (collateral != address(0)) {
-            IERC20(collateral).approve(address(marketFactory), totalStaked);
-        }
-
-        uint256 underlyingMarketId = marketFactory.deployMarketPair(
-            proposalId,
-            collateral,
-            totalStaked,
-            0.01 ether, // Liquidity parameter
-            market.tradingPeriodSeconds,
-            ConditionalMarketFactory.BetType.YesNo
-        );
-
-        market.marketId = underlyingMarketId;
-        market.status = FriendMarketStatus.Active;
-        market.active = true;
-        market.liquidityAmount = totalStaked;
-
-        emit MarketActivated(
+        FriendGroupCreationLib.activateMarket(
+            friendMarkets[friendMarketId],
             friendMarketId,
-            underlyingMarketId,
-            block.timestamp,
-            totalStaked,
+            marketTotalStaked[friendMarketId],
+            defaultCollateralToken,
+            marketFactory,
             acceptedParticipantCount[friendMarketId]
         );
     }
@@ -1292,27 +884,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     /**
      * @notice Get acceptance status for a market
      */
-    function getAcceptanceStatus(uint256 friendMarketId) external view returns (
-        uint256 accepted,
-        uint256 required,
-        uint256 deadline,
-        bool arbitratorRequired,
-        bool arbitratorAccepted,
-        FriendMarketStatus status
-    ) {
-        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        return (
-            acceptedParticipantCount[friendMarketId],
-            market.minAcceptanceThreshold,
-            market.acceptanceDeadline,
-            market.arbitrator != address(0),
-            market.arbitrator != address(0) ?
-                marketAcceptances[friendMarketId][market.arbitrator].hasAccepted : true,
-            market.status
-        );
-    }
+    // getAcceptanceStatus removed - use acceptedParticipantCount, friendMarkets, marketAcceptances directly
 
     /**
      * @notice Get participant's acceptance record
@@ -1441,58 +1013,11 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         return userMarkets[msg.sender];
     }
 
-    /**
-     * @notice Batch fetch market summaries to reduce RPC round-trips
-     * @param ids Array of friend market IDs to fetch
-     * @return statuses Array of market statuses (uint8)
-     * @return creators Array of creator addresses
-     * @return stakeTokens Array of stake token addresses
-     * @return stakeAmounts Array of stake amounts per participant
-     * @return acceptedCounts Array of accepted participant counts
-     * @return acceptanceDeadlines Array of acceptance deadlines
-     */
-    function getFriendMarketsBatch(uint256[] calldata ids) external view returns (
-        uint8[] memory statuses,
-        address[] memory creators,
-        address[] memory stakeTokens,
-        uint256[] memory stakeAmounts,
-        uint256[] memory acceptedCounts,
-        uint256[] memory acceptanceDeadlines
-    ) {
-        uint256 len = ids.length;
-        statuses = new uint8[](len);
-        creators = new address[](len);
-        stakeTokens = new address[](len);
-        stakeAmounts = new uint256[](len);
-        acceptedCounts = new uint256[](len);
-        acceptanceDeadlines = new uint256[](len);
-
-        for (uint256 i = 0; i < len; i++) {
-            if (ids[i] < friendMarketCount) {
-                FriendMarket storage market = friendMarkets[ids[i]];
-                statuses[i] = uint8(market.status);
-                creators[i] = market.creator;
-                stakeTokens[i] = market.stakeToken;
-                stakeAmounts[i] = market.stakePerParticipant;
-                acceptedCounts[i] = acceptedParticipantCount[ids[i]];
-                acceptanceDeadlines[i] = market.acceptanceDeadline;
-            }
-        }
-    }
-
-    /**
-     * @notice Check if user is a member of a market
-     * @param friendMarketId ID of the friend market
-     * @param user Address to check
-     */
     function isMember(uint256 friendMarketId, address user) public view returns (bool) {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         FriendMarket storage market = friendMarkets[friendMarketId];
-        
         for (uint256 i = 0; i < market.members.length; i++) {
-            if (market.members[i] == user) {
-                return true;
-            }
+            if (market.members[i] == user) return true;
         }
         return false;
     }
@@ -1506,71 +1031,37 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         return memberCount[friendMarketId];
     }
     
-    /**
-     * @notice Peg an existing friend market to a public market
-     * @param friendMarketId ID of the friend market
-     * @param publicMarketId ID of the public market to peg to
-     */
+    // ========== Public Market Pegging (via FriendGroupResolutionLib) ==========
+
     function pegToPublicMarket(uint256 friendMarketId, uint256 publicMarketId) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         if (publicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
 
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (msg.sender != market.creator) revert NotAuthorized();
-        if (market.autoPegged) revert AlreadyPegged();
+        FriendGroupResolutionLib.validatePegToPublicMarket(friendMarkets[friendMarketId], msg.sender);
 
-        market.peggedPublicMarketId = publicMarketId;
-        market.autoPegged = true;
-        
+        friendMarkets[friendMarketId].peggedPublicMarketId = publicMarketId;
+        friendMarkets[friendMarketId].autoPegged = true;
         publicMarketToPeggedFriendMarkets[publicMarketId].push(friendMarketId);
+
         emit MarketPeggedToPublic(friendMarketId, publicMarketId);
     }
-    
-    /**
-     * @notice Automatically resolve friend market based on pegged public market
-     * @param friendMarketId ID of the friend market
-     */
+
     function autoResolvePeggedMarket(uint256 friendMarketId) external nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
         FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (!market.autoPegged) revert NotPegged();
         if (market.peggedPublicMarketId == 0) revert NotPegged();
 
         ConditionalMarketFactory.Market memory publicMarket = marketFactory.getMarket(market.peggedPublicMarketId);
         if (!publicMarket.resolved) revert NotResolved();
 
-        // Determine outcome
-        bool outcome = publicMarket.passValue > publicMarket.failValue;
-
-        // Resolve friend market based on public market outcome
-        market.active = false;
-        market.status = FriendMarketStatus.Resolved;
-
-        // Track resolution outcome and winner
+        (bool outcome, address winner) = FriendGroupResolutionLib.computeAutoResolution(
+            market, friendMarketId, publicMarket.passValue, publicMarket.failValue, market.peggedPublicMarketId, msg.sender
+        );
         wagerOutcome[friendMarketId] = outcome;
         resolvedAt[friendMarketId] = block.timestamp;
-        if (outcome) {
-            wagerWinner[friendMarketId] = market.creator;
-        } else if (market.members.length > 1) {
-            wagerWinner[friendMarketId] = market.members[1];
-        }
-
-        emit PeggedMarketAutoResolved(
-            friendMarketId,
-            market.peggedPublicMarketId,
-            publicMarket.passValue,
-            publicMarket.failValue
-        );
-        emit MarketResolved(friendMarketId, msg.sender, outcome);
+        wagerWinner[friendMarketId] = winner;
     }
-    
-    /**
-     * @notice Batch resolve all pegged markets for a resolved public market
-     * @param publicMarketId ID of the resolved public market
-     */
+
     function batchAutoResolvePeggedMarkets(uint256 publicMarketId) external nonReentrant {
         if (publicMarketId >= marketFactory.marketCount()) revert InvalidMarketId();
 
@@ -1578,165 +1069,72 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (!publicMarket.resolved) revert NotResolved();
 
         uint256[] storage peggedMarkets = publicMarketToPeggedFriendMarkets[publicMarketId];
-        bool outcome = publicMarket.passValue > publicMarket.failValue;
 
         for (uint256 i = 0; i < peggedMarkets.length; i++) {
-            uint256 friendMarketId = peggedMarkets[i];
-            FriendMarket storage market = friendMarkets[friendMarketId];
+            uint256 fmId = peggedMarkets[i];
+            FriendMarket storage market = friendMarkets[fmId];
 
             if (market.active && market.autoPegged) {
-                market.active = false;
-                market.status = FriendMarketStatus.Resolved;
-
-                // Track resolution outcome and winner
-                wagerOutcome[friendMarketId] = outcome;
-                resolvedAt[friendMarketId] = block.timestamp;
-                if (outcome) {
-                    wagerWinner[friendMarketId] = market.creator;
-                } else if (market.members.length > 1) {
-                    wagerWinner[friendMarketId] = market.members[1];
-                }
-
-                emit PeggedMarketAutoResolved(
-                    friendMarketId,
-                    publicMarketId,
-                    publicMarket.passValue,
-                    publicMarket.failValue
+                (bool outcome, address winner) = FriendGroupResolutionLib.computeAutoResolution(
+                    market, fmId, publicMarket.passValue, publicMarket.failValue, publicMarketId, msg.sender
                 );
-                emit MarketResolved(friendMarketId, msg.sender, outcome);
+                wagerOutcome[fmId] = outcome;
+                resolvedAt[fmId] = block.timestamp;
+                wagerWinner[fmId] = winner;
             }
         }
     }
 
     // ========== Polymarket Oracle Integration Functions ==========
 
-    /**
-     * @notice Peg a friend market to a Polymarket condition for oracle resolution
-     * @dev This allows the friend market to be resolved based on Polymarket's outcome
-     * @param friendMarketId ID of the friend market
-     * @param conditionId Polymarket condition ID (from their CTF)
-     */
     function pegToPolymarketCondition(uint256 friendMarketId, bytes32 conditionId) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        if (address(polymarketAdapter) == address(0)) revert PolymarketAdapterNotSet();
-        if (conditionId == bytes32(0)) revert InvalidConditionId();
 
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (msg.sender != market.creator) revert NotAuthorized();
-        if (market.polymarketConditionId != bytes32(0)) revert AlreadyPeggedToPolymarket();
-        if (market.autoPegged) revert AlreadyPegged(); // Can't use both public market and Polymarket pegging
+        FriendGroupResolutionLib.validatePegToPolymarket(friendMarkets[friendMarketId], conditionId, msg.sender, address(polymarketAdapter));
 
-        // Link in the adapter (validates condition exists)
         polymarketAdapter.linkMarketToPolymarket(friendMarketId, conditionId);
 
-        market.polymarketConditionId = conditionId;
-        market.resolutionType = ResolutionType.PolymarketOracle;
-
+        friendMarkets[friendMarketId].polymarketConditionId = conditionId;
+        friendMarkets[friendMarketId].resolutionType = ResolutionType.PolymarketOracle;
         polymarketConditionToFriendMarkets[conditionId].push(friendMarketId);
 
         emit MarketPeggedToPolymarket(friendMarketId, conditionId);
     }
 
-    /**
-     * @notice Resolve a friend market based on its linked Polymarket condition
-     * @param friendMarketId ID of the friend market
-     */
     function resolveFromPolymarket(uint256 friendMarketId) external nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        if (address(polymarketAdapter) == address(0)) revert PolymarketAdapterNotSet();
 
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (market.polymarketConditionId == bytes32(0)) revert InvalidConditionId();
-        if (market.resolutionType != ResolutionType.PolymarketOracle) revert InvalidResolutionType();
+        (uint256 passNumerator, uint256 failNumerator, , bool resolved) =
+            polymarketAdapter.getResolutionForMarket(friendMarketId);
 
-        // Fetch resolution from Polymarket via adapter
-        (
-            uint256 passNumerator,
-            uint256 failNumerator,
-            uint256 denominator,
-            bool resolved
-        ) = polymarketAdapter.getResolutionForMarket(friendMarketId);
-
-        if (!resolved) revert PolymarketNotResolved();
-
-        // Determine outcome
-        bool outcome;
-        if (passNumerator == failNumerator) {
-            // Tie - default to fail (conservative approach)
-            outcome = false;
-        } else {
-            outcome = passNumerator > failNumerator;
-        }
-
-        // Resolve the market
-        market.active = false;
-        market.status = FriendMarketStatus.Resolved;
-
-        // Track resolution outcome and winner
+        (bool outcome, address winner) = FriendGroupResolutionLib.computePolymarketResolution(
+            friendMarkets[friendMarketId], friendMarketId, passNumerator, failNumerator, resolved, msg.sender
+        );
         wagerOutcome[friendMarketId] = outcome;
         resolvedAt[friendMarketId] = block.timestamp;
-        if (outcome) {
-            wagerWinner[friendMarketId] = market.creator;
-        } else if (market.members.length > 1) {
-            wagerWinner[friendMarketId] = market.members[1];
-        }
-
-        emit PolymarketMarketResolved(
-            friendMarketId,
-            market.polymarketConditionId,
-            passNumerator,
-            failNumerator,
-            outcome
-        );
-        emit MarketResolved(friendMarketId, msg.sender, outcome);
+        wagerWinner[friendMarketId] = winner;
     }
 
-    /**
-     * @notice Batch resolve all friend markets pegged to a Polymarket condition
-     * @param conditionId The Polymarket condition ID
-     */
     function batchResolveFromPolymarket(bytes32 conditionId) external nonReentrant {
         if (address(polymarketAdapter) == address(0)) revert PolymarketAdapterNotSet();
         if (conditionId == bytes32(0)) revert InvalidConditionId();
-
-        // Check if condition is resolved
         if (!polymarketAdapter.isConditionResolved(conditionId)) revert PolymarketNotResolved();
 
-        // Fetch resolution data
         (uint256 passNumerator, uint256 failNumerator, ) = polymarketAdapter.fetchResolution(conditionId);
-
-        // Determine outcome
-        bool outcome = passNumerator > failNumerator;
 
         uint256[] storage peggedMarkets = polymarketConditionToFriendMarkets[conditionId];
 
         for (uint256 i = 0; i < peggedMarkets.length; i++) {
-            uint256 friendMarketId = peggedMarkets[i];
-            FriendMarket storage market = friendMarkets[friendMarketId];
+            uint256 fmId = peggedMarkets[i];
+            FriendMarket storage market = friendMarkets[fmId];
 
             if (market.active && market.resolutionType == ResolutionType.PolymarketOracle) {
-                market.active = false;
-                market.status = FriendMarketStatus.Resolved;
-
-                // Track resolution outcome and winner
-                wagerOutcome[friendMarketId] = outcome;
-                resolvedAt[friendMarketId] = block.timestamp;
-                if (outcome) {
-                    wagerWinner[friendMarketId] = market.creator;
-                } else if (market.members.length > 1) {
-                    wagerWinner[friendMarketId] = market.members[1];
-                }
-
-                emit PolymarketMarketResolved(
-                    friendMarketId,
-                    conditionId,
-                    passNumerator,
-                    failNumerator,
-                    outcome
+                (bool outcome, address winner) = FriendGroupResolutionLib.computePolymarketResolution(
+                    market, fmId, passNumerator, failNumerator, true, msg.sender
                 );
-                emit MarketResolved(friendMarketId, msg.sender, outcome);
+                wagerOutcome[fmId] = outcome;
+                resolvedAt[fmId] = block.timestamp;
+                wagerWinner[fmId] = winner;
             }
         }
     }
@@ -1750,14 +1148,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         return polymarketConditionToFriendMarkets[conditionId];
     }
 
-    /**
-     * @notice Check if a friend market is pegged to Polymarket
-     * @param friendMarketId ID of the friend market
-     */
-    function isPeggedToPolymarket(uint256 friendMarketId) external view returns (bool) {
-        if (friendMarketId >= friendMarketCount) return false;
-        return friendMarkets[friendMarketId].polymarketConditionId != bytes32(0);
-    }
+    // isPeggedToPolymarket removed - check polymarketConditionId from getFriendMarket off-chain
 
     /**
      * @notice Get Polymarket condition ID for a friend market
@@ -1768,320 +1159,73 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         return friendMarkets[friendMarketId].polymarketConditionId;
     }
     
-    /**
-     * @notice Resolve a friend market based on resolution type
-     * @param friendMarketId ID of the friend market
-     * @param outcome True for positive outcome, false for negative
-     * @dev NOTE: This simplified implementation emits events only.
-     * In production, this would integrate with OracleResolver to properly
-     * resolve the underlying ConditionalMarketFactory market and enable
-     * token redemption based on the outcome.
-     */
-    /**
-     * @notice Propose a resolution for a friend market (starts challenge period)
-     * @dev For manual resolutions, this starts a challenge period before finalization
-     * @param friendMarketId ID of the friend market
-     * @param outcome The proposed outcome (true = creator wins, false = opponent wins)
-     */
     function resolveFriendMarket(uint256 friendMarketId, bool outcome) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (market.autoPegged) revert AlreadyPegged();
-
-        bool canResolve = false;
-
-        // Determine resolution authority based on resolutionType
-        if (market.resolutionType == ResolutionType.Either) {
-            // Either creator or opponent can resolve (default behavior)
-            // Also allows arbitrator if set
-            canResolve = msg.sender == market.creator ||
-                         (market.members.length > 1 && msg.sender == market.members[1]) ||
-                         (market.arbitrator != address(0) && msg.sender == market.arbitrator);
-        } else if (market.resolutionType == ResolutionType.Initiator) {
-            // Only creator can resolve
-            canResolve = msg.sender == market.creator;
-        } else if (market.resolutionType == ResolutionType.Receiver) {
-            // Only opponent (second member) can resolve
-            canResolve = market.members.length > 1 && msg.sender == market.members[1];
-        } else if (market.resolutionType == ResolutionType.ThirdParty) {
-            // Only designated arbitrator can resolve
-            canResolve = market.arbitrator != address(0) && msg.sender == market.arbitrator;
-        } else if (market.resolutionType == ResolutionType.AutoPegged) {
-            // Auto-pegged markets should use autoResolvePeggedMarket instead
-            revert NotAuthorized();
-        } else if (market.resolutionType == ResolutionType.PolymarketOracle) {
-            // Polymarket-pegged markets should use resolveFromPolymarket instead
-            revert NotAuthorized();
-        }
-
-        if (!canResolve) revert NotAuthorized();
-
-        // Start challenge period instead of immediate resolution
-        market.active = false;
-        market.status = FriendMarketStatus.PendingResolution;
-
-        uint256 deadline = block.timestamp + challengePeriod;
-        pendingResolutions[friendMarketId] = PendingResolutionData({
-            proposedOutcome: outcome,
-            proposer: msg.sender,
-            proposedAt: block.timestamp,
-            challengeDeadline: deadline,
-            challenger: address(0),
-            challengeBondPaid: 0
-        });
-
-        emit ResolutionProposed(friendMarketId, msg.sender, outcome, deadline);
+        FriendGroupResolutionLib.computeManualResolution(
+            friendMarkets[friendMarketId], pendingResolutions[friendMarketId],
+            friendMarketId, outcome, msg.sender, challengePeriod
+        );
     }
 
-    /**
-     * @notice Challenge a pending resolution
-     * @dev Either party can challenge by posting a bond. Requires arbitrator to resolve.
-     * @param friendMarketId ID of the friend market with pending resolution
-     */
     function challengeResolution(uint256 friendMarketId) external payable {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        if (market.status != FriendMarketStatus.PendingResolution) revert NotPendingResolution();
-
-        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
-        if (block.timestamp >= pending.challengeDeadline) revert ChallengePeriodNotExpired();
-        if (pending.challenger != address(0)) revert AlreadyChallenged();
-
-        // Challenger must be a market participant (not the proposer)
-        bool isParticipant = msg.sender == market.creator ||
-                             (market.members.length > 1 && msg.sender == market.members[1]);
-        if (!isParticipant) revert NotAuthorized();
-        if (msg.sender == pending.proposer) revert NotAuthorized();
-
-        // Require challenge bond
-        if (msg.value < challengeBond) revert InsufficientChallengeBond();
-
-        // Record challenge
-        pending.challenger = msg.sender;
-        pending.challengeBondPaid = msg.value;
-        market.status = FriendMarketStatus.Challenged;
-
-        emit ResolutionChallenged(friendMarketId, msg.sender, msg.value);
+        FriendGroupResolutionLib.computeChallenge(
+            friendMarkets[friendMarketId], pendingResolutions[friendMarketId],
+            friendMarketId, msg.sender, msg.value, challengeBond
+        );
     }
 
-    /**
-     * @notice Finalize a pending resolution after challenge period expires
-     * @dev Can only be called if no challenge was made and period has expired
-     * @param friendMarketId ID of the friend market
-     */
     function finalizeResolution(uint256 friendMarketId) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        if (market.status != FriendMarketStatus.PendingResolution) revert NotPendingResolution();
-
-        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
-        if (block.timestamp < pending.challengeDeadline) revert NotInChallengePeriod();
-
-        // Finalize the resolution
-        bool outcome = pending.proposedOutcome;
-        market.status = FriendMarketStatus.Resolved;
-
-        // Track resolution outcome and winner
+        (bool outcome, address winner) = FriendGroupResolutionLib.computeFinalization(
+            friendMarkets[friendMarketId], pendingResolutions[friendMarketId], friendMarketId
+        );
         wagerOutcome[friendMarketId] = outcome;
         resolvedAt[friendMarketId] = block.timestamp;
-
-        if (outcome) {
-            wagerWinner[friendMarketId] = market.creator;
-        } else if (market.members.length > 1) {
-            wagerWinner[friendMarketId] = market.members[1];
-        }
-
-        emit ResolutionFinalized(friendMarketId, outcome);
-        emit MarketResolved(friendMarketId, pending.proposer, outcome);
+        wagerWinner[friendMarketId] = winner;
     }
 
-    /**
-     * @notice Resolve a disputed/challenged resolution
-     * @dev Only callable by arbitrator when market is in Challenged state
-     * @param friendMarketId ID of the friend market
-     * @param outcome The final outcome decided by arbitrator
-     */
     function resolveDispute(uint256 friendMarketId, bool outcome) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        if (market.status != FriendMarketStatus.Challenged) revert NotChallenged();
-
-        // Only arbitrator can resolve disputes
-        // For markets without arbitrator, owner acts as fallback arbitrator
-        bool canResolveDispute = (market.arbitrator != address(0) && msg.sender == market.arbitrator) ||
-                                  (market.arbitrator == address(0) && msg.sender == owner());
-        if (!canResolveDispute) revert NotAuthorized();
-
-        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
-
-        // Determine who gets the challenge bond
-        // If arbitrator agrees with proposer, challenger loses bond
-        // If arbitrator agrees with challenger, proposer implicitly "loses" (but didn't post bond)
-        address bondRecipient;
-        uint256 bondAmount = pending.challengeBondPaid;
-
-        if (outcome == pending.proposedOutcome) {
-            // Proposer was correct - bond goes to proposer
-            bondRecipient = pending.proposer;
-        } else {
-            // Challenger was correct - return bond to challenger
-            bondRecipient = pending.challenger;
-        }
-
-        // Finalize market
-        market.status = FriendMarketStatus.Resolved;
-        wagerOutcome[friendMarketId] = outcome;
+        (bool finalOutcome, address winner, address bondRecipient, uint256 bondAmount) =
+            FriendGroupResolutionLib.computeDisputeResolution(
+                friendMarkets[friendMarketId], pendingResolutions[friendMarketId],
+                friendMarketId, outcome, msg.sender, owner()
+            );
+        wagerOutcome[friendMarketId] = finalOutcome;
         resolvedAt[friendMarketId] = block.timestamp;
-
-        if (outcome) {
-            wagerWinner[friendMarketId] = market.creator;
-        } else if (market.members.length > 1) {
-            wagerWinner[friendMarketId] = market.members[1];
-        }
-
-        // Transfer bond to recipient
+        wagerWinner[friendMarketId] = winner;
         if (bondAmount > 0) {
             (bool success, ) = payable(bondRecipient).call{value: bondAmount}("");
             if (!success) revert TransferFailed();
         }
-
-        emit DisputeResolved(friendMarketId, msg.sender, outcome, bondRecipient, bondAmount);
-        emit MarketResolved(friendMarketId, msg.sender, outcome);
     }
 
     // ========== Claim Functions ==========
 
-    /**
-     * @notice Claim winnings from a resolved wager
-     * @dev Transfers all staked funds to the winner
-     * @param friendMarketId ID of the resolved friend market
-     */
     function claimWinnings(uint256 friendMarketId) external nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Must be resolved
-        if (market.status != FriendMarketStatus.Resolved) revert WagerNotResolved();
-
-        // Must be the winner
-        address winner = wagerWinner[friendMarketId];
-        if (msg.sender != winner) revert NotWinner();
-
-        // Must not already be claimed
-        if (winningsClaimed[friendMarketId]) revert AlreadyClaimed();
-
-        // Mark as claimed
+        (uint256 amount, address token) = FriendGroupClaimsLib.computeClaim(
+            friendMarkets[friendMarketId], friendMarketId,
+            wagerWinner[friendMarketId], winningsClaimed[friendMarketId],
+            marketTotalStaked[friendMarketId], msg.sender
+        );
         winningsClaimed[friendMarketId] = true;
-
-        // Calculate total pot
-        uint256 totalPot = marketTotalStaked[friendMarketId];
-
-        // Transfer winnings
-        address token = market.stakeToken;
-        if (token == address(0)) {
-            // Native token
-            (bool success, ) = payable(winner).call{value: totalPot}("");
-            if (!success) revert TransferFailed();
-        } else {
-            // ERC20 token
-            (bool success, bytes memory returnData) = token.call(
-                abi.encodeWithSelector(IERC20.transfer.selector, winner, totalPot)
-            );
-            if (!success) revert TransferFailed();
-            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
-        }
-
-        emit WinningsClaimed(friendMarketId, winner, totalPot, token);
+        _transferStake(token, msg.sender, amount);
     }
 
-    /**
-     * @notice Check if a wager has been claimed
-     * @param friendMarketId ID of the friend market
-     */
-    function isWagerClaimed(uint256 friendMarketId) external view returns (bool) {
-        return winningsClaimed[friendMarketId];
-    }
-
-    /**
-     * @notice Sweep unclaimed funds to treasury after claim timeout expires
-     * @dev Anyone can call this after the timeout period for resolved, unclaimed wagers
-     * @param friendMarketId ID of the resolved friend market
-     */
     function sweepUnclaimedFunds(uint256 friendMarketId) external nonReentrant {
-        if (treasury == address(0)) revert TreasuryNotSet();
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Must be resolved
-        if (market.status != FriendMarketStatus.Resolved) revert WagerNotResolved();
-
-        // Must not already be claimed
-        if (winningsClaimed[friendMarketId]) revert AlreadyClaimed();
-
-        // Must be past claim timeout
-        uint256 resolvedTime = resolvedAt[friendMarketId];
-        if (block.timestamp < resolvedTime + claimTimeout) revert ClaimTimeoutNotExpired();
-
-        // Mark as claimed (funds swept)
+        (uint256 amount, address token) = FriendGroupClaimsLib.computeSweep(
+            friendMarkets[friendMarketId], friendMarketId,
+            winningsClaimed[friendMarketId], resolvedAt[friendMarketId],
+            marketTotalStaked[friendMarketId], claimTimeout, treasury
+        );
         winningsClaimed[friendMarketId] = true;
-
-        // Calculate total pot
-        uint256 totalPot = marketTotalStaked[friendMarketId];
-
-        // Transfer to treasury
-        address token = market.stakeToken;
-        if (token == address(0)) {
-            // Native token
-            (bool success, ) = payable(treasury).call{value: totalPot}("");
-            if (!success) revert TransferFailed();
-        } else {
-            // ERC20 token
-            (bool success, bytes memory returnData) = token.call(
-                abi.encodeWithSelector(IERC20.transfer.selector, treasury, totalPot)
-            );
-            if (!success) revert TransferFailed();
-            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
-        }
-
-        emit UnclaimedFundsSwept(friendMarketId, totalPot, token, treasury);
+        _transferStake(token, treasury, amount);
     }
 
-    /**
-     * @notice Check if unclaimed funds can be swept for a market
-     * @param friendMarketId ID of the friend market
-     * @return canSweep Whether the funds can be swept
-     * @return timeUntilSweep Seconds until sweep is allowed (0 if already allowed)
-     */
-    function canSweepUnclaimedFunds(uint256 friendMarketId) external view returns (
-        bool canSweep,
-        uint256 timeUntilSweep
-    ) {
-        if (friendMarketId >= friendMarketCount) {
-            return (false, 0);
-        }
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Must be resolved and not claimed
-        if (market.status != FriendMarketStatus.Resolved || winningsClaimed[friendMarketId]) {
-            return (false, 0);
-        }
-
-        uint256 resolvedTime = resolvedAt[friendMarketId];
-        uint256 sweepTime = resolvedTime + claimTimeout;
-
-        if (block.timestamp >= sweepTime) {
-            return (true, 0);
-        } else {
-            return (false, sweepTime - block.timestamp);
-        }
-    }
+    // canSweepUnclaimedFunds removed - compute off-chain from resolvedAt + claimTimeout
 
     // ========== Oracle Timeout Functions ==========
 
@@ -2093,24 +1237,7 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function setExpectedResolutionTime(uint256 friendMarketId, uint256 timestamp) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Only creator can set expected resolution time
-        if (msg.sender != market.creator) revert NotAuthorized();
-
-        // Must be an oracle-pegged market
-        if (market.resolutionType != ResolutionType.AutoPegged &&
-            market.resolutionType != ResolutionType.PolymarketOracle) {
-            revert NotOraclePegged();
-        }
-
-        // Must be active
-        if (market.status != FriendMarketStatus.Active) revert NotActive();
-
-        // Timestamp must be in the future
-        if (timestamp <= block.timestamp) revert InvalidMarketId();
-
+        FriendGroupClaimsLib.validateSetExpectedResolutionTime(friendMarkets[friendMarketId], timestamp, msg.sender);
         expectedResolutionTime[friendMarketId] = timestamp;
         emit ExpectedResolutionTimeSet(friendMarketId, timestamp);
     }
@@ -2122,30 +1249,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function triggerOracleTimeout(uint256 friendMarketId) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Must be an oracle-pegged market
-        if (market.resolutionType != ResolutionType.AutoPegged &&
-            market.resolutionType != ResolutionType.PolymarketOracle) {
-            revert NotOraclePegged();
-        }
-
-        // Must be active (not already resolved or timed out)
-        if (market.status != FriendMarketStatus.Active) revert NotActive();
-
-        // Must have expected resolution time set
-        uint256 expectedTime = expectedResolutionTime[friendMarketId];
-        if (expectedTime == 0) revert InvalidMarketId();
-
-        // Must be past timeout period
-        if (block.timestamp < expectedTime + oracleTimeout) revert OracleTimeoutNotExpired();
-
-        // Transition to timed out state
-        market.active = false;
-        market.status = FriendMarketStatus.OracleTimedOut;
-
-        emit OracleTimeoutTriggered(friendMarketId, expectedTime, block.timestamp);
+        FriendGroupClaimsLib.computeOracleTimeout(
+            friendMarkets[friendMarketId], friendMarketId,
+            expectedResolutionTime[friendMarketId], oracleTimeout
+        );
     }
 
     /**
@@ -2155,29 +1262,13 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function acceptMutualRefund(uint256 friendMarketId) external nonReentrant {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Must be timed out
-        if (market.status != FriendMarketStatus.OracleTimedOut) revert NotTimedOut();
-
-        // Must be a participant
-        bool isCreator = msg.sender == market.creator;
-        bool isOpponent = market.members.length > 1 && msg.sender == market.members[1];
-        if (!isCreator && !isOpponent) revert NotAuthorized();
-
-        // Must not have already accepted
-        if (refundAccepted[friendMarketId][msg.sender]) revert RefundAlreadyAccepted();
-
-        // Record acceptance
+        bool allAccepted = FriendGroupClaimsLib.computeRefundAcceptance(
+            friendMarkets[friendMarketId], friendMarketId,
+            msg.sender, refundAccepted[friendMarketId][msg.sender], refundAcceptanceCount[friendMarketId]
+        );
         refundAccepted[friendMarketId][msg.sender] = true;
         refundAcceptanceCount[friendMarketId]++;
-
-        emit RefundAccepted(friendMarketId, msg.sender);
-
-        // Check if all parties have accepted (for 1v1, need 2 acceptances)
-        uint256 requiredAcceptances = market.members.length > 1 ? 2 : 1;
-        if (refundAcceptanceCount[friendMarketId] >= requiredAcceptances) {
+        if (allAccepted) {
             _executeRefund(friendMarketId);
         }
     }
@@ -2190,29 +1281,12 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function forceOracleResolution(uint256 friendMarketId, bool outcome) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Must be timed out
-        if (market.status != FriendMarketStatus.OracleTimedOut) revert NotTimedOut();
-
-        // Only arbitrator (or owner as fallback) can force resolution
-        bool canForce = (market.arbitrator != address(0) && msg.sender == market.arbitrator) ||
-                        (market.arbitrator == address(0) && msg.sender == owner());
-        if (!canForce) revert NotAuthorized();
-
-        // Resolve the market
-        market.status = FriendMarketStatus.Resolved;
+        address winner = FriendGroupClaimsLib.computeForceResolution(
+            friendMarkets[friendMarketId], friendMarketId, outcome, msg.sender, owner()
+        );
         wagerOutcome[friendMarketId] = outcome;
         resolvedAt[friendMarketId] = block.timestamp;
-
-        if (outcome) {
-            wagerWinner[friendMarketId] = market.creator;
-        } else if (market.members.length > 1) {
-            wagerWinner[friendMarketId] = market.members[1];
-        }
-
-        emit MarketResolved(friendMarketId, msg.sender, outcome);
+        wagerWinner[friendMarketId] = winner;
     }
 
     /**
@@ -2220,197 +1294,32 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
      */
     function _executeRefund(uint256 friendMarketId) internal {
         FriendMarket storage market = friendMarkets[friendMarketId];
-
-        // Mark as refunded
         market.status = FriendMarketStatus.Refunded;
-        winningsClaimed[friendMarketId] = true; // Prevent further claims
+        winningsClaimed[friendMarketId] = true;
 
-        // Refund each participant their stake
+        FriendGroupClaimsLib.computeRefund(market, friendMarketId);
+
         address token = market.stakeToken;
         uint256 stakePerPerson = market.stakePerParticipant;
-        uint256 totalRefunded = 0;
-
-        // Refund creator
         if (stakePerPerson > 0) {
             _transferStake(token, market.creator, stakePerPerson);
-            totalRefunded += stakePerPerson;
         }
-
-        // Refund opponent (if exists)
         if (market.members.length > 1) {
             _transferStake(token, market.members[1], stakePerPerson);
-            totalRefunded += stakePerPerson;
         }
-
-        emit MutualRefundCompleted(friendMarketId, totalRefunded);
     }
 
-    /**
-     * @dev Internal helper to transfer stake back to participant
-     */
     function _transferStake(address token, address recipient, uint256 amount) internal {
-        if (token == address(0)) {
-            // Native token
-            (bool success, ) = payable(recipient).call{value: amount}("");
-            if (!success) revert TransferFailed();
-        } else {
-            // ERC20 token
-            (bool success, bytes memory returnData) = token.call(
-                abi.encodeWithSelector(IERC20.transfer.selector, recipient, amount)
-            );
-            if (!success) revert TransferFailed();
-            if (returnData.length > 0 && !abi.decode(returnData, (bool))) revert TransferFailed();
-        }
+        FriendGroupCreationLib.transferStake(token, recipient, amount);
     }
 
-    /**
-     * @notice Check if oracle timeout can be triggered
-     * @param friendMarketId ID of the friend market
-     * @return canTrigger Whether timeout can be triggered
-     * @return timeRemaining Seconds until timeout can be triggered (0 if ready)
-     */
-    function canTriggerOracleTimeout(uint256 friendMarketId) external view returns (
-        bool canTrigger,
-        uint256 timeRemaining
-    ) {
-        if (friendMarketId >= friendMarketCount) {
-            return (false, 0);
-        }
+    // canTriggerOracleTimeout removed - compute off-chain from expectedResolutionTime + oracleTimeout
+    // getOracleTimeoutStatus removed - read individual fields via public mappings
 
-        FriendMarket storage market = friendMarkets[friendMarketId];
+    // getWagerResolution removed - use individual mappings: wagerWinner, wagerOutcome, winningsClaimed, resolvedAt, marketTotalStaked
+    // getPendingResolution removed - use public pendingResolutions mapping directly
 
-        // Must be oracle-pegged and active
-        if ((market.resolutionType != ResolutionType.AutoPegged &&
-             market.resolutionType != ResolutionType.PolymarketOracle) ||
-            market.status != FriendMarketStatus.Active) {
-            return (false, 0);
-        }
-
-        uint256 expectedTime = expectedResolutionTime[friendMarketId];
-        if (expectedTime == 0) {
-            return (false, 0);
-        }
-
-        uint256 timeoutTime = expectedTime + oracleTimeout;
-        if (block.timestamp >= timeoutTime) {
-            return (true, 0);
-        } else {
-            return (false, timeoutTime - block.timestamp);
-        }
-    }
-
-    /**
-     * @notice Get oracle timeout status for a market
-     * @param friendMarketId ID of the friend market
-     * @return isTimedOut Whether the market is in timed out state
-     * @return expectedTime Expected resolution timestamp
-     * @return creatorAccepted Whether creator accepted refund
-     * @return opponentAccepted Whether opponent accepted refund
-     */
-    function getOracleTimeoutStatus(uint256 friendMarketId) external view returns (
-        bool isTimedOut,
-        uint256 expectedTime,
-        bool creatorAccepted,
-        bool opponentAccepted
-    ) {
-        if (friendMarketId >= friendMarketCount) {
-            return (false, 0, false, false);
-        }
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-
-        return (
-            market.status == FriendMarketStatus.OracleTimedOut,
-            expectedResolutionTime[friendMarketId],
-            refundAccepted[friendMarketId][market.creator],
-            market.members.length > 1 ? refundAccepted[friendMarketId][market.members[1]] : false
-        );
-    }
-
-    /**
-     * @notice Get wager resolution details
-     * @param friendMarketId ID of the friend market
-     * @return winner The winner's address (zero if not resolved)
-     * @return outcome The resolution outcome (true = creator wins)
-     * @return claimed Whether winnings have been claimed
-     * @return resolvedTimestamp When the wager was resolved
-     * @return totalPot Total amount to be claimed
-     */
-    function getWagerResolution(uint256 friendMarketId) external view returns (
-        address winner,
-        bool outcome,
-        bool claimed,
-        uint256 resolvedTimestamp,
-        uint256 totalPot
-    ) {
-        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        return (
-            wagerWinner[friendMarketId],
-            wagerOutcome[friendMarketId],
-            winningsClaimed[friendMarketId],
-            resolvedAt[friendMarketId],
-            marketTotalStaked[friendMarketId]
-        );
-    }
-
-    /**
-     * @notice Get pending resolution details for a market
-     * @param friendMarketId ID of the friend market
-     * @return proposedOutcome The proposed outcome
-     * @return proposer Address that proposed the resolution
-     * @return proposedAt Timestamp when resolution was proposed
-     * @return challengeDeadline When challenge period ends
-     * @return challenger Address that challenged (zero if none)
-     * @return challengeBondPaid Amount of challenge bond paid
-     */
-    function getPendingResolution(uint256 friendMarketId) external view returns (
-        bool proposedOutcome,
-        address proposer,
-        uint256 proposedAt,
-        uint256 challengeDeadline,
-        address challenger,
-        uint256 challengeBondPaid
-    ) {
-        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-
-        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
-        return (
-            pending.proposedOutcome,
-            pending.proposer,
-            pending.proposedAt,
-            pending.challengeDeadline,
-            pending.challenger,
-            pending.challengeBondPaid
-        );
-    }
-
-    /**
-     * @notice Check if a market can be finalized (challenge period expired, not challenged)
-     * @param friendMarketId ID of the friend market
-     * @return canFinalize Whether the market can be finalized
-     * @return timeRemaining Seconds until challenge period expires (0 if expired)
-     */
-    function canFinalizeResolution(uint256 friendMarketId) external view returns (
-        bool canFinalize,
-        uint256 timeRemaining
-    ) {
-        if (friendMarketId >= friendMarketCount) {
-            return (false, 0);
-        }
-
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (market.status != FriendMarketStatus.PendingResolution) {
-            return (false, 0);
-        }
-
-        PendingResolutionData storage pending = pendingResolutions[friendMarketId];
-        if (block.timestamp >= pending.challengeDeadline) {
-            return (true, 0);
-        } else {
-            return (false, pending.challengeDeadline - block.timestamp);
-        }
-    }
+    // canFinalizeResolution removed - compute off-chain from pendingResolutions.challengeDeadline
 
     // ========== Multi-Oracle Registry Functions ==========
 
@@ -2426,25 +1335,23 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         bytes32 conditionId
     ) external {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        if (address(oracleRegistry) == address(0)) revert OracleRegistryNotSet();
         if (conditionId == bytes32(0)) revert InvalidConditionId();
 
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-        if (msg.sender != market.creator) revert NotAuthorized();
-        if (marketOracleCondition[friendMarketId] != bytes32(0)) revert AlreadyPeggedToOracle();
-        if (market.polymarketConditionId != bytes32(0)) revert AlreadyPeggedToPolymarket();
-        if (market.autoPegged) revert AlreadyPegged();
+        FriendGroupResolutionLib.validatePegToOracle(
+            friendMarkets[friendMarketId],
+            marketOracleCondition[friendMarketId],
+            msg.sender,
+            address(oracleRegistry)
+        );
 
         // Verify oracle and condition exist
         address adapter = oracleRegistry.getAdapter(oracleId);
         if (adapter == address(0)) revert InvalidAddress();
         if (!IOracleAdapter(adapter).isConditionSupported(conditionId)) revert InvalidConditionId();
 
-        // Store oracle info
         marketOracleId[friendMarketId] = oracleId;
         marketOracleCondition[friendMarketId] = conditionId;
-        market.resolutionType = ResolutionType.PolymarketOracle; // Reuse oracle type
+        friendMarkets[friendMarketId].resolutionType = ResolutionType.PolymarketOracle;
 
         emit MarketPeggedToOracle(friendMarketId, oracleId, conditionId);
     }
@@ -2457,85 +1364,28 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
         if (address(oracleRegistry) == address(0)) revert OracleRegistryNotSet();
 
-        FriendMarket storage market = friendMarkets[friendMarketId];
-        if (!market.active) revert NotActive();
-
         bytes32 oracleId = marketOracleId[friendMarketId];
         bytes32 conditionId = marketOracleCondition[friendMarketId];
-        if (conditionId == bytes32(0)) revert InvalidConditionId();
-
-        // Get outcome from registry
         (bool outcome, uint256 confidence) = oracleRegistry.resolveCondition(oracleId, conditionId);
-        if (confidence == 0) revert OracleConditionNotResolved();
 
-        // Apply resolution
-        market.active = false;
-        market.status = FriendMarketStatus.Resolved;
+        address winner = FriendGroupResolutionLib.computeOracleResolution(
+            friendMarkets[friendMarketId],
+            friendMarketId,
+            oracleId,
+            conditionId,
+            outcome,
+            confidence,
+            msg.sender
+        );
 
         wagerOutcome[friendMarketId] = outcome;
+        wagerWinner[friendMarketId] = winner;
         resolvedAt[friendMarketId] = block.timestamp;
-
-        // Determine winner based on outcome
-        if (outcome) {
-            wagerWinner[friendMarketId] = market.creator;
-        } else if (market.members.length > 1) {
-            wagerWinner[friendMarketId] = market.members[1];
-        }
-
-        emit OracleMarketResolved(friendMarketId, oracleId, conditionId, outcome);
-        emit MarketResolved(friendMarketId, msg.sender, outcome);
     }
 
-    /**
-     * @notice Check if a friend market is pegged to an oracle
-     * @param friendMarketId ID of the friend market
-     */
-    function isPeggedToOracle(uint256 friendMarketId) external view returns (bool) {
-        if (friendMarketId >= friendMarketCount) return false;
-        return marketOracleCondition[friendMarketId] != bytes32(0);
-    }
-
-    /**
-     * @notice Get oracle info for a friend market
-     * @param friendMarketId ID of the friend market
-     * @return oracleId The oracle identifier
-     * @return conditionId The condition ID
-     */
-    function getOracleInfo(uint256 friendMarketId) external view returns (
-        bytes32 oracleId,
-        bytes32 conditionId
-    ) {
-        if (friendMarketId >= friendMarketCount) revert InvalidMarketId();
-        return (marketOracleId[friendMarketId], marketOracleCondition[friendMarketId]);
-    }
-
-    /**
-     * @notice Check if an oracle condition is resolved and get the outcome
-     * @param friendMarketId ID of the friend market
-     * @return canResolve True if condition is resolved
-     * @return outcome The outcome if resolved
-     */
-    function checkOracleResolution(uint256 friendMarketId) external view returns (
-        bool canResolve,
-        bool outcome
-    ) {
-        if (friendMarketId >= friendMarketCount) return (false, false);
-        if (address(oracleRegistry) == address(0)) return (false, false);
-
-        bytes32 oracleId = marketOracleId[friendMarketId];
-        bytes32 conditionId = marketOracleCondition[friendMarketId];
-        if (conditionId == bytes32(0)) return (false, false);
-
-        address adapter = oracleRegistry.getAdapter(oracleId);
-        if (adapter == address(0)) return (false, false);
-
-        if (!IOracleAdapter(adapter).isConditionResolved(conditionId)) {
-            return (false, false);
-        }
-
-        (bool result, , ) = IOracleAdapter(adapter).getOutcome(conditionId);
-        return (true, result);
-    }
+    // isPeggedToOracle removed - check marketOracleCondition mapping off-chain
+    // getOracleInfo removed - read marketOracleId/marketOracleCondition mappings off-chain
+    // checkOracleResolution removed - query oracle adapter directly off-chain
 
     /**
      * @notice Withdraw accumulated fees (owner only)

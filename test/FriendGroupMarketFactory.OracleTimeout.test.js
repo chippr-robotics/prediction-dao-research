@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 // Resolution type enum
 const ResolutionType = {
@@ -105,7 +106,7 @@ describe("FriendGroupMarketFactory - Oracle Timeout", function () {
     await paymentManager.waitForDeployment();
 
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
@@ -230,7 +231,7 @@ describe("FriendGroupMarketFactory - Oracle Timeout", function () {
 
       await expect(
         friendGroupFactory.connect(addr1).setExpectedResolutionTime(0, pastTime)
-      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidMarketId");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidTimestamp");
     });
   });
 
@@ -275,7 +276,7 @@ describe("FriendGroupMarketFactory - Oracle Timeout", function () {
 
       await expect(
         friendGroupFactory.triggerOracleTimeout(0)
-      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidMarketId");
+      ).to.be.revertedWithCustomError(friendGroupFactory, "InvalidTimestamp");
     });
   });
 
@@ -387,8 +388,8 @@ describe("FriendGroupMarketFactory - Oracle Timeout", function () {
       const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
       expect(marketWithStatus.status).to.equal(FriendMarketStatus.Resolved);
 
-      const resolution = await friendGroupFactory.getWagerResolution(0);
-      expect(resolution.winner).to.equal(addr1.address);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      expect(winner).to.equal(addr1.address);
     });
 
     it("Should allow owner to force resolution when no arbitrator", async function () {
@@ -417,8 +418,8 @@ describe("FriendGroupMarketFactory - Oracle Timeout", function () {
 
       await friendGroupFactory.connect(owner).forceOracleResolution(1, false);
 
-      const resolution = await friendGroupFactory.getWagerResolution(1);
-      expect(resolution.winner).to.equal(addr2.address);
+      const winner = await friendGroupFactory.wagerWinner(1);
+      expect(winner).to.equal(addr2.address);
     });
 
     it("Should reject force resolution from non-arbitrator", async function () {
@@ -454,49 +455,62 @@ describe("FriendGroupMarketFactory - Oracle Timeout", function () {
   });
 
   describe("View Functions", function () {
-    it("canTriggerOracleTimeout should return correct state", async function () {
+    it("canTriggerOracleTimeout equivalent: compute from expectedResolutionTime and oracleTimeout", async function () {
       await createOraclePeggedMarket();
       const latestBlock = await ethers.provider.getBlock('latest');
       const expectedTime = latestBlock.timestamp + 7 * ONE_DAY;
       await friendGroupFactory.connect(addr1).setExpectedResolutionTime(0, expectedTime);
 
-      // Before timeout
-      let [canTrigger, timeRemaining] = await friendGroupFactory.canTriggerOracleTimeout(0);
+      // Before timeout - compute canTrigger locally
+      const storedExpectedTime = await friendGroupFactory.expectedResolutionTime(0);
+      const storedOracleTimeout = await friendGroupFactory.oracleTimeout();
+      const deadline = storedExpectedTime + storedOracleTimeout;
+      let currentBlock = await ethers.provider.getBlock('latest');
+      let canTrigger = BigInt(currentBlock.timestamp) >= deadline;
+      let timeRemaining = canTrigger ? 0n : deadline - BigInt(currentBlock.timestamp);
       expect(canTrigger).to.equal(false);
       expect(timeRemaining).to.be.closeTo(7 * ONE_DAY + THIRTY_DAYS, 5);
 
       // After timeout
       await time.increase(7 * ONE_DAY + THIRTY_DAYS + 1);
-      [canTrigger, timeRemaining] = await friendGroupFactory.canTriggerOracleTimeout(0);
+      currentBlock = await ethers.provider.getBlock('latest');
+      canTrigger = BigInt(currentBlock.timestamp) >= deadline;
+      timeRemaining = canTrigger ? 0n : deadline - BigInt(currentBlock.timestamp);
       expect(canTrigger).to.equal(true);
-      expect(timeRemaining).to.equal(0);
+      expect(timeRemaining).to.equal(0n);
     });
 
-    it("getOracleTimeoutStatus should return correct data", async function () {
+    it("getOracleTimeoutStatus equivalent: read status, expectedResolutionTime, and refundAccepted", async function () {
       await createOraclePeggedMarket();
       const latestBlock = await ethers.provider.getBlock('latest');
       const expectedTime = latestBlock.timestamp + 7 * ONE_DAY;
       await friendGroupFactory.connect(addr1).setExpectedResolutionTime(0, expectedTime);
 
-      // Before timeout
-      let status = await friendGroupFactory.getOracleTimeoutStatus(0);
-      expect(status.isTimedOut).to.equal(false);
-      expect(status.expectedTime).to.equal(expectedTime);
-      expect(status.creatorAccepted).to.equal(false);
-      expect(status.opponentAccepted).to.equal(false);
+      // Before timeout - check individual fields
+      let marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
+      let isTimedOut = marketWithStatus.status === BigInt(FriendMarketStatus.OracleTimedOut);
+      let storedExpectedTime = await friendGroupFactory.expectedResolutionTime(0);
+      let creatorAccepted = await friendGroupFactory.refundAccepted(0, addr1.address);
+      let opponentAccepted = await friendGroupFactory.refundAccepted(0, addr2.address);
+      expect(isTimedOut).to.equal(false);
+      expect(storedExpectedTime).to.equal(expectedTime);
+      expect(creatorAccepted).to.equal(false);
+      expect(opponentAccepted).to.equal(false);
 
       // After timeout triggered
       await time.increase(7 * ONE_DAY + THIRTY_DAYS + 1);
       await friendGroupFactory.triggerOracleTimeout(0);
 
-      status = await friendGroupFactory.getOracleTimeoutStatus(0);
-      expect(status.isTimedOut).to.equal(true);
+      marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
+      isTimedOut = marketWithStatus.status === BigInt(FriendMarketStatus.OracleTimedOut);
+      expect(isTimedOut).to.equal(true);
 
       // After creator accepts
       await friendGroupFactory.connect(addr1).acceptMutualRefund(0);
-      status = await friendGroupFactory.getOracleTimeoutStatus(0);
-      expect(status.creatorAccepted).to.equal(true);
-      expect(status.opponentAccepted).to.equal(false);
+      creatorAccepted = await friendGroupFactory.refundAccepted(0, addr1.address);
+      opponentAccepted = await friendGroupFactory.refundAccepted(0, addr2.address);
+      expect(creatorAccepted).to.equal(true);
+      expect(opponentAccepted).to.equal(false);
     });
   });
 

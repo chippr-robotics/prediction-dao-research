@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 const ONE_DAY = 86400;
 
@@ -99,7 +100,7 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
     await paymentManager.waitForDeployment();
 
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
@@ -219,7 +220,10 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       await resolveAndFinalizeMarket(0, addr1, true);
 
       // Check winner is set correctly
-      const [winner, outcome, claimed, resolvedAt, pot] = await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      const claimed = await friendGroupFactory.winningsClaimed(0);
+      const pot = await friendGroupFactory.marketTotalStaked(0);
       expect(winner).to.equal(addr1.address);
       expect(outcome).to.equal(true);
       expect(claimed).to.equal(false);
@@ -243,7 +247,7 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
         .withArgs(0, addr1.address, totalPot, ethers.ZeroAddress);
 
       // Verify claimed state
-      expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(true);
+      expect(await friendGroupFactory.winningsClaimed(0)).to.equal(true);
     });
 
     it("Should allow opponent to claim winnings when they win (native token)", async function () {
@@ -255,7 +259,9 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       await resolveAndFinalizeMarket(0, addr1, false);
 
       // Check winner is set correctly
-      const [winner, outcome, claimed, , pot] = await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      const pot = await friendGroupFactory.marketTotalStaked(0);
       expect(winner).to.equal(addr2.address);
       expect(outcome).to.equal(false);
       expect(pot).to.equal(totalPot);
@@ -422,8 +428,11 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
     it("Should return correct details for unresolved market", async function () {
       await createAndActivateNativeMarket();
 
-      const [winner, outcome, claimed, resolvedAt, totalPot] =
-        await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      const claimed = await friendGroupFactory.winningsClaimed(0);
+      const resolvedAt = await friendGroupFactory.resolvedAt(0);
+      const totalPot = await friendGroupFactory.marketTotalStaked(0);
 
       expect(winner).to.equal(ethers.ZeroAddress);
       expect(outcome).to.equal(false);
@@ -436,8 +445,11 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       await createAndActivateNativeMarket();
       await resolveAndFinalizeMarket(0, addr1, true);
 
-      const [winner, outcome, claimed, resolvedAt, totalPot] =
-        await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      const claimed = await friendGroupFactory.winningsClaimed(0);
+      const resolvedAt = await friendGroupFactory.resolvedAt(0);
+      const totalPot = await friendGroupFactory.marketTotalStaked(0);
 
       expect(winner).to.equal(addr1.address);
       expect(outcome).to.equal(true);
@@ -451,8 +463,11 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       await resolveAndFinalizeMarket(0, addr1, true);
       await friendGroupFactory.connect(addr1).claimWinnings(0);
 
-      const [winner, outcome, claimed, resolvedAt, totalPot] =
-        await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      const claimed = await friendGroupFactory.winningsClaimed(0);
+      const resolvedAt = await friendGroupFactory.resolvedAt(0);
+      const totalPot = await friendGroupFactory.marketTotalStaked(0);
 
       expect(winner).to.equal(addr1.address);
       expect(outcome).to.equal(true);
@@ -461,16 +476,16 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
       expect(totalPot).to.equal(ethers.parseEther("1"));
     });
 
-    it("isWagerClaimed should return correct state", async function () {
+    it("winningsClaimed should return correct state", async function () {
       await createAndActivateNativeMarket();
 
-      expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(false);
+      expect(await friendGroupFactory.winningsClaimed(0)).to.equal(false);
 
       await resolveAndFinalizeMarket(0, addr1, true);
-      expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(false);
+      expect(await friendGroupFactory.winningsClaimed(0)).to.equal(false);
 
       await friendGroupFactory.connect(addr1).claimWinnings(0);
-      expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(true);
+      expect(await friendGroupFactory.winningsClaimed(0)).to.equal(true);
     });
   });
 
@@ -519,8 +534,8 @@ describe("FriendGroupMarketFactory - Claim Winnings", function () {
         .to.emit(friendGroupFactory, "WinningsClaimed");
 
       // Both should be marked as claimed
-      expect(await friendGroupFactory.isWagerClaimed(0)).to.equal(true);
-      expect(await friendGroupFactory.isWagerClaimed(1)).to.equal(true);
+      expect(await friendGroupFactory.winningsClaimed(0)).to.equal(true);
+      expect(await friendGroupFactory.winningsClaimed(1)).to.equal(true);
     });
   });
 

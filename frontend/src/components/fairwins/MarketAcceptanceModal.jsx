@@ -331,11 +331,19 @@ function MarketAcceptanceModal({
       // may not fully propagate cross-contract revert reasons (e.g. ETC Mordor).
       console.log('Running pre-flight activation check...')
       try {
-        const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
-        const currentAccepted = Number(acceptanceStatus.accepted)
-        const required = Number(acceptanceStatus.required)
-        const arbitratorRequired = acceptanceStatus.arbitratorRequired
-        const arbitratorAccepted = acceptanceStatus.arbitratorAccepted
+        const [acceptedCountRaw, marketData] = await Promise.all([
+          contract.acceptedParticipantCount(marketId),
+          contract.getFriendMarketWithStatus(marketId)
+        ])
+        const currentAccepted = Number(acceptedCountRaw)
+        const required = Number(marketData.minAcceptanceThreshold)
+        const arbitratorAddr = marketData.arbitrator
+        const arbitratorRequired = arbitratorAddr && arbitratorAddr !== ethers.ZeroAddress
+        let arbitratorAccepted = true
+        if (arbitratorRequired) {
+          const arbRecord = await contract.getParticipantAcceptance(marketId, arbitratorAddr)
+          arbitratorAccepted = arbRecord.hasAccepted
+        }
 
         // Will this acceptance trigger market activation?
         // Activation triggers when accepted >= required AND arbitrator is OK
@@ -345,9 +353,10 @@ function MarketAcceptanceModal({
 
         if (willTriggerActivation) {
           // Check if the proposalId already exists in ConditionalMarketFactory.
-          // The deployed contract uses: proposalId = friendMarketId + 10_000_000_000
-          const PROPOSAL_ID_OFFSET = 10_000_000_000n
-          const proposalId = BigInt(marketId) + PROPOSAL_ID_OFFSET
+          // The deployed contract uses: proposalId = keccak256(abi.encodePacked(contractAddress, friendMarketId))
+          const contractAddress = getContractAddress('friendGroupMarketFactory')
+          const encoded = ethers.solidityPacked(['address', 'uint256'], [contractAddress, marketId])
+          const proposalId = BigInt(ethers.keccak256(encoded))
 
           const cmfAddress = getContractAddress('marketFactory')
           if (cmfAddress) {
