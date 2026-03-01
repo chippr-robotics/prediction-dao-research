@@ -81,7 +81,7 @@ function MarketAcceptancePage() {
   useEffect(() => {
     const fetchMarketData = async () => {
       if (!marketId) {
-        setError('No market ID provided')
+        setError('No wager ID provided')
         setLoading(false)
         return
       }
@@ -163,10 +163,14 @@ function MarketAcceptancePage() {
           // Format stake amount with correct decimals
           const stakeAmount = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
 
+          // Get resolution type and odds from contract
+          const resolutionType = Number(marketResult.resolutionType)
+          const opponentOddsMultiplier = Number(marketResult.opponentOddsMultiplier)
+
           // Handle encrypted descriptions - show placeholder instead of JSON
           const rawDescription = marketResult.description
           const displayDescription = isEncryptedDescription(rawDescription)
-            ? 'Encrypted Market (details visible to participants)'
+            ? 'Encrypted Wager (details visible to participants)'
             : rawDescription
 
           // Get createdAt from full market result
@@ -220,6 +224,8 @@ function MarketAcceptancePage() {
             stakeTokenSymbol: tokenSymbol,
             acceptances,
             acceptedCount: Number(acceptanceStatus.accepted),
+            opponentOddsMultiplier,
+            resolutionType,
             // Add market end date info
             createdAt,
             tradingPeriodSeconds: tradingPeriodSeconds || tradingPeriodFromMetadata,
@@ -233,7 +239,7 @@ function MarketAcceptancePage() {
           if (urlCreator && urlStake) {
             setMarketData({
               id: marketId,
-              description: 'Market details will load when connected...',
+              description: 'Offer details will load when connected...',
               creator: urlCreator,
               participants: [],
               arbitrator: null,
@@ -248,7 +254,7 @@ function MarketAcceptancePage() {
               acceptedCount: 0
             })
           } else {
-            setError('Failed to load market data. Please ensure you are connected to the correct network.')
+            setError('Failed to load offer data. Please ensure you are connected to the correct network.')
           }
         }
       } else {
@@ -256,7 +262,7 @@ function MarketAcceptancePage() {
         if (urlCreator && urlStake) {
           setMarketData({
             id: marketId,
-            description: 'Connect wallet to view full market details',
+            description: 'Connect wallet to view full offer details',
             creator: urlCreator,
             participants: [],
             arbitrator: null,
@@ -271,7 +277,7 @@ function MarketAcceptancePage() {
             acceptedCount: 0
           })
         } else {
-          setError('Please connect your wallet to view market details')
+          setError('Please connect your wallet to view offer details')
         }
       }
 
@@ -295,7 +301,7 @@ function MarketAcceptancePage() {
     return (
       <div className="map-loading">
         <div className="map-spinner"></div>
-        <p>Loading market details...</p>
+        <p>Loading offer details...</p>
       </div>
     )
   }
@@ -304,7 +310,7 @@ function MarketAcceptancePage() {
     return (
       <div className="map-error">
         <div className="map-error-icon">&#9888;</div>
-        <h2>Unable to Load Market</h2>
+        <h2>Unable to Load Offer</h2>
         <p>{error}</p>
         <button className="map-btn" onClick={handleClose}>
           Go Back

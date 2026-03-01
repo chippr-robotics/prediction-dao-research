@@ -26,7 +26,7 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
     // First check decrypted metadata (from useDecryptedMarkets hook)
     if (market.metadata && market.canView !== false) {
       const title = market.metadata.name || market.metadata.description || market.metadata.question
-      if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+      if (title && title !== 'Private Market' && title !== 'Private Wager' && title !== 'Encrypted Market' && title !== 'Encrypted Wager') {
         return title
       }
     }
@@ -35,7 +35,7 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
     if (market.marketType === 'friend') {
       const desc = market.description
       // Skip placeholder values
-      if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+      if (desc && desc !== 'Encrypted Market' && desc !== 'Encrypted Wager' && desc !== 'Private Market' && desc !== 'Private Wager') {
         return desc
       }
       // If encrypted/private, show stake info
@@ -98,7 +98,7 @@ function MarketTile({ market, onClick, isActive = false, compact = false }) {
       </div>
 
       <h3 className="tile-title">
-        {isPrivateMarket && <span className="private-icon" title="Private Market">🔒 </span>}
+        {isPrivateMarket && <span className="private-icon" title="Private Wager">🔒 </span>}
         {displayTitle}
       </h3>
 

@@ -57,18 +57,18 @@ const getMarketDescription = (market) => {
   if (market.metadata && market.canView !== false) {
     // Decrypted metadata may have name, description, or question field
     const title = market.metadata.name || market.metadata.description || market.metadata.question
-    if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+    if (title && title !== 'Private Market' && title !== 'Private Wager' && title !== 'Encrypted Market' && title !== 'Encrypted Wager') {
       return title
     }
   }
 
   // Check raw description, skip placeholder values
   const desc = market.description
-  if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+  if (desc && desc !== 'Encrypted Market' && desc !== 'Encrypted Wager' && desc !== 'Private Market' && desc !== 'Private Wager') {
     return desc
   }
 
-  // For encrypted/private markets, show stake and time info instead of "Market #X"
+  // For encrypted/private wagers, show stake and time info instead of generic label
   const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
   return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
 }
@@ -408,7 +408,7 @@ function FriendMarketsModal({
       handleFormChange('peggedMarketId', marketLookupId)
     } catch (error) {
       console.error('Market lookup error:', error)
-      setMarketLookupError('Market not found or unable to fetch details')
+      setMarketLookupError('Wager not found or unable to fetch details')
     } finally {
       setMarketLookupLoading(false)
     }
@@ -507,7 +507,7 @@ function FriendMarketsModal({
       await tx.wait()
       console.log('Market cancelled successfully')
 
-      window.alert('Market cancelled. Stakes have been refunded.')
+      window.alert('Wager cancelled. Stakes have been refunded.')
       // Refresh to show updated state
       window.location.reload()
     } catch (error) {
@@ -685,9 +685,9 @@ function FriendMarketsModal({
         if (!formData.arbitrator || !formData.arbitrator.trim()) {
           newErrors.arbitrator = 'Linked market ID is required for auto-pegged resolution'
         } else if (!/^\d+$/.test(formData.arbitrator.trim())) {
-          newErrors.arbitrator = 'Market ID must be a number'
+          newErrors.arbitrator = 'Wager ID must be a number'
         } else if (parseInt(formData.arbitrator.trim(), 10) < 0) {
-          newErrors.arbitrator = 'Market ID must be a positive number'
+          newErrors.arbitrator = 'Wager ID must be a positive number'
         }
       }
     }
@@ -862,7 +862,7 @@ function FriendMarketsModal({
       setCreationStep('success')
     } catch (error) {
       console.error('Error creating friend market:', error)
-      const errorMessage = error.message || 'Failed to create market. Please try again.'
+      const errorMessage = error.message || 'Failed to create wager. Please try again.'
       setErrors({ submit: errorMessage })
       // Reset step to 'idle' so the error banner is visible
       // (TransactionProgress unmounts when submitting=false, and
@@ -956,7 +956,7 @@ function FriendMarketsModal({
       if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
         setResolveError('Transaction rejected in wallet.')
       } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
-        setResolveError('Market is not active. It may already be resolved or still pending acceptance.')
+        setResolveError('Wager is not active. It may already be resolved or still pending acceptance.')
       } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
         setResolveError('You are not authorized to resolve this market.')
       } else {
@@ -1201,7 +1201,7 @@ function FriendMarketsModal({
               {/* Type Selection Step */}
               {creationStep === 'type' && (
                 <div className="fm-type-selection">
-                  <h3 className="fm-section-title">Choose Market Type</h3>
+                  <h3 className="fm-section-title">Choose Wager Type</h3>
                   <div className="fm-type-grid">
                     <button
                       className="fm-type-card"
@@ -1457,14 +1457,14 @@ function FriendMarketsModal({
                           <option value={ResolutionType.Initiator}>Creator Only</option>
                           <option value={ResolutionType.Receiver}>Opponent Only</option>
                           <option value={ResolutionType.ThirdParty}>Third Party Arbitrator</option>
-                          <option value={ResolutionType.AutoPegged}>Linked Market (Auto)</option>
+                          <option value={ResolutionType.AutoPegged}>Linked Wager (Auto)</option>
                         </select>
                         <span className="fm-hint">
-                          {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the market'}
-                          {formData.resolutionType === ResolutionType.Initiator && 'Only you (the creator) can resolve the market'}
-                          {formData.resolutionType === ResolutionType.Receiver && 'Only your opponent can resolve the market'}
+                          {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the wager'}
+                          {formData.resolutionType === ResolutionType.Initiator && 'Only you (the creator) can resolve the wager'}
+                          {formData.resolutionType === ResolutionType.Receiver && 'Only your opponent can resolve the wager'}
                           {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
-                          {formData.resolutionType === ResolutionType.AutoPegged && 'Resolution follows a linked public market'}
+                          {formData.resolutionType === ResolutionType.AutoPegged && 'Resolution follows a linked public wager'}
                         </span>
                       </div>
                     )}
@@ -1593,7 +1593,7 @@ function FriendMarketsModal({
                         <label htmlFor="fm-arbitrator">
                           {formData.resolutionType === ResolutionType.ThirdParty
                             ? 'Arbitrator Address'
-                            : 'Linked Market ID'} <span className="fm-required">*</span>
+                            : 'Linked Wager ID'} <span className="fm-required">*</span>
                         </label>
                         <div className="fm-input-with-action">
                           <input
@@ -1603,7 +1603,7 @@ function FriendMarketsModal({
                             onChange={(e) => handleFormChange('arbitrator', e.target.value)}
                             placeholder={formData.resolutionType === ResolutionType.ThirdParty
                               ? '0x... (trusted third party address)'
-                              : 'Market ID to follow (e.g., 123)'}
+                              : 'Wager ID to follow (e.g., 123)'}
                             disabled={submitting}
                             className={errors.arbitrator ? 'error' : ''}
                           />
@@ -1651,7 +1651,7 @@ function FriendMarketsModal({
                               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                               <path d="M7 11V7a5 5 0 0110 0v4"/>
                             </svg>
-                            Private Market
+                            Private Wager
                           </span>
                         </label>
 
@@ -1667,7 +1667,7 @@ function FriendMarketsModal({
                         <span className="fm-hint">
                           {enableEncryption
                             ? 'End-to-end encrypted with X-Wing (quantum-resistant). Only participants can decrypt.'
-                            : 'Market details will be publicly visible on the blockchain.'}
+                            : 'Wager details will be publicly visible on the blockchain.'}
                         </span>
 
                         {enableEncryption && (
@@ -1735,7 +1735,7 @@ function FriendMarketsModal({
                               type="text"
                               value={marketLookupId}
                               onChange={(e) => setMarketLookupId(e.target.value)}
-                              placeholder="Enter market ID to look up..."
+                              placeholder="Enter wager ID to look up..."
                               disabled={submitting || marketLookupLoading}
                             />
                             <button
@@ -1872,7 +1872,7 @@ function FriendMarketsModal({
                           Creating...
                         </>
                       ) : (
-                        'Create Market'
+                        'Create Wager'
                       )}
                     </button>
                   </div>
@@ -2416,7 +2416,7 @@ function MarketsCompactTable({
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
-                      title={needsUnlock ? 'Click to unlock' : 'Encrypted market'}
+                      title={needsUnlock ? 'Click to unlock' : 'Encrypted wager'}
                     >
                       <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                       <path d="M7 11V7a5 5 0 0110 0v4"/>
@@ -2559,7 +2559,7 @@ function MarketDetailView({
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              title="Encrypted market"
+              title="Encrypted wager"
             >
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
               <path d="M7 11V7a5 5 0 0110 0v4"/>

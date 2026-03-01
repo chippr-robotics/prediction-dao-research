@@ -783,7 +783,7 @@ function getMarketDisplayTitle(market) {
   // First check decrypted metadata (from useDecryptedMarkets hook)
   if (market.metadata && market.canView !== false) {
     const title = market.metadata.name || market.metadata.description || market.metadata.question
-    if (title && title !== 'Private Market' && title !== 'Encrypted Market') {
+    if (title && title !== 'Private Market' && title !== 'Private Wager' && title !== 'Encrypted Market' && title !== 'Encrypted Wager') {
       return title
     }
   }
@@ -792,7 +792,7 @@ function getMarketDisplayTitle(market) {
   if (market.marketType === 'friend') {
     const desc = market.description
     // Skip placeholder values
-    if (desc && desc !== 'Encrypted Market' && desc !== 'Private Market') {
+    if (desc && desc !== 'Encrypted Market' && desc !== 'Encrypted Wager' && desc !== 'Private Market' && desc !== 'Private Wager') {
       return desc
     }
     // If encrypted/private, show stake and time info
@@ -1144,7 +1144,9 @@ function MarketDetailView({
       {market.description &&
        market.proposalTitle &&
        market.description !== 'Encrypted Market' &&
-       market.description !== 'Private Market' && (
+       market.description !== 'Encrypted Wager' &&
+       market.description !== 'Private Market' &&
+       market.description !== 'Private Wager' && (
         <div className="mm-detail-description">
           <p>{market.description}</p>
         </div>
@@ -1152,7 +1154,7 @@ function MarketDetailView({
 
       <div className="mm-detail-grid">
         <div className="mm-detail-item">
-          <span className="mm-detail-label">Market ID</span>
+          <span className="mm-detail-label">Wager ID</span>
           <span className="mm-detail-value">#{market.id}</span>
         </div>
         <div className="mm-detail-item">
