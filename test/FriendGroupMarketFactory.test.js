@@ -497,8 +497,8 @@ describe("FriendGroupMarketFactory", function () {
         { value: stakeAmount }
       );
 
-      // Initially only creator is member
-      const ownerMarkets = await friendGroupFactory.getUserMarkets(owner.address);
+      // Verify creator can see their own markets via getMyMarkets
+      const ownerMarkets = await friendGroupFactory.connect(owner).getMyMarkets();
       expect(ownerMarkets.length).to.equal(1);
     });
   });
@@ -751,11 +751,19 @@ describe("FriendGroupMarketFactory", function () {
       expect(market.description).to.equal("Bet 1");
     });
 
-    it("Should return user markets correctly", async function () {
-      const addr1Markets = await friendGroupFactory.getUserMarkets(addr1.address);
+    it("Should return user markets correctly via getMyMarkets", async function () {
+      const addr1Markets = await friendGroupFactory.connect(addr1).getMyMarkets();
       expect(addr1Markets.length).to.equal(2);
       expect(addr1Markets[0]).to.equal(0);
       expect(addr1Markets[1]).to.equal(1);
+    });
+
+    it("Should emit MemberAdded events during market creation", async function () {
+      // MemberAdded events should have been emitted for both participants
+      // when the 1v1 market was created
+      const filter = friendGroupFactory.filters.MemberAdded(0, null);
+      const events = await friendGroupFactory.queryFilter(filter);
+      expect(events.length).to.be.greaterThanOrEqual(2);
     });
 
     it("Should check membership correctly", async function () {

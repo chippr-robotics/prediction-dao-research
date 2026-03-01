@@ -166,8 +166,8 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     // Friend market ID => FriendMarket
     mapping(uint256 => FriendMarket) public friendMarkets;
     
-    // User => array of friend market IDs they're in
-    mapping(address => uint256[]) public userMarkets;
+    // User => array of friend market IDs they're in (internal to prevent public enumeration)
+    mapping(address => uint256[]) internal userMarkets;
     
     // Member count tracking per market
     mapping(uint256 => uint256) public memberCount;
@@ -790,6 +790,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         userMarkets[msg.sender].push(friendMarketId);
         userMarkets[opponent].push(friendMarketId);
 
+        // Emit MemberAdded for each participant (enables event-based market discovery)
+        emit MemberAdded(friendMarketId, msg.sender);
+        emit MemberAdded(friendMarketId, opponent);
+
         emit MarketCreatedPending(
             friendMarketId,
             msg.sender,
@@ -911,6 +915,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         userMarkets[msg.sender].push(friendMarketId);
         userMarkets[opponent].push(friendMarketId);
 
+        // Emit MemberAdded for each participant (enables event-based market discovery)
+        emit MemberAdded(friendMarketId, msg.sender);
+        emit MemberAdded(friendMarketId, opponent);
+
         emit MarketCreatedPending(
             friendMarketId,
             msg.sender,
@@ -1021,9 +1029,10 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
         marketTotalStaked[friendMarketId] = stakeAmount;
         memberCount[friendMarketId] = allParticipants.length;
 
-        // Add all participants to user markets
+        // Add all participants to user markets and emit MemberAdded for event-based discovery
         for (uint256 i = 0; i < allParticipants.length; i++) {
             userMarkets[allParticipants[i]].push(friendMarketId);
+            emit MemberAdded(friendMarketId, allParticipants[i]);
         }
 
         emit MarketCreatedPending(
@@ -1425,13 +1434,52 @@ contract FriendGroupMarketFactory is Ownable, ReentrancyGuard {
     }
     
     /**
-     * @notice Get all markets for a user
-     * @param user Address of the user
+     * @notice Get your own markets (privacy-preserving: only callable by the user themselves)
+     * @dev External callers cannot enumerate another user's bets. Use MemberAdded events for discovery.
      */
-    function getUserMarkets(address user) external view returns (uint256[] memory) {
-        return userMarkets[user];
+    function getMyMarkets() external view returns (uint256[] memory) {
+        return userMarkets[msg.sender];
     }
-    
+
+    /**
+     * @notice Batch fetch market summaries to reduce RPC round-trips
+     * @param ids Array of friend market IDs to fetch
+     * @return statuses Array of market statuses (uint8)
+     * @return creators Array of creator addresses
+     * @return stakeTokens Array of stake token addresses
+     * @return stakeAmounts Array of stake amounts per participant
+     * @return acceptedCounts Array of accepted participant counts
+     * @return acceptanceDeadlines Array of acceptance deadlines
+     */
+    function getFriendMarketsBatch(uint256[] calldata ids) external view returns (
+        uint8[] memory statuses,
+        address[] memory creators,
+        address[] memory stakeTokens,
+        uint256[] memory stakeAmounts,
+        uint256[] memory acceptedCounts,
+        uint256[] memory acceptanceDeadlines
+    ) {
+        uint256 len = ids.length;
+        statuses = new uint8[](len);
+        creators = new address[](len);
+        stakeTokens = new address[](len);
+        stakeAmounts = new uint256[](len);
+        acceptedCounts = new uint256[](len);
+        acceptanceDeadlines = new uint256[](len);
+
+        for (uint256 i = 0; i < len; i++) {
+            if (ids[i] < friendMarketCount) {
+                FriendMarket storage market = friendMarkets[ids[i]];
+                statuses[i] = uint8(market.status);
+                creators[i] = market.creator;
+                stakeTokens[i] = market.stakeToken;
+                stakeAmounts[i] = market.stakePerParticipant;
+                acceptedCounts[i] = acceptedParticipantCount[ids[i]];
+                acceptanceDeadlines[i] = market.acceptanceDeadline;
+            }
+        }
+    }
+
     /**
      * @notice Check if user is a member of a market
      * @param friendMarketId ID of the friend market
