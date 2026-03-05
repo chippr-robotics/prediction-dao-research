@@ -1075,9 +1075,12 @@ function FriendMarketsModal({
   // Filter markets where user is participating
   // Note: Show markets even if canView is false (encrypted), as long as user is a participant
   // They should see these markets with "encrypted" placeholder to prompt acceptance
+  const isTerminalStatus = (status) =>
+    status === 'cancelled' || status === 'canceled' || status === 'resolved' || status === 'refunded' || status === 'oracle_timed_out'
+
   const userActiveMarkets = useMemo(() => {
     return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status !== 'pending_acceptance' && m.status !== 'cancelled' && m.status !== 'canceled'
+      isUserInMarket(m) && m.status !== 'pending_acceptance' && !isTerminalStatus(m.status)
     )
   }, [lazyActiveMarkets, isUserInMarket])
 

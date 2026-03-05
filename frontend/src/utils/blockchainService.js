@@ -1272,7 +1272,7 @@ async function discoverMarketIds(contract, userAddress, provider) {
  */
 function processMarketResult(marketId, marketResult, acceptanceStatus, acceptances) {
   const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
-  const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
+  const statusNames = ['pending_acceptance', 'active', 'pending_resolution', 'challenged', 'resolved', 'cancelled', 'refunded', 'oracle_timed_out']
 
   const stakeToken = marketResult.stakeToken
   const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()

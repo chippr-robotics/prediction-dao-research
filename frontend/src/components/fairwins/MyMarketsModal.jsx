@@ -163,6 +163,9 @@ function MyMarketsModal({
         return MarketStatus.CANCELLED
       }
       if (statusLower === 'resolved') return MarketStatus.RESOLVED
+      if (statusLower === 'refunded') return MarketStatus.REFUNDED
+      if (statusLower === 'oracle_timed_out') return MarketStatus.ORACLE_TIMED_OUT
+      if (statusLower === 'challenged') return MarketStatus.CHALLENGED
 
       // Check for pending_acceptance status (friend markets awaiting participant stakes)
       if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
@@ -210,8 +213,8 @@ function MyMarketsModal({
         return
       }
 
-      // Resolved and cancelled markets go to history
-      if (status === MarketStatus.RESOLVED || status === MarketStatus.CANCELLED) {
+      // Terminal markets go to history
+      if (status === MarketStatus.RESOLVED || status === MarketStatus.CANCELLED || status === MarketStatus.REFUNDED || status === MarketStatus.ORACLE_TIMED_OUT) {
         if (isCreator(market) || isParticipant(market)) {
           history.push(marketWithStatus)
         }
@@ -259,9 +262,12 @@ function MyMarketsModal({
       case MarketStatus.PENDING_ACCEPTANCE: return 'status-pending-acceptance'
       case MarketStatus.ACTIVE: return 'status-active'
       case MarketStatus.PENDING_RESOLUTION: return 'status-pending'
+      case MarketStatus.CHALLENGED: return 'status-disputed'
       case MarketStatus.DISPUTED: return 'status-disputed'
       case MarketStatus.RESOLVED: return 'status-resolved'
       case MarketStatus.CANCELLED: return 'status-cancelled'
+      case MarketStatus.REFUNDED: return 'status-cancelled'
+      case MarketStatus.ORACLE_TIMED_OUT: return 'status-cancelled'
       default: return 'status-default'
     }
   }
@@ -271,9 +277,12 @@ function MyMarketsModal({
       case MarketStatus.PENDING_ACCEPTANCE: return 'Pending Acceptance'
       case MarketStatus.ACTIVE: return 'Active'
       case MarketStatus.PENDING_RESOLUTION: return 'Pending Resolution'
+      case MarketStatus.CHALLENGED: return 'Challenged'
       case MarketStatus.DISPUTED: return 'Disputed'
       case MarketStatus.RESOLVED: return 'Resolved'
       case MarketStatus.CANCELLED: return 'Cancelled'
+      case MarketStatus.REFUNDED: return 'Refunded'
+      case MarketStatus.ORACLE_TIMED_OUT: return 'Timed Out'
       default: return status
     }
   }

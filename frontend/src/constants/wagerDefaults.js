@@ -45,10 +45,13 @@ export const WagerStatus = {
   PENDING_ACCEPTANCE: 'pending_acceptance',
   ACTIVE: 'active',
   PENDING_RESOLUTION: 'pending_resolution',
+  CHALLENGED: 'challenged',
   DISPUTED: 'disputed',
   RESOLVED: 'resolved',
   EXPIRED: 'expired',
   CANCELLED: 'cancelled',
+  REFUNDED: 'refunded',
+  ORACLE_TIMED_OUT: 'oracle_timed_out',
 }
 
 // ── Dispute status strings ──────────────────────────────────────────

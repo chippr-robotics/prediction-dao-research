@@ -47,10 +47,13 @@ function StatusBadge({ status }) {
     [WagerStatus.PENDING_ACCEPTANCE]: { label: 'Pending', className: 'status-pending' },
     [WagerStatus.ACTIVE]: { label: 'Active', className: 'status-active' },
     [WagerStatus.PENDING_RESOLUTION]: { label: 'Resolving', className: 'status-resolving' },
+    [WagerStatus.CHALLENGED]: { label: 'Challenged', className: 'status-disputed' },
     [WagerStatus.DISPUTED]: { label: 'Disputed', className: 'status-disputed' },
     [WagerStatus.RESOLVED]: { label: 'Resolved', className: 'status-resolved' },
     [WagerStatus.EXPIRED]: { label: 'Expired', className: 'status-expired' },
-    [WagerStatus.CANCELLED]: { label: 'Cancelled', className: 'status-expired' }
+    [WagerStatus.CANCELLED]: { label: 'Cancelled', className: 'status-expired' },
+    [WagerStatus.REFUNDED]: { label: 'Refunded', className: 'status-expired' },
+    [WagerStatus.ORACLE_TIMED_OUT]: { label: 'Timed Out', className: 'status-expired' }
   }
 
   const config = statusConfig[status] || { label: status, className: '' }
@@ -499,7 +502,9 @@ function Dashboard({ onConnect }) {
       return endDate <= now ||
              status === 'resolved' ||
              status === 'cancelled' ||
-             status === 'canceled'
+             status === 'canceled' ||
+             status === 'refunded' ||
+             status === 'oracle_timed_out'
     }
 
     return {
@@ -566,7 +571,7 @@ function Dashboard({ onConnect }) {
 
   const pastWagers = useMemo(() => {
     const wagers = demoMode ? mockWagers : liveWagers
-    return wagers.filter(w => w.status === WagerStatus.RESOLVED || w.status === WagerStatus.EXPIRED || w.status === WagerStatus.CANCELLED)
+    return wagers.filter(w => w.status === WagerStatus.RESOLVED || w.status === WagerStatus.EXPIRED || w.status === WagerStatus.CANCELLED || w.status === WagerStatus.REFUNDED || w.status === WagerStatus.ORACLE_TIMED_OUT)
   }, [demoMode, mockWagers, liveWagers])
 
   const handleQuickAction = useCallback((actionId) => {
