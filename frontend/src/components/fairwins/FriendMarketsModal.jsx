@@ -484,6 +484,11 @@ function FriendMarketsModal({
       return
     }
 
+    if (market.status === 'cancelled' || market.status === 'canceled') {
+      window.alert('This wager has already been cancelled.')
+      return
+    }
+
     const marketId = market.id
     if (marketId === undefined || marketId === null) {
       window.alert('Invalid market ID')
@@ -512,7 +517,23 @@ function FriendMarketsModal({
     } catch (error) {
       console.error('Error cancelling market:', error)
       let errorMessage = 'Failed to cancel wager'
-      if (error.reason) {
+
+      // Decode known custom error selectors
+      const errorData = error.data || error.info?.error?.data
+      if (errorData) {
+        const selector = typeof errorData === 'string' ? errorData.slice(0, 10) : null
+        const knownErrors = {
+          '0x7dc6505a': 'This wager is no longer pending — it may have already been cancelled or activated.',
+          '0xba4ef4cb': 'Not authorized to cancel this wager.',
+        }
+        if (selector && knownErrors[selector]) {
+          errorMessage = knownErrors[selector]
+        } else if (error.reason) {
+          errorMessage += `: ${error.reason}`
+        } else if (error.message) {
+          errorMessage += `: ${error.message}`
+        }
+      } else if (error.reason) {
         errorMessage += `: ${error.reason}`
       } else if (error.message) {
         errorMessage += `: ${error.message}`
@@ -1056,14 +1077,14 @@ function FriendMarketsModal({
   // They should see these markets with "encrypted" placeholder to prompt acceptance
   const userActiveMarkets = useMemo(() => {
     return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status !== 'pending_acceptance'
+      isUserInMarket(m) && m.status !== 'pending_acceptance' && m.status !== 'cancelled' && m.status !== 'canceled'
     )
   }, [lazyActiveMarkets, isUserInMarket])
 
-  // Filter pending markets awaiting acceptance (exclude expired)
+  // Filter pending markets awaiting acceptance (exclude expired and cancelled)
   const userPendingMarkets = useMemo(() => {
     return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status === 'pending_acceptance' && !isExpiredInvitation(m)
+      isUserInMarket(m) && m.status === 'pending_acceptance' && !isExpiredInvitation(m) && m.status !== 'cancelled' && m.status !== 'canceled'
     )
   }, [lazyActiveMarkets, isUserInMarket, isExpiredInvitation])
 
@@ -2103,7 +2124,7 @@ function FriendMarketsModal({
                                 </svg>
                                 Share
                               </button>
-                              {isCreator && (
+                              {isCreator && market.status !== 'cancelled' && market.status !== 'canceled' && (
                                 <button
                                   type="button"
                                   className="fm-btn-danger-outline"

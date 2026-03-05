@@ -561,7 +561,7 @@ function Dashboard({ onConnect }) {
 
   const activeWagers = useMemo(() => {
     const wagers = demoMode ? mockWagers : liveWagers
-    return wagers.filter(w => w.status === WagerStatus.ACTIVE || w.status === WagerStatus.PENDING_ACCEPTANCE)
+    return wagers.filter(w => (w.status === WagerStatus.ACTIVE || w.status === WagerStatus.PENDING_ACCEPTANCE) && w.status !== WagerStatus.CANCELLED)
   }, [demoMode, mockWagers, liveWagers])
 
   const pastWagers = useMemo(() => {
