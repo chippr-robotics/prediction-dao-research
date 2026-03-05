@@ -3554,3 +3554,16 @@ export const FriendGroupMarketFactoryABI = [
     "type": "receive"
   }
 ];
+
+// Back-compat alias used by most importers
+export const FRIEND_GROUP_MARKET_FACTORY_ABI = FriendGroupMarketFactoryABI;
+
+// Enum mirrors for Solidity's ResolutionType
+export const ResolutionType = {
+  Either: 0,
+  Initiator: 1,
+  Receiver: 2,
+  ThirdParty: 3,
+  AutoPegged: 4,
+  PolymarketOracle: 5,
+};
