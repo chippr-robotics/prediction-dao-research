@@ -109,7 +109,29 @@ async function main() {
   }
 
   // =========================================================================
-  // Deploy FriendGroupMarketFactory
+  // Deploy FriendGroupMarketFactory Libraries
+  // =========================================================================
+  console.log("\n\n--- Deploying FriendGroupMarketFactory Libraries ---");
+
+  const libraryNames = [
+    "FriendGroupResolutionLib",
+    "FriendGroupClaimsLib",
+    "FriendGroupCreationLib",
+  ];
+  const libraries = {};
+  for (const libName of libraryNames) {
+    const lib = await deployDeterministic(
+      libName,
+      [],
+      generateSalt(saltPrefix + libName),
+      deployer
+    );
+    libraries[libName] = lib.address;
+    deployments[libName] = lib.address;
+  }
+
+  // =========================================================================
+  // Deploy FriendGroupMarketFactory (linked to libraries)
   // =========================================================================
   console.log("\n\n--- Deploying FriendGroupMarketFactory ---");
 
@@ -125,8 +147,9 @@ async function main() {
       rbacDeployment.contracts.membershipPaymentManager,
       deployer.address  // Explicit owner for deterministic deployment
     ],
-    generateSalt(saltPrefix + "FriendGroupMarketFactory-v5"),
-    deployer
+    generateSalt(saltPrefix + "FriendGroupMarketFactory-v7"),
+    deployer,
+    { libraries }
   );
   deployments.friendGroupMarketFactory = friendGroupMarketFactory.address;
 
@@ -232,6 +255,9 @@ async function main() {
 
   const verificationTargets = [
     { name: "CTF1155", address: ctf1155.address, constructorArguments: [] },
+    { name: "FriendGroupResolutionLib", address: deployments.FriendGroupResolutionLib, constructorArguments: [] },
+    { name: "FriendGroupClaimsLib", address: deployments.FriendGroupClaimsLib, constructorArguments: [] },
+    { name: "FriendGroupCreationLib", address: deployments.FriendGroupCreationLib, constructorArguments: [] },
     {
       name: "FriendGroupMarketFactory",
       address: friendGroupMarketFactory.address,
@@ -241,7 +267,8 @@ async function main() {
         rbacDeployment.contracts.tieredRoleManager,
         rbacDeployment.contracts.membershipPaymentManager,
         deployer.address
-      ]
+      ],
+      libraries
     },
   ];
 

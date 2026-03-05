@@ -36,7 +36,7 @@ vi.mock('ethers', async () => {
       ...actual.ethers,
       Contract: vi.fn().mockImplementation(() => ({
         getFriendMarketWithStatus: vi.fn(),
-        getAcceptanceStatus: vi.fn(),
+        acceptedParticipantCount: vi.fn(),
         getParticipantAcceptance: vi.fn()
       })),
       ZeroAddress: '0x0000000000000000000000000000000000000000',

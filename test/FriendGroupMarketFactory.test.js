@@ -1,5 +1,6 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 // Resolution type enum (matches contract)
 const ResolutionType = {
@@ -93,7 +94,7 @@ describe("FriendGroupMarketFactory", function () {
     await paymentManager.waitForDeployment();
     
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),

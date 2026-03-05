@@ -6,7 +6,7 @@
  */
 
 import { ethers } from 'ethers'
-import { getContractAddress, NETWORK_CONFIG } from '../config/contracts'
+import { getContractAddress, NETWORK_CONFIG, DEPLOYMENT_BLOCKS } from '../config/contracts'
 import { MARKET_FACTORY_ABI } from '../abis/ConditionalMarketFactory'
 import { PROPOSAL_REGISTRY_ABI } from '../abis/ProposalRegistry'
 import { WELFARE_METRIC_REGISTRY_ABI } from '../abis/WelfareMetricRegistry'
@@ -338,7 +338,7 @@ async function tryGetMarketTradeStats(contract, marketId, collateralDecimals = 6
   try {
     // Query TokensPurchased events for this market
     const filter = contract.filters.TokensPurchased(marketId)
-    const events = await contract.queryFilter(filter, 0, 'latest')
+    const events = await contract.queryFilter(filter, DEPLOYMENT_BLOCKS.marketFactory || 0, 'latest')
 
     if (events.length === 0) {
       return {
@@ -385,7 +385,7 @@ async function tryGetPriceHistory(contract, marketId, currentPassPrice = 0.5, nu
   try {
     // Query TokensPurchased events for this market
     const filter = contract.filters.TokensPurchased(marketId)
-    const events = await contract.queryFilter(filter, 0, 'latest')
+    const events = await contract.queryFilter(filter, DEPLOYMENT_BLOCKS.marketFactory || 0, 'latest')
 
     if (events.length === 0) {
       // No trades yet - return flat line at current price
@@ -487,7 +487,7 @@ async function tryGetMarketCreationEvent(contract, marketId) {
   try {
     // Query MarketCreated events for this specific market
     const filter = contract.filters.MarketCreated(marketId)
-    const events = await contract.queryFilter(filter, 0, 'latest')
+    const events = await contract.queryFilter(filter, DEPLOYMENT_BLOCKS.marketFactory || 0, 'latest')
 
     if (events.length > 0) {
       const event = events[0]
@@ -1219,8 +1219,9 @@ async function discoverMarketIds(contract, userAddress, provider) {
     return index.marketIds
   }
 
-  // Scan from last indexed block + 1 (or contract deployment block)
-  const fromBlock = index.lastBlock > 0 ? index.lastBlock + 1 : 0
+  // Scan from last indexed block + 1, or contract deployment block on first run
+  const deployBlock = DEPLOYMENT_BLOCKS.friendGroupMarketFactory || 0
+  const fromBlock = index.lastBlock > 0 ? index.lastBlock + 1 : deployBlock
   console.log(`[MarketIndex] Scanning MemberAdded events from block ${fromBlock} to ${currentBlock}`)
 
   // Query MemberAdded events where member = userAddress (indexed topic)
@@ -1426,10 +1427,11 @@ export async function fetchFriendMarketsForUser(userAddress) {
     const freshMarkets = await Promise.all(
       idsToFetch.map(async (marketId) => {
         try {
-          const [marketResult, acceptanceStatus] = await Promise.all([
+          const [marketResult, acceptedCount] = await Promise.all([
             contract.getFriendMarketWithStatus(marketId),
-            contract.getAcceptanceStatus(marketId)
+            contract.acceptedParticipantCount(marketId)
           ])
+          const acceptanceStatus = { accepted: acceptedCount }
 
           // Determine token decimals for formatting
           const stakeToken = marketResult.stakeToken

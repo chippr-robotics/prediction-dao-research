@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 /**
  * UMA Oracle Integration Tests for FriendGroupMarketFactory
@@ -104,7 +105,7 @@ describe("FriendGroupMarketFactory - UMA Integration", function () {
     await paymentManager.waitForDeployment();
 
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
@@ -282,9 +283,10 @@ describe("FriendGroupMarketFactory - UMA Integration", function () {
       ).to.emit(friendGroupFactory, "MarketPeggedToOracle")
         .withArgs(0, UMA_ORACLE_ID, conditionId);
 
-      expect(await friendGroupFactory.isPeggedToOracle(0)).to.be.true;
+      expect(await friendGroupFactory.marketOracleCondition(0)).to.not.equal(ethers.ZeroHash);
 
-      const [oracleId, returnedConditionId] = await friendGroupFactory.getOracleInfo(0);
+      const oracleId = await friendGroupFactory.marketOracleId(0);
+      const returnedConditionId = await friendGroupFactory.marketOracleCondition(0);
       expect(oracleId).to.equal(UMA_ORACLE_ID);
       expect(returnedConditionId).to.equal(conditionId);
     });
@@ -323,7 +325,8 @@ describe("FriendGroupMarketFactory - UMA Integration", function () {
       const market = await friendGroupFactory.friendMarkets(0);
       expect(market.status).to.equal(4); // Resolved
 
-      const [winner, outcome] = await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
       expect(outcome).to.be.true;
       expect(winner).to.equal(creator.address);
     });
@@ -358,7 +361,8 @@ describe("FriendGroupMarketFactory - UMA Integration", function () {
       // Resolve from oracle
       await friendGroupFactory.resolveFromOracle(0);
 
-      const [winner, outcome] = await friendGroupFactory.getWagerResolution(0);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
       expect(outcome).to.be.false;
       expect(winner).to.equal(opponent.address);
     });

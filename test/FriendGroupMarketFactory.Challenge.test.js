@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
+const { getFriendGroupMarketFactoryWithLibs } = require("./helpers/deployFriendGroupFactory");
 
 // Resolution type enum (matches contract)
 const ResolutionType = {
@@ -102,7 +103,7 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
     await paymentManager.waitForDeployment();
 
     // Deploy FriendGroupMarketFactory
-    const FriendGroupMarketFactory = await ethers.getContractFactory("FriendGroupMarketFactory");
+    const FriendGroupMarketFactory = await getFriendGroupMarketFactoryWithLibs();
     friendGroupFactory = await FriendGroupMarketFactory.deploy(
       await marketFactory.getAddress(),
       await ragequitModule.getAddress(),
@@ -171,7 +172,7 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
       expect(marketWithStatus.status).to.equal(FriendMarketStatus.PendingResolution);
 
-      const pending = await friendGroupFactory.getPendingResolution(0);
+      const pending = await friendGroupFactory.pendingResolutions(0);
       expect(pending.proposedOutcome).to.equal(true);
       expect(pending.proposer).to.equal(addr1.address);
       expect(pending.challenger).to.equal(ethers.ZeroAddress);
@@ -187,7 +188,7 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
       expect(marketWithStatus.status).to.equal(FriendMarketStatus.PendingResolution);
 
-      const pending = await friendGroupFactory.getPendingResolution(0);
+      const pending = await friendGroupFactory.pendingResolutions(0);
       expect(pending.proposedOutcome).to.equal(false);
       expect(pending.proposer).to.equal(addr2.address);
     });
@@ -198,7 +199,7 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       const tx = await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
       const block = await ethers.provider.getBlock(tx.blockNumber);
 
-      const pending = await friendGroupFactory.getPendingResolution(0);
+      const pending = await friendGroupFactory.pendingResolutions(0);
       expect(pending.challengeDeadline).to.equal(block.timestamp + ONE_DAY);
     });
 
@@ -221,7 +222,7 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
       expect(marketWithStatus.status).to.equal(FriendMarketStatus.Challenged);
 
-      const pending = await friendGroupFactory.getPendingResolution(0);
+      const pending = await friendGroupFactory.pendingResolutions(0);
       expect(pending.challenger).to.equal(addr2.address);
       expect(pending.challengeBondPaid).to.equal(CHALLENGE_BOND);
 
@@ -235,7 +236,7 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
 
       await friendGroupFactory.connect(addr1).challengeResolution(0, { value: CHALLENGE_BOND });
 
-      const pending = await friendGroupFactory.getPendingResolution(0);
+      const pending = await friendGroupFactory.pendingResolutions(0);
       expect(pending.challenger).to.equal(addr1.address);
     });
 
@@ -302,9 +303,10 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
       expect(marketWithStatus.status).to.equal(FriendMarketStatus.Resolved);
 
-      const resolution = await friendGroupFactory.getWagerResolution(0);
-      expect(resolution.winner).to.equal(addr1.address);
-      expect(resolution.outcome).to.equal(true);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      expect(winner).to.equal(addr1.address);
+      expect(outcome).to.equal(true);
 
       await expect(tx).to.emit(friendGroupFactory, "ResolutionFinalized")
         .withArgs(0, true);
@@ -354,9 +356,10 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
       expect(marketWithStatus.status).to.equal(FriendMarketStatus.Resolved);
 
-      const resolution = await friendGroupFactory.getWagerResolution(0);
-      expect(resolution.winner).to.equal(addr2.address);
-      expect(resolution.outcome).to.equal(false);
+      const winner = await friendGroupFactory.wagerWinner(0);
+      const outcome = await friendGroupFactory.wagerOutcome(0);
+      expect(winner).to.equal(addr2.address);
+      expect(outcome).to.equal(false);
 
       await expect(tx).to.emit(friendGroupFactory, "DisputeResolved");
     });
@@ -422,31 +425,40 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
   });
 
   describe("View Functions", function () {
-    it("canFinalizeResolution should return correct state", async function () {
+    it("should be able to determine finalization readiness from pendingResolutions", async function () {
       await createAndActivateMarket();
 
-      // Before proposal
-      let [canFinalize, timeRemaining] = await friendGroupFactory.canFinalizeResolution(0);
-      expect(canFinalize).to.equal(false);
+      // Before proposal - challengeDeadline should be 0
+      let pending = await friendGroupFactory.pendingResolutions(0);
+      expect(pending.challengeDeadline).to.equal(0);
 
-      // After proposal, before expiry
+      // After proposal, before expiry - challengeDeadline should be in the future
       await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
-      [canFinalize, timeRemaining] = await friendGroupFactory.canFinalizeResolution(0);
-      expect(canFinalize).to.equal(false);
-      expect(timeRemaining).to.be.closeTo(ONE_DAY, 5);
+      pending = await friendGroupFactory.pendingResolutions(0);
+      const latestBlock = await ethers.provider.getBlock("latest");
+      expect(pending.challengeDeadline).to.be.gt(latestBlock.timestamp);
 
-      // After expiry
+      // Finalization should revert before challenge period expires
+      await expect(
+        friendGroupFactory.finalizeResolution(0)
+      ).to.be.revertedWithCustomError(friendGroupFactory, "NotInChallengePeriod");
+
+      // After expiry - block.timestamp should be past challengeDeadline
       await time.increase(ONE_DAY + 1);
-      [canFinalize, timeRemaining] = await friendGroupFactory.canFinalizeResolution(0);
-      expect(canFinalize).to.equal(true);
-      expect(timeRemaining).to.equal(0);
+      const laterBlock = await ethers.provider.getBlock("latest");
+      expect(laterBlock.timestamp).to.be.gte(pending.challengeDeadline);
+
+      // Finalization should succeed after challenge period expires
+      await friendGroupFactory.finalizeResolution(0);
+      const marketWithStatus = await friendGroupFactory.getFriendMarketWithStatus(0);
+      expect(marketWithStatus.status).to.equal(FriendMarketStatus.Resolved);
     });
 
-    it("getPendingResolution should return correct data", async function () {
+    it("pendingResolutions mapping should return correct data", async function () {
       await createAndActivateMarket();
       await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
 
-      const pending = await friendGroupFactory.getPendingResolution(0);
+      const pending = await friendGroupFactory.pendingResolutions(0);
       expect(pending.proposedOutcome).to.equal(true);
       expect(pending.proposer).to.equal(addr1.address);
       expect(pending.proposedAt).to.be.gt(0);

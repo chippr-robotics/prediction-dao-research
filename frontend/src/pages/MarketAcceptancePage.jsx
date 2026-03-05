@@ -105,7 +105,8 @@ function MarketAcceptancePage() {
 
           // Fetch market details with status
           const marketResult = await contract.getFriendMarketWithStatus(marketId)
-          const acceptanceStatus = await contract.getAcceptanceStatus(marketId)
+          const acceptedCount = await contract.acceptedParticipantCount(marketId)
+          const acceptanceStatus = { accepted: acceptedCount }
 
           // Also fetch full market details to get createdAt
           const fullMarketResult = await contract.getFriendMarket(marketId)

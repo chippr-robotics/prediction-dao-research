@@ -4,7 +4,10 @@
   "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
   "contracts": {
     "ctf1155": "0x5baBA40b92EE6C9D4245DFd39f7d9Ab1Abf9E1D5",
-    "friendGroupMarketFactory": "0xB32679E6B64B706Ed635c3e109f90012876bA1cF"
+    "FriendGroupResolutionLib": "0x1C8780a84539c3c2F98530a2275fB9D2E4eA5aE9",
+    "FriendGroupClaimsLib": "0xca3b4c3e0E04E5Ffcb0983d6e2DfE793BbEEfBbc",
+    "FriendGroupCreationLib": "0xB3060ED1dc17dB2297021D5874821ce13777A657",
+    "friendGroupMarketFactory": "0xE1eC8d34b36f55015ed636337121CA8EFbA96227"
   },
   "dependencies": {
     "marketFactory": "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",
@@ -12,5 +15,5 @@
     "tieredRoleManager": "0x55e6346Be542B13462De504FCC379a2477D227f0",
     "paymentManager": "0x9CDc3D0Aff85F89C04d03b6b9E9Ba99fDf033E34"
   },
-  "timestamp": "2026-01-30T16:02:28.764Z"
+  "timestamp": "2026-03-01T22:37:38.917Z"
 }

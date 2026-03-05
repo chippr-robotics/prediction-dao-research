@@ -241,7 +241,7 @@ async function verifyOnBlockscout({ name, address, contract, constructorArgument
  * @param {Object} deployer - Ethers signer
  * @returns {Object} Contract instance, address, and deployment status
  */
-async function deployDeterministic(contractName, constructorArgs, salt, deployer) {
+async function deployDeterministic(contractName, constructorArgs, salt, deployer, options) {
   console.log(`\nDeploying ${contractName} deterministically...`);
 
   // Diagnostics: show runtime code size
@@ -261,8 +261,9 @@ async function deployDeterministic(contractName, constructorArgs, salt, deployer
     // ignore if artifact isn't readable
   }
 
-  // Get contract factory
-  const ContractFactory = await ethers.getContractFactory(contractName, deployer);
+  // Get contract factory (with optional library linking)
+  const factoryOpts = options?.libraries ? { libraries: options.libraries } : {};
+  const ContractFactory = await ethers.getContractFactory(contractName, { ...factoryOpts, signer: deployer });
 
   // Get deployment bytecode
   const deployTx = await ContractFactory.getDeployTransaction(...constructorArgs);

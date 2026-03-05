@@ -12,8 +12,17 @@ import {
   getDefaultAcceptanceDeadline
 } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType } from '../../abis/FriendGroupMarketFactory'
+import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
+
+// Fallback so the UI renders even if the enum export is missing in some environments
+const ResolutionType = _ResolutionType ?? {
+  Either: 0,
+  Initiator: 1,
+  Receiver: 2,
+  ThirdParty: 3,
+  AutoPegged: 4,
+}
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
