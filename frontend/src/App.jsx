@@ -1,14 +1,11 @@
 //core
-import { useLocation, useNavigate } from 'react-router-dom'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import './theme.css'
 import './App.css'
-import { useEffect } from 'react'
 
 //system hooks & effects
 import { useWallet, useWalletConnection, useWalletNetwork } from './hooks'
 import { useAnnouncement, useNotification } from './hooks/useUI'
-import { useTheme } from './hooks/useTheme'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
 import AnnouncementRegion from './components/ui/AnnouncementRegion'
@@ -18,13 +15,8 @@ import LandingPage from './components/LandingPage'
 import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
 
 // add-ons
-import RolePurchaseScreen from './components/RolePurchaseScreen'
-import TokenMintPage from './pages/TokenMintPage'
-import MarketPage from './pages/MarketPage'
-import CorrelatedMarketsPage from './pages/CorrelatedMarketsPage'
 import WalletPage from './pages/WalletPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
-
 
 //admin
 import RoleManagementAdmin from './components/RoleManagementAdmin'
@@ -36,10 +28,6 @@ import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 
-//potential removal
-import PlatformSelector from './components/PlatformSelector'
-import ClearPathApp from './components/ClearPathApp'
-
 
 function AppContent() {
   const { isConnected } = useWallet()
@@ -47,19 +35,6 @@ function AppContent() {
   const { networkError, switchNetwork } = useWalletNetwork()
   const { announce } = useAnnouncement()
   const { showNotification } = useNotification()
-  const { setThemePlatform } = useTheme()
-  const location = useLocation()
-  const navigate = useNavigate()
-
-  // Auto-detect platform based on route
-  useEffect(() => {
-    if (location.pathname.includes('/clearpath')) {
-      setThemePlatform('clearpath')
-    } else {
-      // All other routes use FairWins theme (this is fairwins.app)
-      setThemePlatform('fairwins')
-    }
-  }, [location.pathname, setThemePlatform])
 
   const handleConnect = async () => {
     const success = await connectWallet()
@@ -85,36 +60,32 @@ function AppContent() {
     showNotification('Switching network...', 'info')
   }
 
-  const handleBack = () => {
-    navigate('/')
-  }
-
   return (
     <>
       {/* Development warning banner - always visible */}
       <DevelopmentWarningBanner />
-      
+
       {/* Development warning modal - shows once per session */}
       <DevelopmentWarningModal />
-      
+
       {/* Accessibility announcement region */}
       <AnnouncementRegion />
-      
+
       {/* Notification system */}
       <NotificationSystem />
-      
+
       {/* Modal system */}
       <ModalSystem />
 
       {/* Network error banner */}
       {networkError && isConnected && (
-        <div 
-          className="network-error-banner" 
+        <div
+          className="network-error-banner"
           role="alert"
           aria-live="assertive"
         >
           <span>{networkError}</span>
-          <button 
+          <button
             onClick={handleSwitchNetwork}
             className="switch-network-button"
             aria-label="Switch to correct network"
@@ -125,57 +96,14 @@ function AppContent() {
       )}
 
       <Routes>
-        <Route 
-          path="/" 
-          element={<LandingPage />} 
-        />
         <Route
-          path="/select"
-          element={<Navigate to="/app" replace />}
+          path="/"
+          element={<LandingPage />}
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
-        <Route 
-          path="/clearpath" 
-          element={
-            <ClearPathApp 
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-              onBack={handleBack}
-            />
-          } 
-        />
-        <Route 
-          path="/app" 
-          element={
-            <FairWinsAppNew 
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          } 
-        />
-        <Route 
-          path="/main" 
-          element={
-            <FairWinsAppNew 
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          } 
-        />
-        <Route 
-          path="/fairwins" 
-          element={
-            <FairWinsAppNew 
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          } 
-        />
-        
-        {/* Market routes now open modals in FairWinsAppNew */}
         <Route
-          path="/market/:id"
+          path="/app"
           element={
             <FairWinsAppNew
               onConnect={handleConnect}
@@ -184,7 +112,16 @@ function AppContent() {
           }
         />
         <Route
-          path="/markets/correlated/:groupId"
+          path="/main"
+          element={
+            <FairWinsAppNew
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+            />
+          }
+        />
+        <Route
+          path="/fairwins"
           element={
             <FairWinsAppNew
               onConnect={handleConnect}
@@ -193,17 +130,12 @@ function AppContent() {
           }
         />
 
-        {/* Legacy page routes - kept for backward compatibility if needed */}
-        <Route path="/market-page/:id" element={<MarketPage />} />
-        <Route path="/markets-page/correlated/:groupId" element={<CorrelatedMarketsPage />} />
         <Route path="/wallet" element={<WalletPage />} />
-        <Route path="/tokenmint" element={<TokenMintPage />} />
         <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
 
         {/* Admin routes - restricted to users with admin roles */}
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/admin/roles" element={<RoleManagementAdmin />} />
-        <Route path="/purchase-roles" element={<RolePurchaseScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

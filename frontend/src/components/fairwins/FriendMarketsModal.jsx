@@ -378,7 +378,7 @@ function FriendMarketsModal({
   // Market lookup for event tracking
   const handleMarketLookup = async () => {
     if (!marketLookupId.trim()) {
-      setMarketLookupError('Please enter a market ID')
+      setMarketLookupError('Please enter a wager ID')
       return
     }
 
@@ -490,7 +490,7 @@ function FriendMarketsModal({
       return
     }
 
-    if (!window.confirm('Cancel this market and refund all stakes? This cannot be undone.')) {
+    if (!window.confirm('Cancel this wager and refund all stakes? This cannot be undone.')) {
       return
     }
 
@@ -511,7 +511,7 @@ function FriendMarketsModal({
       window.location.reload()
     } catch (error) {
       console.error('Error cancelling market:', error)
-      let errorMessage = 'Failed to cancel market'
+      let errorMessage = 'Failed to cancel wager'
       if (error.reason) {
         errorMessage += `: ${error.reason}`
       } else if (error.message) {
@@ -912,7 +912,7 @@ function FriendMarketsModal({
   // Handle market resolution
   const handleResolveMarket = useCallback(async (market, outcomeBool) => {
     if (!signer) {
-      setResolveError('Please connect your wallet to resolve this market.')
+      setResolveError('Please connect your wallet to resolve this wager.')
       return
     }
     if (!isCorrectNetwork) {
@@ -957,7 +957,7 @@ function FriendMarketsModal({
       } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
         setResolveError('Wager is not active. It may already be resolved or still pending acceptance.')
       } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
-        setResolveError('You are not authorized to resolve this market.')
+        setResolveError('You are not authorized to resolve this wager.')
       } else {
         setResolveError(err.reason || err.shortMessage || err.message || 'Failed to resolve.')
       }
@@ -1224,7 +1224,7 @@ function FriendMarketsModal({
                       <div className="fm-type-icon">&#128106;</div>
                       <div className="fm-type-info">
                         <h4>Small Group</h4>
-                        <p>Pool predictions with 2-10 friends</p>
+                        <p>Pool wagers with 2-10 friends</p>
                       </div>
                       <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="9 18 15 12 9 6"/>
@@ -1238,7 +1238,7 @@ function FriendMarketsModal({
                       <div className="fm-type-icon">&#127942;</div>
                       <div className="fm-type-info">
                         <h4>Event Tracking</h4>
-                        <p>Competitive predictions for events</p>
+                        <p>Competitive wagers for events</p>
                       </div>
                       <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="9 18 15 12 9 6"/>
@@ -1541,7 +1541,7 @@ function FriendMarketsModal({
                         disabled={submitting}
                         className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
                       />
-                      <span className="fm-hint">When does this market end? (min: 1 day, max: 1 year)</span>
+                      <span className="fm-hint">When does this wager end? (min: 1 day, max: 1 year)</span>
                       {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
                     </div>
 
@@ -1580,7 +1580,7 @@ function FriendMarketsModal({
                           disabled={submitting}
                           className={errors.minAcceptanceThreshold ? 'error' : ''}
                         />
-                        <span className="fm-hint">Market activates when this many participants accept (including you)</span>
+                        <span className="fm-hint">Wager activates when this many participants accept (including you)</span>
                         {errors.minAcceptanceThreshold && <span className="fm-error">{errors.minAcceptanceThreshold}</span>}
                       </div>
                     )}
@@ -1685,7 +1685,7 @@ function FriendMarketsModal({
                               </div>
                               <div className="fm-field-encrypted">
                                 <span className="fm-field-icon">🔒</span>
-                                <span>Market metadata</span>
+                                <span>Wager metadata</span>
                               </div>
                               <div className="fm-field-public">
                                 <span className="fm-field-icon">🌐</span>
@@ -1697,7 +1697,7 @@ function FriendMarketsModal({
                               </div>
                               <div className="fm-field-public">
                                 <span className="fm-field-icon">🌐</span>
-                                <span>Market timing</span>
+                                <span>Wager timing</span>
                               </div>
                             </div>
                           </div>
@@ -1725,7 +1725,7 @@ function FriendMarketsModal({
                     {friendMarketType === 'eventTracking' && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-market-lookup">
-                          Peg to Existing Market (Optional)
+                          Peg to Existing Wager (Optional)
                         </label>
                         <div className="fm-market-lookup">
                           <div className="fm-input-with-action">
@@ -1742,7 +1742,7 @@ function FriendMarketsModal({
                               className="fm-lookup-btn"
                               onClick={handleMarketLookup}
                               disabled={submitting || marketLookupLoading || !marketLookupId.trim()}
-                              title="Look up market"
+                              title="Look up wager"
                             >
                               {marketLookupLoading ? (
                                 <span className="fm-spinner-small"></span>
@@ -1760,7 +1760,7 @@ function FriendMarketsModal({
                           {marketLookupResult && (
                             <div className="fm-lookup-result">
                               <div className="fm-lookup-result-header">
-                                <span className="fm-lookup-result-title">Found Market</span>
+                                <span className="fm-lookup-result-title">Found Wager</span>
                                 <button
                                   type="button"
                                   className="fm-lookup-clear"
@@ -1882,7 +1882,7 @@ function FriendMarketsModal({
               {creationStep === 'success' && createdMarket && (
                 <div className="fm-success">
                   <div className="fm-success-icon">&#9989;</div>
-                  <h3>Market Created!</h3>
+                  <h3>Wager Created!</h3>
                   <p className="fm-success-desc">{createdMarket.description}</p>
 
                   <div className="fm-qr-section">
@@ -1894,7 +1894,7 @@ function FriendMarketsModal({
                         includeMargin={false}
                         fgColor="#36B37E"
                         bgColor="transparent"
-                        aria-label="QR code to share this market"
+                        aria-label="QR code to share this wager"
                         imageSettings={{
                           src: '/assets/logo_fairwins.svg',
                           height: 32,
@@ -1904,7 +1904,7 @@ function FriendMarketsModal({
                       />
                     </div>
                     <p className="fm-qr-hint">
-                      Share this QR code with participants to accept the market
+                      Share this QR code with participants to accept the wager
                     </p>
                     <div className="fm-acceptance-info">
                       <span className="fm-acceptance-status">&#9203; Waiting for acceptance</span>
@@ -1962,7 +1962,7 @@ function FriendMarketsModal({
                       </div>
                     )}
                     <div className="fm-detail-row">
-                      <span>Market Ends</span>
+                      <span>Wager Ends</span>
                       <span>{createdMarket.endDateTime ? new Date(createdMarket.endDateTime).toLocaleString() : `${createdMarket.tradingPeriod} days`}</span>
                     </div>
                     {createdMarket.arbitrator && (

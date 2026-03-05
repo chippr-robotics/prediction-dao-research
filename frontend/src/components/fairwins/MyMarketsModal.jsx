@@ -10,20 +10,19 @@ import './MyMarketsModal.css'
 /**
  * MyMarketsModal Component
  *
- * A comprehensive modal for users to manage their prediction markets:
- * - Participating: View active markets where user has positions
- * - Created: Manage markets the user created (resolve, view disputes)
- * - History: View past/resolved markets and outcomes
+ * A comprehensive modal for users to manage their wagers:
+ * - Participating: View active wagers where user has positions
+ * - Created: Manage wagers the user created (resolve, view disputes)
+ * - History: View past/resolved wagers and outcomes
  *
  * Features:
- * - Market resolution flow for market makers
- * - Dispute management for both participants and market makers
+ * - Wager resolution flow
+ * - Dispute management for both participants and creators
  * - Status tracking and filtering
  */
 function MyMarketsModal({
   isOpen,
   onClose,
-  predictionMarkets = [],
   friendMarkets = []
 }) {
   const { isConnected, account } = useWallet()
@@ -56,7 +55,7 @@ function MyMarketsModal({
   const [acceptanceMarket, setAcceptanceMarket] = useState(null)
 
   // Filter state
-  const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'prediction', 'friend'
+  const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
   const [statusFilter, setStatusFilter] = useState('all')
 
   // Fetch markets data
@@ -76,7 +75,7 @@ function MyMarketsModal({
       setUserPositions(positions || [])
     } catch (err) {
       console.error('Error fetching markets data:', err)
-      setError('Failed to load markets. Please try again.')
+      setError('Failed to load wagers. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -134,11 +133,10 @@ function MyMarketsModal({
     const userAddr = account?.toLowerCase()
     if (!userAddr) return { participating: [], created: [], history: [] }
 
-    // Combine prediction and friend markets
+    // Combine fetched and friend markets
     const allMarkets = [
-      ...markets.map(m => ({ ...m, marketType: 'prediction' })),
-      ...friendMarkets.map(m => ({ ...m, marketType: 'friend' })),
-      ...predictionMarkets.map(m => ({ ...m, marketType: 'prediction' }))
+      ...markets.map(m => ({ ...m, marketType: 'friend' })),
+      ...friendMarkets.map(m => ({ ...m, marketType: 'friend' }))
     ]
 
     // Remove duplicates by id
@@ -228,7 +226,7 @@ function MyMarketsModal({
     })
 
     return { participating, created, history }
-  }, [markets, friendMarkets, predictionMarkets, userPositions, account, marketTypeFilter, statusFilter])
+  }, [markets, friendMarkets, userPositions, account, marketTypeFilter, statusFilter])
 
   // Format helpers
   const formatDate = (dateValue) => {
@@ -516,9 +514,8 @@ function MyMarketsModal({
               onChange={(e) => setMarketTypeFilter(e.target.value)}
               className="mm-filter-select"
             >
-              <option value="all">All Markets</option>
-              <option value="prediction">Prediction Markets</option>
-              <option value="friend">Friend Markets</option>
+              <option value="all">All Wagers</option>
+              <option value="friend">Friend Wagers</option>
             </select>
           </div>
           <div className="mm-filter-group">
@@ -540,7 +537,7 @@ function MyMarketsModal({
             className="mm-refresh-btn"
             onClick={fetchMarketsData}
             disabled={loading}
-            title="Refresh markets"
+            title="Refresh wagers"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={loading ? 'spinning' : ''}>
               <path d="M23 4v6h-6"/>
@@ -556,12 +553,12 @@ function MyMarketsModal({
             <div className="mm-empty-state">
               <div className="mm-empty-icon">&#128274;</div>
               <h3>Connect Your Wallet</h3>
-              <p>Please connect your wallet to view your markets.</p>
+              <p>Please connect your wallet to view your wagers.</p>
             </div>
           ) : loading ? (
             <div className="mm-loading">
               <div className="mm-spinner"></div>
-              <p>Loading your markets...</p>
+              <p>Loading your wagers...</p>
             </div>
           ) : error ? (
             <div className="mm-error-state">
@@ -594,8 +591,8 @@ function MyMarketsModal({
                     <div className="mm-empty-state">
                       <div className="mm-empty-icon">&#128200;</div>
                       <h3>No Active Positions</h3>
-                      <p>You don&apos;t have any active positions in markets.</p>
-                      <p className="mm-hint">Start trading on prediction markets to see them here.</p>
+                      <p>You don&apos;t have any active wagers.</p>
+                      <p className="mm-hint">Create or accept a wager to see them here.</p>
                     </div>
                   ) : (
                     <MarketsTable
@@ -638,9 +635,9 @@ function MyMarketsModal({
                   ) : categorizedMarkets.created.length === 0 ? (
                     <div className="mm-empty-state">
                       <div className="mm-empty-icon">&#128203;</div>
-                      <h3>No Markets Created</h3>
-                      <p>You haven&apos;t created any markets yet.</p>
-                      <p className="mm-hint">Get Market Maker access to create prediction markets.</p>
+                      <h3>No Wagers Created</h3>
+                      <p>You haven&apos;t created any wagers yet.</p>
+                      <p className="mm-hint">Use the quick actions on the dashboard to create your first wager.</p>
                     </div>
                   ) : (
                     <MarketsTable
@@ -682,8 +679,8 @@ function MyMarketsModal({
                   ) : categorizedMarkets.history.length === 0 ? (
                     <div className="mm-empty-state">
                       <div className="mm-empty-icon">&#128214;</div>
-                      <h3>No Market History</h3>
-                      <p>Your resolved markets will appear here.</p>
+                      <h3>No Wager History</h3>
+                      <p>Your resolved wagers will appear here.</p>
                     </div>
                   ) : (
                     <MarketsTable
@@ -805,7 +802,7 @@ function MarketsTable({
       <table className="mm-table" role="table">
         <thead>
           <tr>
-            <th>Market</th>
+            <th>Wager</th>
             <th>Type</th>
             <th>{showOutcome ? 'Outcome' : 'Time Left'}</th>
             <th>Status</th>
@@ -842,7 +839,7 @@ function MarketsTable({
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
-                        title="Private market"
+                        title="Private wager"
                         style={{ marginRight: '6px', verticalAlign: 'middle', opacity: 0.7 }}
                       >
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -857,7 +854,7 @@ function MarketsTable({
                 </td>
                 <td>
                   <span className={`mm-type-badge mm-type-${market.marketType}`}>
-                    {market.marketType === 'friend' ? 'Friend' : 'Prediction'}
+                    {market.marketType === 'friend' ? 'Friend' : 'Wager'}
                   </span>
                 </td>
                 <td className="mm-table-time">
@@ -896,7 +893,7 @@ function MarketsTable({
                       <button
                         className="mm-action-btn mm-action-resolve"
                         onClick={(e) => { e.stopPropagation(); onResolve(market) }}
-                        title="Resolve market"
+                        title="Resolve wager"
                       >
                         Resolve
                       </button>
@@ -1012,7 +1009,7 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
       <button
         className="mm-action-btn mm-action-resolve"
         onClick={(e) => { e.stopPropagation(); onResolve(market) }}
-        title="Resolve market"
+        title="Resolve wager"
       >
         Resolve
       </button>
@@ -1097,7 +1094,7 @@ function MarketDetailView({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                title="Private market"
+                title="Private wager"
                 style={{ marginRight: '8px', verticalAlign: 'middle', opacity: 0.7 }}
               >
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -1112,7 +1109,7 @@ function MarketDetailView({
         </div>
         <div className="mm-detail-meta">
           <span className={`mm-type-badge mm-type-${market.marketType}`}>
-            {market.marketType === 'friend' ? 'Friend Market' : 'Prediction Market'}
+            {market.marketType === 'friend' ? 'Friend Wager' : 'Wager'}
           </span>
           {market.category && <span className="mm-category-tag">{market.category}</span>}
         </div>
@@ -1196,14 +1193,14 @@ function MarketDetailView({
       {/* Outcome for resolved markets */}
       {isHistoryView && market.outcome && (
         <div className="mm-outcome-section">
-          <h4>Market Outcome</h4>
+          <h4>Wager Outcome</h4>
           <div className={`mm-outcome-display ${market.outcome === 'Pass' || market.outcome === 'Yes' ? 'positive' : 'negative'}`}>
             {market.outcome}
           </div>
           {position && (
             <div className="mm-outcome-result">
               {position.side === market.outcome ? (
-                <span className="mm-result-win">You won this market!</span>
+                <span className="mm-result-win">You won this wager!</span>
               ) : (
                 <span className="mm-result-loss">Better luck next time</span>
               )}
@@ -1308,7 +1305,7 @@ function ResolutionModal({
     }
 
     if (!signer) {
-      setError('Please connect your wallet to resolve this market.')
+      setError('Please connect your wallet to resolve this wager.')
       return
     }
 
@@ -1356,11 +1353,11 @@ function ResolutionModal({
       if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
         setError('Transaction was rejected in your wallet.')
       } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
-        setError('This market is not active. It may have already been resolved or is still pending acceptance.')
+        setError('This wager is not active. It may have already been resolved or is still pending acceptance.')
       } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
-        setError('You are not authorized to resolve this market based on its resolution type.')
+        setError('You are not authorized to resolve this wager based on its resolution type.')
       } else {
-        setError(err.reason || err.shortMessage || err.message || 'Failed to resolve market. Please try again.')
+        setError(err.reason || err.shortMessage || err.message || 'Failed to resolve wager. Please try again.')
       }
     } finally {
       setSubmitting(false)
@@ -1381,7 +1378,7 @@ function ResolutionModal({
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            Resolve Market
+            Resolve Wager
           </h3>
           <button
             className="mm-close-btn"
@@ -1401,8 +1398,8 @@ function ResolutionModal({
               <div className="mm-resolution-market-info">
                 <h4>{getMarketDisplayTitle(market)}</h4>
                 <p className="mm-resolution-hint">
-                  Select the winning outcome for this market. This action will distribute
-                  winnings to participants who predicted correctly.
+                  Select the winning outcome for this wager. This action will distribute
+                  winnings to participants who chose correctly.
                 </p>
               </div>
 
@@ -1478,7 +1475,7 @@ function ResolutionModal({
                 <div className="mm-confirmation-icon">&#9888;</div>
                 <h4>Confirm Resolution</h4>
                 <p>
-                  You are about to resolve this market with outcome: <strong>{selectedOutcome}</strong>
+                  You are about to resolve this wager with outcome: <strong>{selectedOutcome}</strong>
                 </p>
                 <p className="mm-confirmation-warning">
                   This action cannot be undone. Participants will have a window to dispute
@@ -1674,7 +1671,7 @@ function DisputeModal({
                       id="dispute-reason"
                       value={disputeReason}
                       onChange={(e) => setDisputeReason(e.target.value)}
-                      placeholder="Explain why you believe the market resolution is incorrect..."
+                      placeholder="Explain why you believe the wager resolution is incorrect..."
                       rows={4}
                       disabled={submitting}
                       className={error && !disputeReason.trim() ? 'error' : ''}
@@ -1714,7 +1711,7 @@ function DisputeModal({
                   <div className="mm-dispute-info-box">
                     <h5>What happens next?</h5>
                     <ul>
-                      <li>The market maker will be notified and can respond</li>
+                      <li>The wager creator will be notified and can respond</li>
                       <li>A dispute bond may be required (refunded if you win)</li>
                       <li>If unresolved, the dispute can be escalated to arbitration</li>
                     </ul>
@@ -1785,7 +1782,7 @@ function DisputeModal({
                     </div>
                     <span className="mm-hint">
                       {selectedResolution === 'accept'
-                        ? 'The market resolution will be changed to the disputant\'s suggested outcome'
+                        ? 'The wager resolution will be changed to the disputant\'s suggested outcome'
                         : selectedResolution === 'reject'
                         ? 'The original resolution will be maintained. The disputant can escalate.'
                         : 'Select your decision'}
@@ -1838,14 +1835,14 @@ function DisputeModal({
                 <h4>Confirm {isOpenMode ? 'Dispute' : 'Response'}</h4>
                 {isOpenMode ? (
                   <p>
-                    You are about to open a dispute for this market.
+                    You are about to open a dispute for this wager.
                     {selectedResolution && ` You believe the correct outcome should be: ${selectedResolution}`}
                   </p>
                 ) : (
                   <p>
                     You are about to {selectedResolution === 'accept' ? 'accept' : 'reject'} this dispute.
                     {selectedResolution === 'accept'
-                      ? ' The market resolution will be changed.'
+                      ? ' The wager resolution will be changed.'
                       : ' The original resolution will be maintained.'}
                   </p>
                 )}
@@ -1887,9 +1884,9 @@ function DisputeModal({
               <h4>{isOpenMode ? 'Dispute Submitted!' : 'Response Submitted!'}</h4>
               <p>
                 {isOpenMode
-                  ? 'Your dispute has been recorded. The market maker will be notified and can respond.'
+                  ? 'Your dispute has been recorded. The wager creator will be notified and can respond.'
                   : selectedResolution === 'accept'
-                  ? 'The dispute has been accepted. The market resolution will be updated.'
+                  ? 'The dispute has been accepted. The wager resolution will be updated.'
                   : 'The dispute has been rejected. The disputant can escalate if they disagree.'}
               </p>
               <button

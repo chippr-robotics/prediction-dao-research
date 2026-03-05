@@ -295,7 +295,7 @@ describe('MyMarketsModal', () => {
       await user.click(createdTab)
 
       await waitFor(() => {
-        expect(screen.getByText('No Markets Created')).toBeInTheDocument()
+        expect(screen.getByText('No Wagers Created')).toBeInTheDocument()
       })
     })
 
@@ -315,7 +315,7 @@ describe('MyMarketsModal', () => {
       await user.click(historyTab)
 
       await waitFor(() => {
-        expect(screen.getByText('No Market History')).toBeInTheDocument()
+        expect(screen.getByText('No Wager History')).toBeInTheDocument()
       })
     })
   })
@@ -345,23 +345,20 @@ describe('MyMarketsModal', () => {
     const mockMarkets = [
       {
         id: '1',
-        proposalTitle: 'Test Market 1',
-        description: 'Test description',
+        description: 'Test Wager 1',
         creator: '0x1234567890123456789012345678901234567890',
         tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400 * 7),
         status: 'active',
-        category: 'crypto',
-        marketType: 'prediction'
+        marketType: 'friend'
       },
       {
         id: '2',
-        proposalTitle: 'Test Market 2',
-        description: 'Another test',
+        description: 'Test Wager 2',
         creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+        participants: ['0x1234567890123456789012345678901234567890'],
         tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400 * 14),
         status: 'active',
-        category: 'sports',
-        marketType: 'prediction'
+        marketType: 'friend'
       }
     ]
 
@@ -396,7 +393,7 @@ describe('MyMarketsModal', () => {
       await user.click(createdTab)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Market 1')).toBeInTheDocument()
+        expect(screen.getByText('Test Wager 1')).toBeInTheDocument()
       })
     })
 
@@ -408,7 +405,7 @@ describe('MyMarketsModal', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Test Market 2')).toBeInTheDocument()
+        expect(screen.getByText('Test Wager 2')).toBeInTheDocument()
       })
     })
 

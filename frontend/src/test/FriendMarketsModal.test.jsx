@@ -387,8 +387,8 @@ describe('FriendMarketsModal', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
       expect(screen.getByText('Head-to-head bet with a friend')).toBeInTheDocument()
-      expect(screen.getByText('Pool predictions with 2-10 friends')).toBeInTheDocument()
-      expect(screen.getByText('Competitive predictions for events')).toBeInTheDocument()
+      expect(screen.getByText('Pool wagers with 2-10 friends')).toBeInTheDocument()
+      expect(screen.getByText('Competitive wagers for events')).toBeInTheDocument()
     })
 
     it('should navigate to form when 1v1 type is selected', async () => {
@@ -562,9 +562,9 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
-        expect(screen.getByText('Market Created!')).toBeInTheDocument()
+        expect(screen.getByText('Wager Created!')).toBeInTheDocument()
         expect(screen.getByTestId('qr-code')).toBeInTheDocument()
-        expect(screen.getByText('Share this QR code with participants to accept the market')).toBeInTheDocument()
+        expect(screen.getByText('Share this QR code with participants to accept the wager')).toBeInTheDocument()
       })
     })
 
@@ -598,7 +598,7 @@ describe('FriendMarketsModal', () => {
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
-        expect(screen.getByText('Market Created!')).toBeInTheDocument()
+        expect(screen.getByText('Wager Created!')).toBeInTheDocument()
       })
 
       await userEvent.click(screen.getByRole('button', { name: /create another/i }))

@@ -414,10 +414,10 @@ function MarketAcceptanceModal({
       // Known revert reason strings from downstream contracts
       const knownRevertReasons = {
         'Market already exists': 'This wager cannot be activated because of a conflict with a previous deployment. The contract needs to be redeployed to fix this.',
-        'Requires owner or MARKET_MAKER_ROLE': 'The wager contract is not authorized to create markets. Please contact the administrator.',
-        'Market creation limit exceeded': 'The market creation limit has been reached. Please try again later.',
+        'Requires owner or MARKET_MAKER_ROLE': 'The wager contract is not authorized. Please contact the administrator.',
+        'Market creation limit exceeded': 'The wager creation limit has been reached. Please try again later.',
         'Invalid trading period': 'The trading period for this wager is outside the allowed range.',
-        'CTF1155 not set': 'The market system is not fully configured. Please contact the administrator.',
+        'CTF1155 not set': 'The wager system is not fully configured. Please contact the administrator.',
         'CTF requires ERC20 collateral': 'This wager requires an ERC20 token for collateral, but native currency was configured.'
       }
 
