@@ -336,7 +336,7 @@ function MarketAcceptanceModal({
           contract.getFriendMarketWithStatus(marketId)
         ])
         const currentAccepted = Number(acceptedCountRaw)
-        const required = Number(marketData.minAcceptanceThreshold)
+        const required = Number(marketData.minThreshold)
         const arbitratorAddr = marketData.arbitrator
         const arbitratorRequired = arbitratorAddr && arbitratorAddr !== ethers.ZeroAddress
         let arbitratorAccepted = true
@@ -455,7 +455,7 @@ function MarketAcceptanceModal({
       // Strip verbose ethers v6 error details for cleaner UI display
       if (errorMessage.includes('transaction execution reverted')) {
         // The detailed ethers error is too verbose for the UI; use a friendlier version
-        errorMessage = 'Transaction reverted on-chain. The wager acceptance could not be completed. Please try again or contact support if the issue persists.'
+        errorMessage = 'Transaction reverted on-chain. The wager acceptance could not be completed. Please try again or check your wallet and network connection if the issue persists.'
       }
 
       setError(errorMessage)

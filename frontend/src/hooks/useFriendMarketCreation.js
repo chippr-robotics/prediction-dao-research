@@ -161,7 +161,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         if (syncStatus.needsSync) {
           throw new Error(
             `Your Friend Market role (${syncStatus.tierName}) needs to be activated in the system. ` +
-            `Please contact support or wait for the role to be synced. ` +
+            `Please wait for the role to be synced automatically. ` +
             `Your purchase was successful but the role needs admin activation for friend market creation.`
           )
         }
