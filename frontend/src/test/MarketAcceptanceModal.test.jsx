@@ -196,7 +196,7 @@ describe('MarketAcceptanceModal', () => {
       })
       render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
 
-      expect(screen.getByText('Unlock Wager Details')).toBeInTheDocument()
+      expect(screen.getByText('Decrypt Wager Details')).toBeInTheDocument()
     })
 
     it('should display stake with non-stablecoin symbol', () => {
