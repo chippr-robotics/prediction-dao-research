@@ -155,7 +155,7 @@ function MarketAcceptancePage() {
 
           // Map market type enum to string
           const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
-          const statusNames = ['pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
+          const statusNames = ['pending_acceptance', 'active', 'pending_resolution', 'challenged', 'resolved', 'cancelled', 'refunded', 'oracle_timed_out']
 
           // Determine token info
           const stakeTokenAddr = marketResult.stakeToken
