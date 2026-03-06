@@ -3,6 +3,13 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption } from '../../hooks/useEncryption'
 import { fetchEncryptedEnvelope } from '../../utils/ipfsService'
+import {
+  deriveXWingKeyPairFromSignature,
+  decryptEnvelopeXWing,
+  decryptEnvelope as decryptEnvelopeX25519,
+  deriveKeyPairFromSignature,
+  isXWingEnvelope,
+} from '../../utils/crypto/envelopeEncryption'
 import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -154,6 +161,25 @@ function MarketAcceptanceModal({
     resolveEnvelope()
   }, [marketData?.isEncrypted, marketData?.rawDescription, marketData?.ipfsCid])
 
+  // Decrypt using the shared creator signature (fallback when user's key isn't in envelope)
+  const decryptWithSharedSignature = useCallback((envelope) => {
+    const sig = marketData?.sharedSignature
+    if (!sig || !marketData?.creator) return null
+
+    try {
+      if (isXWingEnvelope(envelope)) {
+        const { secretKey } = deriveXWingKeyPairFromSignature(sig)
+        return decryptEnvelopeXWing(envelope, marketData.creator, secretKey)
+      } else {
+        const { privateKey } = deriveKeyPairFromSignature(sig)
+        return decryptEnvelopeX25519(envelope, marketData.creator, privateKey)
+      }
+    } catch (err) {
+      console.warn('Shared signature decryption failed:', err.message)
+      return null
+    }
+  }, [marketData?.sharedSignature, marketData?.creator])
+
   // Attempt to decrypt once we have the envelope
   useEffect(() => {
     const tryDecrypt = async () => {
@@ -168,16 +194,29 @@ function MarketAcceptanceModal({
       }
 
       try {
-        if (!canUserDecrypt(resolvedEnvelope)) {
-          setDecryptionError('You are not a participant in this encrypted wager')
-          return
-        }
-
-        if (encryptionInitialized) {
+        // Try 1: User's own key is in the envelope
+        if (canUserDecrypt(resolvedEnvelope) && encryptionInitialized) {
           setIsDecrypting(true)
           const decrypted = await decryptMetadata(resolvedEnvelope)
           setDecryptedDescription(decrypted.description || decrypted.name || 'Wager Details')
           setIsDecrypting(false)
+          return
+        }
+
+        // Try 2: Use shared creator signature (from invitation URL)
+        const sharedResult = decryptWithSharedSignature(resolvedEnvelope)
+        if (sharedResult) {
+          setDecryptedDescription(sharedResult.description || sharedResult.name || 'Wager Details')
+          return
+        }
+
+        // No decryption method available
+        if (!canUserDecrypt(resolvedEnvelope)) {
+          if (marketData?.sharedSignature) {
+            setDecryptionError('Failed to decrypt with the provided key')
+          } else {
+            setDecryptionError('Use the invitation link from the creator to view wager details')
+          }
         }
       } catch (err) {
         console.error('Failed to decrypt wager:', err)
@@ -187,17 +226,13 @@ function MarketAcceptanceModal({
     }
 
     tryDecrypt()
-  }, [marketData?.isEncrypted, resolvedEnvelope, account, encryptionInitialized, canUserDecrypt, decryptMetadata])
+  }, [marketData?.isEncrypted, resolvedEnvelope, account, encryptionInitialized, canUserDecrypt, decryptMetadata, decryptWithSharedSignature, marketData?.sharedSignature])
 
-  // Handler to manually trigger decryption (requires wallet signature)
+  // Handler to manually trigger decryption (requires wallet signature or shared key)
   const handleDecrypt = async () => {
     try {
       setIsDecrypting(true)
       setDecryptionError(null)
-
-      if (!encryptionInitialized) {
-        await initializeKeys()
-      }
 
       // Use already-resolved envelope, or fetch from IPFS if needed
       let envelope = resolvedEnvelope
@@ -212,6 +247,17 @@ function MarketAcceptanceModal({
         throw new Error('No encrypted envelope available')
       }
 
+      // Try 1: shared signature from invitation URL (no wallet interaction needed)
+      const sharedResult = decryptWithSharedSignature(envelope)
+      if (sharedResult) {
+        setDecryptedDescription(sharedResult.description || sharedResult.name || 'Wager Details')
+        return
+      }
+
+      // Try 2: user's own keys (requires wallet signature if not cached)
+      if (!encryptionInitialized) {
+        await initializeKeys()
+      }
       const decrypted = await decryptMetadata(envelope)
       setDecryptedDescription(decrypted.description || decrypted.name || 'Wager Details')
     } catch (err) {

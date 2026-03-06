@@ -92,6 +92,7 @@ function MarketAcceptancePage() {
   const urlStake = searchParams.get('stake')
   const urlToken = searchParams.get('token')
   const urlDeadline = searchParams.get('deadline')
+  const urlSharedSignature = searchParams.get('sig')
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -229,6 +230,7 @@ function MarketAcceptancePage() {
             rawDescription: rawDescription, // Keep original for decryption
             isEncrypted: isEncryptedDescription(rawDescription),
             ipfsCid: getIpfsCid(rawDescription),
+            sharedSignature: urlSharedSignature || null,
             creator: marketResult.creator,
             participants: members,
             arbitrator: arbitrator !== ethers.ZeroAddress ? arbitrator : null,
@@ -302,7 +304,7 @@ function MarketAcceptancePage() {
     }
 
     fetchMarketData()
-  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline])
+  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlSharedSignature])
 
   const handleClose = () => {
     navigate('/')

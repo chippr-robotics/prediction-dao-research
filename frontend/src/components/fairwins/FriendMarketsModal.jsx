@@ -447,6 +447,9 @@ function FriendMarketsModal({
       isEncrypted: market.isEncrypted || false,
       ipfsCid: market.ipfsCid || null,
       rawDescription: market.metadata ? JSON.stringify(market.metadata) : null,
+      sharedSignature: (() => {
+        try { return localStorage.getItem(`fw_sig_${market.id}`) } catch { return null }
+      })(),
     }
 
     setMarketToAccept(marketData)
@@ -882,6 +885,16 @@ function FriendMarketsModal({
         creatorSignature: creatorSignatureForSharing
       }
 
+      // Persist creator's encryption signature so invitation URLs can include it
+      // This allows opponents to decrypt wager details before accepting
+      if (enableEncryption && creatorSignatureForSharing && newMarket.id) {
+        try {
+          localStorage.setItem(`fw_sig_${newMarket.id}`, creatorSignatureForSharing)
+        } catch {
+          // localStorage may be full or unavailable — non-fatal
+        }
+      }
+
       setCreatedMarket(newMarket)
       setCreationStep('success')
     } catch (error) {
@@ -1002,6 +1015,14 @@ function FriendMarketsModal({
       token: market.stakeTokenSymbol || 'ETC',
       deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
     })
+
+    // Include creator's encryption signature so opponent can decrypt wager details
+    const sig = market.creatorSignature || (() => {
+      try { return localStorage.getItem(`fw_sig_${market.id}`) } catch { return null }
+    })()
+    if (sig) {
+      params.set('sig', sig)
+    }
 
     return `${window.location.origin}/friend-market/accept?${params.toString()}`
   }
