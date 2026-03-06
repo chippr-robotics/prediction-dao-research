@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -6,7 +6,7 @@ import { WAGER_DEFAULTS, WagerStatus, ORACLE_SOURCES } from '../../constants/wag
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import QRScanner from '../ui/QRScanner'
-import { fetchFriendMarketsForUser } from '../../utils/blockchainService'
+import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import './Dashboard.css'
 
 // ============================================================================
@@ -437,38 +437,8 @@ function Dashboard({ onConnect }) {
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
 
-  // Friend markets state (live blockchain data)
-  const [friendMarkets, setFriendMarkets] = useState([])
-  const [wagersLoading, setWagersLoading] = useState(false)
-
-  // Fetch friend markets from blockchain when connected and in live mode
-  useEffect(() => {
-    if (!account || !isConnected || demoMode) return
-
-    let cancelled = false
-
-    const fetchMarkets = async (attempt = 0) => {
-      setWagersLoading(true)
-      try {
-        const markets = await fetchFriendMarketsForUser(account)
-        if (!cancelled) {
-          setFriendMarkets(markets)
-          setWagersLoading(false)
-        }
-      } catch (error) {
-        console.error('[Dashboard] Error fetching friend markets:', error)
-        if (!cancelled && attempt < 2) {
-          const delay = (attempt + 1) * 2000
-          setTimeout(() => fetchMarkets(attempt + 1), delay)
-        } else if (!cancelled) {
-          setWagersLoading(false)
-        }
-      }
-    }
-
-    fetchMarkets()
-    return () => { cancelled = true }
-  }, [account, isConnected, demoMode])
+  // Friend markets from shared context (single fetch, no duplication)
+  const { friendMarkets, loading: wagersLoading } = useFriendMarkets()
 
   // Transform friend markets into wager card format for live mode display
   const liveWagers = useMemo(() => {
