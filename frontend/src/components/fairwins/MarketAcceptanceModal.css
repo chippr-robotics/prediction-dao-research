@@ -803,6 +803,20 @@
   font-weight: 600;
 }
 
+/* Decrypt Required Notice */
+.ma-decrypt-required {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
 /* Mobile Responsive */
 @media (max-width: 480px) {
   .ma-modal {

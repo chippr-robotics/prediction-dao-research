@@ -96,7 +96,7 @@ const MORDOR_ADDRESSES = {
 
   // Market Contracts
   ctf1155: "0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9",
-  friendGroupMarketFactory: "0x0E118DEf0946f0e7F1BEAAA385c6c37CAc6acfa7",
+  friendGroupMarketFactory: "0xE1eC8d34b36f55015ed636337121CA8EFbA96227",
 
   // Registry Contracts
   marketCorrelationRegistry: "0x2a820A38997743fC3303cDcA56b996598963B909",

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption } from '../../hooks/useEncryption'
+import { fetchEncryptedEnvelope } from '../../utils/ipfsService'
 import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -113,12 +114,50 @@ function MarketAcceptanceModal({
     return () => clearInterval(interval)
   }, [marketData?.acceptanceDeadline])
 
-  // Attempt to decrypt encrypted wager description
+  // Resolve the encrypted envelope (from inline JSON or IPFS)
+  const [resolvedEnvelope, setResolvedEnvelope] = useState(null)
+  const [envelopeLoading, setEnvelopeLoading] = useState(false)
+
+  useEffect(() => {
+    const resolveEnvelope = async () => {
+      if (!marketData?.isEncrypted) return
+
+      // Try inline JSON first (rawDescription contains the envelope)
+      if (marketData.rawDescription) {
+        try {
+          const parsed = JSON.parse(marketData.rawDescription)
+          if (parsed.version && parsed.algorithm && parsed.content) {
+            setResolvedEnvelope(parsed)
+            return
+          }
+        } catch {
+          // Not inline JSON, try IPFS
+        }
+      }
+
+      // Fetch from IPFS if we have a CID
+      const cid = marketData.ipfsCid
+      if (cid) {
+        try {
+          setEnvelopeLoading(true)
+          const envelope = await fetchEncryptedEnvelope(cid)
+          setResolvedEnvelope(envelope)
+        } catch (err) {
+          console.error('Failed to fetch encrypted envelope from IPFS:', err)
+        } finally {
+          setEnvelopeLoading(false)
+        }
+      }
+    }
+
+    setResolvedEnvelope(null)
+    resolveEnvelope()
+  }, [marketData?.isEncrypted, marketData?.rawDescription, marketData?.ipfsCid])
+
+  // Attempt to decrypt once we have the envelope
   useEffect(() => {
     const tryDecrypt = async () => {
-      if (!marketData?.isEncrypted || !marketData?.rawDescription) {
-        return
-      }
+      if (!marketData?.isEncrypted || !resolvedEnvelope) return
 
       setDecryptedDescription(null)
       setDecryptionError(null)
@@ -129,16 +168,14 @@ function MarketAcceptanceModal({
       }
 
       try {
-        const envelope = JSON.parse(marketData.rawDescription)
-
-        if (!canUserDecrypt(envelope)) {
+        if (!canUserDecrypt(resolvedEnvelope)) {
           setDecryptionError('You are not a participant in this encrypted wager')
           return
         }
 
         if (encryptionInitialized) {
           setIsDecrypting(true)
-          const decrypted = await decryptMetadata(envelope)
+          const decrypted = await decryptMetadata(resolvedEnvelope)
           setDecryptedDescription(decrypted.description || decrypted.name || 'Wager Details')
           setIsDecrypting(false)
         }
@@ -150,12 +187,10 @@ function MarketAcceptanceModal({
     }
 
     tryDecrypt()
-  }, [marketData?.isEncrypted, marketData?.rawDescription, account, encryptionInitialized, canUserDecrypt, decryptMetadata])
+  }, [marketData?.isEncrypted, resolvedEnvelope, account, encryptionInitialized, canUserDecrypt, decryptMetadata])
 
   // Handler to manually trigger decryption (requires wallet signature)
   const handleDecrypt = async () => {
-    if (!marketData?.rawDescription) return
-
     try {
       setIsDecrypting(true)
       setDecryptionError(null)
@@ -164,7 +199,19 @@ function MarketAcceptanceModal({
         await initializeKeys()
       }
 
-      const envelope = JSON.parse(marketData.rawDescription)
+      // Use already-resolved envelope, or fetch from IPFS if needed
+      let envelope = resolvedEnvelope
+      if (!envelope && marketData?.ipfsCid) {
+        envelope = await fetchEncryptedEnvelope(marketData.ipfsCid)
+        setResolvedEnvelope(envelope)
+      }
+      if (!envelope && marketData?.rawDescription) {
+        envelope = JSON.parse(marketData.rawDescription)
+      }
+      if (!envelope) {
+        throw new Error('No encrypted envelope available')
+      }
+
       const decrypted = await decryptMetadata(envelope)
       setDecryptedDescription(decrypted.description || decrypted.name || 'Wager Details')
     } catch (err) {
@@ -477,7 +524,9 @@ function MarketAcceptanceModal({
   if (!isOpen) return null
 
   const isExpired = timeRemaining <= 0
-  const canAccept = isConnected && !hasAlreadyAccepted && !isExpired && (isParticipant || isArbitrator)
+  // Require decryption before accepting encrypted wagers (proper consideration)
+  const needsDecryption = marketData?.isEncrypted && !decryptedDescription
+  const canAccept = isConnected && !hasAlreadyAccepted && !isExpired && (isParticipant || isArbitrator) && !needsDecryption
 
   // Calculate total pot for display
   const participantCount = marketData?.participants?.length || 0
@@ -524,10 +573,10 @@ function MarketAcceptanceModal({
                     </div>
                     {decryptedDescription ? (
                       <h3 className="ma-description">{decryptedDescription}</h3>
-                    ) : isDecrypting || encryptionInitializing ? (
+                    ) : isDecrypting || encryptionInitializing || envelopeLoading ? (
                       <div className="ma-decrypting">
                         <span className="ma-spinner-small"></span>
-                        <span>Decrypting...</span>
+                        <span>{envelopeLoading ? 'Loading encrypted data...' : 'Decrypting...'}</span>
                       </div>
                     ) : decryptionError ? (
                       <div className="ma-decrypt-error">
@@ -544,13 +593,13 @@ function MarketAcceptanceModal({
                       </div>
                     ) : (isParticipant || isArbitrator) ? (
                       <div className="ma-decrypt-prompt">
-                        <p>Sign a message to decrypt and view the wager details</p>
+                        <p>Sign a message to decrypt and view the wager details before accepting</p>
                         <button
                           type="button"
                           className="ma-btn-decrypt"
                           onClick={handleDecrypt}
                         >
-                          Unlock Wager Details
+                          Decrypt Wager Details
                         </button>
                       </div>
                     ) : (
@@ -734,6 +783,14 @@ function MarketAcceptanceModal({
                   >
                     {isArbitrator ? 'Accept Role' : 'Accept Offer'}
                   </button>
+                </div>
+              )}
+
+              {/* Prompt to decrypt before accepting */}
+              {needsDecryption && isConnected && !hasAlreadyAccepted && !isExpired && (isParticipant || isArbitrator) && (
+                <div className="ma-decrypt-required">
+                  <span>&#128274;</span>
+                  You must decrypt and review the wager details before you can accept this offer.
                 </div>
               )}
 

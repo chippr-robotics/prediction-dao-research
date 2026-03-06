@@ -25,12 +25,12 @@ async function main() {
   // Contract addresses from current deployment
   const ADDRESSES = {
     tieredRoleManager: "0x55e6346Be542B13462De504FCC379a2477D227f0",
-    marketFactory: "0x75e81ba01f3aBC160381f3b2b3c59acB2E1800F7",
-    friendGroupMarketFactory: "0x0E118DEf0946f0e7F1BEAAA385c6c37CAc6acfa7",
+    marketFactory: "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",
+    friendGroupMarketFactory: "0xE1eC8d34b36f55015ed636337121CA8EFbA96227",
   };
 
   // Role hashes (keccak256 of role names)
-  const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER"));
+  const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
 
   console.log("\n--- Contract Addresses ---");
   console.log("TieredRoleManager:", ADDRESSES.tieredRoleManager);

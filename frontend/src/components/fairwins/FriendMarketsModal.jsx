@@ -442,7 +442,11 @@ function FriendMarketsModal({
       stakeToken: market.stakeTokenAddress || null,
       stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
       acceptances: market.acceptances || {},
-      acceptedCount: market.acceptedCount || 0
+      acceptedCount: market.acceptedCount || 0,
+      // Encryption fields for decryption in the acceptance modal
+      isEncrypted: market.isEncrypted || false,
+      ipfsCid: market.ipfsCid || null,
+      rawDescription: market.metadata ? JSON.stringify(market.metadata) : null,
     }
 
     setMarketToAccept(marketData)

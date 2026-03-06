@@ -7,6 +7,7 @@ import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactor
 import { getContractAddress } from '../config/contracts'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
+import { parseEncryptedIpfsReference } from '../utils/ipfsService'
 import './MarketAcceptancePage.css'
 
 /**
@@ -41,16 +42,29 @@ function getTokenDecimals(tokenAddress) {
 }
 
 /**
- * Check if a description is an encrypted JSON envelope
+ * Check if a description is encrypted (inline JSON envelope or IPFS reference)
  */
 function isEncryptedDescription(description) {
   if (!description || typeof description !== 'string') return false
+  // Check for IPFS reference: "encrypted:ipfs://..." or "ipfs://..." or raw CID
+  const ipfsRef = parseEncryptedIpfsReference(description)
+  if (ipfsRef.isIpfs) return true
+  // Check for inline JSON envelope
   try {
     const parsed = JSON.parse(description)
     return parsed.version && parsed.algorithm && parsed.content
   } catch {
     return false
   }
+}
+
+/**
+ * Extract IPFS CID from an encrypted description, if present
+ */
+function getIpfsCid(description) {
+  if (!description || typeof description !== 'string') return null
+  const ipfsRef = parseEncryptedIpfsReference(description)
+  return ipfsRef.isIpfs ? ipfsRef.cid : null
 }
 
 /**
@@ -214,6 +228,7 @@ function MarketAcceptancePage() {
             description: displayDescription,
             rawDescription: rawDescription, // Keep original for decryption
             isEncrypted: isEncryptedDescription(rawDescription),
+            ipfsCid: getIpfsCid(rawDescription),
             creator: marketResult.creator,
             participants: members,
             arbitrator: arbitrator !== ethers.ZeroAddress ? arbitrator : null,
