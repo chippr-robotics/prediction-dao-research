@@ -20,6 +20,10 @@ export { UserPreferencesProvider } from './UserPreferencesContext.jsx'
 export { WalletContext } from './WalletContext.js'
 export { WalletProvider } from './WalletContext.jsx'
 
+// Friend markets context (single source of truth for friend/private wager data)
+export { FriendMarketsContext, useFriendMarkets } from './FriendMarketsContext.js'
+export { FriendMarketsProvider } from './FriendMarketsContext.jsx'
+
 // Role constants and context (roles are managed in WalletProvider, but RoleContext exported for test compatibility)
 export { RoleContext, ROLES, ROLE_INFO, ADMIN_ROLES, isAdminRole, getRoleName } from './RoleContext.js'
 

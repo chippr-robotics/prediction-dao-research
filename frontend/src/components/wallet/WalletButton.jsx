@@ -21,8 +21,8 @@ import {
   getUserTierOnChain,
   hasRoleOnChain,
   checkRoleSyncNeeded,
-  fetchFriendMarketsForUser
 } from '../../utils/blockchainService'
+import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import {
   uploadMarketMetadata,
   uploadEncryptedEnvelope,
@@ -49,25 +49,6 @@ import './RoleDetailsCard.css'
  * - Shows connector options when disconnected
  * - Integrates with existing modal system for user management
  */
-// Helper to load friend markets from localStorage
-const loadFriendMarketsFromStorage = () => {
-  try {
-    const stored = localStorage.getItem('friendMarkets')
-    return stored ? JSON.parse(stored) : []
-  } catch (e) {
-    console.warn('Failed to load friend markets from storage:', e)
-    return []
-  }
-}
-
-// Helper to save friend markets to localStorage
-const saveFriendMarketsToStorage = (markets) => {
-  try {
-    localStorage.setItem('friendMarkets', JSON.stringify(markets))
-  } catch (e) {
-    console.warn('Failed to save friend markets to storage:', e)
-  }
-}
 
 // Helper to track pending transactions for resume capability
 const PENDING_TX_KEY = 'pendingFriendMarketTx'
@@ -113,7 +94,7 @@ function WalletButton({ className = '' }) {
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
   const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
-  const [friendMarkets, setFriendMarkets] = useState(() => loadFriendMarketsFromStorage())
+  const { friendMarkets, addMarket: addFriendMarket } = useFriendMarkets()
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -135,45 +116,6 @@ function WalletButton({ className = '' }) {
   const [connectorStatus, setConnectorStatus] = useState({})
   const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
   const [pendingConnector, setPendingConnector] = useState(null)
-
-  // Fetch friend markets from blockchain when user connects
-  useEffect(() => {
-    if (!address || !isConnected) return
-
-    let cancelled = false
-
-    const fetchBlockchainMarkets = async (attempt = 0) => {
-      try {
-        console.log('[WalletButton] Fetching friend markets from blockchain for:', address, `(attempt ${attempt + 1})`)
-        const blockchainMarkets = await fetchFriendMarketsForUser(address)
-        console.log('[WalletButton] Fetched friend markets:', blockchainMarkets.length)
-
-        if (cancelled) return
-
-        // Always update state with blockchain data (source of truth)
-        // This ensures stale localStorage data is replaced even when user has 0 markets
-        const marketsWithUniqueIds = blockchainMarkets.map(m => ({
-          ...m,
-          uniqueId: `${m.contractAddress || 'unknown'}-${m.id}`
-        }))
-
-        setFriendMarkets(marketsWithUniqueIds)
-        saveFriendMarketsToStorage(marketsWithUniqueIds)
-      } catch (error) {
-        console.error('[WalletButton] Error fetching friend markets from blockchain:', error)
-        // Retry with exponential backoff (up to 3 attempts)
-        if (!cancelled && attempt < 2) {
-          const delay = (attempt + 1) * 2000
-          console.log(`[WalletButton] Retrying in ${delay}ms...`)
-          setTimeout(() => fetchBlockchainMarkets(attempt + 1), delay)
-        }
-        // On final failure, keep existing state (localStorage cache) as fallback
-      }
-    }
-
-    fetchBlockchainMarkets()
-    return () => { cancelled = true }
-  }, [address, isConnected])
 
   // Filter friend markets into active and past based on end date and user
   const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
@@ -901,12 +843,8 @@ function WalletButton({ className = '' }) {
         txHash: receipt.hash
       }
 
-      // Update state and persist to localStorage
-      setFriendMarkets(prev => {
-        const updated = [...prev, newMarket]
-        saveFriendMarketsToStorage(updated)
-        return updated
-      })
+      // Add to shared context (persists to localStorage automatically)
+      addFriendMarket(newMarket)
 
       console.log('Friend market stored:', newMarket)
 

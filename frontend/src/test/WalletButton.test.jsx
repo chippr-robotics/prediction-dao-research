@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 // import { axe } from 'vitest-axe' // Unused, commented out for now
 import WalletButton from '../components/wallet/WalletButton'
-import { WalletContext, ThemeContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext } from '../contexts'
+import { WalletContext, ThemeContext, ROLES, ROLE_INFO, UIContext, UserPreferencesContext, FriendMarketsContext } from '../contexts'
 import { BrowserRouter } from 'react-router-dom'
 
 // Mock wagmi hooks
@@ -122,20 +122,31 @@ describe('WalletButton Component - Wagers', () => {
     signer: null
   }
 
+  const defaultFriendMarketsContext = {
+    friendMarkets: [],
+    loading: false,
+    refresh: vi.fn(),
+    addMarket: vi.fn(),
+    setFriendMarkets: vi.fn()
+  }
+
   const renderWithProviders = (component, options = {}) => {
     const {
       uiContext = defaultUIContext,
       themeContext = defaultThemeContext,
-      walletContext = defaultWalletContext
+      walletContext = defaultWalletContext,
+      friendMarketsContext = defaultFriendMarketsContext
     } = options
 
     return render(
       <BrowserRouter>
         <ThemeContext.Provider value={themeContext}>
           <WalletContext.Provider value={walletContext}>
-            <UIContext.Provider value={uiContext}>
-              {component}
-            </UIContext.Provider>
+            <FriendMarketsContext.Provider value={friendMarketsContext}>
+              <UIContext.Provider value={uiContext}>
+                {component}
+              </UIContext.Provider>
+            </FriendMarketsContext.Provider>
           </WalletContext.Provider>
         </ThemeContext.Provider>
       </BrowserRouter>

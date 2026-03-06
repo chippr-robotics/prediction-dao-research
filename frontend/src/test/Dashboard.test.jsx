@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
-import { UserPreferencesContext, WalletContext } from '../contexts'
+import { UserPreferencesContext, WalletContext, FriendMarketsContext } from '../contexts'
 
 describe('Dashboard Component', () => {
   const defaultWalletContext = {
@@ -39,17 +39,28 @@ describe('Dashboard Component', () => {
     clearAllPreferences: vi.fn()
   }
 
+  const defaultFriendMarketsContext = {
+    friendMarkets: [],
+    loading: false,
+    refresh: vi.fn(),
+    addMarket: vi.fn(),
+    setFriendMarkets: vi.fn()
+  }
+
   const renderWithProviders = (component, options = {}) => {
     const {
       walletContext = defaultWalletContext,
-      preferencesContext = defaultPreferencesContext
+      preferencesContext = defaultPreferencesContext,
+      friendMarketsContext = defaultFriendMarketsContext
     } = options
 
     return render(
       <MemoryRouter>
         <WalletContext.Provider value={walletContext}>
           <UserPreferencesContext.Provider value={preferencesContext}>
-            {component}
+            <FriendMarketsContext.Provider value={friendMarketsContext}>
+              {component}
+            </FriendMarketsContext.Provider>
           </UserPreferencesContext.Provider>
         </WalletContext.Provider>
       </MemoryRouter>
