@@ -1,0 +1,9 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "timestamp": "2026-03-07T12:26:40.724Z",
+  "contracts": {
+    "zkKeyManager": "0xF75bcd3673E379E0a85CC944AA147B7596c7AE67"
+  }
+}

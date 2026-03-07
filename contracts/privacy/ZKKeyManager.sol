@@ -116,10 +116,11 @@ contract ZKKeyManager is AccessControl, Pausable {
     
     // ========== Constructor ==========
     
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(ADMIN_ROLE, msg.sender);
-        
+    constructor(address initialAdmin) {
+        require(initialAdmin != address(0), "ZKKeyManager: zero address admin");
+        _grantRole(DEFAULT_ADMIN_ROLE, initialAdmin);
+        _grantRole(ADMIN_ROLE, initialAdmin);
+
         // Default configuration
         keyExpirationDuration = 365 days;
         maxRotationsPerYear = 4;  // Once per quarter

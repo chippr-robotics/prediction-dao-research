@@ -32,7 +32,7 @@ export const DEPLOYED_CONTRACTS = {
 
   // Privacy & Key Management
   nullifierRegistry: '0x5569FEe7f8Bab39EEd08bf448Dd6824640C7d272',
-  zkKeyManager: null, // TODO: Deploy with scripts/deploy/deploy-zk-key-manager.js and set address
+  zkKeyManager: '0xF75bcd3673E379E0a85CC944AA147B7596c7AE67',
 
   // Back-compat aliases
   roleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',

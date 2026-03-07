@@ -4,7 +4,7 @@ import './theme.css'
 import './App.css'
 
 //system hooks & effects
-import { useWallet, useWalletConnection, useWalletNetwork } from './hooks'
+import { useWallet, useWalletNetwork } from './hooks'
 import { useAnnouncement, useNotification } from './hooks/useUI'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
@@ -31,28 +31,9 @@ import { ComponentExamples } from './components/ui'
 
 function AppContent() {
   const { isConnected } = useWallet()
-  const { connectWallet, disconnectWallet } = useWalletConnection()
   const { networkError, switchNetwork } = useWalletNetwork()
   const { announce } = useAnnouncement()
   const { showNotification } = useNotification()
-
-  const handleConnect = async () => {
-    const success = await connectWallet()
-    if (success) {
-      announce('Wallet connected successfully')
-      showNotification('Wallet connected successfully', 'success')
-    } else {
-      announce('Wallet connection failed')
-      showNotification('Failed to connect wallet. Please try again.', 'error')
-    }
-    return success
-  }
-
-  const handleDisconnect = () => {
-    disconnectWallet()
-    announce('Wallet disconnected')
-    showNotification('Wallet disconnected', 'info')
-  }
 
   const handleSwitchNetwork = async () => {
     await switchNetwork()

@@ -4,16 +4,16 @@ import { DEPLOYED_CONTRACTS, getContractAddress } from '../config/contracts'
 
 describe('contracts config', () => {
   describe('DEPLOYED_CONTRACTS', () => {
-    it('exposes deterministic deployment keys', () => {
-      expect(DEPLOYED_CONTRACTS.welfareRegistry).toMatch(/^0x[0-9a-fA-F]{40}$/)
-      expect(DEPLOYED_CONTRACTS.proposalRegistry).toMatch(/^0x[0-9a-fA-F]{40}$/)
-      expect(DEPLOYED_CONTRACTS.marketFactory).toMatch(/^0x[0-9a-fA-F]{40}$/)
-      expect(DEPLOYED_CONTRACTS.futarchyGovernor).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    it('exposes core contract addresses', () => {
+      expect(DEPLOYED_CONTRACTS.deployer).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.treasury).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.roleManagerCore).toMatch(/^0x[0-9a-fA-F]{40}$/)
     })
 
-    it('exposes factory contract addresses', () => {
-      expect(DEPLOYED_CONTRACTS.tokenMintFactory).toMatch(/^0x[0-9a-fA-F]{40}$/)
-      expect(DEPLOYED_CONTRACTS.daoFactory).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    it('exposes RBAC contract addresses', () => {
+      expect(DEPLOYED_CONTRACTS.tieredRoleManager).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.tierRegistry).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.membershipManager).toMatch(/^0x[0-9a-fA-F]{40}$/)
     })
 
     it('exposes role manager contracts', () => {
@@ -32,16 +32,17 @@ describe('contracts config', () => {
 
     it('exposes friend market contracts', () => {
       expect(DEPLOYED_CONTRACTS.friendGroupMarketFactory).toMatch(/^0x[0-9a-fA-F]{40}$/)
-      expect(DEPLOYED_CONTRACTS.ctf1155).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.friendGroupCreationLib).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.friendGroupResolutionLib).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(DEPLOYED_CONTRACTS.friendGroupClaimsLib).toMatch(/^0x[0-9a-fA-F]{40}$/)
     })
   })
 
   describe('getContractAddress', () => {
     it('returns address from DEPLOYED_CONTRACTS', () => {
-      expect(getContractAddress('tokenMintFactory')).toEqual(DEPLOYED_CONTRACTS.tokenMintFactory)
-      expect(getContractAddress('daoFactory')).toEqual(DEPLOYED_CONTRACTS.daoFactory)
       expect(getContractAddress('roleManager')).toEqual(DEPLOYED_CONTRACTS.roleManager)
       expect(getContractAddress('roleManagerCore')).toEqual(DEPLOYED_CONTRACTS.roleManagerCore)
+      expect(getContractAddress('tieredRoleManager')).toEqual(DEPLOYED_CONTRACTS.tieredRoleManager)
     })
 
     it('returns address for friendGroupMarketFactory', () => {
@@ -57,14 +58,14 @@ describe('contracts config', () => {
 
     it('handles case sensitivity correctly', () => {
       // Contract names are case-sensitive and should match DEPLOYED_CONTRACTS keys exactly
-      expect(getContractAddress('marketFactory')).toBeDefined()
-      expect(getContractAddress('MARKETFACTORY')).toBeUndefined() // Wrong case
+      expect(getContractAddress('friendGroupMarketFactory')).toBeDefined()
+      expect(getContractAddress('FRIENDGROUPMARKETFACTORY')).toBeUndefined() // Wrong case
     })
 
     // Note: Environment variable override tests would require mocking import.meta.env
     // which is challenging in Vitest. The function supports:
-    // - VITE_MARKETFACTORY_ADDRESS (uppercase name)
-    // - VITE_MARKET_FACTORY_ADDRESS (snake_case conversion)
+    // - VITE_FRIENDGROUPMARKETFACTORY_ADDRESS (uppercase name)
+    // - VITE_FRIEND_GROUP_MARKET_FACTORY_ADDRESS (snake_case conversion)
     // These are verified through manual testing and integration tests.
   })
 })

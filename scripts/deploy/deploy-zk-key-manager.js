@@ -25,7 +25,7 @@ const {
   verifyOnBlockscout,
 } = require("./lib/helpers");
 
-const SALT_PREFIX = "ClearPathDAO-ZKKeyMgr-v1.0-";
+const SALT_PREFIX = "ClearPathDAO-ZKKeyMgr-v1.1-";
 
 async function main() {
   console.log("=".repeat(60));
@@ -53,7 +53,7 @@ async function main() {
 
   const zkKeyManager = await deployDeterministic(
     "ZKKeyManager",
-    [],
+    [deployer.address],
     generateSalt(SALT_PREFIX + "ZKKeyManager"),
     deployer
   );
@@ -94,7 +94,11 @@ async function main() {
   // Verify on Blockscout if on Mordor
   if (hre.network.name === "mordor") {
     console.log("\n--- Verifying on Blockscout ---");
-    await verifyOnBlockscout("ZKKeyManager", deployments.zkKeyManager, []);
+    await verifyOnBlockscout({
+      name: "ZKKeyManager",
+      address: deployments.zkKeyManager,
+      constructorArguments: [deployer.address]
+    });
   }
 
   console.log("\n" + "=".repeat(60));
