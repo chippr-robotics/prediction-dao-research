@@ -12,7 +12,7 @@ import AnnouncementRegion from './components/ui/AnnouncementRegion'
 
 // Main flow
 import LandingPage from './components/LandingPage'
-import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
+import Dashboard from './components/fairwins/Dashboard'
 
 // add-ons
 import WalletPage from './pages/WalletPage'
@@ -102,33 +102,9 @@ function AppContent() {
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
-        <Route
-          path="/app"
-          element={
-            <FairWinsAppNew
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          }
-        />
-        <Route
-          path="/main"
-          element={
-            <FairWinsAppNew
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          }
-        />
-        <Route
-          path="/fairwins"
-          element={
-            <FairWinsAppNew
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          }
-        />
+        <Route path="/app" element={<Dashboard />} />
+        <Route path="/main" element={<Dashboard />} />
+        <Route path="/fairwins" element={<Dashboard />} />
 
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />

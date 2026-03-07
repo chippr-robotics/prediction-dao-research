@@ -119,7 +119,9 @@ function FriendMarketsModal({
   const {
     isInitialized: encryptionInitialized,
     isInitializing: encryptionInitializing,
-    createEncrypted
+    createEncrypted,
+    lookupOpponentKey,
+    addRecipientByPublicKey
   } = useEncryption()
 
   // Lazy load IPFS envelopes - only fetches when user views a market
@@ -447,9 +449,6 @@ function FriendMarketsModal({
       isEncrypted: market.isEncrypted || false,
       ipfsCid: market.ipfsCid || null,
       rawDescription: market.metadata ? JSON.stringify(market.metadata) : null,
-      sharedSignature: (() => {
-        try { return localStorage.getItem(`fw_sig_${market.id}`) } catch { return null }
-      })(),
     }
 
     setMarketToAccept(marketData)
@@ -798,20 +797,33 @@ function FriendMarketsModal({
 
       // Handle encryption if enabled
       let finalMetadata = marketMetadata
-      let creatorSignatureForSharing = null
 
-      if (enableEncryption && friendMarketType === 'oneVsOne') {
-        // For 1v1 markets, create encrypted envelope
-        // Creator's envelope - participants will be added when they accept
-        const { envelope, creatorSignature } = await createEncrypted(marketMetadata)
-        finalMetadata = envelope
-        creatorSignatureForSharing = creatorSignature
-      } else if (enableEncryption && (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking')) {
-        // For group markets, start with creator as only recipient
-        // Other participants will be added as they accept and provide signatures
-        const { envelope, creatorSignature } = await createEncrypted(marketMetadata)
-        finalMetadata = envelope
-        creatorSignatureForSharing = creatorSignature
+      if (enableEncryption) {
+        // Look up opponent's on-chain encryption key before creating envelope
+        const opponentAddress = friendMarketType === 'oneVsOne'
+          ? formData.opponent
+          : null // For group markets, encrypt for creator only initially
+
+        if (friendMarketType === 'oneVsOne' && opponentAddress) {
+          const opponentKey = await lookupOpponentKey(opponentAddress)
+          if (!opponentKey) {
+            throw new Error(
+              'Your opponent has not registered their encryption key yet. ' +
+              'They must visit the app and register their key before you can create an encrypted wager. ' +
+              'You can still create an unencrypted wager.'
+            )
+          }
+
+          // Create encrypted envelope for creator
+          const { envelope } = await createEncrypted(marketMetadata)
+          // Add opponent as recipient using their on-chain public key (no shared secret)
+          finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
+        } else {
+          // Group markets: start with creator as only recipient
+          // Other participants will be added as they accept
+          const { envelope } = await createEncrypted(marketMetadata)
+          finalMetadata = envelope
+        }
       }
 
       // Calculate trading period in days BEFORE building submit data
@@ -831,9 +843,8 @@ function FriendMarketsModal({
           // Pass actual token address so WalletButton can use correct decimals
           // 'native' means native ETC (no ERC20 address), pass null for this case
           collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null),
-          // Include encrypted metadata and creator's signature for participant key exchange
+          // Include encrypted metadata (opponent's key wrapped via on-chain registry)
           encryptedMetadata: enableEncryption ? finalMetadata : null,
-          creatorSignature: creatorSignatureForSharing,
           isEncrypted: enableEncryption,
           // Progress callback for transaction status updates
           onProgress: handleProgress
@@ -881,18 +892,7 @@ function FriendMarketsModal({
           }
         },
         // Encryption fields
-        isEncrypted: enableEncryption,
-        creatorSignature: creatorSignatureForSharing
-      }
-
-      // Persist creator's encryption signature so invitation URLs can include it
-      // This allows opponents to decrypt wager details before accepting
-      if (enableEncryption && creatorSignatureForSharing && newMarket.id) {
-        try {
-          localStorage.setItem(`fw_sig_${newMarket.id}`, creatorSignatureForSharing)
-        } catch {
-          // localStorage may be full or unavailable — non-fatal
-        }
+        isEncrypted: enableEncryption
       }
 
       setCreatedMarket(newMarket)
@@ -1016,14 +1016,8 @@ function FriendMarketsModal({
       deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
     })
 
-    // Include creator's encryption signature so opponent can decrypt wager details
-    const sig = market.creatorSignature || (() => {
-      try { return localStorage.getItem(`fw_sig_${market.id}`) } catch { return null }
-    })()
-    if (sig) {
-      params.set('sig', sig)
-    }
-
+    // No shared signature needed — opponent decrypts using their own wallet-derived keys
+    // via the on-chain key registry (ZKKeyManager)
     return `${window.location.origin}/friend-market/accept?${params.toString()}`
   }
 
@@ -1708,13 +1702,13 @@ function FriendMarketsModal({
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                             </svg>
-                            <span>Post-Quantum Secure</span>
+                            <span>End-to-End Encrypted</span>
                           </div>
                         )}
 
                         <span className="fm-hint">
                           {enableEncryption
-                            ? 'End-to-end encrypted with X-Wing (quantum-resistant). Only participants can decrypt.'
+                            ? 'End-to-end encrypted. Only participants can decrypt wager details.'
                             : 'Wager details will be publicly visible on the blockchain.'}
                         </span>
 
@@ -1759,6 +1753,17 @@ function FriendMarketsModal({
                               <path d="M12 16v-4M12 8h.01"/>
                             </svg>
                             <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
+                          </div>
+                        )}
+                        {enableEncryption && friendMarketType === 'oneVsOne' && (
+                          <div className="fm-encryption-info" style={{ marginTop: '0.5rem' }}>
+                            <div className="fm-encryption-info-header">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                              </svg>
+                              <span>Your opponent must have registered their encryption key to create an encrypted wager.</span>
+                            </div>
                           </div>
                         )}
                         {encryptionInitializing && (
@@ -2624,7 +2629,7 @@ function MarketDetailView({
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              PQ Secure
+              Encrypted
             </span>
           )}
         </div>

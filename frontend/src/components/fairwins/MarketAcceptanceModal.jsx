@@ -161,7 +161,7 @@ function MarketAcceptanceModal({
     resolveEnvelope()
   }, [marketData?.isEncrypted, marketData?.rawDescription, marketData?.ipfsCid])
 
-  // Decrypt using the shared creator signature (fallback when user's key isn't in envelope)
+  // Legacy fallback: decrypt using shared creator signature from old invitation URLs
   const decryptWithSharedSignature = useCallback((envelope) => {
     const sig = marketData?.sharedSignature
     if (!sig || !marketData?.creator) return null
@@ -175,7 +175,7 @@ function MarketAcceptanceModal({
         return decryptEnvelopeX25519(envelope, marketData.creator, privateKey)
       }
     } catch (err) {
-      console.warn('Shared signature decryption failed:', err.message)
+      console.warn('[acceptance] Legacy shared signature decryption failed:', err.message)
       return null
     }
   }, [marketData?.sharedSignature, marketData?.creator])
@@ -189,12 +189,12 @@ function MarketAcceptanceModal({
       setDecryptionError(null)
 
       if (!account) {
-        setDecryptionError('Connect wallet to view encrypted content')
+        setDecryptionError('Connect wallet to view encrypted wager details')
         return
       }
 
       try {
-        // Try 1: User's own key is in the envelope
+        // Primary path: user's own key is in the envelope (on-chain key registry flow)
         if (canUserDecrypt(resolvedEnvelope) && encryptionInitialized) {
           setIsDecrypting(true)
           const decrypted = await decryptMetadata(resolvedEnvelope)
@@ -203,20 +203,18 @@ function MarketAcceptanceModal({
           return
         }
 
-        // Try 2: Use shared creator signature (from invitation URL)
-        const sharedResult = decryptWithSharedSignature(resolvedEnvelope)
-        if (sharedResult) {
-          setDecryptedDescription(sharedResult.description || sharedResult.name || 'Wager Details')
-          return
+        // Legacy fallback: old wagers created with shared signature in URL
+        if (marketData?.sharedSignature) {
+          const sharedResult = decryptWithSharedSignature(resolvedEnvelope)
+          if (sharedResult) {
+            setDecryptedDescription(sharedResult.description || sharedResult.name || 'Wager Details')
+            return
+          }
         }
 
         // No decryption method available
         if (!canUserDecrypt(resolvedEnvelope)) {
-          if (marketData?.sharedSignature) {
-            setDecryptionError('Failed to decrypt with the provided key')
-          } else {
-            setDecryptionError('Use the invitation link from the creator to view wager details')
-          }
+          setDecryptionError('Your encryption key is not registered for this wager. Register your key and ask the creator to re-share.')
         }
       } catch (err) {
         console.error('Failed to decrypt wager:', err)

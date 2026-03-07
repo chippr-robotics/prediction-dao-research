@@ -1,23 +1,8 @@
-// FairWins Components - Admin Dashboard UI
+// FairWins Components - P2P Wager Dashboard UI
 export { default as SidebarNav } from './SidebarNav'
 export { default as HeaderBar } from './HeaderBar'
-export { default as MarketTile } from './MarketTile'
-export { default as ModernMarketCard } from './ModernMarketCard'
-export { default as MarketGrid } from './MarketGrid'
-export { default as CompactMarketView } from './CompactMarketView'
-export { default as ViewToggle } from './ViewToggle'
-export { default as MarketHeroCard } from './MarketHeroCard'
-export { default as HorizontalMarketScroller } from './HorizontalMarketScroller'
-export { default as CategoryRow } from './CategoryRow'
-export { default as FairWinsAppNew } from './FairWinsAppNew'
 export { default as Dashboard } from './Dashboard'
-export { default as MarketsTable } from './MarketsTable'
 
 // Modal Components
-export { default as TokenMintBuilderModal } from './TokenMintBuilderModal'
-export { default as TokenCreationModal } from './TokenCreationModal'
-export { default as MarketCreationModal } from './MarketCreationModal'
-export { default as TokenManagementModal } from './TokenManagementModal'
-export { default as MarketModal } from './MarketModal'
 export { default as FriendMarketsModal } from './FriendMarketsModal'
 export { default as MyMarketsModal } from './MyMarketsModal'

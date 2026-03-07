@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import TokenMintButton from './TokenMintButton'
 import WalletButton from './wallet/WalletButton'
 import './Header.css'
 
@@ -80,12 +79,9 @@ function Header({ showClearPathBranding = false, hideWalletButton = false }) {
         {/* Wallet Connection Section */}
         <div className="header-actions">
           {!hideWalletButton && (
-            <>
-              <TokenMintButton />
-              <WalletButton 
+            <WalletButton
                 theme="dark"
               />
-            </>
           )}
 
           {/* Mobile Menu Toggle */}

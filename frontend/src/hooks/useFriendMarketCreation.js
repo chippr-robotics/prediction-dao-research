@@ -3,7 +3,14 @@ import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { getContractAddress } from '../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
-import { ERC20_ABI } from '../abis/ConditionalMarketFactory'
+
+// Minimal ERC20 ABI for stake token interactions
+const ERC20_ABI = [
+  'function balanceOf(address owner) view returns (uint256)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)'
+]
 import { ETCSWAP_ADDRESSES, TOKENS } from '../constants/etcswap'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import {

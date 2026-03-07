@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet, useWeb3, useDataFetcher } from '../../hooks'
+import { useWallet, useWeb3 } from '../../hooks'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
@@ -27,7 +27,6 @@ function MyMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
-  const { getMarkets, getPositions } = useDataFetcher()
 
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
@@ -58,7 +57,7 @@ function MyMarketsModal({
   const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
   const [statusFilter, setStatusFilter] = useState('all')
 
-  // Fetch markets data
+  // Fetch markets data (friend markets are passed via props)
   const fetchMarketsData = useCallback(async () => {
     if (!account) return
 
@@ -66,20 +65,15 @@ function MyMarketsModal({
     setError(null)
 
     try {
-      const [fetchedMarkets, positions] = await Promise.all([
-        getMarkets(),
-        getPositions(account)
-      ])
-
-      setMarkets(fetchedMarkets || [])
-      setUserPositions(positions || [])
+      setMarkets([])
+      setUserPositions([])
     } catch (err) {
       console.error('Error fetching markets data:', err)
       setError('Failed to load wagers. Please try again.')
     } finally {
       setLoading(false)
     }
-  }, [account, getMarkets, getPositions])
+  }, [account])
 
   // Load data when modal opens
   useEffect(() => {
