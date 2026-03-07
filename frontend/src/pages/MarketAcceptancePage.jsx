@@ -92,7 +92,8 @@ function MarketAcceptancePage() {
   const urlStake = searchParams.get('stake')
   const urlToken = searchParams.get('token')
   const urlDeadline = searchParams.get('deadline')
-  const urlSharedSignature = searchParams.get('sig')
+  // Legacy: old URLs may still include sig param for backward compat
+  const urlSharedSignature = searchParams.get('sig') || null
 
   useEffect(() => {
     const fetchMarketData = async () => {

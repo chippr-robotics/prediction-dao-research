@@ -20,7 +20,7 @@ describe("ZK Key Lifecycle - Integration Tests", function () {
     
     // Deploy ZKKeyManager
     const ZKKeyManager = await ethers.getContractFactory("ZKKeyManager");
-    zkKeyManager = await ZKKeyManager.deploy();
+    zkKeyManager = await ZKKeyManager.deploy(owner.address);
     await zkKeyManager.waitForDeployment();
     
     // Deploy ZKVerifier

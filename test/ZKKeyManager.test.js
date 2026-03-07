@@ -10,9 +10,9 @@ describe("ZKKeyManager - Unit Tests", function () {
     [owner, admin, user1, user2, user3] = await ethers.getSigners();
     
     const ZKKeyManager = await ethers.getContractFactory("ZKKeyManager");
-    zkKeyManager = await ZKKeyManager.deploy();
+    zkKeyManager = await ZKKeyManager.deploy(owner.address);
     await zkKeyManager.waitForDeployment();
-    
+
     // Grant admin role
     const ADMIN_ROLE = await zkKeyManager.ADMIN_ROLE();
     await zkKeyManager.grantRole(ADMIN_ROLE, admin.address);

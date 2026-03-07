@@ -34,7 +34,6 @@ vi.mock('../hooks', () => ({
   useWalletRoles: vi.fn(),
   useWeb3: vi.fn(() => ({ signer: {}, isCorrectNetwork: true, switchNetwork: vi.fn() })),
   useWallet: vi.fn(() => ({ isConnected: true, account: '0x1234567890123456789012345678901234567890' })),
-  useDataFetcher: vi.fn(() => ({ getMarkets: vi.fn(() => Promise.resolve([])), getPositions: vi.fn(() => Promise.resolve([])) }))
 }))
 
 vi.mock('../hooks/useETCswap', () => ({
@@ -58,12 +57,6 @@ vi.mock('../components/fairwins/FriendMarketsModal', () => ({
   ) : null,
   FriendMarketsModal: ({ isOpen, onClose }) => isOpen ? (
     <div role="dialog" aria-label="Create Wager Modal"><button onClick={onClose}>Close</button></div>
-  ) : null
-}))
-
-vi.mock('../components/fairwins/MarketCreationModal', () => ({
-  default: ({ isOpen, onClose }) => isOpen ? (
-    <div role="dialog" aria-label="Create Prediction Market Modal"><button onClick={onClose}>Close</button></div>
   ) : null
 }))
 
@@ -242,24 +235,7 @@ describe('WalletButton Component - Wagers', () => {
       })
     })
 
-    it('shows Create Prediction Market button for users with MARKET_MAKER role', async () => {
-      const user = userEvent.setup()
-      useWalletRoles.mockReturnValue({
-        roles: [ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
-      })
-
-      renderWithProviders(<WalletButton />)
-
-      const button = screen.getByRole('button', { name: /wallet account/i })
-      await user.click(button)
-
-      await waitFor(() => {
-        expect(screen.getByText('Create Prediction Market')).toBeInTheDocument()
-      })
-    })
-
-    it('hides Create Prediction Market button for users without MARKET_MAKER role', async () => {
+    it('hides Create Prediction Market button (removed feature)', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
         roles: [],
@@ -318,46 +294,9 @@ describe('WalletButton Component - Wagers', () => {
       })
     })
 
-    it('opens prediction market modal when Create Prediction Market is clicked', async () => {
-      const user = userEvent.setup()
-      useWalletRoles.mockReturnValue({
-        roles: [ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.MARKET_MAKER)
-      })
-
-      renderWithProviders(<WalletButton />)
-
-      const button = screen.getByRole('button', { name: /wallet account/i })
-      await user.click(button)
-
-      const createMarketBtn = await screen.findByText('Create Prediction Market')
-      await user.click(createMarketBtn)
-
-      await waitFor(() => {
-        expect(screen.getByRole('dialog', { name: /create prediction market/i })).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Wager and Market Integration', () => {
-    it('shows both Create Wager and Create Prediction Market when user has both roles', async () => {
-      const user = userEvent.setup()
-      useWalletRoles.mockReturnValue({
-        roles: [ROLES.FRIEND_MARKET, ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.FRIEND_MARKET || role === ROLES.MARKET_MAKER)
-      })
-
-      renderWithProviders(<WalletButton />)
-
-      const button = screen.getByRole('button', { name: /wallet account/i })
-      await user.click(button)
-
-      await waitFor(() => {
-        expect(screen.getByText('Create Wager')).toBeInTheDocument()
-        expect(screen.getByText('Create Prediction Market')).toBeInTheDocument()
-      })
-    })
-
     it('all wager actions are within a single Wagers section', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({

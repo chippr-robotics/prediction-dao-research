@@ -10,27 +10,29 @@ import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
-import { MARKET_FACTORY_ABI, BetType, TradingPeriod, ERC20_ABI } from '../../abis/ConditionalMarketFactory'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+
+// Minimal ERC20 ABI for stake token interactions
+const ERC20_ABI = [
+  'function balanceOf(address owner) view returns (uint256)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)'
+]
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import {
-  isCorrelationRegistryDeployed,
-  createCorrelationGroup,
-  addMarketToCorrelationGroup,
   getUserTierOnChain,
   hasRoleOnChain,
   checkRoleSyncNeeded,
 } from '../../utils/blockchainService'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import {
-  uploadMarketMetadata,
   uploadEncryptedEnvelope,
   buildEncryptedIpfsReference
 } from '../../utils/ipfsService'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
-import MarketCreationModal from '../fairwins/MarketCreationModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import walletIcon from '../../assets/wallet_no_text.svg'
 import { FriendMarketsModal, MyMarketsModal } from '../fairwins'
@@ -92,7 +94,6 @@ const clearPendingTransaction = () => {
 function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
-  const [showMarketCreationModal, setShowMarketCreationModal] = useState(false)
   const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
   const { friendMarkets, addMarket: addFriendMarket } = useFriendMarkets()
   const { address, isConnected } = useAccount()
@@ -867,380 +868,6 @@ function WalletButton({ className = '' }) {
     }
   }
 
-  const handleOpenMarketCreation = () => {
-    setIsOpen(false)
-    setShowMarketCreationModal(true)
-  }
-
-  /**
-   * Handle creation from the MarketCreationModal
-   * Supports prediction markets with web3 transactions using CTF1155
-   *
-   * Transaction Flow:
-   * 1. Approve collateral token (if needed)
-   * 2. Create market on-chain
-   * 3. Create correlation group (if new group selected)
-   * 4. Add market to correlation group (if correlation enabled)
-   */
-  const handleMarketCreation = async (submitData, modalSigner, onProgress) => {
-    const activeSigner = modalSigner || signer
-
-    // Helper to report progress
-    const reportProgress = (step, total, description, status = 'pending') => {
-      if (onProgress) {
-        onProgress({ step, total, description, status })
-      }
-      console.log(`[${step}/${total}] ${description} - ${status}`)
-    }
-
-    // Calculate total steps based on configuration
-    const hasCorrelation = submitData.correlationGroup && isCorrelationRegistryDeployed()
-    const isNewGroup = hasCorrelation && submitData.correlationGroup.createNew
-    const hasMetadata = submitData.metadata && !submitData.metadataUri
-    let totalSteps = 2 // Base: approve + create market
-    if (hasMetadata) totalSteps++ // + upload metadata to IPFS
-    if (isNewGroup) totalSteps++ // + create group
-    if (hasCorrelation) totalSteps++ // + add to group
-
-    if (!activeSigner) {
-      console.error('No signer available for market creation')
-      throw new Error('Please connect your wallet to create a market')
-    }
-
-    // Verify signer is authorized for the connected address
-    try {
-      const signerAddress = await activeSigner.getAddress()
-      console.log('Market creation - Signer address:', signerAddress)
-      console.log('Market creation - Connected address:', address)
-
-      if (address && signerAddress.toLowerCase() !== address.toLowerCase()) {
-        console.warn('Signer address does not match connected address, reconnecting...')
-        // Request accounts to ensure authorization
-        if (window.ethereum) {
-          await window.ethereum.request({ method: 'eth_requestAccounts' })
-        }
-      }
-    } catch (addressError) {
-      console.error('Error verifying signer address:', addressError)
-      throw new Error('Wallet authorization failed. Please reconnect your wallet.')
-    }
-
-    console.log('Market creation data:', submitData)
-    console.log('Collateral token from form:', submitData.collateralToken)
-
-    try {
-      const marketFactoryAddress = getContractAddress('marketFactory')
-      if (!marketFactoryAddress) {
-        throw new Error('Market factory contract not deployed on this network')
-      }
-
-      // Get collateral token address - use form data or default to USC stablecoin
-      const collateralTokenAddress = submitData.collateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN
-      console.log('Using collateral token:', collateralTokenAddress)
-      console.log('USC stablecoin address:', ETCSWAP_ADDRESSES.USC_STABLECOIN)
-
-      if (!collateralTokenAddress) {
-        throw new Error('Collateral token not configured')
-      }
-
-      // Determine token decimals based on token address
-      const tokenDecimals = collateralTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()
-        ? TOKENS.USC.decimals  // 6 decimals for USC
-        : 18  // Default to 18 decimals for other tokens
-
-      const contract = new ethers.Contract(marketFactoryAddress, MARKET_FACTORY_ABI, activeSigner)
-      const collateralToken = new ethers.Contract(collateralTokenAddress, ERC20_ABI, activeSigner)
-
-      // Pre-flight checks: verify contract is properly configured
-      const [ctf1155Address, roleManagerAddress, ownerAddress] = await Promise.all([
-        contract.ctf1155(),
-        contract.roleManager(),
-        contract.owner()
-      ])
-
-      const userAddress = await activeSigner.getAddress()
-
-      // Check CTF1155 is configured
-      if (ctf1155Address === ethers.ZeroAddress) {
-        throw new Error('Market factory not fully configured: CTF1155 contract not set. Contact the contract owner.')
-      }
-
-      // Check if user can create markets
-      const isOwner = userAddress.toLowerCase() === ownerAddress.toLowerCase()
-      let hasMarketMakerRole = false
-
-      // Log role check details for debugging
-      console.log('Role check details:', {
-        userAddress,
-        ownerAddress,
-        isOwner,
-        roleManagerFromFactory: roleManagerAddress,
-        expectedRoleManager: getContractAddress('roleManager')
-      })
-
-      if (roleManagerAddress !== ethers.ZeroAddress) {
-        // Check on-chain role using the roleManager from factory
-        const roleManagerAbi = [
-          'function hasRole(bytes32 role, address account) view returns (bool)',
-          'function MARKET_MAKER_ROLE() view returns (bytes32)',
-          'function isActiveMember(address user, bytes32 role) view returns (bool)',
-          'function checkMarketCreationLimitFor(address user, bytes32 role) returns (bool)'
-        ]
-        const roleManager = new ethers.Contract(roleManagerAddress, roleManagerAbi, activeSigner)
-        try {
-          const marketMakerRole = await roleManager.MARKET_MAKER_ROLE()
-          console.log('MARKET_MAKER_ROLE hash:', marketMakerRole)
-
-          // Try hasRole first
-          hasMarketMakerRole = await roleManager.hasRole(marketMakerRole, userAddress)
-          console.log('hasRole result:', hasMarketMakerRole)
-
-          // If hasRole fails, try isActiveMember (TieredRoleManager specific)
-          if (!hasMarketMakerRole) {
-            try {
-              const isActive = await roleManager.isActiveMember(userAddress, marketMakerRole)
-              console.log('isActiveMember result:', isActive)
-              hasMarketMakerRole = isActive
-            } catch (activeMemberError) {
-              console.log('isActiveMember not available or failed:', activeMemberError.message)
-            }
-          }
-
-          // Pre-check market creation limit (this is what the contract will call)
-          if (hasMarketMakerRole) {
-            try {
-              const limitCheck = await roleManager.checkMarketCreationLimitFor.staticCall(userAddress, marketMakerRole)
-              console.log('checkMarketCreationLimitFor result:', limitCheck)
-              if (!limitCheck) {
-                throw new Error('Market creation limit exceeded. You may need to wait or upgrade your tier.')
-              }
-            } catch (limitError) {
-              console.warn('checkMarketCreationLimitFor check failed:', limitError.message)
-              // Don't fail here - the contract might handle this differently
-            }
-          }
-        } catch (roleError) {
-          console.warn('Could not verify on-chain role:', roleError)
-        }
-      }
-
-      // Always check blockchain for roles - roles could expire
-      if (!isOwner && !hasMarketMakerRole) {
-        if (roleManagerAddress === ethers.ZeroAddress) {
-          throw new Error('Market creation requires contract owner privileges. Role manager not configured on factory.')
-        }
-        throw new Error('You do not have the MARKET_MAKER role on-chain. Your role may have expired. Please purchase or renew your Market Maker access.')
-      }
-
-      console.log('Pre-flight checks passed (on-chain verified):', { isOwner, hasMarketMakerRole, ctf1155Address })
-
-      // Calculate trading period in seconds (enforce contract limits: 7-21 days)
-      const tradingPeriodSeconds = Math.max(
-        TradingPeriod.MIN,
-        Math.min(TradingPeriod.MAX, submitData.tradingPeriod || TradingPeriod.DEFAULT)
-      )
-
-      // Parse initial liquidity using correct decimals for token
-      const liquidityAmount = ethers.parseUnits(submitData.initialLiquidity.toString(), tokenDecimals)
-
-      // Generate a unique proposal ID
-      const proposalId = BigInt(Date.now())
-
-      // Default liquidity parameter for LMSR
-      // Use same decimals as collateral token for consistency
-      const liquidityParameter = ethers.parseUnits('100', tokenDecimals)
-
-      // Determine bet type from metadata or default to YesNo
-      let betType = BetType.YesNo
-      if (submitData.metadata?.attributes) {
-        const betTypeAttr = submitData.metadata.attributes.find(
-          attr => attr.trait_type === 'BetType'
-        )
-        if (betTypeAttr?.value && BetType[betTypeAttr.value] !== undefined) {
-          betType = BetType[betTypeAttr.value]
-        }
-      }
-
-      // Step 1: Check and approve collateral token if needed
-      let currentStep = 1
-      const currentAllowance = await collateralToken.allowance(userAddress, marketFactoryAddress)
-      if (currentAllowance < liquidityAmount) {
-        reportProgress(currentStep, totalSteps, 'Approving collateral token...', 'signing')
-        const approveTx = await collateralToken.approve(marketFactoryAddress, liquidityAmount)
-        reportProgress(currentStep, totalSteps, 'Waiting for approval confirmation...', 'confirming')
-        await approveTx.wait()
-        reportProgress(currentStep, totalSteps, 'Collateral approved', 'completed')
-      } else {
-        reportProgress(currentStep, totalSteps, 'Collateral already approved', 'completed')
-      }
-
-      // Step 2 (if hasMetadata): Upload metadata to IPFS
-      let metadataUri = submitData.metadataUri || ''
-      if (hasMetadata) {
-        currentStep++
-        reportProgress(currentStep, totalSteps, 'Uploading metadata to IPFS...', 'pending')
-        try {
-          console.log('Uploading market metadata to IPFS:', submitData.metadata)
-          const uploadResult = await uploadMarketMetadata(submitData.metadata)
-          metadataUri = uploadResult.uri
-          console.log('Metadata uploaded to IPFS:', metadataUri)
-          reportProgress(currentStep, totalSteps, 'Metadata uploaded to IPFS', 'completed')
-        } catch (uploadError) {
-          console.error('Failed to upload metadata to IPFS:', uploadError)
-          throw new Error(`Failed to upload metadata: ${uploadError.message}`)
-        }
-      }
-
-      // Step 3: Create the market on-chain
-      currentStep++
-      reportProgress(currentStep, totalSteps, 'Creating market...', 'signing')
-      console.log('Deploying market pair with metadata...', {
-        proposalId: proposalId.toString(),
-        collateralToken: collateralTokenAddress,
-        liquidityAmount: liquidityAmount.toString(),
-        liquidityParameter: liquidityParameter.toString(),
-        tradingPeriodSeconds,
-        betType,
-        metadataUri
-      })
-
-      // First try a static call to get detailed error information if it would fail
-      try {
-        await contract.deployMarketPairWithMetadata.staticCall(
-          proposalId,
-          collateralTokenAddress,
-          liquidityAmount,
-          liquidityParameter,
-          tradingPeriodSeconds,
-          betType,
-          metadataUri
-        )
-        console.log('Static call simulation passed')
-      } catch (staticCallError) {
-        console.error('Static call simulation failed:', staticCallError)
-        // Try to extract more detailed error info
-        if (staticCallError.reason) {
-          throw new Error(`Market creation would fail: ${staticCallError.reason}`)
-        }
-        if (staticCallError.data && staticCallError.data !== '0x') {
-          // Try to decode error
-          try {
-            const decoded = contract.interface.parseError(staticCallError.data)
-            if (decoded) {
-              throw new Error(`Market creation would fail: ${decoded.name}(${decoded.args.join(', ')})`)
-            }
-          } catch {
-            // Check for standard Error(string) revert
-            if (staticCallError.data.startsWith('0x08c379a0')) {
-              const abiCoder = new ethers.AbiCoder()
-              const errorString = abiCoder.decode(['string'], '0x' + staticCallError.data.slice(10))[0]
-              throw new Error(`Market creation would fail: ${errorString}`)
-            }
-          }
-        }
-        // If we can't get more info, throw with the original message
-        throw new Error(`Market creation simulation failed: ${staticCallError.message}`)
-      }
-
-      const tx = await contract.deployMarketPairWithMetadata(
-        proposalId,
-        collateralTokenAddress,
-        liquidityAmount,
-        liquidityParameter,
-        tradingPeriodSeconds,
-        betType,
-        metadataUri
-      )
-
-      console.log('Market creation transaction sent:', tx.hash)
-      reportProgress(currentStep, totalSteps, 'Waiting for market confirmation...', 'confirming')
-      const receipt = await tx.wait()
-      console.log('Market created:', receipt)
-
-      // Validate transaction was successful
-      if (receipt && receipt.status === 0) {
-        throw new Error('Transaction reverted on-chain. The market was not created.')
-      }
-      if (!receipt) {
-        throw new Error('Transaction was dropped or replaced. Please try again.')
-      }
-
-      reportProgress(currentStep, totalSteps, 'Market created successfully', 'completed')
-
-      // Extract market ID from event logs
-      const marketCreatedEvent = receipt.logs.find(log => {
-        try {
-          const parsed = contract.interface.parseLog(log)
-          return parsed?.name === 'MarketCreated'
-        } catch {
-          return false
-        }
-      })
-
-      let marketId = null
-      if (marketCreatedEvent) {
-        const parsed = contract.interface.parseLog(marketCreatedEvent)
-        marketId = parsed?.args?.marketId?.toString()
-      }
-
-      // Handle correlation group if provided
-      if (hasCorrelation && marketId) {
-        console.log('Processing correlation group:', submitData.correlationGroup)
-
-        try {
-          let groupId = submitData.correlationGroup.existingGroupId
-
-          // Step 3 (optional): Create new group if needed
-          if (isNewGroup) {
-            currentStep++
-            reportProgress(currentStep, totalSteps, 'Creating correlation group...', 'signing')
-            console.log('Creating new correlation group...')
-            const groupResult = await createCorrelationGroup(
-              activeSigner,
-              submitData.correlationGroup.newGroupName,
-              submitData.correlationGroup.newGroupDescription || '',
-              submitData.correlationGroup.category
-            )
-            groupId = groupResult.groupId
-            console.log('New correlation group created:', groupId)
-            reportProgress(currentStep, totalSteps, 'Correlation group created', 'completed')
-          }
-
-          // Step 3 or 4: Add market to group
-          if (groupId !== null && groupId !== undefined) {
-            currentStep++
-            reportProgress(currentStep, totalSteps, 'Adding market to group...', 'signing')
-            console.log('Adding market to correlation group:', { groupId, marketId })
-            await addMarketToCorrelationGroup(activeSigner, groupId, parseInt(marketId))
-            console.log('Market added to correlation group successfully')
-            reportProgress(currentStep, totalSteps, 'Market added to group', 'completed')
-          }
-        } catch (correlationError) {
-          // Log the error and notify user, but don't fail - market was already created
-          console.error('Error handling correlation group:', correlationError)
-          console.warn('Market was created but correlation group operation failed')
-          reportProgress(currentStep, totalSteps, `Group operation failed: ${correlationError.message}`, 'failed')
-
-          // Show user-friendly error message
-          const errorMessage = correlationError.message || 'Unknown error'
-          if (errorMessage.includes('group creator')) {
-            console.warn('Permission error: Only the group creator or owner can add markets to this group')
-          }
-        }
-      }
-
-      setShowMarketCreationModal(false)
-
-      return {
-        id: marketId || `market-${Date.now()}`,
-        txHash: receipt.hash
-      }
-    } catch (error) {
-      console.error('Error creating market:', error)
-      throw error
-    }
-  }
-
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
     navigate('/admin/roles')
@@ -1420,16 +1047,6 @@ function WalletButton({ className = '' }) {
                     </button>
                   </div>
                 )}
-                {hasRole(ROLES.MARKET_MAKER) && (
-                  <button
-                    onClick={handleOpenMarketCreation}
-                    className="action-button create-market-btn"
-                    role="menuitem"
-                  >
-                    <span aria-hidden="true">📊</span>
-                    <span>Create Prediction Market</span>
-                  </button>
-                )}
                 <button
                   onClick={handleOpenMyMarkets}
                   className="action-button my-markets-btn"
@@ -1527,12 +1144,6 @@ function WalletButton({ className = '' }) {
         onClearPendingTransaction={clearPendingTransaction}
       />
 
-      {/* Market Creation Modal - Prediction Markets */}
-      <MarketCreationModal
-        isOpen={showMarketCreationModal}
-        onClose={() => setShowMarketCreationModal(false)}
-        onCreate={handleMarketCreation}
-      />
     </div>
   )
 }

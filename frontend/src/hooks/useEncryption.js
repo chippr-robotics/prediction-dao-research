@@ -19,6 +19,7 @@ import {
   decryptMarketMetadata,
   createEncryptedMarket,
   addParticipantToMarket,
+  addRecipient,
   // X-Wing (v2.0) functions
   deriveXWingKeyPairFromSignature,
   xwingPublicKeyFromSignature,
@@ -34,6 +35,12 @@ import {
   getRecipients,
   isEncryptedEnvelope
 } from '../utils/crypto/envelopeEncryption.js'
+import {
+  lookupPublicKey,
+  hasRegisteredKey,
+  ensureKeyRegistered,
+  clearKeyCache
+} from '../utils/keyRegistryService.js'
 
 // Cache signatures in session storage (now stores JSON with version info)
 const SIGNATURE_CACHE_KEY = 'fairwins_encryption_signature'
@@ -187,7 +194,19 @@ export function useEncryption() {
         // Cache signature with version info
         saveSignatureToCache(account, x25519Result.signature, signingVersion)
 
-        console.log(`[useEncryption] Dual keypairs initialized and cached for session (version ${signingVersion})`)
+        // Auto-register X25519 public key on-chain (non-blocking)
+        // This allows other users to look up our key for encrypted wagers
+        ensureKeyRegistered(signer, account, x25519Result.publicKey).then(wasRegistered => {
+          if (wasRegistered) {
+            console.log('[useEncryption] Encryption key registered on-chain')
+          }
+        }).catch(err => {
+          // Non-fatal — user can still encrypt/decrypt locally, just won't be
+          // discoverable by others until key is registered
+          console.warn('[useEncryption] Failed to auto-register key on-chain:', err.message)
+        })
+
+        console.log(`[useEncryption] Keypairs initialized and cached for session (version ${signingVersion})`)
 
         return {
           signature: x25519Result.signature,
@@ -401,11 +420,57 @@ export function useEncryption() {
   }, [])
 
   /**
+   * Look up an opponent's encryption public key from the on-chain registry
+   * @param {string} opponentAddress - Ethereum address
+   * @returns {Promise<Uint8Array|null>} X25519 public key bytes, or null if not registered
+   */
+  const lookupOpponentKey = useCallback(async (opponentAddress) => {
+    if (!opponentAddress) return null
+    const provider = signer?.provider
+    if (!provider) {
+      throw new Error('No provider available')
+    }
+    return lookupPublicKey(opponentAddress, provider)
+  }, [signer])
+
+  /**
+   * Check if an opponent has a registered encryption key
+   * @param {string} opponentAddress - Ethereum address
+   * @returns {Promise<boolean>}
+   */
+  const opponentHasKey = useCallback(async (opponentAddress) => {
+    if (!opponentAddress) return false
+    const provider = signer?.provider
+    if (!provider) return false
+    return hasRegisteredKey(opponentAddress, provider)
+  }, [signer])
+
+  /**
+   * Add a recipient to an existing envelope using their on-chain public key
+   * (no signature from the opponent needed)
+   * @param {Object} envelope - Existing encrypted envelope
+   * @param {string} recipientAddress - Address to add
+   * @param {Uint8Array} recipientPublicKey - Their X25519 public key from on-chain registry
+   * @returns {Object} Updated envelope with the new recipient
+   */
+  const addRecipientByPublicKey = useCallback((envelope, recipientAddress, recipientPublicKey) => {
+    if (!account || !keyPairs.x25519?.privateKey) {
+      throw new Error('Encryption keys not initialized')
+    }
+    // Use the low-level addRecipient which accepts {address, publicKey} directly
+    return addRecipient(envelope, account, keyPairs.x25519.privateKey, {
+      address: recipientAddress,
+      publicKey: recipientPublicKey
+    })
+  }, [account, keyPairs])
+
+  /**
    * Clear cached keys
    */
   const clearKeys = useCallback(() => {
     if (account) {
       sessionStorage.removeItem(`${SIGNATURE_CACHE_KEY}_${account.toLowerCase()}`)
+      clearKeyCache(account)
     }
     setKeyPairs({ x25519: null, xwing: null })
     setSignature(null)
@@ -451,7 +516,12 @@ export function useEncryption() {
     isEncrypted,
     isPostQuantum,
     getPublicKeyFromSignature,
-    getXWingPublicKeyFromSignature
+    getXWingPublicKeyFromSignature,
+
+    // On-chain key registry
+    lookupOpponentKey,
+    opponentHasKey,
+    addRecipientByPublicKey
   }
 }
 

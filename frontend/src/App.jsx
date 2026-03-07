@@ -4,7 +4,7 @@ import './theme.css'
 import './App.css'
 
 //system hooks & effects
-import { useWallet, useWalletConnection, useWalletNetwork } from './hooks'
+import { useWallet, useWalletNetwork } from './hooks'
 import { useAnnouncement, useNotification } from './hooks/useUI'
 import NotificationSystem from './components/ui/NotificationSystem'
 import ModalSystem from './components/ui/ModalSystem'
@@ -12,7 +12,7 @@ import AnnouncementRegion from './components/ui/AnnouncementRegion'
 
 // Main flow
 import LandingPage from './components/LandingPage'
-import FairWinsAppNew from './components/fairwins/FairWinsAppNew'
+import Dashboard from './components/fairwins/Dashboard'
 
 // add-ons
 import WalletPage from './pages/WalletPage'
@@ -31,28 +31,9 @@ import { ComponentExamples } from './components/ui'
 
 function AppContent() {
   const { isConnected } = useWallet()
-  const { connectWallet, disconnectWallet } = useWalletConnection()
   const { networkError, switchNetwork } = useWalletNetwork()
   const { announce } = useAnnouncement()
   const { showNotification } = useNotification()
-
-  const handleConnect = async () => {
-    const success = await connectWallet()
-    if (success) {
-      announce('Wallet connected successfully')
-      showNotification('Wallet connected successfully', 'success')
-    } else {
-      announce('Wallet connection failed')
-      showNotification('Failed to connect wallet. Please try again.', 'error')
-    }
-    return success
-  }
-
-  const handleDisconnect = () => {
-    disconnectWallet()
-    announce('Wallet disconnected')
-    showNotification('Wallet disconnected', 'info')
-  }
 
   const handleSwitchNetwork = async () => {
     await switchNetwork()
@@ -102,33 +83,9 @@ function AppContent() {
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
-        <Route
-          path="/app"
-          element={
-            <FairWinsAppNew
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          }
-        />
-        <Route
-          path="/main"
-          element={
-            <FairWinsAppNew
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          }
-        />
-        <Route
-          path="/fairwins"
-          element={
-            <FairWinsAppNew
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          }
-        />
+        <Route path="/app" element={<Dashboard />} />
+        <Route path="/main" element={<Dashboard />} />
+        <Route path="/fairwins" element={<Dashboard />} />
 
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />

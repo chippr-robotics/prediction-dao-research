@@ -42,6 +42,7 @@ export function WalletProvider({ children }) {
   // Update provider and signer when connection changes
   // Use wagmi's walletClient for proper authorization
   useEffect(() => {
+    let cancelled = false
     const updateProviderAndSigner = async () => {
       if (isConnected && walletClient) {
         try {
@@ -54,10 +55,12 @@ export function WalletProvider({ children }) {
 
           // Get signer for the specific account that wagmi has authorized
           const ethersSigner = await ethersProvider.getSigner(walletClient.account.address)
+          if (cancelled) return
           setProvider(ethersProvider)
           setSigner(ethersSigner)
           console.log('[WalletContext] Signer created for:', walletClient.account.address)
         } catch (error) {
+          if (cancelled) return
           console.error('Error creating provider/signer from walletClient:', error)
 
           // Fallback to window.ethereum if walletClient approach fails
@@ -65,10 +68,12 @@ export function WalletProvider({ children }) {
             try {
               const fallbackProvider = new ethers.BrowserProvider(window.ethereum)
               const fallbackSigner = await fallbackProvider.getSigner()
+              if (cancelled) return
               setProvider(fallbackProvider)
               setSigner(fallbackSigner)
               console.log('[WalletContext] Using fallback signer')
             } catch (fallbackError) {
+              if (cancelled) return
               console.error('Fallback signer creation also failed:', fallbackError)
               setProvider(null)
               setSigner(null)
@@ -83,10 +88,12 @@ export function WalletProvider({ children }) {
         try {
           const ethersProvider = new ethers.BrowserProvider(window.ethereum)
           const ethersSigner = await ethersProvider.getSigner()
+          if (cancelled) return
           setProvider(ethersProvider)
           setSigner(ethersSigner)
           console.log('[WalletContext] Signer created from window.ethereum')
         } catch (error) {
+          if (cancelled) return
           console.error('Error creating provider/signer:', error)
           setProvider(null)
           setSigner(null)
@@ -98,6 +105,7 @@ export function WalletProvider({ children }) {
     }
 
     updateProviderAndSigner()
+    return () => { cancelled = true }
   }, [isConnected, address, walletClient])
 
   // Check network compatibility

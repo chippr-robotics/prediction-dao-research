@@ -13,8 +13,31 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { TREASURY_VAULT_ABI } from '../abis/TreasuryVault'
 import { getContractAddress, DEPLOYED_CONTRACTS } from '../config/contracts'
+
+// Minimal TreasuryVault ABI (human-readable format)
+const TREASURY_VAULT_ABI = [
+  'function getETHBalance() view returns (uint256)',
+  'function getTokenBalance(address token) view returns (uint256)',
+  'function paused() view returns (bool)',
+  'function owner() view returns (address)',
+  'function guardian() view returns (address)',
+  'function transactionLimit(address token) view returns (uint256)',
+  'function rateLimitPeriod(address token) view returns (uint256)',
+  'function periodLimit(address token) view returns (uint256)',
+  'function getRemainingPeriodAllowance(address token) view returns (uint256)',
+  'function nullifierRegistry() view returns (address)',
+  'function enforceNullificationOnWithdrawals() view returns (bool)',
+  'function isAuthorizedSpender(address spender) view returns (bool)',
+  'function withdrawETH(address to, uint256 amount)',
+  'function withdrawERC20(address token, address to, uint256 amount)',
+  'function authorizeSpender(address spender)',
+  'function revokeSpender(address spender)',
+  'function setTransactionLimit(address token, uint256 limit)',
+  'function setRateLimit(address token, uint256 period, uint256 limit)',
+  'function pause()',
+  'function unpause()'
+]
 
 // Contract address from contracts.js config
 const TREASURY_VAULT_ADDRESS = getContractAddress('treasuryVault') || null

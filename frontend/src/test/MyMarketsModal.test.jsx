@@ -15,14 +15,10 @@ vi.mock('../hooks', () => ({
     signer: {},
     isCorrectNetwork: true,
     switchNetwork: vi.fn()
-  })),
-  useDataFetcher: vi.fn(() => ({
-    getMarkets: vi.fn(() => Promise.resolve([])),
-    getPositions: vi.fn(() => Promise.resolve([]))
   }))
 }))
 
-import { useWallet, useWeb3, useDataFetcher } from '../hooks'
+import { useWallet, useWeb3 } from '../hooks'
 
 describe('MyMarketsModal', () => {
   const mockOnClose = vi.fn()
@@ -88,10 +84,6 @@ describe('MyMarketsModal', () => {
       signer: {},
       isCorrectNetwork: true,
       switchNetwork: vi.fn()
-    })
-    useDataFetcher.mockReturnValue({
-      getMarkets: vi.fn(() => Promise.resolve([])),
-      getPositions: vi.fn(() => Promise.resolve([]))
     })
   })
 
@@ -362,26 +354,11 @@ describe('MyMarketsModal', () => {
       }
     ]
 
-    const mockPositions = [
-      {
-        marketId: '2',
-        side: 'Yes',
-        amount: '100'
-      }
-    ]
-
-    beforeEach(() => {
-      useDataFetcher.mockReturnValue({
-        getMarkets: vi.fn(() => Promise.resolve(mockMarkets)),
-        getPositions: vi.fn(() => Promise.resolve(mockPositions))
-      })
-    })
-
     it('should display markets user has created in Created tab', async () => {
       const user = userEvent.setup()
       await act(async () => {
         renderWithProviders(
-          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={mockMarkets} />
         )
       })
 
@@ -400,7 +377,7 @@ describe('MyMarketsModal', () => {
     it('should display markets user is participating in', async () => {
       await act(async () => {
         renderWithProviders(
-          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={mockMarkets} />
         )
       })
 
@@ -412,7 +389,7 @@ describe('MyMarketsModal', () => {
     it('should show tab badges with counts', async () => {
       await act(async () => {
         renderWithProviders(
-          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={mockMarkets} />
         )
       })
 

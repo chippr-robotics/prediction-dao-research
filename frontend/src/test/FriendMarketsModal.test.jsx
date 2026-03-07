@@ -69,6 +69,7 @@ vi.mock('../hooks/useEncryption', () => ({
   useEncryption: () => ({
     createEncrypted: vi.fn().mockResolvedValue({
       encrypted: true,
+      envelope: { version: '1.0', recipients: [] },
       metadata: { name: 'test' }
     }),
     decryptMetadata: vi.fn().mockResolvedValue({ name: 'test' }),
@@ -76,6 +77,9 @@ vi.mock('../hooks/useEncryption', () => ({
     canUserDecrypt: vi.fn().mockReturnValue(true),
     isEncrypted: vi.fn().mockReturnValue(false),
     getPublicKeyFromSignature: vi.fn().mockReturnValue('0xpublickey'),
+    lookupOpponentKey: vi.fn().mockResolvedValue(new Uint8Array(32)),
+    opponentHasKey: vi.fn().mockResolvedValue(true),
+    addRecipientByPublicKey: vi.fn().mockReturnValue({ version: '1.0', recipients: [] }),
     isInitialized: true,
     isInitializing: false
   }),

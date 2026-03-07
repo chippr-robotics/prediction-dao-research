@@ -68,27 +68,12 @@ export {
 // Admin hooks
 export { useAdminContracts } from './useAdminContracts'
 
-// Data fetcher hooks
-export { useDataFetcher } from './useDataFetcher'
-
-// Token creation hooks
-export { useTokenCreation, TxState } from './useTokenCreation'
-export { useTokenMintFactory, LoadState } from './useTokenMintFactory'
-
 // ENS Resolution hooks
 export {
   useEnsResolution,
   useEnsReverseLookup,
   useAddressInput
 } from './useEnsResolution'
-
-// Perpetual Futures hooks
-export {
-  usePerpetualsContract,
-  PositionSide,
-  MarketCategory,
-  MarketStatus
-} from './usePerpetualsContract'
 
 // Encryption hooks (for friend market privacy)
 export {
@@ -116,8 +101,3 @@ export {
   useLazyMarketMetadata
 } from './useIpfs'
 
-// Infinite scroll market hooks
-export {
-  useInfiniteMarkets,
-  useTrendingMarkets
-} from './useInfiniteMarkets'
