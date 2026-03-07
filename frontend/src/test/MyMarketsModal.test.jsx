@@ -354,14 +354,6 @@ describe('MyMarketsModal', () => {
       }
     ]
 
-    const mockPositions = [
-      {
-        marketId: '2',
-        side: 'Yes',
-        amount: '100'
-      }
-    ]
-
     it('should display markets user has created in Created tab', async () => {
       const user = userEvent.setup()
       await act(async () => {
