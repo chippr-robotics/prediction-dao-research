@@ -179,9 +179,8 @@ describe('Dashboard Component', () => {
 
   describe('Not Connected State', () => {
     it('should show welcome view when not connected and not demo mode', () => {
-      const mockConnect = vi.fn()
-      renderWithProviders(<Dashboard onConnect={mockConnect} />, {
-        walletContext: { ...defaultWalletContext, isConnected: false, account: null },
+      renderWithProviders(<Dashboard />, {
+        walletContext: { ...defaultWalletContext, isConnected: false, account: null, connectWallet: vi.fn() },
         preferencesContext: {
           ...defaultPreferencesContext,
           preferences: { ...defaultPreferencesContext.preferences, demoMode: false }

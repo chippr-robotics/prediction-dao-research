@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWallet, useWalletRoles } from '../../hooks'
+import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES } from '../../contexts/RoleContext'
@@ -400,8 +400,9 @@ function WelcomeView({ onConnect }) {
 // MAIN DASHBOARD COMPONENT
 // ============================================================================
 
-function Dashboard({ onConnect }) {
+function Dashboard() {
   const { isConnected, account } = useWallet()
+  const { connectWallet } = useWalletConnection()
   const { preferences } = useUserPreferences()
   const { hasRole } = useWalletRoles()
   const { showModal, hideModal } = useModal()
@@ -590,7 +591,7 @@ function Dashboard({ onConnect }) {
   if (!isConnected && !demoMode) {
     return (
       <div className="dashboard-container">
-        <WelcomeView onConnect={onConnect} />
+        <WelcomeView onConnect={() => connectWallet()} />
       </div>
     )
   }
