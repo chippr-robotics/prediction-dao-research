@@ -31,7 +31,7 @@ const getConnectorInfo = (connector) => {
 }
 
 function WalletPage() {
-  const { address, isConnected, connectors } = useWallet()
+  const { address, isConnected, connectors, provider, signer } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
@@ -87,12 +87,10 @@ function WalletPage() {
   }
 
   const handleCheckKeyStatus = useCallback(async () => {
-    if (!address) return
+    if (!address || !provider) return
     setKeyCheckLoading(true)
     setKeyError(null)
     try {
-      const { ethers } = await import('ethers')
-      const provider = new ethers.BrowserProvider(window.ethereum)
       const registered = await hasRegisteredKey(address, provider)
       setKeyRegistered(registered)
     } catch (err) {
@@ -100,9 +98,13 @@ function WalletPage() {
     } finally {
       setKeyCheckLoading(false)
     }
-  }, [address])
+  }, [address, provider])
 
   const handleRegisterKey = useCallback(async () => {
+    if (!signer) {
+      setKeyError('Wallet not connected. Please reconnect.')
+      return
+    }
     setKeyRegisterLoading(true)
     setKeyError(null)
     try {
@@ -110,9 +112,6 @@ function WalletPage() {
       if (!result?.publicKey) {
         throw new Error('Failed to derive encryption keys')
       }
-      const { ethers } = await import('ethers')
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
       await registerEncryptionKey(signer, result.publicKey)
       setKeyRegistered(true)
     } catch (err) {
@@ -124,7 +123,7 @@ function WalletPage() {
     } finally {
       setKeyRegisterLoading(false)
     }
-  }, [ensureInitialized])
+  }, [ensureInitialized, signer])
 
   const shortenAddress = (address) => {
     if (!address) return ''
