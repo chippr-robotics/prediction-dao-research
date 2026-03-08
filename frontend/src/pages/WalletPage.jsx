@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
-import { hasRegisteredKey, registerEncryptionKey } from '../utils/keyRegistryService'
+import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
@@ -101,7 +101,7 @@ function WalletPage() {
   }, [address, provider])
 
   const handleRegisterKey = useCallback(async () => {
-    if (!signer) {
+    if (!signer || !address) {
       setKeyError('Wallet not connected. Please reconnect.')
       return
     }
@@ -112,18 +112,33 @@ function WalletPage() {
       if (!result?.publicKey) {
         throw new Error('Failed to derive encryption keys')
       }
-      await registerEncryptionKey(signer, result.publicKey)
+      // ensureKeyRegistered checks on-chain first, only registers if needed
+      const wasNewlyRegistered = await ensureKeyRegistered(signer, address, result.publicKey)
       setKeyRegistered(true)
+      if (!wasNewlyRegistered) {
+        // Key was already registered — not an error, just inform user
+        console.log('[WalletPage] Key was already registered on-chain')
+      }
     } catch (err) {
       if (err.message.includes('rejected') || err.message.includes('denied')) {
         setKeyError('Transaction was rejected.')
+      } else if (err.message.includes('KeyAlreadyExists') || err.message.includes('0xe0accd63')) {
+        // Key already exists on-chain — treat as success
+        setKeyRegistered(true)
       } else {
         setKeyError('Key registration failed: ' + err.message)
       }
     } finally {
       setKeyRegisterLoading(false)
     }
-  }, [ensureInitialized, signer])
+  }, [ensureInitialized, signer, address])
+
+  // Auto-check key status when Security tab is shown
+  useEffect(() => {
+    if (activeTab === 'security' && isConnected && keyRegistered === null) {
+      handleCheckKeyStatus()
+    }
+  }, [activeTab, isConnected, keyRegistered, handleCheckKeyStatus])
 
   const shortenAddress = (address) => {
     if (!address) return ''
