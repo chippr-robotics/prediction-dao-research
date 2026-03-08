@@ -62,14 +62,6 @@ export const DisputeStatus = {
   RESOLVED: 'resolved',
 }
 
-// ── Oracle source definitions ───────────────────────────────────────
-export const ORACLE_SOURCES = [
-  { id: 'polymarket', name: 'Polymarket', description: 'Peg wagers to Polymarket event outcomes', icon: '\uD83C\uDFAF' },
-  { id: 'chainlink',  name: 'Chainlink',  description: 'Price feed-based resolution',            icon: '\uD83D\uDD17' },
-  { id: 'uma',        name: 'UMA',        description: 'Custom truth assertions',                icon: '\u2696\uFE0F' },
-  { id: 'manual',     name: 'Manual',     description: 'Creator-resolved with challenge period',  icon: '\u270B' },
-]
-
 // ── Date helpers ────────────────────────────────────────────────────
 /** Returns an ISO datetime-local string N days from now */
 export const getDefaultEndDateTime = (days = WAGER_DEFAULTS.WAGER_END_DAYS) => {

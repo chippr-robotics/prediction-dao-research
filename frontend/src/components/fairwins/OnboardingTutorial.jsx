@@ -25,7 +25,7 @@ const TUTORIAL_STEPS = [
       <>
         <p>
           FairWins lets you <strong>create private wagers with friends</strong> that automatically
-          resolve using trusted oracles like Polymarket, Chainlink, and UMA.
+          resolve using built-in resolution methods with challenge periods.
         </p>
         <div className="tutorial-highlight-box">
           <span className="highlight-icon">💡</span>
@@ -67,8 +67,8 @@ const TUTORIAL_STEPS = [
           <li>
             <span className="step-number">3</span>
             <div className="step-content">
-              <strong>Choose an oracle</strong>
-              <span>Polymarket, Chainlink, UMA, or manual resolution</span>
+              <strong>Choose resolution method</strong>
+              <span>Either party, initiator, receiver, or third party</span>
             </div>
           </li>
           <li>
@@ -108,7 +108,7 @@ const TUTORIAL_STEPS = [
             <div className="anatomy-title">Will BTC hit $100k by March?</div>
             <div className="anatomy-stats">
               <span>50 USC</span>
-              <span>1v1 &bull; Chainlink</span>
+              <span>1v1 &bull; Either Party</span>
             </div>
           </div>
           <div className="anatomy-labels">
@@ -122,7 +122,7 @@ const TUTORIAL_STEPS = [
             </div>
             <div className="anatomy-label" style={{ top: '70%' }}>
               <span className="label-line"></span>
-              <span className="label-text">Stake amount, type &amp; oracle</span>
+              <span className="label-text">Stake amount, type &amp; resolution</span>
             </div>
           </div>
         </div>
@@ -130,8 +130,8 @@ const TUTORIAL_STEPS = [
     )
   },
   {
-    id: 'oracles',
-    title: 'Oracle Resolution',
+    id: 'resolution',
+    title: 'Resolution Methods',
     subtitle: 'How wagers get settled',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -142,36 +142,36 @@ const TUTORIAL_STEPS = [
     content: (
       <>
         <p>
-          Wagers resolve automatically using <strong>trusted oracle sources</strong>,
-          so there's no arguing about results.
+          Choose how your wager gets resolved. All methods include a
+          <strong> 24-hour challenge period</strong> to prevent disputes.
         </p>
         <div className="tutorial-next-steps">
           <div className="next-step-item">
-            <span className="next-icon">&#127919;</span>
+            <span className="next-icon">&#129309;</span>
             <div className="next-content">
-              <strong>Polymarket</strong>
-              <span>Peg to real-world event outcomes</span>
+              <strong>Either Party</strong>
+              <span>Either side can propose the outcome</span>
             </div>
           </div>
           <div className="next-step-item">
-            <span className="next-icon">&#128279;</span>
+            <span className="next-icon">&#128100;</span>
             <div className="next-content">
-              <strong>Chainlink</strong>
-              <span>Price feeds for crypto wagers</span>
+              <strong>Initiator Resolves</strong>
+              <span>Wager creator reports the result</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#128101;</span>
+            <div className="next-content">
+              <strong>Receiver Resolves</strong>
+              <span>Accepting party reports the result</span>
             </div>
           </div>
           <div className="next-step-item">
             <span className="next-icon">&#9878;&#65039;</span>
             <div className="next-content">
-              <strong>UMA</strong>
-              <span>Custom truth assertions</span>
-            </div>
-          </div>
-          <div className="next-step-item">
-            <span className="next-icon">&#9995;</span>
-            <div className="next-content">
-              <strong>Manual + Challenge</strong>
-              <span>Creator resolves, 24h dispute window</span>
+              <strong>Third Party</strong>
+              <span>Trusted arbiter resolves the wager</span>
             </div>
           </div>
         </div>
@@ -248,15 +248,15 @@ const TUTORIAL_STEPS = [
           <div className="next-step-item">
             <span className="next-icon">&#127942;</span>
             <div className="next-content">
-              <strong>Explore Oracle Sources</strong>
-              <span>See how wagers get resolved</span>
+              <strong>Create a Group Wager</strong>
+              <span>Set up a pool for 3-10 friends</span>
             </div>
           </div>
           <div className="next-step-item">
             <span className="next-icon">&#128200;</span>
             <div className="next-content">
-              <strong>Browse Markets</strong>
-              <span>Find events to wager on</span>
+              <strong>View My Wagers</strong>
+              <span>Track your active and past bets</span>
             </div>
           </div>
         </div>

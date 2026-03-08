@@ -59,12 +59,12 @@ function LandingPage() {
           <h1 className="hero-headline">
             Your Wager.<br />
             <span className="hero-headline-accent">Your Rules.</span><br />
-            Your Oracle.
+            Your Call.
           </h1>
 
           <p className="hero-subtitle">
             Create private, trustless bets with friends.
-            Smart contracts hold the stakes. Oracles decide the outcome.
+            Smart contracts hold the stakes and enforce the rules.
             No middlemen. No arguments.
           </p>
 
@@ -127,12 +127,12 @@ function LandingPage() {
                 <span className="preview-stake-value">0.5 ETC</span>
               </div>
             </div>
-            <div className="preview-oracle">
+            <div className="preview-resolution">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-              Resolves via Chainlink Price Feed
+              Resolves by either party with challenge period
             </div>
           </div>
         </div>
@@ -142,8 +142,8 @@ function LandingPage() {
       <section className="proof-strip">
         <div className="proof-strip-inner">
           <div className="proof-item">
-            <span className="proof-number">4</span>
-            <span className="proof-label">Oracle Sources</span>
+            <span className="proof-number">5</span>
+            <span className="proof-label">Resolution Types</span>
           </div>
           <div className="proof-divider" />
           <div className="proof-item">
@@ -192,8 +192,8 @@ function LandingPage() {
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
               </div>
-              <h3>Oracle Resolution</h3>
-              <p>Wagers auto-resolve using Polymarket, Chainlink, or UMA. No arguing about who won.</p>
+              <h3>Fair Resolution</h3>
+              <p>Choose who resolves: either party, the creator, or a trusted third party. Challenge periods prevent disputes.</p>
             </div>
             <div className="value-card">
               <div className="value-icon">
@@ -248,8 +248,8 @@ function LandingPage() {
               <div className="step-content">
                 <h3>Create</h3>
                 <p>
-                  Pick what you're betting on, set the stakes, and choose your oracle.
-                  Link it to a Polymarket outcome, a Chainlink price feed, or resolve manually.
+                  Pick what you're betting on, set the stakes, and choose your resolution method.
+                  Choose who resolves: either party, the creator, or a trusted third party.
                 </p>
               </div>
             </div>
@@ -274,8 +274,8 @@ function LandingPage() {
               <div className="step-content">
                 <h3>Settle</h3>
                 <p>
-                  The oracle reports the result. The winner claims the pot.
-                  If it's manual, there's a 24-hour window to dispute. Fair and final.
+                  The result is proposed and verified through a 24-hour challenge period.
+                  The winner claims the pot. Fair and final.
                 </p>
               </div>
             </div>
@@ -283,61 +283,21 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Oracle Sources - Distinct Visual */}
-      <section className={`oracles-section ${isVisible('oracles-area') ? 'visible' : ''}`}>
-        <div className="container" id="oracles-area" data-animate>
+      {/* Resolution Methods - Distinct Visual */}
+      <section className={`resolution-section ${isVisible('resolution-area') ? 'visible' : ''}`}>
+        <div className="container" id="resolution-area" data-animate>
           <div className="section-header">
             <span className="section-tag">Resolution Layer</span>
-            <h2 className="section-title">Pick your truth source</h2>
+            <h2 className="section-title">Choose how your wager settles</h2>
             <p className="section-subtitle">
-              Every wager needs a source of truth. Choose the oracle that fits your bet.
+              Every wager needs a resolution method. Pick the one that fits your bet.
             </p>
           </div>
 
-          <div className="oracle-grid">
-            <div className="oracle-card oracle-polymarket">
-              <div className="oracle-accent" />
-              <div className="oracle-icon-badge">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
-              </div>
-              <h3>Polymarket</h3>
-              <p>Peg your wager to any Polymarket event. Elections, sports, world events — when it resolves there, yours resolves here.</p>
-              <span className="oracle-use-case">Best for: Events & outcomes</span>
-            </div>
-
-            <div className="oracle-card oracle-chainlink">
-              <div className="oracle-accent" />
-              <div className="oracle-icon-badge">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                </svg>
-              </div>
-              <h3>Chainlink</h3>
-              <p>Decentralized price feeds for crypto, forex, and commodities. Tamper-proof data settles your price bets automatically.</p>
-              <span className="oracle-use-case">Best for: Price predictions</span>
-            </div>
-
-            <div className="oracle-card oracle-uma">
-              <div className="oracle-accent" />
-              <div className="oracle-icon-badge">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-              <h3>UMA Optimistic</h3>
-              <p>Assert any truth statement and let UMA's dispute mechanism ensure honest resolution. Perfect for custom, creative bets.</p>
-              <span className="oracle-use-case">Best for: Custom claims</span>
-            </div>
-
-            <div className="oracle-card oracle-manual">
-              <div className="oracle-accent" />
-              <div className="oracle-icon-badge">
+          <div className="resolution-grid">
+            <div className="resolution-card resolution-either">
+              <div className="resolution-accent" />
+              <div className="resolution-icon-badge">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
@@ -345,9 +305,50 @@ function LandingPage() {
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <h3>Manual + Challenge</h3>
-              <p>The creator resolves it. The other side gets 24 hours to dispute. Simple and trust-minimized for casual bets.</p>
-              <span className="oracle-use-case">Best for: Casual bets with friends</span>
+              <h3>Either Party</h3>
+              <p>Either side can propose the outcome. A 24-hour challenge period ensures fairness. Most flexible for casual bets.</p>
+              <span className="resolution-use-case">Best for: Casual bets with friends</span>
+            </div>
+
+            <div className="resolution-card resolution-initiator">
+              <div className="resolution-accent" />
+              <div className="resolution-icon-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+              <h3>Initiator Resolves</h3>
+              <p>The wager creator reports the result. The opponent gets 24 hours to challenge if they disagree.</p>
+              <span className="resolution-use-case">Best for: Creator-led wagers</span>
+            </div>
+
+            <div className="resolution-card resolution-receiver">
+              <div className="resolution-accent" />
+              <div className="resolution-icon-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="8.5" cy="7" r="4" />
+                  <polyline points="17 11 19 13 23 9" />
+                </svg>
+              </div>
+              <h3>Receiver Resolves</h3>
+              <p>The accepting party reports the result. The creator gets 24 hours to challenge if they disagree.</p>
+              <span className="resolution-use-case">Best for: Trust-balanced wagers</span>
+            </div>
+
+            <div className="resolution-card resolution-thirdparty">
+              <div className="resolution-accent" />
+              <div className="resolution-icon-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <h3>Third Party</h3>
+              <p>A mutually trusted address resolves the wager. Perfect for bets where a neutral arbiter is preferred.</p>
+              <span className="resolution-use-case">Best for: High-stakes or competitive bets</span>
             </div>
           </div>
         </div>
@@ -367,7 +368,7 @@ function LandingPage() {
               <h3>The Big Game</h3>
               <p className="scenario-setup">"I bet you $50 the Chiefs win the Super Bowl."</p>
               <p className="scenario-resolution">
-                Pegged to Polymarket. Game ends, market resolves, winner claims the pot. One click.
+                Either party proposes the result. 24-hour challenge period. Winner claims the pot. One click.
               </p>
             </div>
             <div className="scenario-card">
@@ -375,7 +376,7 @@ function LandingPage() {
               <h3>The Price Call</h3>
               <p className="scenario-setup">"No way ETH hits $5k by June."</p>
               <p className="scenario-resolution">
-                Chainlink price feed as the oracle. When the deadline hits, the number speaks for itself.
+                Assign a trusted third party to verify the price. When the deadline hits, the result speaks for itself.
               </p>
             </div>
             <div className="scenario-card">
