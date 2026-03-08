@@ -1,5 +1,5 @@
 //core
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import './theme.css'
 import './App.css'
 
@@ -13,6 +13,7 @@ import AnnouncementRegion from './components/ui/AnnouncementRegion'
 // Main flow
 import LandingPage from './components/LandingPage'
 import Dashboard from './components/fairwins/Dashboard'
+import Header from './components/Header'
 
 // add-ons
 import WalletPage from './pages/WalletPage'
@@ -27,6 +28,15 @@ import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
+
+function AppLayout() {
+  return (
+    <>
+      <Header appMode />
+      <Outlet />
+    </>
+  )
+}
 
 
 function AppContent() {
@@ -83,16 +93,18 @@ function AppContent() {
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
-        <Route path="/app" element={<Dashboard />} />
-        <Route path="/main" element={<Dashboard />} />
-        <Route path="/fairwins" element={<Dashboard />} />
 
-        <Route path="/wallet" element={<WalletPage />} />
-        <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
+        {/* App routes with header + wallet button */}
+        <Route element={<AppLayout />}>
+          <Route path="/app" element={<Dashboard />} />
+          <Route path="/main" element={<Dashboard />} />
+          <Route path="/fairwins" element={<Dashboard />} />
+          <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
+          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/admin/roles" element={<RoleManagementAdmin />} />
+        </Route>
 
-        {/* Admin routes - restricted to users with admin roles */}
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/admin/roles" element={<RoleManagementAdmin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

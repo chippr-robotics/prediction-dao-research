@@ -82,8 +82,13 @@
   width: 100%;
 }
 
-.nav-link:hover {
+.nav-link:hover,
+.nav-link.active {
   color: #2D7A4F;
+}
+
+.nav-link.active::after {
+  width: 100%;
 }
 
 .nav-link:focus-visible {

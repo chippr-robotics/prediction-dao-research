@@ -86,10 +86,6 @@ function WalletPage() {
     navigate('/admin/roles')
   }
 
-  const handleClose = () => {
-    navigate(-1)
-  }
-
   const handleCheckKeyStatus = useCallback(async () => {
     if (!address) return
     setKeyCheckLoading(true)
@@ -136,16 +132,8 @@ function WalletPage() {
   }
 
   return (
-    <div className="wallet-page-backdrop">
-      <div className="wallet-page-container">
-        <div className="wallet-page">
-          <button
-            className="page-close-btn"
-            onClick={handleClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
+    <div className="wallet-page-wrapper">
+      <div className="wallet-page">
 
           {isConnected && (
             <div className="page-header-section">
@@ -345,7 +333,6 @@ function WalletPage() {
               </div>
             </>
           )}
-        </div>
       </div>
     </div>
   )

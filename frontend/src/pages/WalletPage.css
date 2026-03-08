@@ -1,42 +1,17 @@
+.wallet-page-wrapper {
+  max-width: 760px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
 .wallet-page {
   width: 100%;
-  max-width: 700px;
   background: var(--color-surface);
   border-radius: 12px;
   padding: 0;
   overflow: hidden;
   position: relative;
-}
-
-.page-close-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: var(--text-primary);
-  font-size: 2rem;
-  font-weight: bold;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 10;
-}
-
-.page-close-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .modal-header-section {
@@ -612,8 +587,12 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+  .wallet-page-wrapper {
+    margin: 0;
+    padding: 0;
+  }
+
   .wallet-page {
-    max-width: 100%;
     border-radius: 0;
   }
 
