@@ -321,7 +321,7 @@
   letter-spacing: 0.1em;
 }
 
-.preview-oracle {
+.preview-resolution {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -331,7 +331,7 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.preview-oracle svg {
+.preview-resolution svg {
   flex-shrink: 0;
   stroke: #4C9AFF;
 }
@@ -437,7 +437,7 @@
 /* Workaround: target container inside visible section */
 .value-section.visible .container,
 .steps-section.visible .container,
-.oracles-section.visible .container,
+.resolution-section.visible .container,
 .scenarios-section.visible .container {
   opacity: 1;
   transform: translateY(0);
@@ -600,19 +600,19 @@
   line-height: 1.7;
 }
 
-/* ===== Oracle Section ===== */
-.oracles-section {
+/* ===== Resolution Section ===== */
+.resolution-section {
   padding: 6rem 2rem;
   background: #ffffff;
 }
 
-.oracle-grid {
+.resolution-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
 }
 
-.oracle-card {
+.resolution-card {
   position: relative;
   padding: 2rem;
   background: #f8f9fa;
@@ -622,13 +622,13 @@
   transition: all 0.3s ease;
 }
 
-.oracle-card:hover {
+.resolution-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
   background: #ffffff;
 }
 
-.oracle-accent {
+.resolution-accent {
   position: absolute;
   top: 0;
   left: 0;
@@ -636,12 +636,12 @@
   height: 3px;
 }
 
-.oracle-polymarket .oracle-accent { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
-.oracle-chainlink .oracle-accent { background: linear-gradient(90deg, #2563eb, #3b82f6); }
-.oracle-uma .oracle-accent { background: linear-gradient(90deg, #dc2626, #ef4444); }
-.oracle-manual .oracle-accent { background: linear-gradient(90deg, #2D7A4F, #36B37E); }
+.resolution-either .resolution-accent { background: linear-gradient(90deg, #2D7A4F, #36B37E); }
+.resolution-initiator .resolution-accent { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+.resolution-receiver .resolution-accent { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+.resolution-thirdparty .resolution-accent { background: linear-gradient(90deg, #dc2626, #ef4444); }
 
-.oracle-icon-badge {
+.resolution-icon-badge {
   width: 48px;
   height: 48px;
   display: flex;
@@ -651,26 +651,26 @@
   margin-bottom: 1.25rem;
 }
 
-.oracle-polymarket .oracle-icon-badge { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
-.oracle-chainlink .oracle-icon-badge { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
-.oracle-uma .oracle-icon-badge { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
-.oracle-manual .oracle-icon-badge { background: rgba(45, 122, 79, 0.1); color: #2D7A4F; }
+.resolution-either .resolution-icon-badge { background: rgba(45, 122, 79, 0.1); color: #2D7A4F; }
+.resolution-initiator .resolution-icon-badge { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+.resolution-receiver .resolution-icon-badge { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.resolution-thirdparty .resolution-icon-badge { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
 
-.oracle-card h3 {
+.resolution-card h3 {
   font-size: 1.25rem;
   font-weight: 700;
   color: #1a1a1a;
   margin-bottom: 0.75rem;
 }
 
-.oracle-card p {
+.resolution-card p {
   font-size: 0.95rem;
   color: #5a6772;
   line-height: 1.65;
   margin-bottom: 1rem;
 }
 
-.oracle-use-case {
+.resolution-use-case {
   font-size: 0.8rem;
   font-weight: 600;
   color: #8a959e;
@@ -905,7 +905,7 @@
     grid-column: 1 / -1;
   }
 
-  .oracle-grid {
+  .resolution-grid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -972,7 +972,7 @@
     margin-bottom: 1rem;
   }
 
-  .oracle-grid {
+  .resolution-grid {
     grid-template-columns: 1fr;
   }
 
@@ -982,7 +982,7 @@
 
   .steps-section,
   .value-section,
-  .oracles-section,
+  .resolution-section,
   .scenarios-section {
     padding: 4rem 1.5rem;
   }
@@ -1013,7 +1013,7 @@
   }
 
   .value-card:hover,
-  .oracle-card:hover,
+  .resolution-card:hover,
   .scenario-card:hover,
   .hero-cta-primary:hover,
   .hero-social-link:hover {

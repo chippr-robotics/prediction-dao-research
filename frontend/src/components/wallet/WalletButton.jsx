@@ -1091,13 +1091,21 @@ function WalletButton({ className = '' }) {
 
               {/* Navigation Actions */}
               <div className="dropdown-actions">
+                <button
+                  onClick={() => { setIsOpen(false); navigate('/wallet') }}
+                  className="action-button"
+                  role="menuitem"
+                >
+                  <span aria-hidden="true">{'\u2699\uFE0F'}</span>
+                  <span>My Account</span>
+                </button>
                 {hasRole(ROLES.ADMIN) && (
                   <button
                     onClick={handleNavigateToAdmin}
                     className="action-button"
                     role="menuitem"
                   >
-                    <span aria-hidden="true">👑</span>
+                    <span aria-hidden="true">{'\uD83D\uDC51'}</span>
                     <span>Role Management</span>
                   </button>
                 )}

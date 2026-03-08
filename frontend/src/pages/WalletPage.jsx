@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
-import { useUserPreferences } from '../hooks/useUserPreferences'
+import { useEncryption } from '../hooks/useEncryption'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
+import { hasRegisteredKey, registerEncryptionKey } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
@@ -12,11 +13,11 @@ import './WalletPage.css'
 
 const CONNECTOR_CONFIG = {
   walletConnect: {
-    icon: '🔗',
+    icon: '\uD83D\uDD17',
     label: 'WalletConnect'
   },
   injected: {
-    icon: '🦊',
+    icon: '\uD83E\uDD8A',
     label: 'MetaMask'
   }
 }
@@ -33,18 +34,21 @@ function WalletPage() {
   const { address, isConnected, connectors } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
   const { showModal, hideModal } = useModal()
-  const { preferences } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
+  const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('profile')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState('account')
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
+  const [keyRegistered, setKeyRegistered] = useState(null)
+  const [keyCheckLoading, setKeyCheckLoading] = useState(false)
+  const [keyRegisterLoading, setKeyRegisterLoading] = useState(false)
+  const [keyError, setKeyError] = useState(null)
 
   const handleConnect = async (connectorId) => {
     setConnectingConnectorId(connectorId)
     setConnectionError(null)
-    
+
     try {
       const success = await connectWallet(connectorId)
       if (!success) {
@@ -52,7 +56,7 @@ function WalletPage() {
       }
     } catch (error) {
       console.error('Wallet connection error:', error)
-      
+
       if (error.message.includes('rejected') || error.message.includes('approve')) {
         setConnectionError('Connection request was rejected. Please try again.')
       } else if (error.message.includes('connector')) {
@@ -70,25 +74,12 @@ function WalletPage() {
     navigate('/app')
   }
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault()
-    console.log('Searching for:', searchQuery)
-  }
-
-  const handleLaunchMarket = () => {
-    console.log('Navigate to launch market')
-  }
-
   const handleOpenPurchaseModal = () => {
     showModal(<PremiumPurchaseModal onClose={hideModal} />, {
       title: '',
       size: 'large',
       closable: false
     })
-  }
-
-  const handleNavigateToClearPath = () => {
-    navigate('/clearpath')
   }
 
   const handleNavigateToAdmin = () => {
@@ -99,6 +90,46 @@ function WalletPage() {
     navigate(-1)
   }
 
+  const handleCheckKeyStatus = useCallback(async () => {
+    if (!address) return
+    setKeyCheckLoading(true)
+    setKeyError(null)
+    try {
+      const { ethers } = await import('ethers')
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const registered = await hasRegisteredKey(address, provider)
+      setKeyRegistered(registered)
+    } catch (err) {
+      setKeyError('Could not check key status: ' + err.message)
+    } finally {
+      setKeyCheckLoading(false)
+    }
+  }, [address])
+
+  const handleRegisterKey = useCallback(async () => {
+    setKeyRegisterLoading(true)
+    setKeyError(null)
+    try {
+      const result = await ensureInitialized()
+      if (!result?.publicKey) {
+        throw new Error('Failed to derive encryption keys')
+      }
+      const { ethers } = await import('ethers')
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+      await registerEncryptionKey(signer, result.publicKey)
+      setKeyRegistered(true)
+    } catch (err) {
+      if (err.message.includes('rejected') || err.message.includes('denied')) {
+        setKeyError('Transaction was rejected.')
+      } else {
+        setKeyError('Key registration failed: ' + err.message)
+      }
+    } finally {
+      setKeyRegisterLoading(false)
+    }
+  }, [ensureInitialized])
+
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
@@ -108,12 +139,12 @@ function WalletPage() {
     <div className="wallet-page-backdrop">
       <div className="wallet-page-container">
         <div className="wallet-page">
-          <button 
+          <button
             className="page-close-btn"
             onClick={handleClose}
             aria-label="Close"
           >
-            ×
+            &times;
           </button>
 
           {isConnected && (
@@ -129,17 +160,17 @@ function WalletPage() {
           {!isConnected ? (
             <div className="connect-section">
               <div className="connect-prompt">
-                <div className="connect-icon" aria-hidden="true">🔗</div>
+                <div className="connect-icon" aria-hidden="true">{'\uD83D\uDD17'}</div>
                 <h3>Connect Your Wallet</h3>
-                <p>Connect your Web3 wallet to access all features, manage your preferences, and interact with markets.</p>
-                
+                <p>Connect your Web3 wallet to access all features, manage your membership, and create wagers.</p>
+
                 {connectionError && (
                   <div className="connection-error" role="alert" aria-live="assertive">
-                    <span className="error-icon" aria-hidden="true">⚠️</span>
+                    <span className="error-icon" aria-hidden="true">{'\u26A0\uFE0F'}</span>
                     <span className="error-message">{connectionError}</span>
                   </div>
                 )}
-                
+
                 <div className="connector-options">
                   {connectors.map((connector) => {
                     const isThisConnecting = connectingConnectorId === connector.id
@@ -163,12 +194,12 @@ function WalletPage() {
                     )
                   })}
                 </div>
-                
+
                 <div className="wallet-help" role="note">
                   <p>New to Web3 wallets?</p>
-                  <a 
-                    href="https://ethereum.org/en/wallets/" 
-                    target="_blank" 
+                  <a
+                    href="https://ethereum.org/en/wallets/"
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="install-metamask-link"
                   >
@@ -180,14 +211,14 @@ function WalletPage() {
           ) : (
             <>
               <div className="tabs" role="tablist">
-                <button role="tab" aria-selected={activeTab === 'profile'} className={`tab ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveTab('profile')}>Profile</button>
-                <button role="tab" aria-selected={activeTab === 'search'} className={`tab ${activeTab === 'search' ? 'active' : ''}`} onClick={() => setActiveTab('search')}>Search Markets</button>
-                <button role="tab" aria-selected={activeTab === 'swap'} className={`tab ${activeTab === 'swap' ? 'active' : ''}`} onClick={() => setActiveTab('swap')}>Swap Tokens</button>
-                <button role="tab" aria-selected={activeTab === 'launch'} className={`tab ${activeTab === 'launch' ? 'active' : ''}`} onClick={() => setActiveTab('launch')}>Launch Market</button>
+                <button role="tab" aria-selected={activeTab === 'account'} className={`tab ${activeTab === 'account' ? 'active' : ''}`} onClick={() => setActiveTab('account')}>Account</button>
+                <button role="tab" aria-selected={activeTab === 'membership'} className={`tab ${activeTab === 'membership' ? 'active' : ''}`} onClick={() => setActiveTab('membership')}>Membership</button>
+                <button role="tab" aria-selected={activeTab === 'security'} className={`tab ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security</button>
+                <button role="tab" aria-selected={activeTab === 'swap'} className={`tab ${activeTab === 'swap' ? 'active' : ''}`} onClick={() => setActiveTab('swap')}>Swap</button>
               </div>
 
               <div className="tab-content">
-                {activeTab === 'profile' && (
+                {activeTab === 'account' && (
                   <div className="profile-section" role="tabpanel">
                     <div className="section">
                       <h3>Wallet</h3>
@@ -200,20 +231,18 @@ function WalletPage() {
                       </div>
                     </div>
 
-                    <div className="section">
-                      <h3>Preferences</h3>
-                      <div className="preferences-info">
-                        <div className="pref-item">
-                          <span className="pref-label">Favorite Markets:</span>
-                          <span className="pref-value">{preferences.favoriteMarkets.length}</span>
-                        </div>
-                        <div className="pref-item">
-                          <span className="pref-label">Default Slippage:</span>
-                          <span className="pref-value">{preferences.defaultSlippage}%</span>
-                        </div>
+                    {hasRole(ROLES.ADMIN) && (
+                      <div className="section admin-section">
+                        <h3>Administration</h3>
+                        <p className="section-description">Manage roles and permissions for users</p>
+                        <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
                       </div>
-                    </div>
+                    )}
+                  </div>
+                )}
 
+                {activeTab === 'membership' && (
+                  <div className="membership-section" role="tabpanel">
                     <div className="section">
                       <h3>Your Roles</h3>
                       {roles.length > 0 ? (
@@ -233,55 +262,77 @@ function WalletPage() {
                         </div>
                       ) : (
                         <div className="no-roles-message">
-                          <p>You don't have any special roles yet.</p>
-                          <button onClick={handleOpenPurchaseModal} className="get-roles-btn">Get Premium Access</button>
+                          <p>You don't have any roles yet. Get a membership to create and accept wagers.</p>
                         </div>
                       )}
                     </div>
 
-                    {hasRole(ROLES.CLEARPATH_USER) && (
-                      <div className="section clearpath-management-section">
-                        <h3>ClearPath Management</h3>
-                        <p className="section-description">Access DAO governance and management features</p>
-                        <button onClick={handleNavigateToClearPath} className="manage-org-btn">Manage Organizations</button>
-                      </div>
-                    )}
-
-                    {hasRole(ROLES.ADMIN) && (
-                      <div className="section admin-section">
-                        <h3>Administration</h3>
-                        <p className="section-description">Manage roles and permissions for users</p>
-                        <button onClick={handleNavigateToAdmin} className="admin-panel-btn">Role Management</button>
-                      </div>
-                    )}
+                    <div className="section">
+                      <h3>Membership</h3>
+                      {hasRole(ROLES.FRIEND_MARKET) ? (
+                        <div className="membership-active">
+                          <div className="membership-status-badge active">Active</div>
+                          <p>You have access to create and accept P2P wagers.</p>
+                          <button onClick={handleOpenPurchaseModal} className="renew-btn">Renew / Upgrade</button>
+                        </div>
+                      ) : (
+                        <div className="membership-inactive">
+                          <p>Get access to create and accept encrypted P2P wagers with friends.</p>
+                          <button onClick={handleOpenPurchaseModal} className="get-roles-btn">Get Membership</button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
-                {activeTab === 'search' && (
-                  <div className="search-section" role="tabpanel">
-                    <h3>Search Markets</h3>
-                    <form onSubmit={handleSearchSubmit} className="search-form">
-                      <div className="search-input-group">
-                        <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search for markets..." className="search-input" aria-label="Search markets" />
-                        <button type="submit" className="search-btn">Search</button>
-                      </div>
-                    </form>
+                {activeTab === 'security' && (
+                  <div className="security-section" role="tabpanel">
+                    <div className="section">
+                      <h3>Encryption Key</h3>
+                      <p className="section-description">
+                        Your encryption key allows you to send and receive encrypted wagers. It is derived from your wallet signature and registered on-chain.
+                      </p>
 
-                    {preferences.recentSearches.length > 0 && (
-                      <div className="recent-searches">
-                        <h4>Recent Searches</h4>
-                        <ul className="search-list">
-                          {preferences.recentSearches.slice(0, 5).map((search, index) => (
-                            <li key={index} className="search-item">
-                              <button onClick={() => setSearchQuery(search)} className="search-item-btn">{search}</button>
-                            </li>
-                          ))}
-                        </ul>
+                      <div className="key-status-card">
+                        <div className="key-status-row">
+                          <span className="key-status-label">Local Keys:</span>
+                          <span className={`key-status-value ${isInitialized ? 'active' : 'inactive'}`}>
+                            {isInitializing ? 'Initializing...' : isInitialized ? 'Derived' : 'Not initialized'}
+                          </span>
+                        </div>
+                        <div className="key-status-row">
+                          <span className="key-status-label">On-chain Registration:</span>
+                          <span className={`key-status-value ${keyRegistered ? 'active' : keyRegistered === false ? 'inactive' : ''}`}>
+                            {keyCheckLoading ? 'Checking...' : keyRegistered === null ? 'Not checked' : keyRegistered ? 'Registered' : 'Not registered'}
+                          </span>
+                        </div>
                       </div>
-                    )}
 
-                    <div className="search-help">
-                      <p>Search for prediction markets by title, category, or description.</p>
+                      {keyError && (
+                        <div className="key-error" role="alert">
+                          {keyError}
+                        </div>
+                      )}
+
+                      <div className="key-actions">
+                        <button
+                          onClick={handleCheckKeyStatus}
+                          className="key-action-btn secondary"
+                          disabled={keyCheckLoading}
+                        >
+                          {keyCheckLoading ? 'Checking...' : 'Check Status'}
+                        </button>
+
+                        {!keyRegistered && (
+                          <button
+                            onClick={handleRegisterKey}
+                            className="key-action-btn primary"
+                            disabled={keyRegisterLoading}
+                          >
+                            {keyRegisterLoading ? 'Registering...' : 'Register Encryption Key'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -289,27 +340,6 @@ function WalletPage() {
                 {activeTab === 'swap' && (
                   <div className="swap-section" role="tabpanel">
                     <SwapPanel />
-                  </div>
-                )}
-
-                {activeTab === 'launch' && (
-                  <div className="launch-section" role="tabpanel">
-                    <h3>Launch a New Market</h3>
-                    <div className="launch-content">
-                      <div className="launch-icon" aria-hidden="true">🚀</div>
-                      <p className="launch-description">
-                        Create and launch your own prediction market. Define the question, set the parameters, and let the community predict the outcome.
-                      </p>
-                      <button onClick={handleLaunchMarket} className="launch-market-btn">Launch New Market</button>
-                      <div className="launch-help">
-                        <h4>Requirements:</h4>
-                        <ul>
-                          <li>Connected wallet with sufficient funds</li>
-                          <li>Clear market question and resolution criteria</li>
-                          <li>Initial liquidity for the market</li>
-                        </ul>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>

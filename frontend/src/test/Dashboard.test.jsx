@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
-import { UserPreferencesContext, WalletContext, FriendMarketsContext } from '../contexts'
+import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext } from '../contexts'
 
 describe('Dashboard Component', () => {
   const defaultWalletContext = {
@@ -17,7 +17,30 @@ describe('Dashboard Component', () => {
     isCorrectNetwork: true,
     networkError: null,
     isConnecting: false,
-    balance: '0'
+    balance: '0',
+    roles: [],
+    rolesLoading: false,
+    blockchainSynced: true,
+    refreshRoles: vi.fn(),
+    hasRole: vi.fn().mockReturnValue(false),
+    hasAnyRole: vi.fn().mockReturnValue(false),
+    hasAllRoles: vi.fn().mockReturnValue(false),
+    grantRole: vi.fn(),
+    revokeRole: vi.fn()
+  }
+
+  const defaultUIContext = {
+    modal: null,
+    showModal: vi.fn(),
+    hideModal: vi.fn(),
+    notification: null,
+    showNotification: vi.fn(),
+    hideNotification: vi.fn(),
+    announcement: null,
+    announce: vi.fn(),
+    error: null,
+    showError: vi.fn(),
+    clearError: vi.fn()
   }
 
   const defaultPreferencesContext = {
@@ -51,18 +74,21 @@ describe('Dashboard Component', () => {
     const {
       walletContext = defaultWalletContext,
       preferencesContext = defaultPreferencesContext,
-      friendMarketsContext = defaultFriendMarketsContext
+      friendMarketsContext = defaultFriendMarketsContext,
+      uiContext = defaultUIContext
     } = options
 
     return render(
       <MemoryRouter>
-        <WalletContext.Provider value={walletContext}>
-          <UserPreferencesContext.Provider value={preferencesContext}>
-            <FriendMarketsContext.Provider value={friendMarketsContext}>
-              {component}
-            </FriendMarketsContext.Provider>
-          </UserPreferencesContext.Provider>
-        </WalletContext.Provider>
+        <UIContext.Provider value={uiContext}>
+          <WalletContext.Provider value={walletContext}>
+            <UserPreferencesContext.Provider value={preferencesContext}>
+              <FriendMarketsContext.Provider value={friendMarketsContext}>
+                {component}
+              </FriendMarketsContext.Provider>
+            </UserPreferencesContext.Provider>
+          </WalletContext.Provider>
+        </UIContext.Provider>
       </MemoryRouter>
     )
   }
@@ -116,7 +142,7 @@ describe('Dashboard Component', () => {
       fireEvent.click(toggle)
       expect(screen.getByText('Create a wager')).toBeInTheDocument()
       expect(screen.getByText('Share the invite')).toBeInTheDocument()
-      expect(screen.getByText('Auto-resolution')).toBeInTheDocument()
+      expect(screen.getByText('The designated party proposes the outcome. A 24-hour challenge window ensures fairness.')).toBeInTheDocument()
       expect(screen.getByText('Claim winnings')).toBeInTheDocument()
     })
   })
@@ -151,21 +177,6 @@ describe('Dashboard Component', () => {
     })
   })
 
-  describe('Oracle Info', () => {
-    it('should render oracle sources panel', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Oracle Sources')).toBeInTheDocument()
-    })
-
-    it('should display all oracle options', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Peg wagers to Polymarket event outcomes')).toBeInTheDocument()
-      expect(screen.getByText('Price feed-based resolution')).toBeInTheDocument()
-      expect(screen.getByText('Custom truth assertions')).toBeInTheDocument()
-      expect(screen.getByText('Creator-resolved with challenge period')).toBeInTheDocument()
-    })
-  })
-
   describe('Not Connected State', () => {
     it('should show welcome view when not connected and not demo mode', () => {
       const mockConnect = vi.fn()
@@ -178,7 +189,7 @@ describe('Dashboard Component', () => {
       })
       expect(screen.getByText('Create a wagerwith a friend')).toBeInTheDocument()
       expect(screen.getByText('How it works')).toBeInTheDocument()
-      expect(screen.getByText('Pick your truth source')).toBeInTheDocument()
+      expect(screen.getByText('Resolution methods')).toBeInTheDocument()
     })
   })
 

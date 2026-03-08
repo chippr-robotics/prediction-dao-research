@@ -1,11 +1,14 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWallet } from '../../hooks'
+import { useWallet, useWalletRoles } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { WAGER_DEFAULTS, WagerStatus, ORACLE_SOURCES } from '../../constants/wagerDefaults'
+import { useModal } from '../../hooks/useUI'
+import { ROLES } from '../../contexts/RoleContext'
+import { WAGER_DEFAULTS, WagerStatus } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import QRScanner from '../ui/QRScanner'
+import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import './Dashboard.css'
 
@@ -175,8 +178,8 @@ function WagerCard({ wager, onClick }) {
           <span className="wager-detail-value">{wager.type}</span>
         </div>
         <div className="wager-detail">
-          <span className="wager-detail-label">Oracle</span>
-          <span className="wager-detail-value">{wager.oracle}</span>
+          <span className="wager-detail-label">Resolution</span>
+          <span className="wager-detail-value">{wager.resolution}</span>
         </div>
       </div>
       <div className="wager-card-participants">
@@ -213,7 +216,7 @@ function HowItWorksGuide() {
             <div className="how-step-number">1</div>
             <div className="how-step-content">
               <strong>Create a wager</strong>
-              <p>Pick your topic, set the stake, and choose an oracle for resolution (Polymarket, Chainlink, UMA, or manual).</p>
+              <p>Pick your topic, set the stake, and choose a resolution method (either party, initiator, receiver, or third party).</p>
             </div>
           </div>
           <div className="how-step">
@@ -226,8 +229,8 @@ function HowItWorksGuide() {
           <div className="how-step">
             <div className="how-step-number">3</div>
             <div className="how-step-content">
-              <strong>Auto-resolution</strong>
-              <p>The oracle resolves the outcome. Manual resolutions include a 24-hour challenge window.</p>
+              <strong>Resolution</strong>
+              <p>The designated party proposes the outcome. A 24-hour challenge window ensures fairness.</p>
             </div>
           </div>
           <div className="how-step">
@@ -239,34 +242,6 @@ function HowItWorksGuide() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ============================================================================
-// ORACLE INFO PANEL (used in connected dashboard view)
-// ============================================================================
-
-function OracleInfoPanel({ isConnected }) {
-  const status = isConnected ? 'available' : 'offline'
-
-  return (
-    <div className="oracle-info-panel">
-      <h3>Oracle Sources</h3>
-      <div className="oracle-list">
-        {ORACLE_SOURCES.map(oracle => (
-          <div key={oracle.name} className="oracle-item">
-            <span className="oracle-icon" aria-hidden="true">{oracle.icon}</span>
-            <div className="oracle-content">
-              <span className="oracle-name">{oracle.name}</span>
-              <span className="oracle-description">{oracle.description}</span>
-            </div>
-            <span className={`oracle-status ${status}`}>
-              {isConnected ? 'Available' : 'Not Connected'}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
@@ -288,7 +263,7 @@ function WelcomeView({ onConnect }) {
           Create a wager<br />with a friend
         </h1>
         <p className="welcome-hero-subtitle">
-          Connect your wallet to create trustless P2P bets. Pick a topic, set the stakes, choose an oracle, and share the invite.
+          Connect your wallet to create trustless P2P bets. Pick a topic, set the stakes, choose a resolution method, and share the invite.
         </p>
         <button className="welcome-connect-btn" onClick={onConnect}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -337,38 +312,38 @@ function WelcomeView({ onConnect }) {
               </svg>
             </div>
             <h3>Settle</h3>
-            <p>The oracle resolves the result. The winner claims the pot from the smart contract.</p>
+            <p>The result is proposed and verified through a challenge period. The winner claims the pot.</p>
           </div>
         </div>
       </section>
 
-      {/* Oracle options - informational, not status */}
-      <section className="welcome-oracles">
-        <h2 className="welcome-section-label">Pick your truth source</h2>
-        <div className="welcome-oracle-grid">
-          <div className="welcome-oracle-card">
-            <div className="welcome-oracle-accent welcome-oracle-accent-polymarket" />
-            <h3>Polymarket</h3>
-            <p>Peg your wager to any Polymarket event. Elections, sports, world events.</p>
-            <span className="welcome-oracle-tag">Events &amp; outcomes</span>
+      {/* Resolution methods */}
+      <section className="welcome-resolution">
+        <h2 className="welcome-section-label">Resolution methods</h2>
+        <div className="welcome-resolution-grid">
+          <div className="welcome-resolution-card">
+            <div className="welcome-resolution-accent welcome-resolution-accent-either" />
+            <h3>Either Party</h3>
+            <p>Either side can propose the outcome. 24-hour challenge period for disputes.</p>
+            <span className="welcome-resolution-tag">Most flexible</span>
           </div>
-          <div className="welcome-oracle-card">
-            <div className="welcome-oracle-accent welcome-oracle-accent-chainlink" />
-            <h3>Chainlink</h3>
-            <p>Decentralized price feeds for crypto, forex, and commodities.</p>
-            <span className="welcome-oracle-tag">Price predictions</span>
+          <div className="welcome-resolution-card">
+            <div className="welcome-resolution-accent welcome-resolution-accent-initiator" />
+            <h3>Initiator Resolves</h3>
+            <p>The wager creator reports the result. The opponent can challenge.</p>
+            <span className="welcome-resolution-tag">Creator decides</span>
           </div>
-          <div className="welcome-oracle-card">
-            <div className="welcome-oracle-accent welcome-oracle-accent-uma" />
-            <h3>UMA Optimistic</h3>
-            <p>Assert any claim and let UMA's dispute mechanism ensure honest resolution.</p>
-            <span className="welcome-oracle-tag">Custom claims</span>
+          <div className="welcome-resolution-card">
+            <div className="welcome-resolution-accent welcome-resolution-accent-receiver" />
+            <h3>Receiver Resolves</h3>
+            <p>The accepting party reports the result. The creator can challenge.</p>
+            <span className="welcome-resolution-tag">Opponent decides</span>
           </div>
-          <div className="welcome-oracle-card">
-            <div className="welcome-oracle-accent welcome-oracle-accent-manual" />
-            <h3>Manual + Challenge</h3>
-            <p>Creator resolves it. The other side gets 24 hours to dispute.</p>
-            <span className="welcome-oracle-tag">Casual bets</span>
+          <div className="welcome-resolution-card">
+            <div className="welcome-resolution-accent welcome-resolution-accent-thirdparty" />
+            <h3>Third Party</h3>
+            <p>A mutually trusted address resolves the wager. No challenge needed.</p>
+            <span className="welcome-resolution-tag">Trusted arbiter</span>
           </div>
         </div>
       </section>
@@ -399,7 +374,7 @@ function WelcomeView({ onConnect }) {
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            Resolves via Chainlink Price Feed
+            Resolves by either party with challenge period
           </div>
         </div>
       </section>
@@ -428,6 +403,8 @@ function WelcomeView({ onConnect }) {
 function Dashboard({ onConnect }) {
   const { isConnected, account } = useWallet()
   const { preferences } = useUserPreferences()
+  const { hasRole } = useWalletRoles()
+  const { showModal, hideModal } = useModal()
   const navigate = useNavigate()
   const demoMode = preferences?.demoMode ?? true
 
@@ -436,6 +413,7 @@ function Dashboard({ onConnect }) {
   const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'smallGroup'
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
 
   // Friend markets from shared context (single fetch, no duplication)
   const { friendMarkets, loading: wagersLoading } = useFriendMarkets()
@@ -450,7 +428,7 @@ function Dashboard({ onConnect }) {
       stakeAmount: m.stakeAmount,
       stakeToken: m.stakeTokenSymbol || 'ETC',
       type: m.type === 'oneVsOne' ? '1v1' : m.type === 'smallGroup' ? 'Group' : m.type,
-      oracle: m.arbitrator ? 'Third Party' : 'Manual',
+      resolution: m.arbitrator ? 'Third Party' : 'Either Party',
       endTime: m.endDate,
       participants: m.participants || []
     }))
@@ -494,7 +472,7 @@ function Dashboard({ onConnect }) {
         stakeAmount: '50',
         stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: '1v1',
-        oracle: 'Chainlink',
+        resolution: 'Either Party',
         endTime: DEMO_END_30D,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12']
       },
@@ -505,7 +483,7 @@ function Dashboard({ onConnect }) {
         stakeAmount: '25',
         stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: '1v1',
-        oracle: 'Polymarket',
+        resolution: 'Initiator Resolves',
         endTime: DEMO_END_14D,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12']
       },
@@ -516,7 +494,7 @@ function Dashboard({ onConnect }) {
         stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
         stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: 'Group',
-        oracle: 'Manual',
+        resolution: 'Either Party',
         endTime: DEMO_END_45D,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12', '0x9876543210fedcba9876543210fedcba98765432']
       },
@@ -527,7 +505,7 @@ function Dashboard({ onConnect }) {
         stakeAmount: '100',
         stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
         type: '1v1',
-        oracle: 'Chainlink',
+        resolution: 'Third Party',
         endTime: DEMO_END_PAST,
         participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xfedcba0987654321fedcba0987654321fedcba09']
       }
@@ -634,6 +612,25 @@ function Dashboard({ onConnect }) {
         </div>
       </header>
 
+      {/* Membership CTA Banner */}
+      {isConnected && !bannerDismissed && !hasRole(ROLES.FRIEND_MARKET) && (
+        <div className="dashboard-cta-banner">
+          <div className="cta-banner-content">
+            <strong>Get access to create and accept wagers</strong>
+            <p>Purchase a membership to start creating P2P wagers with friends.</p>
+          </div>
+          <div className="cta-banner-actions">
+            <button
+              className="cta-banner-btn primary"
+              onClick={() => showModal(<PremiumPurchaseModal onClose={hideModal} />, { title: '', size: 'large', closable: false })}
+            >
+              Get Membership
+            </button>
+            <button className="cta-banner-dismiss" onClick={() => setBannerDismissed(true)} aria-label="Dismiss">&times;</button>
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions */}
       <section className="dashboard-section">
         <QuickActions onAction={handleQuickAction} />
@@ -681,11 +678,6 @@ function Dashboard({ onConnect }) {
           </div>
         </section>
       )}
-
-      {/* Oracle Info */}
-      <section className="dashboard-section">
-        <OracleInfoPanel isConnected={isConnected} />
-      </section>
 
       {/* Create Wager Modal */}
       <FriendMarketsModal
