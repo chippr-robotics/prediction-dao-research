@@ -134,8 +134,12 @@ export async function registerEncryptionKey(signer, publicKeyBytes) {
     throw new Error('ZKKeyManager contract not configured')
   }
 
-  const contract = new ethers.Contract(address, ZK_KEY_MANAGER_ABI, signer)
-  const tx = await contract.registerKey(publicKeyHex)
+  // Explicitly encode the function call data to avoid issues with ethers v6
+  // Contract proxy + BrowserProvider (wagmi transport) dropping the data field
+  const iface = new ethers.Interface(ZK_KEY_MANAGER_ABI)
+  const data = iface.encodeFunctionData('registerKey', [publicKeyHex])
+
+  const tx = await signer.sendTransaction({ to: address, data })
   const receipt = await tx.wait()
 
   // Invalidate cache for this user
