@@ -1123,14 +1123,12 @@ export async function registerZKKey(signer, publicKey) {
       throw new Error('ZKKeyManager contract not deployed yet. Please register your key later.')
     }
 
-    const zkKeyManagerContract = new ethers.Contract(
-      zkKeyManagerAddress,
-      ZK_KEY_MANAGER_ABI,
-      signer
-    )
+    // Explicitly encode function call data to avoid ethers v6 Contract proxy
+    // + BrowserProvider (wagmi transport) dropping the data field
+    const iface = new ethers.Interface(ZK_KEY_MANAGER_ABI)
+    const data = iface.encodeFunctionData('registerKey', [publicKey.trim()])
 
-    // Call registerKey function
-    const tx = await zkKeyManagerContract.registerKey(publicKey.trim())
+    const tx = await signer.sendTransaction({ to: zkKeyManagerAddress, data })
     const receipt = await tx.wait()
 
     return {
