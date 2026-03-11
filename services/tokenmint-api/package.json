@@ -1,0 +1,27 @@
+{
+  "name": "@prediction-dao/tokenmint-api",
+  "version": "1.0.0",
+  "description": "TokenMint API service — institutional-grade tokenization API compatible with Fireblocks, BitGo, Blockdaemon, and DFNS interfaces",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test src/**/*.test.js",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "ethers": "^6.16.0",
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
+    "express-rate-limit": "^7.5.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "private": true
+}
