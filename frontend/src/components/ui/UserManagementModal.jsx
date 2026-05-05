@@ -37,14 +37,15 @@ function UserManagementModal({ onScanMarket }) {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
-    // TODO: Implement market search navigation
-    console.log('Searching for:', searchQuery)
+    if (searchQuery.trim()) {
+      hideModal()
+      navigate(`/markets?search=${encodeURIComponent(searchQuery)}`)
+    }
   }
 
   const handleLaunchMarket = () => {
-    // TODO: Implement launch market navigation
     hideModal()
-    console.log('Navigate to launch market')
+    navigate('/markets/create')
   }
 
   const handleOpenPurchaseModal = () => {
