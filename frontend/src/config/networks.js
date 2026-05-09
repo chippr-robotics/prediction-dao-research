@@ -126,6 +126,16 @@ export function isDexAvailable(chainId) {
   return Boolean(getNetwork(chainId)?.dex)
 }
 
+/**
+ * Whether a chainId is a supported network. Used by the wallet/web3 contexts
+ * to allow either Mordor (limited functionality) or Polygon Amoy (primary)
+ * without prompting the user to switch — the per-chain capabilities map
+ * controls what features each chain can actually do.
+ */
+export function isSupportedChainId(chainId) {
+  return Object.prototype.hasOwnProperty.call(NETWORKS, chainId)
+}
+
 export function listSupportedChainIds() {
   return Object.keys(NETWORKS).map((id) => parseInt(id, 10))
 }

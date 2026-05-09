@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { ethers } from 'ethers'
-import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
+import { isSupportedChainId, getNetwork, listSupportedChainIds, PRIMARY_CHAIN_ID } from '../config/networks'
 import {
   getUserRoles,
   addUserRole,
@@ -108,11 +108,20 @@ export function WalletProvider({ children }) {
     return () => { cancelled = true }
   }, [isConnected, address, walletClient])
 
-  // Check network compatibility
+  // Check network compatibility. The app supports multiple chains (Mordor
+  // and Polygon Amoy today); a network error is only emitted when the
+  // wallet is on a chain we don't recognize. The LimitedFunctionalityBanner
+  // handles steering Mordor users toward Amoy.
   useEffect(() => {
-    if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
-      const expectedChain = getExpectedChain()
-      setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
+    if (isConnected && !isSupportedChainId(chainId)) {
+      const supported = listSupportedChainIds()
+        .map((id) => getNetwork(id)?.name)
+        .filter(Boolean)
+        .join(' or ')
+      const primary = getNetwork(PRIMARY_CHAIN_ID)
+      setNetworkError(
+        `Wrong network. Please switch to ${supported || primary?.name || 'a supported network'}.`
+      )
     } else {
       setNetworkError(null)
     }
@@ -383,14 +392,18 @@ export function WalletProvider({ children }) {
     }
   }, [disconnect])
 
-  // Switch to correct network
+  // Switch to the configured primary network (Polygon Amoy post-migration).
+  // This is invoked from the network-error banner / "Switch Network" button;
+  // users on Mordor are not directed here because Mordor is supported.
   const switchNetwork = useCallback(async () => {
+    const target = PRIMARY_CHAIN_ID
     try {
-      await switchChain({ chainId: EXPECTED_CHAIN_ID })
+      await switchChain({ chainId: target })
       return true
     } catch (error) {
       console.error('Error switching network:', error)
-      throw new Error(`Please manually switch to ${getExpectedChain().name} in your wallet`)
+      const targetNet = getNetwork(target)
+      throw new Error(`Please manually switch to ${targetNet?.name || 'Polygon Amoy'} in your wallet`)
     }
   }, [switchChain])
 
@@ -475,9 +488,12 @@ export function WalletProvider({ children }) {
     }
   }, [address])
 
-  // Computed values
+  // Computed values. "Correct" here means any supported chain — Mordor or
+  // Polygon Amoy. Per-chain feature gates (e.g. polymarketSidebets only on
+  // Amoy) are enforced via the capabilities map in networks.js, not by
+  // refusing to load the app on Mordor.
   const isCorrectNetwork = useMemo(
-    () => isConnected && chainId === EXPECTED_CHAIN_ID,
+    () => isConnected && isSupportedChainId(chainId),
     [isConnected, chainId]
   )
 
