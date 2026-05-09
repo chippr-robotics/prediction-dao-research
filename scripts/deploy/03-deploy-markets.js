@@ -136,7 +136,12 @@ async function main() {
   console.log("\n\n--- Deploying FriendGroupMarketFactory ---");
 
   const networkName = hre.network.name;
-  const collateralToken = TOKENS[networkName]?.USC || deployer.address;
+  // Resolve the chain stablecoin: USDC on Polygon Amoy, USC on Mordor. Fallback
+  // to the deployer address only for local/hardhat networks where there is no
+  // stablecoin and the contract takes any non-zero address as a placeholder.
+  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
+  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USC";
+  const collateralToken = stableAddress || deployer.address;
 
   const friendGroupMarketFactory = await deployDeterministic(
     "FriendGroupMarketFactory",
@@ -158,7 +163,7 @@ async function main() {
     console.log("  Configuring FriendGroupMarketFactory...");
 
     // Set default collateral token
-    if (TOKENS[networkName]?.USC) {
+    if (stableAddress) {
       try {
         const tx = await friendGroupMarketFactory.contract.setDefaultCollateralToken(collateralToken);
         await tx.wait();
@@ -171,7 +176,7 @@ async function main() {
       try {
         const tx = await friendGroupMarketFactory.contract.addAcceptedPaymentToken(collateralToken, true);
         await tx.wait();
-        console.log("  ✓ USC added as accepted payment token");
+        console.log(`  ✓ ${stableSymbol} added as accepted payment token`);
       } catch (error) {
         console.warn(`  ⚠️  Failed to add payment token: ${error.message?.split("\n")[0]}`);
       }
@@ -203,7 +208,7 @@ async function main() {
       [
         fundingRateEngine.address,  // _fundingRateEngine
         deployer.address,           // _feeRecipient (treasury)
-        collateralToken             // _defaultCollateralToken (USC)
+        collateralToken             // _defaultCollateralToken (chain stablecoin)
       ],
       generateSalt(perpSaltPrefix + "PerpetualFuturesFactory"),
       deployer
@@ -222,7 +227,7 @@ async function main() {
     }
 
     // Create default markets (BTC, ETH, ETC)
-    if (!perpFactory.alreadyDeployed && TOKENS[networkName]?.USC) {
+    if (!perpFactory.alreadyDeployed && stableAddress) {
       console.log("\n  Creating default perpetual markets...");
       const markets = [
         { name: "BTC-PERP", oracle: deployer.address },
@@ -234,7 +239,7 @@ async function main() {
         try {
           const tx = await perpFactory.contract.createMarket(
             market.name,
-            TOKENS[networkName].USC,
+            stableAddress,
             market.oracle
           );
           const receipt = await tx.wait();

@@ -70,11 +70,32 @@ export function getContractAddress(contractName) {
 }
 
 /**
- * Network configuration for Mordor testnet
+ * Network configuration for the active chain. The active chain is selected via
+ * VITE_NETWORK_ID and defaults to Polygon Amoy (the primary post-migration).
+ *
+ * Note: this lookup is intentionally inlined rather than imported from
+ * networks.js to avoid a circular import (networks.js consumes
+ * DEPLOYED_CONTRACTS from this file). For the full chain config — DEX
+ * addresses, capabilities, etc. — read from frontend/src/config/networks.js.
  */
+const _activeChainId = parseInt(import.meta.env.VITE_NETWORK_ID || '80002', 10)
+
+const _NETWORK_CONFIG_BY_CHAIN = {
+  61: { name: 'Ethereum Classic', rpcUrl: 'https://etc.rivet.link', blockExplorer: 'https://etc.blockscout.com' },
+  63: { name: 'Mordor Testnet', rpcUrl: 'https://rpc.mordor.etccooperative.org', blockExplorer: 'https://etc-mordor.blockscout.com' },
+  80002: {
+    name: 'Polygon Amoy',
+    rpcUrl: import.meta.env.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
+    blockExplorer: 'https://amoy.polygonscan.com',
+  },
+  1337: { name: 'Hardhat', rpcUrl: 'http://127.0.0.1:8545', blockExplorer: '' },
+}
+
+const _activeNetwork = _NETWORK_CONFIG_BY_CHAIN[_activeChainId] || _NETWORK_CONFIG_BY_CHAIN[80002]
+
 export const NETWORK_CONFIG = {
-  chainId: parseInt(import.meta.env.VITE_NETWORK_ID || '63', 10),
-  name: 'Mordor Testnet',
-  rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org',
-  blockExplorer: 'https://etc-mordor.blockscout.com'
+  chainId: _activeChainId,
+  name: _activeNetwork.name,
+  rpcUrl: import.meta.env.VITE_RPC_URL || _activeNetwork.rpcUrl,
+  blockExplorer: _activeNetwork.blockExplorer,
 }

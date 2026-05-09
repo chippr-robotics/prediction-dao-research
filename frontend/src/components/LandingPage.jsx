@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
+import { useChainTokens } from '../hooks/useChainTokens'
 import './LandingPage.css'
 
 function LandingPage() {
   const navigate = useNavigate()
   const [logoErrors, setLogoErrors] = useState({ fairwins: false })
   const [visibleSections, setVisibleSections] = useState(new Set())
+  const { native: nativeSymbol, networkName } = useChainTokens()
 
   const handleGetStarted = () => {
     navigate('/app')
@@ -53,7 +55,7 @@ function LandingPage() {
         <div className="hero-content">
           <div className="hero-badge">
             <span className="hero-badge-dot" />
-            Built on Ethereum Classic
+            Built on {networkName || 'Polygon'}
           </div>
 
           <h1 className="hero-headline">
@@ -119,12 +121,12 @@ function LandingPage() {
             <div className="preview-stakes">
               <div className="preview-stake">
                 <span className="preview-stake-label">Your stake</span>
-                <span className="preview-stake-value">0.5 ETC</span>
+                <span className="preview-stake-value">0.5 {nativeSymbol}</span>
               </div>
               <div className="preview-vs">VS</div>
               <div className="preview-stake">
                 <span className="preview-stake-label">Their stake</span>
-                <span className="preview-stake-value">0.5 ETC</span>
+                <span className="preview-stake-value">0.5 {nativeSymbol}</span>
               </div>
             </div>
             <div className="preview-resolution">
@@ -224,7 +226,7 @@ function LandingPage() {
                 </svg>
               </div>
               <h3>Flexible Stakes</h3>
-              <p>Wager with ETC, stablecoins, or custom tokens. Set your own amounts and deadlines.</p>
+              <p>Wager with {nativeSymbol}, stablecoins, or custom tokens. Set your own amounts and deadlines.</p>
             </div>
           </div>
         </div>

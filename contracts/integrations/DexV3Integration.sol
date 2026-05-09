@@ -12,36 +12,38 @@ import "../interfaces/uniswap-v3/INonfungiblePositionManager.sol";
 import "../access/TieredRoleManager.sol";
 
 /**
- * @title ETCSwapV3Integration
- * @notice Production-ready integration with ETCSwap v3 with role-based liquidity management
- * @dev Handles pool creation, liquidity management, and trading for conditional tokens
- * 
- * This contract provides a comprehensive interface to ETCSwap v3 (Uniswap v3 fork):
+ * @title DexV3Integration
+ * @notice Chain-agnostic integration with any Uniswap V3-compatible DEX
+ * @dev Works with ETCSwap on Ethereum Classic, Uniswap V3 on Polygon, and any other
+ *      V3 fork. All DEX-specific addresses are passed in via the constructor; the
+ *      contract makes no chain-id assumptions. Handles pool creation, liquidity
+ *      management, and trading for conditional tokens.
+ *
+ * Capabilities:
  * - Pool creation and initialization for PASS/FAIL tokens
  * - Liquidity provision and management
  * - Token swapping with slippage protection
  * - Emergency controls and safety mechanisms
  * - Events for off-chain tracking and analytics
- * 
+ *
  * RBAC INTEGRATION:
  * - Pool creation requires MARKET_MAKER_ROLE
  * - Admin functions require OPERATIONS_ADMIN_ROLE
- * 
- * Based on: https://github.com/etcswap/v3-sdk
+ *
  * Reference: https://docs.uniswap.org/contracts/v3/overview
  */
-contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
+contract DexV3Integration is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ============ State Variables ============
 
-    /// @notice ETCSwap v3 Factory contract
+    /// @notice Uniswap V3-compatible Factory contract
     IUniswapV3Factory public immutable factory;
 
-    /// @notice ETCSwap v3 SwapRouter contract
+    /// @notice Uniswap V3-compatible SwapRouter contract
     ISwapRouter public immutable swapRouter;
 
-    /// @notice ETCSwap v3 NonfungiblePositionManager contract
+    /// @notice Uniswap V3-compatible NonfungiblePositionManager contract
     INonfungiblePositionManager public immutable positionManager;
 
     /// @notice Default fee tier (0.3% = 3000)
@@ -154,10 +156,10 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
     // ============ Constructor ============
 
     /**
-     * @notice Initialize the ETCSwap v3 integration
-     * @param _factory ETCSwap v3 Factory address
-     * @param _swapRouter ETCSwap v3 SwapRouter address
-     * @param _positionManager ETCSwap v3 NonfungiblePositionManager address
+     * @notice Initialize the V3 DEX integration
+     * @param _factory Uniswap V3-compatible Factory address
+     * @param _swapRouter Uniswap V3-compatible SwapRouter address
+     * @param _positionManager Uniswap V3-compatible NonfungiblePositionManager address
      */
     constructor(
         address _factory,
@@ -193,7 +195,7 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
     // ============ Pool Management Functions ============
 
     /**
-     * @notice Create ETCSwap v3 pools for a prediction market
+     * @notice Create V3 DEX pools for a prediction market
      * @dev Creates two pools: PASS/collateral and FAIL/collateral
      * @param marketId Market identifier
      * @param passToken Address of PASS conditional token
@@ -320,7 +322,7 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
     // ============ Trading Functions ============
 
     /**
-     * @notice Buy outcome tokens using collateral via ETCSwap
+     * @notice Buy outcome tokens using collateral via the V3 DEX
      * @dev Executes a swap from collateral to outcome token (PASS or FAIL)
      * @param marketId Market identifier
      * @param collateralToken Address of collateral token
@@ -387,7 +389,7 @@ contract ETCSwapV3Integration is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Sell outcome tokens for collateral via ETCSwap
+     * @notice Sell outcome tokens for collateral via the V3 DEX
      * @dev Executes a swap from outcome token (PASS or FAIL) to collateral
      * @param marketId Market identifier
      * @param outcomeToken Address of outcome token (PASS or FAIL)

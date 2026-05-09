@@ -22,12 +22,22 @@ const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 // =============================================================================
 
 /**
- * Token addresses by network
+ * Token addresses by network. The stablecoin entry is named after the canonical
+ * symbol on each chain (USC on ETC, USDC on Polygon). Deploy scripts should look
+ * up the stablecoin via TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC so
+ * adding new chains does not require changes to call sites.
  */
 const TOKENS = {
   mordor: {
     USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // USC Stablecoin (6 decimals)
     WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC
+  },
+  amoy: {
+    // Polymarket testnet USDC on Polygon Amoy. The exact address must be verified
+    // from Polymarket's docs at deploy time; provided via env var so it can be
+    // overridden without a code change.
+    USDC: process.env.AMOY_USDC || null,
+    WMATIC: process.env.AMOY_WMATIC || null,
   },
   localhost: {
     USC: null,   // Deploy mock in test
@@ -37,6 +47,29 @@ const TOKENS = {
     USC: null,
     WETC: null,
   }
+};
+
+/**
+ * Stablecoin decimals by network. Both USC (Mordor) and Polymarket Amoy USDC are
+ * 6 decimals — same value for both supported chains today, but exposed here so
+ * deploy scripts can encode tier prices/limits correctly per chain without
+ * hardcoding the decimal count.
+ */
+const STABLECOIN_DECIMALS = {
+  mordor: 6,
+  amoy: 6,
+  localhost: 18, // mock tokens default to 18 in tests
+  hardhat: 18,
+};
+
+/**
+ * Polymarket CTF (Conditional Token Framework) addresses per network. Only set on
+ * networks where Polymarket-pegged settlement is supported. Mordor cannot host a
+ * Polymarket CTF — friend markets there fall back to manual / arbitrator
+ * resolution and the Polymarket peg UI is gated client-side.
+ */
+const POLYMARKET_CTF = {
+  amoy: process.env.AMOY_POLYMARKET_CTF || null,
 };
 
 // =============================================================================
@@ -72,152 +105,176 @@ const MembershipTier = {
 };
 
 /**
- * Friend Market tier configurations
+ * Build tier configurations for a given stablecoin decimal count. Tier prices
+ * and limits are token amounts that must be encoded with the same decimals as
+ * the stablecoin used to pay them. Both supported stables today (USC on Mordor,
+ * USDC on Amoy) are 6-decimal, but this helper keeps the encoding correct if a
+ * future chain ships with a different decimal stablecoin (e.g. 18-dec DAI).
+ *
+ * Historical note: previous versions of this file used ethers.parseEther for
+ * these amounts, which encoded them with 18 decimals. Combined with a 6-dec
+ * stablecoin, the on-chain price ended up 1e12x too large. Always call this
+ * factory with the resolved stablecoin decimals for the deploy network.
  */
-const FRIEND_MARKET_TIERS = [
-  {
-    tier: MembershipTier.BRONZE,
-    name: "Friend Market Bronze",
-    description: "Basic friend market creation - 15 markets/month",
-    price: ethers.parseEther("50"),
-    limits: {
-      dailyBetLimit: 5,
-      weeklyBetLimit: 20,
-      monthlyMarketCreation: 15,
-      maxPositionSize: ethers.parseEther("5"),
-      maxConcurrentMarkets: 5,
-      withdrawalLimit: ethers.parseEther("25"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: false,
-      feeDiscount: 10000  // 100% discount (no fees for friend markets)
+const _amount = (decimals) => (s) => ethers.parseUnits(s, decimals);
+
+function buildFriendMarketTiers(stableDecimals) {
+  const u = _amount(stableDecimals);
+  return [
+    {
+      tier: MembershipTier.BRONZE,
+      name: "Friend Market Bronze",
+      description: "Basic friend market creation - 15 markets/month",
+      price: u("50"),
+      limits: {
+        dailyBetLimit: 5,
+        weeklyBetLimit: 20,
+        monthlyMarketCreation: 15,
+        maxPositionSize: u("5"),
+        maxConcurrentMarkets: 5,
+        withdrawalLimit: u("25"),
+        canCreatePrivateMarkets: true,
+        canUseAdvancedFeatures: false,
+        feeDiscount: 10000  // 100% discount (no fees for friend markets)
+      }
+    },
+    {
+      tier: MembershipTier.SILVER,
+      name: "Friend Market Silver",
+      description: "Enhanced friend market creation - 30 markets/month",
+      price: u("100"),
+      limits: {
+        dailyBetLimit: 10,
+        weeklyBetLimit: 50,
+        monthlyMarketCreation: 30,
+        maxPositionSize: u("15"),
+        maxConcurrentMarkets: 10,
+        withdrawalLimit: u("100"),
+        canCreatePrivateMarkets: true,
+        canUseAdvancedFeatures: true,
+        feeDiscount: 10000
+      }
+    },
+    {
+      tier: MembershipTier.GOLD,
+      name: "Friend Market Gold",
+      description: "Advanced friend market creation - 100 markets/month",
+      price: u("200"),
+      limits: {
+        dailyBetLimit: 35,
+        weeklyBetLimit: 200,
+        monthlyMarketCreation: 100,
+        maxPositionSize: u("50"),
+        maxConcurrentMarkets: 30,
+        withdrawalLimit: u("500"),
+        canCreatePrivateMarkets: true,
+        canUseAdvancedFeatures: true,
+        feeDiscount: 10000
+      }
+    },
+    {
+      tier: MembershipTier.PLATINUM,
+      name: "Friend Market Platinum",
+      description: "Unlimited friend market creation",
+      price: u("400"),
+      limits: {
+        dailyBetLimit: ethers.MaxUint256,
+        weeklyBetLimit: ethers.MaxUint256,
+        monthlyMarketCreation: ethers.MaxUint256,
+        maxPositionSize: ethers.MaxUint256,
+        maxConcurrentMarkets: ethers.MaxUint256,
+        withdrawalLimit: ethers.MaxUint256,
+        canCreatePrivateMarkets: true,
+        canUseAdvancedFeatures: true,
+        feeDiscount: 10000
+      }
     }
-  },
-  {
-    tier: MembershipTier.SILVER,
-    name: "Friend Market Silver",
-    description: "Enhanced friend market creation - 30 markets/month",
-    price: ethers.parseEther("100"),
-    limits: {
-      dailyBetLimit: 10,
-      weeklyBetLimit: 50,
-      monthlyMarketCreation: 30,
-      maxPositionSize: ethers.parseEther("15"),
-      maxConcurrentMarkets: 10,
-      withdrawalLimit: ethers.parseEther("100"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 10000
+  ];
+}
+
+function buildMarketMakerTiers(stableDecimals) {
+  const u = _amount(stableDecimals);
+  return [
+    {
+      tier: MembershipTier.BRONZE,
+      name: "Market Maker Bronze",
+      description: "Basic market creation capabilities",
+      price: u("100"),
+      limits: {
+        dailyBetLimit: 10,
+        weeklyBetLimit: 50,
+        monthlyMarketCreation: 5,
+        maxPositionSize: u("10"),
+        maxConcurrentMarkets: 3,
+        withdrawalLimit: u("50"),
+        canCreatePrivateMarkets: false,
+        canUseAdvancedFeatures: false,
+        feeDiscount: 0
+      }
+    },
+    {
+      tier: MembershipTier.SILVER,
+      name: "Market Maker Silver",
+      description: "Enhanced market creation with more limits",
+      price: u("150"),
+      limits: {
+        dailyBetLimit: 25,
+        weeklyBetLimit: 150,
+        monthlyMarketCreation: 15,
+        maxPositionSize: u("50"),
+        maxConcurrentMarkets: 10,
+        withdrawalLimit: u("200"),
+        canCreatePrivateMarkets: false,
+        canUseAdvancedFeatures: true,
+        feeDiscount: 500  // 5% discount
+      }
+    },
+    {
+      tier: MembershipTier.GOLD,
+      name: "Market Maker Gold",
+      description: "Professional market creation capabilities",
+      price: u("250"),
+      limits: {
+        dailyBetLimit: 100,
+        weeklyBetLimit: 500,
+        monthlyMarketCreation: 50,
+        maxPositionSize: u("200"),
+        maxConcurrentMarkets: 30,
+        withdrawalLimit: u("1000"),
+        canCreatePrivateMarkets: true,
+        canUseAdvancedFeatures: true,
+        feeDiscount: 1000  // 10% discount
+      }
+    },
+    {
+      tier: MembershipTier.PLATINUM,
+      name: "Market Maker Platinum",
+      description: "Unlimited market creation for institutions",
+      price: u("500"),
+      limits: {
+        dailyBetLimit: ethers.MaxUint256,
+        weeklyBetLimit: ethers.MaxUint256,
+        monthlyMarketCreation: ethers.MaxUint256,
+        maxPositionSize: ethers.MaxUint256,
+        maxConcurrentMarkets: ethers.MaxUint256,
+        withdrawalLimit: ethers.MaxUint256,
+        canCreatePrivateMarkets: true,
+        canUseAdvancedFeatures: true,
+        feeDiscount: 2000  // 20% discount
+      }
     }
-  },
-  {
-    tier: MembershipTier.GOLD,
-    name: "Friend Market Gold",
-    description: "Advanced friend market creation - 100 markets/month",
-    price: ethers.parseEther("200"),
-    limits: {
-      dailyBetLimit: 35,
-      weeklyBetLimit: 200,
-      monthlyMarketCreation: 100,
-      maxPositionSize: ethers.parseEther("50"),
-      maxConcurrentMarkets: 30,
-      withdrawalLimit: ethers.parseEther("500"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 10000
-    }
-  },
-  {
-    tier: MembershipTier.PLATINUM,
-    name: "Friend Market Platinum",
-    description: "Unlimited friend market creation",
-    price: ethers.parseEther("400"),
-    limits: {
-      dailyBetLimit: ethers.MaxUint256,
-      weeklyBetLimit: ethers.MaxUint256,
-      monthlyMarketCreation: ethers.MaxUint256,
-      maxPositionSize: ethers.MaxUint256,
-      maxConcurrentMarkets: ethers.MaxUint256,
-      withdrawalLimit: ethers.MaxUint256,
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 10000
-    }
-  }
-];
+  ];
+}
 
 /**
- * Market Maker tier configurations
+ * Default tiers (legacy export). Deploy scripts that have not been updated to
+ * resolve the network's stablecoin decimals fall back to 6-dec encoding, which
+ * is correct for both Mordor (USC) and Amoy (USDC). NOTE: this is a behavior
+ * change from the previous file, which encoded with 18 decimals — see
+ * buildFriendMarketTiers for the rationale.
  */
-const MARKET_MAKER_TIERS = [
-  {
-    tier: MembershipTier.BRONZE,
-    name: "Market Maker Bronze",
-    description: "Basic market creation capabilities",
-    price: ethers.parseEther("100"),
-    limits: {
-      dailyBetLimit: 10,
-      weeklyBetLimit: 50,
-      monthlyMarketCreation: 5,
-      maxPositionSize: ethers.parseEther("10"),
-      maxConcurrentMarkets: 3,
-      withdrawalLimit: ethers.parseEther("50"),
-      canCreatePrivateMarkets: false,
-      canUseAdvancedFeatures: false,
-      feeDiscount: 0
-    }
-  },
-  {
-    tier: MembershipTier.SILVER,
-    name: "Market Maker Silver",
-    description: "Enhanced market creation with more limits",
-    price: ethers.parseEther("150"),
-    limits: {
-      dailyBetLimit: 25,
-      weeklyBetLimit: 150,
-      monthlyMarketCreation: 15,
-      maxPositionSize: ethers.parseEther("50"),
-      maxConcurrentMarkets: 10,
-      withdrawalLimit: ethers.parseEther("200"),
-      canCreatePrivateMarkets: false,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 500  // 5% discount
-    }
-  },
-  {
-    tier: MembershipTier.GOLD,
-    name: "Market Maker Gold",
-    description: "Professional market creation capabilities",
-    price: ethers.parseEther("250"),
-    limits: {
-      dailyBetLimit: 100,
-      weeklyBetLimit: 500,
-      monthlyMarketCreation: 50,
-      maxPositionSize: ethers.parseEther("200"),
-      maxConcurrentMarkets: 30,
-      withdrawalLimit: ethers.parseEther("1000"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 1000  // 10% discount
-    }
-  },
-  {
-    tier: MembershipTier.PLATINUM,
-    name: "Market Maker Platinum",
-    description: "Unlimited market creation for institutions",
-    price: ethers.parseEther("500"),
-    limits: {
-      dailyBetLimit: ethers.MaxUint256,
-      weeklyBetLimit: ethers.MaxUint256,
-      monthlyMarketCreation: ethers.MaxUint256,
-      maxPositionSize: ethers.MaxUint256,
-      maxConcurrentMarkets: ethers.MaxUint256,
-      withdrawalLimit: ethers.MaxUint256,
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 2000  // 20% discount
-    }
-  }
-];
+const FRIEND_MARKET_TIERS = buildFriendMarketTiers(6);
+const MARKET_MAKER_TIERS = buildMarketMakerTiers(6);
 
 // =============================================================================
 // SALT PREFIXES
@@ -249,6 +306,12 @@ const NETWORK_CONFIG = {
     name: "Mordor Testnet",
     rpcUrl: "https://rpc.mordor.etccooperative.org",
     blockExplorer: "https://etc-mordor.blockscout.com",
+  },
+  amoy: {
+    chainId: 80002,
+    name: "Polygon Amoy",
+    rpcUrl: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+    blockExplorer: "https://amoy.polygonscan.com",
   },
   localhost: {
     chainId: 1337,
@@ -282,7 +345,9 @@ const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 // MAINNET CHAIN IDS (for safety checks)
 // =============================================================================
 
-const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Ethereum Classic Mainnet
+// Polygon mainnet (137) included to block accidental deploys when targeting the
+// Amoy testnet — Amoy is 80002 and is intentionally not in this list.
+const MAINNET_CHAIN_IDS = [1, 61, 137]; // Ethereum Mainnet, ETC Mainnet, Polygon Mainnet
 
 // =============================================================================
 // EXPORTS
@@ -294,6 +359,10 @@ module.exports = {
 
   // Tokens
   TOKENS,
+  STABLECOIN_DECIMALS,
+
+  // Oracle adapters
+  POLYMARKET_CTF,
 
   // Roles
   ROLE_HASHES,
@@ -302,6 +371,8 @@ module.exports = {
   MembershipTier,
   FRIEND_MARKET_TIERS,
   MARKET_MAKER_TIERS,
+  buildFriendMarketTiers,
+  buildMarketMakerTiers,
 
   // Salts
   SALT_PREFIXES,

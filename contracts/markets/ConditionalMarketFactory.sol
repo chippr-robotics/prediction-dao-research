@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "../integrations/ETCSwapV3Integration.sol";
+import "../integrations/DexV3Integration.sol";
 import "../access/TieredRoleManager.sol";
 import "./CTF1155.sol";
 import "../security/NullifierRegistry.sol";
@@ -17,26 +17,27 @@ import "../security/NullifierRegistry.sol";
  * @title ConditionalMarketFactory
  * @notice Automated deployment of pass-fail market pairs using Gnosis CTF standards
  * @dev Creates conditional prediction markets for proposals with role-based access control
- * 
+ *
  * For a practical walkthrough of how this contract works, see:
  * docs/user-guide/conditional-market-rain-example.md
- * 
+ *
  * TRADING INTEGRATION:
- * This contract now integrates with ETC Swap v3 contracts for production-ready DEX trading.
- * The integration uses ETCSwapV3Integration contract for:
+ * This contract integrates with any Uniswap V3-compatible DEX via DexV3Integration:
+ * - ETCSwap on Ethereum Classic / Mordor
+ * - Uniswap V3 on Polygon (or any V3 fork)
  * - Pool creation and initialization
  * - Liquidity provision and management
  * - Token swapping with slippage protection
- * 
+ *
  * Integration approach:
  * 1. ConditionalMarketFactory creates PASS/FAIL token pairs
- * 2. ETCSwapV3Integration creates pools for PASS/collateral and FAIL/collateral trading pairs
- * 3. Liquidity is provided to ETC Swap pools through the integration layer
- * 4. Users trade through ETC Swap's battle-tested DEX infrastructure
+ * 2. DexV3Integration creates pools for PASS/collateral and FAIL/collateral trading pairs
+ * 3. Liquidity is provided to the DEX through the integration layer
+ * 4. Users trade through the DEX's battle-tested V3 infrastructure
  * 5. ConditionalMarketFactory handles final settlement based on oracle outcomes
- * 
+ *
  * Trading modes:
- * - ETCSwap mode: Full decentralized trading via Uniswap v3 pools
+ * - DEX mode: Full decentralized trading via Uniswap V3-compatible pools
  * - Fallback mode: Simplified LMSR for testing and backwards compatibility
  * 
  * RBAC INTEGRATION:
@@ -116,9 +117,9 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
 
     bool private _initialized;
     
-    // ETCSwap v3 integration
-    ETCSwapV3Integration public etcSwapIntegration;
-    bool public useETCSwap;
+    // V3 DEX integration (ETCSwap on Mordor, Uniswap V3 on Polygon, etc.)
+    DexV3Integration public dexIntegration;
+    bool public useDex;
     
     // Role-based access control
     TieredRoleManager public roleManager;
@@ -200,8 +201,16 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         uint256 totalMarketsResolved
     );
     
+    event DexIntegrationUpdated(address indexed integration, bool enabled);
+    /// @dev Legacy alias retained for one release for indexer back-compat. Emitted alongside DexIntegrationUpdated.
     event ETCSwapIntegrationUpdated(address indexed integration, bool enabled);
-    
+
+    event DexPoolsCreated(
+        uint256 indexed marketId,
+        address indexed passPool,
+        address indexed failPool
+    );
+    /// @dev Legacy alias retained for one release for indexer back-compat. Emitted alongside DexPoolsCreated.
     event ETCSwapPoolsCreated(
         uint256 indexed marketId,
         address indexed passPool,
@@ -294,14 +303,28 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     }
     
     /**
-     * @notice Set ETCSwap v3 integration contract
-     * @param _integration Address of ETCSwapV3Integration contract
-     * @param _enabled Whether to enable ETCSwap trading
+     * @notice Set the V3 DEX integration contract
+     * @param _integration Address of DexV3Integration contract
+     * @param _enabled Whether to enable DEX-routed trading
+     */
+    function setDexIntegration(address _integration, bool _enabled) external onlyOwner {
+        require(_integration != address(0), "Invalid integration address");
+        dexIntegration = DexV3Integration(_integration);
+        useDex = _enabled;
+        emit DexIntegrationUpdated(_integration, _enabled);
+        emit ETCSwapIntegrationUpdated(_integration, _enabled);
+    }
+
+    /**
+     * @notice Legacy alias for setDexIntegration. Retained for one release so existing
+     *         deployment scripts and admin tooling continue to work without changes.
+     * @dev Forwards to setDexIntegration.
      */
     function setETCSwapIntegration(address _integration, bool _enabled) external onlyOwner {
         require(_integration != address(0), "Invalid integration address");
-        etcSwapIntegration = ETCSwapV3Integration(_integration);
-        useETCSwap = _enabled;
+        dexIntegration = DexV3Integration(_integration);
+        useDex = _enabled;
+        emit DexIntegrationUpdated(_integration, _enabled);
         emit ETCSwapIntegrationUpdated(_integration, _enabled);
     }
     
@@ -387,22 +410,22 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     }
 
     /**
-     * @notice Create ETCSwap pools for an existing market
+     * @notice Create V3 DEX pools for an existing market
      * @param marketId ID of the market
      * @param initialSqrtPriceX96 Initial price for pools (Q64.96 format)
      * @param fee Fee tier to use (500, 3000, or 10000)
      */
-    function createETCSwapPools(
+    function createDexPools(
         uint256 marketId,
         uint160 initialSqrtPriceX96,
         uint24 fee
-    ) external onlyOwner {
+    ) public onlyOwner {
         require(marketId < marketCount, "Invalid market ID");
-        require(address(etcSwapIntegration) != address(0), "ETCSwap integration not set");
-        
+        require(address(dexIntegration) != address(0), "DEX integration not set");
+
         Market storage market = markets[marketId];
-        
-        (address passPool, address failPool) = etcSwapIntegration.createMarketPools(
+
+        (address passPool, address failPool) = dexIntegration.createMarketPools(
             marketId,
             market.passToken,
             market.failToken,
@@ -410,8 +433,21 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
             fee,
             initialSqrtPriceX96
         );
-        
+
+        emit DexPoolsCreated(marketId, passPool, failPool);
         emit ETCSwapPoolsCreated(marketId, passPool, failPool);
+    }
+
+    /**
+     * @notice Legacy alias for createDexPools. Forwards to the renamed function so
+     *         existing deployment scripts and tooling continue to work.
+     */
+    function createETCSwapPools(
+        uint256 marketId,
+        uint160 initialSqrtPriceX96,
+        uint24 fee
+    ) external onlyOwner {
+        createDexPools(marketId, initialSqrtPriceX96, fee);
     }
 
     /**
@@ -696,8 +732,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     }
 
     /**
-     * @notice Buy outcome tokens via ETCSwap or fallback LMSR
-     * @dev Integrates with ETC Swap v3 when enabled, falls back to simplified LMSR for testing
+     * @notice Buy outcome tokens via the V3 DEX or fallback LMSR
+     * @dev Routes through DexV3Integration when enabled, falls back to simplified LMSR for testing
      * @param marketId ID of the market
      * @param buyPass True to buy PASS tokens, false for FAIL tokens
      * @param amount Amount of collateral to spend
@@ -714,28 +750,27 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         require(block.timestamp < market.tradingEndTime, "Trading period ended");
         require(amount > 0, "Amount must be positive");
 
-        if (useETCSwap && address(etcSwapIntegration) != address(0)) {
-            // Use ETCSwap v3 for actual DEX trading with ERC20 collateral
+        if (useDex && address(dexIntegration) != address(0)) {
             address outcomeToken = buyPass ? market.passToken : market.failToken;
-            
-            // When using ETCSwap, collateral must be an ERC20 token
-            require(market.collateralToken != address(0), "ETCSwap requires ERC20 collateral");
+
+            // DEX-routed trading requires an ERC20 collateral token
+            require(market.collateralToken != address(0), "DEX requires ERC20 collateral");
             require(msg.value == 0, "Send collateral tokens, not ETH");
-            
+
             // Transfer collateral from buyer to this contract
             IERC20(market.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
-            
-            // Approve ETCSwap integration to spend collateral (using forceApprove for safety)
-            IERC20(market.collateralToken).forceApprove(address(etcSwapIntegration), amount);
+
+            // Approve DEX integration to spend collateral (using forceApprove for safety)
+            IERC20(market.collateralToken).forceApprove(address(dexIntegration), amount);
             
             // Calculate minimum output with slippage protection
             // Use quoter to estimate output and apply default slippage tolerance
-            try etcSwapIntegration.quoteBuyTokens(marketId, buyPass, amount) returns (uint256 estimatedOutput) {
+            try dexIntegration.quoteBuyTokens(marketId, buyPass, amount) returns (uint256 estimatedOutput) {
                 // Apply more conservative slippage tolerance (10% for testing with mocks)
-                uint256 minTokenAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 1000);
+                uint256 minTokenAmount = dexIntegration.calculateMinOutput(estimatedOutput, 1000);
                 
                 // Execute swap with slippage protection
-                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
+                DexV3Integration.SwapResult memory result = dexIntegration.buyTokens(
                     marketId,
                     market.collateralToken,
                     outcomeToken,
@@ -747,13 +782,13 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
                 tokenAmount = result.amountOut;
                 
                 // Transfer purchased tokens from this contract to the buyer
-                // (ETCSwap sends tokens to this contract, we forward to buyer)
+                // (DEX sends tokens to this contract, we forward to buyer)
                 IERC20(outcomeToken).safeTransfer(msg.sender, tokenAmount);
             } catch {
                 // If quote fails, use conservative minimum (allow up to 20% slippage for edge cases)
                 uint256 minTokenAmount = (amount * 80) / 100;
                 
-                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.buyTokens(
+                DexV3Integration.SwapResult memory result = dexIntegration.buyTokens(
                     marketId,
                     market.collateralToken,
                     outcomeToken,
@@ -823,8 +858,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     }
     
     /**
-     * @notice Sell outcome tokens via ETCSwap or fallback LMSR
-     * @dev Integrates with ETC Swap v3 when enabled, falls back to simplified LMSR for testing
+     * @notice Sell outcome tokens via the V3 DEX or fallback LMSR
+     * @dev Routes through DexV3Integration when enabled, falls back to simplified LMSR for testing
      * @param marketId ID of the market
      * @param sellPass True to sell PASS tokens, false for FAIL tokens
      * @param tokenAmount Amount of tokens to sell
@@ -841,27 +876,26 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         require(block.timestamp < market.tradingEndTime, "Trading period ended");
         require(tokenAmount > 0, "Amount must be positive");
 
-        if (useETCSwap && address(etcSwapIntegration) != address(0)) {
-            // Use ETCSwap v3 for actual DEX trading with ERC20 collateral
+        if (useDex && address(dexIntegration) != address(0)) {
             address outcomeToken = sellPass ? market.passToken : market.failToken;
-            
-            // When using ETCSwap, collateral must be an ERC20 token
-            require(market.collateralToken != address(0), "ETCSwap requires ERC20 collateral");
-            
+
+            // DEX-routed trading requires an ERC20 collateral token
+            require(market.collateralToken != address(0), "DEX requires ERC20 collateral");
+
             // Transfer tokens from seller to this contract
             IERC20(outcomeToken).safeTransferFrom(msg.sender, address(this), tokenAmount);
-            
-            // Approve ETCSwap integration to spend outcome tokens (using forceApprove for safety)
-            IERC20(outcomeToken).forceApprove(address(etcSwapIntegration), tokenAmount);
+
+            // Approve DEX integration to spend outcome tokens (using forceApprove for safety)
+            IERC20(outcomeToken).forceApprove(address(dexIntegration), tokenAmount);
             
             // Calculate minimum output with slippage protection
             // Use quoter to estimate output and apply default slippage tolerance
-            try etcSwapIntegration.quoteSellTokens(marketId, sellPass, tokenAmount) returns (uint256 estimatedOutput) {
+            try dexIntegration.quoteSellTokens(marketId, sellPass, tokenAmount) returns (uint256 estimatedOutput) {
                 // Apply more conservative slippage tolerance (10% for testing with mocks)
-                uint256 minCollateralAmount = etcSwapIntegration.calculateMinOutput(estimatedOutput, 1000);
+                uint256 minCollateralAmount = dexIntegration.calculateMinOutput(estimatedOutput, 1000);
                 
                 // Execute swap with slippage protection
-                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
+                DexV3Integration.SwapResult memory result = dexIntegration.sellTokens(
                     marketId,
                     outcomeToken,
                     market.collateralToken,
@@ -875,7 +909,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
                 // If quote fails, use conservative minimum (allow up to 20% slippage for edge cases)
                 uint256 minCollateralAmount = (tokenAmount * 80) / 100;
                 
-                ETCSwapV3Integration.SwapResult memory result = etcSwapIntegration.sellTokens(
+                DexV3Integration.SwapResult memory result = dexIntegration.sellTokens(
                     marketId,
                     outcomeToken,
                     market.collateralToken,
