@@ -219,7 +219,11 @@ describe('WalletButton Component - Wagers', () => {
       await user.click(button)
 
       await waitFor(() => {
-        expect(screen.getByText('Get Access - $50 USC per Month')).toBeInTheDocument()
+        // Stable symbol is chain-aware (USC on Mordor, USDC on Polygon Amoy);
+        // chains with no stablecoin defined render the "STABLE" fallback. The
+        // test setup mocks useChainId to ETC mainnet (no stablecoin) so STABLE
+        // is the expected value here — but match all symbols for safety.
+        expect(screen.getByText(/Get Access - \$50 (USC|USDC|STABLE) per Month/)).toBeInTheDocument()
       })
     })
 

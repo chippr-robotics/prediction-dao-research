@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useETCswap } from '../../hooks/useETCswap'
 import { TOKENS, SLIPPAGE_OPTIONS, getExplorerUrl } from '../../constants/etcswap'
 import { useWallet } from '../../hooks'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import './SwapPanel.css'
 
 function SwapPanel() {
@@ -19,7 +20,16 @@ function SwapPanel() {
   } = useETCswap()
   
   const { isConnected, chainId } = useWallet()
-  
+  // Stable symbol changes between USC (Mordor) and USDC (Polygon Amoy). The
+  // internal token key in this swap context is always 'USC' for back-compat —
+  // only the display label tracks the active chain.
+  const { stable: stableSymbol } = useChainTokens()
+
+  // Map an internal token key (kept stable for state/storage) to the chain-aware
+  // display label so users see "USDC" on Amoy where the same key still means USC
+  // on Mordor for back-compat with the swap context.
+  const toLabel = (key) => (key === 'USC' ? stableSymbol : key)
+
   const [swapMode, setSwapMode] = useState('wrap') // 'wrap', 'unwrap', 'swap'
   const [fromToken, setFromToken] = useState('ETC')
   const [toToken, setToToken] = useState('WETC')
@@ -108,7 +118,7 @@ function SwapPanel() {
         const tokenOutAddr = toToken === 'WETC' ? addresses.WETC : addresses.USC_STABLECOIN
         // Execute swap
         await swap(tokenInAddr, tokenOutAddr, amount)
-        setSuccess(`Successfully swapped ${amount} ${fromToken} to ${toToken}`)
+        setSuccess(`Successfully swapped ${amount} ${toLabel(fromToken)} to ${toLabel(toToken)}`)
       }
       
       setAmount('')
@@ -195,10 +205,10 @@ function SwapPanel() {
                 className="token-select"
               >
                 <option value="WETC">WETC</option>
-                <option value="USC">USC</option>
+                <option value="USC">{stableSymbol}</option>
               </select>
             ) : (
-              <div className="token-display">{fromToken}</div>
+              <div className="token-display">{toLabel(fromToken)}</div>
             )}
             <input
               id="from-amount"
@@ -223,7 +233,7 @@ function SwapPanel() {
               fromToken === 'ETC' ? balances.etc :
               fromToken === 'WETC' ? balances.wetc :
               balances.usc
-            } {fromToken}
+            } {toLabel(fromToken)}
           </div>
         </div>
         
@@ -256,10 +266,10 @@ function SwapPanel() {
                 className="token-select"
               >
                 <option value="WETC">WETC</option>
-                <option value="USC">USC</option>
+                <option value="USC">{stableSymbol}</option>
               </select>
             ) : (
-              <div className="token-display">{toToken}</div>
+              <div className="token-display">{toLabel(toToken)}</div>
             )}
             <div className="amount-display">
               {quotingPrice ? '...' : estimatedOutput || '0.0'}
@@ -270,7 +280,7 @@ function SwapPanel() {
               toToken === 'ETC' ? balances.etc :
               toToken === 'WETC' ? balances.wetc :
               balances.usc
-            } {toToken}
+            } {toLabel(toToken)}
           </div>
         </div>
         
@@ -336,7 +346,7 @@ function SwapPanel() {
             rel="noopener noreferrer"
             className="contract-link"
           >
-            USC Contract ↗
+            {stableSymbol} Contract ↗
           </a>
           <a
             href={getExplorerUrl(chainId, addresses.SWAP_ROUTER_02, 'address')}

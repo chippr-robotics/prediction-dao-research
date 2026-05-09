@@ -6,6 +6,7 @@ import { useETCswap } from '../../hooks/useETCswap'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
@@ -96,6 +97,7 @@ function WalletButton({ className = '' }) {
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
   const { friendMarkets, addMarket: addFriendMarket } = useFriendMarkets()
+  const { stable: stableSymbol } = useChainTokens()
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -1003,7 +1005,7 @@ function WalletButton({ className = '' }) {
                   <div className="account-details">
                     <span className="account-address-full">{shortenAddress(address)}</span>
                     <span className="usc-balance">
-                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.usc || 0).toFixed(2)} USC`}
+                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.usc || 0).toFixed(2)} ${stableSymbol}`}
                     </span>
                     <span className="network-info">Chain ID: {chainId}</span>
                   </div>
@@ -1043,7 +1045,7 @@ function WalletButton({ className = '' }) {
                       role="menuitem"
                     >
                       <span aria-hidden="true">🔓</span>
-                      <span>Get Access - $50 USC per Month</span>
+                      <span>{`Get Access - $50 ${stableSymbol} per Month`}</span>
                     </button>
                   </div>
                 )}
@@ -1117,7 +1119,7 @@ function WalletButton({ className = '' }) {
                   role="menuitem"
                 >
                   <span aria-hidden="true">💰</span>
-                  <span>Get USC</span>
+                  <span>{`Get ${stableSymbol}`}</span>
                 </a>
                 <button
                   onClick={handleDisconnect}

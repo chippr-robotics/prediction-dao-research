@@ -4,6 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithUSC } from '../../utils/blockchainService'
 import './RolePurchaseModal.css'
@@ -16,32 +17,31 @@ const MEMBERSHIP_TIERS = {
   PLATINUM: { id: 4, name: 'Platinum', color: '#e5e4e2' }
 }
 
-// Tier benefits for display
-const TIER_BENEFITS = {
-  BRONZE: {
-    dailyBets: 10,
-    monthlyMarkets: 5,
-    maxPosition: '100 USC',
-    features: ['Basic market access', 'Standard support']
-  },
-  SILVER: {
-    dailyBets: 25,
-    monthlyMarkets: 15,
-    maxPosition: '500 USC',
-    features: ['Priority support', 'Advanced analytics']
-  },
-  GOLD: {
-    dailyBets: 50,
-    monthlyMarkets: 30,
-    maxPosition: '2,000 USC',
-    features: ['Premium support', 'Full analytics', 'Private markets']
-  },
-  PLATINUM: {
-    dailyBets: 'Unlimited',
-    monthlyMarkets: 'Unlimited',
-    maxPosition: 'Unlimited',
-    features: ['Dedicated support', 'API access', 'Exclusive features']
+// Tier benefits for display. maxPosition is rendered with the chain stable
+// symbol at runtime via the buildTierBenefits factory below; the numeric
+// amounts here stay constant.
+const TIER_BENEFIT_AMOUNTS = {
+  BRONZE: { dailyBets: 10, monthlyMarkets: 5, maxPositionAmount: '100',
+    features: ['Basic market access', 'Standard support'] },
+  SILVER: { dailyBets: 25, monthlyMarkets: 15, maxPositionAmount: '500',
+    features: ['Priority support', 'Advanced analytics'] },
+  GOLD: { dailyBets: 50, monthlyMarkets: 30, maxPositionAmount: '2,000',
+    features: ['Premium support', 'Full analytics', 'Private markets'] },
+  PLATINUM: { dailyBets: 'Unlimited', monthlyMarkets: 'Unlimited', maxPositionAmount: null,
+    features: ['Dedicated support', 'API access', 'Exclusive features'] },
+}
+
+function buildTierBenefits(stableSymbol) {
+  const out = {}
+  for (const [k, v] of Object.entries(TIER_BENEFIT_AMOUNTS)) {
+    out[k] = {
+      dailyBets: v.dailyBets,
+      monthlyMarkets: v.monthlyMarkets,
+      maxPosition: v.maxPositionAmount ? `${v.maxPositionAmount} ${stableSymbol}` : 'Unlimited',
+      features: v.features,
+    }
   }
+  return out
 }
 
 function RolePurchaseModal({ onClose }) {
@@ -49,6 +49,8 @@ function RolePurchaseModal({ onClose }) {
   const { account, isConnected } = useWeb3()
   const { signer } = useWalletTransactions()
   const { showNotification } = useNotification()
+  const { stable: stableSymbol } = useChainTokens()
+  const TIER_BENEFITS = buildTierBenefits(stableSymbol)
   const [selectedRole, setSelectedRole] = useState(ROLES.FRIEND_MARKET)
   const [selectedTier, setSelectedTier] = useState('BRONZE')
   const [zkPublicKey, setZkPublicKey] = useState('')
@@ -102,7 +104,7 @@ function RolePurchaseModal({ onClose }) {
         // Record the purchase with tier info
         recordRolePurchase(account, selectedRole, {
           price: price,
-          currency: 'USC',
+          currency: stableSymbol,
           tier: selectedTier,
           tierValue: tierValue,
           txHash: receipt.hash,
@@ -206,7 +208,7 @@ function RolePurchaseModal({ onClose }) {
                           {isOwned ? (
                             <span className="role-option-owned-badge">Already Owned</span>
                           ) : (
-                            <span className="role-option-price">from {getRolePrice(roleKey, 'BRONZE')} USC</span>
+                            <span className="role-option-price">from {getRolePrice(roleKey, 'BRONZE')} {stableSymbol}</span>
                           )}
                         </div>
                         <p className="role-option-description">{roleInfo.description}</p>
@@ -260,7 +262,7 @@ function RolePurchaseModal({ onClose }) {
                         <span className="tier-badge" style={{ backgroundColor: tier.color }}>
                           {tier.name}
                         </span>
-                        <span className="tier-price">${tierPrice} USC</span>
+                        <span className="tier-price">${tierPrice} {stableSymbol}</span>
                       </div>
                       <div className="tier-limits">
                         <div className="limit-item">
@@ -302,7 +304,7 @@ function RolePurchaseModal({ onClose }) {
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Price:</span>
-                  <span className="summary-value">${price} USC</span>
+                  <span className="summary-value">${price} {stableSymbol}</span>
                 </div>
                 <div className="summary-row">
                   <span className="summary-label">Duration:</span>
@@ -331,7 +333,7 @@ function RolePurchaseModal({ onClose }) {
             <div className="payment-details">
               <div className="detail-row">
                 <span>Amount:</span>
-                <span>${price} USC</span>
+                <span>${price} {stableSymbol}</span>
               </div>
               <div className="detail-row">
                 <span>Role:</span>

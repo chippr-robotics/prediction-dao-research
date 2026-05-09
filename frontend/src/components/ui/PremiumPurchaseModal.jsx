@@ -4,6 +4,7 @@ import { useWeb3 } from '../../hooks/useWeb3'
 import { useWalletTransactions } from '../../hooks/useWalletManagement'
 import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -43,59 +44,54 @@ const MEMBERSHIP_TIERS = {
   PLATINUM: { id: 4, name: 'Platinum', color: '#e5e4e2' }
 }
 
-// Tier benefits matching TierLimits struct from TierRegistry contract:
-// - dailyBetLimit, weeklyBetLimit, monthlyMarketCreation, maxPositionSize
-// - maxConcurrentMarkets, withdrawalLimit, canCreatePrivateMarkets
-// - canUseAdvancedFeatures, feeDiscount (basis points)
-const TIER_BENEFITS = {
+// Tier benefit amounts matching TierLimits struct from TierRegistry. Position
+// and withdrawal limits are formatted with the chain stablecoin symbol at
+// render time via buildTierBenefits below; the numeric values stay constant.
+const TIER_BENEFIT_AMOUNTS = {
   BRONZE: {
-    dailyBetLimit: 10,
-    weeklyBetLimit: 50,
-    monthlyMarketCreation: 5,
-    maxPositionSize: '100 USC',
-    maxConcurrentMarkets: 3,
-    withdrawalLimit: '500 USC',
-    canCreatePrivateMarkets: false,
-    canUseAdvancedFeatures: false,
-    feeDiscount: 0,
-    duration: '30 days'
+    dailyBetLimit: 10, weeklyBetLimit: 50, monthlyMarketCreation: 5,
+    maxPositionAmount: '100', maxConcurrentMarkets: 3, withdrawalAmount: '500',
+    canCreatePrivateMarkets: false, canUseAdvancedFeatures: false,
+    feeDiscount: 0, duration: '30 days',
   },
   SILVER: {
-    dailyBetLimit: 25,
-    weeklyBetLimit: 125,
-    monthlyMarketCreation: 15,
-    maxPositionSize: '500 USC',
-    maxConcurrentMarkets: 10,
-    withdrawalLimit: '2,000 USC',
-    canCreatePrivateMarkets: false,
-    canUseAdvancedFeatures: true,
-    feeDiscount: 5,
-    duration: '30 days'
+    dailyBetLimit: 25, weeklyBetLimit: 125, monthlyMarketCreation: 15,
+    maxPositionAmount: '500', maxConcurrentMarkets: 10, withdrawalAmount: '2,000',
+    canCreatePrivateMarkets: false, canUseAdvancedFeatures: true,
+    feeDiscount: 5, duration: '30 days',
   },
   GOLD: {
-    dailyBetLimit: 50,
-    weeklyBetLimit: 250,
-    monthlyMarketCreation: 30,
-    maxPositionSize: '2,000 USC',
-    maxConcurrentMarkets: 25,
-    withdrawalLimit: '10,000 USC',
-    canCreatePrivateMarkets: true,
-    canUseAdvancedFeatures: true,
-    feeDiscount: 10,
-    duration: '30 days'
+    dailyBetLimit: 50, weeklyBetLimit: 250, monthlyMarketCreation: 30,
+    maxPositionAmount: '2,000', maxConcurrentMarkets: 25, withdrawalAmount: '10,000',
+    canCreatePrivateMarkets: true, canUseAdvancedFeatures: true,
+    feeDiscount: 10, duration: '30 days',
   },
   PLATINUM: {
-    dailyBetLimit: 'Unlimited',
-    weeklyBetLimit: 'Unlimited',
-    monthlyMarketCreation: 'Unlimited',
-    maxPositionSize: 'Unlimited',
-    maxConcurrentMarkets: 'Unlimited',
-    withdrawalLimit: 'Unlimited',
-    canCreatePrivateMarkets: true,
-    canUseAdvancedFeatures: true,
-    feeDiscount: 20,
-    duration: '30 days'
+    dailyBetLimit: 'Unlimited', weeklyBetLimit: 'Unlimited', monthlyMarketCreation: 'Unlimited',
+    maxPositionAmount: null, maxConcurrentMarkets: 'Unlimited', withdrawalAmount: null,
+    canCreatePrivateMarkets: true, canUseAdvancedFeatures: true,
+    feeDiscount: 20, duration: '30 days',
+  },
+}
+
+function buildTierBenefits(stableSymbol) {
+  const fmt = (amount) => (amount ? `${amount} ${stableSymbol}` : 'Unlimited')
+  const out = {}
+  for (const [k, v] of Object.entries(TIER_BENEFIT_AMOUNTS)) {
+    out[k] = {
+      dailyBetLimit: v.dailyBetLimit,
+      weeklyBetLimit: v.weeklyBetLimit,
+      monthlyMarketCreation: v.monthlyMarketCreation,
+      maxPositionSize: fmt(v.maxPositionAmount),
+      maxConcurrentMarkets: v.maxConcurrentMarkets,
+      withdrawalLimit: fmt(v.withdrawalAmount),
+      canCreatePrivateMarkets: v.canCreatePrivateMarkets,
+      canUseAdvancedFeatures: v.canUseAdvancedFeatures,
+      feeDiscount: v.feeDiscount,
+      duration: v.duration,
+    }
   }
+  return out
 }
 
 // Extended role information with features and fund destination
@@ -181,8 +177,9 @@ const ROLE_BENEFIT_CATEGORIES = {
   }
 }
 
-// Note: Tier prices are now fetched from TierRegistry contract via useTierPrices hook
-// All prices are in USC (stablecoin) - ETC is only used for gas
+// Note: Tier prices are fetched from TierRegistry contract via useTierPrices.
+// All prices are denominated in the chain stablecoin (USC on Mordor, USDC on
+// Polygon Amoy); the chain native token is only used for gas.
 
 /**
  * RoleBenefitsDisplay - Renders role-specific tier benefits
@@ -190,6 +187,8 @@ const ROLE_BENEFIT_CATEGORIES = {
  */
 function RoleBenefitsDisplay({ roleKey, tierName, chainLimits }) {
   const category = ROLE_BENEFIT_CATEGORIES[roleKey]
+  const { stable: stableSymbol } = useChainTokens()
+  const TIER_BENEFITS = useMemo(() => buildTierBenefits(stableSymbol), [stableSymbol])
 
   if (!category) return null
 
@@ -280,6 +279,8 @@ function RoleBenefitsDisplay({ roleKey, tierName, chainLimits }) {
  */
 function RoleBenefitFeatures({ roleKey, tierName, chainLimits }) {
   const category = ROLE_BENEFIT_CATEGORIES[roleKey]
+  const { stable: stableSymbol } = useChainTokens()
+  const TIER_BENEFITS = useMemo(() => buildTierBenefits(stableSymbol), [stableSymbol])
 
   if (!category) return null
 
@@ -380,6 +381,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
   const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { signer: _signer } = useWalletTransactions()
   const { showNotification } = useNotification()
+  const { stable: stableSymbol } = useChainTokens()
+  const TIER_BENEFITS = useMemo(() => buildTierBenefits(stableSymbol), [stableSymbol])
 
   // Normalize preselectedRole - ensure it's a string, not an object
   // This prevents crashes when an object is accidentally passed instead of a role name string
@@ -646,8 +649,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
       const transactionCount = selectedRoles.length
       const notificationMessage =
         transactionCount > 1
-          ? `You will need to confirm ${transactionCount} separate transactions (${tierName} tier, total ${pricing.total} USC).`
-          : `Please confirm the transaction in your wallet (${tierName} tier, ${pricing.total} USC)`
+          ? `You will need to confirm ${transactionCount} separate transactions (${tierName} tier, total ${pricing.total} ${stableSymbol}).`
+          : `Please confirm the transaction in your wallet (${tierName} tier, ${pricing.total} ${stableSymbol})`
 
       showNotification(notificationMessage, 'info', 10000)
 
@@ -666,7 +669,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
           // Record the purchase
           recordRolePurchase(account, roleKey, {
             price: price,
-            currency: 'USC',
+            currency: stableSymbol,
             tier: selectedTier,
             tierValue: tierValue,
             txHash: receipt.hash,
@@ -862,7 +865,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                                   <span className="ppm-role-name">{roleInfo.name}</span>
                                   <span className="ppm-role-tagline">{details?.tagline}</span>
                                 </div>
-                                <span className="ppm-role-price">from ${bronzePrice} USC</span>
+                                <span className="ppm-role-price">from ${bronzePrice} {stableSymbol}</span>
                               </div>
 
                               <ul className="ppm-role-features">
@@ -994,7 +997,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                               >
                                 {tier.name}
                               </span>
-                              <span className="ppm-tier-price">${tierTotal} USC</span>
+                              <span className="ppm-tier-price">${tierTotal} {stableSymbol}</span>
                             </div>
 
                             {/* Single role: show that role's specific benefits */}
@@ -1132,7 +1135,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                                 <span className="ppm-review-role-duration">{tierBenefits?.duration}</span>
                               </div>
                             </div>
-                            <span className="ppm-review-role-price">${rolePrice} USC</span>
+                            <span className="ppm-review-role-price">${rolePrice} {stableSymbol}</span>
                           </div>
                         )
                       })}
@@ -1142,7 +1145,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                   <div className="ppm-review-pricing">
                     <div className="ppm-review-pricing-row ppm-total">
                       <span>Total ({pricing.roleCount} transaction{pricing.roleCount > 1 ? 's' : ''})</span>
-                      <span>${pricing.total.toFixed(2)} USC</span>
+                      <span>${pricing.total.toFixed(2)} {stableSymbol}</span>
                     </div>
                   </div>
 
@@ -1336,7 +1339,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                   </>
                 ) : (
                   <>
-                    Confirm Purchase (${pricing.total.toFixed(2)} USC)
+                    Confirm Purchase (${pricing.total.toFixed(2)} {stableSymbol})
                   </>
                 )}
               </button>

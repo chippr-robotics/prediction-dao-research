@@ -1,59 +1,78 @@
+import { useEffect, useRef } from 'react'
 import { useSwitchChain } from 'wagmi'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { PRIMARY_CHAIN_ID, getNetwork } from '../../config/networks'
+import './LimitedFunctionalityBanner.css'
 
 /**
- * Top-of-app banner shown when the user is connected to a chain marked
- * `limitedFunctionality: true` in networks.js (currently Mordor). Explains
- * which features are missing and offers a one-click switch to the primary
- * chain (Polygon Amoy).
- *
- * Renders nothing when on a fully-supported chain.
+ * Banner shown when the user is connected to a chain marked
+ * `limitedFunctionality: true` in networks.js (Mordor today). Renders nothing
+ * on fully-supported chains. Stacks below the DevelopmentWarningBanner via the
+ * shared --dev-banner-height CSS variable, and publishes its own height as
+ * --limited-banner-height so the Header can offset by the combined stack.
  */
-export function LimitedFunctionalityBanner() {
+function LimitedFunctionalityBanner() {
   const { limitedFunctionality, networkName } = useChainTokens()
-  const { switchChain } = useSwitchChain()
+  const { switchChain, isPending } = useSwitchChain()
+  const ref = useRef(null)
+
+  // Publish the rendered height as a CSS variable so the Header (and any other
+  // sticky/fixed surface) can lay out below the full banner stack. When not
+  // rendered, the variable is removed so the Header sits at top: 0.
+  useEffect(() => {
+    if (!limitedFunctionality) {
+      document.documentElement.style.removeProperty('--limited-banner-height')
+      return
+    }
+
+    const apply = () => {
+      const h = ref.current?.getBoundingClientRect().height
+      if (h) {
+        document.documentElement.style.setProperty('--limited-banner-height', `${Math.ceil(h)}px`)
+      }
+    }
+    apply()
+    window.addEventListener('resize', apply)
+    return () => {
+      window.removeEventListener('resize', apply)
+      document.documentElement.style.removeProperty('--limited-banner-height')
+    }
+  }, [limitedFunctionality])
 
   if (!limitedFunctionality) return null
 
   const primary = getNetwork(PRIMARY_CHAIN_ID)
   const primaryName = primary?.name || 'Polygon Amoy'
 
+  const handleSwitch = () => {
+    if (typeof switchChain === 'function') {
+      switchChain({ chainId: PRIMARY_CHAIN_ID })
+    }
+  }
+
   return (
     <div
+      ref={ref}
+      className="limited-functionality-banner"
       role="status"
-      style={{
-        padding: '0.75rem 1rem',
-        background: '#FFF4CE',
-        color: '#5A4500',
-        borderBottom: '1px solid #E0C97A',
-        display: 'flex',
-        gap: '0.75rem',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        fontSize: '0.9rem',
-      }}
+      aria-live="polite"
     >
-      <span>
-        You're connected to <strong>{networkName}</strong>. Polymarket-pegged
-        side bets aren't available here — switch to <strong>{primaryName}</strong> for
-        full functionality.
-      </span>
-      <button
-        type="button"
-        onClick={() => switchChain?.({ chainId: PRIMARY_CHAIN_ID })}
-        style={{
-          padding: '0.4rem 0.75rem',
-          background: '#5A4500',
-          color: '#FFF4CE',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          fontWeight: 600,
-        }}
-      >
-        Switch to {primaryName}
-      </button>
+      <div className="limited-functionality-banner__content">
+        <span className="limited-functionality-banner__icon" aria-hidden="true">⚠️</span>
+        <span className="limited-functionality-banner__text">
+          You're connected to <strong>{networkName}</strong>. Polymarket-pegged
+          side bets aren't available here — switch to <strong>{primaryName}</strong> for
+          full functionality.
+        </span>
+        <button
+          type="button"
+          className="limited-functionality-banner__action"
+          onClick={handleSwitch}
+          disabled={isPending}
+        >
+          {isPending ? 'Switching…' : `Switch to ${primaryName}`}
+        </button>
+      </div>
     </div>
   )
 }

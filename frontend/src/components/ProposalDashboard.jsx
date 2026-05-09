@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import './ProposalDashboard.css'
 import { useEthers } from '../hooks/useWeb3'
+import { useChainTokens } from '../hooks/useChainTokens'
 import ProposalDetailView from './ProposalDetailView'
 
 const ProposalRegistryABI = [
@@ -11,6 +12,7 @@ const ProposalRegistryABI = [
 
 function ProposalDashboard({ daos }) {
   const { provider } = useEthers()
+  const { native: nativeSymbol } = useChainTokens()
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, pending, completed
@@ -170,7 +172,7 @@ function ProposalDashboard({ daos }) {
               <div className="proposal-details">
                 <div className="detail-item">
                   <span className="detail-label">Funding:</span>
-                  <span className="detail-value">{formatAmount(proposal.fundingAmount)} ETC</span>
+                  <span className="detail-value">{formatAmount(proposal.fundingAmount)} {nativeSymbol}</span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Submitted:</span>
