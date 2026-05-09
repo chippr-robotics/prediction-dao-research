@@ -1,67 +1,29 @@
 import { http, createConfig } from 'wagmi'
 import { injected, walletConnect } from 'wagmi/connectors'
+import { NETWORKS, getCurrentChainId, getNetwork } from './config/networks'
 
-// Define Ethereum Classic mainnet
-const ethereumClassic = {
-  id: 61,
-  name: 'Ethereum Classic',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Ether',
-    symbol: 'ETC',
-  },
+// Chain definitions are derived from the per-chain config in
+// frontend/src/config/networks.js. This keeps wagmi, thirdweb, the block
+// explorer config, and the swap context aligned on a single source of truth.
+const toViemChain = (n) => ({
+  id: n.chainId,
+  name: n.name,
+  nativeCurrency: n.nativeCurrency,
   rpcUrls: {
-    default: { http: ['https://etc.rivet.link'] },
-    public: { http: ['https://etc.rivet.link'] },
+    default: { http: [n.rpcUrl] },
+    public: { http: [n.rpcUrl] },
   },
-  blockExplorers: {
-    default: { name: 'Blockscout', url: 'https://etc.blockscout.com' },
-  },
-  testnet: false,
-}
+  blockExplorers: n.explorer?.baseUrl
+    ? { default: { name: n.explorer.name, url: n.explorer.baseUrl } }
+    : undefined,
+  testnet: n.isTestnet,
+})
 
-// Define Mordor testnet
-const mordor = {
-  id: 63,
-  name: 'Mordor',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Mordor Ether',
-    symbol: 'METC',
-  },
-  rpcUrls: {
-    default: { http: ['https://rpc.mordor.etccooperative.org'] },
-    public: { http: ['https://rpc.mordor.etccooperative.org'] },
-  },
-  blockExplorers: {
-    default: { name: 'Blockscout', url: 'https://etc-mordor.blockscout.com' },
-  },
-  testnet: true,
-}
+const networkId = getCurrentChainId()
 
-// Define Hardhat local network (for development)
-const hardhat = {
-  id: 1337,
-  name: 'Hardhat',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Ether',
-    symbol: 'ETH',
-  },
-  rpcUrls: {
-    default: { http: ['http://127.0.0.1:8545'] },
-    public: { http: ['http://127.0.0.1:8545'] },
-  },
-  testnet: true,
-}
-
-// Get network ID from environment or default to Mordor testnet
-const networkId = import.meta.env.VITE_NETWORK_ID 
-  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
-  : 63
-
-// Get RPC URL from environment
-const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
+// RPC URL override (legacy env var preserved for back-compat with existing
+// deployments that set VITE_RPC_URL when targeting Mordor).
+const rpcUrl = import.meta.env.VITE_RPC_URL || getNetwork(networkId).rpcUrl
 
 // Get WalletConnect project ID from environment
 // Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
@@ -100,8 +62,18 @@ const resolveAppUrl = () => {
 
 const appUrl = resolveAppUrl()
 
-// Define supported chains
-const chains = [ethereumClassic, mordor, hardhat]
+// All chains in NETWORKS are advertised to wagmi. The user's connected chain
+// must be one of these for the app to function.
+const chains = Object.values(NETWORKS).map(toViemChain)
+
+// Per-chain transports. The active network gets its RPC overridable via
+// VITE_RPC_URL; everything else uses the chain's default URL.
+const transports = Object.fromEntries(
+  Object.values(NETWORKS).map((n) => [
+    n.chainId,
+    n.chainId === networkId ? http(rpcUrl) : http(n.rpcUrl),
+  ])
+)
 
 // Create wagmi config
 export const config = createConfig({
@@ -123,25 +95,13 @@ export const config = createConfig({
       showQrModal: true,
     }),
   ],
-  transports: {
-    [ethereumClassic.id]: http(),
-    [mordor.id]: http(rpcUrl),
-    [hardhat.id]: http('http://localhost:8545'),
-  },
+  transports,
 })
 
 // Helper to get expected chain info
 export const getExpectedChain = () => {
-  switch (networkId) {
-    case 61:
-      return ethereumClassic
-    case 63:
-      return mordor
-    case 1337:
-      return hardhat
-    default:
-      return mordor
-  }
+  const network = getNetwork(networkId)
+  return toViemChain(network)
 }
 
 export const EXPECTED_CHAIN_ID = networkId

@@ -5,6 +5,7 @@ import { useNotification } from '../hooks/useUI'
 import { useEnsResolution } from '../hooks/useEnsResolution'
 import { useAdminContracts, CONTRACT_STATE_REFRESH_INTERVAL } from '../hooks/useAdminContracts'
 import { useTreasuryVault } from '../hooks/useTreasuryVault'
+import { useChainTokens } from '../hooks/useChainTokens'
 import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
@@ -33,6 +34,11 @@ function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
   const { account, signer, provider } = useWeb3()
   const { showNotification } = useNotification()
+  // Native-token symbol for the connected chain. The 'ETC' string in
+  // withdrawalData.tokenType is an internal selector value (kept stable for
+  // form/state); user-facing labels render via nativeSymbol so they read
+  // ETC on Mordor and MATIC on Polygon Amoy.
+  const { native: nativeSymbol } = useChainTokens()
   const {
     isLoading,
     // error is available but handled via showNotification
@@ -330,16 +336,16 @@ function AdminPanel() {
         ? parseFloat(treasuryState.fairWinsBalance || '0')
         : parseFloat(treasuryState.ethBalance || '0')
     } else {
-      // RoleManager only has ETC
+      // RoleManager only holds the chain native token
       if (isTokenWithdrawal) {
-        showNotification('RoleManager only holds ETC. Select Treasury Vault for token withdrawals.', 'error')
+        showNotification(`RoleManager only holds ${nativeSymbol}. Select Treasury Vault for token withdrawals.`, 'error')
         return
       }
       availableBalance = parseFloat(contractState.contractBalance || '0')
     }
 
     if (amountNum > availableBalance) {
-      const unit = isTokenWithdrawal ? 'FWN' : 'ETC'
+      const unit = isTokenWithdrawal ? 'FWN' : nativeSymbol
       const source = isFromTreasury ? 'Treasury Vault' : 'RoleManager'
       showNotification(`Withdrawal amount exceeds ${source} balance (${availableBalance} ${unit})`, 'error')
       return
@@ -627,7 +633,7 @@ function AdminPanel() {
                   </div>
                   <div className="status-row">
                     <span className="status-label">Contract Balance</span>
-                    <span className="status-value">{contractState.contractBalance} ETC</span>
+                    <span className="status-value">{contractState.contractBalance} {nativeSymbol}</span>
                   </div>
                   <div className="status-row">
                     <span className="status-label">Network</span>
@@ -1047,7 +1053,7 @@ function AdminPanel() {
                   <div className="balance-item">
                     <div className="balance-display">
                       <span className="balance-value">{contractState.contractBalance}</span>
-                      <span className="balance-unit">ETC</span>
+                      <span className="balance-unit">{nativeSymbol}</span>
                     </div>
                     <span className="balance-label">From Tier Purchases</span>
                   </div>
@@ -1069,7 +1075,7 @@ function AdminPanel() {
                     <div className="balance-item">
                       <div className="balance-display">
                         <span className="balance-value">{contractState.friendMarketBalance}</span>
-                        <span className="balance-unit">ETC</span>
+                        <span className="balance-unit">{nativeSymbol}</span>
                       </div>
                       <span className="balance-label">From Market Stakes</span>
                     </div>
@@ -1085,7 +1091,7 @@ function AdminPanel() {
                         try {
                           setPendingTx(true)
                           await withdrawFromFriendMarketFactory()
-                          showNotification(`Successfully withdrew ${contractState.friendMarketBalance} ETC`, 'success')
+                          showNotification(`Successfully withdrew ${contractState.friendMarketBalance} ${nativeSymbol}`, 'success')
                         } catch (err) {
                           showNotification(err.message, 'error')
                         } finally {
@@ -1094,7 +1100,7 @@ function AdminPanel() {
                       }}
                       disabled={pendingTx || isLoading}
                     >
-                      {pendingTx ? 'Withdrawing...' : `Withdraw ${contractState.friendMarketBalance} ETC`}
+                      {pendingTx ? 'Withdrawing...' : `Withdraw ${contractState.friendMarketBalance} ${nativeSymbol}`}
                     </button>
                   )}
                 </div>
@@ -1111,7 +1117,7 @@ function AdminPanel() {
                     <div className="balance-item">
                       <div className="balance-display">
                         <span className="balance-value">{treasuryState.ethBalance}</span>
-                        <span className="balance-unit">ETC</span>
+                        <span className="balance-unit">{nativeSymbol}</span>
                       </div>
                       <span className="balance-label">Native Currency</span>
                     </div>
@@ -1145,7 +1151,7 @@ function AdminPanel() {
                       <span className="limit-label">ETC Transaction Limit</span>
                       <span className="limit-value">
                         {parseFloat(treasuryState.ethTransactionLimit) > 0
-                          ? `${treasuryState.ethTransactionLimit} ETC`
+                          ? `${treasuryState.ethTransactionLimit} ${nativeSymbol}`
                           : 'Unlimited'}
                       </span>
                     </div>
@@ -1153,7 +1159,7 @@ function AdminPanel() {
                       <span className="limit-label">ETC Period Allowance</span>
                       <span className="limit-value">
                         {treasuryState.ethRateLimitPeriod > 0
-                          ? `${treasuryState.ethRemainingAllowance} / ${treasuryState.ethPeriodLimit} ETC`
+                          ? `${treasuryState.ethRemainingAllowance} / ${treasuryState.ethPeriodLimit} ${nativeSymbol}`
                           : 'Unlimited'}
                       </span>
                     </div>
@@ -1217,9 +1223,9 @@ function AdminPanel() {
                       }))}
                       className="admin-select"
                     >
-                      <option value="ROLEMANAGER">Tier Revenue (RoleManager) - {contractState.contractBalance} ETC</option>
+                      <option value="ROLEMANAGER">Tier Revenue (RoleManager) - {contractState.contractBalance} {nativeSymbol}</option>
                       {isTreasuryAvailable && (
-                        <option value="TREASURY">Treasury Vault - {treasuryState.ethBalance} ETC</option>
+                        <option value="TREASURY">Treasury Vault - {treasuryState.ethBalance} {nativeSymbol}</option>
                       )}
                     </select>
                   </div>
@@ -1234,7 +1240,7 @@ function AdminPanel() {
                         onChange={(e) => setWithdrawalData(prev => ({ ...prev, tokenType: e.target.value, amount: '' }))}
                         className="admin-select"
                       >
-                        <option value="ETC">ETC (Native Currency)</option>
+                        <option value="ETC">{nativeSymbol} (Native Currency)</option>
                         <option value="FAIRWINS">FWN (FairWins Token) - {treasuryState.fairWinsBalance} FWN</option>
                       </select>
                     </div>
@@ -1276,7 +1282,7 @@ function AdminPanel() {
 
                   <div className="form-group">
                     <label htmlFor="withdraw-amount">
-                      Amount ({withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : 'ETC'})
+                      Amount ({withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : nativeSymbol})
                     </label>
                     <div className="input-with-action">
                       <input
@@ -1317,7 +1323,7 @@ function AdminPanel() {
                   <button
                     onClick={() => {
                       const sourceLabel = withdrawalData.source === 'TREASURY' ? 'Treasury Vault' : 'RoleManager (Tier Revenue)'
-                      const tokenLabel = withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : 'ETC'
+                      const tokenLabel = withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : nativeSymbol
                       setConfirmAction({
                         title: 'Confirm Withdrawal',
                         message: `You are about to withdraw ${withdrawalData.amount} ${tokenLabel} from ${sourceLabel} to ${isWithdrawalEns ? `${withdrawalData.toAddress} (${shortenAddress(resolvedWithdrawalAddress)})` : shortenAddress(resolvedWithdrawalAddress || withdrawalData.toAddress)}.`,

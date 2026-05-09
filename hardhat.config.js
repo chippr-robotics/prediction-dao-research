@@ -241,6 +241,13 @@ module.exports = {
       // Mount floppy and set FLOPPY_KEYSTORE_PASSWORD to use
       accounts: floppyKeys,
     },
+    amoy: {
+      // Polymarket testnet (Polygon Amoy). Co-locating here lets friend markets
+      // settle by referenced lookup against Polymarket's CTF without a bridge.
+      url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      chainId: 80002,
+      accounts: floppyKeys,
+    },
     // Example: Mainnet with floppy keystore (uncomment when ready to use)
     // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)
     // "mainnet-floppy": {
@@ -280,8 +287,9 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
-      'mordor': 'empty'
-   },
+      'mordor': 'empty',
+      'amoy': process.env.POLYGONSCAN_API_KEY || 'empty',
+    },
     customChains: [
       {
         network: "mordor",
@@ -289,6 +297,14 @@ module.exports = {
         urls: {
           apiURL: "https://etc-mordor.blockscout.com/api",
           browserURL: "https://etc-mordor.blockscout.com"
+        }
+      },
+      {
+        network: "amoy",
+        chainId: 80002,
+        urls: {
+          apiURL: "https://api-amoy.polygonscan.com/api",
+          browserURL: "https://amoy.polygonscan.com"
         }
       }
     ]

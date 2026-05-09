@@ -1,24 +1,35 @@
 /**
- * Blockscout Block Explorer Configuration
+ * Block Explorer Configuration
  *
- * Centralized configuration for Blockscout URLs across the application.
- * All explorer links should use these utilities to ensure consistency.
+ * Centralized utilities for explorer URLs. The actual per-chain base URLs are
+ * defined in frontend/src/config/networks.js — this file derives from there so
+ * adding a new chain only requires touching one config.
+ *
+ * The "Blockscout" naming in some helpers is historical (the app started on
+ * ETC, which uses Blockscout). On Polygon Amoy the explorer is Polygonscan,
+ * but the URL-shape helpers below are compatible with both.
  */
 
-// Blockscout base URLs by chain ID
-export const BLOCKSCOUT_URLS = {
-  61: 'https://etc.blockscout.com',      // ETC Mainnet
-  63: 'https://etc-mordor.blockscout.com', // Mordor Testnet
-}
+import { NETWORKS, getNetwork } from './networks'
+
+// Base URLs by chain ID, derived from NETWORKS. Preserved as a named export
+// for any consumer that read the constant directly.
+export const BLOCKSCOUT_URLS = Object.fromEntries(
+  Object.values(NETWORKS)
+    .filter((n) => n.explorer?.baseUrl)
+    .map((n) => [n.chainId, n.explorer.baseUrl])
+)
 
 /**
- * Get the Blockscout base URL for a given chain ID
- * @param {number} chainId - The chain ID (61 for mainnet, 63 for Mordor)
- * @returns {string} The Blockscout base URL
+ * Get the explorer base URL for a given chain ID. Falls back to the configured
+ * primary chain when an unknown chainId is passed.
  */
-export const getBlockscoutBaseUrl = (chainId) => {
-  return BLOCKSCOUT_URLS[chainId] || BLOCKSCOUT_URLS[63] // Default to Mordor
+export const getExplorerBaseUrl = (chainId) => {
+  return getNetwork(chainId)?.explorer?.baseUrl || ''
 }
+
+// Legacy alias preserved for back-compat with existing call sites.
+export const getBlockscoutBaseUrl = getExplorerBaseUrl
 
 /**
  * Get the full Blockscout URL for an address, transaction, or block

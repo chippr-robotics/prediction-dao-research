@@ -14,6 +14,7 @@ import {
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
+import { useChainTokens } from '../../hooks/useChainTokens'
 
 // Fallback so the UI renders even if the enum export is missing in some environments
 const ResolutionType = _ResolutionType ?? {
@@ -22,6 +23,7 @@ const ResolutionType = _ResolutionType ?? {
   Receiver: 2,
   ThirdParty: 3,
   AutoPegged: 4,
+  PolymarketOracle: 5,
 }
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import TransactionProgress from './TransactionProgress'
@@ -95,6 +97,12 @@ function FriendMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+
+  // Per-chain capabilities — drives which resolution-type options the user
+  // sees. Polymarket-pegged side bets only render on chains where the
+  // Polymarket CTF is reachable (Amoy today; not Mordor).
+  const { capabilities, networkName } = useChainTokens()
+  const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
 
   // Built-in market creation handler used when no external onCreate is provided
   const { createFriendMarket } = useFriendMarketCreation()
@@ -1500,6 +1508,9 @@ function FriendMarketsModal({
                           <option value={ResolutionType.Receiver}>Opponent Only</option>
                           <option value={ResolutionType.ThirdParty}>Third Party Arbitrator</option>
                           <option value={ResolutionType.AutoPegged}>Linked Wager (Auto)</option>
+                          {polymarketSidebetsEnabled && (
+                            <option value={ResolutionType.PolymarketOracle}>Polymarket (Settle by Reference)</option>
+                          )}
                         </select>
                         <span className="fm-hint">
                           {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the wager'}
@@ -1507,6 +1518,12 @@ function FriendMarketsModal({
                           {formData.resolutionType === ResolutionType.Receiver && 'Only your opponent can resolve the wager'}
                           {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
                           {formData.resolutionType === ResolutionType.AutoPegged && 'Resolution follows a linked public wager'}
+                          {formData.resolutionType === ResolutionType.PolymarketOracle && 'Settles automatically when the linked Polymarket condition resolves'}
+                          {!polymarketSidebetsEnabled && (
+                            <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
+                              Polymarket-pegged settlement is unavailable on {networkName}. Switch to Polygon Amoy to use it.
+                            </em>
+                          )}
                         </span>
                       </div>
                     )}

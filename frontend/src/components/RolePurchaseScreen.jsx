@@ -1,20 +1,22 @@
 import { useState, useMemo } from 'react'
 import { useWallet, useWalletRoles } from '../hooks'
 import { useNotification } from '../hooks/useUI'
+import { useChainTokens } from '../hooks/useChainTokens'
 import { recordRolePurchase } from '../utils/roleStorage'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import './RolePurchaseScreen.css'
 
 // Payment configuration
 const PAYMENT_RECEIVER_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' // Example payment address
-const PAYMENT_TOKEN = 'ETC' // ETC for payments
 
-// Individual role prices in ETC - Bronze tier (entry level from RBAC_SMART_CONTRACTS.md)
-// Higher tiers (Silver, Gold, Platinum) available with increased limits
+// Bronze-tier role prices, denominated in the chain stablecoin (USC on Mordor,
+// USDC on Polygon Amoy). Higher tiers (Silver, Gold, Platinum) are available
+// on-chain with larger limits — the on-chain authoritative prices are read
+// via useTierPrices; these values are display fallbacks.
 const ROLE_PRICES = {
-  [ROLES.MARKET_MAKER]: 100,      // Bronze: 100 ETC (Silver: 150, Gold: 250, Platinum: 500)
-  [ROLES.CLEARPATH_USER]: 250,    // Bronze: 250 ETC (Silver: 200, Gold: 350, Platinum: 750)  
-  [ROLES.TOKENMINT]: 150,         // Bronze: 150 ETC (Silver: 200, Gold: 350, Platinum: 600)
+  [ROLES.MARKET_MAKER]: 100,
+  [ROLES.CLEARPATH_USER]: 250,
+  [ROLES.TOKENMINT]: 150,
 }
 
 // Bundle discount percentage
@@ -26,6 +28,8 @@ function RolePurchaseScreen() {
   const { address, isConnected } = useWallet()
   const { hasRole, grantRole } = useWalletRoles()
   const { showNotification } = useNotification()
+  // Role prices are denominated in the chain stablecoin; symbol tracks chain.
+  const { stable: paymentToken } = useChainTokens()
   
   const [selectedProducts, setSelectedProducts] = useState(new Set())
   const [isPurchasing, setIsPurchasing] = useState(false)
@@ -191,7 +195,7 @@ function RolePurchaseScreen() {
       for (const role of rolesToGrant) {
         recordRolePurchase(address, role, {
           price: ROLE_PRICES[role],
-          currency: PAYMENT_TOKEN,
+          currency: paymentToken,
           txHash: txHash,
           bundlePurchase: selectedItems[0].startsWith('bundle-')
         })
@@ -216,7 +220,7 @@ function RolePurchaseScreen() {
     // const tx = await contract.purchaseRoles({ value: ethers.utils.parseUnits(amount.toString(), 6) })
     // await tx.wait()
     
-    console.log(`Simulated payment: ${amount} ${PAYMENT_TOKEN} from ${fromAddress} to ${PAYMENT_RECEIVER_ADDRESS}`)
+    console.log(`Simulated payment: ${amount} ${paymentToken} from ${fromAddress} to ${PAYMENT_RECEIVER_ADDRESS}`)
   }
 
   const handleComplete = () => {
@@ -261,9 +265,9 @@ function RolePurchaseScreen() {
                       </p>
                     </div>
                     <div className="bundle-pricing">
-                      <div className="original-price">{bundle.basePrice} {PAYMENT_TOKEN}</div>
-                      <div className="bundle-price">{bundle.price} {PAYMENT_TOKEN}</div>
-                      <div className="savings-badge">Save {bundle.savings} {PAYMENT_TOKEN} ({Math.round(bundle.discount * 100)}% off)</div>
+                      <div className="original-price">{`${bundle.basePrice} ${paymentToken}`}</div>
+                      <div className="bundle-price">{`${bundle.price} ${paymentToken}`}</div>
+                      <div className="savings-badge">{`Save ${bundle.savings} ${paymentToken} (${Math.round(bundle.discount * 100)}% off)`}</div>
                     </div>
                   </div>
                   
@@ -296,14 +300,14 @@ function RolePurchaseScreen() {
                     {role.owned && <div className="owned-badge">Owned</div>}
                     <div className="product-header">
                       <h3>{role.name}</h3>
-                      <div className="product-price">{role.price} {PAYMENT_TOKEN}</div>
+                      <div className="product-price">{`${role.price} ${paymentToken}`}</div>
                     </div>
                     <p className="product-description">{role.description}</p>
                     <div className="product-tier-badge">Bronze Tier</div>
                     <div className="product-features">
                       <h4>Bronze Tier Limits:</h4>
                       <ul>
-                        {getFeaturesList(role.key).map((feature, idx) => (
+                        {getFeaturesList(role.key, paymentToken).map((feature, idx) => (
                           <li key={idx}>{feature}</li>
                         ))}
                       </ul>
@@ -327,11 +331,11 @@ function RolePurchaseScreen() {
                     <div className="bundle-header">
                       <h3>{bundle.name}</h3>
                       <div className="bundle-pricing">
-                        <div className="original-price">{bundle.basePrice} {PAYMENT_TOKEN}</div>
-                        <div className="bundle-price">{bundle.price} {PAYMENT_TOKEN}</div>
+                        <div className="original-price">{`${bundle.basePrice} ${paymentToken}`}</div>
+                        <div className="bundle-price">{`${bundle.price} ${paymentToken}`}</div>
                       </div>
                     </div>
-                    <div className="bundle-savings">Save {bundle.savings} {PAYMENT_TOKEN}</div>
+                    <div className="bundle-savings">{`Save ${bundle.savings} ${paymentToken}`}</div>
                     <div className="bundle-includes-list">
                       {bundle.roles.map(roleKey => (
                         <div key={roleKey} className="include-item">
@@ -352,17 +356,17 @@ function RolePurchaseScreen() {
                   <div className="summary-details">
                     <div className="summary-row">
                       <span>Subtotal:</span>
-                      <span>{calculateTotal.subtotal} {PAYMENT_TOKEN}</span>
+                      <span>{`${calculateTotal.subtotal} ${paymentToken}`}</span>
                     </div>
                     {calculateTotal.discount > 0 && (
                       <div className="summary-row discount">
                         <span>Bundle Discount:</span>
-                        <span>-{calculateTotal.discount} {PAYMENT_TOKEN}</span>
+                        <span>{`-${calculateTotal.discount} ${paymentToken}`}</span>
                       </div>
                     )}
                     <div className="summary-row total">
                       <span>Total:</span>
-                      <span>{calculateTotal.total} {PAYMENT_TOKEN}</span>
+                      <span>{`${calculateTotal.total} ${paymentToken}`}</span>
                     </div>
                   </div>
                   <button
@@ -393,7 +397,7 @@ function RolePurchaseScreen() {
             <div className="payment-details">
               <div className="detail-row">
                 <span>Amount:</span>
-                <span>{calculateTotal.total} {PAYMENT_TOKEN}</span>
+                <span>{`${calculateTotal.total} ${paymentToken}`}</span>
               </div>
               <div className="detail-row">
                 <span>Recipient:</span>
@@ -437,25 +441,28 @@ function RolePurchaseScreen() {
 
 // Helper function to get features list for each role
 // Helper function to get features list for each role (Bronze tier)
-function getFeaturesList(roleKey) {
+// Position/withdrawal limits are denominated in the chain stablecoin to match
+// the on-chain tier metadata (TieredRoleManager.tierLimits). Pass the active
+// chain's stable symbol so labels track the connected network.
+function getFeaturesList(roleKey, stableSymbol = 'USDC') {
   const features = {
     MARKET_MAKER: [
       '10 daily bets',
       '5 monthly markets',
-      'Up to 10 ETC max position',
-      '50 ETC daily withdrawal limit'
+      `Up to 10 ${stableSymbol} max position`,
+      `50 ${stableSymbol} daily withdrawal limit`
     ],
     CLEARPATH_USER: [
       '5 daily bets on proposals',
       '2 monthly market participations',
-      'Up to 5 ETC max position',
-      '25 ETC daily withdrawal limit'
+      `Up to 5 ${stableSymbol} max position`,
+      `25 ${stableSymbol} daily withdrawal limit`
     ],
     TOKENMINT: [
       '10 monthly token mints',
       '5 active contracts',
-      'Up to 100 ETC mint value',
-      '50 ETC daily withdrawal limit'
+      `Up to 100 ${stableSymbol} mint value`,
+      `50 ${stableSymbol} daily withdrawal limit`
     ]
   }
   return features[roleKey] || []

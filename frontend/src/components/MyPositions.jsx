@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
 import { usePrice } from '../contexts/PriceContext'
 import { getMockPositions } from '../utils/mockDataLoader'
+import { useChainTokens } from '../hooks/useChainTokens'
 import CurrencyToggle from './ui/CurrencyToggle'
 import './MyPositions.css'
 
 function MyPositions() {
   const { isConnected } = useWeb3()
   const { formatPrice } = usePrice()
+  const { native: nativeSymbol } = useChainTokens()
   const [positions, setPositions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, active, settled
@@ -76,7 +78,7 @@ Position Details:
 - Market: ${position.proposalTitle}
 - Type: ${position.tokenType}
 - Amount: ${position.amount} tokens
-- Current P&L: ${position.unrealizedPnL} ETC (${position.unrealizedPnLPercent}%)
+- Current P&L: ${position.unrealizedPnL} ${nativeSymbol} (${position.unrealizedPnLPercent}%)
 
 This would:
 1. Decrypt your position using your private key

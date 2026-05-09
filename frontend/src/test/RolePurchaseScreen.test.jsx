@@ -56,22 +56,25 @@ describe('RolePurchaseScreen', () => {
 
   it('displays featured bundle with discount badge', () => {
     renderWithProviders(<RolePurchaseScreen />)
-    
+
+    // Price labels render the chain stablecoin symbol — USC on Mordor, USDC
+    // on Polygon Amoy, "STABLE" fallback on chains with no stablecoin defined
+    // (the test setup mocks useChainId to ETC mainnet, which has none). Match
+    // any of these so the assertion tracks chain-aware rendering.
     expect(screen.getByText('🌟 BEST VALUE')).toBeInTheDocument()
-    expect(screen.getByText(/Save \d+ ETC \(25% off\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Save \d+ (USC|USDC|STABLE) \(25% off\)/)).toBeInTheDocument()
   })
 
   it('shows individual role prices', () => {
     renderWithProviders(<RolePurchaseScreen />)
-    
-    // Check for ETC prices (may appear multiple times in bundles too)
-    const etc100 = screen.getAllByText('100 ETC')
-    const etc250 = screen.getAllByText('250 ETC')
-    const etc150 = screen.getAllByText('150 ETC')
-    
-    expect(etc100.length).toBeGreaterThan(0)
-    expect(etc250.length).toBeGreaterThan(0)
-    expect(etc150.length).toBeGreaterThan(0)
+
+    // Prices are denominated in the chain stablecoin; the symbol varies by
+    // active chain. Assert each numeric amount renders with some recognized
+    // stable-token suffix rather than baking in a specific symbol.
+    const priceMatcher = (n) => new RegExp(`^\\s*${n}\\s+(USC|USDC|STABLE)\\s*$`)
+    expect(screen.getAllByText(priceMatcher(100)).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(priceMatcher(250)).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(priceMatcher(150)).length).toBeGreaterThan(0)
   })
 
   it('renders without errors when wallet is connected', () => {
