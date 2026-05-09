@@ -5,6 +5,8 @@ import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications }
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
+import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { fetchMarketById } from '../../utils/dataFetcher'
 import { TOKENS } from '../../constants/etcswap'
 import {
   WAGER_DEFAULTS,
@@ -95,6 +97,8 @@ function FriendMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { preferences } = useUserPreferences()
+  const demoMode = preferences?.demoMode ?? false
 
   // Built-in market creation handler used when no external onCreate is provided
   const { createFriendMarket } = useFriendMarketCreation()
@@ -389,24 +393,26 @@ function FriendMarketsModal({
     setMarketLookupResult(null)
 
     try {
-      // TODO: Replace with actual API call or contract query
-      // This mock implementation should be replaced with real market lookup functionality
-      // Example: const marketData = await fetchMarketById(marketLookupId)
-      await new Promise(resolve => setTimeout(resolve, 800))
+      const trimmedId = marketLookupId.trim()
+      const lookupId = /^\d+$/.test(trimmedId) ? Number(trimmedId) : trimmedId
 
-      // Mock result for demo purposes
-      const mockMarket = {
-        id: marketLookupId,
-        description: 'Sample prediction market for demonstration',
-        question: 'Will ETH reach $5000 by end of Q1 2026?',
-        totalVolume: '1,234.56',
-        participants: 42,
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active'
+      const market = await fetchMarketById(demoMode, lookupId)
+
+      if (!market) {
+        setMarketLookupError('Wager not found or unable to fetch details')
+        return
       }
 
-      setMarketLookupResult(mockMarket)
-      handleFormChange('peggedMarketId', marketLookupId)
+      setMarketLookupResult({
+        id: market.id ?? lookupId,
+        description: market.description || '',
+        question: market.proposalTitle || market.question || market.description || '',
+        totalVolume: market.totalLiquidity || market.totalVolume || '0',
+        participants: market.uniqueTraders ?? market.tradesCount ?? 0,
+        endDate: market.tradingEndTime || market.endDate || null,
+        status: typeof market.status === 'string' ? market.status.toLowerCase() : 'active'
+      })
+      handleFormChange('peggedMarketId', String(market.id ?? lookupId))
     } catch (error) {
       console.error('Market lookup error:', error)
       setMarketLookupError('Wager not found or unable to fetch details')
