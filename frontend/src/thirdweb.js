@@ -26,13 +26,37 @@ export const thirdwebClient = createThirdwebClient({
   clientId,
 })
 
-// Get network ID from environment or default to Mordor testnet
-const networkId = import.meta.env.VITE_NETWORK_ID 
-  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
-  : 63
+// Get network ID from environment or default to Polygon Amoy (the primary
+// post-migration). Mordor is still supported for limited-functionality access
+// but is no longer the default.
+const networkId = import.meta.env.VITE_NETWORK_ID
+  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10)
+  : 80002
 
-// Get RPC URL from environment
-const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
+// Get RPC URL from environment, falling back to the Amoy public RPC.
+const rpcUrl =
+  import.meta.env.VITE_RPC_URL ||
+  import.meta.env.VITE_RPC_URL_AMOY ||
+  'https://rpc-amoy.polygon.technology'
+
+// Define Polygon Amoy testnet for ThirdWeb (primary post-migration)
+export const polygonAmoy = defineChain({
+  id: 80002,
+  name: 'Polygon Amoy',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'MATIC',
+    symbol: 'MATIC',
+  },
+  rpc: networkId === 80002 ? rpcUrl : 'https://rpc-amoy.polygon.technology',
+  blockExplorers: [
+    {
+      name: 'Polygonscan',
+      url: 'https://amoy.polygonscan.com',
+    },
+  ],
+  testnet: true,
+})
 
 // Define Ethereum Classic mainnet for ThirdWeb
 export const ethereumClassic = defineChain({
@@ -62,7 +86,7 @@ export const mordor = defineChain({
     name: 'Mordor Ether',
     symbol: 'METC',
   },
-  rpc: rpcUrl,
+  rpc: networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org',
   blockExplorers: [
     {
       name: 'Blockscout',
@@ -94,10 +118,11 @@ export const getThirdwebChain = () => {
       return mordor
     case 1337:
       return hardhat
+    case 80002:
     default:
-      return mordor
+      return polygonAmoy
   }
 }
 
 // All supported chains for ThirdWeb
-export const supportedChains = [ethereumClassic, mordor, hardhat]
+export const supportedChains = [polygonAmoy, ethereumClassic, mordor, hardhat]

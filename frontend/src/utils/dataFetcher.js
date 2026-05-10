@@ -121,7 +121,7 @@ export async function fetchMarkets(demoMode, _contracts = null, options = {}) {
   }
 
   try {
-    // Fetch from Mordor testnet (with request deduplication)
+    // Fetch from the active chain (with request deduplication)
     logger.log('Live mode - fetching from blockchain (cache miss or refresh)')
     const requestKey = forceRefresh ? 'fetchMarkets:force' : 'fetchMarkets:normal'
     const markets = await deduplicateRequest(requestKey, () => fetchMarketsFromBlockchain())

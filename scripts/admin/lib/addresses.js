@@ -38,7 +38,7 @@ function loadDeploymentFile(filename) {
  */
 function getDeploymentFilename(prefix) {
   const network = hre.network.name;
-  const chainId = hre.network.config.chainId || 63;
+  const chainId = hre.network.config.chainId || 80002;
   return `${network}-chain${chainId}-${prefix}.json`;
 }
 

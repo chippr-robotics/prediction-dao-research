@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './MyMarketsModal.css'
@@ -1285,6 +1286,7 @@ function ResolutionModal({
   isCorrectNetwork,
   switchNetwork
 }) {
+  const { chainId } = useWeb3()
   const [selectedOutcome, setSelectedOutcome] = useState(null)
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1529,7 +1531,7 @@ function ResolutionModal({
               </p>
               {txHash && (
                 <p className="mm-success-hint">
-                  <a href={`https://etc-mordor.blockscout.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer">
+                  <a href={getTransactionUrl(chainId, txHash)} target="_blank" rel="noopener noreferrer">
                     View transaction
                   </a>
                 </p>

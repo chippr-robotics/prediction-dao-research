@@ -71,8 +71,8 @@ function main() {
   const repoRoot = path.join(__dirname, '..', '..')
   const deploymentsDir = path.join(repoRoot, 'deployments')
 
-  const network = args.network || 'mordor'
-  const chainId = Number.isFinite(args.chainId) ? args.chainId : 63
+  const network = args.network || 'amoy'
+  const chainId = Number.isFinite(args.chainId) ? args.chainId : 80002
 
   const deploymentFile = args.deploymentFile
     ? path.resolve(repoRoot, args.deploymentFile)
