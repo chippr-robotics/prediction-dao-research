@@ -57,7 +57,7 @@ function AppContent() {
       {/* Development warning banner - always visible */}
       <DevelopmentWarningBanner />
 
-      {/* Limited-functionality banner - shows when on Mordor, hidden on Amoy */}
+      {/* Limited-functionality banner - shows on chains marked limited (e.g. Mordor) */}
       <LimitedFunctionalityBanner />
 
       {/* Development warning modal - shows once per session */}

@@ -1225,7 +1225,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                       </div>
                       {result.txHash && (
                         <a
-                          href={getTransactionUrl(chainId || 63, result.txHash)}
+                          href={getTransactionUrl(chainId, result.txHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ppm-tx-link"

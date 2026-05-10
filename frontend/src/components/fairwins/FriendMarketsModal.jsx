@@ -12,6 +12,7 @@ import {
   getDefaultAcceptanceDeadline
 } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import { useChainTokens } from '../../hooks/useChainTokens'
@@ -2535,13 +2536,14 @@ function MarketsCompactTable({
  */
 function ResolveInline({ market, onResolve, resolveState }) {
   const [showChoices, setShowChoices] = useState(false)
+  const { chainId } = useWeb3()
 
   if (resolveState?.marketId === market.id && resolveState?.step === 'success') {
     return (
       <div className="fm-resolve-inline">
         <span>Resolution proposed!</span>
         {resolveState.txHash && (
-          <a href={`https://etc-mordor.blockscout.com/tx/${resolveState.txHash}`} target="_blank" rel="noopener noreferrer">
+          <a href={getTransactionUrl(chainId, resolveState.txHash)} target="_blank" rel="noopener noreferrer">
             View tx
           </a>
         )}
