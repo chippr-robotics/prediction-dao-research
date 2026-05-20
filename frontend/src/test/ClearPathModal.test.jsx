@@ -190,7 +190,7 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
         expect(screen.getByText('DeFi Innovation Fund')).toBeInTheDocument()
         expect(screen.getByText('Research & Development DAO')).toBeInTheDocument()
       })
@@ -215,7 +215,7 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
     })
 
@@ -224,10 +224,10 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
-      const daoCard = screen.getByText('Ethereum Classic Governance').closest('button')
+      const daoCard = screen.getByText('Polymarket Governance Demo').closest('button')
       await user.click(daoCard)
       
       await waitFor(() => {
@@ -240,10 +240,10 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
-      const daoCard = screen.getByText('Ethereum Classic Governance').closest('button')
+      const daoCard = screen.getByText('Polymarket Governance Demo').closest('button')
       await user.click(daoCard)
       
       await waitFor(() => {
@@ -254,7 +254,7 @@ describe('ClearPathModal Component', () => {
       await user.click(backButton)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
         expect(screen.queryByText(/back to list/i)).not.toBeInTheDocument()
       })
     })
@@ -266,10 +266,10 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
-      const firstDAO = screen.getByText('Ethereum Classic Governance').closest('button')
+      const firstDAO = screen.getByText('Polymarket Governance Demo').closest('button')
       firstDAO.focus()
       
       await user.keyboard('{ArrowDown}')
@@ -283,10 +283,10 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
-      const firstDAO = screen.getByText('Ethereum Classic Governance').closest('button')
+      const firstDAO = screen.getByText('Polymarket Governance Demo').closest('button')
       firstDAO.focus()
       
       await user.keyboard('{Enter}')
@@ -301,10 +301,10 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
-      const firstDAO = screen.getByText('Ethereum Classic Governance').closest('button')
+      const firstDAO = screen.getByText('Polymarket Governance Demo').closest('button')
       firstDAO.focus()
       
       await user.keyboard(' ')
@@ -492,7 +492,7 @@ describe('ClearPathModal Component', () => {
       
       // Wait for content to load
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
       const results = await axe(container)
@@ -503,10 +503,10 @@ describe('ClearPathModal Component', () => {
       render(<ClearPathModal isOpen={true} onClose={mockOnClose} />)
       
       await waitFor(() => {
-        expect(screen.getByText('Ethereum Classic Governance')).toBeInTheDocument()
+        expect(screen.getByText('Polymarket Governance Demo')).toBeInTheDocument()
       })
       
-      const daoCard = screen.getByText('Ethereum Classic Governance').closest('button')
+      const daoCard = screen.getByText('Polymarket Governance Demo').closest('button')
       expect(daoCard).toHaveAttribute('aria-label')
     })
 

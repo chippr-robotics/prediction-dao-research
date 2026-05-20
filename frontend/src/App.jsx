@@ -26,7 +26,6 @@ import AdminPanel from './components/AdminPanel'
 // dev
 import DevelopmentWarningBanner from './components/ui/DevelopmentWarningBanner'
 import DevelopmentWarningModal from './components/ui/DevelopmentWarningModal'
-import LimitedFunctionalityBanner from './components/ui/LimitedFunctionalityBanner'
 import StateManagementDemo from './components/StateManagementDemo'
 import { ComponentExamples } from './components/ui'
 
@@ -56,9 +55,6 @@ function AppContent() {
     <>
       {/* Development warning banner - always visible */}
       <DevelopmentWarningBanner />
-
-      {/* Limited-functionality banner - shows on chains marked limited (e.g. Mordor) */}
-      <LimitedFunctionalityBanner />
 
       {/* Development warning modal - shows once per session */}
       <DevelopmentWarningModal />

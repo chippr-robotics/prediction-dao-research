@@ -11,7 +11,7 @@ const { requireAddress } = require("./lib/addresses");
  * - Perform day-to-day operations
  *
  * Usage:
- *   USER=0x123... npx hardhat run scripts/admin/grant-operations-admin-role.js --network mordor
+ *   USER=0x123... npx hardhat run scripts/admin/grant-operations-admin-role.js --network amoy
  */
 
 async function main() {
@@ -20,7 +20,7 @@ async function main() {
   if (!userAddress || !ethers.isAddress(userAddress)) {
     console.error("Error: Valid USER address required");
     console.log("\nUsage:");
-    console.log("  USER=0x123... npx hardhat run scripts/admin/grant-operations-admin-role.js --network mordor");
+    console.log("  USER=0x123... npx hardhat run scripts/admin/grant-operations-admin-role.js --network amoy");
     process.exit(1);
   }
 

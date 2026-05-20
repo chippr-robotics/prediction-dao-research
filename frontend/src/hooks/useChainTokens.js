@@ -3,13 +3,12 @@ import { getNetwork, getCurrentChainId } from '../config/networks'
 
 /**
  * Hook returning chain-aware token symbols, decimals, and per-chain
- * capabilities. Use this everywhere the UI used to hardcode "ETC" / "USC" so
- * the same screen renders the right labels on Mordor (METC / USC) and
- * Polygon Amoy (MATIC / USDC).
+ * capabilities. Use this anywhere the UI would otherwise hardcode a token
+ * symbol — on Polygon Amoy the native is MATIC and the stable is USDC.
  *
- * Also exposes capabilities and the limited-functionality flag so screens can
- * decide whether to gate features (e.g. Polymarket-pegged side bets are only
- * available on chains where Polymarket's CTF lives).
+ * Capabilities flow through here so screens can decide whether to gate
+ * features (e.g. Polymarket-pegged side bets only render on chains where
+ * Polymarket's CTF lives).
  */
 export function useChainTokens() {
   const wagmiChainId = useChainId()
@@ -21,7 +20,6 @@ export function useChainTokens() {
     networkName: n?.name || '',
     isPrimary: Boolean(n?.isPrimary),
     isTestnet: Boolean(n?.isTestnet),
-    limitedFunctionality: Boolean(n?.limitedFunctionality),
     capabilities: n?.capabilities || {},
     native: n?.nativeCurrency?.symbol || '',
     nativeName: n?.nativeCurrency?.name || '',

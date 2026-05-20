@@ -765,10 +765,10 @@ Impermanent loss: $2.4 (2%)
 
 ### Phase 2: Testnet Deployment
 
-**Objective**: Deploy and test on Mordor testnet
+**Objective**: Deploy and test on Polygon Amoy (Polymarket testnet)
 
 **Tasks**:
-- [ ] Deploy V3Factory to Mordor
+- [ ] Deploy V3Factory to Polygon Amoy
 - [ ] Deploy V3MarketFactory
 - [ ] Create test FairWins markets
 - [ ] Gather community feedback

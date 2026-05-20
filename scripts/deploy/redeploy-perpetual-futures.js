@@ -5,7 +5,7 @@
  * with the fixed decimal handling for non-18 decimal tokens (like USC with 6 decimals).
  *
  * Usage:
- *   npx hardhat run scripts/deploy/redeploy-perpetual-futures.js --network mordor
+ *   npx hardhat run scripts/deploy/redeploy-perpetual-futures.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -42,7 +42,7 @@ async function main() {
     throw new Error("No deployer signer available");
   }
   console.log("\nDeployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   const networkName = hre.network.name;
   const collateralToken = TOKENS[networkName]?.USC;
@@ -136,7 +136,7 @@ async function main() {
     },
     {
       name: "Ethereum Classic Perpetual",
-      underlyingAsset: "ETC",
+      underlyingAsset: "MATIC",
       category: 0,
       initialIndexPrice: ethers.parseEther("30"), // $30
       initialMarkPrice: ethers.parseEther("30"),

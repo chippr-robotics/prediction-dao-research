@@ -8,7 +8,7 @@ const { getAddress, requireAddress, ROLE_HASHES, printAddresses } = require("./l
  * Diagnostic script to verify TieredRoleManager state and permissions.
  *
  * Usage:
- *   npx hardhat run scripts/admin/check-role-manager.js --network mordor
+ *   npx hardhat run scripts/admin/check-role-manager.js --network amoy
  */
 
 async function main() {

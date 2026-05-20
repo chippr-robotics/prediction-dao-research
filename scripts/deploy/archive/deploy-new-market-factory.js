@@ -8,7 +8,7 @@ const { ethers } = require("hardhat");
  * that prevents updating the roleManager once set. The new contract allows
  * roleManager updates, enabling migration to the modular RoleManagerCore.
  *
- * Run with: npx hardhat run scripts/deploy-new-market-factory.js --network mordor
+ * Run with: npx hardhat run scripts/deploy-new-market-factory.js --network amoy
  */
 
 // Existing deployed contracts

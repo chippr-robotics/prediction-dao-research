@@ -12,7 +12,7 @@ const { ethers } = require("hardhat");
  * 2. Grants MARKET_MAKER_ROLE to the user who purchased it
  * 3. Updates the factory to use the new RoleManagerCore
  *
- * Run with: npx hardhat run scripts/upgrade-role-manager-core.js --network mordor
+ * Run with: npx hardhat run scripts/upgrade-role-manager-core.js --network amoy
  */
 
 // Existing addresses

@@ -223,7 +223,7 @@ function ProposalSubmission({ daos = [] }) {
             aria-describedby="funding-token-help"
             aria-invalid={errors.fundingToken ? "true" : "false"}
           />
-          <small id="funding-token-help">Enter ERC20 token address, or leave empty for native token (ETH/ETC)</small>
+          <small id="funding-token-help">Enter ERC20 token address, or leave empty for the chain's native token</small>
           {errors.fundingToken && (
             <span 
               className="error-text" 
@@ -362,7 +362,7 @@ function ProposalSubmission({ daos = [] }) {
         <div className="bond-notice">
           <strong>⚠️ Important:</strong>
           <ul>
-            <li>Submitting a proposal requires a bond of 50 ETC</li>
+            <li>Submitting a proposal requires a 50-unit bond in the chain native token</li>
             <li>You must set an execution deadline to ensure time-bound execution</li>
             <li>Treasury must have approved tokens if using ERC20</li>
           </ul>

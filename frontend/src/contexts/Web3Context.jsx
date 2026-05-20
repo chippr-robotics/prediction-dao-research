@@ -44,11 +44,8 @@ export function Web3Provider({ children }) {
     return () => { ignore = true }
   }, [isConnected, address])
 
-  // Check network compatibility. The app supports multiple networks (Mordor
-  // and Polygon Amoy today); only emit a network error when the connected
-  // chain is not in the supported set. The LimitedFunctionalityBanner takes
-  // care of steering users from limited chains (Mordor) to the primary
-  // (Amoy) — this hook only fires for chains we don't recognize at all.
+  // Check network compatibility. Only emit a network error when the connected
+  // chain is not in the supported set (Polygon Amoy or local Hardhat).
   useEffect(() => {
     let ignore = false
 
@@ -109,9 +106,8 @@ export function Web3Provider({ children }) {
   }, [disconnect])
 
   const handleSwitchNetwork = useCallback(async () => {
-    // Switch to the configured primary chain (Polygon Amoy post-migration).
-    // If the user is on Mordor that's already a supported chain — they only
-    // see this code path when they're on an unrecognized network.
+    // Switch to the configured primary chain (Polygon Amoy). This path only
+    // runs when the user is on an unrecognized network.
     const target = PRIMARY_CHAIN_ID
     try {
       await switchChain({ chainId: target })
@@ -135,9 +131,9 @@ export function Web3Provider({ children }) {
     provider,
     signer,
     
-    // Network state — "correct" means any supported chain (Mordor or Amoy).
-    // Use capabilities from networks.js to decide whether a feature is
-    // available on the connected chain rather than gating on chain identity.
+    // Network state — "correct" means the user is on a supported chain
+    // (Polygon Amoy or local Hardhat). Use capabilities from networks.js to
+    // decide whether a feature is available on the connected chain.
     networkError,
     isCorrectNetwork: isConnected && isSupportedChainId(chainId),
     

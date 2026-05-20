@@ -21,7 +21,7 @@ import "./interfaces/IRoleManager.sol";
  * - Real-time PnL tracking
  *
  * Integration with FairWins:
- * - Uses same collateral tokens (USC, WETC, ETC)
+ * - Uses the same collateral tokens as the rest of the protocol (the chain stablecoin and wrapped/native tokens)
  * - Role-based access control via IRoleManager
  * - Oracle integration for index price feeds
  */

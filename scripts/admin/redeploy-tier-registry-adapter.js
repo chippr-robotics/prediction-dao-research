@@ -14,7 +14,7 @@ const { ethers } = require("hardhat");
  *
  * Run with admin floppy disk:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/admin/redeploy-tier-registry-adapter.js --network mordor
+ *   npx hardhat run scripts/admin/redeploy-tier-registry-adapter.js --network amoy
  */
 
 const SINGLETON_FACTORY = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
@@ -47,7 +47,7 @@ async function main() {
   const [signer] = await ethers.getSigners();
   console.log("\nAdmin address:", signer.address);
   const balance = await ethers.provider.getBalance(signer.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
   // Step 1: Deploy new TierRegistryAdapter
   console.log("\n[1/5] Deploying new TierRegistryAdapter...");
@@ -217,7 +217,7 @@ async function main() {
   console.log("=".repeat(60));
   console.log("New TierRegistryAdapter:", predictedAddress);
   console.log("\nNext steps (as user):");
-  console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+  console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
 }
 
 main()

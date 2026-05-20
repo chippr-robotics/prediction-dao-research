@@ -12,7 +12,7 @@ const { ethers } = require("hardhat");
  * so it can deploy markets when friend markets activate.
  *
  * Usage:
- *   npx hardhat run scripts/grant-factory-market-maker-role.js --network mordor
+ *   npx hardhat run scripts/grant-factory-market-maker-role.js --network amoy
  */
 
 const CONTRACTS = {

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /**
  * @title IUniswapV3Pool
  * @notice The interface for a Uniswap V3 Pool
- * @dev Compatible with ETCSwap v3
+ * @dev Compatible with any Uniswap V3-style DEX
  * Reference: https://github.com/Uniswap/v3-core/blob/main/contracts/interfaces/IUniswapV3Pool.sol
  */
 interface IUniswapV3Pool {

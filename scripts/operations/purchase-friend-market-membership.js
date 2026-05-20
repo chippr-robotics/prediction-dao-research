@@ -14,7 +14,7 @@
  * Prerequisites:
  *   1. Floppy must be mounted: npm run floppy:mount
  *   2. Keystore must exist: npm run floppy:create
- *   3. Wallet must have sufficient USC for purchase and ETC for gas
+ *   3. Wallet must have sufficient USC for purchase and MATIC for gas
  */
 const { ethers } = require('ethers');
 const fs = require('fs');
@@ -47,7 +47,7 @@ const KEYSTORE_PATH = path.join(
   CONFIG.KEYSTORE_FILENAME
 );
 
-const RPC_URL = 'https://rpc.mordor.etccooperative.org';
+const RPC_URL = 'https://rpc-amoy.polygon.technology';
 
 // Modular RBAC contracts (same as frontend)
 const PAYMENT_PROCESSOR = '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63';
@@ -151,7 +151,7 @@ async function main() {
   console.log('\n[3/7] Checking balances...');
 
   const etcBalance = await provider.getBalance(wallet.address);
-  console.log('ETC balance:', ethers.formatEther(etcBalance), 'ETC');
+  console.log('MATIC balance:', ethers.formatEther(etcBalance), 'MATIC');
 
   const uscContract = new ethers.Contract(USC_TOKEN, ERC20_ABI, connectedWallet);
   const uscBalance = await uscContract.balanceOf(wallet.address);
@@ -252,7 +252,7 @@ async function main() {
   // Show new balances
   const newEtcBalance = await provider.getBalance(wallet.address);
   const newUscBalance = await uscContract.balanceOf(wallet.address);
-  console.log('\nNew ETC balance:', ethers.formatEther(newEtcBalance), 'ETC');
+  console.log('\nNew MATIC balance:', ethers.formatEther(newEtcBalance), 'MATIC');
   console.log('New USC balance:', ethers.formatUnits(newUscBalance, uscDecimals), 'USC');
 }
 

@@ -15,7 +15,7 @@ const { ethers } = require('hardhat');
  * 4. Add multiple authorized spenders for oversight
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-treasury-limits.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-treasury-limits.js --network amoy
  */
 
 const TREASURY_VAULT_ADDRESS = '0x93F7ee39C02d99289E3c29696f1F3a70656d0772';
@@ -23,11 +23,11 @@ const FAIRWINS_TOKEN_ADDRESS = '0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB';
 
 // Configuration parameters - adjust for production
 const CONFIG = {
-  // ETH (ETC) limits
+  // Native MATIC limits
   eth: {
-    // Max per single transaction (10 ETC)
+    // Max per single transaction (10 MATIC)
     transactionLimit: ethers.parseEther('10'),
-    // Rate limit: max 50 ETC per day
+    // Rate limit: max 50 MATIC per day
     rateLimitPeriod: 86400, // 1 day in seconds
     periodLimit: ethers.parseEther('50')
   },
@@ -70,7 +70,7 @@ async function main() {
   // Display current state
   console.log('\n--- Current Configuration ---');
   const ethBalance = await treasury.getETHBalance();
-  console.log('ETH Balance:', ethers.formatEther(ethBalance), 'ETC');
+  console.log('Native Balance:', ethers.formatEther(ethBalance), 'MATIC');
 
   try {
     const fwnBalance = await treasury.getTokenBalance(FAIRWINS_TOKEN_ADDRESS);
@@ -88,22 +88,22 @@ async function main() {
   const currentEthPeriodLimit = await treasury.periodLimit(ethers.ZeroAddress);
 
   console.log('\nCurrent ETH Limits:');
-  console.log('  Transaction Limit:', currentEthTxLimit > 0 ? ethers.formatEther(currentEthTxLimit) + ' ETC' : 'Unlimited');
+  console.log('  Transaction Limit:', currentEthTxLimit > 0 ? ethers.formatEther(currentEthTxLimit) + ' MATIC' : 'Unlimited');
   console.log('  Rate Period:', currentEthRatePeriod > 0 ? `${currentEthRatePeriod}s` : 'None');
-  console.log('  Period Limit:', currentEthPeriodLimit > 0 ? ethers.formatEther(currentEthPeriodLimit) + ' ETC' : 'Unlimited');
+  console.log('  Period Limit:', currentEthPeriodLimit > 0 ? ethers.formatEther(currentEthPeriodLimit) + ' MATIC' : 'Unlimited');
 
   // Configure ETH limits
   console.log('\n--- Configuring ETH Limits ---');
 
   if (CONFIG.eth.transactionLimit > 0) {
-    console.log('Setting ETH transaction limit to', ethers.formatEther(CONFIG.eth.transactionLimit), 'ETC...');
+    console.log('Setting native transaction limit to', ethers.formatEther(CONFIG.eth.transactionLimit), 'MATIC...');
     const tx1 = await treasury.setTransactionLimit(ethers.ZeroAddress, CONFIG.eth.transactionLimit);
     await tx1.wait();
     console.log('Transaction limit set!');
   }
 
   if (CONFIG.eth.rateLimitPeriod > 0 && CONFIG.eth.periodLimit > 0) {
-    console.log('Setting ETH rate limit:', ethers.formatEther(CONFIG.eth.periodLimit), 'ETC per', CONFIG.eth.rateLimitPeriod, 'seconds...');
+    console.log('Setting native rate limit:', ethers.formatEther(CONFIG.eth.periodLimit), 'MATIC per', CONFIG.eth.rateLimitPeriod, 'seconds...');
     const tx2 = await treasury.setRateLimit(ethers.ZeroAddress, CONFIG.eth.rateLimitPeriod, CONFIG.eth.periodLimit);
     await tx2.wait();
     console.log('Rate limit set!');
@@ -152,9 +152,9 @@ async function main() {
   const newFwnPeriodLimit = await treasury.periodLimit(FAIRWINS_TOKEN_ADDRESS);
 
   console.log('\nNew ETH Limits:');
-  console.log('  Transaction Limit:', newEthTxLimit > 0n ? ethers.formatEther(newEthTxLimit) + ' ETC' : 'Unlimited');
+  console.log('  Transaction Limit:', newEthTxLimit > 0n ? ethers.formatEther(newEthTxLimit) + ' MATIC' : 'Unlimited');
   console.log('  Rate Period:', newEthRatePeriod > 0n ? `${newEthRatePeriod}s (${Number(newEthRatePeriod) / 3600} hours)` : 'None');
-  console.log('  Period Limit:', newEthPeriodLimit > 0n ? ethers.formatEther(newEthPeriodLimit) + ' ETC' : 'Unlimited');
+  console.log('  Period Limit:', newEthPeriodLimit > 0n ? ethers.formatEther(newEthPeriodLimit) + ' MATIC' : 'Unlimited');
 
   console.log('\nNew FWN Limits:');
   console.log('  Transaction Limit:', newFwnTxLimit > 0n ? ethers.formatEther(newFwnTxLimit) + ' FWN' : 'Unlimited');

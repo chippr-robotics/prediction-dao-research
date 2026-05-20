@@ -36,7 +36,7 @@ The `title` should be concise and descriptive, like "Upgrade oracle infrastructu
 
 The `description` field holds your full proposal. Explain what you want to do, why it benefits the DAO, how you'll spend the funds, and what success looks like. Include milestones if the work spans multiple phases. Clear descriptions help traders make informed decisions.
 
-The `fundingAmount` specifies how much ETC you need, denominated in wei. Remember that 1 ETC equals 10^18 wei. The contract enforces a maximum of 50,000 ETC per proposal to prevent single proposals from dominating the treasury.
+The `fundingAmount` specifies how much  you need, denominated in wei. Remember that 1  equals 10^18 wei. The contract enforces a maximum of 50,000  per proposal to prevent single proposals from dominating the treasury.
 
 The `recipient` address receives the funds if your proposal passes. This might be your own address for individual work, a multisig for team projects, or a contract address for automated distribution.
 
@@ -44,7 +44,7 @@ The `welfareMetricId` determines which success measure will evaluate your propos
 
 **The bond requirement:**
 
-You must send exactly 50 ETC as `msg.value` when calling this function. This bond discourages spam and demonstrates commitment. You get it back when your proposal completes the process in good faith, even if markets reject it.
+You must send exactly 50  as `msg.value` when calling this function. This bond discourages spam and demonstrates commitment. You get it back when your proposal completes the process in good faith, even if markets reject it.
 
 **Return value:**
 
@@ -52,7 +52,7 @@ The function returns a `proposalId`, a unique number identifying your proposal t
 
 ### Practical Example: Submitting a Development Proposal
 
-Imagine you want to propose building a mobile wallet interface for the DAO. You estimate needing 500 ETC for six months of development work. Here's how that interaction looks in practice.
+Imagine you want to propose building a mobile wallet interface for the DAO. You estimate needing 500  for six months of development work. Here's how that interaction looks in practice.
 
 First, prepare your proposal details:
 
@@ -73,7 +73,7 @@ Success will be measured by enabling mobile participation,
 which should increase the network activity metric through 
 higher transaction counts and more active addresses.
 `;
-const fundingAmount = ethers.parseEther("500"); // 500 ETC
+const fundingAmount = ethers.parseEther("500"); // 500
 const recipient = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"; // your address
 const welfareMetricId = 2; // Network activity metric
 const bondAmount = ethers.parseEther("50"); // Required bond
@@ -131,7 +131,7 @@ const proposal = await proposalRegistry.getProposal(proposalId);
 
 console.log(`Title: ${proposal.title}`);
 console.log(`Status: ${proposal.status}`); // Pending, Active, Resolved, etc.
-console.log(`Funding: ${ethers.formatEther(proposal.fundingAmount)} ETC`);
+console.log(`Funding: ${ethers.formatEther(proposal.fundingAmount)} MATIC`);
 console.log(`Proposer: ${proposal.proposer}`);
 console.log(`Submitted: ${new Date(proposal.createdAt * 1000)}`);
 ```
@@ -213,7 +213,7 @@ const marketId = 5;
 const tokensWanted = ethers.parseEther("100"); // 100 tokens
 const cost = await marketFactory.calculateCost(marketId, tokensWanted, true);
 
-console.log(`Buying 100 PASS tokens will cost: ${ethers.formatEther(cost)} ETC`);
+console.log(`Buying 100 PASS tokens will cost: ${ethers.formatEther(cost)} MATIC`);
 
 // Check if this fits your budget
 const yourBalance = await ethers.provider.getBalance(yourAddress);
@@ -411,7 +411,7 @@ The `evidenceURI` points to detailed evidence supporting your values, typically 
 
 **Bond requirement:**
 
-You must send 100 ETC as `msg.value`. This bond gets returned if the community accepts your report or slashed if someone successfully challenges it.
+You must send 100  as `msg.value`. This bond gets returned if the community accepts your report or slashed if someone successfully challenges it.
 
 **Example reporting:**
 
@@ -472,7 +472,7 @@ function challengeReport(
 ) external payable
 ```
 
-Challenging requires posting a 150 ETC bond (higher than the reporter's bond to prevent cheap griefing).
+Challenging requires posting a 150  bond (higher than the reporter's bond to prevent cheap griefing).
 
 **Parameters:**
 
@@ -671,7 +671,7 @@ Monitoring these events allows interfaces to update in real-time as governance a
 // Listen for new proposals
 proposalRegistry.on("ProposalSubmitted", (proposalId, proposer, title, amount) => {
     console.log(`New proposal #${proposalId}: ${title}`);
-    console.log(`Requesting ${ethers.formatEther(amount)} ETC`);
+    console.log(`Requesting ${ethers.formatEther(amount)} MATIC`);
     refreshProposalList();
 });
 
@@ -695,7 +695,7 @@ oracleResolver.on("ReportSubmitted", (reportId, marketId, reporter, passValue, f
 
 The contracts include helpful error messages, but understanding common failure cases helps avoid wasted gas:
 
-**"Insufficient bond"** means you didn't send enough ETC with your transaction. Check the required amount for the specific function and include it as `msg.value`.
+**"Insufficient bond"** means you didn't send enough  with your transaction. Check the required amount for the specific function and include it as `msg.value`.
 
 **"Proposal already exists"** happens if you try to resubmit the same proposal. Each title must be unique, or you need to modify your proposal slightly.
 
@@ -727,7 +727,7 @@ try {
     await tx.wait();
 } catch (error) {
     if (error.message.includes("Insufficient bond")) {
-        alert("Please send at least 50 ETC bond with your proposal");
+        alert("Please send at least 50  bond with your proposal");
     } else {
         alert(`Transaction failed: ${error.message}`);
     }
@@ -773,7 +773,7 @@ function validateProposal(title, description, amount, recipient) {
         throw new Error("Description too short, provide details");
     }
     if (amount <= 0n || amount > ethers.parseEther("50000")) {
-        throw new Error("Amount must be between 0 and 50,000 ETC");
+        throw new Error("Amount must be between 0 and 50,000 MATIC");
     }
     if (!ethers.isAddress(recipient)) {
         throw new Error("Invalid recipient address");

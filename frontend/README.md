@@ -10,7 +10,7 @@ This application features a comprehensive, site-wide wallet management system th
 - Single source of truth for wallet state across the entire app
 - Integrated RVAC (Role-Based Access Control) tied to wallet address
 - Transaction helpers for signing and sending
-- Balance tracking and caching (ETC, WETC, tokens)
+- Balance tracking and caching (native, wrapped-native, tokens)
 - Network validation and switching
 - Specialized hooks for different use cases
 
@@ -106,8 +106,8 @@ Create a `.env` file based on `.env.example`:
 
 ```bash
 # Network Configuration
-VITE_NETWORK_ID=63                              # 63 for Mordor testnet, 61 for ETC mainnet, 1337 for Hardhat
-VITE_RPC_URL=https://rpc.mordor.etccooperative.org  # RPC endpoint
+VITE_NETWORK_ID=80002                                 # 80002 for Polygon Amoy (Polymarket testnet), 1337 for Hardhat
+VITE_RPC_URL=https://rpc-amoy.polygon.technology     # RPC endpoint
 
 # Application URL (required for production, optional for development)
 VITE_APP_URL=http://localhost:5173            # Used for WalletConnect metadata and external integrations

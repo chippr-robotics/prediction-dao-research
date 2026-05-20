@@ -3,10 +3,10 @@ import { ethers } from 'ethers'
 import { DEPLOYED_CONTRACTS, NETWORK_CONFIG } from '../config/contracts'
 
 /**
- * Hook to fetch tier prices from TierRegistry contract
+ * Hook to fetch tier prices from TierRegistry contract.
  *
- * Fetches prices for all roles and tiers from the blockchain in USC (stablecoin).
- * USC is the primary currency for all payments - ETC is only used for gas.
+ * Fetches prices for all roles and tiers from the blockchain in the chain's
+ * stablecoin (USDC on Polygon Amoy). The native token is only used for gas.
  */
 
 const TIER_REGISTRY_ADDRESS = DEPLOYED_CONTRACTS.tierRegistry
@@ -18,8 +18,8 @@ const TIER_REGISTRY_ABI = [
   'function getTierLimits(bytes32 role, uint8 tier) external view returns (tuple(uint256 dailyBetLimit, uint256 weeklyBetLimit, uint256 monthlyMarketCreation, uint256 maxPositionSize, uint256 maxConcurrentMarkets, uint256 withdrawalLimit, bool canCreatePrivateMarkets, bool canUseAdvancedFeatures, uint256 feeDiscount))'
 ]
 
-// USC has 6 decimals
-const USC_DECIMALS = 6
+// Stablecoin (USDC) has 6 decimals
+const STABLE_DECIMALS = 6
 
 // Role hashes (computed from role names)
 const ROLE_HASHES = {
@@ -37,8 +37,8 @@ const TIER_IDS = {
   PLATINUM: 4
 }
 
-// Fallback prices in USC (stablecoin with 6 decimals)
-// These match the TierRegistry configuration on Mordor testnet
+// Fallback prices in stablecoin units (USDC, 6 decimals)
+// These match the TierRegistry configuration on Polygon Amoy
 const FALLBACK_PRICES = {
   BRONZE: { FRIEND_MARKET: 50, MARKET_MAKER: 100, CLEARPATH_USER: 25, TOKENMINT: 25 },
   SILVER: { FRIEND_MARKET: 100, MARKET_MAKER: 100, CLEARPATH_USER: 100, TOKENMINT: 100 },
@@ -83,23 +83,23 @@ export function useTierPrices() {
       for (const [roleKey, roleHash] of Object.entries(ROLE_HASHES)) {
         for (const [tierName, tierId] of Object.entries(TIER_IDS)) {
           try {
-            // Get price from TierRegistry (in USC with 6 decimals)
+            // Get price from TierRegistry (in stablecoin with 6 decimals)
             const priceRaw = await contract.getTierPrice(roleHash, tierId)
             const isActive = await contract.isTierActive(roleHash, tierId)
 
-            // Convert from 6 decimals to human-readable USC amount
-            prices[tierName][roleKey] = parseFloat(ethers.formatUnits(priceRaw, USC_DECIMALS))
+            // Convert from 6 decimals to human-readable stablecoin amount
+            prices[tierName][roleKey] = parseFloat(ethers.formatUnits(priceRaw, STABLE_DECIMALS))
 
             // Try to get limits (may not be available for all tiers)
             try {
               const tierLimits = await contract.getTierLimits(roleHash, tierId)
               limits[tierName][roleKey] = {
-                dailyBetLimit: ethers.formatUnits(tierLimits.dailyBetLimit, USC_DECIMALS),
-                weeklyBetLimit: ethers.formatUnits(tierLimits.weeklyBetLimit, USC_DECIMALS),
+                dailyBetLimit: ethers.formatUnits(tierLimits.dailyBetLimit, STABLE_DECIMALS),
+                weeklyBetLimit: ethers.formatUnits(tierLimits.weeklyBetLimit, STABLE_DECIMALS),
                 monthlyMarketCreation: Number(tierLimits.monthlyMarketCreation),
-                maxPositionSize: ethers.formatUnits(tierLimits.maxPositionSize, USC_DECIMALS),
+                maxPositionSize: ethers.formatUnits(tierLimits.maxPositionSize, STABLE_DECIMALS),
                 maxConcurrentMarkets: Number(tierLimits.maxConcurrentMarkets),
-                withdrawalLimit: ethers.formatUnits(tierLimits.withdrawalLimit, USC_DECIMALS),
+                withdrawalLimit: ethers.formatUnits(tierLimits.withdrawalLimit, STABLE_DECIMALS),
                 canCreatePrivateMarkets: tierLimits.canCreatePrivateMarkets,
                 canUseAdvancedFeatures: tierLimits.canUseAdvancedFeatures,
                 feeDiscount: Number(tierLimits.feeDiscount),

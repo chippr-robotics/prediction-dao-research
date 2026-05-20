@@ -9,7 +9,7 @@ import { ethers } from 'ethers'
 import { getContractAddress, NETWORK_CONFIG, DEPLOYMENT_BLOCKS } from '../config/contracts'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
-import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
+import { DEX_ADDRESSES } from '../constants/dex'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import {
@@ -282,8 +282,8 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
   const statusNames = ['pending_acceptance', 'active', 'pending_resolution', 'challenged', 'resolved', 'cancelled', 'refunded', 'oracle_timed_out']
 
   const stakeToken = marketResult.stakeToken
-  const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
-  const tokenDecimals = isUSC ? 6 : 18
+  const isStable = stakeToken && stakeToken.toLowerCase() === DEX_ADDRESSES?.STABLECOIN?.toLowerCase()
+  const tokenDecimals = isStable ? 6 : 18
   const stakeAmountFormatted = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
 
   const arbitrator = marketResult.arbitrator
@@ -361,7 +361,7 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
     minAcceptanceThreshold: Number(marketResult.minThreshold) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
     stakeAmount: stakeAmountFormatted,
     stakeTokenAddress: stakeToken,
-    stakeTokenSymbol: isUSC ? 'USC' : 'ETC',
+    stakeTokenSymbol: isStable ? 'USDC' : 'MATIC',
     acceptances,
     acceptedCount: Number(acceptanceStatus.accepted),
     endDate: endDateStr,
@@ -442,8 +442,8 @@ export async function fetchFriendMarketsForUser(userAddress) {
 
           // Determine token decimals for formatting
           const stakeToken = marketResult.stakeToken
-          const isUSC = stakeToken && stakeToken.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
-          const tokenDecimals = isUSC ? 6 : 18
+          const isStable = stakeToken && stakeToken.toLowerCase() === DEX_ADDRESSES?.STABLECOIN?.toLowerCase()
+          const tokenDecimals = isStable ? 6 : 18
 
           // Fetch acceptances for participants in parallel
           const members = marketResult.members || []
@@ -934,45 +934,43 @@ const PAYMENT_PROCESSOR_ABI = [
 ]
 
 /**
- * Purchase a role using USC stablecoin with tiered membership
- * This function calls the PaymentProcessor's purchaseTierWithToken function,
- * which handles both the payment and role granting in a single transaction.
- *
- * Requires modular RBAC deployment: npx hardhat run scripts/deploy-modular-rbac.js --network mordor
+ * Purchase a role using the active chain's stablecoin (USDC on Polygon Amoy)
+ * with tiered membership. Calls PaymentProcessor.purchaseTierWithToken,
+ * which handles both the payment and role granting atomically.
  *
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
- * @param {number} priceUSD - Price in USD (will be converted to USC with 6 decimals)
+ * @param {number} priceUSD - Price in USD (converted to stablecoin units, 6 decimals)
  * @param {number} tier - Membership tier (1=Bronze, 2=Silver, 3=Gold, 4=Platinum), defaults to Bronze
  * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
-export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = MembershipTier.BRONZE) {
+export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE) {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
 
   try {
-    const uscAddress = ETCSWAP_ADDRESSES.USC_STABLECOIN
+    const stableAddress = DEX_ADDRESSES.STABLECOIN
     const paymentProcessorAddress = getContractAddress('paymentProcessor')
 
     if (!paymentProcessorAddress) {
-      throw new Error('PaymentProcessor not deployed. Run: npx hardhat run scripts/deploy-modular-rbac.js --network mordor')
+      throw new Error('PaymentProcessor not deployed on this network.')
     }
 
-    const uscContract = new ethers.Contract(uscAddress, ERC20_ABI, signer)
+    const stableContract = new ethers.Contract(stableAddress, ERC20_ABI, signer)
     const paymentProcessor = new ethers.Contract(paymentProcessorAddress, PAYMENT_PROCESSOR_ABI, signer)
 
-    // Convert price to USC units (USC has 6 decimals like USDC)
+    // Convert price to stablecoin units (USDC has 6 decimals).
     const amountWei = ethers.parseUnits(String(priceUSD), 6)
 
-    // Check USC balance
+    // Check stablecoin balance
     const userAddress = await signer.getAddress()
-    const balanceRaw = await uscContract.balanceOf(userAddress)
+    const balanceRaw = await stableContract.balanceOf(userAddress)
     const balance = BigInt(balanceRaw.toString())
     const amount = BigInt(amountWei.toString())
 
     // Debug logging for balance issues
-    console.log('USC Balance Check:', {
+    console.log('Stablecoin Balance Check:', {
       userAddress,
       balanceWei: balance.toString(),
       balanceFormatted: ethers.formatUnits(balance, 6),
@@ -982,7 +980,7 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
 
     if (balance < amount) {
       const balanceFormatted = ethers.formatUnits(balance, 6)
-      throw new Error(`Insufficient USC balance. You have ${parseFloat(balanceFormatted).toFixed(2)} USC but need ${priceUSD} USC.`)
+      throw new Error(`Insufficient stablecoin balance. You have ${parseFloat(balanceFormatted).toFixed(2)} but need ${priceUSD}.`)
     }
 
     // Get role hash
@@ -1000,24 +998,24 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
     }
 
     if (paymentManagerAddress === ethers.ZeroAddress) {
-      throw new Error('MembershipPaymentManager not configured. Run: npx hardhat run scripts/deploy-modular-rbac.js --network mordor')
+      throw new Error('MembershipPaymentManager not configured on this network.')
     }
 
-    // Check and approve USC for the PaymentProcessor
-    const allowanceRaw = await uscContract.allowance(userAddress, paymentProcessorAddress)
+    // Check and approve the stablecoin for the PaymentProcessor
+    const allowanceRaw = await stableContract.allowance(userAddress, paymentProcessorAddress)
     const allowance = BigInt(allowanceRaw.toString())
 
     if (allowance < amount) {
-      console.log('Approving USC for PaymentProcessor...', {
+      console.log('Approving the stablecoin for PaymentProcessor...', {
         spender: paymentProcessorAddress,
         amount: amountWei.toString(),
-        amountFormatted: ethers.formatUnits(amountWei, 6) + ' USC'
+        amountFormatted: ethers.formatUnits(amountWei, 6) + ' stable'
       })
       try {
         // First try to estimate gas to see if the transaction would succeed
         let gasEstimate
         try {
-          gasEstimate = await uscContract.approve.estimateGas(paymentProcessorAddress, amountWei)
+          gasEstimate = await stableContract.approve.estimateGas(paymentProcessorAddress, amountWei)
           console.log('Gas estimate for approve:', gasEstimate.toString())
         } catch (estimateError) {
           console.warn('Gas estimation failed, using default:', estimateError.message)
@@ -1027,12 +1025,12 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
         // Add 20% buffer to gas estimate
         const gasLimit = (gasEstimate * 120n) / 100n
 
-        const approveTx = await uscContract.approve(paymentProcessorAddress, amountWei, {
+        const approveTx = await stableContract.approve(paymentProcessorAddress, amountWei, {
           gasLimit: gasLimit
         })
         console.log('Approve transaction sent:', approveTx.hash)
         await approveTx.wait()
-        console.log('USC approved successfully')
+        console.log('Stablecoin approved successfully')
       } catch (approveError) {
         console.error('Approve failed:', approveError)
         if (approveError.code === 'ACTION_REJECTED' || approveError.code === 4001) {
@@ -1043,10 +1041,10 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
           throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.')
         }
         // Try to provide more helpful error message
-        throw new Error(`Failed to approve USC. Please ensure you have enough ETC for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
+        throw new Error(`Failed to approve the stablecoin. Please ensure you have enough native token for gas and try again. Details: ${approveError.message || 'Unknown error'}`)
       }
     } else {
-      console.log('USC already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
+      console.log('Stablecoin already approved for PaymentProcessor, allowance:', ethers.formatUnits(allowance, 6))
     }
 
     // Validate tier value
@@ -1059,14 +1057,14 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
       roleHash,
       tier: validTier,
       tierName,
-      paymentToken: uscAddress,
+      paymentToken: stableAddress,
       amount: amountWei.toString()
     })
 
     const purchaseTx = await paymentProcessor.purchaseTierWithToken(
       roleHash,
       validTier,
-      uscAddress,
+      stableAddress,
       amountWei
     )
     const receipt = await purchaseTx.wait()
@@ -1092,7 +1090,7 @@ export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = Mem
       throw new Error('Transaction rejected by user')
     } else if (error.code === 4100 || error.message?.includes('4100') || error.message?.includes('not been authorized')) {
       throw new Error('Wallet authorization lost. Please reconnect your wallet and try again.')
-    } else if (error.message?.includes('Insufficient USC balance')) {
+    } else if (error.message?.includes('Insufficient stablecoin balance')) {
       throw error
     } else {
       throw new Error(error.message || 'Transaction failed')

@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react'
 import { useWallet } from '../hooks'
+import { useChainTokens } from '../hooks/useChainTokens'
 import './MarketCreation.css'
 
 function MarketCreation() {
   const { isConnected } = useWallet()
+  const { native: nativeSymbol } = useChainTokens()
   const [formData, setFormData] = useState({
     question: '',
     description: '',
@@ -65,9 +67,9 @@ function MarketCreation() {
     if (!formData.initialLiquidity) {
       newErrors.initialLiquidity = 'Initial liquidity is required'
     } else if (parseFloat(formData.initialLiquidity) < 100) {
-      newErrors.initialLiquidity = 'Minimum liquidity is 100 ETC'
+      newErrors.initialLiquidity = `Minimum liquidity is 100 ${nativeSymbol}`
     } else if (parseFloat(formData.initialLiquidity) > 1000000) {
-      newErrors.initialLiquidity = 'Maximum liquidity is 1,000,000 ETC'
+      newErrors.initialLiquidity = `Maximum liquidity is 1,000,000 ${nativeSymbol}`
     }
 
     if (!formData.resolutionCriteria.trim()) {
@@ -117,7 +119,7 @@ Market Details:
 - Question: ${formData.question}
 - Trading Ends: ${new Date(formData.tradingEndTime).toLocaleString()}
 - Resolution Date: ${new Date(formData.resolutionDate).toLocaleString()}
-- Initial Liquidity: ${formData.initialLiquidity} ETC
+- Initial Liquidity: ${formData.initialLiquidity} ${nativeSymbol}
 
 This would:
 1. Create a new prediction market contract
@@ -294,7 +296,7 @@ This would:
           
           <div className="form-group">
             <label htmlFor="initialLiquidity">
-              Initial Liquidity (ETC)
+              Initial Liquidity ({nativeSymbol})
               <span className="required" aria-label="required">*</span>
             </label>
             <input
@@ -312,7 +314,7 @@ This would:
               aria-describedby={errors.initialLiquidity ? "initialLiquidity-error" : "initialLiquidity-help"}
             />
             <small id="initialLiquidity-help" className="helper-text">
-              Minimum 100 ETC, Maximum 1,000,000 ETC
+              Minimum 100 {nativeSymbol}, Maximum 1,000,000 {nativeSymbol}
             </small>
             {errors.initialLiquidity && (
               <span 

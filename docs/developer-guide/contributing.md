@@ -172,7 +172,7 @@ export default MyComponent;
  * @notice Submit a new proposal to the DAO
  * @param title The proposal title (max 100 characters)
  * @param description Detailed proposal description
- * @param fundingAmount Amount of ETC requested
+ * @param fundingAmount Amount of  requested
  * @param recipient Address to receive funds if approved
  * @param welfareMetricId Which metric to evaluate against
  * @return proposalId The ID of the created proposal

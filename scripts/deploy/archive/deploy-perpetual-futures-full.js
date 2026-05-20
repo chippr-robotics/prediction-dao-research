@@ -13,7 +13,7 @@ const path = require("path");
  * - Saves deployment info to deployments/ directory
  *
  * Usage:
- *   npx hardhat run scripts/deploy-perpetual-futures-full.js --network mordor
+ *   npx hardhat run scripts/deploy-perpetual-futures-full.js --network amoy
  *
  * Environment variables:
  *   VERIFY=true|false         Enable/disable Blockscout verification (default: true)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -28,6 +29,7 @@ function MyMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { native: nativeSymbol } = useChainTokens()
 
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
@@ -410,7 +412,7 @@ function MyMarketsModal({
       minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
       stakePerParticipant: market.stakeAmount,
       stakeToken: market.stakeTokenAddress || null,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
+      stakeTokenSymbol: market.stakeTokenSymbol || nativeSymbol || 'MATIC',
       acceptances: market.acceptances || {},
       acceptedCount: market.acceptedCount || 0
     }
@@ -758,7 +760,7 @@ function MyMarketsModal({
 /**
  * Get display title for a market, handling encrypted markets
  */
-function getMarketDisplayTitle(market) {
+function getMarketDisplayTitle(market, nativeSymbol = 'MATIC') {
   // First check decrypted metadata (from useDecryptedMarkets hook)
   if (market.metadata && market.canView !== false) {
     const title = market.metadata.name || market.metadata.description || market.metadata.question
@@ -775,7 +777,7 @@ function getMarketDisplayTitle(market) {
       return desc
     }
     // If encrypted/private, show stake and time info
-    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || nativeSymbol}` : ''
     return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
   }
 
@@ -801,6 +803,7 @@ function MarketsTable({
   account,
   showResolveCountdown = false
 }) {
+  const { native: nativeSymbol } = useChainTokens()
   return (
     <div className="mm-table-container">
       <table className="mm-table" role="table">
@@ -821,7 +824,7 @@ function MarketsTable({
             const showDisputeBtn = showActions && canRespondToDispute?.(market)
             const showAcceptBtn = canAccept?.(market)
             const showUnderConsideration = isCreatorOfPending?.(market)
-            const displayTitle = getMarketDisplayTitle(market)
+            const displayTitle = getMarketDisplayTitle(market, nativeSymbol || 'MATIC')
 
             return (
               <tr
@@ -1073,6 +1076,7 @@ function MarketDetailView({
   isCreatorView = false,
   isHistoryView = false
 }) {
+  const { native: nativeSymbol } = useChainTokens()
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
   const endTime = market.tradingEndTime || market.endDate
@@ -1105,7 +1109,7 @@ function MarketDetailView({
                 <path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
             )}
-            {getMarketDisplayTitle(market)}
+            {getMarketDisplayTitle(market, nativeSymbol || 'MATIC')}
           </h3>
           <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
             {getStatusLabel(market.computedStatus)}
@@ -1287,6 +1291,7 @@ function ResolutionModal({
   switchNetwork
 }) {
   const { chainId } = useWeb3()
+  const { native: nativeSymbol } = useChainTokens()
   const [selectedOutcome, setSelectedOutcome] = useState(null)
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1401,7 +1406,7 @@ function ResolutionModal({
           {step === 'select' && (
             <>
               <div className="mm-resolution-market-info">
-                <h4>{getMarketDisplayTitle(market)}</h4>
+                <h4>{getMarketDisplayTitle(market, nativeSymbol || 'MATIC')}</h4>
                 <p className="mm-resolution-hint">
                   Select the winning outcome for this wager. This action will distribute
                   winnings to participants who chose correctly.
@@ -1562,6 +1567,7 @@ function DisputeModal({
   isCorrectNetwork,
   switchNetwork
 }) {
+  const { native: nativeSymbol } = useChainTokens()
   const [disputeReason, setDisputeReason] = useState('')
   const [evidenceUrl, setEvidenceUrl] = useState('')
   const [responseText, setResponseText] = useState('')
@@ -1658,7 +1664,7 @@ function DisputeModal({
           {step === 'form' && (
             <>
               <div className="mm-dispute-market-info">
-                <h4>{getMarketDisplayTitle(market)}</h4>
+                <h4>{getMarketDisplayTitle(market, nativeSymbol || 'MATIC')}</h4>
                 {market.outcome && (
                   <p className="mm-dispute-current-outcome">
                     Current resolution: <strong>{market.outcome}</strong>

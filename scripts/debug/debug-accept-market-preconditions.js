@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
  * Debug script to check all preconditions for acceptMarket
  *
  * Usage:
- *   npx hardhat run scripts/debug-accept-market-preconditions.js --network mordor
+ *   npx hardhat run scripts/debug-accept-market-preconditions.js --network amoy
  */
 
 async function main() {

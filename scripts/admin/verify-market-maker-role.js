@@ -5,7 +5,7 @@
  * Verifies and fixes the MARKET_MAKER_ROLE configuration for FriendGroupMarketFactory.
  *
  * Usage:
- *   npx hardhat run scripts/admin/verify-market-maker-role.js --network mordor
+ *   npx hardhat run scripts/admin/verify-market-maker-role.js --network amoy
  */
 
 const hre = require("hardhat");

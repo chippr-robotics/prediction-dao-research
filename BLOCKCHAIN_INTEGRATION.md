@@ -1,39 +1,37 @@
 # Blockchain Integration Guide
 
 ## Overview
-The demo mode toggle now connects to live blockchain data on the Mordor testnet when users switch from Demo Mode to Live Mode.
+The demo mode toggle connects to live blockchain data on Polygon Amoy (the Polymarket testnet) when users switch from Demo Mode to Live Mode.
 
 ## Architecture
 
 ### Configuration Layer (`config/contracts.js`)
-Stores all deployed contract addresses from the Mordor testnet deployment:
+Stores the contract addresses deployed for the active chain. The
+`sync:frontend-contracts` script populates this map from
+`deployments/<network>-<stage>-deployment.json` after each deploy:
 
 ```javascript
 export const DEPLOYED_CONTRACTS = {
-  marketFactory: '0xd1B610a650EE14e42Fb29Ec65e21C53Ea8aDb203',
-  proposalRegistry: '0xf5cB8752a95afb0264ABd2E6a7a543B795Dd0fB1',
-  welfareRegistry: '0x8fE770a847C8BE899C51C16A21aDe6b6a2a5547D',
-  // ... more contracts
+  friendGroupMarketFactory: '0x...',
+  tieredRoleManager: '0x...',
+  paymentProcessor: '0x...',
+  // ...one entry per deployed contract
 }
 ```
 
 Supports environment variable overrides:
-- `VITE_NETWORK_ID` - Network chain ID (default: 63 for Mordor)
-- `VITE_RPC_URL` - RPC endpoint (default: https://rpc.mordor.etccooperative.org)
-- `VITE_MARKETFACTORY_ADDRESS` - Override market factory address
-- `VITE_PROPOSALREGISTRY_ADDRESS` - Override proposal registry address
-- etc.
+- `VITE_NETWORK_ID` - Network chain ID (default: 80002 for Polygon Amoy)
+- `VITE_RPC_URL` - RPC endpoint (default: https://rpc-amoy.polygon.technology)
+- `VITE_<CONTRACT>_ADDRESS` - Override an individual contract address
 
 ### ABI Layer (`abis/`)
 Contains contract ABIs for:
-- **ConditionalMarketFactory** - Market creation and trading
-- **ProposalRegistry** - DAO proposals
-- **WelfareMetricRegistry** - Welfare metrics
+- **FriendGroupMarketFactory** - Friend-market creation and resolution
+- **TieredRoleManager** - Tiered membership and access control
+- **PaymentProcessor** - Stablecoin-denominated tier purchases
 
-Each ABI includes:
-- Read functions (view/pure)
-- Write functions (payable/non-payable)
-- Event definitions
+Each ABI includes read functions (view/pure), write functions
+(payable/non-payable), and event definitions.
 
 ### Blockchain Service (`utils/blockchainService.js`)
 Handles all direct contract interactions:
@@ -63,7 +61,7 @@ export async function fetchMarkets(demoMode, contracts = null) {
   if (demoMode) {
     return getMockMarkets()
   }
-  
+
   try {
     return await fetchMarketsFromBlockchain()
   } catch (error) {
@@ -150,7 +148,7 @@ import { useDataFetcher } from '../hooks/useDataFetcher'
 function MarketList() {
   const { getMarkets, demoMode } = useDataFetcher()
   const [markets, setMarkets] = useState([])
-  
+
   useEffect(() => {
     async function loadMarkets() {
       const data = await getMarkets()
@@ -158,7 +156,7 @@ function MarketList() {
     }
     loadMarkets()
   }, [getMarkets])
-  
+
   return (
     <div>
       {demoMode && <Banner>Using demo data</Banner>}
@@ -176,7 +174,7 @@ function MarketList() {
 4. Open User Management modal
 5. Go to Profile tab
 6. Toggle "Switch to Live Mode"
-7. Markets will be fetched from Mordor testnet
+7. Markets will be fetched from Polygon Amoy
 
 ## Troubleshooting
 
@@ -189,7 +187,7 @@ function MarketList() {
 ### Empty data from blockchain
 - Contracts may not have any data yet
 - Check contract addresses in `config/contracts.js`
-- Verify contracts are deployed on Mordor
+- Verify contracts are deployed on Polygon Amoy
 
 ### Slow loading
 - Blockchain queries can be slower than mock data

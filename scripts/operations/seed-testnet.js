@@ -2,9 +2,9 @@ const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
 /**
- * Garden of Eden - Mordor Testnet Seeding Script
+ * Polygon Amoy Testnet Seeding Script
  * 
- * This script seeds the Mordor testnet with dummy data and markets to simulate
+ * This script seeds the Polygon Amoy testnet with dummy data and markets to simulate
  * real-world usage of the prediction market platform. It creates markets and
  * simulates trading activity with multiple actors over time.
  * 
@@ -460,7 +460,7 @@ function setupSignalHandlers() {
 async function main() {
   console.log(`
 ${'='.repeat(70)}
-🌱 Garden of Eden - Mordor Testnet Seeding Service
+🌱 Polygon Amoy Testnet Seeding Service
 ${'='.repeat(70)}
   
 Configuration:

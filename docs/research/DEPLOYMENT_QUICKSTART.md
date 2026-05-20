@@ -1,17 +1,17 @@
 # Deployment Quick Start Guide
 
-This guide will help you quickly set up and deploy the ClearPath DAO contracts to Mordor testnet.
+This guide will help you quickly set up and deploy the ClearPath DAO contracts to Polygon Amoy (Polymarket testnet).
 
 ## Prerequisites
 
 Before deploying, you need:
 
 1. **GitHub Repository Secrets**
-   - `PRIVATE_KEY`: Your Ethereum Classic wallet private key (without `0x` prefix)
+   - `PRIVATE_KEY`: Your Polygon Amoy wallet private key (without `0x` prefix)
    
 2. **Sufficient Balance**
-   - Your wallet needs Mordor testnet ETC for gas fees
-   - Get testnet ETC from: https://github.com/chippr-robotics/mordor-public-faucet
+   - Your wallet needs Polygon Amoy (Polymarket testnet)  for gas fees
+   - Get testnet MATIC from: https://faucet.polygon.technology/
 
 ## Quick Setup (5 minutes)
 
@@ -42,9 +42,9 @@ The GitHub Actions workflow will automatically deploy the contracts.
 **Option B: Manual Deployment**
 
 1. Go to the **Actions** tab in GitHub
-2. Click **Deploy DAO Contracts to Mordor Testnet**
+2. Click **Deploy DAO Contracts to Polygon Amoy (Polymarket testnet)**
 3. Click **Run workflow**
-4. Select network: `mordor`
+4. Select network: `amoy`
 5. Click **Run workflow** button
 
 ### Step 3: View Deployment Results
@@ -56,7 +56,7 @@ After deployment completes (usually 2-3 minutes):
    - Download deployment logs from artifacts
 
 2. **On Blockscout**:
-   - Visit: https://etc-mordor.blockscout.com/
+   - Visit: https://amoy.polygonscan.com/
    - Search for contract addresses
    - Verify bytecode and transactions
 
@@ -88,17 +88,17 @@ npm ci
 # Compile contracts
 npm run compile
 
-# Deploy to Mordor testnet
-npm run deploy:mordor
+# Deploy to Polygon Amoy (Polymarket testnet)
+npm run deploy:amoy
 ```
 
 ## Deployment Details
 
-- **Network**: Ethereum Classic Mordor Testnet
+- **Network**: Polygon Amoy Polygon Amoy (Polymarket testnet)
 - **Chain ID**: 63
-- **RPC URL**: https://rpc.mordor.etccooperative.org
+- **RPC URL**: https://rpc-amoy.polygon.technology
 - **Factory**: 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7 (Safe Singleton Factory)
-- **Explorer**: https://etc-mordor.blockscout.com/
+- **Explorer**: https://amoy.polygonscan.com/
 
 ## Deterministic Deployment Benefits
 
@@ -118,7 +118,7 @@ Approximate gas costs for deployment:
 - RagequitModule: ~500,000 gas
 - FutarchyGovernor: ~1,200,000 gas
 
-**Total**: ~5,000,000 gas (~0.1 ETC at 20 gwei)
+**Total**: ~5,000,000 gas (~0.1  at 20 gwei)
 
 ## Troubleshooting
 
@@ -127,18 +127,18 @@ Approximate gas costs for deployment:
 - Ensure the secret name is exactly `PRIVATE_KEY`
 
 ### "Insufficient balance"
-- Get testnet ETC from: https://github.com/chippr-robotics/mordor-public-faucet
-- Ensure you have at least 0.2 ETC for gas fees
+- Get testnet MATIC from: https://faucet.polygon.technology/
+- Ensure you have at least 0.2  for gas fees
 
 ### "Factory not deployed"
-- Safe Singleton Factory is already deployed on Mordor
+- Safe Singleton Factory is already deployed on Polygon Amoy
 - If you see this error, check network connection
-- RPC URL should be: https://rpc.mordor.etccooperative.org
+- RPC URL should be: https://rpc-amoy.polygon.technology
 
 ### Deployment takes too long
 - Normal deployment takes 2-3 minutes
 - Check GitHub Actions logs for details
-- Mordor testnet block time is ~15 seconds
+- Polygon Amoy (Polymarket testnet) block time is ~15 seconds
 
 ### Contract already deployed
 - This is normal! The script is idempotent
@@ -172,4 +172,4 @@ For issues or questions:
 
 ---
 
-**Ready to deploy?** Follow the steps above and your contracts will be live on Mordor testnet in minutes! 🚀
+**Ready to deploy?** Follow the steps above and your contracts will be live on Polygon Amoy (Polymarket testnet) in minutes! 🚀

@@ -35,11 +35,11 @@ Before starting the migration:
 ### 1.1 Deploy MetadataRegistry Contract
 
 ```bash
-# Deploy to Mordor testnet
-npx hardhat run scripts/deploy-metadata-registry.js --network mordor
+# Deploy to Polygon Amoy (Polymarket testnet)
+npx hardhat run scripts/deploy-metadata-registry.js --network amoy
 
 # Verify contract on block explorer
-npx hardhat verify --network mordor <CONTRACT_ADDRESS>
+npx hardhat verify --network amoy <CONTRACT_ADDRESS>
 ```
 
 ### 1.2 Configure IPFS Access
@@ -305,7 +305,7 @@ main().catch(console.error)
 ### 4.2 Run Registration
 
 ```bash
-npx hardhat run scripts/register-cids.js --network mordor
+npx hardhat run scripts/register-cids.js --network amoy
 ```
 
 ### 4.3 Verify Registration

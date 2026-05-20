@@ -24,8 +24,8 @@ describe('sync-frontend-contracts script', () => {
       deploymentFile,
       JSON.stringify(
         {
-          network: 'mordor',
-          chainId: 63,
+          network: 'amoy',
+          chainId: 80002,
           deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
           contracts: {
             tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
@@ -86,8 +86,8 @@ describe('sync-frontend-contracts script', () => {
       deploymentFile,
       JSON.stringify(
         {
-          network: 'mordor',
-          chainId: 63,
+          network: 'amoy',
+          chainId: 80002,
           deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
           contracts: {
             tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',

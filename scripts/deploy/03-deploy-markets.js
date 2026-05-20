@@ -13,7 +13,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/03-deploy-markets.js --network localhost
- *   npx hardhat run scripts/deploy/03-deploy-markets.js --network mordor
+ *   npx hardhat run scripts/deploy/03-deploy-markets.js --network amoy
  *
  * Environment variables:
  *   DEPLOY_PERPETUALS=true|false - Deploy perpetual futures (default: false)
@@ -136,11 +136,11 @@ async function main() {
   console.log("\n\n--- Deploying FriendGroupMarketFactory ---");
 
   const networkName = hre.network.name;
-  // Resolve the chain stablecoin: USDC on Polygon Amoy, USC on Mordor. Fallback
-  // to the deployer address only for local/hardhat networks where there is no
+  // Resolve the chain stablecoin (USDC on Polygon Amoy). Fall back to the
+  // deployer address only for local/hardhat networks where there is no
   // stablecoin and the contract takes any non-zero address as a placeholder.
-  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
-  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USC";
+  const stableAddress = TOKENS[networkName]?.USDC;
+  const stableSymbol = "USDC";
   const collateralToken = stableAddress || deployer.address;
 
   const friendGroupMarketFactory = await deployDeterministic(
@@ -226,13 +226,13 @@ async function main() {
       }
     }
 
-    // Create default markets (BTC, ETH, ETC)
+    // Create default markets (BTC, ETH, MATIC)
     if (!perpFactory.alreadyDeployed && stableAddress) {
       console.log("\n  Creating default perpetual markets...");
       const markets = [
         { name: "BTC-PERP", oracle: deployer.address },
         { name: "ETH-PERP", oracle: deployer.address },
-        { name: "ETC-PERP", oracle: deployer.address },
+        { name: "MATIC-PERP", oracle: deployer.address },
       ];
 
       for (const market of markets) {

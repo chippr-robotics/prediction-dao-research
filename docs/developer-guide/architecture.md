@@ -98,7 +98,7 @@ The primary user-facing system. For a detailed assessment, see [P2P Wager Platfo
 ```
 1. SUBMISSION
    User → ProposalRegistry
-   - Submit with 50 ETC bond
+   - Submit with 50 MATIC bond
    - Define milestones
    - 7-day review period
 
@@ -213,17 +213,17 @@ After Resolution:
 ### Bond System
 
 ```
-Proposal Bond (50 ETC):
+Proposal Bond (50):
 - Required for proposal submission
 - Returned on good-faith resolution
 - Forfeited for spam/malicious proposals
 
-Oracle Reporter Bond (100 ETC):
+Oracle Reporter Bond (100):
 - Required for reporting welfare metrics
 - Returned if report accepted
 - Slashed if report successfully challenged
 
-Challenger Bond (150 ETC):
+Challenger Bond (150):
 - Required to challenge oracle report
 - Must exceed reporter bond (prevents cheap griefing)
 - Returned if challenge succeeds

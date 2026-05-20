@@ -9,8 +9,8 @@ import './RolePurchaseScreen.css'
 // Payment configuration
 const PAYMENT_RECEIVER_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' // Example payment address
 
-// Bronze-tier role prices, denominated in the chain stablecoin (USC on Mordor,
-// USDC on Polygon Amoy). Higher tiers (Silver, Gold, Platinum) are available
+// Bronze-tier role prices, denominated in the chain stablecoin (USDC on
+// Polygon Amoy). Higher tiers (Silver, Gold, Platinum) are available
 // on-chain with larger limits — the on-chain authoritative prices are read
 // via useTierPrices; these values are display fallbacks.
 const ROLE_PRICES = {

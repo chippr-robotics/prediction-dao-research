@@ -139,7 +139,7 @@ inputs:
   network:
     type: choice
     options:
-      - mordor
+      - amoy
 ```
 
 **Recommendation:**
@@ -276,7 +276,7 @@ No critical or high-severity vulnerabilities identified. The system is suitable 
 - Conducting professional security audit
 - Setting up monitoring and alerting
 
-**Final Assessment: APPROVED for Mordor testnet deployment**
+**Final Assessment: APPROVED for Polygon Amoy (Polymarket testnet) deployment**
 
 ---
 

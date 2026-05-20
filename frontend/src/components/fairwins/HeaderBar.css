@@ -1,6 +1,6 @@
 .header-bar {
   position: fixed;
-  top: calc(var(--dev-banner-height, 0px) + var(--limited-banner-height, 0px));
+  top: var(--dev-banner-height, 0px);
   left: 0;
   right: 0;
   width: 100%;

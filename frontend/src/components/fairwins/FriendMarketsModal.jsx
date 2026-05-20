@@ -5,7 +5,7 @@ import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications }
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
-import { TOKENS } from '../../constants/etcswap'
+import { TOKENS } from '../../constants/dex'
 import {
   WAGER_DEFAULTS,
   getDefaultEndDateTime,
@@ -30,11 +30,11 @@ import MarketAcceptanceModal from './MarketAcceptanceModal'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
 
-// Stake token options derived from ETCswap tokens
+// Stake token options derived from the active chain's tokens.
 const STAKE_TOKEN_OPTIONS = [
-  { id: 'USC', ...TOKENS.USC, isDefault: true },
-  { id: 'WETC', ...TOKENS.WETC },
-  { id: 'ETC', ...TOKENS.ETC },
+  { id: 'STABLE', ...TOKENS.STABLE, isDefault: true },
+  { id: 'WNATIVE', ...TOKENS.WNATIVE },
+  { id: 'NATIVE', ...TOKENS.NATIVE },
   { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
 ]
 
@@ -42,7 +42,7 @@ const STAKE_TOKEN_OPTIONS = [
 const formatUSD = (amount, symbol) => {
   const num = parseFloat(amount) || 0
   // Only show USD formatting for stablecoins
-  const isStablecoin = symbol === 'USC' || symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
+  const isStablecoin = symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
 
   if (isStablecoin) {
     if (num === 0) return '$0.00'
@@ -71,7 +71,7 @@ const getMarketDescription = (market) => {
   }
 
   // For encrypted/private wagers, show stake and time info instead of generic label
-  const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+  const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'MATIC'}` : ''
   return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
 }
 
@@ -101,7 +101,7 @@ function FriendMarketsModal({
 
   // Per-chain capabilities — drives which resolution-type options the user
   // sees. Polymarket-pegged side bets only render on chains where the
-  // Polymarket CTF is reachable (Amoy today; not Mordor).
+  // Polymarket CTF is reachable (Polygon Amoy today).
   const { capabilities, networkName } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
 
@@ -451,7 +451,7 @@ function FriendMarketsModal({
       minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
       stakePerParticipant: market.stakeAmount,
       stakeToken: market.stakeTokenAddress || null,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
+      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC',
       acceptances: market.acceptances || {},
       acceptedCount: market.acceptedCount || 0,
       // Encryption fields for decryption in the acceptance modal
@@ -482,7 +482,7 @@ function FriendMarketsModal({
       url: getMarketUrl(market),
       description: getMarketDescription(market),
       stakeAmount: market.stakeAmount,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC'
+      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC'
     })
     setShowShareModal(true)
   }
@@ -784,7 +784,7 @@ function FriendMarketsModal({
           }
         }
         const token = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
-        return token || STAKE_TOKEN_OPTIONS[0] // Default to USC if not found
+        return token || STAKE_TOKEN_OPTIONS[0] // Default to STABLE if not found
       }
       const stakeToken = getStakeTokenInfo()
 
@@ -850,7 +850,7 @@ function FriendMarketsModal({
           // Pass calculated trading period so WalletButton uses the user's selected end date
           tradingPeriod: tradingPeriodDays,
           // Pass actual token address so WalletButton can use correct decimals
-          // 'native' means native ETC (no ERC20 address), pass null for this case
+          // 'native' means the chain's native token (no ERC20 address), pass null for this case
           collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null),
           // Include encrypted metadata (opponent's key wrapped via on-chain registry)
           encryptedMetadata: enableEncryption ? finalMetadata : null,
@@ -1021,7 +1021,7 @@ function FriendMarketsModal({
       marketId: market.id,
       creator: market.creator || account || '',
       stake: market.stakeAmount || '0',
-      token: market.stakeTokenSymbol || 'ETC',
+      token: market.stakeTokenSymbol || 'MATIC',
       deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
     })
 
@@ -1420,7 +1420,7 @@ function FriendMarketsModal({
                         Stake Amount <span className="fm-required">*</span>
                       </label>
                       <div className="fm-stake-input-wrapper">
-                        {(formData.stakeTokenId === 'USC' || formData.stakeTokenId === 'CUSTOM') && (
+                        {(formData.stakeTokenId === 'STABLE' || formData.stakeTokenId === 'CUSTOM') && (
                           <span className="fm-stake-prefix">$</span>
                         )}
                         <input
@@ -1428,19 +1428,19 @@ function FriendMarketsModal({
                           type="number"
                           value={formData.stakeAmount}
                           onChange={(e) => handleFormChange('stakeAmount', e.target.value)}
-                          placeholder={formData.stakeTokenId === 'USC' ? '10.00' : '10'}
+                          placeholder={formData.stakeTokenId === 'STABLE' ? '10.00' : '10'}
                           min="0.1"
                           max="1000"
                           step="0.01"
                           disabled={submitting}
-                          className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'USC' ? 'fm-stake-usd' : ''}`}
+                          className={`${errors.stakeAmount ? 'error' : ''} ${formData.stakeTokenId === 'STABLE' ? 'fm-stake-usd' : ''}`}
                         />
-                        {formData.stakeTokenId !== 'USC' && formData.stakeTokenId !== 'CUSTOM' && (
-                          <span className="fm-stake-suffix">{selectedStakeToken?.symbol || 'ETC'}</span>
+                        {formData.stakeTokenId !== 'STABLE' && formData.stakeTokenId !== 'CUSTOM' && (
+                          <span className="fm-stake-suffix">{selectedStakeToken?.symbol || 'MATIC'}</span>
                         )}
                       </div>
                       <span className="fm-hint">
-                        {formData.stakeTokenId === 'USC'
+                        {formData.stakeTokenId === 'STABLE'
                           ? 'Enter amount in USD (e.g., 10.00 for $10)'
                           : `Enter amount in ${selectedStakeToken?.symbol || 'tokens'}`}
                       </span>
@@ -1465,11 +1465,11 @@ function FriendMarketsModal({
                         ))}
                       </select>
                       <span className="fm-hint">
-                        {formData.stakeTokenId === 'ETC'
-                          ? 'Native ETC will be used for stakes'
+                        {formData.stakeTokenId === 'NATIVE'
+                          ? 'The chain native token will be used for stakes'
                           : formData.stakeTokenId === 'CUSTOM'
                           ? 'Enter custom token address below'
-                          : `${selectedStakeToken?.name} from ETCswap`}
+                          : `${selectedStakeToken?.name} from the active chain`}
                       </span>
                     </div>
 
@@ -1884,7 +1884,7 @@ function FriendMarketsModal({
                       currentStep={submitting ? txProgress.step : 'idle'}
                       error={txProgress.error}
                       txHash={txProgress.txHash}
-                      isNativeToken={formData.stakeTokenId === 'ETC'}
+                      isNativeToken={formData.stakeTokenId === 'NATIVE'}
                       pendingState={!submitting && pendingTransaction ? {
                         step: pendingTransaction.step,
                         txHash: pendingTransaction.txHash,

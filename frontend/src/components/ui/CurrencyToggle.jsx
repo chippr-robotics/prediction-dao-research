@@ -1,20 +1,23 @@
 import { usePrice } from '../../contexts/PriceContext'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import './CurrencyToggle.css'
 
 function CurrencyToggle() {
-  const { showUsd, toggleCurrency, etcUsdRate, loading } = usePrice()
+  const { showUsd, toggleCurrency, nativeUsdRate, loading } = usePrice()
+  const { native: nativeSymbol } = useChainTokens()
+  const symbol = nativeSymbol || 'MATIC'
 
   return (
     <button
       className="currency-toggle"
       onClick={toggleCurrency}
-      aria-label={`Currently showing prices in ${showUsd ? 'USD' : 'ETC'}. Click to toggle to ${showUsd ? 'ETC' : 'USD'}`}
-      title={`Toggle between USD and ETC${etcUsdRate ? ` (1 ETC = $${etcUsdRate.toFixed(2)})` : ''}`}
+      aria-label={`Currently showing prices in ${showUsd ? 'USD' : symbol}. Click to toggle to ${showUsd ? symbol : 'USD'}`}
+      title={`Toggle between USD and ${symbol}${nativeUsdRate ? ` (1 ${symbol} = $${nativeUsdRate.toFixed(2)})` : ''}`}
       disabled={loading}
     >
       <span className={`currency-option ${showUsd ? 'active' : ''}`}>USD</span>
       <span className="currency-divider">|</span>
-      <span className={`currency-option ${!showUsd ? 'active' : ''}`}>ETC</span>
+      <span className={`currency-option ${!showUsd ? 'active' : ''}`}>{symbol}</span>
     </button>
   )
 }

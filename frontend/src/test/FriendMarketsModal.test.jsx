@@ -10,7 +10,7 @@ import {
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
-  ETCswapProvider,
+  DexProvider,
   PriceProvider
 } from '../contexts'
 
@@ -150,8 +150,8 @@ const mockActiveMarkets = [
     type: 'oneVsOne',
     description: 'Patriots will win the Super Bowl',
     stakeAmount: '10',
-    stakeTokenId: 'USC',
-    stakeTokenSymbol: 'USC',
+    stakeTokenId: 'STABLE',
+    stakeTokenSymbol: 'USDC',
     stakeTokenIcon: '💵',
     tradingPeriod: '7',
     participants: ['0x1234567890123456789012345678901234567890', '0xabcdef1234567890123456789012345678901234'],
@@ -165,8 +165,8 @@ const mockActiveMarkets = [
     type: 'smallGroup',
     description: 'BTC will reach $100k by EOY',
     stakeAmount: '25',
-    stakeTokenId: 'USC',
-    stakeTokenSymbol: 'USC',
+    stakeTokenId: 'STABLE',
+    stakeTokenSymbol: 'USDC',
     stakeTokenIcon: '💵',
     tradingPeriod: '30',
     participants: [
@@ -187,8 +187,8 @@ const mockPastMarkets = [
     type: 'eventTracking',
     description: 'World Cup Final Winner',
     stakeAmount: '50',
-    stakeTokenId: 'USC',
-    stakeTokenSymbol: 'USC',
+    stakeTokenId: 'STABLE',
+    stakeTokenSymbol: 'USDC',
     stakeTokenIcon: '💵',
     tradingPeriod: '14',
     participants: [
@@ -242,13 +242,13 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
         <ThemeProvider>
           <WalletProvider>
             <UserPreferencesProvider>
-              <ETCswapProvider>
+              <DexProvider>
                 <UIProvider>
                   <PriceProvider>
                     {ui}
                   </PriceProvider>
                 </UIProvider>
-              </ETCswapProvider>
+              </DexProvider>
             </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>

@@ -12,7 +12,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/05-configure.js --network localhost
- *   npx hardhat run scripts/deploy/05-configure.js --network mordor
+ *   npx hardhat run scripts/deploy/05-configure.js --network amoy
  */
 
 const hre = require("hardhat");

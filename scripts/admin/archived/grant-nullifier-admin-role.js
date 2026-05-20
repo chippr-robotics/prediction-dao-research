@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * - Reinstate previously nullified markets/addresses
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/grant-nullifier-admin-role.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/grant-nullifier-admin-role.js --network amoy
  */
 
 // Update this with the deployed NullifierRegistry address
@@ -29,7 +29,7 @@ async function main() {
     console.error("\nERROR: NullifierRegistry address not set!");
     console.error("Please set CONTRACTS.nullifierRegistry to the deployed address.");
     console.error("Example: const CONTRACTS = { nullifierRegistry: '0x...' };");
-    console.error("Deploy with: npx hardhat run scripts/deploy-nullifier-registry.js --network mordor");
+    console.error("Deploy with: npx hardhat run scripts/deploy-nullifier-registry.js --network amoy");
     process.exit(1);
   }
 

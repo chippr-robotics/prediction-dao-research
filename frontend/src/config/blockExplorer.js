@@ -5,9 +5,8 @@
  * defined in frontend/src/config/networks.js — this file derives from there so
  * adding a new chain only requires touching one config.
  *
- * The "Blockscout" naming in some helpers is historical (the app started on
- * ETC, which uses Blockscout). On Polygon Amoy the explorer is Polygonscan,
- * but the URL-shape helpers below are compatible with both.
+ * Helper names that contain "Blockscout" are historical and are kept as
+ * aliases; the URL-shape helpers below work with Polygonscan on Amoy.
  */
 
 import { NETWORKS, getNetwork } from './networks'

@@ -28,8 +28,8 @@ const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_ADDRESS || '0x0000000000000
 const DEMO_USER_DAOS = [
   {
     id: '1',
-    name: 'Ethereum Classic Governance',
-    description: 'The primary governance DAO for Ethereum Classic ecosystem decisions and treasury management.',
+    name: 'Polymarket Governance Demo',
+    description: 'Demo governance DAO for Polymarket-pegged side bets on Polygon Amoy.',
     futarchyGovernor: '0x1234567890123456789012345678901234567890',
     welfareRegistry: '0x2345678901234567890123456789012345678901',
     proposalRegistry: '0x3456789012345678901234567890123456789012',
@@ -42,12 +42,12 @@ const DEMO_USER_DAOS = [
     createdAt: BigInt(Date.now() - 90 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 1247,
-    treasuryBalance: '125,000 ETC'
+    treasuryBalance: '125,000 USDC'
   },
   {
     id: '2',
     name: 'DeFi Innovation Fund',
-    description: 'A community-driven fund for supporting innovative DeFi projects on Ethereum Classic.',
+    description: 'Demo fund that backs DeFi-themed prediction markets on Polygon Amoy.',
     futarchyGovernor: '0xaaaa567890123456789012345678901234567890',
     welfareRegistry: '0xbbbb678901234567890123456789012345678901',
     proposalRegistry: '0xcccc789012345678901234567890123456789012',
@@ -60,7 +60,7 @@ const DEMO_USER_DAOS = [
     createdAt: BigInt(Date.now() - 45 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 523,
-    treasuryBalance: '45,000 ETC'
+    treasuryBalance: '45,000 USDC'
   },
   {
     id: '3',
@@ -78,7 +78,7 @@ const DEMO_USER_DAOS = [
     createdAt: BigInt(Date.now() - 120 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 89,
-    treasuryBalance: '78,500 ETC'
+    treasuryBalance: '78,500 USDC'
   }
 ]
 
@@ -86,7 +86,7 @@ const DEMO_ALL_DAOS = [
   {
     id: '4',
     name: 'NFT Creators Collective',
-    description: 'A DAO for NFT artists and creators to collaborate and share resources on ETC.',
+    description: 'Demo DAO for NFT-themed prediction markets and creator collaboration.',
     futarchyGovernor: '0xDDDD567890123456789012345678901234567890',
     welfareRegistry: '0xEEEE678901234567890123456789012345678901',
     proposalRegistry: '0xFFFF789012345678901234567890123456789012',
@@ -99,12 +99,12 @@ const DEMO_ALL_DAOS = [
     createdAt: BigInt(Date.now() - 30 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 312,
-    treasuryBalance: '12,000 ETC'
+    treasuryBalance: '12,000 USDC'
   },
   {
     id: '5',
     name: 'Infrastructure Builders Guild',
-    description: 'Supporting core infrastructure development for the Ethereum Classic network.',
+    description: 'Demo guild that funds infrastructure for Polygon-resident prediction markets.',
     futarchyGovernor: '0x6666567890123456789012345678901234567890',
     welfareRegistry: '0x7777678901234567890123456789012345678901',
     proposalRegistry: '0x8888789012345678901234567890123456789012',
@@ -117,7 +117,7 @@ const DEMO_ALL_DAOS = [
     createdAt: BigInt(Date.now() - 60 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 156,
-    treasuryBalance: '95,000 ETC'
+    treasuryBalance: '95,000 USDC'
   },
   {
     id: '6',
@@ -135,7 +135,7 @@ const DEMO_ALL_DAOS = [
     createdAt: BigInt(Date.now() - 15 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 678,
-    treasuryBalance: '22,500 ETC'
+    treasuryBalance: '22,500 USDC'
   }
 ]
 

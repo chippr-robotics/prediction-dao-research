@@ -21,8 +21,7 @@ const toViemChain = (n) => ({
 
 const networkId = getCurrentChainId()
 
-// RPC URL override (legacy env var preserved for back-compat with existing
-// deployments that set VITE_RPC_URL when targeting Mordor).
+// RPC URL override for the active chain via VITE_RPC_URL.
 const rpcUrl = import.meta.env.VITE_RPC_URL || getNetwork(networkId).rpcUrl
 
 // Get WalletConnect project ID from environment

@@ -14,15 +14,15 @@ async function deployPerpetualFuturesFixture() {
   const collateralToken = await MockERC20.deploy("USD Coin", "USC", ethers.parseEther("100000000"));
   await collateralToken.waitForDeployment();
 
-  // Deploy a second collateral token (WETC)
-  const wetcToken = await MockERC20.deploy("Wrapped ETC", "WETC", ethers.parseEther("100000000"));
-  await wetcToken.waitForDeployment();
+  // Deploy a second collateral token (wrapped native)
+  const wmaticToken = await MockERC20.deploy("Wrapped MATIC", "WMATIC", ethers.parseEther("100000000"));
+  await wmaticToken.waitForDeployment();
 
   // Distribute tokens to test accounts
   const distributionAmount = ethers.parseEther("1000000");
   for (const account of [trader1, trader2, trader3, liquidator]) {
     await collateralToken.transfer(account.address, distributionAmount);
-    await wetcToken.transfer(account.address, distributionAmount);
+    await wmaticToken.transfer(account.address, distributionAmount);
   }
 
   // Deploy FundingRateEngine
@@ -41,7 +41,7 @@ async function deployPerpetualFuturesFixture() {
   await perpFactory.waitForDeployment();
 
   // Configure allowed collateral tokens
-  await perpFactory.setAllowedCollateralToken(await wetcToken.getAddress(), true);
+  await perpFactory.setAllowedCollateralToken(await wmaticToken.getAddress(), true);
 
   // Configure funding rate engine
   await fundingRateEngine.setPriceUpdater(await perpFactory.getAddress(), true);
@@ -52,7 +52,7 @@ async function deployPerpetualFuturesFixture() {
       fundingRateEngine,
       perpFactory,
       collateralToken,
-      wetcToken
+      wmaticToken
     },
     accounts: {
       owner,
@@ -158,7 +158,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
     it("Should create multiple markets with different configurations", async function () {
       const { contracts } = await loadFixture(deployPerpetualFuturesFixture);
-      const { perpFactory, collateralToken, wetcToken } = contracts;
+      const { perpFactory, collateralToken, wmaticToken } = contracts;
 
       console.log("\n=== Multi-Market Creation Test ===\n");
 
@@ -191,12 +191,12 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
         ethConfig
       );
 
-      // Create ETC market with WETC collateral
+      // Create native-token-pegged market with wrapped-native collateral
       const { market: etcMarket } = await createTestMarket(
         perpFactory,
-        "ETC Perpetual",
-        "ETC",
-        wetcToken,
+        "MATIC Perpetual",
+        "MATIC",
+        wmaticToken,
         ethers.parseEther("25")
       );
 
@@ -213,12 +213,12 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       expect(ethMarketConfig.maxLeverage).to.equal(15n * 10000n);
       expect(ethMarketConfig.fundingInterval).to.equal(4n * 3600n);
 
-      // Verify ETC market uses different collateral
-      expect(await etcMarket.collateralToken()).to.equal(await wetcToken.getAddress());
+      // Verify MATIC market uses different collateral
+      expect(await etcMarket.collateralToken()).to.equal(await wmaticToken.getAddress());
 
       console.log("  ✓ BTC market created at:", await btcMarket.getAddress());
       console.log("  ✓ ETH market created with custom config");
-      console.log("  ✓ ETC market created with WETC collateral");
+      console.log("  ✓ MATIC market created with WMATIC collateral");
     });
 
     it("Should retrieve markets by category and asset", async function () {

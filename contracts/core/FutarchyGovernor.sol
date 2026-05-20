@@ -60,7 +60,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
     // Treasury management
     address public treasuryVault;
-    uint256 public constant MAX_DAILY_SPENDING = 100_000 ether; // 100k ETC
+    uint256 public constant MAX_DAILY_SPENDING = 100_000 ether; // 100k native units (MATIC on Polygon Amoy)
     mapping(uint256 => uint256) public dailySpending; // day => amount
 
     // Timelock
@@ -309,7 +309,7 @@ contract FutarchyGovernor is Ownable, ReentrancyGuard {
 
         // Execute fund transfer based on token type
         if (fundingToken == address(0)) {
-            // Native token (ETH/ETC)
+            // The chain native token
             (bool success, ) = payable(recipient).call{value: fundingAmount}("");
             require(success, "Transfer failed");
         } else {

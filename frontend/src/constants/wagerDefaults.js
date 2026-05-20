@@ -12,8 +12,8 @@ export const WAGER_DEFAULTS = {
   /** Default stake amount (string, token units) */
   STAKE_AMOUNT: '10',
 
-  /** Default stake token id */
-  STAKE_TOKEN_ID: 'USC',
+  /** Default stake token id — the chain stablecoin (USDC on Polygon Amoy). */
+  STAKE_TOKEN_ID: 'STABLE',
 
   /** Max allowed stake amount (used in validation) */
   MAX_STAKE: 1000,

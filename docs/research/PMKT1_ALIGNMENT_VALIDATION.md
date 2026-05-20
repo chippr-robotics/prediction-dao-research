@@ -122,7 +122,7 @@ require(collateralToken != address(0), "CTF requires ERC20 collateral");
 {
     name: "PredictionMarketExchange",
     version: "1",
-    chainId: 61,  // ETC mainnet
+    chainId: 61,  //  mainnet
     verifyingContract: <exchange_address>
 }
 ```

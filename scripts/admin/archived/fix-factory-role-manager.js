@@ -5,7 +5,7 @@ const { ethers } = require("hardhat");
  * Fix the factory's roleManager to use the newer RoleManagerCore
  * that has the checkMarketCreationLimitFor function
  *
- * Run with: npx hardhat run scripts/fix-factory-role-manager.js --network mordor
+ * Run with: npx hardhat run scripts/fix-factory-role-manager.js --network amoy
  */
 
 async function main() {

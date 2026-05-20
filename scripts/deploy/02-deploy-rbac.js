@@ -14,7 +14,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network localhost
- *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network mordor
+ *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -99,8 +99,8 @@ async function main() {
   }
 
   // Build tier configs using the chain stablecoin's decimals so prices and
-  // limits encode to the correct on-chain unit count. Both Mordor (USC) and
-  // Amoy (USDC) are 6-dec; STABLECOIN_DECIMALS encodes this per network.
+  // limits encode to the correct on-chain unit count. Polygon Amoy stablecoin (USDC) is 6-dec; STABLECOIN_DECIMALS
+  // encodes this per network and preserves compatibility for local mocks.
   const stableDecimals = STABLECOIN_DECIMALS[hre.network.name] ?? 6;
   const friendMarketTiers = buildFriendMarketTiers(stableDecimals);
   const marketMakerTiers = buildMarketMakerTiers(stableDecimals);
@@ -304,7 +304,7 @@ async function main() {
   // =========================================================================
   console.log("\n\n--- Configuring Payment Manager ---");
 
-  // Resolve the chain stablecoin (USDC on Polygon Amoy, USC on Mordor).
+  // Resolve the chain stablecoin (USDC on Polygon Amoy).
   const networkName = hre.network.name;
   const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
   const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USC";

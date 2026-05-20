@@ -10,7 +10,7 @@ import {
   deriveKeyPairFromSignature,
   isXWingEnvelope,
 } from '../../utils/crypto/envelopeEncryption'
-import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { DEX_ADDRESSES } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { getContractAddress } from '../../config/contracts'
@@ -20,7 +20,7 @@ import './MarketAcceptanceModal.css'
 const formatUSD = (amount, symbol) => {
   const num = parseFloat(amount) || 0
   // Only show USD formatting for stablecoins
-  const isStablecoin = symbol === 'USC' || symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
+  const isStablecoin = symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
 
   if (isStablecoin) {
     if (num === 0) return '$0.00'
@@ -333,15 +333,15 @@ function MarketAcceptanceModal({
         const stakeTokenAddress = onChainMarket.stakeToken
 
         // Determine token decimals for display purposes
-        const isUSC = stakeTokenAddress &&
-          stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES?.USC_STABLECOIN?.toLowerCase()
-        const tokenDecimals = isUSC ? 6 : 18
+        const isStable = stakeTokenAddress &&
+          stakeTokenAddress.toLowerCase() === DEX_ADDRESSES?.STABLECOIN?.toLowerCase()
+        const tokenDecimals = isStable ? 6 : 18
 
         console.log('Stake calculation (using on-chain value):', {
           stakePerParticipantFormatted: marketData.stakePerParticipant,
           stakePerParticipantOnChain: stakeAmount.toString(),
           stakeToken: stakeTokenAddress,
-          isUSC,
+          isStable,
           tokenDecimals
         })
 
@@ -419,7 +419,7 @@ function MarketAcceptanceModal({
 
       // Pre-flight check: detect proposalId collisions that would cause activation
       // to revert. This is more reliable than staticCall on chains where eth_call
-      // may not fully propagate cross-contract revert reasons (e.g. ETC Mordor).
+      // may not fully propagate cross-contract revert reasons.
       console.log('Running pre-flight activation check...')
       try {
         const [acceptedCountRaw, marketData] = await Promise.all([

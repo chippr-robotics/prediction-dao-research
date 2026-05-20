@@ -6,7 +6,7 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
+import { purchaseRoleWithStablecoin, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -126,7 +126,7 @@ const ROLE_DETAILS = {
     features: [
       'Mint custom ERC20 tokens',
       'Create NFT collections',
-      'Integrate with ETC swap',
+      'Integrate with the active chain DEX',
       'Token management tools'
     ],
     fundsDestination: 'DAO Treasury',
@@ -178,8 +178,8 @@ const ROLE_BENEFIT_CATEGORIES = {
 }
 
 // Note: Tier prices are fetched from TierRegistry contract via useTierPrices.
-// All prices are denominated in the chain stablecoin (USC on Mordor, USDC on
-// Polygon Amoy); the chain native token is only used for gas.
+// All prices are denominated in the chain stablecoin (USDC on Polygon Amoy);
+// the chain native token is only used for gas.
 
 /**
  * RoleBenefitsDisplay - Renders role-specific tier benefits
@@ -661,7 +661,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
         try {
           // Execute blockchain transaction with verified signer
-          const receipt = await purchaseRoleWithUSC(verifiedSigner, roleName, price, tierValue)
+          const receipt = await purchaseRoleWithStablecoin(verifiedSigner, roleName, price, tierValue)
 
           // Grant the role to the current user
           grantRole(roleKey)

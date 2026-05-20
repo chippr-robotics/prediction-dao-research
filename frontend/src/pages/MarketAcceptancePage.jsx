@@ -5,38 +5,46 @@ import { useWallet, useWeb3 } from '../hooks'
 import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { getContractAddress } from '../config/contracts'
-import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
+import { DEX_ADDRESSES } from '../constants/dex'
+import { getNetwork, getCurrentChainId } from '../config/networks'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import { parseEncryptedIpfsReference } from '../utils/ipfsService'
 import './MarketAcceptancePage.css'
 
 /**
- * Determine token symbol based on token address
+ * Determine token symbol based on token address.
+ *
+ * Native (ZeroAddress) → active chain's native symbol (MATIC on Amoy).
+ * Stablecoin address → active chain's stable symbol (USDC on Amoy).
+ * Anything else falls back to a generic label.
  */
 function getTokenSymbol(tokenAddress) {
+  const network = getNetwork(getCurrentChainId())
   if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
-    return 'ETC'
+    return network?.nativeCurrency?.symbol || 'MATIC'
   }
   const addr = tokenAddress.toLowerCase()
-  if (addr === ETCSWAP_ADDRESSES.USC_STABLECOIN?.toLowerCase()) {
-    return 'USC'
+  if (addr === DEX_ADDRESSES.STABLECOIN?.toLowerCase()) {
+    return network?.stablecoin?.symbol || 'USDC'
   }
-  if (addr === ETCSWAP_ADDRESSES.WETC?.toLowerCase()) {
-    return 'WETC'
+  if (addr === DEX_ADDRESSES.WNATIVE?.toLowerCase()) {
+    const sym = network?.nativeCurrency?.symbol
+    return sym ? `W${sym}` : 'WNATIVE'
   }
   return 'tokens'
 }
 
 /**
- * Get decimal places for a token
+ * Get decimal places for a token.
  */
 function getTokenDecimals(tokenAddress) {
   if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
     return 18
   }
   const addr = tokenAddress.toLowerCase()
-  if (addr === ETCSWAP_ADDRESSES.USC_STABLECOIN?.toLowerCase()) {
-    return 6 // USC has 6 decimals
+  if (addr === DEX_ADDRESSES.STABLECOIN?.toLowerCase()) {
+    const network = getNetwork(getCurrentChainId())
+    return network?.stablecoin?.decimals ?? 6
   }
   return 18
 }

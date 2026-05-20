@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/deploy-zk-key-manager.js --network localhost
- *   npx hardhat run scripts/deploy/deploy-zk-key-manager.js --network mordor
+ *   npx hardhat run scripts/deploy/deploy-zk-key-manager.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -91,9 +91,9 @@ async function main() {
 
   console.log(`\nDeployment saved to: ${filename}`);
 
-  // Verify on Blockscout if on Mordor
-  if (hre.network.name === "mordor") {
-    console.log("\n--- Verifying on Blockscout ---");
+  // Verify on the chain's block explorer (Polygonscan on Amoy).
+  if (hre.network.name === "amoy") {
+    console.log("\n--- Verifying on Polygonscan ---");
     await verifyOnBlockscout({
       name: "ZKKeyManager",
       address: deployments.zkKeyManager,

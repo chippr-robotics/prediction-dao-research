@@ -47,24 +47,24 @@ const MAX_VALID_DATE = new Date('2100-01-01T00:00:00Z').getTime()
 const DEMO_USER_DAOS = [
   {
     id: '1',
-    name: 'Ethereum Classic Governance',
-    description: 'The primary governance DAO for Ethereum Classic ecosystem decisions and treasury management.',
+    name: 'Polymarket Governance Demo',
+    description: 'Demo governance DAO for Polymarket-pegged side bets on Polygon Amoy.',
     creator: '0x9012345678901234567890123456789012345678',
     createdAt: BigInt(Date.now() - 90 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 1247,
-    treasuryBalance: '125,000 ETC',
+    treasuryBalance: '125,000 USDC',
     proposalCount: 24
   },
   {
     id: '2',
     name: 'DeFi Innovation Fund',
-    description: 'A community-driven fund for supporting innovative DeFi projects on Ethereum Classic.',
+    description: 'Demo fund that backs DeFi-themed prediction markets on Polygon Amoy.',
     creator: '0x3333345678901234567890123456789012345678',
     createdAt: BigInt(Date.now() - 45 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 523,
-    treasuryBalance: '45,000 ETC',
+    treasuryBalance: '45,000 USDC',
     proposalCount: 12
   },
   {
@@ -75,7 +75,7 @@ const DEMO_USER_DAOS = [
     createdAt: BigInt(Date.now() - 120 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 89,
-    treasuryBalance: '78,500 ETC',
+    treasuryBalance: '78,500 USDC',
     proposalCount: 8
   }
 ]
@@ -84,23 +84,23 @@ const DEMO_ALL_DAOS = [
   {
     id: '4',
     name: 'NFT Creators Collective',
-    description: 'A DAO for NFT artists and creators to collaborate and share resources on ETC.',
+    description: 'Demo DAO for NFT-themed prediction markets and creator collaboration.',
     creator: '0x5555345678901234567890123456789012345678',
     createdAt: BigInt(Date.now() - 30 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 312,
-    treasuryBalance: '12,000 ETC',
+    treasuryBalance: '12,000 USDC',
     proposalCount: 6
   },
   {
     id: '5',
     name: 'Infrastructure Builders Guild',
-    description: 'Supporting core infrastructure development for the Ethereum Classic network.',
+    description: 'Demo guild that funds infrastructure for Polygon-resident prediction markets.',
     creator: '0xEEEE345678901234567890123456789012345678',
     createdAt: BigInt(Date.now() - 60 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 156,
-    treasuryBalance: '95,000 ETC',
+    treasuryBalance: '95,000 USDC',
     proposalCount: 15
   },
   {
@@ -111,7 +111,7 @@ const DEMO_ALL_DAOS = [
     createdAt: BigInt(Date.now() - 15 * 24 * 60 * 60 * 1000),
     active: true,
     memberCount: 678,
-    treasuryBalance: '22,500 ETC',
+    treasuryBalance: '22,500 USDC',
     proposalCount: 4
   }
 ]
@@ -122,7 +122,7 @@ const DEMO_PROPOSALS = [
     title: 'Treasury Diversification Strategy',
     description: 'Proposal to diversify 20% of treasury holdings into stable assets.',
     daoId: '1',
-    daoName: 'Ethereum Classic Governance',
+    daoName: 'Polymarket Governance Demo',
     status: 'active',
     votesFor: 847,
     votesAgainst: 234,
@@ -132,7 +132,7 @@ const DEMO_PROPOSALS = [
   {
     id: 'prop-2',
     title: 'Grant Program Q1 2026',
-    description: 'Allocate 10,000 ETC for developer grants in Q1 2026.',
+    description: 'Allocate 10,000 USDC for developer grants in Q1 2026.',
     daoId: '2',
     daoName: 'DeFi Innovation Fund',
     status: 'active',
@@ -684,7 +684,7 @@ function DAOCompactList({ daos, onSelect, showJoinButton = false }) {
           onClick={() => onSelect(dao)}
           onKeyDown={(e) => handleKeyDown(e, dao)}
           type="button"
-          aria-label={`${dao.name}, ${dao.memberCount || 0} members, ${dao.treasuryBalance || '0 ETC'} treasury`}
+          aria-label={`${dao.name}, ${dao.memberCount || 0} members, ${dao.treasuryBalance || '0 USDC'} treasury`}
         >
           <div className="cp-dao-card-main">
             <div className="cp-dao-avatar">
@@ -701,7 +701,7 @@ function DAOCompactList({ daos, onSelect, showJoinButton = false }) {
               <span className="cp-dao-stat-label">Members</span>
             </div>
             <div className="cp-dao-stat">
-              <span className="cp-dao-stat-value">{dao.treasuryBalance || '0 ETC'}</span>
+              <span className="cp-dao-stat-value">{dao.treasuryBalance || '0 USDC'}</span>
               <span className="cp-dao-stat-label">Treasury</span>
             </div>
             {showJoinButton && (
@@ -751,7 +751,7 @@ function DAODetailView({ dao, onBack, formatDate, formatAddress, showJoinButton 
         </div>
         <div className="cp-detail-item">
           <span className="cp-detail-label">Treasury</span>
-          <span className="cp-detail-value">{dao.treasuryBalance || '0 ETC'}</span>
+          <span className="cp-detail-value">{dao.treasuryBalance || '0 USDC'}</span>
         </div>
         <div className="cp-detail-item">
           <span className="cp-detail-label">Proposals</span>

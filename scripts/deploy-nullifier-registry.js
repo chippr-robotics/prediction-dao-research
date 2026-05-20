@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
  * Deploy NullifierRegistry and configure integration with FGMF
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/deploy-nullifier-registry.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/deploy-nullifier-registry.js --network amoy
  */
 
 const CONTRACTS = {
@@ -22,7 +22,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   console.log("Deployer address:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   // Deploy NullifierRegistry
   console.log("\n--- Deploying NullifierRegistry ---");

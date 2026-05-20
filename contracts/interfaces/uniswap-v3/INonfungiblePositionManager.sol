@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /**
  * @title INonfungiblePositionManager
  * @notice Wraps Uniswap V3 positions in the ERC721 non-fungible token interface
- * @dev Compatible with ETCSwap v3
+ * @dev Compatible with any Uniswap V3-style DEX
  * Reference: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/INonfungiblePositionManager.sol
  */
 interface INonfungiblePositionManager {

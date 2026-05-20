@@ -4,6 +4,7 @@ import { useWallet, useWalletConnection, useWalletRoles, useTheme } from '../../
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { usePrice } from '../../contexts/PriceContext'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import SwapPanel from '../fairwins/SwapPanel'
 import PremiumPurchaseModal from './PremiumPurchaseModal'
@@ -17,7 +18,7 @@ import './FairWinsUserModal.css'
  * - User profile and wallet management
  * - Theme switching (light/dark mode)
  * - Platform switching (FairWins/ClearPath)
- * - Currency display toggle (USD/ETC)
+ * - Currency display toggle (USD/native)
  * - Role management and purchasing
  * - Demo mode toggle
  * - ClearPath status management
@@ -36,6 +37,8 @@ function FairWinsUserModal() {
   const { toggleMode, isDark, setThemePlatform, isClearPath } = useTheme()
   const priceContext = usePrice() || {}
   const { showUsd = false, toggleCurrency = () => {} } = priceContext
+  const { native: nativeSymbol } = useChainTokens()
+  const symbol = nativeSymbol || 'MATIC'
   const navigate = useNavigate()
   
   const [activeTab, setActiveTab] = useState('profile')
@@ -360,19 +363,19 @@ function FairWinsUserModal() {
                   </span>
                   <div className="fwum-setting-text">
                     <strong>Currency</strong>
-                    <p>Toggle between USD and ETC display</p>
+                    <p>Toggle between USD and {symbol} display</p>
                   </div>
                 </div>
                 <button
                   className="fwum-toggle-btn"
                   onClick={toggleCurrency}
                   aria-pressed={showUsd}
-                  aria-label={`Switch to ${showUsd ? 'ETC' : 'USD'} display`}
+                  aria-label={`Switch to ${showUsd ? symbol : 'USD'} display`}
                 >
                   <span className="fwum-toggle-track currency">
                     <span className={`fwum-toggle-thumb ${showUsd ? 'active' : ''}`} />
                   </span>
-                  <span className="fwum-toggle-label">{showUsd ? 'USD' : 'ETC'}</span>
+                  <span className="fwum-toggle-label">{showUsd ? 'USD' : symbol}</span>
                 </button>
               </div>
             </section>

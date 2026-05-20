@@ -42,7 +42,7 @@ const createMockMarketData = (overrides = {}) => ({
   arbitrator: ARBITRATOR_ADDRESS,
   acceptanceDeadline: Date.now() + 86400000, // 24 hours from now
   stakePerParticipant: '10.00',
-  stakeTokenSymbol: 'USC',
+  stakeTokenSymbol: 'USDC',
   marketType: '1v1',
   acceptances: {
     [CREATOR_ADDRESS.toLowerCase()]: { hasAccepted: true }
@@ -202,11 +202,11 @@ describe('MarketAcceptanceModal', () => {
     it('should display stake with non-stablecoin symbol', () => {
       const marketData = createMockMarketData({
         stakePerParticipant: '1.5',
-        stakeTokenSymbol: 'ETC'
+        stakeTokenSymbol: 'MATIC'
       })
       render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
 
-      expect(screen.getByText('1.5 ETC')).toBeInTheDocument()
+      expect(screen.getByText('1.5 MATIC')).toBeInTheDocument()
     })
   })
 

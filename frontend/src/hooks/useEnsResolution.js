@@ -7,7 +7,7 @@ import { isEnsName, isValidEthereumAddress } from '../utils/validation'
  * Hook to resolve ENS names to Ethereum addresses
  *
  * Uses Ethereum mainnet for ENS resolution, regardless of the current chain.
- * This allows apps on other chains (like Ethereum Classic) to still use ENS.
+ * This lets the app resolve ENS names while running on Polygon Amoy.
  *
  * @param {string} nameOrAddress - ENS name or Ethereum address
  * @returns {Object} Resolution result with address, loading state, and error

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
-import { useETCswap } from '../../hooks/useETCswap'
+import { useDex } from '../../hooks/useDex'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
@@ -12,7 +12,7 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
-import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 
 // Minimal ERC20 ABI for stake token interactions
 const ERC20_ABI = [
@@ -104,7 +104,7 @@ function WalletButton({ className = '' }) {
   const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
-  const { balances, loading: balanceLoading } = useETCswap()
+  const { balances, loading: balanceLoading } = useDex()
   const { preferences, setDemoMode } = useUserPreferences()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
@@ -360,28 +360,28 @@ function WalletButton({ className = '' }) {
         throw new Error('FriendGroupMarketFactory not deployed on this network')
       }
 
-      // Get stake token address - use form data or default to USC stablecoin
-      // null/undefined means native ETC, which uses ZeroAddress in the contract
+      // Get stake token address - use form data or default to the chain's
+      // stablecoin (USDC on Amoy). null/undefined means the native token,
+      // which uses ZeroAddress in the contract.
       const rawCollateralToken = data.data?.collateralToken
-      const isNativeETC = rawCollateralToken === null || rawCollateralToken === undefined
-      const stakeTokenAddress = isNativeETC ? ethers.ZeroAddress : (rawCollateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN)
+      const isNativeToken = rawCollateralToken === null || rawCollateralToken === undefined
+      const stakeTokenAddress = isNativeToken ? ethers.ZeroAddress : (rawCollateralToken || DEX_ADDRESSES.STABLECOIN)
 
-      // Determine token decimals based on token address
-      // USC has 6 decimals, native ETC and most others have 18
+      // Stablecoins (USDC) have 6 decimals; the native token has 18.
       let tokenDecimals = 18
-      if (!isNativeETC && stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()) {
-        tokenDecimals = TOKENS.USC.decimals  // 6 decimals for USC
+      if (!isNativeToken && stakeTokenAddress.toLowerCase() === DEX_ADDRESSES.STABLECOIN.toLowerCase()) {
+        tokenDecimals = TOKENS.STABLE.decimals
       }
 
       console.log('Stake token config:', {
         rawCollateralToken,
-        isNativeETC,
+        isNativeToken,
         stakeTokenAddress,
         tokenDecimals
       })
 
       const friendFactory = new ethers.Contract(friendFactoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, activeSigner)
-      const stakeToken = isNativeETC ? null : new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
+      const stakeToken = isNativeToken ? null : new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
       const userAddress = await activeSigner.getAddress()
 
       // Check if user has FRIEND_MARKET role (checks both TierRegistry AND RoleManager)
@@ -535,13 +535,13 @@ function WalletButton({ className = '' }) {
         creatorStakeWei: creatorStakeWei.toString(),
         creatorStakeFormatted: ethers.formatUnits(creatorStakeWei, tokenDecimals),
         tokenDecimals,
-        isNativeETC
+        isNativeToken
       })
 
       // Check user balance for ERC20 tokens (creator needs to stake creatorStakeWei)
-      if (!isNativeETC && stakeToken) {
+      if (!isNativeToken && stakeToken) {
         const balance = await stakeToken.balanceOf(userAddress)
-        const tokenSymbol = TOKENS.USC?.symbol || 'tokens'
+        const tokenSymbol = TOKENS.STABLE?.symbol || 'tokens'
         const requiredAmount = ethers.formatUnits(creatorStakeWei, tokenDecimals)
         console.log('Token balance check:', {
           balance: balance.toString(),
@@ -554,11 +554,11 @@ function WalletButton({ className = '' }) {
             `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${requiredAmount} ${tokenSymbol}.`
           )
         }
-      } else if (isNativeETC) {
-        // Check native ETC balance (creator needs to stake creatorStakeWei)
+      } else if (isNativeToken) {
+        // Check native token balance (creator needs to stake creatorStakeWei)
         const balance = await activeSigner.provider.getBalance(userAddress)
         const requiredAmount = ethers.formatEther(creatorStakeWei)
-        console.log('Native ETC balance check:', {
+        console.log('Native balance check:', {
           balance: balance.toString(),
           balanceFormatted: ethers.formatEther(balance),
           required: creatorStakeWei.toString(),
@@ -566,7 +566,7 @@ function WalletButton({ className = '' }) {
         })
         if (balance < creatorStakeWei) {
           throw new Error(
-            `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount} ETC.`
+            `Insufficient native balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount}.`
           )
         }
       }
@@ -613,9 +613,9 @@ function WalletButton({ className = '' }) {
       // Get arbitrator (optional - can be zero address for no arbitrator)
       const arbitrator = data.data.arbitrator || ethers.ZeroAddress
 
-      // Approve stake token for FriendGroupMarketFactory (only for ERC20 tokens, not native ETC)
+      // Approve stake token for FriendGroupMarketFactory (only for ERC20 tokens, not the native token)
       // Creator needs to approve their stake amount (creatorStakeWei)
-      if (!isNativeETC && stakeToken) {
+      if (!isNativeToken && stakeToken) {
         const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
         if (currentAllowance < creatorStakeWei) {
           onProgress({ step: 'approve', message: 'Approving token spend...' })
@@ -701,10 +701,10 @@ function WalletButton({ className = '' }) {
         oddsMultiplier,
         creatorStakeWei: creatorStakeWei.toString(),
         stakeToken: stakeTokenAddress,
-        isNativeETC
+        isNativeToken
       })
 
-      // For native ETC, send the creator's stake as msg.value; for ERC20, no value needed
+      // For the native token, send the creator's stake as msg.value; for ERC20, no value needed
       // With IPFS storage, encrypted markets now have small on-chain footprint
       // CID reference is ~60 bytes vs 1000+ bytes for full envelope
       const gasLimit = 1000000n
@@ -714,7 +714,7 @@ function WalletButton({ className = '' }) {
         // Bookmaker market: requires dual roles, supports custom odds
         // createBookmakerMarket(opponent, description, tradingPeriod, acceptanceDeadline,
         //   opponentStakeAmount, opponentOddsMultiplier, stakeToken, resolutionType, arbitrator)
-        if (isNativeETC) {
+        if (isNativeToken) {
           tx = await friendFactory.createBookmakerMarket(
             opponent,
             marketDescription,
@@ -745,7 +745,7 @@ function WalletButton({ className = '' }) {
         // Regular 1v1 market: equal stakes, no odds multiplier
         // createOneVsOneMarketPending(opponent, description, tradingPeriod, arbitrator,
         //   acceptanceDeadline, stakeAmount, stakeToken, resolutionType)
-        if (isNativeETC) {
+        if (isNativeToken) {
           tx = await friendFactory.createOneVsOneMarketPending(
             opponent,
             marketDescription,
@@ -1005,7 +1005,7 @@ function WalletButton({ className = '' }) {
                   <div className="account-details">
                     <span className="account-address-full">{shortenAddress(address)}</span>
                     <span className="usc-balance">
-                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.usc || 0).toFixed(2)} ${stableSymbol}`}
+                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.stable || 0).toFixed(2)} ${stableSymbol}`}
                     </span>
                     <span className="network-info">Chain ID: {chainId}</span>
                   </div>
@@ -1112,7 +1112,7 @@ function WalletButton({ className = '' }) {
                   </button>
                 )}
                 <a
-                  href="https://v3.etcswap.org/#/swap"
+                  href="https://faucet.polygon.technology/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="action-button get-usdc-btn"

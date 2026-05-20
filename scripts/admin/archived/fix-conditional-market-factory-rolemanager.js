@@ -10,7 +10,7 @@ const { ethers } = require("hardhat");
  * Problem: The factory's roleManager() was returning 0x3759B1F153193471Dd48401eE198F664f2d7FeB8
  * which is an old/incorrect address. It should be 0xA6F794292488C628f91A0475dDF8dE6cEF2706EF.
  *
- * Run with: npx hardhat run scripts/fix-conditional-market-factory-rolemanager.js --network mordor
+ * Run with: npx hardhat run scripts/fix-conditional-market-factory-rolemanager.js --network amoy
  */
 
 const CONTRACTS = {

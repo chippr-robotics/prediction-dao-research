@@ -3,7 +3,7 @@
  *
  * Run after deploy-modular-rbac.js to add payment processing capability
  *
- * Usage: npx hardhat run scripts/configure-payment-manager.js --network mordor
+ * Usage: npx hardhat run scripts/configure-payment-manager.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -20,8 +20,8 @@ const DEPLOYED = {
   membershipManager: '0x5fbc6c64CAF5EA21090b50e0E4bb07ADdA0eB661'
 };
 
-// USC stablecoin on Mordor
-const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+// USDC stablecoin on Polygon Amoy
+const USDC_ADDRESS = process.env.AMOY_USDC || '0xDE093684c796204224BC081f937aa059D903c52a';
 
 function generateSalt(identifier) {
   return ethers.id(identifier);
@@ -139,17 +139,17 @@ async function main() {
   // Configure MembershipPaymentManager
   console.log("\nConfiguring MembershipPaymentManager...");
 
-  // Add USC as payment token
+  // Add USDC as payment token
   try {
     const tx = await membershipPaymentManager.contract.addPaymentToken(
-      USC_ADDRESS,
-      "USC",
+      USDC_ADDRESS,
+      "USDC",
       6
     );
     await tx.wait();
-    console.log("  ✓ USC added as payment token");
+    console.log("  ✓ USDC added as payment token");
   } catch (error) {
-    console.warn("  ⚠️  USC may already be configured:", error.message);
+    console.warn("  ⚠️  USDC may already be configured:", error.message);
   }
 
   // Set role prices
@@ -164,9 +164,9 @@ async function main() {
   for (const { role, name, price } of rolePrices) {
     try {
       const priceWei = ethers.parseUnits(price, 6);
-      const tx = await membershipPaymentManager.contract.setRolePrice(role, USC_ADDRESS, priceWei);
+      const tx = await membershipPaymentManager.contract.setRolePrice(role, USDC_ADDRESS, priceWei);
       await tx.wait();
-      console.log(`  ✓ ${name} price set to ${price} USC`);
+      console.log(`  ✓ ${name} price set to ${price} USDC`);
     } catch (error) {
       console.warn(`  ⚠️  ${name} price may already be set:`, error.message);
     }
@@ -253,7 +253,7 @@ async function main() {
   console.log("\nVerifying TierRegistry configuration...");
   const tier1Active = await tierRegistry.isTierActive(MARKET_MAKER_ROLE, MembershipTier.BRONZE);
   const tier1Price = await tierRegistry.getTierPrice(MARKET_MAKER_ROLE, MembershipTier.BRONZE);
-  console.log(`  MARKET_MAKER tier 1 (BRONZE): active=${tier1Active}, price=${ethers.formatUnits(tier1Price, 6)} USC`)
+  console.log(`  MARKET_MAKER tier 1 (BRONZE): active=${tier1Active}, price=${ethers.formatUnits(tier1Price, 6)} USDC`)
 
   // Summary
   console.log("\n" + "=".repeat(60));

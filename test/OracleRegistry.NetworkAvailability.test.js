@@ -204,14 +204,14 @@ describe("OracleRegistry - Network Availability", function () {
     });
   });
 
-  describe("Mordor Testnet Simulation", function () {
+  describe("Chain with limited external oracle coverage", function () {
     it("Should correctly identify unavailable external oracles", async function () {
-      // Simulate Mordor deployment where external oracles aren't available
+      // Simulate a deployment where only one external oracle is reachable.
       await oracleRegistry.registerAdapter(ORACLE_ID_1, mockAdapter1.target);
       await oracleRegistry.registerAdapter(ORACLE_ID_2, mockAdapter2.target);
       await oracleRegistry.registerAdapter(ORACLE_ID_3, mockAdapter3.target);
 
-      // Mark UMA and Polymarket as unavailable (not deployed on Mordor)
+      // Mark UMA and Polymarket as unavailable on this network.
       await mockAdapter2.setAvailable(false);
       await mockAdapter3.setAvailable(false);
 
@@ -231,10 +231,10 @@ describe("OracleRegistry - Network Availability", function () {
       await oracleRegistry.registerAdapter(ORACLE_ID_2, mockAdapter2.target);
       await oracleRegistry.registerAdapter(ORACLE_ID_3, mockAdapter3.target);
 
-      // Simulate Mordor state
-      await mockAdapter1.setAvailable(true);   // Mock adapter works
-      await mockAdapter2.setAvailable(false);  // UMA not on Mordor
-      await mockAdapter3.setAvailable(false);  // Polymarket not on Mordor
+      // Simulate a chain where only the mock adapter is available.
+      await mockAdapter1.setAvailable(true);
+      await mockAdapter2.setAvailable(false);
+      await mockAdapter3.setAvailable(false);
 
       const [oracleIds, oracleTypes, availabilities, chainIds] =
         await oracleRegistry.getNetworkOracleStatus();

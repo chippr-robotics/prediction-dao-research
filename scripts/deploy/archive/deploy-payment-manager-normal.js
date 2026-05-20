@@ -6,7 +6,7 @@ const { ethers } = require("hardhat");
  *
  * This ensures the deployer gets admin roles, not the factory.
  *
- * Run with: npx hardhat run scripts/deploy-payment-manager-normal.js --network mordor
+ * Run with: npx hardhat run scripts/deploy-payment-manager-normal.js --network amoy
  */
 
 // Existing contract addresses

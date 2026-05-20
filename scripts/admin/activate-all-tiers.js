@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * This script activates all tiers for all roles so users can upgrade.
  *
  * Usage:
- *   npx hardhat run scripts/admin/activate-all-tiers.js --network mordor
+ *   npx hardhat run scripts/admin/activate-all-tiers.js --network amoy
  */
 
 // Contract addresses

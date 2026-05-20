@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * It deploys new contracts with the authorizedExtensions feature to allow
  * PaymentProcessor to call setUserTier and setMembershipExpiration.
  *
- * Run with: npx hardhat run scripts/deploy-modular-rbac-fix.js --network mordor
+ * Run with: npx hardhat run scripts/deploy-modular-rbac-fix.js --network amoy
  */
 
 // Existing contract addresses (from previous deployment)

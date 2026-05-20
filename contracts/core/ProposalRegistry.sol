@@ -11,7 +11,7 @@ import "../access/TieredRoleManager.sol";
  * @title ProposalRegistry
  * @notice Permissionless submission interface for funding requests with role-based admin controls
  * @dev Manages proposals with standardized metadata and collateral bonding
- * Supports both native token (ETH/ETC) and ERC20 token funding
+ * Supports both the chain native token and ERC20 token funding
  * 
  * RBAC INTEGRATION:
  * - Proposal submission is permissionless (anyone can submit with bond)
@@ -58,9 +58,9 @@ contract ProposalRegistry is Ownable, ReentrancyGuard {
     mapping(uint256 => Proposal) public proposals;
     
     uint256 public proposalCount;
-    uint256 public bondAmount = 50 ether; // 50 ETC initial bond
+    uint256 public bondAmount = 50 ether; // 50-unit initial bond in the chain native token
     uint256 public constant REVIEW_PERIOD = 7 days;
-    uint256 public constant MAX_PROPOSAL_AMOUNT = 50000 ether; // 50k ETC max
+    uint256 public constant MAX_PROPOSAL_AMOUNT = 50000 ether; // 50k native-unit max
 
     // FutarchyGovernor address - allowed to return bonds
     address public governor;

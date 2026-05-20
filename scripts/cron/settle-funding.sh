@@ -30,8 +30,8 @@ if [ -z "$PROJECT_DIR" ]; then
     PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 fi
 
-# Network to use (mordor, mainnet, etc.)
-NETWORK="mordor"
+# Network to use (amoy for Polygon Amoy testnet, mainnet, etc.)
+NETWORK="amoy"
 
 # Floppy keystore password (loaded from file for security)
 # Create this file with: echo "your-password" > /etc/perp-funding/keystore-password

@@ -234,40 +234,15 @@ module.exports = {
     localhost: {
       url: "http://127.0.0.1:8545",
     },
-    mordor: {
-      url: "https://rpc.mordor.etccooperative.org",
-      chainId: 63,
-      // SECURITY: Keys loaded from floppy disk only - no PRIVATE_KEY env var fallback
-      // Mount floppy and set FLOPPY_KEYSTORE_PASSWORD to use
-      accounts: floppyKeys,
-    },
     amoy: {
       // Polymarket testnet (Polygon Amoy). Co-locating here lets friend markets
       // settle by referenced lookup against Polymarket's CTF without a bridge.
+      // SECURITY: Keys loaded from floppy disk only - no PRIVATE_KEY env var fallback
+      // Mount floppy and set FLOPPY_KEYSTORE_PASSWORD to use
       url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
       chainId: 80002,
       accounts: floppyKeys,
     },
-    // Example: Mainnet with floppy keystore (uncomment when ready to use)
-    // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)
-    // "mainnet-floppy": {
-    //   url: process.env.MAINNET_RPC_URL || "https://eth.llamarpc.com",
-    //   chainId: 1,
-    //   accounts: async () => {
-    //     if (!isFloppyMounted() || !keystoreExists()) {
-    //       throw new Error("Floppy not mounted or keystore not found. Run: npm run floppy:mount");
-    //     }
-    //     return getFloppyPrivateKeys({ count: 5 });
-    //   },
-    // },
-    // Mordor testnet with floppy keystore
-    // Note: Use `mordor` network for regular testing, or set PRIVATE_KEY env var
-    // "mordor-floppy": {
-    //   url: "https://rpc.mordor.etccooperative.org",
-    //   chainId: 63,
-    //   // accounts must be synchronous or use lazyFunction helper
-    //   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-    // },
   },
   paths: {
     sources: "./contracts",
@@ -287,18 +262,9 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
-      'mordor': 'empty',
       'amoy': process.env.POLYGONSCAN_API_KEY || 'empty',
     },
     customChains: [
-      {
-        network: "mordor",
-        chainId: 63,
-        urls: {
-          apiURL: "https://etc-mordor.blockscout.com/api",
-          browserURL: "https://etc-mordor.blockscout.com"
-        }
-      },
       {
         network: "amoy",
         chainId: 80002,

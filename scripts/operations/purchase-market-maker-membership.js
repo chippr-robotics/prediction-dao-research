@@ -9,7 +9,7 @@ const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
  *
  * Usage:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/operations/purchase-market-maker-membership.js --network mordor
+ *   npx hardhat run scripts/operations/purchase-market-maker-membership.js --network amoy
  */
 
 // Contract addresses (modular RBAC system)
@@ -88,7 +88,7 @@ async function main() {
   // Check balances
   console.log("\n[2/6] Checking balances...");
   const etcBalance = await provider.getBalance(wallet.address);
-  console.log("ETC balance:", ethers.formatEther(etcBalance), "ETC");
+  console.log("MATIC balance:", ethers.formatEther(etcBalance), "MATIC");
 
   const usc = new ethers.Contract(CONTRACTS.usc, ERC20_ABI, wallet);
   const uscBalance = await usc.balanceOf(wallet.address);
@@ -120,7 +120,7 @@ async function main() {
       console.log("Expires:", new Date(Number(expiration) * 1000).toISOString());
     }
     console.log("\nYou can create public markets. Run:");
-    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
     return;
   }
 
@@ -210,7 +210,7 @@ async function main() {
   if (newHasRole) {
     console.log("SUCCESS: MARKET_MAKER_ROLE membership purchased!");
     console.log("\nYou can now create public prediction markets:");
-    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
   } else {
     console.log("WARNING: Transaction completed but role not granted");
     console.log("Check transaction on block explorer");
@@ -220,7 +220,7 @@ async function main() {
   // Show new balances
   const newEtcBalance = await provider.getBalance(wallet.address);
   const newUscBalance = await usc.balanceOf(wallet.address);
-  console.log("\nNew ETC balance:", ethers.formatEther(newEtcBalance), "ETC");
+  console.log("\nNew MATIC balance:", ethers.formatEther(newEtcBalance), "MATIC");
   console.log("New USC balance:", ethers.formatUnits(newUscBalance, uscDecimals), "USC");
 }
 

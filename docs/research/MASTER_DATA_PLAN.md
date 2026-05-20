@@ -354,7 +354,7 @@ For dates:
 2. **DAO Metadata** (IPFS):
    ```json
    {
-     "name": "ETC Treasury DAO",
+     "name": "MATIC Treasury DAO",
      "description": "Main governance DAO...",
      "image": "ipfs://QmXXX/logo.png",
      "external_url": "https://fairwins.app/dao/etc-treasury",
@@ -797,7 +797,7 @@ function MarketDisplay({ marketId }) {
     },
     {
       "trait_type": "Funding Token",
-      "value": "ETC"
+      "value": "MATIC"
     },
     {
       "trait_type": "Welfare Metric",
@@ -945,8 +945,8 @@ function MarketDisplay({ marketId }) {
 
 ```json
 {
-  "name": "ETC Treasury DAO",
-  "description": "Main governance DAO for Ethereum Classic treasury management and protocol upgrades. Uses futarchy governance to make data-driven decisions about protocol development and funding allocation.",
+  "name": "MATIC Treasury DAO",
+  "description": "Main governance DAO for Polygon Amoy treasury management and protocol upgrades. Uses futarchy governance to make data-driven decisions about protocol development and funding allocation.",
   "external_url": "https://fairwins.app/dao/etc-treasury",
   "image": "ipfs://QmHHH/etc-dao-logo.png",
   "banner_image": "ipfs://QmIII/etc-dao-banner.png",

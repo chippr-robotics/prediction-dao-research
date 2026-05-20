@@ -1,5 +1,6 @@
 import { useTheme } from '../../hooks/useTheme'
 import { usePrice } from '../../contexts/PriceContext'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import './SettingsModal.css'
 
 /**
@@ -9,6 +10,8 @@ import './SettingsModal.css'
 export default function SettingsModal({ isOpen, onClose, onConnect, onDisconnect, isConnected, account }) {
   const { mode, toggleMode, isDark } = useTheme()
   const { showUsd, toggleCurrency } = usePrice()
+  const { native: nativeSymbol } = useChainTokens()
+  const symbol = nativeSymbol || 'MATIC'
 
   if (!isOpen) return null
 
@@ -97,20 +100,20 @@ export default function SettingsModal({ isOpen, onClose, onConnect, onDisconnect
                 <div>
                   <strong>Currency</strong>
                   <p className="setting-description">
-                    Toggle between USD and ETC display
+                    Toggle between USD and {symbol} display
                   </p>
                 </div>
               </div>
               <button
                 className="setting-toggle"
                 onClick={toggleCurrency}
-                aria-label={`Switch to ${showUsd ? 'ETC' : 'USD'} display`}
+                aria-label={`Switch to ${showUsd ? symbol : 'USD'} display`}
                 aria-pressed={showUsd}
               >
                 <span className="toggle-track">
                   <span className={`toggle-thumb ${showUsd ? 'active' : ''}`} />
                 </span>
-                <span className="toggle-label">{showUsd ? 'USD' : 'ETC'}</span>
+                <span className="toggle-label">{showUsd ? 'USD' : symbol}</span>
               </button>
             </div>
           </div>

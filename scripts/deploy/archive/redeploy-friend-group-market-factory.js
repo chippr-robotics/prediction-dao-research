@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * the current source code.
  *
  * Usage:
- *   npx hardhat run scripts/redeploy-friend-group-market-factory.js --network mordor
+ *   npx hardhat run scripts/redeploy-friend-group-market-factory.js --network amoy
  */
 
 // Constructor arguments from existing deployment

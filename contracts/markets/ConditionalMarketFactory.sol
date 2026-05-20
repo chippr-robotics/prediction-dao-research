@@ -23,7 +23,6 @@ import "../security/NullifierRegistry.sol";
  *
  * TRADING INTEGRATION:
  * This contract integrates with any Uniswap V3-compatible DEX via DexV3Integration:
- * - ETCSwap on Ethereum Classic / Mordor
  * - Uniswap V3 on Polygon (or any V3 fork)
  * - Pool creation and initialization
  * - Liquidity provision and management
@@ -117,7 +116,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
 
     bool private _initialized;
     
-    // V3 DEX integration (ETCSwap on Mordor, Uniswap V3 on Polygon, etc.)
+    // V3 DEX integration (Uniswap V3 on Polygon, or any V3 fork)
     DexV3Integration public dexIntegration;
     bool public useDex;
     
@@ -202,16 +201,8 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     );
     
     event DexIntegrationUpdated(address indexed integration, bool enabled);
-    /// @dev Legacy alias retained for one release for indexer back-compat. Emitted alongside DexIntegrationUpdated.
-    event ETCSwapIntegrationUpdated(address indexed integration, bool enabled);
 
     event DexPoolsCreated(
-        uint256 indexed marketId,
-        address indexed passPool,
-        address indexed failPool
-    );
-    /// @dev Legacy alias retained for one release for indexer back-compat. Emitted alongside DexPoolsCreated.
-    event ETCSwapPoolsCreated(
         uint256 indexed marketId,
         address indexed passPool,
         address indexed failPool
@@ -303,7 +294,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     }
     
     /**
-     * @notice Set the V3 DEX integration contract
+     * @notice Set the V3 DEX integration contract.
      * @param _integration Address of DexV3Integration contract
      * @param _enabled Whether to enable DEX-routed trading
      */
@@ -312,20 +303,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         dexIntegration = DexV3Integration(_integration);
         useDex = _enabled;
         emit DexIntegrationUpdated(_integration, _enabled);
-        emit ETCSwapIntegrationUpdated(_integration, _enabled);
-    }
-
-    /**
-     * @notice Legacy alias for setDexIntegration. Retained for one release so existing
-     *         deployment scripts and admin tooling continue to work without changes.
-     * @dev Forwards to setDexIntegration.
-     */
-    function setETCSwapIntegration(address _integration, bool _enabled) external onlyOwner {
-        require(_integration != address(0), "Invalid integration address");
-        dexIntegration = DexV3Integration(_integration);
-        useDex = _enabled;
-        emit DexIntegrationUpdated(_integration, _enabled);
-        emit ETCSwapIntegrationUpdated(_integration, _enabled);
     }
     
     /**
@@ -419,7 +396,7 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         uint256 marketId,
         uint160 initialSqrtPriceX96,
         uint24 fee
-    ) public onlyOwner {
+    ) external onlyOwner {
         require(marketId < marketCount, "Invalid market ID");
         require(address(dexIntegration) != address(0), "DEX integration not set");
 
@@ -435,19 +412,6 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
         );
 
         emit DexPoolsCreated(marketId, passPool, failPool);
-        emit ETCSwapPoolsCreated(marketId, passPool, failPool);
-    }
-
-    /**
-     * @notice Legacy alias for createDexPools. Forwards to the renamed function so
-     *         existing deployment scripts and tooling continue to work.
-     */
-    function createETCSwapPools(
-        uint256 marketId,
-        uint160 initialSqrtPriceX96,
-        uint24 fee
-    ) external onlyOwner {
-        createDexPools(marketId, initialSqrtPriceX96, fee);
     }
 
     /**

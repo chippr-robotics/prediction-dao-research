@@ -17,8 +17,8 @@ export {
   useWalletConnection
 } from './useWalletManagement'
 
-// ETCswap hooks
-export { useETCswap } from './useETCswap'
+// DEX hooks
+export { useDex } from './useDex'
 
 // UI hooks
 export { 

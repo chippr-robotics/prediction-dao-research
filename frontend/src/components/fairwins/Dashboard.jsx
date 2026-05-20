@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES } from '../../contexts/RoleContext'
@@ -257,7 +258,7 @@ function WelcomeView({ onConnect }) {
       <section className="welcome-hero">
         <div className="welcome-hero-badge">
           <span className="welcome-hero-badge-dot" />
-          Ethereum Classic
+          Polygon Amoy
         </div>
         <h1 className="welcome-hero-title">
           Create a wager<br />with a friend
@@ -361,12 +362,12 @@ function WelcomeView({ onConnect }) {
           <div className="welcome-preview-stakes">
             <div className="welcome-preview-side">
               <span className="welcome-preview-side-label">You stake</span>
-              <span className="welcome-preview-side-value">0.5 ETC</span>
+              <span className="welcome-preview-side-value">50 USDC</span>
             </div>
             <div className="welcome-preview-vs">VS</div>
             <div className="welcome-preview-side">
               <span className="welcome-preview-side-label">They stake</span>
-              <span className="welcome-preview-side-value">0.5 ETC</span>
+              <span className="welcome-preview-side-value">50 USDC</span>
             </div>
           </div>
           <div className="welcome-preview-footer">
@@ -403,6 +404,7 @@ function WelcomeView({ onConnect }) {
 function Dashboard() {
   const { isConnected, account } = useWallet()
   const { connectWallet } = useWalletConnection()
+  const { native: nativeSymbol } = useChainTokens()
   const { preferences } = useUserPreferences()
   const { hasRole } = useWalletRoles()
   const { showModal, hideModal } = useModal()
@@ -427,13 +429,13 @@ function Dashboard() {
       description: m.description,
       status: m.status === 'pending' ? WagerStatus.PENDING_ACCEPTANCE : m.status,
       stakeAmount: m.stakeAmount,
-      stakeToken: m.stakeTokenSymbol || 'ETC',
+      stakeToken: m.stakeTokenSymbol || nativeSymbol || 'MATIC',
       type: m.type === 'oneVsOne' ? '1v1' : m.type === 'smallGroup' ? 'Group' : m.type,
       resolution: m.arbitrator ? 'Third Party' : 'Either Party',
       endTime: m.endDate,
       participants: m.participants || []
     }))
-  }, [friendMarkets, demoMode])
+  }, [friendMarkets, demoMode, nativeSymbol])
 
   // Split friend markets into active/past for modals
   const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
