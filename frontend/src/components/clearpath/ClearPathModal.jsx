@@ -133,7 +133,7 @@ const DEMO_PROPOSALS = [
   {
     id: 'prop-2',
     title: 'Grant Program Q1 2026',
-    description: 'Allocate 10,000'''for developer grants in Q1 2026.',
+    description: 'Allocate 10,000 USDC for developer grants in Q1 2026.',
     daoId: '2',
     daoName: 'DeFi Innovation Fund',
     status: 'active',

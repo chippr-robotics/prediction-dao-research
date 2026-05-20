@@ -376,7 +376,7 @@ function AdminPanel() {
     } finally {
       setPendingTx(false)
     }
-  }, [withdrawalData, contractState.contractBalance, treasuryState, withdraw, withdrawFromTreasuryETH, withdrawFromTreasuryERC20, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError, isTreasuryAvailable, fairWinsTokenAddress])
+  }, [withdrawalData, contractState.contractBalance, treasuryState, withdraw, withdrawFromTreasuryETH, withdrawFromTreasuryERC20, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError, isTreasuryAvailable, fairWinsTokenAddress, nativeSymbol])
 
   const shortenAddress = (address) => {
     if (!address) return ''
