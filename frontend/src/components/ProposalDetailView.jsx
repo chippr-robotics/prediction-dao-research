@@ -374,7 +374,7 @@ function ProposalDetailView({ proposalId, dao, onClose }) {
                     <h4>Proposal Submitted</h4>
                     <p className="timeline-date">{formatDate(proposal.submissionTime)}</p>
                     <p className="timeline-description">
-                      Proposal submitted by {proposal.proposer.substring(0, 10)}... with {formatAmount(proposal.bond)} ETC bond
+                      Proposal submitted by {proposal.proposer.substring(0, 10)}... with a {formatAmount(proposal.bond)} bond
                     </p>
                   </div>
                 </div>

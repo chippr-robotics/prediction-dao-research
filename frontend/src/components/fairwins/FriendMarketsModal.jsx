@@ -101,7 +101,7 @@ function FriendMarketsModal({
 
   // Per-chain capabilities — drives which resolution-type options the user
   // sees. Polymarket-pegged side bets only render on chains where the
-  // Polymarket CTF is reachable (Amoy today; not Mordor).
+  // Polymarket CTF is reachable (Polygon Amoy today).
   const { capabilities, networkName } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
 
@@ -850,7 +850,7 @@ function FriendMarketsModal({
           // Pass calculated trading period so WalletButton uses the user's selected end date
           tradingPeriod: tradingPeriodDays,
           // Pass actual token address so WalletButton can use correct decimals
-          // 'native' means native ETC (no ERC20 address), pass null for this case
+          // 'native' means the chain's native token (no ERC20 address), pass null for this case
           collateralToken: stakeToken.address === 'native' ? null : (stakeToken.address || null),
           // Include encrypted metadata (opponent's key wrapped via on-chain registry)
           encryptedMetadata: enableEncryption ? finalMetadata : null,

@@ -1,10 +1,11 @@
 /**
- * TieredRoleManager ABI
+ * TieredRoleManager ABI.
  *
  * Optimized tiered membership system with BRONZE/SILVER/GOLD/PLATINUM levels.
  * Supports checkMarketCreationLimitFor for tier-based market creation limits.
  *
- * Address on Mordor: 0x55e6346Be542B13462De504FCC379a2477D227f0 (Updated 2026-01-24)
+ * Deployed address is environment-specific; read from DEPLOYED_CONTRACTS or
+ * override with VITE_TIERED_ROLE_MANAGER_ADDRESS.
  */
 
 export const TIERED_ROLE_MANAGER_ABI = [

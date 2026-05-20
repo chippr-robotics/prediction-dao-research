@@ -298,7 +298,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         })
         if (balance < creatorStakeWei) {
           throw new Error(
-            `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount} ETC.`
+            `Insufficient native balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount}.`
           )
         }
       }

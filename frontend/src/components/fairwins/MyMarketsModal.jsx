@@ -410,7 +410,7 @@ function MyMarketsModal({
       minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
       stakePerParticipant: market.stakeAmount,
       stakeToken: market.stakeTokenAddress || null,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
+      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC',
       acceptances: market.acceptances || {},
       acceptedCount: market.acceptedCount || 0
     }
@@ -775,7 +775,7 @@ function getMarketDisplayTitle(market) {
       return desc
     }
     // If encrypted/private, show stake and time info
-    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
+    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'MATIC'}` : ''
     return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
   }
 

@@ -34,10 +34,9 @@ function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
   const { account, signer, provider } = useWeb3()
   const { showNotification } = useNotification()
-  // Native-token symbol for the connected chain. The 'ETC' string in
-  // withdrawalData.tokenType is an internal selector value (kept stable for
-  // form/state); user-facing labels render via nativeSymbol so they read
-  // ETC on Mordor and MATIC on Polygon Amoy.
+  // Native-token symbol for the connected chain (MATIC on Polygon Amoy).
+  // The 'NATIVE' string in withdrawalData.tokenType is an internal selector
+  // value; user-facing labels render via nativeSymbol.
   const { native: nativeSymbol } = useChainTokens()
   const {
     isLoading,
@@ -108,7 +107,7 @@ function AdminPanel() {
   const [withdrawalData, setWithdrawalData] = useState({
     toAddress: '',
     amount: '',
-    tokenType: 'ETC', // 'ETC' or 'FAIRWINS'
+    tokenType: 'NATIVE', // 'NATIVE' or 'FAIRWINS'
     source: 'ROLEMANAGER' // 'ROLEMANAGER' or 'TREASURY'
   })
 
@@ -370,7 +369,7 @@ function AdminPanel() {
         await withdraw(resolvedWithdrawalAddress, rawAmount)
       }
       showNotification('Withdrawal successful', 'success')
-      setWithdrawalData({ toAddress: '', amount: '', tokenType: 'ETC', source: 'ROLEMANAGER' })
+      setWithdrawalData({ toAddress: '', amount: '', tokenType: 'NATIVE', source: 'ROLEMANAGER' })
       setConfirmAction(null)
     } catch (err) {
       showNotification(err.message, 'error')
@@ -840,7 +839,7 @@ function AdminPanel() {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="tier-price">Price (ETC)</label>
+                    <label htmlFor="tier-price">Price ({nativeSymbol})</label>
                     <input
                       id="tier-price"
                       type="number"
@@ -1148,7 +1147,7 @@ function AdminPanel() {
                   </div>
                   <div className="spending-limits-grid">
                     <div className="limit-item">
-                      <span className="limit-label">ETC Transaction Limit</span>
+                      <span className="limit-label">{nativeSymbol} Transaction Limit</span>
                       <span className="limit-value">
                         {parseFloat(treasuryState.ethTransactionLimit) > 0
                           ? `${treasuryState.ethTransactionLimit} ${nativeSymbol}`
@@ -1156,7 +1155,7 @@ function AdminPanel() {
                       </span>
                     </div>
                     <div className="limit-item">
-                      <span className="limit-label">ETC Period Allowance</span>
+                      <span className="limit-label">{nativeSymbol} Period Allowance</span>
                       <span className="limit-value">
                         {treasuryState.ethRateLimitPeriod > 0
                           ? `${treasuryState.ethRemainingAllowance} / ${treasuryState.ethPeriodLimit} ${nativeSymbol}`
@@ -1218,7 +1217,7 @@ function AdminPanel() {
                       onChange={(e) => setWithdrawalData(prev => ({
                         ...prev,
                         source: e.target.value,
-                        tokenType: 'ETC', // Reset to ETC when changing source
+                        tokenType: 'NATIVE', // Reset to native when changing source
                         amount: ''
                       }))}
                       className="admin-select"
@@ -1240,7 +1239,7 @@ function AdminPanel() {
                         onChange={(e) => setWithdrawalData(prev => ({ ...prev, tokenType: e.target.value, amount: '' }))}
                         className="admin-select"
                       >
-                        <option value="ETC">{nativeSymbol} (Native Currency)</option>
+                        <option value="NATIVE">{nativeSymbol} (Native Currency)</option>
                         <option value="FAIRWINS">FWN (FairWins Token) - {treasuryState.fairWinsBalance} FWN</option>
                       </select>
                     </div>

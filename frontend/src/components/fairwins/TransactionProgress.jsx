@@ -41,7 +41,7 @@ function TransactionProgress({
 }) {
   const steps = STEP_CONFIGS[type] || STEP_CONFIGS.friend_market
 
-  // Filter out optional steps when not needed (e.g., no token approval for native ETC)
+  // Filter out optional steps when not needed (e.g. no token approval needed for the native token).
   const activeSteps = steps.filter(step => {
     if (step.optional && step.id === 'approve' && isNativeToken) {
       return false

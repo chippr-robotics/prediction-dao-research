@@ -286,7 +286,7 @@ export function generateProposalMetadata(params) {
     title,
     description,
     fundingAmount,
-    fundingToken = 'ETC',
+    fundingToken = 'MATIC',
     proposer,
     recipient,
     milestones = [],

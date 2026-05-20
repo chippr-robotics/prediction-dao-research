@@ -21,7 +21,7 @@ describe('usePriceConversion hook', () => {
   it('should initialize with loading state', () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())
@@ -31,10 +31,10 @@ describe('usePriceConversion hook', () => {
     expect(result.current.showUsd).toBe(true)
   })
 
-  it('should fetch ETC price successfully', async () => {
+  it('should fetch native price successfully', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())
@@ -63,7 +63,7 @@ describe('usePriceConversion hook', () => {
   it('should toggle currency display', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())
@@ -84,7 +84,7 @@ describe('usePriceConversion hook', () => {
   it('should convert ETC to USD correctly', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())
@@ -100,7 +100,7 @@ describe('usePriceConversion hook', () => {
   it('should handle null values in convertToUsd', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())
@@ -116,7 +116,7 @@ describe('usePriceConversion hook', () => {
   it('should format price in USD by default', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())
@@ -131,7 +131,7 @@ describe('usePriceConversion hook', () => {
   it('should format price with compact notation', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ 'ethereum-classic': { usd: 25.50 } })
+      json: async () => ({ 'matic-network': { usd: 25.50 } })
     })
 
     const { result } = renderHook(() => usePriceConversion())

@@ -419,7 +419,7 @@ function MarketAcceptanceModal({
 
       // Pre-flight check: detect proposalId collisions that would cause activation
       // to revert. This is more reliable than staticCall on chains where eth_call
-      // may not fully propagate cross-contract revert reasons (e.g. ETC Mordor).
+      // may not fully propagate cross-contract revert reasons.
       console.log('Running pre-flight activation check...')
       try {
         const [acceptedCountRaw, marketData] = await Promise.all([

@@ -257,7 +257,7 @@ function WelcomeView({ onConnect }) {
       <section className="welcome-hero">
         <div className="welcome-hero-badge">
           <span className="welcome-hero-badge-dot" />
-          Ethereum Classic
+          Polygon Amoy
         </div>
         <h1 className="welcome-hero-title">
           Create a wager<br />with a friend
@@ -361,12 +361,12 @@ function WelcomeView({ onConnect }) {
           <div className="welcome-preview-stakes">
             <div className="welcome-preview-side">
               <span className="welcome-preview-side-label">You stake</span>
-              <span className="welcome-preview-side-value">0.5 ETC</span>
+              <span className="welcome-preview-side-value">50 USDC</span>
             </div>
             <div className="welcome-preview-vs">VS</div>
             <div className="welcome-preview-side">
               <span className="welcome-preview-side-label">They stake</span>
-              <span className="welcome-preview-side-value">0.5 ETC</span>
+              <span className="welcome-preview-side-value">50 USDC</span>
             </div>
           </div>
           <div className="welcome-preview-footer">
@@ -427,7 +427,7 @@ function Dashboard() {
       description: m.description,
       status: m.status === 'pending' ? WagerStatus.PENDING_ACCEPTANCE : m.status,
       stakeAmount: m.stakeAmount,
-      stakeToken: m.stakeTokenSymbol || 'ETC',
+      stakeToken: m.stakeTokenSymbol || 'MATIC',
       type: m.type === 'oneVsOne' ? '1v1' : m.type === 'smallGroup' ? 'Group' : m.type,
       resolution: m.arbitrator ? 'Third Party' : 'Either Party',
       endTime: m.endDate,

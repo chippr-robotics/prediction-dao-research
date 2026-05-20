@@ -11,8 +11,8 @@ import './OnboardingTutorial.css'
  */
 
 // Tutorial steps include example wager amounts denominated in the chain
-// stablecoin. The factory takes the symbol so labels track the connected
-// network (USC on Mordor, USDC on Polygon Amoy).
+// stablecoin (USDC on Polygon Amoy). The factory takes the symbol so the
+// labels render correctly when the symbol differs from the default.
 const buildTutorialSteps = (stable) => [
   {
     id: 'welcome',

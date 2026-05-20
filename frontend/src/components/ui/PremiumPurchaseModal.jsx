@@ -126,7 +126,7 @@ const ROLE_DETAILS = {
     features: [
       'Mint custom ERC20 tokens',
       'Create NFT collections',
-      'Integrate with ETC swap',
+      'Integrate with the active chain DEX',
       'Token management tools'
     ],
     fundsDestination: 'DAO Treasury',
@@ -178,8 +178,8 @@ const ROLE_BENEFIT_CATEGORIES = {
 }
 
 // Note: Tier prices are fetched from TierRegistry contract via useTierPrices.
-// All prices are denominated in the chain stablecoin (USC on Mordor, USDC on
-// Polygon Amoy); the chain native token is only used for gas.
+// All prices are denominated in the chain stablecoin (USDC on Polygon Amoy);
+// the chain native token is only used for gas.
 
 /**
  * RoleBenefitsDisplay - Renders role-specific tier benefits

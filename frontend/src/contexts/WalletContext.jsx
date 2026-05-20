@@ -28,8 +28,8 @@ export function WalletProvider({ children }) {
   
   // Balances (cached)
   const [balances, setBalances] = useState({
-    etc: '0',
-    wetc: '0',
+    native: '0',
+    wnative: '0',
     tokens: {} // For other ERC20 tokens
   })
   const [balancesLoading, setBalancesLoading] = useState(false)
@@ -256,12 +256,12 @@ export function WalletProvider({ children }) {
     
     setBalancesLoading(true)
     try {
-      // Get native ETC balance
-      const etcBalance = await provider.getBalance(walletAddress)
-      
+      // Get native token balance
+      const nativeBalance = await provider.getBalance(walletAddress)
+
       setBalances(prev => ({
         ...prev,
-        etc: ethers.formatEther(etcBalance)
+        native: ethers.formatEther(nativeBalance)
       }))
     } catch (error) {
       console.error('Error fetching balances:', error)
@@ -277,7 +277,7 @@ export function WalletProvider({ children }) {
       fetchBalances(address)
     } else {
       setRoles([])
-      setBalances({ etc: '0', wetc: '0', tokens: {} })
+      setBalances({ native: '0', wnative: '0', tokens: {} })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected])
@@ -356,7 +356,7 @@ export function WalletProvider({ children }) {
   const disconnectWallet = useCallback(() => {
     disconnect()
     setRoles([])
-    setBalances({ etc: '0', wetc: '0', tokens: {} })
+    setBalances({ native: '0', wnative: '0', tokens: {} })
 
     // Clear wagmi and WalletConnect persistence from storage
     try {
@@ -391,9 +391,9 @@ export function WalletProvider({ children }) {
     }
   }, [disconnect])
 
-  // Switch to the configured primary network (Polygon Amoy post-migration).
-  // This is invoked from the network-error banner / "Switch Network" button;
-  // users on Mordor are not directed here because Mordor is supported.
+  // Switch to the configured primary network (Polygon Amoy). Invoked from
+  // the network-error banner / "Switch Network" button when the user is on
+  // an unsupported chain.
   const switchNetwork = useCallback(async () => {
     const target = PRIMARY_CHAIN_ID
     try {
@@ -487,10 +487,9 @@ export function WalletProvider({ children }) {
     }
   }, [address])
 
-  // Computed values. "Correct" here means any supported chain — Mordor or
-  // Polygon Amoy. Per-chain feature gates (e.g. polymarketSidebets only on
-  // Amoy) are enforced via the capabilities map in networks.js, not by
-  // refusing to load the app on Mordor.
+  // Computed values. "Correct" here means a supported chain (Polygon Amoy
+  // or local Hardhat). Per-chain feature gates (e.g. polymarketSidebets) are
+  // enforced via the capabilities map in networks.js.
   const isCorrectNetwork = useMemo(
     () => isConnected && isSupportedChainId(chainId),
     [isConnected, chainId]

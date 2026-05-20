@@ -284,7 +284,7 @@ function TraditionalVoting({ governorAddress, registryAddress, provider, account
                 <div className="proposal-details">
                   <div className="detail-row">
                     <span className="label">Funding Amount:</span>
-                    <span className="value">{proposal.fundingAmount} ETC</span>
+                    <span className="value">{proposal.fundingAmount}</span>
                   </div>
                   <div className="detail-row">
                     <span className="label">Recipient:</span>

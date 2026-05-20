@@ -555,7 +555,7 @@ function WalletButton({ className = '' }) {
           )
         }
       } else if (isNativeToken) {
-        // Check native ETC balance (creator needs to stake creatorStakeWei)
+        // Check native token balance (creator needs to stake creatorStakeWei)
         const balance = await activeSigner.provider.getBalance(userAddress)
         const requiredAmount = ethers.formatEther(creatorStakeWei)
         console.log('Native ETC balance check:', {
@@ -566,7 +566,7 @@ function WalletButton({ className = '' }) {
         })
         if (balance < creatorStakeWei) {
           throw new Error(
-            `Insufficient ETC balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount} ETC.`
+            `Insufficient native balance. You have ${ethers.formatEther(balance)} but need ${requiredAmount}.`
           )
         }
       }
@@ -613,7 +613,7 @@ function WalletButton({ className = '' }) {
       // Get arbitrator (optional - can be zero address for no arbitrator)
       const arbitrator = data.data.arbitrator || ethers.ZeroAddress
 
-      // Approve stake token for FriendGroupMarketFactory (only for ERC20 tokens, not native ETC)
+      // Approve stake token for FriendGroupMarketFactory (only for ERC20 tokens, not the native token)
       // Creator needs to approve their stake amount (creatorStakeWei)
       if (!isNativeToken && stakeToken) {
         const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
@@ -704,7 +704,7 @@ function WalletButton({ className = '' }) {
         isNativeToken
       })
 
-      // For native ETC, send the creator's stake as msg.value; for ERC20, no value needed
+      // For the native token, send the creator's stake as msg.value; for ERC20, no value needed
       // With IPFS storage, encrypted markets now have small on-chain footprint
       // CID reference is ~60 bytes vs 1000+ bytes for full envelope
       const gasLimit = 1000000n

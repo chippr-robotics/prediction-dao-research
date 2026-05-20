@@ -110,7 +110,7 @@ describe('MarketAcceptancePage', () => {
     })
 
     it('should use URL params for fallback preview when no provider', async () => {
-      renderWithRouter('?marketId=123&creator=0xCreator&stake=10&token=USC&deadline=1999999999999')
+      renderWithRouter('?marketId=123&creator=0xCreator&stake=10&token=USDC&deadline=1999999999999')
 
       await waitFor(() => {
         expect(screen.getByTestId('market-creator')).toHaveTextContent('0xCreator')
@@ -179,7 +179,7 @@ describe('MarketAcceptancePage', () => {
     })
 
     it('should use provided stake amount from URL', async () => {
-      renderWithRouter('?marketId=123&creator=0xCreator&stake=25.50&token=USC')
+      renderWithRouter('?marketId=123&creator=0xCreator&stake=25.50&token=USDC')
 
       await waitFor(() => {
         expect(screen.getByTestId('acceptance-modal')).toBeInTheDocument()
@@ -227,8 +227,8 @@ describe('Helper Functions', () => {
   })
 
   describe('getTokenSymbol', () => {
-    it('should return ETC for null/zero address', async () => {
-      // Tested indirectly through URL param ?token=ETC flow
+    it('should return MATIC for null/zero address', async () => {
+      // Tested indirectly through URL param ?token=MATIC flow
       renderWithRouter('?marketId=123&creator=0xCreator&stake=10')
 
       await waitFor(() => {
