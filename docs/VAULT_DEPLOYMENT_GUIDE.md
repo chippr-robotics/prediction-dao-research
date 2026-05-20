@@ -84,8 +84,7 @@ Create a `.env` file in the project root:
 cat > .env << 'EOF'
 # Network RPC URLs
 ETHEREUM_RPC=https://mainnet.infura.io/v3/YOUR_INFURA_KEY
-ETHEREUM_CLASSIC_RPC=https://www.ethercluster.com/etc
-MORDOR_RPC=https://rpc-amoy.polygon.technology
+AMOY_RPC=https://rpc-amoy.polygon.technology
 POLYGON_RPC=https://polygon-rpc.com
 ARBITRUM_RPC=https://arb1.arbitrum.io/rpc
 OPTIMISM_RPC=https://mainnet.optimism.io
