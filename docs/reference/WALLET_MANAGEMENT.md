@@ -51,7 +51,7 @@ The `WalletContext` is the central hub for all wallet-related state and operatio
 - **Multiple Connectors**: Support for injected wallets and WalletConnect
 - **Address Management**: Current wallet address and connection state
 - **Provider & Signer**: Ethers.js provider and signer instances for transactions
-- **Balance Tracking**: ETC, WETC, and other token balances
+- **Balance Tracking**:. WETC, and other token balances
 - **Network Management**: Network detection, validation, and switching
 - **RVAC Integration**: Role management tied directly to wallet address
 - **Transaction Helpers**: Utilities for sending transactions and signing messages
@@ -119,7 +119,7 @@ function BalanceDisplay() {
   
   return (
     <div>
-      <p>ETC Balance: {balances.etc}</p>
+      <p>MATIC Balance: {balances.etc}</p>
       <button onClick={refreshBalances}>Refresh</button>
     </div>
   )
@@ -241,7 +241,7 @@ function RolePurchase() {
   
   return (
     <button onClick={() => handlePurchase('MARKET_MAKER', 100)}>
-      Purchase Market Maker Role (100 ETC)
+      Purchase Market Maker Role (100)
     </button>
   )
 }
@@ -287,13 +287,13 @@ await tx.wait()
 
 The wallet system automatically tracks and caches balances:
 
-### Native Balance (ETC)
+### Native Balance (MATIC)
 Automatically loaded when wallet connects and can be refreshed:
 
 ```jsx
 const { balances, refreshBalances } = useWallet()
 
-console.log(`ETC Balance: ${balances.etc}`)
+console.log(`MATIC Balance: ${balances.etc}`)
 await refreshBalances() // Manually refresh
 ```
 
@@ -375,11 +375,11 @@ The wallet system is integrated into the app's provider hierarchy:
         <Web3Provider>         {/* Legacy - backwards compatibility */}
           <UserPreferencesProvider>
             <RoleProvider>     {/* Legacy - backwards compatibility */}
-              <ETCswapProvider>  {/* Uses WalletProvider internally */}
+              <DexProvider>  {/* Uses WalletProvider internally */}
                 <UIProvider>
                   <App />
                 </UIProvider>
-              </ETCswapProvider>
+              </DexProvider>
             </RoleProvider>
           </UserPreferencesProvider>
         </Web3Provider>
@@ -460,12 +460,12 @@ function CompleteExample() {
       {isConnected ? (
         <div>
           <p>Address: {address}</p>
-          <p>Balance: {balances.etc} ETC</p>
+          <p>Balance: {balances.etc} MATIC</p>
           {hasRole('MARKET_MAKER') ? (
             <p>You have Market Maker access!</p>
           ) : (
             <button onClick={handlePurchaseRole}>
-              Purchase Market Maker Role (100 ETC)
+              Purchase Market Maker Role (100)
             </button>
           )}
         </div>
@@ -499,7 +499,7 @@ function CompleteExample() {
   
   // Balances
   balances: {
-    etc: string                       // Native ETC balance
+    etc: string                       // Native  balance
     wetc: string                      // WETC balance
     tokens: Record<string, string>    // Token address -> balance
   }

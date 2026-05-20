@@ -20,7 +20,7 @@ This document analyzes potential improvements to the prediction-dao-research rep
 2. **Frontend Testing** - Vitest and accessibility audits
 3. **Deploy Docs** - MkDocs to GitHub Pages
 4. **Deploy Cloud Run** - Frontend deployment to GCP
-5. **Deploy Contracts** - Automated contract deployment to Mordor testnet
+5. **Deploy Contracts** - Automated contract deployment to Polygon Amoy (Polymarket testnet)
 6. **Security Testing** - Slither and security analysis
 
 #### Documentation Structure

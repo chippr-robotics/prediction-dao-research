@@ -1,6 +1,6 @@
 # Garden of Eden - Testnet Seeding Service
 
-This service seeds the Mordor testnet with dummy data and markets to simulate realistic usage of the prediction market platform. It creates markets and simulates trading activity with multiple actors over an extended period of time.
+This service seeds the Polygon Amoy (Polymarket testnet) with dummy data and markets to simulate realistic usage of the prediction market platform. It creates markets and simulates trading activity with multiple actors over an extended period of time.
 
 ## Overview
 
@@ -55,14 +55,14 @@ npm run compile
 
 ## Usage
 
-### Run on Mordor Testnet
+### Run on Polygon Amoy (Polymarket testnet)
 
 ```bash
 npm run seed:testnet
 ```
 
 This will:
-1. Connect to Mordor testnet
+1. Connect to Polygon Amoy (Polymarket testnet)
 2. Deploy or connect to MarketFactory
 3. Start the seeding service
 4. Run continuously until stopped (Ctrl+C)

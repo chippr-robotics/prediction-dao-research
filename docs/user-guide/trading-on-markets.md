@@ -41,7 +41,7 @@ Prices are determined by the market using LMSR (Logarithmic Market Scoring Rule)
 P_pass + P_fail = 1
 ```
 
-- If PASS = 0.70 ETC, then FAIL = 0.30 ETC
+- If PASS = 0.70. then FAIL = 0.30
 - Prices reflect aggregate market beliefs
 - Higher price = higher probability according to the market
 
@@ -52,7 +52,7 @@ P_pass + P_fail = 1
 Before trading, ensure you have:
 
 - ✅ Connected wallet
-- ✅ Sufficient ETC for trades + gas fees
+- ✅ Sufficient  for trades + gas fees
 - ✅ Understanding of the proposal you're trading on
 - ✅ Knowledge of relevant welfare metric
 
@@ -328,7 +328,7 @@ After the trading period ends:
 2. **Challenge Period**
    - 2-day window for challenges
    - Community can verify oracle data
-   - Challengers post 150 ETC bond
+   - Challengers post 150  bond
 
 3. **Finalization**
    - If no challenges: Oracle report accepted

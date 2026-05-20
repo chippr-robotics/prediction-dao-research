@@ -41,24 +41,24 @@ It may not be ideal for purely subjective or values-based decisions.
 ### What do I need to participate?
 
 - MetaMask or compatible Web3 wallet
-- ETC tokens for gas fees and bonds
+-  tokens for gas fees and bonds
 - Understanding of the proposal you're voting on
 
-### Where do I get ETC?
+### Where do I get MATIC?
 
 - **Mainnet**: Purchase from cryptocurrency exchanges
-- **Testnet**: Request from Mordor testnet faucet
+- **Testnet**: Request from Polygon Amoy (Polymarket testnet) faucet
 - **Local**: Use pre-funded Hardhat test accounts
 
 ### How much does it cost to participate?
 
 **Trading**: Only gas fees (~150,000 gas per trade)
 
-**Submitting Proposals**: 50 ETC bond + gas fees (bond returned)
+**Submitting Proposals**: 50  bond + gas fees (bond returned)
 
-**Oracle Reporting**: 100 ETC bond + gas fees (bond returned)
+**Oracle Reporting**: 100  bond + gas fees (bond returned)
 
-**Challenging**: 150 ETC bond + gas fees (forfeited if challenge fails)
+**Challenging**: 150  bond + gas fees (forfeited if challenge fails)
 
 ### Can I participate anonymously?
 
@@ -76,7 +76,7 @@ Yes! Privacy protection is built-in:
 1. Connect your wallet
 2. Navigate to "Submit Proposal"
 3. Fill in all required details
-4. Post 50 ETC bond
+4. Post 50  bond
 5. Submit transaction
 
 See the [Submitting Proposals guide](submitting-proposals.md) for details.
@@ -101,7 +101,7 @@ If your proposal fails (FAIL tokens win):
 
 - Proposal is not executed
 - No funds are transferred
-- Your 50 ETC bond is returned (if submitted in good faith)
+- Your 50  bond is returned (if submitted in good faith)
 - You can learn from feedback and submit an improved version
 
 ### How long does the proposal process take?
@@ -117,7 +117,7 @@ Minimum timeline:
 
 ### Can I submit multiple proposals?
 
-Yes, but each requires a separate 50 ETC bond. Consider timing to avoid having too many proposals active simultaneously.
+Yes, but each requires a separate 50  bond. Consider timing to avoid having too many proposals active simultaneously.
 
 ## Trading
 
@@ -127,7 +127,7 @@ Prediction markets create conditional tokens:
 
 - **PASS tokens**: Bet that the proposal will succeed
 - **FAIL tokens**: Bet that the proposal will fail
-- **Prices**: Reflect aggregate market beliefs (0-1 ETC)
+- **Prices**: Reflect aggregate market beliefs (0-1)
 - **Winner**: Determined by oracle-reported welfare metrics
 
 ### Do I need a counterparty to trade?
@@ -222,7 +222,7 @@ Key change is a MACI feature that lets you change your encryption key, invalidat
     This is research and demonstration code. Before mainnet deployment:
     
     - Minimum 2 independent security audits required
-    - Bug bounty program (100k USD in ETC)
+    - Bug bounty program (100k USD in)
     - 30-day community review period
     - Formal verification of critical functions
 
@@ -271,13 +271,13 @@ Yes, through the governance process itself. The DAO can vote to:
 
 There's a 2-day challenge period where anyone can:
 
-1. Post 150 ETC challenge bond
+1. Post 150  challenge bond
 2. Submit counter-evidence
 3. Escalate to UMA for arbitration
 
 If the challenge succeeds:
 
-- Oracle's 100 ETC bond is slashed
+- Oracle's 100  bond is slashed
 - Challenger receives compensation
 - Correct values are used
 
@@ -288,7 +288,7 @@ If the challenge succeeds:
 Common reasons:
 
 - **Insufficient gas**: Increase gas limit
-- **Insufficient balance**: Need more ETC
+- **Insufficient balance**: Need more
 - **Slippage**: Price moved too much, increase tolerance
 - **Network congestion**: Try again or increase gas price
 - **Wrong network**: Verify you're on correct network
@@ -354,7 +354,7 @@ A schedule for reducing guardian powers:
 
 ### Who can be an oracle reporter?
 
-Anyone can report oracle values by posting a 100 ETC bond. The first reporter for each proposal gets priority.
+Anyone can report oracle values by posting a 100  bond. The first reporter for each proposal gets priority.
 
 ### How are oracle values verified?
 
@@ -369,8 +369,8 @@ Multiple stages:
 
 Protections include:
 
-- Bond requirements (100 ETC)
-- Challenge mechanism (150 ETC bond)
+- Bond requirements (100)
+- Challenge mechanism (150  bond)
 - Evidence requirements
 - UMA escalation for disputes
 - Slashing for false reports

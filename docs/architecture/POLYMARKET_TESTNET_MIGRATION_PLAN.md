@@ -2,9 +2,9 @@
 
 ## Context
 
-The `etc-swap` integration was deferred because the app sits on **Ethereum Classic Mordor (chain 63)** while Polymarket lives on **Polygon (chain 137 prod / 80002 Amoy testnet)**. Friend-market side bets that settle by referenced lookup against a Polymarket condition cannot work cross-chain without a bridge — yet the resolution-by-Polymarket plumbing is already 80% built (`PolymarketOracleAdapter`, `pegToPolymarketCondition`, `resolveFromPolymarket`, `batchResolveFromPolymarket`, `ResolutionType.PolymarketOracle` enum value, `polymarketConditionId` field on `FriendMarket`).
+The `etc-swap` integration was deferred because the app sits on **Polygon Amoy Polygon Amoy (chain 63)** while Polymarket lives on **Polygon (chain 137 prod / 80002 Amoy testnet)**. Friend-market side bets that settle by referenced lookup against a Polymarket condition cannot work cross-chain without a bridge — yet the resolution-by-Polymarket plumbing is already 80% built (`PolymarketOracleAdapter`, `pegToPolymarketCondition`, `resolveFromPolymarket`, `batchResolveFromPolymarket`, `ResolutionType.PolymarketOracle` enum value, `polymarketConditionId` field on `FriendMarket`).
 
-The unblock is to **co-locate on Polygon Amoy (Polymarket's testnet)** so the existing settle-by-reference path runs natively. Mordor stays live but is labeled limited functionality. Stablecoin acceptance switches to **Polymarket testnet USDC** so friend-market collateral is the same token Polymarket settles in. The previously-deferred swap layer generalizes from `ETCSwapV3Integration` to a chain-agnostic `DexV3Integration`, deployable against ETCSwap on Mordor and Uniswap V3 (or fork) on Amoy.
+The unblock is to **co-locate on Polygon Amoy (Polymarket's testnet)** so the existing settle-by-reference path runs natively. Polygon Amoy stays live but is labeled limited functionality. Stablecoin acceptance switches to **Polymarket testnet USDC** so friend-market collateral is the same token Polymarket settles in. The previously-deferred swap layer generalizes from `ETCSwapV3Integration` to a chain-agnostic `DexV3Integration`, deployable against ETCSwap on Polygon Amoy and Uniswap V3 (or fork) on Amoy.
 
 Outcome: a user can create a private friend-market wager on Amoy, peg it to a Polymarket Amoy `conditionId`, and have it settle automatically when Polymarket resolves — all in USDC, end to end.
 
@@ -14,14 +14,14 @@ Outcome: a user can create a private friend-market wager on Amoy, peg it to a Po
 
 - **Target testnet**: Polygon Amoy (chain `80002`).
 - **Stablecoin**: Polymarket testnet USDC on Amoy (single token for collateral and settlement reference).
-- **Mordor**: keep deployed, label as limited; gate Polymarket-pegging UI behind a capability check.
+- **Polygon Amoy**: keep deployed, label as limited; gate Polymarket-pegging UI behind a capability check.
 - **Swap layer**: rename to chain-agnostic `DexV3Integration`; support Uniswap V3 (or fork) on Amoy. Skip if no V3 deployment is available — friend-market settle-by-reference does not require the DEX path.
 
 ---
 
 ## Step 1 — Generalize the swap integration
 
-**Rename** (source-only; existing Mordor `ETCSwapV3Integration` deployment stays as-is):
+**Rename** (source-only; existing Polygon Amoy `ETCSwapV3Integration` deployment stays as-is):
 
 - `contracts/integrations/ETCSwapV3Integration.sol` → `contracts/integrations/DexV3Integration.sol` (rename file + `contract` identifier; constructor `(address _factory, address _swapRouter, address _positionManager)` unchanged; no chain assumptions exist in the body — confirmed by exploration)
 - Add `contracts/integrations/legacy/ETCSwapV3Integration.sol` — empty subclass shim so out-of-tree imports still compile
@@ -34,7 +34,7 @@ Outcome: a user can create a private friend-market wager on Amoy, peg it to a Po
 - Lines 203, 205: events `ETCSwapIntegrationUpdated`/`ETCSwapPoolsCreated` → `DexIntegrationUpdated`/`DexPoolsCreated` (emit both for one release)
 - Line 395–415: `createETCSwapPools` → `createDexPools` (alias forwarder retained)
 
-**Storage layout note**: identifier-only renames preserve slot order; safe whether we redeploy or upgrade. Recommend redeploy on Mordor since it is a testnet.
+**Storage layout note**: identifier-only renames preserve slot order; safe whether we redeploy or upgrade. Recommend redeploy on Polygon Amoy since it is a testnet.
 
 **Tests touched**: `test/ETCSwapV3Integration.test.js`, `test/integration/etcswap/etcswap-trading.test.js` — pass-through via shim, no behavior change required.
 
@@ -42,7 +42,7 @@ Outcome: a user can create a private friend-market wager on Amoy, peg it to a Po
 
 ## Step 2 — Deployment infrastructure
 
-**`hardhat.config.js`** (after the existing `mordor` block at lines 237–243):
+**`hardhat.config.js`** (after the existing `amoy` block at lines 237–243):
 ```js
 amoy: {
   url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
@@ -63,7 +63,7 @@ Add `etherscan.apiKey.amoy` and `customChains` entry pointing at `https://api-am
 const stable = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
 ```
 
-**`scripts/deploy/02-deploy-rbac.js`** — **audit tier-price decimal encoding**. If prices use `parseEther("50")` (18-dec) but the stablecoin is 6-dec, the on-chain price is 1e12× too large. USC and USDC are both 6-dec, so the existing Mordor deployment masks any latent bug. Fix to `parseUnits(price, stableDecimals)` keyed off chain stablecoin.
+**`scripts/deploy/02-deploy-rbac.js`** — **audit tier-price decimal encoding**. If prices use `parseEther("50")` (18-dec) but the stablecoin is 6-dec, the on-chain price is 1e12× too large. USC and USDC are both 6-dec, so the existing Polygon Amoy deployment masks any latent bug. Fix to `parseUnits(price, stableDecimals)` keyed off chain stablecoin.
 
 **`package.json`** — add scripts:
 ```json
@@ -84,12 +84,12 @@ const stable = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
 **Create `frontend/src/config/networks.js`** as the single source of truth:
 ```js
 export const NETWORKS = {
-  61: { /* ETC mainnet — read-only */ },
+  61: { /*  mainnet — read-only */ },
   63: {
-    chainId: 63, name: 'Mordor', isTestnet: true, isPrimary: false, limitedFunctionality: true,
-    nativeCurrency: { symbol: 'METC', decimals: 18, name: 'Mordor Ether' },
-    rpcUrl: import.meta.env.VITE_RPC_URL_MORDOR || 'https://rpc.mordor.etccooperative.org',
-    explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' },
+    chainId: 63, name: 'Polygon Amoy', isTestnet: true, isPrimary: false, limitedFunctionality: true,
+    nativeCurrency: { symbol: 'METC', decimals: 18, name: 'Polygon Amoy Ether' },
+    rpcUrl: import.meta.env.VITE_RPC_URL_MORDOR || 'https://rpc-amoy.polygon.technology',
+    explorer: { name: 'Blockscout', baseUrl: 'https://amoy.polygonscan.com' },
     stablecoin: { address: '0xDE093684c796204224BC081f937aa059D903c52a', symbol: 'USC', decimals: 6 },
     dex: { factory: '0x...', router: '0x...', positionManager: '0x...' },
     contracts: { /* paste current DEPLOYED_CONTRACTS */ },
@@ -154,7 +154,7 @@ export function useChainTokens() {
 **Sweep hardcoded labels** (full list with line numbers from exploration):
 - `LandingPage.jsx` lines 56, 122, 127, 227
 - `ProposalDashboard.jsx` line 173
-- `RolePurchaseScreen.jsx` lines 10, 12, 15-17, 445-458 (`PAYMENT_TOKEN='ETC'` constant → hook value)
+- `RolePurchaseScreen.jsx` lines 10, 12, 15-17, 445-458 (`PAYMENT_TOKEN='MATIC'` constant → hook value)
 - `ui/RolePurchaseModal.jsx` lines 24, 30, 36
 - `ui/PremiumPurchaseModal.jsx` lines 55-81, 185
 - `AdminPanel.jsx` lines 105, 335, 342, 367, 630, 837, 1050, 1072, 1088, 1097, 1114, 1148
@@ -167,7 +167,7 @@ export function useChainTokens() {
 
 ---
 
-## Step 5 — Limited-functionality gating for Mordor
+## Step 5 — Limited-functionality gating for Polygon Amoy
 
 **Create `frontend/src/components/ui/ChainCapabilityGate.jsx`**:
 ```jsx
@@ -178,7 +178,7 @@ export function ChainCapabilityGate({ capability, fallback, children }) {
 }
 ```
 
-**Create `frontend/src/components/ui/LimitedFunctionalityBanner.jsx`** — top-of-app banner shown when `useChainTokens().limitedFunctionality === true`. Copy: *"You're connected to Mordor (ETC testnet). Polymarket-pegged side bets aren't available here — switch to Polygon Amoy for full functionality."* Includes a `useSwitchChain({ chainId: 80002 })` button.
+**Create `frontend/src/components/ui/LimitedFunctionalityBanner.jsx`** — top-of-app banner shown when `useChainTokens().limitedFunctionality === true`. Copy: *"You're connected to Polygon Amoy (MATIC testnet). Polymarket-pegged side bets aren't available here — switch to Polygon Amoy for full functionality."* Includes a `useSwitchChain({ chainId: 80002 })` button.
 
 **Mount the banner** in `frontend/src/App.jsx` (root layout — confirm exact file at edit time).
 
@@ -186,7 +186,7 @@ export function ChainCapabilityGate({ capability, fallback, children }) {
 - `frontend/src/hooks/useFriendMarketCreation.js`
 - The friend-market creation modal in `frontend/src/components/fairwins/` (concrete file at edit time)
 
-The gate wraps only the *Polymarket peg* UI block; other resolution types (Either, Initiator, Receiver, ThirdParty) stay available on Mordor.
+The gate wraps only the *Polymarket peg* UI block; other resolution types (Either, Initiator, Receiver, ThirdParty) stay available on Polygon Amoy.
 
 ---
 
@@ -275,7 +275,7 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 6. Click **Settle from Polymarket** → `resolveFromPolymarket` succeeds.
 7. Winner clicks **Claim** → USDC received.
 
-**Mordor regression** (`VITE_NETWORK_ID=63 npm run frontend`):
+**Polygon Amoy regression** (`VITE_NETWORK_ID=63 npm run frontend`):
 - Limited-functionality banner shows.
 - Non-Polymarket friend markets create/resolve normally.
 - "Peg to Polymarket" UI is gated with copy directing user to Amoy.
@@ -285,9 +285,9 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 
 ## Out of scope
 
-- Cross-chain bridging Mordor ↔ Amoy.
+- Cross-chain bridging Polygon Amoy ↔ Amoy.
 - Polygon mainnet (137) deployment — explicitly blocked via `MAINNET_CHAIN_IDS`.
-- ETC Swap deprecation on Mordor (existing on-chain integration left alone).
+-  Swap deprecation on Polygon Amoy (existing on-chain integration left alone).
 - UI rewrite or i18n.
 - Renaming `frontend/src/constants/etcswap.js` filepath.
 - Redeploying Chainlink/UMA adapters on Amoy.
@@ -310,14 +310,14 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 | `package.json` | `deploy:amoy`, `sync:frontend-contracts:amoy`, `seed:amoy` |
 | `frontend/src/config/networks.js` (new) | Single source of truth for per-chain config |
 | `frontend/src/hooks/useChainTokens.js` (new) | Symbol/decimals abstraction |
-| `frontend/src/components/ui/ChainCapabilityGate.jsx` (new) | Mordor feature-gate wrapper |
-| `frontend/src/components/ui/LimitedFunctionalityBanner.jsx` (new) | Mordor banner |
+| `frontend/src/components/ui/ChainCapabilityGate.jsx` (new) | Polygon Amoy feature-gate wrapper |
+| `frontend/src/components/ui/LimitedFunctionalityBanner.jsx` (new) | Polygon Amoy banner |
 | `test/integration/oracle/amoy-private-sidebet.test.js` (new) | E2E side-bet settlement test |
 
 ## Execution order
 1. Contract rename + factory updates → unit tests green via shim
 2. Deploy infra (`hardhat.config.js`, `constants.js`, `package.json`, deploy scripts) + tier-price decimal audit
 3. Frontend `networks.js` config refactor
-4. Frontend symbol abstraction sweep + Mordor gating (parallelizable with 3)
+4. Frontend symbol abstraction sweep + Polygon Amoy gating (parallelizable with 3)
 5. New E2E test
-6. `deploy:amoy` + smoke test on Amoy + Mordor regression
+6. `deploy:amoy` + smoke test on Amoy + Polygon Amoy regression

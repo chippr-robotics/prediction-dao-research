@@ -40,7 +40,7 @@ This document describes the production-ready zero-knowledge key verification sys
 #### 1. Key Registration
 - Validates key format (32-512 characters)
 - Creates unique key hash using: user address, public key, timestamp, and incrementing nonce
-- Nonce-based approach ensures compatibility with Ethereum Classic (no prevrandao dependency)
+- Nonce-based approach ensures compatibility with Polygon Amoy (no prevrandao dependency)
 - Sets expiration timestamp
 - Maintains key history
 
@@ -240,7 +240,7 @@ function verifyPositionProofWithInputs(
 - **Expiration**: Forces periodic key rotation (default: 365 days)
 - **Revocation**: Immediate invalidation of compromised keys
 - **Audit Trail**: Complete history maintained for all keys
-- **Nonce-Based Hashing**: Uses incrementing nonce combined with user address, public key, and timestamp to ensure unique and unpredictable key hashes. This approach is compatible with Ethereum Classic and doesn't rely on post-merge features like prevrandao.
+- **Nonce-Based Hashing**: Uses incrementing nonce combined with user address, public key, and timestamp to ensure unique and unpredictable key hashes. This approach is compatible with Polygon Amoy and doesn't rely on post-merge features like prevrandao.
 
 ### 2. Access Control
 - **Admin Role**: Can expire keys and update configuration

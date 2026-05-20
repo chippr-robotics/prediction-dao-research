@@ -75,7 +75,7 @@ The current system consists of several key components:
 #### 4. **Memory-Bound Operations**
 
 - **Current**: Loading full market state for each operation
-- **Issue**: Block gas limit constraints (30M gas on ETC)
+- **Issue**: Block gas limit constraints (30M gas on)
 - **Impact**: Max ~150 markets processable in single transaction
 
 ---
@@ -1171,7 +1171,7 @@ function updateMarketsBatch(uint256[] calldata ids) external {
 ### Phase 5: Deployment & Monitoring (Weeks 9-10)
 
 #### Week 9: Testnet Deployment
-- [ ] Deploy to Mordor testnet
+- [ ] Deploy to Polygon Amoy (Polymarket testnet)
 - [ ] Run integration tests
 - [ ] Monitor performance
 - [ ] Gather community feedback

@@ -6,7 +6,7 @@ This guide will help you get the Garden of Eden testnet seeding service up and r
 
 - Node.js (v18 or higher)
 - NPM
-- 10 funded accounts on Mordor testnet (or use local network for testing)
+- 10 funded accounts on Polygon Amoy (Polymarket testnet) (or use local network for testing)
 
 ## Quick Setup (5 Minutes)
 
@@ -39,7 +39,7 @@ SEED_PLAYER_10=0x...your_private_key_10...
 ### Step 3: Fund Your Accounts
 
 Ensure all 10 accounts have ETH on the target network:
-- **Mordor Testnet**: Get testnet ETH from a faucet
+- **Polygon Amoy (Polymarket testnet)**: Get testnet ETH from a faucet
 - **Local Network**: Accounts are pre-funded by Hardhat
 
 Recommended minimum: **10 ETH per account**
@@ -55,7 +55,7 @@ npm run node
 npm run seed:local
 ```
 
-**On Mordor Testnet:**
+**On Polygon Amoy (Polymarket testnet):**
 ```bash
 npm run seed:testnet
 ```

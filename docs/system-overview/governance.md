@@ -36,8 +36,8 @@ All non-emergency decisions go through futarchy:
 **Rationale**: New system needs close oversight
 
 **Spending Limits**:
-- 50,000 ETC per proposal
-- 100,000 ETC daily aggregate
+- 50,000  per proposal
+- 100,000  daily aggregate
 
 ### Phase 2: Increased Threshold (Year 2)
 
@@ -183,13 +183,13 @@ After Year 3, community can override:
 
 ### Who Can Participate
 
-**Submit Proposals**: Anyone with 50 ETC bond
+**Submit Proposals**: Anyone with 50  bond
 
-**Trade on Markets**: Anyone with ETC for gas + positions
+**Trade on Markets**: Anyone with  for gas + positions
 
-**Report Oracle Values**: Anyone with 100 ETC bond
+**Report Oracle Values**: Anyone with 100  bond
 
-**Challenge Reports**: Anyone with 150 ETC bond
+**Challenge Reports**: Anyone with 150  bond
 
 **Vote on Metrics**: Token holders (if applicable)
 

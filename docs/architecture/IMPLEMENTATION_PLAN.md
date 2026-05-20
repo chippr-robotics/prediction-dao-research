@@ -1118,7 +1118,7 @@ graph TD
 - Timeout handling
 
 ### Testnet Deployment
-- Deploy to Mordor (ETC testnet) after each phase
+- Deploy to Polygon Amoy (MATIC testnet) after each phase
 - Manual QA before mainnet
 
 ---

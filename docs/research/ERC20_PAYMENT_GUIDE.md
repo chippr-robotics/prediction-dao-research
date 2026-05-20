@@ -7,10 +7,10 @@ Friend group markets now support ERC20 token payments for membership fees, marke
 ## Key Features
 
 ### 1. Multi-Token Support
-- **Native ETC**: Original payment method (address(0))
+- **Native MATIC**: Original payment method (address(0))
 - **USDC**: USD Coin stablecoin support
 - **USDT**: Tether USD stablecoin support
-- **WETC**: Wrapped ETC support
+- **WETC**: Wrapped  support
 - **Custom tokens**: Any ERC20 token approved by managers
 
 ### 2. Use Cases
@@ -200,11 +200,11 @@ async function displayGasCostUSD(gasUsed) {
 ### Showing Prices to Users
 
 **Best Practices:**
-- **Always show USD prices first**: `$50 USD` not `0.05 ETC`
+- **Always show USD prices first**: `$50 USD` not `0.05 MATIC`
 - **Show token equivalents**: `$50 USD (50 USDC or 50 USDT)`
 - **Display gas in USD**: `Transaction cost: ~$2.50 USD gas`
 - **Update prices dynamically**: Fetch live rates from ETCSwap
-- **Warn about volatility**: If using ETC, show USD equivalent may change
+- **Warn about volatility**: If using. show USD equivalent may change
 
 **Example UI:**
 
@@ -218,7 +218,7 @@ async function displayGasCostUSD(gasUsed) {
 │  Pay with:                             │
 │  ○ USDC  (50.00 USDC)                 │
 │  ○ USDT  (50.00 USDT)                 │
-│  ○ ETC   (~0.05 ETC)  ⚠️ Price varies │
+│  ○    (~0.05)  ⚠️ Price varies │
 │                                        │
 │  Market Creation: FREE for members     │
 │  Gas Cost: ~$2.50 USD                  │
@@ -250,8 +250,8 @@ The contract uses OpenZeppelin's SafeERC20 library for secure transfers:
 ### Accepted Token List
 - Only manager or owner can add tokens
 - Prevents malicious token additions
-- Native ETC (address(0)) always accepted
-- Cannot remove native ETC support
+- Native  (address(0)) always accepted
+- Cannot remove native  support
 
 ## Testing Checklist
 
@@ -263,7 +263,7 @@ The contract uses OpenZeppelin's SafeERC20 library for secure transfers:
 - [ ] Purchase membership with USDT
 - [ ] Create market with USDC liquidity
 - [ ] Create market with USDT liquidity
-- [ ] Mixed ETC/ERC20 markets
+- [ ] Mixed MATIC/ERC20 markets
 - [ ] Token approval requirements
 - [ ] Insufficient token balance handling
 - [ ] Invalid token rejection
@@ -280,13 +280,13 @@ The contract uses OpenZeppelin's SafeERC20 library for secure transfers:
 ## Migration Guide
 
 ### For Existing Markets
-Existing markets created with native ETC continue to work:
+Existing markets created with native  continue to work:
 - No changes required
-- Can still add ETC liquidity
+- Can still add  liquidity
 - Fully backwards compatible
 
 ### Adding Stablecoin Support
-1. Deploy/identify USDC and USDT contracts on ETC Classic
+1. Deploy/identify USDC and USDT contracts on  Classic
 2. Add tokens to FriendGroupMarketFactory:
    ```solidity
    addAcceptedPaymentToken(USDC_ADDRESS, true);
@@ -309,13 +309,13 @@ A: No, only tokens approved by FairWins managers. This prevents malicious token 
 A: The transaction will revert with "Payment token not accepted" error.
 
 **Q: How are prices set?**
-A: Managers set prices in USD terms for stablecoins (e.g., 50 USDC = $50 USD). ETC prices are converted to USD via ETCSwap oracle.
+A: Managers set prices in USD terms for stablecoins (e.g., 50 USDC = $50 USD).  prices are converted to USD via ETCSwap oracle.
 
-**Q: Can I mix ETC and stablecoins?**
-A: Yes, you can pay membership in USDC and add market liquidity in USDT or ETC.
+**Q: Can I mix  and stablecoins?**
+A: Yes, you can pay membership in USDC and add market liquidity in USDT or.
 
 **Q: What about gas fees?**
-A: Gas fees are always paid in native ETC, but displayed in USD equivalent to users.
+A: Gas fees are always paid in native. but displayed in USD equivalent to users.
 
 **Q: Are there different fees for different tokens?**
 A: No, USD-equivalent pricing ensures fair pricing regardless of token choice.
@@ -328,8 +328,8 @@ A: Managers can remove tokens from the accepted list. Users should monitor stabl
 
 ## Benefits Summary
 
-✅ **Price Stability**: Pay in USD-pegged stablecoins, no ETC volatility exposure
-✅ **Accessibility**: Users without ETC can participate using USDC/USDT
+✅ **Price Stability**: Pay in USD-pegged stablecoins, no  volatility exposure
+✅ **Accessibility**: Users without  can participate using USDC/USDT
 ✅ **Professional UX**: All prices shown in familiar USD terms
 ✅ **Treasury Management**: Platform receives stable assets for operations
 ✅ **International**: No currency conversion needed, USD is universal

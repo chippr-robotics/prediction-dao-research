@@ -20,13 +20,13 @@ As proposals move through trading, oracle reporting, challenge periods, and reso
 
 ### Submitting Proposals
 
-The proposal submission interface asks for title, description, funding amount, recipient address, welfare metric selection, and milestones. The 50 ETC bond (returned on resolution) ensures serious proposals. After the seven-day review period where community members discuss your idea, markets open for trading.
+The proposal submission interface asks for title, description, funding amount, recipient address, welfare metric selection, and milestones. The 50  bond (returned on resolution) ensures serious proposals. After the seven-day review period where community members discuss your idea, markets open for trading.
 
 You watch as prices evolve, revealing collective judgment about your proposal's merit. Whether it passes or fails, you learn from how the market evaluates different aspects and can refine future proposals based on this feedback.
 
 ### Beyond Trading
 
-You can participate in welfare metric governance to shape success measures, serve as an oracle reporter by posting a 100 ETC bond to submit verified values, or challenge incorrect reports with evidence and a 150 ETC bond. The ragequit mechanism lets you exit with your proportional treasury share if you oppose a passed proposal, protecting minority rights without blocking majority decisions.
+You can participate in welfare metric governance to shape success measures, serve as an oracle reporter by posting a 100  bond to submit verified values, or challenge incorrect reports with evidence and a 150  bond. The ragequit mechanism lets you exit with your proportional treasury share if you oppose a passed proposal, protecting minority rights without blocking majority decisions.
 
 ## FairWins: Open Prediction Markets
 

@@ -636,14 +636,14 @@ function StatusBadge({ status }) {
 <div className="price-item pass">
   <span className="token-icon" aria-hidden="true">↑</span>
   <div className="token-label">PASS Token</div>
-  <div className="price">0.52 ETC</div>
+  <div className="price">0.52 MATIC</div>
   <div className="probability">52% probability</div>
 </div>
 
 <div className="price-item fail">
   <span className="token-icon" aria-hidden="true">↓</span>
   <div className="token-label">FAIL Token</div>
-  <div className="price">0.48 ETC</div>
+  <div className="price">0.48 MATIC</div>
   <div className="probability">48% probability</div>
 </div>
 ```

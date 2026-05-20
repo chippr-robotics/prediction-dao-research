@@ -7,7 +7,7 @@ Welcome to the Prediction DAO! This guide will help you get started with using t
 ### Required
 
 - **Web3 Wallet**: MetaMask or compatible Web3 wallet
-- **ETC Tokens**: For paying gas fees and bonds
+- **MATIC Tokens**: For paying gas fees and bonds
 - **Web Browser**: Modern browser (Chrome, Firefox, Safari, or Brave)
 
 ### Recommended
@@ -35,15 +35,15 @@ Connect to the appropriate network:
 
 === "Mainnet (Production)"
 
-    - **Network Name**: Ethereum Classic
+    - **Network Name**: Polygon Amoy
     - **RPC URL**: Check with your preferred provider
     - **Chain ID**: 61
-    - **Currency Symbol**: ETC
+    - **Currency Symbol**:
 
-=== "Testnet (Mordor)"
+=== "Testnet (Polygon Amoy)"
 
-    - **Network Name**: Ethereum Classic Mordor
-    - **RPC URL**: https://rpc.mordor.etccooperative.org
+    - **Network Name**: Polygon Amoy Polygon Amoy
+    - **RPC URL**: https://rpc-amoy.polygon.technology
     - **Chain ID**: 63
     - **Currency Symbol**: mETC
 
@@ -54,17 +54,17 @@ Connect to the appropriate network:
     - **Chain ID**: 1337
     - **Currency Symbol**: ETH
 
-### 3. Get ETC Tokens
+### 3. Get  Tokens
 
 === "Mainnet"
 
-    Purchase ETC from a cryptocurrency exchange and transfer to your wallet.
+    Purchase  from a cryptocurrency exchange and transfer to your wallet.
 
 === "Testnet"
 
     Request testnet tokens from a faucet:
     
-    - [Mordor Testnet Faucet](https://easy.hebeswap.com/#/faucet)
+    - [Polygon Amoy (Polymarket testnet) Faucet](https://easy.hebeswap.com/#/faucet)
 
 === "Local Development"
 
@@ -100,7 +100,7 @@ The main dashboard shows:
 
 ### :material-lightbulb: Proposer
 
-Submit proposals for the DAO to consider. Requires a 50 ETC bond.
+Submit proposals for the DAO to consider. Requires a 50  bond.
 
 [Learn more about submitting proposals →](submitting-proposals.md)
 
@@ -116,11 +116,11 @@ Participate in welfare metric selection and governance decisions.
 
 ### :material-gavel: Oracle Reporter
 
-Report welfare metric values after proposals execute. Requires a 100 ETC bond.
+Report welfare metric values after proposals execute. Requires a 100  bond.
 
 ### :material-shield: Challenger
 
-Challenge incorrect oracle reports. Requires a 150 ETC bond.
+Challenge incorrect oracle reports. Requires a 150  bond.
 
 ## Key Concepts
 

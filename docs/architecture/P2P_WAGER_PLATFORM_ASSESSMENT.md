@@ -36,7 +36,7 @@ FairWins is a **wager management layer** that helps users track and manage peer-
 | **External Market Discovery** | HIGH | No indexing of other prediction platforms |
 | **Social Share-out** | MEDIUM | Can't 1-click share to Twitter/Discord |
 | **Position Aggregation** | HIGH | No unified view of user's wagers |
-| **Multi-chain Support** | MEDIUM | Single network only (ETC) |
+| **Multi-chain Support** | MEDIUM | Single network only (MATIC) |
 | **REST/GraphQL API** | MEDIUM | Frontend-only, no external integrations |
 | **Notification System** | MEDIUM | No alerts for wager status changes |
 
