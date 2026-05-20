@@ -45,14 +45,14 @@ Connect to the appropriate network:
     - **Network Name**: Polygon Amoy
     - **RPC URL**: https://rpc-amoy.polygon.technology
     - **Chain ID**: 80002
-    - **Currency Symbol**: MATIC mETC
+    - **Currency Symbol**: MATIC
 
 === "Local Development"
 
     - **Network Name**: Hardhat Local
     - **RPC URL**: http://127.0.0.1:8545
     - **Chain ID**: 1337
-    - **Currency Symbol**: MATIC ETH
+    - **Currency Symbol**: ETH
 
 ### 3. Get MATIC Tokens
 

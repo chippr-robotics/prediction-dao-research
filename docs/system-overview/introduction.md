@@ -152,7 +152,7 @@ Based on Gnosis Conditional Token Framework:
 
 2. **Market Creation** (Day 7)
    - Markets created with PASS/FAIL tokens
-   - Initial price: 0.50 USDC each
+   - Initial price: 0.50 (probability scale) each
    - Trading period begins (7-21 days)
 
 3. **Trading** (Days 7-28)
