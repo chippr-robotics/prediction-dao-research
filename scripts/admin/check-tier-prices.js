@@ -24,7 +24,7 @@ async function main() {
       try {
         const metadata = await rm.tierMetadata(role.hash, tier);
         if (metadata.name || metadata.price > 0) {
-          console.log(`  ${tierNames[tier]} (${tier}): price=${ethers.formatEther(metadata.price)} ETC, name="${metadata.name}", active=${metadata.isActive}`);
+          console.log(`  ${tierNames[tier]} (${tier}): price=${ethers.formatEther(metadata.price)} MATIC, name="${metadata.name}", active=${metadata.isActive}`);
         }
       } catch (e) {
         // Tier not configured

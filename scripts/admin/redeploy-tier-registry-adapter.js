@@ -47,7 +47,7 @@ async function main() {
   const [signer] = await ethers.getSigners();
   console.log("\nAdmin address:", signer.address);
   const balance = await ethers.provider.getBalance(signer.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
   // Step 1: Deploy new TierRegistryAdapter
   console.log("\n[1/5] Deploying new TierRegistryAdapter...");

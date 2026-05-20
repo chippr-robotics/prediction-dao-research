@@ -214,7 +214,7 @@ async function main() {
   logInfo(`Operator: ${signer.address}`);
 
   const balance = await ethers.provider.getBalance(signer.address);
-  logInfo(`Operator balance: ${ethers.formatEther(balance)} ETC`);
+  logInfo(`Operator balance: ${ethers.formatEther(balance)} MATIC`);
 
   if (balance < ethers.parseEther("0.01")) {
     logWarn("Low balance! May not have enough gas for settlements");

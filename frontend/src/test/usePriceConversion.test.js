@@ -81,7 +81,7 @@ describe('usePriceConversion hook', () => {
     expect(result.current.showUsd).toBe(false)
   })
 
-  it('should convert ETC to USD correctly', async () => {
+  it('should convert native amount to USD correctly', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ 'matic-network': { usd: 25.50 } })

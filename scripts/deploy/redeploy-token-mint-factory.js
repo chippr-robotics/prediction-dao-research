@@ -45,7 +45,7 @@ async function main() {
     throw new Error("No deployer signer available");
   }
   console.log("\nDeployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   console.log("\nUsing TieredRoleManager:", TIERED_ROLE_MANAGER);
 

@@ -73,7 +73,7 @@ async function main() {
 
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
-  console.log("ETC Balance:", ethers.formatEther(balance), "ETC");
+  console.log("MATIC Balance:", ethers.formatEther(balance), "MATIC");
 
   // Check USC balance
   console.log("\n[2/5] Checking USC balance...");
@@ -230,7 +230,7 @@ async function main() {
   const finalEtcBalance = await provider.getBalance(wallet.address);
   console.log("\nFinal balances:");
   console.log("  USC:", ethers.formatUnits(finalUscBalance, uscDecimals), "USC");
-  console.log("  ETC:", ethers.formatEther(finalEtcBalance), "ETC");
+  console.log("  MATIC:", ethers.formatEther(finalEtcBalance), "MATIC");
 }
 
 main()

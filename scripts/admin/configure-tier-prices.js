@@ -3,8 +3,8 @@ const { ethers } = require('hardhat');
 /**
  * Configure tier prices in TieredRoleManager for native-token purchases
  *
- * This script sets up tier pricing so users can purchase memberships with native ETC.
- * Prices are set in ETC (wei) and collected in the TieredRoleManager contract.
+ * This script sets up tier pricing so users can purchase memberships with native MATIC.
+ * Prices are set in native units (wei) and collected in the TieredRoleManager contract.
  *
  * Usage:
  *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-tier-prices.js --network amoy
@@ -29,7 +29,7 @@ const TIERS = {
 };
 
 // Tier pricing configuration in
-// These prices are in native ETC for the Polygon Amoy testnet
+// These prices are in the chain native token for the Polygon Amoy testnet
 const TIER_CONFIG = {
   [TIERS.BRONZE]: {
     name: 'Bronze',
@@ -139,7 +139,7 @@ async function main() {
       try {
         // Check current configuration
         const currentMetadata = await tieredRoleManager.tierMetadata(roleHash, tier);
-        console.log(`    Current price: ${ethers.formatEther(currentMetadata.price)} ETC`);
+        console.log(`    Current price: ${ethers.formatEther(currentMetadata.price)}MATIC`);
         console.log(`    Current active: ${currentMetadata.isActive}`);
 
         // Set tier metadata
@@ -167,7 +167,7 @@ async function main() {
 
         console.log(`    Transaction: ${tx.hash}`);
         await tx.wait();
-        console.log(`    ${config.name} tier configured: ${ethers.formatEther(config.price)} ETC`);
+        console.log(`    ${config.name} tier configured: ${ethers.formatEther(config.price)}MATIC`);
       } catch (error) {
         console.error(`    Error configuring ${config.name}:`, error.message);
       }
@@ -187,7 +187,7 @@ async function main() {
       const metadata = await tieredRoleManager.tierMetadata(roleHash, tier);
       const status = metadata.isActive ? 'ACTIVE' : 'INACTIVE';
       console.log(
-        `  ${TIER_NAMES[tier]}: ${ethers.formatEther(metadata.price)} ETC [${status}]`
+        `  ${TIER_NAMES[tier]}: ${ethers.formatEther(metadata.price)} MATIC [${status}]`
       );
     }
   }
@@ -195,7 +195,7 @@ async function main() {
   console.log('\n' + '='.repeat(60));
   console.log('TIER PRICE CONFIGURATION COMPLETE');
   console.log('='.repeat(60));
-  console.log('\nUsers can now purchase tiers with native ETC.');
+  console.log('\nUsers can now purchase tiers with native MATIC.');
   console.log('Funds will be collected in the TieredRoleManager contract.');
   console.log('Use the Admin Panel to withdraw collected funds.');
 }

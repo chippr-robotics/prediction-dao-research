@@ -60,7 +60,7 @@ global.fetch = vi.fn().mockImplementation(async (url, _options) => {
       json: async () => ({
         jsonrpc: '2.0',
         id: 1,
-        result: '0x0de0b6b3a7640000' // 1 ETC in wei
+        result: '0x0de0b6b3a7640000' // 1 native token in wei
       })
     }
   }
@@ -183,7 +183,7 @@ vi.mock('wagmi', () => ({
   useDisconnect: vi.fn(() => ({
     disconnect: vi.fn()
   })),
-  useChainId: vi.fn(() => 61), // ETC mainnet
+  useChainId: vi.fn(() => 61), // Unsupported chain — keeps the no-stablecoin path under test
   useSwitchChain: vi.fn(() => ({
     switchChain: vi.fn()
   })),
@@ -216,9 +216,9 @@ const mockEthereumProvider = {
       case 'eth_accounts':
         return ['0x1234567890123456789012345678901234567890']
       case 'eth_chainId':
-        return '0x3d' // Chain ID 61 (ETC)
+        return '0x3d' // Chain ID 61 (unsupported)
       case 'eth_getBalance':
-        // Return a valid hex string for 1 ETC in wei (1e18)
+        // Return a valid hex string for 1 unit in wei (1e18)
         return '0x0de0b6b3a7640000'
       case 'eth_call':
         // Return a valid hex response for contract calls (simulating balance of 1000 tokens with 18 decimals)

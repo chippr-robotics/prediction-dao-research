@@ -203,9 +203,9 @@ check_operator_balance() {
     local is_low=$(echo "$balance < $MIN_BALANCE_ETC" | bc -l 2>/dev/null || echo "0")
 
     if [ "$is_low" == "1" ]; then
-        output_result "operator_balance" "WARNING" "Low balance: ${balance} ETC"
+        output_result "operator_balance" "WARNING" "Low balance: ${balance} MATIC"
     else
-        output_result "operator_balance" "OK" "Balance: ${balance} ETC"
+        output_result "operator_balance" "OK" "Balance: ${balance} MATIC"
     fi
 }
 

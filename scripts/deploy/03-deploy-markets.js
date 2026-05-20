@@ -226,13 +226,13 @@ async function main() {
       }
     }
 
-    // Create default markets (BTC, ETH, ETC)
+    // Create default markets (BTC, ETH, MATIC)
     if (!perpFactory.alreadyDeployed && stableAddress) {
       console.log("\n  Creating default perpetual markets...");
       const markets = [
         { name: "BTC-PERP", oracle: deployer.address },
         { name: "ETH-PERP", oracle: deployer.address },
-        { name: "ETC-PERP", oracle: deployer.address },
+        { name: "MATIC-PERP", oracle: deployer.address },
       ];
 
       for (const market of markets) {

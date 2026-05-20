@@ -182,7 +182,7 @@ async function calculateRequirements(templates, uscDecimals, gasPrice) {
   const totalGasForApproval = CONFIG.estimatedGasForApproval;
   const totalGasEstimate = totalGasForMarkets + totalGasForApproval;
 
-  // Apply buffer and calculate ETC cost
+  // Apply buffer and calculate MATIC gas cost
   const bufferedGas = (totalGasEstimate * BigInt(Math.floor(CONFIG.gasBufferMultiplier * 100))) / 100n;
   const estimatedEtcCost = bufferedGas * gasPrice;
 
@@ -220,14 +220,14 @@ function displayRequirements(requirements, currentUsc, currentEtc, uscDecimals) 
     console.log(`  Surplus:   ${Math.abs(uscShortfall).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC`);
   }
 
-  console.log("\n--- ETC (Gas) ---");
-  console.log(`  Required:  ${etcRequired.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETC`);
-  console.log(`  Current:   ${currentEtcFloat.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETC`);
+  console.log("\n--- MATIC (Gas) ---");
+  console.log(`  Required:  ${etcRequired.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  console.log(`  Current:   ${currentEtcFloat.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   const etcShortfall = etcRequired - currentEtcFloat;
   if (etcShortfall > 0) {
-    console.log(`  SHORTFALL: ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETC`);
+    console.log(`  SHORTFALL: ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   } else {
-    console.log(`  Surplus:   ${Math.abs(etcShortfall).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ETC`);
+    console.log(`  Surplus:   ${Math.abs(etcShortfall).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   }
 
   console.log("\n--- TOTAL FUNDING NEEDED ---");
@@ -236,7 +236,7 @@ function displayRequirements(requirements, currentUsc, currentEtc, uscDecimals) 
       console.log(`  Acquire ${uscShortfall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} more USC`);
     }
     if (etcShortfall > 0) {
-      console.log(`  Acquire ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} more ETC`);
+      console.log(`  Acquire ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} more MATIC`);
     }
   } else {
     console.log("  Account is sufficiently funded!");
@@ -570,7 +570,7 @@ async function main() {
     const finalEtc = await ethers.provider.getBalance(wallet.address);
     console.log("\nFinal Balances:");
     console.log(`  USC: ${ethers.formatUnits(finalUsc, uscDecimals)} USC`);
-    console.log(`  ETC: ${ethers.formatEther(finalEtc)} ETC`);
+    console.log(`  MATIC: ${ethers.formatEther(finalEtc)} MATIC`);
   }
 
   console.log("\n" + "=".repeat(60));

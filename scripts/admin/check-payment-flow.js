@@ -24,7 +24,7 @@ async function main() {
   console.log('\n--- Contract Balances ---');
   for (const [name, address] of Object.entries(CONTRACTS)) {
     const balance = await provider.getBalance(address);
-    console.log(`${name}: ${ethers.formatEther(balance)} ETC`);
+    console.log(`${name}: ${ethers.formatEther(balance)} MATIC`);
   }
 
   // Check FriendGroupMarketFactory configuration
@@ -92,7 +92,7 @@ async function main() {
   const events = await trm.queryFilter(filter, 12000000);
   console.log(`TieredRoleManager (${CONTRACTS.tieredRoleManager}): ${events.length} TierPurchased events`);
   for (const event of events.slice(0, 10)) {
-    console.log(`  User: ${event.args.user}, Amount: ${ethers.formatEther(event.args.amount)} ETC`);
+    console.log(`  User: ${event.args.user}, Amount: ${ethers.formatEther(event.args.amount)} MATIC`);
   }
 
   // Check FriendGroupMarketFactory for payment events
@@ -102,7 +102,7 @@ async function main() {
     const membershipEvents = await fgmf.queryFilter(membershipFilter, 12000000);
     console.log(`MembershipPurchased events: ${membershipEvents.length}`);
     for (const event of membershipEvents.slice(0, 10)) {
-      console.log(`  User: ${event.args.user}, Tier: ${event.args.tier}, Amount: ${ethers.formatEther(event.args.amount)} ETC`);
+      console.log(`  User: ${event.args.user}, Tier: ${event.args.tier}, Amount: ${ethers.formatEther(event.args.amount)} MATIC`);
     }
   } catch (e) {
     console.log('MembershipPurchased events: not found -', e.message);

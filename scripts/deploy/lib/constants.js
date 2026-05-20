@@ -331,7 +331,7 @@ const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 
 // Polygon mainnet (137) included to block accidental deploys when targeting the
 // Amoy testnet — Amoy is 80002 and is intentionally not in this list.
-const MAINNET_CHAIN_IDS = [1, 61, 137]; // Ethereum Mainnet, ETC Mainnet, Polygon Mainnet
+const MAINNET_CHAIN_IDS = [1, 137]; // Ethereum Mainnet, Polygon Mainnet
 
 // =============================================================================
 // EXPORTS

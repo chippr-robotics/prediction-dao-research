@@ -290,7 +290,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       } else if (isNativeToken) {
         const balance = await activeSigner.provider.getBalance(userAddress)
         const requiredAmount = ethers.formatEther(creatorStakeWei)
-        console.log('Native ETC balance check:', {
+        console.log('Native balance check:', {
           balance: balance.toString(),
           balanceFormatted: ethers.formatEther(balance),
           required: creatorStakeWei.toString(),

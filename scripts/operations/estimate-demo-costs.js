@@ -1,7 +1,7 @@
 /**
  * Garden of Eden - Estimate Funding Requirements
  *
- * Quick script to estimate USC and ETC needed for demo market creation
+ * Quick script to estimate USDC and MATIC needed for demo market creation
  * without requiring network connection.
  *
  * Usage:
@@ -21,7 +21,7 @@ const CONFIG = {
   estimatedGasPerMarket: 500000, // ~500k gas per market creation
   estimatedGasForApproval: 50000, // ~50k gas for ERC20 approval
   gasBufferMultiplier: 1.2, // 20% buffer
-  assumedGasPriceGwei: 1, // 1 gwei default for ETC
+  assumedGasPriceGwei: 1, // 1 gwei default for native gas
 };
 
 function main() {
@@ -62,7 +62,7 @@ function main() {
   const totalGas = (CONFIG.estimatedGasPerMarket * numMarkets + CONFIG.estimatedGasForApproval);
   const bufferedGas = Math.ceil(totalGas * CONFIG.gasBufferMultiplier);
   const etcCostGwei = bufferedGas * CONFIG.assumedGasPriceGwei;
-  const etcCost = etcCostGwei / 1e9; // Convert gwei to ETC
+  const etcCost = etcCostGwei / 1e9; // Convert gwei to native units
 
   console.log("\n" + "=".repeat(60));
   console.log("FUNDING REQUIREMENTS");
@@ -74,15 +74,15 @@ function main() {
   console.log(`  Maximum:  ${totalUscMax.toLocaleString(undefined, { minimumFractionDigits: 2 })} USC`);
   console.log(`\n  Recommended: ${Math.ceil(totalUscAvg * 1.1).toLocaleString()} USC (avg + 10% buffer)`);
 
-  console.log("\n--- ETC (Gas for Transactions) ---");
+  console.log("\n--- MATIC (Gas for Transactions) ---");
   console.log(`  Markets to create: ${numMarkets}`);
   console.log(`  Estimated gas: ${bufferedGas.toLocaleString()} units`);
-  console.log(`  At ${CONFIG.assumedGasPriceGwei} gwei: ${etcCost.toFixed(4)} ETC`);
-  console.log(`\n  Recommended: ${(etcCost * 1.5).toFixed(4)} ETC (estimate + 50% buffer)`);
+  console.log(`  At ${CONFIG.assumedGasPriceGwei} gwei: ${etcCost.toFixed(4)} MATIC`);
+  console.log(`\n  Recommended: ${(etcCost * 1.5).toFixed(4)} MATIC (estimate + 50% buffer)`);
 
   console.log("\n--- SUMMARY ---");
   console.log(`  USC needed: ~${Math.ceil(totalUscAvg).toLocaleString()} USC`);
-  console.log(`  ETC needed: ~${(etcCost * 1.5).toFixed(2)} ETC`);
+  console.log(`  MATIC needed: ~${(etcCost * 1.5).toFixed(2)} MATIC`);
 
   console.log("\n--- BY CATEGORY BREAKDOWN ---");
   const byCategory = {};

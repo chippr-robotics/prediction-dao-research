@@ -10,7 +10,7 @@ const { requireAddress } = require('./lib/addresses');
  * Usage:
  *   npx hardhat run scripts/admin/set-perp-creation-fee.js --network amoy
  *
- * To set a specific fee (in ETC):
+ * To set a specific fee (in native units):
  *   FEE=0.1 npx hardhat run scripts/admin/set-perp-creation-fee.js --network amoy
  *
  * Default behavior: Sets fee to 0 (free market creation for admins)
@@ -26,7 +26,7 @@ async function main() {
 
   const [signer] = await ethers.getSigners();
   console.log('Signer:', signer.address);
-  console.log('Balance:', ethers.formatEther(await ethers.provider.getBalance(signer.address)), 'ETC');
+  console.log('Balance:', ethers.formatEther(await ethers.provider.getBalance(signer.address)), 'MATIC');
 
   // Get factory address from shared config
   const perpFactoryAddress = requireAddress('perpFactory');
@@ -40,7 +40,7 @@ async function main() {
 
   // Check current fee
   const currentFee = await factory.creationFee();
-  console.log(`Current creation fee: ${ethers.formatEther(currentFee)} ETC`);
+  console.log(`Current creation fee: ${ethers.formatEther(currentFee)}MATIC`);
 
   // Check ownership
   const owner = await factory.owner();
@@ -57,11 +57,11 @@ async function main() {
   const newFee = ethers.parseEther(newFeeEther);
 
   if (currentFee === newFee) {
-    console.log(`\nCreation fee is already ${newFeeEther} ETC. No change needed.`);
+    console.log(`\nCreation fee is already ${newFeeEther} MATIC. No change needed.`);
     return;
   }
 
-  console.log(`\nSetting creation fee to: ${newFeeEther} ETC`);
+  console.log(`\nSetting creation fee to: ${newFeeEther}MATIC`);
 
   // Send transaction
   const tx = await factory.setCreationFee(newFee);
@@ -72,7 +72,7 @@ async function main() {
 
   // Verify new fee
   const updatedFee = await factory.creationFee();
-  console.log(`\nUpdated creation fee: ${ethers.formatEther(updatedFee)} ETC`);
+  console.log(`\nUpdated creation fee: ${ethers.formatEther(updatedFee)}MATIC`);
 
   console.log('\n' + '='.repeat(60));
   console.log('CREATION FEE UPDATE COMPLETE');

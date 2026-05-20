@@ -54,7 +54,7 @@ Settles funding fees for perpetual futures markets every 8 hours. Funding paymen
 - Node.js 18+
 - npm/npx
 - Access to Polygon Amoy RPC endpoint
-- Private key with ETC for gas
+- Private key with native MATIC for gas
 
 # Recommended
 - systemd (for service management)
@@ -245,7 +245,7 @@ grep "gasUsed" /var/log/perp-funding/settle-funding.log | tail -20
 # 3. Check operator balance
 npx hardhat run --network amoy -e "
   const [signer] = await ethers.getSigners();
-  console.log('Balance:', ethers.formatEther(await ethers.provider.getBalance(signer.address)), 'ETC');
+  console.log('Balance:', ethers.formatEther(await ethers.provider.getBalance(signer.address)), 'MATIC');
 "
 
 # 4. Verify settlements on-chain (spot check)
@@ -312,7 +312,7 @@ When new perpetual markets are deployed:
 |---------|-------|----------|
 | "Floppy not mounted" | Keystore disk not available | Mount floppy or use PRIVATE_KEY env var |
 | "Invalid password" | Wrong keystore password | Check /etc/perp-funding/keystore-password |
-| "Insufficient balance" | Out of gas | Top up operator wallet with ETC |
+| "Insufficient balance" | Out of gas | Top up operator wallet with MATIC |
 | "Funding interval not reached" | Normal - settlement not due | No action needed |
 | "Market paused" | Market temporarily disabled | Check with admin if unexpected |
 | Script never runs | Cron misconfigured | Check crontab and cron daemon status |

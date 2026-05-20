@@ -84,7 +84,7 @@ async function main() {
 
   // Check balance
   const balance = await provider.getBalance(wallet.address);
-  console.log('\nCurrent balance:', ethers.formatEther(balance), 'ETC');
+  console.log('\nCurrent balance:', ethers.formatEther(balance), 'MATIC');
 
   // Get command from args
   const command = process.argv[2];
@@ -103,10 +103,10 @@ async function main() {
     console.log('Deployer address:', deployerWallet.address);
 
     const deployerBalance = await provider.getBalance(deployerWallet.address);
-    console.log('Deployer balance:', ethers.formatEther(deployerBalance), 'ETC');
+    console.log('Deployer balance:', ethers.formatEther(deployerBalance), 'MATIC');
 
     const fundAmount = ethers.parseEther('0.1');
-    console.log('\nSending', ethers.formatEther(fundAmount), 'ETC to floppy address...');
+    console.log('\nSending', ethers.formatEther(fundAmount), 'MATIC to floppy address...');
 
     const tx = await deployerWallet.sendTransaction({
       to: wallet.address,
@@ -117,7 +117,7 @@ async function main() {
     console.log('Confirmed!');
 
     const newBalance = await provider.getBalance(wallet.address);
-    console.log('New floppy balance:', ethers.formatEther(newBalance), 'ETC');
+    console.log('New floppy balance:', ethers.formatEther(newBalance), 'MATIC');
 
   } else if (command === 'return') {
     // Return funds to deployer
@@ -134,14 +134,14 @@ async function main() {
     const gasCost = gasPrice * gasLimit;
 
     // Keep some for gas, send the rest
-    const sendAmount = balance - gasCost - ethers.parseEther('0.01'); // Keep 0.01 ETC buffer
+    const sendAmount = balance - gasCost - ethers.parseEther('0.01'); // Keep 0.01 MATIC buffer
 
     if (sendAmount <= 0n) {
       console.log('Balance too low to return (need to cover gas)');
       process.exit(0);
     }
 
-    console.log('Sending', ethers.formatEther(sendAmount), 'ETC back to deployer...');
+    console.log('Sending', ethers.formatEther(sendAmount), 'MATIC back to deployer...');
 
     const tx = await connectedWallet.sendTransaction({
       to: DEPLOYER_ADDRESS,
@@ -152,7 +152,7 @@ async function main() {
     console.log('Confirmed!');
 
     const newBalance = await provider.getBalance(wallet.address);
-    console.log('Remaining floppy balance:', ethers.formatEther(newBalance), 'ETC');
+    console.log('Remaining floppy balance:', ethers.formatEther(newBalance), 'MATIC');
 
   } else {
     console.log('\nUsage:');
