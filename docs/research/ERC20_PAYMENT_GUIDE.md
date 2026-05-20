@@ -187,10 +187,10 @@ async function displayMembershipPrice(tier) {
 // Display gas cost in USD
 async function displayGasCostUSD(gasUsed) {
   const gasPrice = await provider.getGasPrice();
-  const gasCostETC = gasUsed.mul(gasPrice);
+  const gasCostMatic = gasUsed.mul(gasPrice);
   
   // Convert to USD
-  const usdCost = await getTokenPriceUSD(ADDRESS_ZERO, gasCostETC);
+  const usdCost = await getTokenPriceUSD(ADDRESS_ZERO, gasCostMatic);
   
   // Display: "~$2.50 USD gas"
   return `~$${(usdCost / 1e6).toFixed(2)} USD gas`;

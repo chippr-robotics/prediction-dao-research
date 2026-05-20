@@ -56,7 +56,7 @@ async function main() {
       const usdcRevenue = await mpm.revenueByToken(CONTRACTS.USDC_TOKEN);
       console.log(`\nUSDC Revenue collected: ${ethers.formatUnits(usdcRevenue, 6)} USDC`);
     } catch (e) {
-      console.log('\nUSC Revenue: Unable to fetch');
+      console.log('\nUSDC Revenue: Unable to fetch');
     }
   } catch (e) {
     console.log('Error:', e.message);

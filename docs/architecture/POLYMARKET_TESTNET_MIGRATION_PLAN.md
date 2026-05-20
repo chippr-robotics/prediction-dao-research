@@ -88,7 +88,7 @@ export const NETWORKS = {
   63: {
     chainId: 63, name: 'Polygon Amoy', isTestnet: true, isPrimary: false, limitedFunctionality: true,
     nativeCurrency: { symbol: '', decimals: 18, name: 'Polygon Amoy Ether' },
-    rpcUrl: import.meta.env.VITE_RPC_URL_MORDOR || 'https://rpc-amoy.polygon.technology',
+    rpcUrl: import.meta.env.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Blockscout', baseUrl: 'https://amoy.polygonscan.com' },
     stablecoin: { address: '0xDE093684c796204224BC081f937aa059D903c52a', symbol: 'USDC', decimals: 6 },
     dex: { factory: '0x...', router: '0x...', positionManager: '0x...' },
@@ -163,7 +163,7 @@ export function useChainTokens() {
 - `MyPositions.jsx` line 79
 - `wallet/WalletButton.jsx` lines 1005-1006, 1046
 
-**`frontend/src/hooks/useTierPrices.js`** — rename `USC_DECIMALS` → `STABLE_DECIMALS` sourced from `getNetwork(chainId).stablecoin.decimals`. No behavior change (USDC and USDC both 6-dec).
+**`frontend/src/hooks/useTierPrices.js`** — rename `USDC_DECIMALS` → `STABLE_DECIMALS` sourced from `getNetwork(chainId).stablecoin.decimals`. No behavior change (USDC is 6-dec on both networks).
 
 ---
 

@@ -26,7 +26,7 @@
 
 .voting-header h2 {
   margin: 0;
-  color: var(--clearpath-primary, #2c3e50);
+  color: #2c3e50;
 }
 
 .voting-info {
@@ -50,7 +50,7 @@
 .info-item .value {
   font-size: 18px;
   font-weight: 600;
-  color: var(--clearpath-primary, #2c3e50);
+  color: #2c3e50;
 }
 
 .no-proposals {
@@ -94,7 +94,7 @@
 
 .proposal-header h3 {
   margin: 0;
-  color: var(--clearpath-primary, #2c3e50);
+  color: #2c3e50;
   font-size: 20px;
   flex: 1;
 }
@@ -163,7 +163,7 @@
 }
 
 .detail-row .value {
-  color: var(--clearpath-primary, #2c3e50);
+  color: #2c3e50;
   font-weight: 600;
   font-size: 14px;
 }
@@ -190,7 +190,7 @@
 .stat-label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--clearpath-primary, #2c3e50);
+  color: #2c3e50;
 }
 
 .stat-bar-container {

@@ -183,52 +183,12 @@
   transform: scale(0.98);
 }
 
-/* Style the buttons inside menu items */
-.kebab-menu-item .tokenmint-button-container,
-.kebab-menu-item .clearpath-button-container {
-  margin: 0;
-  padding: 0;
-}
-
-.kebab-menu-item .tokenmint-button,
-.kebab-menu-item .clearpath-button {
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
-}
-
 .kebab-item-label {
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--text-primary, #E6EDF3);
   flex: 1;
   pointer-events: none;
-}
-
-/* Override dropdown positioning when inside kebab menu - render UPWARD */
-.kebab-dropdown-content .tokenmint-dropdown,
-.kebab-dropdown-content .clearpath-dropdown {
-  top: auto !important;
-  bottom: calc(100% + 8px) !important;
-  right: auto !important;
-  left: 0 !important;
-  transform: none !important;
-  max-height: 60vh;
-  overflow-y: auto;
-  z-index: 1200 !important;
-}
-
-/* Ensure button containers have higher z-index */
-.kebab-dropdown-content .tokenmint-button-container,
-.kebab-dropdown-content .clearpath-button-container {
-  position: relative;
-  z-index: 1002;
-}
-
-/* Prevent kebab menu from closing when interacting with button dropdowns */
-.kebab-dropdown-content .tokenmint-dropdown,
-.kebab-dropdown-content .clearpath-dropdown {
-  pointer-events: auto;
 }
 
 /* Light mode support */

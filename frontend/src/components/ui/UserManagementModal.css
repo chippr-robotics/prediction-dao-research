@@ -314,71 +314,6 @@
   background: var(--danger-color-hover, #b91c1c);
 }
 
-/* ClearPath Status */
-.clearpath-status-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.status-display {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-badge.active {
-  color: var(--color-success);
-  background: var(--color-success-bg, rgba(72, 187, 120, 0.1));
-  border: 1px solid var(--color-success);
-}
-
-.status-badge.inactive {
-  color: var(--color-text-tertiary);
-  background: var(--color-surface-secondary);
-  border: 1px solid var(--color-border);
-}
-
-.last-updated {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-}
-
-.toggle-status-btn {
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--primary-button, #36B37E);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  align-self: flex-start;
-}
-
-.toggle-status-btn:hover {
-  background: var(--primary-button-hover, #2F9E6E);
-}
-
-.clearpath-description {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
 /* Demo Mode Section */
 .demo-mode-section {
   display: flex;
@@ -876,36 +811,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* ClearPath Management Section */
-.clearpath-management-section {
-  background: linear-gradient(135deg, rgba(54, 179, 126, 0.05), rgba(102, 126, 234, 0.05));
-  padding: 20px !important;
-  border-radius: 8px;
-  border: 1px solid var(--color-primary);
-}
-
 .section-description {
   margin: 0 0 16px;
   font-size: 14px;
   color: var(--color-text-secondary);
   line-height: 1.6;
-}
-
-.manage-org-btn {
-  padding: 12px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--primary-button-text, #ffffff);
-  background: var(--primary-button, #36B37E);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.manage-org-btn:hover {
-  background: var(--primary-button-hover, #2F9E6E);
-  transform: translateY(-1px);
 }
 
 /* Admin Section */

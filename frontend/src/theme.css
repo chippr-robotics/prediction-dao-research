@@ -1,13 +1,12 @@
 /**
- * Theme Variables - ClearPath & FairWins Color Palettes
- * 
- * This file defines all color variables for both platforms in light and dark modes.
+ * Theme Variables - FairWins Color Palette
+ *
+ * This file defines all color variables for light and dark modes.
  * The default theme is light mode.
  */
 
 /* ===================================
    BASE/SHARED NEUTRAL COLORS
-   (Used by both ClearPath and FairWins for ecosystem cohesion)
    =================================== */
 
 :root {
@@ -30,44 +29,6 @@
   --text-secondary: #AAB6C2;    /* Cool Gray - Secondary text */
   --text-muted: #7A8590;        /* Muted text - darker than secondary */
   --border-color: #23303D;      /* Graphite - Borders/Dividers */
-}
-
-/* ===================================
-   CLEARPATH THEME COLORS
-   =================================== */
-
-.platform-clearpath {
-  /* ClearPath Brand Colors */
-  --brand-primary: #2FA4A9;     /* Signal Teal */
-  --brand-primary-rgb: 47, 164, 169; /* RGB values for rgba usage */
-  --brand-secondary: #6BCF9C;   /* Path Green */
-  --brand-secondary-rgb: 107, 207, 156; /* RGB values for rgba usage */
-  --brand-highlight: #F5C16C;   /* Insight Gold */
-
-  /* ClearPath Chart Colors */
-  --chart-series-a: #2FA4A9;
-  --chart-series-b: #6BCF9C;
-  --chart-series-c: #F5C16C;
-  --chart-series-d: #4C9AFF;
-  --chart-series-e: #9AA6B2;
-}
-
-/* ClearPath Light Mode */
-.theme-light.platform-clearpath {
-  --primary-button: #2FA4A9;    /* Signal Teal */
-  --primary-button-hover: #248A8E; /* Deep Teal */
-  --primary-button-text: #FFFFFF;
-  --accent-color: #6BCF9C;
-  --highlight-color: #F5C16C;
-}
-
-/* ClearPath Dark Mode */
-.theme-dark.platform-clearpath {
-  --primary-button: #3BC1C7;    /* Soft Teal */
-  --primary-button-hover: #4FD4DA; /* Bright Teal */
-  --primary-button-text: #0E141B;
-  --accent-color: #6BCF9C;
-  --highlight-color: #F5C16C;
 }
 
 /* ===================================
@@ -117,7 +78,6 @@
 
 /* ===================================
    SHARED SEMANTIC COLORS
-   (Available to both platforms)
    =================================== */
 
 :root {
