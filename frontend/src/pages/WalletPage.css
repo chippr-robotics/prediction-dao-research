@@ -859,3 +859,38 @@
   transform: translateY(-1px);
 }
 
+
+/* Polymarket category preferences */
+.polymarket-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.polymarket-category-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.polymarket-category-option:hover {
+  border-color: #2d9cdb;
+}
+
+.polymarket-category-option.checked {
+  background: rgba(45, 156, 219, 0.12);
+  border-color: #2d9cdb;
+  color: #2d9cdb;
+}
+
+.polymarket-category-option input[type="checkbox"] {
+  accent-color: #2d9cdb;
+}
