@@ -8,10 +8,10 @@ const { requireAddress } = require('./lib/addresses');
  * Only the contract owner can call this function.
  *
  * Usage:
- *   npx hardhat run scripts/admin/set-perp-creation-fee.js --network mordor
+ *   npx hardhat run scripts/admin/set-perp-creation-fee.js --network amoy
  *
  * To set a specific fee (in ETC):
- *   FEE=0.1 npx hardhat run scripts/admin/set-perp-creation-fee.js --network mordor
+ *   FEE=0.1 npx hardhat run scripts/admin/set-perp-creation-fee.js --network amoy
  *
  * Default behavior: Sets fee to 0 (free market creation for admins)
  */

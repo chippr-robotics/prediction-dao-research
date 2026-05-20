@@ -76,7 +76,7 @@ async function main() {
 
   console.log("\n--- Check if there's a different RPC endpoint ---");
   // Try calling through an alternative RPC if available
-  const altRpcUrl = "https://geth-mordor.etc-network.info";
+  const altRpcUrl = "https://rpc-amoy.polygon.technology";
   try {
     const altProvider = new ethers.JsonRpcProvider(altRpcUrl);
     const result = await altProvider.call({

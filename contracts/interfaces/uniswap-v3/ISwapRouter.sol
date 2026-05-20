@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /**
  * @title ISwapRouter
  * @notice Router for executing swaps on Uniswap V3
- * @dev Compatible with ETCSwap v3
+ * @dev Compatible with any Uniswap V3-style DEX
  * Reference: https://github.com/Uniswap/v3-periphery/blob/main/contracts/interfaces/ISwapRouter.sol
  */
 interface ISwapRouter {

@@ -5,7 +5,7 @@ const { ethers } = require("hardhat");
  * Checks for the encryption envelope structure
  *
  * Usage:
- *   npx hardhat run scripts/debug/verify-market-encryption.js --network mordor
+ *   npx hardhat run scripts/debug/verify-market-encryption.js --network amoy
  */
 
 const CONTRACTS = {

@@ -5,7 +5,7 @@
  * and creates the default markets.
  *
  * Usage:
- *   npx hardhat run scripts/admin/configure-perp-v2.js --network mordor
+ *   npx hardhat run scripts/admin/configure-perp-v2.js --network amoy
  */
 
 const hre = require("hardhat");

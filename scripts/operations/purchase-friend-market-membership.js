@@ -47,7 +47,7 @@ const KEYSTORE_PATH = path.join(
   CONFIG.KEYSTORE_FILENAME
 );
 
-const RPC_URL = 'https://rpc.mordor.etccooperative.org';
+const RPC_URL = 'https://rpc-amoy.polygon.technology';
 
 // Modular RBAC contracts (same as frontend)
 const PAYMENT_PROCESSOR = '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63';

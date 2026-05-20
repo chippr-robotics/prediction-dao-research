@@ -15,7 +15,7 @@ const { ethers } = require('hardhat');
  * 4. Add multiple authorized spenders for oversight
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-treasury-limits.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-treasury-limits.js --network amoy
  */
 
 const TREASURY_VAULT_ADDRESS = '0x93F7ee39C02d99289E3c29696f1F3a70656d0772';

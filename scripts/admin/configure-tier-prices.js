@@ -1,13 +1,13 @@
 const { ethers } = require('hardhat');
 
 /**
- * Configure tier prices in TieredRoleManager for native ETC purchases
+ * Configure tier prices in TieredRoleManager for native-token purchases
  *
  * This script sets up tier pricing so users can purchase memberships with native ETC.
  * Prices are set in ETC (wei) and collected in the TieredRoleManager contract.
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-tier-prices.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/configure-tier-prices.js --network amoy
  */
 
 const TIERED_ROLE_MANAGER_ADDRESS = '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF';
@@ -28,13 +28,13 @@ const TIERS = {
   PLATINUM: 4,
 };
 
-// Tier pricing configuration in ETC
-// These prices are in native ETC for the Mordor testnet
+// Tier pricing configuration in
+// These prices are in native ETC for the Polygon Amoy testnet
 const TIER_CONFIG = {
   [TIERS.BRONZE]: {
     name: 'Bronze',
     description: 'Basic membership tier with essential features',
-    price: ethers.parseEther('0.05'), // 0.05 ETC
+    price: ethers.parseEther('0.05'), // 0.05
     limits: {
       dailyBetLimit: ethers.parseEther('100'),
       weeklyBetLimit: ethers.parseEther('500'),
@@ -51,7 +51,7 @@ const TIER_CONFIG = {
   [TIERS.SILVER]: {
     name: 'Silver',
     description: 'Intermediate tier with enhanced limits',
-    price: ethers.parseEther('0.1'), // 0.1 ETC
+    price: ethers.parseEther('0.1'), // 0.1
     limits: {
       dailyBetLimit: ethers.parseEther('500'),
       weeklyBetLimit: ethers.parseEther('2000'),
@@ -68,7 +68,7 @@ const TIER_CONFIG = {
   [TIERS.GOLD]: {
     name: 'Gold',
     description: 'Advanced tier for power users',
-    price: ethers.parseEther('0.25'), // 0.25 ETC
+    price: ethers.parseEther('0.25'), // 0.25
     limits: {
       dailyBetLimit: ethers.parseEther('2000'),
       weeklyBetLimit: ethers.parseEther('10000'),
@@ -85,7 +85,7 @@ const TIER_CONFIG = {
   [TIERS.PLATINUM]: {
     name: 'Platinum',
     description: 'Premium tier with maximum benefits',
-    price: ethers.parseEther('0.5'), // 0.5 ETC
+    price: ethers.parseEther('0.5'), // 0.5
     limits: {
       dailyBetLimit: ethers.parseEther('10000'),
       weeklyBetLimit: ethers.parseEther('50000'),

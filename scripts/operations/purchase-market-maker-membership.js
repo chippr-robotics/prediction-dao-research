@@ -9,7 +9,7 @@ const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
  *
  * Usage:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/operations/purchase-market-maker-membership.js --network mordor
+ *   npx hardhat run scripts/operations/purchase-market-maker-membership.js --network amoy
  */
 
 // Contract addresses (modular RBAC system)
@@ -120,7 +120,7 @@ async function main() {
       console.log("Expires:", new Date(Number(expiration) * 1000).toISOString());
     }
     console.log("\nYou can create public markets. Run:");
-    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
     return;
   }
 
@@ -210,7 +210,7 @@ async function main() {
   if (newHasRole) {
     console.log("SUCCESS: MARKET_MAKER_ROLE membership purchased!");
     console.log("\nYou can now create public prediction markets:");
-    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
   } else {
     console.log("WARNING: Transaction completed but role not granted");
     console.log("Check transaction on block explorer");

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /**
  * @title IUniswapV3Factory
  * @notice The interface for the Uniswap V3 Factory
- * @dev Compatible with ETCSwap v3
+ * @dev Compatible with any Uniswap V3-style DEX
  * Reference: https://github.com/Uniswap/v3-core/blob/main/contracts/interfaces/IUniswapV3Factory.sol
  */
 interface IUniswapV3Factory {

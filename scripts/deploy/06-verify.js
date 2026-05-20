@@ -13,7 +13,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/06-verify.js --network localhost
- *   npx hardhat run scripts/deploy/06-verify.js --network mordor
+ *   npx hardhat run scripts/deploy/06-verify.js --network amoy
  */
 
 const hre = require("hardhat");

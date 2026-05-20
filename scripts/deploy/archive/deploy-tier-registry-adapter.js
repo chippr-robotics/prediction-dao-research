@@ -17,7 +17,7 @@ const { ethers } = require("hardhat");
  * 6. Instructions to update FriendGroupMarketFactory
  *
  * Usage:
- *   npx hardhat run scripts/deploy/deploy-tier-registry-adapter.js --network mordor
+ *   npx hardhat run scripts/deploy/deploy-tier-registry-adapter.js --network amoy
  */
 
 // Deployed modular RBAC addresses (Mordor)

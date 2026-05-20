@@ -13,7 +13,7 @@ const { ethers } = require("hardhat");
  * - Progress tracking and statistics
  *
  * Usage:
- *   npx hardhat run scripts/operations/create-demo-markets.js --network mordor
+ *   npx hardhat run scripts/operations/create-demo-markets.js --network amoy
  *
  * Environment Variables:
  *   - PINATA_API_KEY: Pinata API key for IPFS uploads
@@ -37,7 +37,7 @@ const {
 
 const { batchUploadMetadata, verifyPinataConnection } = require("./market-templates/ipfs");
 
-// Contract addresses (Mordor testnet)
+// Contract addresses (Polygon Amoy)
 // These addresses match frontend/src/config/contracts.js - keep in sync!
 const CONTRACTS = {
   conditionalMarketFactory: "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",

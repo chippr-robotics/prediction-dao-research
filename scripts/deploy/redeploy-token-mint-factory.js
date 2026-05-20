@@ -9,7 +9,7 @@
  * This caused users who purchased TOKENMINT role to fail role verification.
  *
  * Usage:
- *   npx hardhat run scripts/deploy/redeploy-token-mint-factory.js --network mordor
+ *   npx hardhat run scripts/deploy/redeploy-token-mint-factory.js --network amoy
  */
 
 const hre = require("hardhat");

@@ -22,16 +22,11 @@ const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 // =============================================================================
 
 /**
- * Token addresses by network. The stablecoin entry is named after the canonical
- * symbol on each chain (USC on ETC, USDC on Polygon). Deploy scripts should look
- * up the stablecoin via TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC so
- * adding new chains does not require changes to call sites.
+ * Token addresses by network. Polygon Amoy is the only supported testnet;
+ * Hardhat / localhost mock tokens are deployed at test time. Deploy scripts
+ * should look up the stablecoin via TOKENS[networkName]?.USDC.
  */
 const TOKENS = {
-  mordor: {
-    USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // USC Stablecoin (6 decimals)
-    WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC
-  },
   amoy: {
     // Polymarket testnet USDC on Polygon Amoy. The exact address must be verified
     // from Polymarket's docs at deploy time; provided via env var so it can be
@@ -40,33 +35,28 @@ const TOKENS = {
     WMATIC: process.env.AMOY_WMATIC || null,
   },
   localhost: {
-    USC: null,   // Deploy mock in test
-    WETC: null,  // Deploy mock in test
+    USDC: null,    // Deploy mock in test
+    WMATIC: null,  // Deploy mock in test
   },
   hardhat: {
-    USC: null,
-    WETC: null,
+    USDC: null,
+    WMATIC: null,
   }
 };
 
 /**
- * Stablecoin decimals by network. Both USC (Mordor) and Polymarket Amoy USDC are
- * 6 decimals — same value for both supported chains today, but exposed here so
- * deploy scripts can encode tier prices/limits correctly per chain without
- * hardcoding the decimal count.
+ * Stablecoin decimals by network. Polygon Amoy USDC is 6-decimal; local mocks
+ * default to 18.
  */
 const STABLECOIN_DECIMALS = {
-  mordor: 6,
   amoy: 6,
-  localhost: 18, // mock tokens default to 18 in tests
+  localhost: 18,
   hardhat: 18,
 };
 
 /**
- * Polymarket CTF (Conditional Token Framework) addresses per network. Only set on
- * networks where Polymarket-pegged settlement is supported. Mordor cannot host a
- * Polymarket CTF — friend markets there fall back to manual / arbitrator
- * resolution and the Polymarket peg UI is gated client-side.
+ * Polymarket CTF (Conditional Token Framework) addresses per network. Only set
+ * on networks where Polymarket-pegged settlement is supported.
  */
 const POLYMARKET_CTF = {
   amoy: process.env.AMOY_POLYMARKET_CTF || null,
@@ -107,9 +97,9 @@ const MembershipTier = {
 /**
  * Build tier configurations for a given stablecoin decimal count. Tier prices
  * and limits are token amounts that must be encoded with the same decimals as
- * the stablecoin used to pay them. Both supported stables today (USC on Mordor,
- * USDC on Amoy) are 6-decimal, but this helper keeps the encoding correct if a
- * future chain ships with a different decimal stablecoin (e.g. 18-dec DAI).
+ * the stablecoin used to pay them. Polygon Amoy USDC is 6-decimal; the helper
+ * keeps the encoding correct if a future chain ships with a different decimal
+ * stablecoin (e.g. 18-dec DAI).
  *
  * Historical note: previous versions of this file used ethers.parseEther for
  * these amounts, which encoded them with 18 decimals. Combined with a 6-dec
@@ -269,8 +259,8 @@ function buildMarketMakerTiers(stableDecimals) {
 /**
  * Default tiers (legacy export). Deploy scripts that have not been updated to
  * resolve the network's stablecoin decimals fall back to 6-dec encoding, which
- * is correct for both Mordor (USC) and Amoy (USDC). NOTE: this is a behavior
- * change from the previous file, which encoded with 18 decimals — see
+ * matches Polygon Amoy USDC. NOTE: this is a behavior change from a previous
+ * version of this file, which encoded with 18 decimals — see
  * buildFriendMarketTiers for the rationale.
  */
 const FRIEND_MARKET_TIERS = buildFriendMarketTiers(6);

@@ -188,7 +188,7 @@ check_operator_balance() {
     cd "$PROJECT_DIR"
 
     # Quick balance check using hardhat
-    local balance=$(npx hardhat run --network mordor -e "
+    local balance=$(npx hardhat run --network amoy -e "
         const [signer] = await ethers.getSigners();
         const bal = await ethers.provider.getBalance(signer.address);
         console.log(ethers.formatEther(bal));

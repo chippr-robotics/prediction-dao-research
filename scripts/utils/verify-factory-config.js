@@ -7,7 +7,7 @@
  * 3. Whether a user has the MARKET_MAKER_ROLE
  *
  * Usage:
- *   npx hardhat run scripts/verify-factory-config.js --network mordor
+ *   npx hardhat run scripts/verify-factory-config.js --network amoy
  *
  * Set USER_ADDRESS environment variable to check a specific user's role.
  */
@@ -67,7 +67,7 @@ async function main() {
     console.log();
     console.log("⚠️  WARNING: RoleManager is not configured on the factory!");
     console.log("Run this to fix:");
-    console.log(`  npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor`);
+    console.log(`  npx hardhat run scripts/deploy-ctf1155-and-configure.js --network amoy`);
     console.log("Or call: marketFactory.setRoleManager('${DEPLOYED_CONTRACTS.tieredRoleManager}')");
   }
 
@@ -76,7 +76,7 @@ async function main() {
     console.log();
     console.log("⚠️  WARNING: CTF1155 is not configured on the factory!");
     console.log("Run this to fix:");
-    console.log(`  npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor`);
+    console.log(`  npx hardhat run scripts/deploy-ctf1155-and-configure.js --network amoy`);
   }
 
   // Check user's role on the roleManager
@@ -105,7 +105,7 @@ async function main() {
         console.log();
         console.log("⚠️  User cannot create markets (not owner, no MARKET_MAKER_ROLE)");
         console.log("To grant the role, run:");
-        console.log(`  USER_ADDRESS=${USER_ADDRESS} npx hardhat run scripts/grant-market-maker-role.js --network mordor`);
+        console.log(`  USER_ADDRESS=${USER_ADDRESS} npx hardhat run scripts/grant-market-maker-role.js --network amoy`);
       } else {
         console.log();
         console.log("✓ User should be able to create markets");

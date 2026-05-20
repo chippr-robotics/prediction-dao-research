@@ -4,19 +4,19 @@ const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
 const { BetType } = require("../../constants/BetType");
 
 /**
- * Integration tests for ETCSwap v3 trading through ConditionalMarketFactory
+ * Integration tests for V3 DEX trading through ConditionalMarketFactory
  * 
  * Tests the complete flow:
  * 1. Deploy market with conditional tokens
- * 2. Set up ETCSwap v3 integration
+ * 2. Set up V3 DEX integration
  * 3. Create pools
  * 4. Add liquidity
  * 5. Execute trades (buy/sell)
  * 6. Verify correct behavior
  */
 
-describe("Integration: ETCSwap V3 Trading", function () {
-    async function deployETCSwapFixture() {
+describe("Integration: V3 DEX Trading", function () {
+    async function deployDexFixture() {
         const [owner, liquidityProvider, trader1, trader2] = await ethers.getSigners();
 
         // Deploy mock Uniswap V3 infrastructure
@@ -29,9 +29,9 @@ describe("Integration: ETCSwap V3 Trading", function () {
         const MockNonfungiblePositionManager = await ethers.getContractFactory("MockNonfungiblePositionManager");
         const positionManager = await MockNonfungiblePositionManager.deploy(await factory.getAddress());
 
-        // Deploy ETCSwapV3Integration
-        const ETCSwapV3Integration = await ethers.getContractFactory("ETCSwapV3Integration");
-        const etcSwapIntegration = await ETCSwapV3Integration.deploy(
+        // Deploy DexV3Integration
+        const DexV3Integration = await ethers.getContractFactory("DexV3Integration");
+        const dexIntegration = await DexV3Integration.deploy(
             await factory.getAddress(),
             await swapRouter.getAddress(),
             await positionManager.getAddress()
@@ -60,31 +60,31 @@ describe("Integration: ETCSwap V3 Trading", function () {
         await collateralToken.transfer(trader2.address, ethers.parseUnits("10000", 6));
 
         return {
-            contracts: { marketFactory, etcSwapIntegration, factory, swapRouter, positionManager, collateralToken, ctf1155 },
+            contracts: { marketFactory, dexIntegration, factory, swapRouter, positionManager, collateralToken, ctf1155 },
             accounts: { owner, liquidityProvider, trader1, trader2 }
         };
     }
 
     describe("Complete Trading Flow", function () {
-        it.skip("Should execute full ETCSwap trading lifecycle (PENDING: needs ERC1155-to-ERC20 wrapper)", async function () {
-            const { contracts, accounts } = await loadFixture(deployETCSwapFixture);
-            const { marketFactory, etcSwapIntegration, collateralToken, ctf1155 } = contracts;
+        it.skip("Should execute full DEX trading lifecycle (PENDING: needs ERC1155-to-ERC20 wrapper)", async function () {
+            const { contracts, accounts } = await loadFixture(deployDexFixture);
+            const { marketFactory, dexIntegration, collateralToken, ctf1155 } = contracts;
             const { owner, liquidityProvider, trader1 } = accounts;
 
-            console.log("\n=== ETCSwap V3 Integration Test ===\n");
+            console.log("\n=== V3 DEX Integration Test ===\n");
 
-            // Step 1: Configure ETCSwap integration in market factory
-            console.log("Step 1: Configure ETCSwap integration");
+            // Step 1: Configure DEX integration in market factory
+            console.log("Step 1: Configure DEX integration");
             
             // Transfer ownership of integration to market factory so it can create pools
-            await etcSwapIntegration.transferOwnership(await marketFactory.getAddress());
+            await dexIntegration.transferOwnership(await marketFactory.getAddress());
             
-            await marketFactory.setETCSwapIntegration(
-                await etcSwapIntegration.getAddress(),
-                true // Enable ETCSwap
+            await marketFactory.setDexIntegration(
+                await dexIntegration.getAddress(),
+                true // Enable DEX
             );
-            expect(await marketFactory.useETCSwap()).to.equal(true);
-            console.log("  ✓ ETCSwap integration configured");
+            expect(await marketFactory.useDex()).to.equal(true);
+            console.log("  ✓ DEX integration configured");
 
             // Step 2: Create a prediction market
             console.log("\nStep 2: Create prediction market");
@@ -110,13 +110,13 @@ describe("Integration: ETCSwap V3 Trading", function () {
             console.log(`  ✓ PASS position ID: ${passPositionId}`);
             console.log(`  ✓ FAIL position ID: ${failPositionId}`);
 
-            // Step 3: Create ETCSwap pools for the market
-            console.log("\nStep 3: Create ETCSwap pools");
+            // Step 3: Create DEX pools for the market
+            console.log("\nStep 3: Create DEX pools");
             const fee = 3000; // 0.3%
             const initialSqrtPrice = "79228162514264337593543950336"; // sqrt(0.5) in Q64.96
 
-            await marketFactory.createETCSwapPools(marketId, initialSqrtPrice, fee);
-            const [passPool, failPool] = await etcSwapIntegration.getMarketPools(marketId);
+            await marketFactory.createDexPools(marketId, initialSqrtPrice, fee);
+            const [passPool, failPool] = await dexIntegration.getMarketPools(marketId);
             console.log(`  ✓ PASS pool created: ${passPool}`);
             console.log(`  ✓ FAIL pool created: ${failPool}`);
 
@@ -149,11 +149,11 @@ describe("Integration: ETCSwap V3 Trading", function () {
 
             // Approve CTF1155 for position manager (ERC1155 approval)
             await ctf1155.connect(liquidityProvider).setApprovalForAll(
-                await etcSwapIntegration.getAddress(),
+                await dexIntegration.getAddress(),
                 true
             );
             await collateralToken.connect(liquidityProvider).approve(
-                await etcSwapIntegration.getAddress(),
+                await dexIntegration.getAddress(),
                 liquidityAmount
             );
 
@@ -233,15 +233,15 @@ describe("Integration: ETCSwap V3 Trading", function () {
 
             expect(collateralReceived).to.be.gt(0);
 
-            console.log("\n=== ETCSwap V3 Integration Test Complete ===\n");
+            console.log("\n=== V3 DEX Integration Test Complete ===\n");
         });
 
-        it("Should handle fallback LMSR mode when ETCSwap is disabled", async function () {
-            const { contracts, accounts } = await loadFixture(deployETCSwapFixture);
+        it("Should handle fallback LMSR mode when DEX is disabled", async function () {
+            const { contracts, accounts } = await loadFixture(deployDexFixture);
             const { marketFactory, collateralToken, ctf1155 } = contracts;
             const { owner, trader1 } = accounts;
 
-            // Create market without enabling ETCSwap (use collateral token, not ETH)
+            // Create market without enabling DEX (use collateral token, not ETH)
             const proposalId = 1;
             const tradingPeriod = 14 * 24 * 3600;
 

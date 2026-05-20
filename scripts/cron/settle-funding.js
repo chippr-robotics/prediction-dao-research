@@ -12,8 +12,8 @@
  * - Detailed logging for monitoring
  *
  * Usage:
- *   npx hardhat run scripts/cron/settle-funding.js --network mordor
- *   DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network mordor
+ *   npx hardhat run scripts/cron/settle-funding.js --network amoy
+ *   DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network amoy
  *
  * Exit codes:
  *   0 - All settlements succeeded (or none were due)

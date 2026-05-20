@@ -5,7 +5,7 @@
  * with the fixed decimal handling for non-18 decimal tokens (like USC with 6 decimals).
  *
  * Usage:
- *   npx hardhat run scripts/deploy/redeploy-perpetual-futures.js --network mordor
+ *   npx hardhat run scripts/deploy/redeploy-perpetual-futures.js --network amoy
  */
 
 const hre = require("hardhat");

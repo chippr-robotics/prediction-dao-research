@@ -65,7 +65,7 @@ describe("TokenMintFactory", function () {
         metadataURI,
         false, // not burnable
         false, // not pausable
-        false  // don't list on ETCSwap
+        false  // don't list on the DEX
       );
 
       const receipt = await tx.wait();
@@ -344,8 +344,8 @@ describe("TokenMintFactory", function () {
     });
   });
 
-  describe("ETCSwap Listing", function () {
-    it("Should allow listing ERC20 on ETCSwap", async function () {
+  describe("DEX Listing", function () {
+    it("Should allow listing ERC20 on the DEX", async function () {
       await tokenMintFactory.connect(user1).createERC20(
         "Test Token",
         "TEST",
@@ -356,10 +356,10 @@ describe("TokenMintFactory", function () {
         false
       );
 
-      await tokenMintFactory.connect(user1).listOnETCSwap(1);
+      await tokenMintFactory.connect(user1).listOnDex(1);
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      expect(tokenInfo.listedOnETCSwap).to.equal(true);
+      expect(tokenInfo.listedOnDex).to.equal(true);
     });
 
     it("Should auto-list on creation if requested", async function () {
@@ -370,14 +370,14 @@ describe("TokenMintFactory", function () {
         "",
         false,
         false,
-        true // list on ETCSwap
+        true // list on the DEX
       );
 
       const tokenInfo = await tokenMintFactory.getTokenInfo(1);
-      expect(tokenInfo.listedOnETCSwap).to.equal(true);
+      expect(tokenInfo.listedOnDex).to.equal(true);
     });
 
-    it("Should not allow listing ERC721 on ETCSwap", async function () {
+    it("Should not allow listing ERC721 on the DEX", async function () {
       await tokenMintFactory.connect(user1).createERC721(
         "Test NFT",
         "TNFT",
@@ -386,7 +386,7 @@ describe("TokenMintFactory", function () {
       );
 
       await expect(
-        tokenMintFactory.connect(user1).listOnETCSwap(1)
+        tokenMintFactory.connect(user1).listOnDex(1)
       ).to.be.revertedWith("Only ERC20 can be listed on swap");
     });
 
@@ -398,15 +398,15 @@ describe("TokenMintFactory", function () {
         "",
         false,
         false,
-        true // list on ETCSwap
+        true // list on the DEX
       );
 
       await expect(
-        tokenMintFactory.connect(user1).listOnETCSwap(1)
+        tokenMintFactory.connect(user1).listOnDex(1)
       ).to.be.revertedWith("Already listed");
     });
 
-    it("Should not allow non-owner to list on ETCSwap", async function () {
+    it("Should not allow non-owner to list on the DEX", async function () {
       await tokenMintFactory.connect(user1).createERC20(
         "Test Token",
         "TEST",
@@ -424,7 +424,7 @@ describe("TokenMintFactory", function () {
       });
 
       await expect(
-        tokenMintFactory.connect(user2).listOnETCSwap(1)
+        tokenMintFactory.connect(user2).listOnDex(1)
       ).to.be.revertedWith("Not token owner");
     });
   });

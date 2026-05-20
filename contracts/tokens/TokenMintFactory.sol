@@ -22,7 +22,7 @@ import "../access/TieredRoleManager.sol";
  * - Create ERC-721 NFT collections with metadata URI support
  * - Track token ownership per wallet
  * - OpenSea metadata standard support (URI/IPFS CID)
- * - Optional ETCSwap listing integration
+ * - Optional V3 DEX listing integration
  * - Role-based access control via TOKENMINT_ROLE
  */
 contract TokenMintFactory is ReentrancyGuard {
@@ -45,7 +45,7 @@ contract TokenMintFactory is ReentrancyGuard {
         string symbol;
         string metadataURI; // IPFS CID or URI (OpenSea standard)
         uint256 createdAt;
-        bool listedOnETCSwap;
+        bool listedOnDex;
         bool isBurnable;
         bool isPausable; // ERC20 only
     }
@@ -84,7 +84,7 @@ contract TokenMintFactory is ReentrancyGuard {
         string metadataURI
     );
 
-    event TokenListedOnETCSwap(
+    event TokenListedOnDex(
         uint256 indexed tokenId,
         address indexed tokenAddress
     );
@@ -134,7 +134,7 @@ contract TokenMintFactory is ReentrancyGuard {
      * @param metadataURI IPFS CID or URI for token metadata (OpenSea standard)
      * @param isBurnable Whether token supports burning
      * @param isPausable Whether token supports pausing
-     * @param listOnETCSwap Whether to list on ETCSwap
+     * @param listOnDex Whether to list on the active chain DEX
      * @return tokenId The ID of the created token
      */
     function createERC20(
@@ -144,7 +144,7 @@ contract TokenMintFactory is ReentrancyGuard {
         string memory metadataURI,
         bool isBurnable,
         bool isPausable,
-        bool listOnETCSwap
+        bool listOnDex
     ) external onlyTokenMinter nonReentrant returns (uint256) {
         require(bytes(name).length > 0, "Name required");
         require(bytes(symbol).length > 0, "Symbol required");
@@ -177,7 +177,7 @@ contract TokenMintFactory is ReentrancyGuard {
             symbol: symbol,
             metadataURI: metadataURI,
             createdAt: block.timestamp,
-            listedOnETCSwap: false,
+            listedOnDex: false,
             isBurnable: isBurnable,
             isPausable: isPausable
         });
@@ -187,9 +187,9 @@ contract TokenMintFactory is ReentrancyGuard {
 
         emit TokenCreated(tokenId, TokenType.ERC20, tokenAddress, msg.sender, name, symbol, metadataURI);
 
-        // List on ETCSwap if requested
-        if (listOnETCSwap) {
-            _listOnETCSwap(tokenId);
+        // List on the active DEX if requested
+        if (listOnDex) {
+            _listOnDex(tokenId);
         }
 
         return tokenId;
@@ -230,7 +230,7 @@ contract TokenMintFactory is ReentrancyGuard {
             symbol: symbol,
             metadataURI: baseURI,
             createdAt: block.timestamp,
-            listedOnETCSwap: false, // NFTs not listed on swap
+            listedOnDex: false, // NFTs not listed on the DEX
             isBurnable: isBurnable,
             isPausable: false // NFTs don't have pause functionality
         });
@@ -260,25 +260,25 @@ contract TokenMintFactory is ReentrancyGuard {
     }
 
     /**
-     * @notice List token on ETCSwap (placeholder for future integration)
+     * @notice List token on the active chain DEX (placeholder for future integration)
      * @param tokenId Token ID
      */
-    function listOnETCSwap(uint256 tokenId)
+    function listOnDex(uint256 tokenId)
         external
         onlyTokenOwner(tokenId)
     {
-        _listOnETCSwap(tokenId);
+        _listOnDex(tokenId);
     }
 
-    function _listOnETCSwap(uint256 tokenId) internal {
+    function _listOnDex(uint256 tokenId) internal {
         require(tokens[tokenId].tokenType == TokenType.ERC20, "Only ERC20 can be listed on swap");
-        require(!tokens[tokenId].listedOnETCSwap, "Already listed");
+        require(!tokens[tokenId].listedOnDex, "Already listed");
 
-        // TODO: Integrate with ETCSwap contract
+        // TODO: Integrate with the active chain DEX contract
         // For now, just mark as listed
-        tokens[tokenId].listedOnETCSwap = true;
+        tokens[tokenId].listedOnDex = true;
 
-        emit TokenListedOnETCSwap(tokenId, tokens[tokenId].tokenAddress);
+        emit TokenListedOnDex(tokenId, tokens[tokenId].tokenAddress);
     }
 
     // ========== View Functions ==========

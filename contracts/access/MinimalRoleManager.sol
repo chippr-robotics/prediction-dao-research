@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/Pausable.sol";
  * @title MinimalRoleManager
  * @notice Ultra-lightweight RBAC for gas-constrained deterministic deployments
  * @dev Stripped down to essentials - no metadata strings, no payment integration, no timelocks.
- *      Use this on chains with low block gas limits (e.g., Mordor ETC testnet ~8M).
+ *      Use this on chains with low block gas limits.
  *      For full functionality, deploy TieredRoleManager on chains with higher limits.
  */
 contract MinimalRoleManager is AccessControl, ReentrancyGuard, Pausable {

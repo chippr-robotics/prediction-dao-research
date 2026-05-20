@@ -9,7 +9,7 @@ const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
  *
  * Usage:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/operations/create-divisional-markets.js --network mordor
+ *   npx hardhat run scripts/operations/create-divisional-markets.js --network amoy
  */
 
 // Contract addresses

@@ -11,10 +11,10 @@ const { ethers } = require("hardhat");
  * This script syncs a user's role/tier from TierRegistry to TieredRoleManager.
  *
  * Usage:
- *   USER_ADDRESS=0x... npx hardhat run scripts/sync-tier-registry-to-tiered-role-manager.js --network mordor
+ *   USER_ADDRESS=0x... npx hardhat run scripts/sync-tier-registry-to-tiered-role-manager.js --network amoy
  *
  * Or to sync a specific role:
- *   USER_ADDRESS=0x... ROLE=FRIEND_MARKET_ROLE npx hardhat run scripts/sync-tier-registry-to-tiered-role-manager.js --network mordor
+ *   USER_ADDRESS=0x... ROLE=FRIEND_MARKET_ROLE npx hardhat run scripts/sync-tier-registry-to-tiered-role-manager.js --network amoy
  */
 
 const CONTRACTS = {
@@ -45,7 +45,7 @@ async function main() {
   const userAddress = process.env.USER_ADDRESS;
   if (!userAddress) {
     console.error("ERROR: USER_ADDRESS environment variable not set");
-    console.log("Usage: USER_ADDRESS=0x... npx hardhat run scripts/sync-tier-registry-to-tiered-role-manager.js --network mordor");
+    console.log("Usage: USER_ADDRESS=0x... npx hardhat run scripts/sync-tier-registry-to-tiered-role-manager.js --network amoy");
     process.exit(1);
   }
 

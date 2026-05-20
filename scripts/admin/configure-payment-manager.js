@@ -3,7 +3,7 @@
  *
  * Run after deploy-modular-rbac.js to add payment processing capability
  *
- * Usage: npx hardhat run scripts/configure-payment-manager.js --network mordor
+ * Usage: npx hardhat run scripts/configure-payment-manager.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -20,7 +20,7 @@ const DEPLOYED = {
   membershipManager: '0x5fbc6c64CAF5EA21090b50e0E4bb07ADdA0eB661'
 };
 
-// USC stablecoin on Mordor
+// USC stablecoin on Polygon Amoy
 const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
 function generateSalt(identifier) {

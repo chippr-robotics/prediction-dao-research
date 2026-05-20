@@ -8,7 +8,7 @@ const { loadMnemonicFromFloppy, keystoreExists, CONFIG } = require("./floppy-key
  * Create a 1v1 Friend Market Bet using the floppy wallet
  *
  * This creates a simple 1v1 bet between two addresses using the
- * FriendGroupMarketFactory on Mordor testnet.
+ * FriendGroupMarketFactory on Polygon Amoy.
  *
  * Requirements:
  * - Floppy disk mounted
@@ -17,10 +17,10 @@ const { loadMnemonicFromFloppy, keystoreExists, CONFIG } = require("./floppy-key
  *
  * Usage:
  *   export FLOPPY_PASSWORD=your_password
- *   npx hardhat run scripts/operations/create-friend-market-bet.js --network mordor
+ *   npx hardhat run scripts/operations/create-friend-market-bet.js --network amoy
  */
 
-// Contract addresses on Mordor
+// Contract addresses on Polygon Amoy
 const CONTRACTS = {
   friendGroupMarketFactory: "0x8cFE477e267bB36925047df8A6E30348f82b0085",
   tierRegistryAdapter: "0x8e3A4C65a6C22d88515FD356cB00732adac4f4d7",

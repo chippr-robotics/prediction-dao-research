@@ -11,7 +11,7 @@
  * Alternative: Users can purchase premium roles via purchaseRole() or purchaseRoleWithToken()
  *
  * Usage:
- *   npx hardhat run scripts/grant-market-maker-role.js --network mordor
+ *   npx hardhat run scripts/grant-market-maker-role.js --network amoy
  *
  * Set the USER_ADDRESS environment variable or edit the script directly.
  */

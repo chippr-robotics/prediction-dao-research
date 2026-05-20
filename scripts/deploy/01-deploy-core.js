@@ -17,7 +17,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/01-deploy-core.js --network localhost
- *   npx hardhat run scripts/deploy/01-deploy-core.js --network mordor
+ *   npx hardhat run scripts/deploy/01-deploy-core.js --network amoy
  *
  * Environment variables:
  *   VERIFY=true|false      - Enable Blockscout verification (default: true)

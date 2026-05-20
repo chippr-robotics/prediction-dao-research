@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/04-deploy-registries.js --network localhost
- *   npx hardhat run scripts/deploy/04-deploy-registries.js --network mordor
+ *   npx hardhat run scripts/deploy/04-deploy-registries.js --network amoy
  */
 
 const hre = require("hardhat");

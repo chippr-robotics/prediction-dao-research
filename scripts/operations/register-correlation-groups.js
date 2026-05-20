@@ -7,7 +7,7 @@ const { ethers } = require("hardhat");
  * with the on-chain MarketCorrelationRegistry.
  *
  * Usage:
- *   npx hardhat run scripts/operations/register-correlation-groups.js --network mordor
+ *   npx hardhat run scripts/operations/register-correlation-groups.js --network amoy
  *
  * Environment Variables:
  *   - CREATOR_PRIVATE_KEY: Private key for transactions
@@ -16,7 +16,7 @@ const { ethers } = require("hardhat");
  *   - END_MARKET_ID: Last market ID to process (default: 46)
  */
 
-// Contract addresses (Mordor testnet)
+// Contract addresses (Polygon Amoy)
 const CONTRACTS = {
   conditionalMarketFactory: "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",
   marketCorrelationRegistry: "0x2a820A38997743fC3303cDcA56b996598963B909",

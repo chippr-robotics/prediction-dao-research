@@ -11,7 +11,7 @@ const { ethers } = require("hardhat");
  *
  * Run with admin floppy disk:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/admin/fix-cmf-role-manager.js --network mordor
+ *   npx hardhat run scripts/admin/fix-cmf-role-manager.js --network amoy
  */
 
 const CONTRACTS = {

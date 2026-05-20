@@ -14,7 +14,7 @@ import "../access/TieredRoleManager.sol";
 /**
  * @title DexV3Integration
  * @notice Chain-agnostic integration with any Uniswap V3-compatible DEX
- * @dev Works with ETCSwap on Ethereum Classic, Uniswap V3 on Polygon, and any other
+ * @dev Works with Uniswap V3 on Polygon and any other Uniswap V3-compatible DEX.
  *      V3 fork. All DEX-specific addresses are passed in via the constructor; the
  *      contract makes no chain-id assumptions. Handles pool creation, liquidity
  *      management, and trading for conditional tokens.

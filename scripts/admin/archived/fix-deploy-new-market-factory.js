@@ -9,7 +9,7 @@
  * never set (ownership was transferred to FutarchyGovernor before configuration).
  *
  * Usage:
- *   npx hardhat run scripts/admin/fix-deploy-new-market-factory.js --network mordor
+ *   npx hardhat run scripts/admin/fix-deploy-new-market-factory.js --network amoy
  */
 
 const hre = require("hardhat");

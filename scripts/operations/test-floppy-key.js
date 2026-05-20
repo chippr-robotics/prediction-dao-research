@@ -32,7 +32,7 @@ const KEYSTORE_PATH = path.join(
   CONFIG.KEYSTORE_FILENAME
 );
 
-const RPC_URL = 'https://rpc.mordor.etccooperative.org';
+const RPC_URL = 'https://rpc-amoy.polygon.technology';
 const DEPLOYER_ADDRESS = '0x52502d049571C7893447b86c4d8B38e6184bF6e1';
 
 async function main() {

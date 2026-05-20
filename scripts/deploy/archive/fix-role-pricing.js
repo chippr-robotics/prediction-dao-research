@@ -14,7 +14,7 @@ const { ethers } = require("hardhat");
  * 1. Mount floppy: npm run floppy:mount
  * 2. Set password: export FLOPPY_KEYSTORE_PASSWORD=password
  *
- * Run with: npx hardhat run scripts/deploy/fix-role-pricing.js --network mordor
+ * Run with: npx hardhat run scripts/deploy/fix-role-pricing.js --network amoy
  */
 
 // Contract addresses from contracts.js

@@ -378,7 +378,7 @@ contract FriendGroupMarketFactory is IFriendGroupErrors, Ownable, ReentrancyGuar
         paymentManager = MembershipPaymentManager(_paymentManager);
         manager = _owner; // Initially owner, transferable
 
-        // Accept native ETC by default
+        // Accept the chain native token by default
         acceptedPaymentTokens[address(0)] = true;
     }
     

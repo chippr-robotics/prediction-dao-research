@@ -53,7 +53,7 @@ Settles funding fees for perpetual futures markets every 8 hours. Funding paymen
 # Required
 - Node.js 18+
 - npm/npx
-- Access to Mordor RPC endpoint
+- Access to Polygon Amoy RPC endpoint
 - Private key with ETC for gas
 
 # Recommended
@@ -158,7 +158,7 @@ grep "ERROR\|FAILED" /var/log/perp-funding/settle-funding.log | tail -10
 ```bash
 # Test without executing transactions
 cd /chipprbots/NAS/github/prediction-dao-research
-DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network mordor
+DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network amoy
 ```
 
 ### Automated Health Monitoring
@@ -243,13 +243,13 @@ grep -c "ERROR" /var/log/perp-funding/settle-funding.log
 grep "gasUsed" /var/log/perp-funding/settle-funding.log | tail -20
 
 # 3. Check operator balance
-npx hardhat run --network mordor -e "
+npx hardhat run --network amoy -e "
   const [signer] = await ethers.getSigners();
   console.log('Balance:', ethers.formatEther(await ethers.provider.getBalance(signer.address)), 'ETC');
 "
 
 # 4. Verify settlements on-chain (spot check)
-DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network mordor
+DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network amoy
 ```
 
 ### Incident Response
@@ -280,7 +280,7 @@ grep "ERROR" /var/log/perp-funding/settle-funding.log | tail -20
 # (see weekly review command above)
 
 # 3. Check contract state
-DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network mordor
+DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network amoy
 
 # 4. Check if markets are paused
 # (script logs will show "market_paused" reason)
@@ -299,7 +299,7 @@ sudo systemctl restart cron
 
 When new perpetual markets are deployed:
 
-1. Update deployment file: `deployments/mordor-perpetual-futures-v2.1-deployment.json`
+1. Update deployment file: `deployments/amoy-chain80002-perpetual-futures-deployment.json`
 2. Add new market to the `markets` array
 3. Script will automatically detect and process new markets on next run
 4. No code changes required

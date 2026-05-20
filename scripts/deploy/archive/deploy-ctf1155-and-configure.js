@@ -7,7 +7,7 @@
  *    - setRoleManager(roleManagerAddress)
  *    - setCTF1155(ctf1155Address)
  *
- * Run with: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
+ * Run with: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network amoy
  */
 
 const hre = require("hardhat");

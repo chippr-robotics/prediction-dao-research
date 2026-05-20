@@ -6,7 +6,7 @@ const { ethers } = require("hardhat");
  * This script updates the factory's roleManager from the old TieredRoleManager
  * to the new modular RoleManagerCore.
  *
- * Run with: npx hardhat run scripts/update-factory-role-manager.js --network mordor
+ * Run with: npx hardhat run scripts/update-factory-role-manager.js --network amoy
  */
 
 const MARKET_FACTORY = '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac';

@@ -5,9 +5,9 @@
  * Replaces multiple individual role grant scripts with a single configurable script.
  *
  * Usage:
- *   ROLE=MARKET_MAKER USER=0x123... npx hardhat run scripts/admin/grant-role.js --network mordor
- *   ROLE=FRIEND_MARKET USER=0x456... TIER=SILVER npx hardhat run scripts/admin/grant-role.js --network mordor
- *   ROLE=DEFAULT_ADMIN USER=0x789... npx hardhat run scripts/admin/grant-role.js --network mordor
+ *   ROLE=MARKET_MAKER USER=0x123... npx hardhat run scripts/admin/grant-role.js --network amoy
+ *   ROLE=FRIEND_MARKET USER=0x456... TIER=SILVER npx hardhat run scripts/admin/grant-role.js --network amoy
+ *   ROLE=DEFAULT_ADMIN USER=0x789... npx hardhat run scripts/admin/grant-role.js --network amoy
  *
  * Environment Variables:
  *   ROLE     - Role to grant (MARKET_MAKER, FRIEND_MARKET, DEFAULT_ADMIN, NULLIFIER_ADMIN, etc.)
@@ -35,7 +35,7 @@ function getRoleName() {
     console.log("  - NULLIFIER_ADMIN  (nullify markets)");
     console.log("  - OPERATIONS_ADMIN (operations access)");
     console.log("\nExample:");
-    console.log("  ROLE=MARKET_MAKER USER=0x123... npx hardhat run scripts/admin/grant-role.js --network mordor");
+    console.log("  ROLE=MARKET_MAKER USER=0x123... npx hardhat run scripts/admin/grant-role.js --network amoy");
     process.exit(1);
   }
   return role.toUpperCase();
@@ -47,7 +47,7 @@ function getUserAddress() {
   if (!user || !ethers.isAddress(user)) {
     console.error("Error: Valid USER address required");
     console.log("\nExample:");
-    console.log("  ROLE=MARKET_MAKER USER=0x123... npx hardhat run scripts/admin/grant-role.js --network mordor");
+    console.log("  ROLE=MARKET_MAKER USER=0x123... npx hardhat run scripts/admin/grant-role.js --network amoy");
     process.exit(1);
   }
   return user;

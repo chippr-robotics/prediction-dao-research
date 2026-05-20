@@ -14,7 +14,7 @@ const path = require("path");
  * proper TieredRoleManager (0xA6F794...).
  *
  * Usage:
- *   npx hardhat run scripts/deploy-new-conditional-market-factory.js --network mordor
+ *   npx hardhat run scripts/deploy-new-conditional-market-factory.js --network amoy
  */
 
 const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
