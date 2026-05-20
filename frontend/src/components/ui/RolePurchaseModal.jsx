@@ -6,7 +6,7 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithUSC } from '../../utils/blockchainService'
+import { purchaseRoleWithStablecoin } from '../../utils/blockchainService'
 import './RolePurchaseModal.css'
 
 // Membership tiers matching TieredRoleManager contract
@@ -95,7 +95,7 @@ function RolePurchaseModal({ onClose }) {
       showNotification('Please confirm the transaction in your wallet', 'info', 5000)
 
       // Execute blockchain transaction with tier
-      const receipt = await purchaseRoleWithUSC(signer, roleName, price, tierValue)
+      const receipt = await purchaseRoleWithStablecoin(signer, roleName, price, tierValue)
 
       // Grant the role locally first for immediate feedback
       const success = grantRole(selectedRole)

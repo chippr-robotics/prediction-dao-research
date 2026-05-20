@@ -6,7 +6,7 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithUSC, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
+import { purchaseRoleWithStablecoin, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -661,7 +661,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
         try {
           // Execute blockchain transaction with verified signer
-          const receipt = await purchaseRoleWithUSC(verifiedSigner, roleName, price, tierValue)
+          const receipt = await purchaseRoleWithStablecoin(verifiedSigner, roleName, price, tierValue)
 
           // Grant the role to the current user
           grantRole(roleKey)

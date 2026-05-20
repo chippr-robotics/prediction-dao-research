@@ -10,7 +10,7 @@ import {
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
-  ETCswapProvider,
+  DexProvider,
   PriceProvider
 } from '../contexts'
 
@@ -242,13 +242,13 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
         <ThemeProvider>
           <WalletProvider>
             <UserPreferencesProvider>
-              <ETCswapProvider>
+              <DexProvider>
                 <UIProvider>
                   <PriceProvider>
                     {ui}
                   </PriceProvider>
                 </UIProvider>
-              </ETCswapProvider>
+              </DexProvider>
             </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>

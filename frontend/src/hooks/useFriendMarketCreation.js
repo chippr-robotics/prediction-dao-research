@@ -11,7 +11,7 @@ const ERC20_ABI = [
   'function approve(address spender, uint256 amount) returns (bool)',
   'function transfer(address to, uint256 amount) returns (bool)'
 ]
-import { ETCSWAP_ADDRESSES, TOKENS } from '../constants/etcswap'
+import { DEX_ADDRESSES, TOKENS } from '../constants/dex'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import {
   getUserTierOnChain,
@@ -111,24 +111,24 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
       // Get stake token address
       const rawCollateralToken = data.data?.collateralToken
-      const isNativeETC = rawCollateralToken === null || rawCollateralToken === undefined
-      const stakeTokenAddress = isNativeETC ? ethers.ZeroAddress : (rawCollateralToken || ETCSWAP_ADDRESSES.USC_STABLECOIN)
+      const isNativeToken = rawCollateralToken === null || rawCollateralToken === undefined
+      const stakeTokenAddress = isNativeToken ? ethers.ZeroAddress : (rawCollateralToken || DEX_ADDRESSES.STABLECOIN)
 
       // Determine token decimals based on token address
       let tokenDecimals = 18
-      if (!isNativeETC && stakeTokenAddress.toLowerCase() === ETCSWAP_ADDRESSES.USC_STABLECOIN.toLowerCase()) {
-        tokenDecimals = TOKENS.USC.decimals
+      if (!isNativeToken && stakeTokenAddress.toLowerCase() === DEX_ADDRESSES.STABLECOIN.toLowerCase()) {
+        tokenDecimals = TOKENS.STABLE.decimals
       }
 
       console.log('Stake token config:', {
         rawCollateralToken,
-        isNativeETC,
+        isNativeToken,
         stakeTokenAddress,
         tokenDecimals
       })
 
       const friendFactory = new ethers.Contract(friendFactoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, activeSigner)
-      const stakeToken = isNativeETC ? null : new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
+      const stakeToken = isNativeToken ? null : new ethers.Contract(stakeTokenAddress, ERC20_ABI, activeSigner)
       const userAddress = await activeSigner.getAddress()
 
       // Check if user has FRIEND_MARKET role (checks both TierRegistry AND RoleManager)
@@ -268,13 +268,13 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         creatorStakeWei: creatorStakeWei.toString(),
         creatorStakeFormatted: ethers.formatUnits(creatorStakeWei, tokenDecimals),
         tokenDecimals,
-        isNativeETC
+        isNativeToken
       })
 
       // Check user balance
-      if (!isNativeETC && stakeToken) {
+      if (!isNativeToken && stakeToken) {
         const balance = await stakeToken.balanceOf(userAddress)
-        const tokenSymbol = TOKENS.USC?.symbol || 'tokens'
+        const tokenSymbol = TOKENS.STABLE?.symbol || 'tokens'
         const requiredAmount = ethers.formatUnits(creatorStakeWei, tokenDecimals)
         console.log('Token balance check:', {
           balance: balance.toString(),
@@ -287,7 +287,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
             `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${requiredAmount} ${tokenSymbol}.`
           )
         }
-      } else if (isNativeETC) {
+      } else if (isNativeToken) {
         const balance = await activeSigner.provider.getBalance(userAddress)
         const requiredAmount = ethers.formatEther(creatorStakeWei)
         console.log('Native ETC balance check:', {
@@ -340,7 +340,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const arbitrator = data.data.arbitrator || ethers.ZeroAddress
 
       // Approve stake token if needed
-      if (!isNativeETC && stakeToken) {
+      if (!isNativeToken && stakeToken) {
         const currentAllowance = await stakeToken.allowance(userAddress, friendFactoryAddress)
         if (currentAllowance < creatorStakeWei) {
           onProgress({ step: 'approve', message: 'Approving token spend...' })
@@ -417,13 +417,13 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         oddsMultiplier,
         creatorStakeWei: creatorStakeWei.toString(),
         stakeToken: stakeTokenAddress,
-        isNativeETC
+        isNativeToken
       })
 
       let tx
 
       // Build the common tx overrides
-      const txOverrides = isNativeETC ? { value: creatorStakeWei } : {}
+      const txOverrides = isNativeToken ? { value: creatorStakeWei } : {}
 
       // Simulate the call first to catch reverts BEFORE the wallet prompts
       // This gives the user an immediate error instead of signing a doomed transaction
@@ -472,7 +472,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
 
       if (isBookmaker) {
-        if (isNativeETC) {
+        if (isNativeToken) {
           tx = await friendFactory.createBookmakerMarket(
             opponent, marketDescription, tradingPeriodSeconds, acceptanceDeadline,
             opponentStakeWei, oddsMultiplier, stakeTokenAddress, resolutionType, arbitrator,
@@ -485,7 +485,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           )
         }
       } else {
-        if (isNativeETC) {
+        if (isNativeToken) {
           tx = await friendFactory.createOneVsOneMarketPending(
             opponent, marketDescription, tradingPeriodSeconds, arbitrator,
             acceptanceDeadline, opponentStakeWei, stakeTokenAddress, resolutionType,

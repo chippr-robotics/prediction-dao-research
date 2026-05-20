@@ -189,7 +189,7 @@ export function generateMarketMetadata(params) {
  * @param {number} [params.decimals=18] - Token decimals
  * @param {string} [params.tokenType='ERC20'] - Token type
  * @param {string} [params.creator] - Creator address
- * @param {boolean} [params.listedOnEtcswap=false] - Listed on ETCSwap
+ * @param {boolean} [params.listedOnDex=false] - Listed on the active chain DEX
  * @param {Object} [params.tokenomics] - Tokenomics information
  * @param {Array<string>} [params.utility] - Token utility descriptions
  * @param {Object} [params.links] - Social and project links
@@ -206,7 +206,7 @@ export function generateTokenMetadata(params) {
     decimals = 18,
     tokenType = 'ERC20',
     creator,
-    listedOnEtcswap = false,
+    listedOnDex = false,
     tokenomics,
     utility = [],
     links = {}
@@ -235,7 +235,7 @@ export function generateTokenMetadata(params) {
     token_address: tokenAddress,
     decimals,
     created_at: new Date().toISOString(),
-    listed_on_etcswap: listedOnEtcswap
+    listed_on_dex: listedOnDex
   }
 
   if (creator) {

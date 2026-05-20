@@ -108,10 +108,9 @@ export function WalletProvider({ children }) {
     return () => { cancelled = true }
   }, [isConnected, address, walletClient])
 
-  // Check network compatibility. The app supports multiple chains (Mordor
-  // and Polygon Amoy today); a network error is only emitted when the
-  // wallet is on a chain we don't recognize. The LimitedFunctionalityBanner
-  // handles steering Mordor users toward Amoy.
+  // Check network compatibility. Only emit a network error when the wallet
+  // is on a chain we don't recognize (anything other than Polygon Amoy or
+  // local Hardhat).
   useEffect(() => {
     if (isConnected && !isSupportedChainId(chainId)) {
       const supported = listSupportedChainIds()

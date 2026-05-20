@@ -44,11 +44,8 @@ export function Web3Provider({ children }) {
     return () => { ignore = true }
   }, [isConnected, address])
 
-  // Check network compatibility. The app supports multiple networks (Mordor
-  // and Polygon Amoy today); only emit a network error when the connected
-  // chain is not in the supported set. The LimitedFunctionalityBanner takes
-  // care of steering users from limited chains (Mordor) to the primary
-  // (Amoy) — this hook only fires for chains we don't recognize at all.
+  // Check network compatibility. Only emit a network error when the connected
+  // chain is not in the supported set (Polygon Amoy or local Hardhat).
   useEffect(() => {
     let ignore = false
 

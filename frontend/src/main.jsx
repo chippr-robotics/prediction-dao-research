@@ -10,7 +10,7 @@ import {
   UIProvider,
   ThemeProvider,
   PriceProvider,
-  ETCswapProvider,
+  DexProvider,
   UserPreferencesProvider,
   FriendMarketsProvider
 } from './contexts'
@@ -30,13 +30,13 @@ createRoot(document.getElementById('root')).render(
             <WalletProvider>
               <UserPreferencesProvider>
                 <FriendMarketsProvider>
-                  <ETCswapProvider>
+                  <DexProvider>
                     <UIProvider>
                       <PriceProvider>
                         <App />
                       </PriceProvider>
                     </UIProvider>
-                  </ETCswapProvider>
+                  </DexProvider>
                 </FriendMarketsProvider>
               </UserPreferencesProvider>
             </WalletProvider>

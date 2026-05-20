@@ -36,8 +36,8 @@ vi.mock('../hooks', () => ({
   useWallet: vi.fn(() => ({ isConnected: true, account: '0x1234567890123456789012345678901234567890' })),
 }))
 
-vi.mock('../hooks/useETCswap', () => ({
-  useETCswap: vi.fn(() => ({
+vi.mock('../hooks/useDex', () => ({
+  useDex: vi.fn(() => ({
     balances: { usc: '100.00' },
     loading: false
   }))
@@ -77,7 +77,7 @@ vi.mock('../components/ui/PremiumPurchaseModal', () => ({
 
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useWalletRoles, useWeb3 } from '../hooks'
-import { useETCswap } from '../hooks/useETCswap'
+import { useDex } from '../hooks/useDex'
 import { useUserPreferences } from '../hooks/useUserPreferences'
 
 describe('WalletButton Component - Wagers', () => {
@@ -166,7 +166,7 @@ describe('WalletButton Component - Wagers', () => {
       hasRole: vi.fn(() => false)
     })
     useWeb3.mockReturnValue({ signer: {} })
-    useETCswap.mockReturnValue({
+    useDex.mockReturnValue({
       balances: { usc: '100.00' },
       loading: false
     })
