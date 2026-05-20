@@ -301,12 +301,6 @@ const SALT_PREFIXES = {
  * Network-specific configurations
  */
 const NETWORK_CONFIG = {
-  mordor: {
-    chainId: 63,
-    name: "Mordor Testnet",
-    rpcUrl: "https://rpc.mordor.etccooperative.org",
-    blockExplorer: "https://etc-mordor.blockscout.com",
-  },
   amoy: {
     chainId: 80002,
     name: "Polygon Amoy",

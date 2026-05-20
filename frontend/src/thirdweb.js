@@ -26,9 +26,8 @@ export const thirdwebClient = createThirdwebClient({
   clientId,
 })
 
-// Get network ID from environment or default to Polygon Amoy (the primary
-// post-migration). Mordor is still supported for limited-functionality access
-// but is no longer the default.
+// Get network ID from environment or default to Polygon Amoy (the Polymarket
+// testnet — the only supported testnet for the app).
 const networkId = import.meta.env.VITE_NETWORK_ID
   ? parseInt(import.meta.env.VITE_NETWORK_ID, 10)
   : 80002
@@ -39,7 +38,8 @@ const rpcUrl =
   import.meta.env.VITE_RPC_URL_AMOY ||
   'https://rpc-amoy.polygon.technology'
 
-// Define Polygon Amoy testnet for ThirdWeb (primary post-migration)
+// Polygon Amoy — Polymarket's testnet. Co-locating with Polymarket's CTF lets
+// friend markets settle by referenced lookup without a bridge.
 export const polygonAmoy = defineChain({
   id: 80002,
   name: 'Polygon Amoy',
@@ -58,45 +58,7 @@ export const polygonAmoy = defineChain({
   testnet: true,
 })
 
-// Define Ethereum Classic mainnet for ThirdWeb
-export const ethereumClassic = defineChain({
-  id: 61,
-  name: 'Ethereum Classic',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Ether',
-    symbol: 'ETC',
-  },
-  rpc: networkId === 61 ? rpcUrl : 'https://etc.rivet.link',
-  blockExplorers: [
-    {
-      name: 'Blockscout',
-      url: 'https://etc.blockscout.com',
-    },
-  ],
-  testnet: false,
-})
-
-// Define Mordor testnet for ThirdWeb
-export const mordor = defineChain({
-  id: 63,
-  name: 'Mordor',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'Mordor Ether',
-    symbol: 'METC',
-  },
-  rpc: networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org',
-  blockExplorers: [
-    {
-      name: 'Blockscout',
-      url: 'https://etc-mordor.blockscout.com',
-    },
-  ],
-  testnet: true,
-})
-
-// Define Hardhat local network for ThirdWeb
+// Hardhat local network for development.
 export const hardhat = defineChain({
   id: 1337,
   name: 'Hardhat',
@@ -112,10 +74,6 @@ export const hardhat = defineChain({
 // Helper to get expected chain info
 export const getThirdwebChain = () => {
   switch (networkId) {
-    case 61:
-      return ethereumClassic
-    case 63:
-      return mordor
     case 1337:
       return hardhat
     case 80002:
@@ -125,4 +83,4 @@ export const getThirdwebChain = () => {
 }
 
 // All supported chains for ThirdWeb
-export const supportedChains = [polygonAmoy, ethereumClassic, mordor, hardhat]
+export const supportedChains = [polygonAmoy, hardhat]
