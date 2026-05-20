@@ -36,9 +36,7 @@ export const TIER_COLORS = {
  */
 export const ROLE_BYTES32 = {
   MARKET_MAKER: ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
-  CLEARPATH_USER: ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
-  TOKENMINT: ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE'))
+  FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
 }
 
 /**
@@ -233,7 +231,7 @@ export function useRoleDetails() {
     setError(null)
 
     try {
-      const roles = ['MARKET_MAKER', 'FRIEND_MARKET', 'CLEARPATH_USER', 'TOKENMINT']
+      const roles = ['MARKET_MAKER', 'FRIEND_MARKET']
       const details = {}
 
       await Promise.all(

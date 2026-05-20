@@ -11,7 +11,7 @@ const { ethers } = require("hardhat");
 
 // Existing contract addresses
 const PAYMENT_PROCESSOR = '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63';
-const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+const USDC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
 // Role hashes
 const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
@@ -63,15 +63,15 @@ async function main() {
     console.log("   You may not be the owner of PaymentProcessor");
   }
 
-  // ========== 3. Add USC as payment token ==========
-  console.log("\n3. Adding USC as payment token...");
+  // ========== 3. Add USDC as payment token ==========
+  console.log("\n3. Adding USDC as payment token...");
 
   try {
-    const tx = await paymentManager.addPaymentToken(USC_ADDRESS, "USC", 6);
+    const tx = await paymentManager.addPaymentToken(USDC_ADDRESS, "USDC", 6);
     await tx.wait();
-    console.log("   ✅ USC added as payment token");
+    console.log("   ✅ USDC added as payment token");
   } catch (error) {
-    console.error("   ❌ Failed to add USC:", error.message);
+    console.error("   ❌ Failed to add USDC:", error.message);
   }
 
   // ========== 4. Set role prices ==========
@@ -85,9 +85,9 @@ async function main() {
   for (const { role, name, price } of rolePrices) {
     try {
       const priceWei = ethers.parseUnits(price, 6);
-      const tx = await paymentManager.setRolePrice(role, USC_ADDRESS, priceWei);
+      const tx = await paymentManager.setRolePrice(role, USDC_ADDRESS, priceWei);
       await tx.wait();
-      console.log(`   ✅ ${name} price set to ${price} USC`);
+      console.log(`   ✅ ${name} price set to ${price} USDC`);
     } catch (error) {
       console.error(`   ❌ Failed to set ${name} price:`, error.message);
     }
@@ -96,13 +96,13 @@ async function main() {
   // ========== 5. Verification ==========
   console.log("\n5. Verifying configuration...");
 
-  const tokenInfo = await paymentManager.paymentTokens(USC_ADDRESS);
-  console.log("   USC token active:", tokenInfo.isActive);
+  const tokenInfo = await paymentManager.paymentTokens(USDC_ADDRESS);
+  console.log("   USDC token active:", tokenInfo.isActive);
 
-  const mmPrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, USC_ADDRESS);
-  const fmPrice = await paymentManager.getRolePrice(FRIEND_MARKET_ROLE, USC_ADDRESS);
-  console.log("   MARKET_MAKER price:", ethers.formatUnits(mmPrice, 6), "USC");
-  console.log("   FRIEND_MARKET price:", ethers.formatUnits(fmPrice, 6), "USC");
+  const mmPrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, USDC_ADDRESS);
+  const fmPrice = await paymentManager.getRolePrice(FRIEND_MARKET_ROLE, USDC_ADDRESS);
+  console.log("   MARKET_MAKER price:", ethers.formatUnits(mmPrice, 6), "USDC");
+  console.log("   FRIEND_MARKET price:", ethers.formatUnits(fmPrice, 6), "USDC");
 
   const configuredManager = await paymentProcessor.paymentManager();
   console.log("   PaymentProcessor.paymentManager:", configuredManager);

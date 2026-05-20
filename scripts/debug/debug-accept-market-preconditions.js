@@ -9,14 +9,14 @@ const { ethers } = require("hardhat");
 
 async function main() {
   const factoryAddress = "0xD9A26537947d99c6961C1013490f0B80d1DFE283";
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
   const tester1 = "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E";
 
   const [deployer] = await ethers.getSigners();
   const provider = deployer.provider;
 
   const factory = await ethers.getContractAt("FriendGroupMarketFactory", factoryAddress);
-  const usc = await ethers.getContractAt("IERC20", uscAddress);
+  const usc = await ethers.getContractAt("IERC20", usdcAddress);
 
   console.log("=".repeat(60));
   console.log("Debug acceptMarket Preconditions");
@@ -40,7 +40,7 @@ async function main() {
       console.log("Status:", Number(market.status), "(0=PendingAcceptance, 1=Active, 2=Resolved, 3=Cancelled, 4=Refunded)");
       console.log("Market Type:", Number(market.marketType));
       console.log("Stake Token:", market.stakeToken);
-      console.log("Stake Per Participant:", ethers.formatUnits(market.stakePerParticipant, 6), "USC");
+      console.log("Stake Per Participant:", ethers.formatUnits(market.stakePerParticipant, 6), "USDC");
 
       console.log("\n--- Members Array ---");
       console.log("Members count:", market.members.length);
@@ -70,7 +70,7 @@ async function main() {
       try {
         const acceptance = await factory.getParticipantAcceptance(marketId, tester1);
         console.log("Has Accepted:", acceptance.hasAccepted);
-        console.log("Staked Amount:", ethers.formatUnits(acceptance.stakedAmount, 6), "USC");
+        console.log("Staked Amount:", ethers.formatUnits(acceptance.stakedAmount, 6), "USDC");
         console.log("Is Arbitrator:", acceptance.isArbitrator);
       } catch (e) {
         console.log("Error getting acceptance:", e.message);
@@ -86,8 +86,8 @@ async function main() {
       console.log("\n--- Tester1 Token Status ---");
       const balance = await usc.balanceOf(tester1);
       const allowance = await usc.allowance(tester1, factoryAddress);
-      console.log("USC Balance:", ethers.formatUnits(balance, 6));
-      console.log("USC Allowance:", ethers.formatUnits(allowance, 6));
+      console.log("USDC Balance:", ethers.formatUnits(balance, 6));
+      console.log("USDC Allowance:", ethers.formatUnits(allowance, 6));
       console.log("Stake Required:", ethers.formatUnits(market.stakePerParticipant, 6));
       console.log("Balance >= Stake:", balance >= market.stakePerParticipant ? "YES" : "NO - INSUFFICIENT!");
       console.log("Allowance >= Stake:", allowance >= market.stakePerParticipant ? "YES" : "NO - NEED APPROVAL!");
@@ -100,8 +100,8 @@ async function main() {
       if (!isTester1InMembers && market.arbitrator.toLowerCase() !== tester1.toLowerCase()) {
         issues.push("Tester1 is NOT in members array and is NOT arbitrator");
       }
-      if (balance < market.stakePerParticipant) issues.push("Insufficient USC balance");
-      if (allowance < market.stakePerParticipant) issues.push("Insufficient USC allowance");
+      if (balance < market.stakePerParticipant) issues.push("Insufficient USDC balance");
+      if (allowance < market.stakePerParticipant) issues.push("Insufficient USDC allowance");
 
       if (issues.length === 0) {
         console.log("✅ All preconditions PASS - acceptMarket should work");

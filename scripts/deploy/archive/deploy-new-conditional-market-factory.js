@@ -255,7 +255,7 @@ async function main() {
 
   const deploymentsDir = path.join(process.cwd(), "deployments");
   if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
-  const outPath = path.join(deploymentsDir, "mordor-new-conditional-market-factory.json");
+  const outPath = path.join(deploymentsDir, "amoy-new-conditional-market-factory.json");
   fs.writeFileSync(outPath, JSON.stringify(deploymentInfo, null, 2));
   console.log("\nDeployment info saved to:", outPath);
 }

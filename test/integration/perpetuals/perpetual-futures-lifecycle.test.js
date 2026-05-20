@@ -9,9 +9,9 @@ const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers"
 async function deployPerpetualFuturesFixture() {
   const [owner, trader1, trader2, trader3, liquidator, feeRecipient, priceUpdater] = await ethers.getSigners();
 
-  // Deploy mock ERC20 token for collateral (USC stablecoin)
+  // Deploy mock ERC20 token for collateral (USDC stablecoin)
   const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
-  const collateralToken = await MockERC20.deploy("USD Coin", "USC", ethers.parseEther("100000000"));
+  const collateralToken = await MockERC20.deploy("USD Coin", "USDC", ethers.parseEther("100000000"));
   await collateralToken.waitForDeployment();
 
   // Deploy a second collateral token (wrapped native)
@@ -262,7 +262,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       );
 
       const initialBalance = await collateralToken.balanceOf(trader1.address);
-      console.log("  Initial balance:", ethers.formatEther(initialBalance), "USC");
+      console.log("  Initial balance:", ethers.formatEther(initialBalance), "USDC");
 
       // Open long position
       // For a 1 BTC position at $50,000, notional = $50,000
@@ -299,7 +299,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       // Check unrealized PnL (should be positive for long)
       const pnl = await market.getUnrealizedPnL(positionId);
       expect(pnl).to.be.gt(0);
-      console.log("  ✓ Unrealized PnL:", ethers.formatEther(pnl), "USC");
+      console.log("  ✓ Unrealized PnL:", ethers.formatEther(pnl), "USDC");
 
       // Deposit to insurance fund to cover profit payout
       const { trader2 } = accounts;
@@ -312,8 +312,8 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       const finalBalance = await collateralToken.balanceOf(trader1.address);
       const profit = finalBalance - initialBalance + collateral;
       console.log("  ✓ Position closed");
-      console.log("  Final balance:", ethers.formatEther(finalBalance), "USC");
-      console.log("  Net profit:", ethers.formatEther(profit), "USC");
+      console.log("  Final balance:", ethers.formatEther(finalBalance), "USDC");
+      console.log("  Net profit:", ethers.formatEther(profit), "USDC");
 
       // Verify profit was realized
       expect(finalBalance).to.be.gt(initialBalance - collateral);
@@ -362,7 +362,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       // Check unrealized PnL (should be negative for short when price goes up)
       const pnl = await market.getUnrealizedPnL(positionId);
       expect(pnl).to.be.lt(0);
-      console.log("  ✓ Unrealized PnL (loss):", ethers.formatEther(pnl), "USC");
+      console.log("  ✓ Unrealized PnL (loss):", ethers.formatEther(pnl), "USDC");
 
       // Close position
       await market.connect(trader1).closePosition(positionId);
@@ -560,7 +560,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       const liquidatorProfit = liquidatorBalanceAfter - liquidatorBalanceBefore;
 
       console.log("  ✓ Position liquidated");
-      console.log("  Liquidator reward:", ethers.formatEther(liquidatorProfit), "USC");
+      console.log("  Liquidator reward:", ethers.formatEther(liquidatorProfit), "USDC");
 
       // Verify position is closed
       const position = await market.getPosition(positionId);
@@ -568,7 +568,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
       // Check insurance fund balance (may be 0 if position was severely underwater)
       const insuranceFund = await market.insuranceFund();
-      console.log("  Insurance fund balance:", ethers.formatEther(insuranceFund), "USC");
+      console.log("  Insurance fund balance:", ethers.formatEther(insuranceFund), "USDC");
     });
 
     it("Should liquidate undercollateralized short position", async function () {
@@ -715,8 +715,8 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
       expect(longPnL).to.be.gt(0);
       expect(shortPnL).to.be.lt(0);
-      console.log("  ✓ Long PnL:", ethers.formatEther(longPnL), "USC");
-      console.log("  ✓ Short PnL:", ethers.formatEther(shortPnL), "USC");
+      console.log("  ✓ Long PnL:", ethers.formatEther(longPnL), "USDC");
+      console.log("  ✓ Short PnL:", ethers.formatEther(shortPnL), "USDC");
 
       // PnL magnitudes should be approximately equal (before fees)
       const pnlDiff = longPnL > -shortPnL ? longPnL + shortPnL : -shortPnL - longPnL;

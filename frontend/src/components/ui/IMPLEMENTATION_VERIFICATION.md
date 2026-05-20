@@ -463,4 +463,4 @@ Navigate to: http://localhost:5173/ui-components
 - Build and lint tests pass
 - Ready for production use
 
-The component library is complete and ready for integration into the ClearPath & FairWins applications.
+The component library is complete and ready for integration into the FairWins application.

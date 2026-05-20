@@ -966,8 +966,8 @@ deploy()
 ### Network Deployment
 
 ```bash
-# Testnet (Mordor)
-npx hardhat run scripts/deploy-privacy.js --network mordor
+# Testnet (Amoy)
+npx hardhat run scripts/deploy-privacy.js --network amoy
 
 # Mainnet (after audits)
 npx hardhat run scripts/deploy-privacy.js --network mainnet

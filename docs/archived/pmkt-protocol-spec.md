@@ -68,7 +68,7 @@ Exchanged immediately after connection.
 ```
 [
   protocolVersion: uint,        // PMKT/1 version (currently 1)
-  networkId: uint,              // 61 for ETC, 63 for Mordor testnet
+  networkId: uint,              // 61 for ETC, 63 for Amoy testnet
   genesisHash: bytes32,         // Genesis block hash for network
   supportedMarkets: [bytes32],  // List of supported market IDs
 ]
@@ -315,12 +315,12 @@ struct Order {
 
 ## Implementation Notes
 
-### Ethereum Classic Specifics
+### Polygon Specifics
 
 - Default gas price: 1-10 Gwei
 - Block time: ~13 seconds
 - Finality: ~1000 blocks (recommended)
-- Network ID: 61 (mainnet), 63 (Mordor testnet)
+- Network ID: 61 (mainnet), 63 (Amoy testnet)
 
 ### Integration with CTF 1155
 

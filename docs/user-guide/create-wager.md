@@ -114,7 +114,7 @@ After creation, copy the wager link and send it to your opponent through any cha
 
 | Parameter | Default Value |
 |-----------|--------------|
-| Stake Amount | 10 USC |
+| Stake Amount | 10 USDC |
 | Wager Duration | 7 days |
 | Acceptance Deadline | 48 hours |
 | Min Acceptance Threshold | 2 participants |

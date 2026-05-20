@@ -48,7 +48,6 @@ describe('Dashboard Component', () => {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      clearPathStatus: { active: false, lastUpdated: null },
       demoMode: true
     },
     isLoading: false,
@@ -56,7 +55,6 @@ describe('Dashboard Component', () => {
     clearRecentSearches: vi.fn(),
     toggleFavoriteMarket: vi.fn(),
     setDefaultSlippage: vi.fn(),
-    setClearPathStatus: vi.fn(),
     setDemoMode: vi.fn(),
     savePreference: vi.fn(),
     clearAllPreferences: vi.fn()

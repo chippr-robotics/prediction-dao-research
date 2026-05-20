@@ -13,7 +13,7 @@ function RoleManagementAdmin() {
   const { showNotification } = useNotification()
   const [allUsers, setAllUsers] = useState({})
   const [newUserAddress, setNewUserAddress] = useState('')
-  const [selectedRole, setSelectedRole] = useState(ROLES.CLEARPATH_USER)
+  const [selectedRole, setSelectedRole] = useState(ROLES.MARKET_MAKER)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('users')
   const [successMessage, setSuccessMessage] = useState('')

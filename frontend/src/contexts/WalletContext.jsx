@@ -158,7 +158,7 @@ export function WalletProvider({ children }) {
    * If a role exists locally but not on-chain, remove it (expired)
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
-    const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+    const premiumRoles = ['MARKET_MAKER', 'FRIEND_MARKET']
     const adminRoles = ['ADMIN', 'CORE_SYSTEM_ADMIN', 'OPERATIONS_ADMIN', 'EMERGENCY_GUARDIAN', 'OVERSIGHT_COMMITTEE']
     const allSyncedRoles = [...premiumRoles, ...adminRoles]
     const updatedRoles = []

@@ -75,12 +75,12 @@ const TIER_LIMITS = {
   }
 };
 
-// Tier prices (in USC with 6 decimals)
+// Tier prices (in USDC with 6 decimals)
 const TIER_PRICES = {
-  1: ethers.parseUnits("25", 6),   // Bronze: 25 USC
-  2: ethers.parseUnits("100", 6),  // Silver: 100 USC
-  3: ethers.parseUnits("250", 6),  // Gold: 250 USC
-  4: ethers.parseUnits("500", 6),  // Platinum: 500 USC
+  1: ethers.parseUnits("25", 6),   // Bronze: 25 USDC
+  2: ethers.parseUnits("100", 6),  // Silver: 100 USDC
+  3: ethers.parseUnits("250", 6),  // Gold: 250 USDC
+  4: ethers.parseUnits("500", 6),  // Platinum: 500 USDC
 };
 
 async function main() {
@@ -122,7 +122,7 @@ async function main() {
         const currentPrice = await tierRegistry.getTierPrice(roleHash, tier);
 
         console.log(`    Currently active: ${isActive}`);
-        console.log(`    Current price: ${ethers.formatUnits(currentPrice, 6)} USC`);
+        console.log(`    Current price: ${ethers.formatUnits(currentPrice, 6)} USDC`);
 
         if (!isActive || currentPrice === 0n) {
           console.log(`    Configuring ${tierName} tier...`);
@@ -174,7 +174,7 @@ async function main() {
       const isActive = await tierRegistry.isTierActive(roleHash, tier);
       const price = await tierRegistry.getTierPrice(roleHash, tier);
       const status = isActive ? "✅" : "❌";
-      console.log(`  ${TIER_NAMES[tier]}: ${status} active, price: ${ethers.formatUnits(price, 6)} USC`);
+      console.log(`  ${TIER_NAMES[tier]}: ${status} active, price: ${ethers.formatUnits(price, 6)} USDC`);
     }
   }
 

@@ -30,7 +30,7 @@ Created a unified `WalletContext` that serves as the single source of truth for 
 #### `WalletContext.jsx`
 - Consolidated wallet state management
 - Provider and signer instances
-- Balance tracking (MATIC, WETC, tokens)
+- Balance tracking (MATIC, WMATIC, tokens)
 - RVAC roles tied to wallet address
 - Network validation and switching
 - Transaction helpers

@@ -68,7 +68,7 @@ describe('validateTheme', () => {
         expect.stringContaining('--brand-primary')
       )
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('platform-clearpath or platform-fairwins')
+        expect.stringContaining('platform-fairwins')
       )
     })
 

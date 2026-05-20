@@ -1,12 +1,12 @@
 const { ethers } = require("hardhat");
 
 /**
- * Debug the exact low-level call that factory makes to USC
+ * Debug the exact low-level call that factory makes to USDC
  */
 
 async function main() {
   const factoryAddress = "0xD9A26537947d99c6961C1013490f0B80d1DFE283";
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
   const tester1 = "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E";
   const deployer1 = "0x52502d049571C7893447b86c4d8B38e6184bF6e1";
   const stakeAmount = ethers.parseUnits("10", 6);
@@ -15,7 +15,7 @@ async function main() {
   const provider = deployer.provider;
 
   console.log("=".repeat(60));
-  console.log("Debug Factory's Low-Level Call to USC");
+  console.log("Debug Factory's Low-Level Call to USDC");
   console.log("=".repeat(60));
 
   // The exact call that _collectStake makes:
@@ -28,10 +28,10 @@ async function main() {
   const factoryCalldata = iface.encodeFunctionData("transferFrom", [tester1, factoryAddress, stakeAmount]);
   console.log("\nFactory would encode:", factoryCalldata);
 
-  console.log("\n--- Test 1: Direct eth_call to USC (simulating factory's perspective) ---");
+  console.log("\n--- Test 1: Direct eth_call to USDC (simulating factory's perspective) ---");
   try {
     const result = await provider.call({
-      to: uscAddress,
+      to: usdcAddress,
       from: factoryAddress,
       data: factoryCalldata
     });
@@ -63,21 +63,21 @@ async function main() {
   }
 
   console.log("\n--- Test 3: Try calling transferFrom directly through deployer account ---");
-  const usc = await ethers.getContractAt("IERC20", uscAddress, deployer);
+  const usc = await ethers.getContractAt("IERC20", usdcAddress, deployer);
 
   // First check allowances
   const deployerAllowance = await usc.allowance(deployer.address, factoryAddress);
   console.log("Deployer allowance to factory:", ethers.formatUnits(deployerAllowance, 6));
 
   const deployerBalance = await usc.balanceOf(deployer.address);
-  console.log("Deployer USC balance:", ethers.formatUnits(deployerBalance, 6));
+  console.log("Deployer USDC balance:", ethers.formatUnits(deployerBalance, 6));
 
-  // Try a real transfer to see if USC works at all
-  console.log("\n--- Test 4: Try a real USC transfer ---");
+  // Try a real transfer to see if USDC works at all
+  console.log("\n--- Test 4: Try a real USDC transfer ---");
   try {
-    // Transfer 1 USC to tester1
+    // Transfer 1 USDC to tester1
     const transferAmount = ethers.parseUnits("0.1", 6);
-    console.log("Transferring 0.1 USC from deployer to tester1...");
+    console.log("Transferring 0.1 USDC from deployer to tester1...");
     const tx = await usc.transfer(tester1, transferAmount);
     const receipt = await tx.wait();
     console.log("✅ Transfer succeeded! Block:", receipt.blockNumber);
@@ -89,8 +89,8 @@ async function main() {
   try {
     const amount = ethers.parseUnits("0.1", 6);
 
-    // Approve factory to spend deployer's USC
-    console.log("Approving factory to spend 0.1 USC...");
+    // Approve factory to spend deployer's USDC
+    console.log("Approving factory to spend 0.1 USDC...");
     const approveTx = await usc.approve(factoryAddress, amount);
     await approveTx.wait();
     console.log("✅ Approve succeeded");
@@ -137,7 +137,7 @@ async function main() {
     console.log(`\nMarket ${i}:`);
     console.log("  Description:", market.description.substring(0, 50));
     console.log("  Status:", Number(market.status));
-    console.log("  Stake:", ethers.formatUnits(market.stakePerParticipant, 6), "USC");
+    console.log("  Stake:", ethers.formatUnits(market.stakePerParticipant, 6), "USDC");
   }
 
   console.log("\n--- Test 8: Deploy a minimal test contract to debug ---");
@@ -149,14 +149,14 @@ async function main() {
   // function can help us debug
 
   console.log("\n--- Summary ---");
-  console.log("1. Direct eth_call to USC.transferFrom works");
+  console.log("1. Direct eth_call to USDC.transferFrom works");
   console.log("2. But calls through factory.acceptMarket/createMarket fail");
-  console.log("3. Regular USC transfers work fine");
-  console.log("4. The issue seems to be specific to how the factory interacts with USC");
+  console.log("3. Regular USDC transfers work fine");
+  console.log("4. The issue seems to be specific to how the factory interacts with USDC");
   console.log("\nPossible causes:");
   console.log("- The low-level call in _collectStake might have an issue");
   console.log("- There might be a gas limit issue in the internal call");
-  console.log("- The USC proxy might behave differently with low-level calls");
+  console.log("- The USDC proxy might behave differently with low-level calls");
 }
 
 main().catch(console.error);

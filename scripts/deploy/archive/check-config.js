@@ -4,7 +4,7 @@ const TIERED_ROLE_MANAGER = '0xA6F794292488C628f91A0475dDF8dE6cEF2706EF';
 const PAYMENT_PROCESSOR = '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63';
 const MEMBERSHIP_PAYMENT_MANAGER = '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28';
 const ADMIN = '0x52502d049571C7893447b86c4d8B38e6184bF6e1';
-const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+const USDC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
 const OPS_ADMIN = ethers.keccak256(ethers.toUtf8Bytes('OPERATIONS_ADMIN_ROLE'));
 const DEFAULT_ADMIN = '0x0000000000000000000000000000000000000000000000000000000000000000';
@@ -59,10 +59,10 @@ async function main() {
   );
 
   try {
-    const uscInfo = await paymentManager.paymentTokens(USC_ADDRESS);
-    console.log('USC token:', uscInfo);
+    const usdcInfo = await paymentManager.paymentTokens(USDC_ADDRESS);
+    console.log('USDC token:', usdcInfo);
   } catch (e) {
-    console.log('Error reading USC:', e.message);
+    console.log('Error reading USDC:', e.message);
   }
 
   try {

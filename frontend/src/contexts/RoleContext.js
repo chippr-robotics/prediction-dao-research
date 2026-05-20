@@ -8,8 +8,6 @@ export const RoleContext = createContext(null)
 export const ROLES = {
   // User-facing roles
   MARKET_MAKER: 'MARKET_MAKER',
-  CLEARPATH_USER: 'CLEARPATH_USER',
-  TOKENMINT: 'TOKENMINT',
   FRIEND_MARKET: 'FRIEND_MARKET',
 
   // Administrative roles (hierarchical)
@@ -27,18 +25,6 @@ export const ROLE_INFO = {
   [ROLES.MARKET_MAKER]: {
     name: 'Market Maker',
     description: 'Ability to create and manage prediction markets',
-    premium: true,
-    isAdminRole: false
-  },
-  [ROLES.CLEARPATH_USER]: {
-    name: 'ClearPath User',
-    description: 'Access to DAO governance and management platform',
-    premium: true,
-    isAdminRole: false
-  },
-  [ROLES.TOKENMINT]: {
-    name: 'Token Mint',
-    description: 'Access to mint and manage NFTs and ERC20 tokens',
     premium: true,
     isAdminRole: false
   },

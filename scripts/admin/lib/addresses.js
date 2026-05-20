@@ -209,7 +209,7 @@ function printAddresses() {
     "Market Contracts": ["ctf1155", "friendGroupMarketFactory"],
     "Perpetual Futures": ["fundingRateEngine", "perpFactory"],
     "Registry Contracts": ["marketCorrelationRegistry", "nullifierRegistry"],
-    "Tokens": ["USC", "WETC"],
+    "Tokens": ["USDC", "WMATIC"],
   };
 
   for (const [category, names] of Object.entries(categories)) {

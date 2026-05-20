@@ -204,7 +204,7 @@ The LoadingScreen automatically uses theme colors from CSS variables:
 - `--brand-secondary`: Checkmark color (Bright Green #34A853)
 - `--text-secondary`: Text color
 
-These are defined in `theme.css` and work with both light/dark modes and FairWins/ClearPath platforms.
+These are defined in `theme.css` and work with both light and dark modes.
 
 ### Custom Styling
 

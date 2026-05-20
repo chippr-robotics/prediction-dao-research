@@ -8,10 +8,10 @@ const hre = require("hardhat");
  * - Optional: Initial market deployment
  */
 
-// Token addresses on ETC (same for mainnet and Mordor testnet)
+// Token addresses on ETC (same for mainnet and Amoy testnet)
 const TOKENS = {
-  USC: '0xDE093684c796204224BC081f937aa059D903c52a', // Classic USD Stablecoin
-  WETC: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a' // Wrapped ETC
+  USDC: '0xDE093684c796204224BC081f937aa059D903c52a', // USDC Stablecoin
+  WMATIC: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a' // Wrapped MATIC
 };
 
 async function main() {
@@ -48,7 +48,7 @@ async function main() {
     const perpFactory = await PerpetualFuturesFactory.deploy(
       fundingRateEngineAddress,  // Funding rate engine
       deployer.address,          // Fee recipient
-      TOKENS.USC                 // Default collateral token (USC stablecoin)
+      TOKENS.USDC                 // Default collateral token (USDC stablecoin)
     );
     await perpFactory.waitForDeployment();
     const perpFactoryAddress = await perpFactory.getAddress();
@@ -71,9 +71,9 @@ async function main() {
     // ========================================
     console.log("Step 4: Configuring allowed collateral tokens...");
 
-    // Allow WETC as collateral
-    console.log("  - Adding WETC as allowed collateral...");
-    await perpFactory.setAllowedCollateralToken(TOKENS.WETC, true);
+    // Allow WMATIC as collateral
+    console.log("  - Adding WMATIC as allowed collateral...");
+    await perpFactory.setAllowedCollateralToken(TOKENS.WMATIC, true);
     console.log("  - Done");
     console.log();
 
@@ -87,7 +87,7 @@ async function main() {
     const btcParams = {
       name: "Bitcoin Perpetual",
       underlyingAsset: "BTC",
-      collateralToken: TOKENS.USC,
+      collateralToken: TOKENS.USDC,
       category: 0, // Crypto
       initialIndexPrice: hre.ethers.parseEther("100000"), // $100,000
       initialMarkPrice: hre.ethers.parseEther("100000"),
@@ -115,7 +115,7 @@ async function main() {
     const ethParams = {
       name: "Ethereum Perpetual",
       underlyingAsset: "ETH",
-      collateralToken: TOKENS.USC,
+      collateralToken: TOKENS.USDC,
       category: 0, // Crypto
       initialIndexPrice: hre.ethers.parseEther("4000"), // $4,000
       initialMarkPrice: hre.ethers.parseEther("4000"),
@@ -140,9 +140,9 @@ async function main() {
     // ETC-PERP market
     console.log("  - Creating ETC-PERP market...");
     const etcParams = {
-      name: "Ethereum Classic Perpetual",
+      name: "Polygon Perpetual",
       underlyingAsset: "ETC",
-      collateralToken: TOKENS.USC,
+      collateralToken: TOKENS.USDC,
       category: 0, // Crypto
       initialIndexPrice: hre.ethers.parseEther("30"), // $30
       initialMarkPrice: hre.ethers.parseEther("30"),
@@ -181,7 +181,7 @@ async function main() {
     console.log("  ETC-PERP (ID: 2):", etcMarketInfo.marketAddress);
     console.log();
     console.log("Configuration:");
-    console.log("  Default Collateral:", TOKENS.USC, "(USC)");
+    console.log("  Default Collateral:", TOKENS.USDC, "(USDC)");
     console.log("  Creation Fee:", hre.ethers.formatEther(creationFee), "ETC");
     console.log("  Max Leverage: 20x");
     console.log("  Funding Interval: 8 hours");

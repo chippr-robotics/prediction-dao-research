@@ -56,11 +56,6 @@ function UserManagementModal({ onScanMarket }) {
     })
   }
 
-  const handleNavigateToClearPath = () => {
-    hideModal()
-    navigate('/clearpath')
-  }
-
   const handleNavigateToAdmin = () => {
     hideModal()
     navigate('/admin/roles')
@@ -200,21 +195,6 @@ function UserManagementModal({ onScanMarket }) {
                 </div>
               )}
             </div>
-
-            {hasRole(ROLES.CLEARPATH_USER) && (
-              <div className="section clearpath-management-section">
-                <h3>ClearPath Management</h3>
-                <p className="section-description">
-                  Access DAO governance and management features
-                </p>
-                <button 
-                  onClick={handleNavigateToClearPath}
-                  className="manage-org-btn"
-                >
-                  Manage Organizations
-                </button>
-              </div>
-            )}
 
             {hasRole(ROLES.ADMIN) && (
               <div className="section admin-section">

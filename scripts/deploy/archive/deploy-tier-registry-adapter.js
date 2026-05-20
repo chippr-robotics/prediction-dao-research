@@ -20,7 +20,7 @@ const { ethers } = require("hardhat");
  *   npx hardhat run scripts/deploy/deploy-tier-registry-adapter.js --network amoy
  */
 
-// Deployed modular RBAC addresses (Mordor)
+// Deployed modular RBAC addresses (Amoy)
 const CONTRACTS = {
   roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
   tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',

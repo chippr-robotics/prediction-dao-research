@@ -13,19 +13,17 @@ import './FairWinsUserModal.css'
 
 /**
  * FairWinsUserModal - Comprehensive user management modal
- * 
+ *
  * Features:
  * - User profile and wallet management
  * - Theme switching (light/dark mode)
- * - Platform switching (FairWins/ClearPath)
  * - Currency display toggle (USD/native)
  * - Role management and purchasing
  * - Demo mode toggle
- * - ClearPath status management
  * - Market search
  * - Token swap integration
  * - Market creation launch
- * 
+ *
  * @param {Function} onScanMarket - Callback for market scanning
  */
 function FairWinsUserModal() {
@@ -34,7 +32,7 @@ function FairWinsUserModal() {
   const { hideModal, showModal } = useModal()
   const { preferences, setDemoMode } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
-  const { toggleMode, isDark, setThemePlatform, isClearPath } = useTheme()
+  const { toggleMode, isDark } = useTheme()
   const priceContext = usePrice() || {}
   const { showUsd = false, toggleCurrency = () => {} } = priceContext
   const { native: nativeSymbol } = useChainTokens()
@@ -61,10 +59,6 @@ function FairWinsUserModal() {
     setDemoMode(!preferences.demoMode)
   }
 
-  const handleTogglePlatform = () => {
-    setThemePlatform(isClearPath ? 'fairwins' : 'clearpath')
-  }
-
   const handleSearchSubmit = (e) => {
     e.preventDefault()
     if (searchQuery.trim()) {
@@ -84,11 +78,6 @@ function FairWinsUserModal() {
       size: 'large',
       closable: false
     })
-  }
-
-  const handleNavigateToClearPath = () => {
-    hideModal()
-    navigate('/clearpath')
   }
 
   const handleNavigateToAdmin = () => {
@@ -237,24 +226,6 @@ function FairWinsUserModal() {
               )}
             </section>
 
-            {/* ClearPath Management (for ClearPath users) */}
-            {hasRole(ROLES.CLEARPATH_USER) && (
-              <section className="fwum-section fwum-clearpath-section">
-                <h3 className="fwum-section-title">
-                  <span aria-hidden="true">🏛️</span> ClearPath Management
-                </h3>
-                <p className="fwum-description">
-                  Access DAO governance and management features
-                </p>
-                <button 
-                  onClick={handleNavigateToClearPath}
-                  className="fwum-action-btn primary"
-                >
-                  Manage Organizations
-                </button>
-              </section>
-            )}
-
             {/* Admin Section (for admins) */}
             {hasRole(ROLES.ADMIN) && (
               <section className="fwum-section fwum-admin-section">
@@ -325,29 +296,6 @@ function FairWinsUserModal() {
                 </button>
               </div>
 
-              {/* Platform Toggle */}
-              <div className="fwum-setting-item">
-                <div className="fwum-setting-info">
-                  <span className="fwum-setting-icon" aria-hidden="true">
-                    {isClearPath ? '🏛️' : '🎯'}
-                  </span>
-                  <div className="fwum-setting-text">
-                    <strong>Platform Style</strong>
-                    <p>Choose platform-specific styling</p>
-                  </div>
-                </div>
-                <button
-                  className="fwum-toggle-btn"
-                  onClick={handleTogglePlatform}
-                  aria-pressed={isClearPath}
-                  aria-label={`Switch to ${isClearPath ? 'FairWins' : 'ClearPath'} style`}
-                >
-                  <span className="fwum-toggle-track platform">
-                    <span className={`fwum-toggle-thumb ${isClearPath ? 'active' : ''}`} />
-                  </span>
-                  <span className="fwum-toggle-label">{isClearPath ? 'ClearPath' : 'FairWins'}</span>
-                </button>
-              </div>
             </section>
 
             {/* Display Section */}

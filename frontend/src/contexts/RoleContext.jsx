@@ -68,7 +68,7 @@ export function RoleProvider({ children }) {
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
     try {
       // Premium roles synced from TierRegistry/TieredRoleManager
-      const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+      const premiumRoles = ['MARKET_MAKER', 'FRIEND_MARKET']
       // Admin roles synced from RoleManager/TieredRoleManager
       const adminRoles = ['ADMIN', 'OPERATIONS_ADMIN', 'EMERGENCY_GUARDIAN']
       const allRolesToSync = [...premiumRoles, ...adminRoles]

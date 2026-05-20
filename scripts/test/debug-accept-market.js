@@ -29,7 +29,7 @@ async function main() {
   console.log("Members:", members);
   console.log("Arbitrator:", arbitrator);
   console.log("Stake token:", stakeToken);
-  console.log("Stake amount:", ethers.formatUnits(stakePerParticipant, 6), "USC");
+  console.log("Stake amount:", ethers.formatUnits(stakePerParticipant, 6), "USDC");
   console.log("Min acceptance threshold:", Number(minThreshold));
   console.log("Accepted count:", Number(acceptedCount));
   console.log("Acceptance deadline:", new Date(Number(acceptanceDeadline) * 1000).toISOString());
@@ -54,9 +54,9 @@ async function main() {
   const balance = await usc.balanceOf(adminWallet);
   const allowance = await usc.allowance(adminWallet, factory.target);
   console.log("\n=== Admin Token Status ===");
-  console.log("Balance:", ethers.formatUnits(balance, 6), "USC");
-  console.log("Allowance to factory:", ethers.formatUnits(allowance, 6), "USC");
-  console.log("Required stake:", ethers.formatUnits(stakePerParticipant, 6), "USC");
+  console.log("Balance:", ethers.formatUnits(balance, 6), "USDC");
+  console.log("Allowance to factory:", ethers.formatUnits(allowance, 6), "USDC");
+  console.log("Required stake:", ethers.formatUnits(stakePerParticipant, 6), "USDC");
   console.log("Has enough balance:", balance >= stakePerParticipant);
   console.log("Has enough allowance:", allowance >= stakePerParticipant);
 
@@ -80,11 +80,11 @@ async function main() {
   if (issues.length === 0) {
     console.log("All checks passed - transaction should succeed");
     console.log("\nThe issue might be in the contract's _collectStake or token transfer.");
-    console.log("Let's check the USC token more carefully...");
+    console.log("Let's check the USDC token more carefully...");
 
-    // Check if USC has any transfer restrictions
-    const uscCode = await ethers.provider.getCode(stakeToken);
-    console.log("\nUSC token code length:", uscCode.length);
+    // Check if USDC has any transfer restrictions
+    const usdcCode = await ethers.provider.getCode(stakeToken);
+    console.log("\nUSC token code length:", usdcCode.length);
 
     // Try to simulate the transferFrom
     console.log("\nSimulating transferFrom...");

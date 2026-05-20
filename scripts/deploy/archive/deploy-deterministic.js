@@ -488,7 +488,7 @@ async function main() {
   console.log(`Network: ${network.name} (Chain ID: ${network.chainId})`);
   
   // Security check: Prevent mainnet deployment with placeholder addresses
-  const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Ethereum Classic Mainnet
+  const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Polygon Mainnet
   const isMainnet = MAINNET_CHAIN_IDS.includes(Number(network.chainId));
   
   if (isMainnet) {

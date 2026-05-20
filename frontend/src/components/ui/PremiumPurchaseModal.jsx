@@ -6,7 +6,7 @@ import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { recordRolePurchase } from '../../utils/roleStorage'
-import { purchaseRoleWithStablecoin, registerZKKey, getUserTierOnChain } from '../../utils/blockchainService'
+import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../../utils/blockchainService'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -108,30 +108,6 @@ const ROLE_DETAILS = {
     fundsDestination: 'DAO Treasury',
     fundsUsage: 'Funds support protocol development and liquidity'
   },
-  CLEARPATH_USER: {
-    icon: '🔐',
-    tagline: 'DAO governance access',
-    features: [
-      'Full DAO governance participation',
-      'Vote on proposals',
-      'Access ZK-protected features',
-      'View organizational reports'
-    ],
-    fundsDestination: 'DAO Treasury',
-    fundsUsage: 'Funds support governance infrastructure'
-  },
-  TOKENMINT: {
-    icon: '🪙',
-    tagline: 'Token creation tools',
-    features: [
-      'Mint custom ERC20 tokens',
-      'Create NFT collections',
-      'Integrate with the active chain DEX',
-      'Token management tools'
-    ],
-    fundsDestination: 'DAO Treasury',
-    fundsUsage: 'Funds support smart contract maintenance'
-  },
   FRIEND_MARKET: {
     icon: '👥',
     tagline: 'Private markets with friends',
@@ -149,24 +125,6 @@ const ROLE_DETAILS = {
 // Role-specific benefit categories
 // Each role type shows different relevant limits/features
 const ROLE_BENEFIT_CATEGORIES = {
-  TOKENMINT: {
-    type: 'token_creation',
-    tierBenefits: {
-      BRONZE: { tokenCreations: 5, nftCollections: 2, etcSwapListing: false, advancedFeatures: false },
-      SILVER: { tokenCreations: 15, nftCollections: 10, etcSwapListing: true, advancedFeatures: true },
-      GOLD: { tokenCreations: 50, nftCollections: 25, etcSwapListing: true, advancedFeatures: true },
-      PLATINUM: { tokenCreations: 'Unlimited', nftCollections: 'Unlimited', etcSwapListing: true, advancedFeatures: true }
-    }
-  },
-  CLEARPATH_USER: {
-    type: 'governance',
-    tierBenefits: {
-      BRONZE: { proposalsPerMonth: 3, daosManaged: 2, zkPrivacy: true, advancedAnalytics: false },
-      SILVER: { proposalsPerMonth: 10, daosManaged: 5, zkPrivacy: true, advancedAnalytics: true },
-      GOLD: { proposalsPerMonth: 25, daosManaged: 10, zkPrivacy: true, advancedAnalytics: true },
-      PLATINUM: { proposalsPerMonth: 'Unlimited', daosManaged: 'Unlimited', zkPrivacy: true, advancedAnalytics: true }
-    }
-  },
   FRIEND_MARKET: {
     type: 'betting',
     useLegacyBenefits: true
@@ -191,56 +149,6 @@ function RoleBenefitsDisplay({ roleKey, tierName, chainLimits }) {
   const TIER_BENEFITS = useMemo(() => buildTierBenefits(stableSymbol), [stableSymbol])
 
   if (!category) return null
-
-  // Token creation role (TOKENMINT)
-  if (category.type === 'token_creation') {
-    const benefits = category.tierBenefits[tierName]
-    return (
-      <div className="ppm-tier-limits ppm-tier-limits--tokens">
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">Tokens/Month:</span>
-          <span className="ppm-limit-value">{benefits.tokenCreations}</span>
-        </div>
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">NFT Collections:</span>
-          <span className="ppm-limit-value">{benefits.nftCollections}</span>
-        </div>
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">ETCSwap Listing:</span>
-          <span className="ppm-limit-value">{benefits.etcSwapListing ? 'Yes' : 'No'}</span>
-        </div>
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">Advanced Features:</span>
-          <span className="ppm-limit-value">{benefits.advancedFeatures ? 'Yes' : 'No'}</span>
-        </div>
-      </div>
-    )
-  }
-
-  // Governance role (CLEARPATH_USER)
-  if (category.type === 'governance') {
-    const benefits = category.tierBenefits[tierName]
-    return (
-      <div className="ppm-tier-limits ppm-tier-limits--governance">
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">Proposals/Month:</span>
-          <span className="ppm-limit-value">{benefits.proposalsPerMonth}</span>
-        </div>
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">DAOs Managed:</span>
-          <span className="ppm-limit-value">{benefits.daosManaged}</span>
-        </div>
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">ZK Privacy:</span>
-          <span className="ppm-limit-value">{benefits.zkPrivacy ? 'Enabled' : 'No'}</span>
-        </div>
-        <div className="ppm-limit-item">
-          <span className="ppm-limit-label">Advanced Analytics:</span>
-          <span className="ppm-limit-value">{benefits.advancedAnalytics ? 'Yes' : 'No'}</span>
-        </div>
-      </div>
-    )
-  }
 
   // Betting roles (FRIEND_MARKET, MARKET_MAKER) - use legacy benefits or chain limits
   const benefits = chainLimits || TIER_BENEFITS[tierName]
@@ -283,64 +191,6 @@ function RoleBenefitFeatures({ roleKey, tierName, chainLimits }) {
   const TIER_BENEFITS = useMemo(() => buildTierBenefits(stableSymbol), [stableSymbol])
 
   if (!category) return null
-
-  // Token creation features
-  if (category.type === 'token_creation') {
-    const benefits = category.tierBenefits[tierName]
-    return (
-      <ul className="ppm-tier-features">
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          Create ERC20 Tokens
-        </li>
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          Create NFT Collections
-        </li>
-        {benefits.etcSwapListing && (
-          <li>
-            <span className="ppm-feature-check" aria-hidden="true">✓</span>
-            ETCSwap Integration
-          </li>
-        )}
-        {benefits.advancedFeatures && (
-          <li>
-            <span className="ppm-feature-check" aria-hidden="true">✓</span>
-            Advanced Token Features
-          </li>
-        )}
-      </ul>
-    )
-  }
-
-  // Governance features
-  if (category.type === 'governance') {
-    const benefits = category.tierBenefits[tierName]
-    return (
-      <ul className="ppm-tier-features">
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          DAO Governance Access
-        </li>
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          Vote on Proposals
-        </li>
-        {benefits.zkPrivacy && (
-          <li>
-            <span className="ppm-feature-check" aria-hidden="true">✓</span>
-            ZK Privacy Features
-          </li>
-        )}
-        {benefits.advancedAnalytics && (
-          <li>
-            <span className="ppm-feature-check" aria-hidden="true">✓</span>
-            Advanced Analytics
-          </li>
-        )}
-      </ul>
-    )
-  }
 
   // Betting features
   const benefits = chainLimits || TIER_BENEFITS[tierName]
@@ -411,9 +261,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
   // Selected tier
   const [selectedTier, setSelectedTier] = useState('BRONZE')
-
-  // ZK key for ClearPath (optional)
-  const [zkPublicKey, setZkPublicKey] = useState('')
 
   // UI state
   const [isPurchasing, setIsPurchasing] = useState(false)
@@ -695,21 +542,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
         }
       }
 
-      // Handle ZK key registration for ClearPath (optional)
-      if (zkPublicKey.trim() && selectedRoles.includes('CLEARPATH_USER')) {
-        try {
-          await registerZKKey(verifiedSigner, zkPublicKey.trim())
-          showNotification('ZK key registered successfully', 'success', 5000)
-        } catch (zkError) {
-          console.error('ZK key registration failed:', zkError)
-          showNotification(
-            'Role purchased successfully, but ZK key registration failed. You can register your key later.',
-            'warning',
-            7000
-          )
-        }
-      }
-
       setPurchaseResults(results)
 
       const successCount = results.filter(r => r.success).length
@@ -757,7 +589,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
 
   if (!isOpen) return null
 
-  const requiresZkKey = selectedRoles.includes('CLEARPATH_USER')
   const tierInfo = MEMBERSHIP_TIERS[selectedTier]
   const tierBenefits = TIER_BENEFITS[selectedTier]
 
@@ -1043,33 +874,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                   </div>
                 )}
 
-                {/* ZK Key Registration for ClearPath (optional) */}
-                {requiresZkKey && (
-                  <div className="ppm-zk-section">
-                    <div className="ppm-info-card">
-                      <span className="ppm-info-icon" aria-hidden="true">🔐</span>
-                      <div>
-                        <strong>ZK Key Registration (Optional)</strong>
-                        <p>
-                          ClearPath uses zero-knowledge proofs for private governance.
-                          You can register your ZK public key now or later.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="ppm-field">
-                      <label htmlFor="zkPublicKey">ZK Public Key (Optional)</label>
-                      <textarea
-                        id="zkPublicKey"
-                        value={zkPublicKey}
-                        onChange={(e) => setZkPublicKey(e.target.value)}
-                        placeholder="Enter your zero-knowledge public key..."
-                        rows={3}
-                        disabled={isPurchasing}
-                      />
-                    </div>
-                  </div>
-                )}
               </section>
             </div>
           )}
@@ -1259,22 +1063,10 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
                 <div className="ppm-whats-next">
                   <h4>What&apos;s Next?</h4>
                   <ul>
-                    {selectedRoles.includes('CLEARPATH_USER') && (
-                      <li>
-                        <span aria-hidden="true">🔐</span>
-                        Access the ClearPath governance dashboard
-                      </li>
-                    )}
                     {selectedRoles.includes('MARKET_MAKER') && (
                       <li>
                         <span aria-hidden="true">📊</span>
                         Create your first prediction market
-                      </li>
-                    )}
-                    {selectedRoles.includes('TOKENMINT') && (
-                      <li>
-                        <span aria-hidden="true">🪙</span>
-                        Explore the token minting tools
                       </li>
                     )}
                     {selectedRoles.includes('FRIEND_MARKET') && (

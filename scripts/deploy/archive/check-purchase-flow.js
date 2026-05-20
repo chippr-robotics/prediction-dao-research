@@ -93,7 +93,7 @@ async function main() {
     try {
       const isActive = await tierRegistryFull.isTierActive(TOKENMINT_ROLE, tier);
       const price = await tierRegistryFull.getTierPrice(TOKENMINT_ROLE, tier);
-      console.log(`   Tier ${tier}: active=${isActive}, price=${ethers.formatUnits(price, 6)} USC`);
+      console.log(`   Tier ${tier}: active=${isActive}, price=${ethers.formatUnits(price, 6)} USDC`);
     } catch (e) {
       console.log(`   Tier ${tier}: Error - ${e.message}`);
     }

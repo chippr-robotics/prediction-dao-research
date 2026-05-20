@@ -505,8 +505,6 @@ export async function fetchFriendMarketsForUser(userAddress) {
 const ROLE_NAME_TO_HASH = {
   // Premium user roles
   'MARKET_MAKER': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  'CLEARPATH_USER': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
-  'TOKENMINT': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
   'FRIEND_MARKET': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
   // Admin roles
   'ADMIN': '0x0000000000000000000000000000000000000000000000000000000000000000', // DEFAULT_ADMIN_ROLE
@@ -516,8 +514,6 @@ const ROLE_NAME_TO_HASH = {
   'OVERSIGHT_COMMITTEE': ethers.keccak256(ethers.toUtf8Bytes('OVERSIGHT_COMMITTEE_ROLE')),
   // Display name aliases
   'Market Maker': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  'ClearPath User': ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
-  'Token Mint': ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
   'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
   // Display names from ROLE_INFO (plural forms)
   'Friend Markets': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
@@ -1099,7 +1095,7 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
 }
 
 /**
- * Register a zero-knowledge public key for ClearPath governance
+ * Register a zero-knowledge public key
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} publicKey - Zero-knowledge public key (base64 or hex encoded)
  * @returns {Promise<Object>} Transaction receipt

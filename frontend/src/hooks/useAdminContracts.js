@@ -137,8 +137,6 @@ export function useAdminContracts() {
         'OPERATIONS_ADMIN_ROLE',
         'EMERGENCY_GUARDIAN_ROLE',
         'MARKET_MAKER_ROLE',
-        'CLEARPATH_USER_ROLE',
-        'TOKENMINT_ROLE',
         'FRIEND_MARKET_ROLE',
         'OVERSIGHT_COMMITTEE_ROLE'
       ]

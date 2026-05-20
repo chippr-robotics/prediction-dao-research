@@ -19,7 +19,6 @@ This skill enables secure management of encrypted cryptographic keys stored on f
 | Zcash | ZEC | secp256k1 | mainnet, testnet (transparent addresses) |
 | Monero | XMR | ed25519 | mainnet, stagenet, testnet |
 | Solana | SOL | ed25519 | mainnet-beta, devnet, testnet |
-| Ethereum Classic | ETC | secp256k1 | mainnet, mordor |
 
 ## Quick Start
 
@@ -173,7 +172,6 @@ Standard BIP-44 paths used for each chain:
 | Zcash | `m/44'/133'/0'/0/{i}` | Transparent addresses |
 | Monero | `m/44'/128'/0'/0/{i}` | Derived from BIP-39 |
 | Solana | `m/44'/501'/{i}'/0'` | Hardened derivation |
-| ETC | `m/44'/61'/0'/0/{i}` | Ethereum Classic |
 
 ## Security Model
 

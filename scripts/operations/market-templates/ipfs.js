@@ -73,7 +73,7 @@ function buildMetadataFromTemplate(template, imageUrl, options = {}) {
     creatorAddress = "0x0000000000000000000000000000000000000000",
     tradingPeriodDays = 14,
     initialLiquidity = 100,
-    network = "Ethereum Classic",
+    network = "Polygon",
   } = options;
 
   const now = new Date();

@@ -1,7 +1,7 @@
 const { ethers } = require('hardhat');
 
 async function main() {
-  const USC = '0xDE093684c796204224BC081f937aa059D903c52a';
+  const USDC = '0xDE093684c796204224BC081f937aa059D903c52a';
   const TESTER1 = '0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E';
   const FRIEND_FACTORY = '0x8cFE477e267bB36925047df8A6E30348f82b0085';
   const STAKE_AMOUNT = 5000000n;
@@ -10,7 +10,7 @@ async function main() {
   console.log('Simulate Stake Collection');
   console.log('='.repeat(60));
 
-  const usc = new ethers.Contract(USC, [
+  const usc = new ethers.Contract(USDC, [
     'function transferFrom(address,address,uint256) returns (bool)',
     'function balanceOf(address) view returns (uint256)',
     'function allowance(address,address) view returns (uint256)',
@@ -18,7 +18,7 @@ async function main() {
   ], ethers.provider);
 
   const symbol = await usc.symbol();
-  console.log('\nToken:', symbol, 'at', USC);
+  console.log('\nToken:', symbol, 'at', USDC);
   console.log('Tester1:', TESTER1);
   console.log('FriendGroupMarketFactory:', FRIEND_FACTORY);
   console.log('Stake amount:', STAKE_AMOUNT.toString());
@@ -44,7 +44,7 @@ async function main() {
 
     // Simulate with FRIEND_FACTORY as the caller
     const result = await ethers.provider.call({
-      to: USC,
+      to: USDC,
       from: FRIEND_FACTORY,
       data: calldata
     });

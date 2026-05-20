@@ -134,26 +134,26 @@ async function main() {
 
   const deploymentsDir = path.join(__dirname, "..", "..", "deployments");
 
-  // Update mordor-chain63-deterministic-deployment.json
-  const deterministicPath = path.join(deploymentsDir, "mordor-chain63-deterministic-deployment.json");
+  // Update amoy-chain63-deterministic-deployment.json
+  const deterministicPath = path.join(deploymentsDir, "amoy-chain63-deterministic-deployment.json");
   if (fs.existsSync(deterministicPath)) {
     const deployment = JSON.parse(fs.readFileSync(deterministicPath, "utf8"));
     deployment.contracts.marketFactory = newMarketFactoryAddress;
     deployment.contracts.oldMarketFactory = ADDRESSES.oldMarketFactory;
     deployment.timestamp = new Date().toISOString();
     fs.writeFileSync(deterministicPath, JSON.stringify(deployment, null, 2));
-    console.log("✓ Updated mordor-chain63-deterministic-deployment.json");
+    console.log("✓ Updated amoy-chain63-deterministic-deployment.json");
   }
 
-  // Update mordor-chain63-core-deployment.json
-  const corePath = path.join(deploymentsDir, "mordor-chain63-core-deployment.json");
+  // Update amoy-chain63-core-deployment.json
+  const corePath = path.join(deploymentsDir, "amoy-chain63-core-deployment.json");
   if (fs.existsSync(corePath)) {
     const deployment = JSON.parse(fs.readFileSync(corePath, "utf8"));
     deployment.contracts.marketFactory = newMarketFactoryAddress;
     deployment.contracts.oldMarketFactory = ADDRESSES.oldMarketFactory;
     deployment.timestamp = new Date().toISOString();
     fs.writeFileSync(corePath, JSON.stringify(deployment, null, 2));
-    console.log("✓ Updated mordor-chain63-core-deployment.json");
+    console.log("✓ Updated amoy-chain63-core-deployment.json");
   }
 
   // Summary

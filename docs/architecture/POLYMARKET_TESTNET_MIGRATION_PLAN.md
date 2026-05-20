@@ -4,7 +4,7 @@
 
 The `etc-swap` integration was deferred because the app sits on **Polygon Amoy Polygon Amoy (chain 63)** while Polymarket lives on **Polygon (chain 137 prod / 80002 Amoy testnet)**. Friend-market side bets that settle by referenced lookup against a Polymarket condition cannot work cross-chain without a bridge — yet the resolution-by-Polymarket plumbing is already 80% built (`PolymarketOracleAdapter`, `pegToPolymarketCondition`, `resolveFromPolymarket`, `batchResolveFromPolymarket`, `ResolutionType.PolymarketOracle` enum value, `polymarketConditionId` field on `FriendMarket`).
 
-The unblock is to **co-locate on Polygon Amoy (Polymarket's testnet)** so the existing settle-by-reference path runs natively. Polygon Amoy stays live but is labeled limited functionality. Stablecoin acceptance switches to **Polymarket testnet USDC** so friend-market collateral is the same token Polymarket settles in. The previously-deferred swap layer generalizes from `ETCSwapV3Integration` to a chain-agnostic `DexV3Integration`, deployable against ETCSwap on Polygon Amoy and Uniswap V3 (or fork) on Amoy.
+The unblock is to **co-locate on Polygon Amoy (Polymarket's testnet)** so the existing settle-by-reference path runs natively. Polygon Amoy stays live but is labeled limited functionality. Stablecoin acceptance switches to **Polymarket testnet USDC** so friend-market collateral is the same token Polymarket settles in. The previously-deferred swap layer generalizes from `ETCSwapV3Integration` to a chain-agnostic `DexV3Integration`, deployable against Dex on Polygon Amoy and Uniswap V3 (or fork) on Amoy.
 
 Outcome: a user can create a private friend-market wager on Amoy, peg it to a Polymarket Amoy `conditionId`, and have it settle automatically when Polymarket resolves — all in USDC, end to end.
 
@@ -36,7 +36,7 @@ Outcome: a user can create a private friend-market wager on Amoy, peg it to a Po
 
 **Storage layout note**: identifier-only renames preserve slot order; safe whether we redeploy or upgrade. Recommend redeploy on Polygon Amoy since it is a testnet.
 
-**Tests touched**: `test/ETCSwapV3Integration.test.js`, `test/integration/etcswap/etcswap-trading.test.js` — pass-through via shim, no behavior change required.
+**Tests touched**: `test/ETCSwapV3Integration.test.js`, `test/integration/dex/dex-trading.test.js` — pass-through via shim, no behavior change required.
 
 ---
 
@@ -60,10 +60,10 @@ Add `etherscan.apiKey.amoy` and `customChains` entry pointing at `https://api-am
 
 **`scripts/deploy/03-deploy-markets.js`** — generalize stablecoin lookup at lines 139, 161, 172, 225, 237:
 ```js
-const stable = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
+const stable = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USDC;
 ```
 
-**`scripts/deploy/02-deploy-rbac.js`** — **audit tier-price decimal encoding**. If prices use `parseEther("50")` (18-dec) but the stablecoin is 6-dec, the on-chain price is 1e12× too large. USC and USDC are both 6-dec, so the existing Polygon Amoy deployment masks any latent bug. Fix to `parseUnits(price, stableDecimals)` keyed off chain stablecoin.
+**`scripts/deploy/02-deploy-rbac.js`** — **audit tier-price decimal encoding**. If prices use `parseEther("50")` (18-dec) but the stablecoin is 6-dec, the on-chain price is 1e12× too large. USDC and USDC are both 6-dec, so the existing Polygon Amoy deployment masks any latent bug. Fix to `parseUnits(price, stableDecimals)` keyed off chain stablecoin.
 
 **`package.json`** — add scripts:
 ```json
@@ -87,10 +87,10 @@ export const NETWORKS = {
   61: { /*  mainnet — read-only */ },
   63: {
     chainId: 63, name: 'Polygon Amoy', isTestnet: true, isPrimary: false, limitedFunctionality: true,
-    nativeCurrency: { symbol: 'METC', decimals: 18, name: 'Polygon Amoy Ether' },
+    nativeCurrency: { symbol: '', decimals: 18, name: 'Polygon Amoy Ether' },
     rpcUrl: import.meta.env.VITE_RPC_URL_MORDOR || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Blockscout', baseUrl: 'https://amoy.polygonscan.com' },
-    stablecoin: { address: '0xDE093684c796204224BC081f937aa059D903c52a', symbol: 'USC', decimals: 6 },
+    stablecoin: { address: '0xDE093684c796204224BC081f937aa059D903c52a', symbol: 'USDC', decimals: 6 },
     dex: { factory: '0x...', router: '0x...', positionManager: '0x...' },
     contracts: { /* paste current DEPLOYED_CONTRACTS */ },
     capabilities: { polymarketSidebets: false, dex: true, friendMarkets: true },
@@ -121,7 +121,7 @@ export function getCurrentChainId() {
 - `frontend/src/thirdweb.js` — same pattern, derive `defineChain` entries.
 - `frontend/src/config/contracts.js` — reroute `getContractAddress(name)` through `NETWORKS[currentChainId].contracts`. Keep `DEPLOYED_CONTRACTS` exported as `NETWORKS[63].contracts` for back-compat.
 - `frontend/src/config/blockExplorer.js` — derive `BLOCKSCOUT_URLS` from `NETWORKS`. Add `getExplorerBaseUrl` alias (the term "blockscout" is now wrong on Amoy).
-- `frontend/src/constants/etcswap.js` — keep file path (avoid touching every importer); rewrite body to derive from `NETWORKS[currentChainId].dex` + `.stablecoin`. Expose `isDexAvailable` flag for callers to branch on.
+- `frontend/src/constants/dex.js` — keep file path (avoid touching every importer); rewrite body to derive from `NETWORKS[currentChainId].dex` + `.stablecoin`. Expose `isDexAvailable` flag for callers to branch on.
 
 **`scripts/utils/sync-frontend-contracts.js`** — write into `NETWORKS[chainId].contracts` instead of flat `DEPLOYED_CONTRACTS`.
 
@@ -163,7 +163,7 @@ export function useChainTokens() {
 - `MyPositions.jsx` line 79
 - `wallet/WalletButton.jsx` lines 1005-1006, 1046
 
-**`frontend/src/hooks/useTierPrices.js`** — rename `USC_DECIMALS` → `STABLE_DECIMALS` sourced from `getNetwork(chainId).stablecoin.decimals`. No behavior change (USC and USDC both 6-dec).
+**`frontend/src/hooks/useTierPrices.js`** — rename `USC_DECIMALS` → `STABLE_DECIMALS` sourced from `getNetwork(chainId).stablecoin.decimals`. No behavior change (USDC and USDC both 6-dec).
 
 ---
 
@@ -268,7 +268,7 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 
 **Manual smoke**:
 1. MetaMask → Polygon Amoy. Faucet MATIC + Polymarket-Amoy USDC.
-2. Buy Bronze membership — verify price label reads `USDC`, not `USC`.
+2. Buy Bronze membership — verify price label reads `USDC`, not `USDC`.
 3. Create private friend market with another wallet; both stake.
 4. Choose **Peg to Polymarket condition**, paste a known Amoy `conditionId`.
 5. Wait for Polymarket resolution (or call `mockCTF.reportPayouts` via script).
@@ -279,7 +279,7 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 - Limited-functionality banner shows.
 - Non-Polymarket friend markets create/resolve normally.
 - "Peg to Polymarket" UI is gated with copy directing user to Amoy.
-- USC membership purchases still work.
+- USDC membership purchases still work.
 
 ---
 
@@ -289,7 +289,7 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 - Polygon mainnet (137) deployment — explicitly blocked via `MAINNET_CHAIN_IDS`.
 -  Swap deprecation on Polygon Amoy (existing on-chain integration left alone).
 - UI rewrite or i18n.
-- Renaming `frontend/src/constants/etcswap.js` filepath.
+- Renaming `frontend/src/constants/dex.js` filepath.
 - Redeploying Chainlink/UMA adapters on Amoy.
 
 ---
@@ -299,7 +299,7 @@ VITE_AMOY_POLYMARKET_CTF=$AMOY_POLYMARKET_CTF \
 | File | Role |
 |---|---|
 | `contracts/integrations/DexV3Integration.sol` (new from rename) | Chain-agnostic V3 swap integration |
-| `contracts/markets/ConditionalMarketFactory.sol` | ETCSwap → Dex rename + alias methods |
+| `contracts/markets/ConditionalMarketFactory.sol` | Dex → Dex rename + alias methods |
 | `contracts/oracles/PolymarketOracleAdapter.sol` | Unchanged; deployed fresh on Amoy with Amoy CTF |
 | `hardhat.config.js` | Add `amoy` network |
 | `scripts/deploy/lib/constants.js` | `TOKENS.amoy`, `POLYMARKET_CTF`, `MAINNET_CHAIN_IDS+=137` |

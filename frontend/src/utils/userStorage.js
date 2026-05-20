@@ -146,30 +146,6 @@ export function getGlobalPreferences() {
 }
 
 /**
- * Check if user has ClearPath status (active/inactive)
- * @param {string} walletAddress - User's wallet address
- * @returns {Object} ClearPath status info
- */
-export function getClearPathStatus(walletAddress) {
-  return getUserPreference(walletAddress, 'clearpath_status', {
-    active: false,
-    lastUpdated: null
-  }, true) // Use localStorage for persistence
-}
-
-/**
- * Update ClearPath status
- * @param {string} walletAddress - User's wallet address
- * @param {boolean} active - Whether ClearPath is active
- */
-export function updateClearPathStatus(walletAddress, active) {
-  saveUserPreference(walletAddress, 'clearpath_status', {
-    active,
-    lastUpdated: Date.now()
-  }, true) // Use localStorage for persistence
-}
-
-/**
  * Get demo mode status (true = mock data, false = real blockchain data)
  * @param {string} walletAddress - User's wallet address
  * @returns {boolean} Demo mode status

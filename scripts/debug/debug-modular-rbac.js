@@ -73,12 +73,12 @@ async function main() {
   console.log("\n--- MembershipPaymentManager (0xF06413E0968a356Fe231C005cd0549900EF442c2) ---");
   const paymentManager = await ethers.getContractAt("MembershipPaymentManager", CONTRACTS.membershipPaymentManager);
 
-  const uscToken = await paymentManager.paymentTokens("0xDE093684c796204224BC081f937aa059D903c52a");
-  console.log("  USC token active:", uscToken.isActive);
-  console.log("  USC token symbol:", uscToken.symbol);
+  const usdcToken = await paymentManager.paymentTokens("0xDE093684c796204224BC081f937aa059D903c52a");
+  console.log("  USDC token active:", usdcToken.isActive);
+  console.log("  USDC token symbol:", usdcToken.symbol);
 
   const mmPrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, "0xDE093684c796204224BC081f937aa059D903c52a");
-  console.log("  MARKET_MAKER USC price:", ethers.formatUnits(mmPrice, 6), "USC");
+  console.log("  MARKET_MAKER USDC price:", ethers.formatUnits(mmPrice, 6), "USDC");
 
   const treasury = await paymentManager.treasury();
   console.log("  Treasury:", treasury);

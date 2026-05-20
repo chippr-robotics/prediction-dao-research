@@ -7,7 +7,7 @@ const ADMIN = '0x52502d049571C7893447b86c4d8B38e6184bF6e1';
 
 const OPS_ADMIN = ethers.keccak256(ethers.toUtf8Bytes('OPERATIONS_ADMIN_ROLE'));
 const TOKENMINT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE'));
-const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+const USDC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
 async function main() {
   const [signer] = await ethers.getSigners();
@@ -58,10 +58,10 @@ async function main() {
   );
 
   try {
-    const uscInfo = await paymentManager.paymentTokens(USC_ADDRESS);
-    console.log('   USC token active:', uscInfo[1]);
+    const usdcInfo = await paymentManager.paymentTokens(USDC_ADDRESS);
+    console.log('   USDC token active:', usdcInfo[1]);
   } catch (e) {
-    console.log('   USC check error:', e.message);
+    console.log('   USDC check error:', e.message);
   }
 
   console.log('\n✅ Done!');

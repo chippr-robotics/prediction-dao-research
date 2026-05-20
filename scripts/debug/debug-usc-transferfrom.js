@@ -1,24 +1,24 @@
 const { ethers } = require("hardhat");
 
 /**
- * Debug USC transferFrom to see if the issue is with the proxy
+ * Debug USDC transferFrom to see if the issue is with the proxy
  */
 
 async function main() {
   const factoryAddress = "0xD9A26537947d99c6961C1013490f0B80d1DFE283";
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
   const tester1 = "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E";
-  const stakeAmount = ethers.parseUnits("10", 6); // 10 USC
+  const stakeAmount = ethers.parseUnits("10", 6); // 10 USDC
 
   const [deployer] = await ethers.getSigners();
   const provider = deployer.provider;
 
   console.log("=".repeat(60));
-  console.log("Debug USC TransferFrom");
+  console.log("Debug USDC TransferFrom");
   console.log("=".repeat(60));
 
-  // Get USC contract with full interface
-  const uscABI = [
+  // Get USDC contract with full interface
+  const usdcABI = [
     "function transferFrom(address from, address to, uint256 amount) returns (bool)",
     "function transfer(address to, uint256 amount) returns (bool)",
     "function approve(address spender, uint256 amount) returns (bool)",
@@ -31,10 +31,10 @@ async function main() {
     "function totalSupply() view returns (uint256)"
   ];
 
-  const usc = new ethers.Contract(uscAddress, uscABI, provider);
+  const usc = new ethers.Contract(usdcAddress, usdcABI, provider);
 
-  console.log("\n--- USC Token Info ---");
-  console.log("Address:", uscAddress);
+  console.log("\n--- USDC Token Info ---");
+  console.log("Address:", usdcAddress);
   try {
     console.log("Name:", await usc.name());
     console.log("Symbol:", await usc.symbol());
@@ -44,29 +44,29 @@ async function main() {
     console.log("Error getting token info:", e.message);
   }
 
-  console.log("\n--- Check if USC is a Proxy ---");
+  console.log("\n--- Check if USDC is a Proxy ---");
   try {
     const impl = await usc.implementation();
     console.log("Implementation:", impl);
-    console.log("USC is a PROXY contract");
+    console.log("USDC is a PROXY contract");
   } catch (e) {
     console.log("No implementation() function - may not be a proxy or different proxy type");
   }
 
   // Check bytecode at address
-  const code = await provider.getCode(uscAddress);
+  const code = await provider.getCode(usdcAddress);
   console.log("Contract code size:", code.length, "bytes");
 
   console.log("\n--- Tester1 Status ---");
   const balance = await usc.balanceOf(tester1);
   const allowance = await usc.allowance(tester1, factoryAddress);
-  console.log("Balance:", ethers.formatUnits(balance, 6), "USC");
-  console.log("Allowance to Factory:", ethers.formatUnits(allowance, 6), "USC");
-  console.log("Stake Amount:", ethers.formatUnits(stakeAmount, 6), "USC");
+  console.log("Balance:", ethers.formatUnits(balance, 6), "USDC");
+  console.log("Allowance to Factory:", ethers.formatUnits(allowance, 6), "USDC");
+  console.log("Stake Amount:", ethers.formatUnits(stakeAmount, 6), "USDC");
 
   // Try to simulate the transferFrom that the factory would do
   console.log("\n--- Simulating transferFrom (factory perspective) ---");
-  console.log("This simulates: USC.transferFrom(tester1, factory, 10 USC)");
+  console.log("This simulates: USDC.transferFrom(tester1, factory, 10 USDC)");
 
   // Encode the transferFrom call
   const iface = new ethers.Interface(["function transferFrom(address,address,uint256) returns (bool)"]);
@@ -76,7 +76,7 @@ async function main() {
   // Try eth_call from factory's perspective
   try {
     const result = await provider.call({
-      to: uscAddress,
+      to: usdcAddress,
       from: factoryAddress,
       data: calldata
     });

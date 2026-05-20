@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import WalletButton from './wallet/WalletButton'
 import './Header.css'
 
-function Header({ showClearPathBranding = false, hideWalletButton = false, appMode = false }) {
+function Header({ hideWalletButton = false, appMode = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -43,17 +43,15 @@ function Header({ showClearPathBranding = false, hideWalletButton = false, appMo
         <div className="header-logo" onClick={() => navigate(appMode ? '/app' : '/')}>
           {!logoError ? (
             <img
-              src={showClearPathBranding ? "/logo_clearpath.svg" : "/assets/fairwins_no-text_logo.svg"}
-              alt={showClearPathBranding ? "ClearPath" : "FairWins"}
+              src="/assets/fairwins_no-text_logo.svg"
+              alt="FairWins"
               className="header-logo-image"
               width="48"
               height="48"
               onError={handleLogoError}
             />
           ) : (
-            <span className="header-logo-text">
-              {showClearPathBranding ? 'ClearPath' : 'FairWins'}
-            </span>
+            <span className="header-logo-text">FairWins</span>
           )}
         </div>
 

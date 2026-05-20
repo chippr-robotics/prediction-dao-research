@@ -590,7 +590,7 @@ Examples:
   node cli.js diff /path/to/manifest.json  # Compare with another disk
 
   # Mother/Clone branching (xprv isolation)
-  node cli.js init-mother --id=mordor   # Make this disk a mother
+  node cli.js init-mother --id=primary   # Make this disk a mother
   node cli.js fork --id=agent-1 --name="Agent Alpha" --ttl=30  # Fork a clone
   node cli.js fork-write                # Write clone to new floppy (after swap)
   node cli.js status                    # Show current disk role and TTL
@@ -610,7 +610,6 @@ Supported Chains:
   zcash (zec)        - Zcash transparent addresses
   monero (xmr)       - Monero (derived from BIP-39)
   solana (sol)       - Solana
-  ethereumClassic    - Ethereum Classic
 
 Environment Variables:
   FLOPPY_DEVICE              - Device path (default: /dev/sde)

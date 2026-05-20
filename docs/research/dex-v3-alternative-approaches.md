@@ -1,7 +1,7 @@
-# ETCswap v3 Integration: Alternative Approaches Evaluated
+# Dex v3 Integration: Alternative Approaches Evaluated
 
 **Document Type**: Appendix  
-**Parent Document**: [ETCswap v3 Integration Analysis](etcswap-v3-integration-analysis.md)  
+**Parent Document**: [Dex v3 Integration Analysis](dex-v3-integration-analysis.md)  
 **Date**: December 23, 2025  
 **Status**: Reference Material
 
@@ -362,7 +362,7 @@ However, the fundamental alignment between platform purpose and optimal mechanis
 
 ## References
 
-- **Main Document**: [ETCswap v3 Integration Analysis](etcswap-v3-integration-analysis.md)
+- **Main Document**: [Dex v3 Integration Analysis](dex-v3-integration-analysis.md)
 - **Platform Overview**: [System Introduction](../system-overview/introduction.md)
 - **ClearPath Details**: [Governance](../system-overview/governance.md)
 - **FairWins Details**: [FairWins Markets](../system-overview/fairwins-markets.md)

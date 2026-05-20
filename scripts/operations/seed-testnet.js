@@ -70,7 +70,7 @@ const CONFIG = {
 const MARKET_TEMPLATES = [
   { question: "Will ETH price exceed $5000 in the next 6 months?", category: "crypto" },
   { question: "Will Bitcoin dominance fall below 40% within 12 months?", category: "crypto" },
-  { question: "Will Ethereum Classic reach 100 TPS within the next year?", category: "tech" },
+  { question: "Will Polygon reach 100 TPS within the next year?", category: "tech" },
   { question: "Will DAO treasury grow by 20% in 6 months?", category: "governance" },
   { question: "Will new DEX integration complete successfully?", category: "tech" },
   { question: "Will community proposal #X pass?", category: "governance" },

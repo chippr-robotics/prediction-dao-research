@@ -1,11 +1,11 @@
 const { ethers } = require('hardhat');
 
 async function main() {
-  const USC = '0xDE093684c796204224BC081f937aa059D903c52a';
+  const USDC = '0xDE093684c796204224BC081f937aa059D903c52a';
   const TESTER1 = '0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E';
   const FRIEND_FACTORY = '0x8cFE477e267bB36925047df8A6E30348f82b0085';
 
-  const usc = new ethers.Contract(USC, [
+  const usc = new ethers.Contract(USDC, [
     'function balanceOf(address) view returns (uint256)',
     'function allowance(address,address) view returns (uint256)',
   ], ethers.provider);
@@ -14,10 +14,10 @@ async function main() {
   console.log('Block:', await ethers.provider.getBlockNumber());
   
   const balance = await usc.balanceOf(TESTER1);
-  console.log('\nTester1 USC balance:', balance.toString(), '(', ethers.formatUnits(balance, 6), 'USC)');
+  console.log('\nTester1 USDC balance:', balance.toString(), '(', ethers.formatUnits(balance, 6), 'USDC)');
   
   const allowance = await usc.allowance(TESTER1, FRIEND_FACTORY);
-  console.log('Tester1 allowance to factory:', allowance.toString(), '(', ethers.formatUnits(allowance, 6), 'USC)');
+  console.log('Tester1 allowance to factory:', allowance.toString(), '(', ethers.formatUnits(allowance, 6), 'USDC)');
 
   // Check Tester1 transaction history for recent acceptMarket calls
   console.log('\n=== Checking Recent Transactions from Tester1 ===');

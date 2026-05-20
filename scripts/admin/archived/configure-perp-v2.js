@@ -11,10 +11,10 @@
 const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
-// V2 deployment addresses (from mordor-perpetual-futures-v2-deployment.json)
+// V2 deployment addresses (from amoy-perpetual-futures-v2-deployment.json)
 const FUNDING_RATE_ENGINE = "0x1F3ec2FaB298Dd684e90f73e44f9267e02b958fE";
 const PERP_FACTORY = "0xF6B327a581D99CC55ed0BA00de2aF6edf2f9b5Db";
-const USC_TOKEN = "0xDE093684c796204224BC081f937aa059D903c52a";
+const USDC_TOKEN = "0xDE093684c796204224BC081f937aa059D903c52a";
 
 async function main() {
   console.log("=".repeat(60));
@@ -35,7 +35,7 @@ async function main() {
   console.log("\nContract Addresses:");
   console.log("  FundingRateEngine:", FUNDING_RATE_ENGINE);
   console.log("  PerpetualFuturesFactory:", PERP_FACTORY);
-  console.log("  USC Token:", USC_TOKEN);
+  console.log("  USDC Token:", USDC_TOKEN);
 
   // =========================================================================
   // Step 1: Configure FundingRateEngine
@@ -98,7 +98,7 @@ async function main() {
       initialMarkPrice: ethers.parseEther("4000"),
     },
     {
-      name: "Ethereum Classic Perpetual",
+      name: "Polygon Perpetual",
       underlyingAsset: "ETC",
       category: 0,
       initialIndexPrice: ethers.parseEther("30"), // $30
@@ -136,7 +136,7 @@ async function main() {
         const params = {
           name: marketConfig.name,
           underlyingAsset: marketConfig.underlyingAsset,
-          collateralToken: USC_TOKEN,
+          collateralToken: USDC_TOKEN,
           category: marketConfig.category,
           initialIndexPrice: marketConfig.initialIndexPrice,
           initialMarkPrice: marketConfig.initialMarkPrice,
