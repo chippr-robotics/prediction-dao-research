@@ -289,22 +289,20 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
   const arbitrator = marketResult.arbitrator
   const hasArbitrator = arbitrator && arbitrator !== ethers.ZeroAddress
 
-  // Safely parse timestamps
+  // Safely parse timestamps. `getFriendMarketWithStatus` does not return
+  // `tradingEndTime` — it returns `acceptanceDeadline`. Use that for
+  // pending-acceptance wagers; otherwise fall back to a 30-day default
+  // (the paginated path in data/wagers/EventsSource.js computes the
+  // accurate value from createdAt + tradingPeriodSeconds).
   const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
-  const tradingEndTimeMs = Number(marketResult.tradingEndTime || 0) * 1000
 
   const now = new Date()
   const defaultEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
   let endDateStr
-  try {
-    if (tradingEndTimeMs > 0) {
-      const endDate = new Date(tradingEndTimeMs)
-      endDateStr = !isNaN(endDate.getTime()) ? endDate.toISOString() : defaultEndDate.toISOString()
-    } else {
-      endDateStr = defaultEndDate.toISOString()
-    }
-  } catch {
+  if (acceptanceDeadlineMs > 0 && Number(marketResult.status) === 0) {
+    endDateStr = new Date(acceptanceDeadlineMs).toISOString()
+  } else {
     endDateStr = defaultEndDate.toISOString()
   }
 

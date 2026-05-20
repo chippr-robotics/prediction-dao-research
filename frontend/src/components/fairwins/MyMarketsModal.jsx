@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet, useWeb3 } from '../../hooks'
+import { useWallet, useWeb3, useMyWagers, useMyWagerNotifications } from '../../hooks'
 import { useChainTokens } from '../../hooks/useChainTokens'
-import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
+import {
+  WagerStatus as MarketStatus,
+  DisputeStatus,
+  WAGER_DEFAULTS,
+  WagerSortKey,
+  ResolutionTypeNames,
+  ResolutionTypeOrder,
+  TERMINAL_STATUSES,
+} from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
@@ -34,10 +42,8 @@ function MyMarketsModal({
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
 
-  // Markets data state
-  const [markets, setMarkets] = useState([])
-  const [userPositions, setUserPositions] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Optimistic data state (legacy — kept for any callers still wiring positions)
+  const [userPositions] = useState([])
   const [error, setError] = useState(null)
 
   // Selected market for detail view
@@ -59,31 +65,69 @@ function MyMarketsModal({
   // Filter state
   const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
   const [statusFilter, setStatusFilter] = useState('all')
+  const [resolutionTypeFilter, setResolutionTypeFilter] = useState('all') // 'all' | '0'..'5'
+  const [sortKey, setSortKey] = useState(WagerSortKey.CREATED)
 
-  // Fetch markets data (friend markets are passed via props)
+  // Paginated wagers via the WagerRepository (subgraph primary, events fallback).
+  // The hook keeps decryption out of the data path — encrypted envelopes are
+  // returned as raw metadataCipher and unwrapped by useLazyMarketDecryption.
+  const myWagersFilter = useMemo(() => ({
+    marketTypes: marketTypeFilter === 'all' ? null : [marketTypeFilter],
+    statuses: statusFilter === 'all' ? null : [statusFilter],
+    resolutionTypes: resolutionTypeFilter === 'all' ? null : [Number(resolutionTypeFilter)],
+    includeExpired: activeTab === 'history',
+  }), [marketTypeFilter, statusFilter, resolutionTypeFilter, activeTab])
+
+  const {
+    items: pagedWagers,
+    loadMore,
+    refresh: refreshPage,
+    isLoading: pageLoading,
+    error: pageError,
+    hasMore,
+  } = useMyWagers({
+    account,
+    tab: activeTab,
+    sort: sortKey,
+    filter: myWagersFilter,
+  })
+
+  // Unread tracking (circuit-breaker for the count badge + mark-as-read).
+  // Independent storage key from FriendMarketsModal so opening a wager in
+  // one view does not mark it read in the other.
+  const {
+    unreadMarketIds,
+    markMarketAsRead,
+    isMarketUnread,
+  } = useMyWagerNotifications(pagedWagers, account)
+
+  // The pagedWagers are already gated on ownership/expiry/tab by the
+  // repository. The remaining job for the modal is to merge in any
+  // optimistic friend markets passed via props (e.g. just-created).
+  const visibleWagers = useMemo(() => {
+    const seen = new Set(pagedWagers.map(w => String(w.id)))
+    const optimistic = (friendMarkets || []).filter(m => !seen.has(String(m.id)))
+    return [...pagedWagers, ...optimistic]
+  }, [pagedWagers, friendMarkets])
+
+  // Fetch markets data — now a thin wrapper that refreshes the paginated query
   const fetchMarketsData = useCallback(async () => {
     if (!account) return
-
-    setLoading(true)
     setError(null)
-
     try {
-      setMarkets([])
-      setUserPositions([])
+      await refreshPage()
     } catch (err) {
       console.error('Error fetching markets data:', err)
       setError('Failed to load wagers. Please try again.')
-    } finally {
-      setLoading(false)
     }
-  }, [account])
+  }, [account, refreshPage])
 
-  // Load data when modal opens
+  const loading = pageLoading
+
+  // Surface page-level errors
   useEffect(() => {
-    if (isOpen && account) {
-      fetchMarketsData()
-    }
-  }, [isOpen, account, fetchMarketsData])
+    if (pageError) setError(pageError)
+  }, [pageError])
 
   // Reset state when modal opens
   useEffect(() => {
@@ -94,6 +138,8 @@ function MyMarketsModal({
       setShowDisputeModal(false)
       setMarketTypeFilter('all')
       setStatusFilter('all')
+      setResolutionTypeFilter('all')
+      setSortKey(WagerSortKey.CREATED)
     }
   }, [isOpen])
 
@@ -125,108 +171,67 @@ function MyMarketsModal({
     }
   }
 
-  // Combine and categorize markets
-  const categorizedMarkets = useMemo(() => {
-    const userAddr = account?.toLowerCase()
-    if (!userAddr) return { participating: [], created: [], history: [] }
-
-    // Combine fetched and friend markets
-    const allMarkets = [
-      ...markets.map(m => ({ ...m, marketType: 'friend' })),
-      ...friendMarkets.map(m => ({ ...m, marketType: 'friend' }))
-    ]
-
-    // Remove duplicates by id
-    const uniqueMarkets = allMarkets.reduce((acc, market) => {
-      const key = `${market.marketType}-${market.id}`
-      if (!acc[key]) acc[key] = market
-      return acc
-    }, {})
-
-    const marketsList = Object.values(uniqueMarkets)
-
-    // Determine market status helper
-    const getMarketStatus = (market) => {
-      const now = Date.now()
-      const endTime = market.tradingEndTime
-        ? (typeof market.tradingEndTime === 'bigint'
-          ? Number(market.tradingEndTime) * 1000
-          : new Date(market.tradingEndTime).getTime())
-        : (market.endDate ? new Date(market.endDate).getTime() : 0)
-
-      // Check for terminal statuses first
+  // Annotate each visible wager with a computedStatus derived from its
+  // chain status + endTime. The repository already gated by tab, so we
+  // only need the lightweight status decoration here.
+  const annotatedWagers = useMemo(() => {
+    if (!account) return []
+    const userAddr = account.toLowerCase()
+    // eslint-disable-next-line react-hooks/purity -- Date.now() is calculated once per memo evaluation; recomputed when deps change
+    const now = Date.now()
+    return visibleWagers.map(market => {
       const statusLower = market.status?.toLowerCase()
+      let computedStatus
       if (statusLower === 'cancelled' || statusLower === 'canceled') {
-        return MarketStatus.CANCELLED
+        computedStatus = MarketStatus.CANCELLED
+      } else if (statusLower === 'resolved') {
+        computedStatus = MarketStatus.RESOLVED
+      } else if (statusLower === 'refunded') {
+        computedStatus = MarketStatus.REFUNDED
+      } else if (statusLower === 'oracle_timed_out') {
+        computedStatus = MarketStatus.ORACLE_TIMED_OUT
+      } else if (statusLower === 'challenged') {
+        computedStatus = MarketStatus.CHALLENGED
+      } else if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
+        computedStatus = MarketStatus.PENDING_ACCEPTANCE
+      } else if (statusLower === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
+        computedStatus = MarketStatus.DISPUTED
+      } else if (statusLower === 'pending_resolution') {
+        computedStatus = MarketStatus.PENDING_RESOLUTION
+      } else {
+        const endTime = market.endTime
+          || (market.endDate ? new Date(market.endDate).getTime() : 0)
+        computedStatus = endTime && now > endTime
+          ? MarketStatus.PENDING_RESOLUTION
+          : MarketStatus.ACTIVE
       }
-      if (statusLower === 'resolved') return MarketStatus.RESOLVED
-      if (statusLower === 'refunded') return MarketStatus.REFUNDED
-      if (statusLower === 'oracle_timed_out') return MarketStatus.ORACLE_TIMED_OUT
-      if (statusLower === 'challenged') return MarketStatus.CHALLENGED
+      return { ...market, computedStatus, marketType: market.marketType || 'friend' }
+    }).filter(m => {
+      // Defensive ownership double-gate against any optimistic injections
+      return m.creator?.toLowerCase() === userAddr
+        || (m.participants || []).some(p => p?.toLowerCase() === userAddr)
+    })
+  }, [visibleWagers, account])
 
-      // Check for pending_acceptance status (friend markets awaiting participant stakes)
-      if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
-        return MarketStatus.PENDING_ACCEPTANCE
-      }
-      if (statusLower === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
-        return MarketStatus.DISPUTED
-      }
-      if (endTime && now > endTime) return MarketStatus.PENDING_RESOLUTION
-      return MarketStatus.ACTIVE
-    }
-
-    // Check if user has position in market
-    const hasPosition = (marketId) => {
-      return userPositions.some(p => String(p.marketId) === String(marketId))
-    }
-
-    // Check if user is creator
-    const isCreator = (market) => {
-      return market.creator?.toLowerCase() === userAddr
-    }
-
-    // Check if user is participant
-    const isParticipant = (market) => {
-      return market.participants?.some(p => p.toLowerCase() === userAddr) ||
-        hasPosition(market.id)
-    }
-
-    // Categorize markets
+  // Split the visible page into tab buckets for the existing UI shape.
+  const categorizedMarkets = useMemo(() => {
+    if (!account) return { participating: [], created: [], history: [] }
+    const userAddr = account.toLowerCase()
+    const isCreator = (m) => m.creator?.toLowerCase() === userAddr
+    const isTerminal = (m) => TERMINAL_STATUSES.has(m.status?.toLowerCase())
     const participating = []
     const created = []
     const history = []
-
-    marketsList.forEach(market => {
-      const status = getMarketStatus(market)
-      const marketWithStatus = { ...market, computedStatus: status }
-
-      // Apply type filter
-      if (marketTypeFilter !== 'all' && market.marketType !== marketTypeFilter) {
-        return
+    for (const market of annotatedWagers) {
+      if (isTerminal(market)) {
+        history.push(market)
+        continue
       }
-
-      // Apply status filter
-      if (statusFilter !== 'all' && status !== statusFilter) {
-        return
-      }
-
-      // Terminal markets go to history
-      if (status === MarketStatus.RESOLVED || status === MarketStatus.CANCELLED || status === MarketStatus.REFUNDED || status === MarketStatus.ORACLE_TIMED_OUT) {
-        if (isCreator(market) || isParticipant(market)) {
-          history.push(marketWithStatus)
-        }
-      } else {
-        if (isCreator(market)) {
-          created.push(marketWithStatus)
-        }
-        if (isParticipant(market) && !isCreator(market)) {
-          participating.push(marketWithStatus)
-        }
-      }
-    })
-
+      if (isCreator(market)) created.push(market)
+      else participating.push(market)
+    }
     return { participating, created, history }
-  }, [markets, friendMarkets, userPositions, account, marketTypeFilter, statusFilter])
+  }, [annotatedWagers, account])
 
   // Format helpers
   const formatDate = (dateValue) => {
@@ -321,6 +326,7 @@ function MyMarketsModal({
   }
 
   const handleMarketSelect = (market) => {
+    if (market?.id) markMarketAsRead(market.id)
     setSelectedMarket(market)
   }
 
@@ -474,9 +480,11 @@ function MyMarketsModal({
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
             <span>Participating</span>
-            {categorizedMarkets.participating.length > 0 && (
-              <span className="mm-tab-badge">{categorizedMarkets.participating.length}</span>
-            )}
+            {(() => {
+              const ids = new Set(unreadMarketIds.map(String))
+              const n = categorizedMarkets.participating.filter(m => ids.has(String(m.id))).length
+              return n > 0 ? <span className="mm-tab-badge mm-tab-badge-unread">{n}</span> : null
+            })()}
           </button>
           <button
             className={`mm-tab ${activeTab === 'created' ? 'active' : ''}`}
@@ -490,9 +498,11 @@ function MyMarketsModal({
               <path d="M2 12l10 5 10-5"/>
             </svg>
             <span>Created</span>
-            {categorizedMarkets.created.length > 0 && (
-              <span className="mm-tab-badge">{categorizedMarkets.created.length}</span>
-            )}
+            {(() => {
+              const ids = new Set(unreadMarketIds.map(String))
+              const n = categorizedMarkets.created.filter(m => ids.has(String(m.id))).length
+              return n > 0 ? <span className="mm-tab-badge mm-tab-badge-unread">{n}</span> : null
+            })()}
           </button>
           <button
             className={`mm-tab ${activeTab === 'history' ? 'active' : ''}`}
@@ -505,9 +515,11 @@ function MyMarketsModal({
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span>History</span>
-            {categorizedMarkets.history.length > 0 && (
-              <span className="mm-tab-badge">{categorizedMarkets.history.length}</span>
-            )}
+            {(() => {
+              const ids = new Set(unreadMarketIds.map(String))
+              const n = categorizedMarkets.history.filter(m => ids.has(String(m.id))).length
+              return n > 0 ? <span className="mm-tab-badge mm-tab-badge-unread">{n}</span> : null
+            })()}
           </button>
         </nav>
 
@@ -537,6 +549,32 @@ function MyMarketsModal({
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
               <option value={MarketStatus.DISPUTED}>Disputed</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>
+            </select>
+          </div>
+          <div className="mm-filter-group">
+            <label>Resolution:</label>
+            <select
+              value={resolutionTypeFilter}
+              onChange={(e) => setResolutionTypeFilter(e.target.value)}
+              className="mm-filter-select"
+            >
+              <option value="all">Any</option>
+              {ResolutionTypeOrder.map(rt => (
+                <option key={rt} value={String(rt)}>{ResolutionTypeNames[rt]}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mm-filter-group">
+            <label>Sort:</label>
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value)}
+              className="mm-filter-select"
+            >
+              <option value={WagerSortKey.CREATED}>Created</option>
+              <option value={WagerSortKey.ENDS}>Ends</option>
+              <option value={WagerSortKey.RESOLUTION_TYPE}>Resolution type</option>
+              <option value={WagerSortKey.STATUS}>Status</option>
             </select>
           </div>
           <button
@@ -601,19 +639,34 @@ function MyMarketsModal({
                       <p className="mm-hint">Create or accept a wager to see them here.</p>
                     </div>
                   ) : (
-                    <MarketsTable
-                      markets={categorizedMarkets.participating}
-                      onSelect={handleMarketSelect}
-                      formatDate={formatDate}
-                      getStatusClass={getStatusClass}
-                      getStatusLabel={getStatusLabel}
-                      getTimeRemaining={getTimeRemaining}
-                      showActions={false}
-                      canAccept={canAcceptMarket}
-                      isCreatorOfPending={isCreatorOfPendingMarket}
-                      onAccept={handleOpenAcceptance}
-                      account={account}
-                    />
+                    <>
+                      <MarketsTable
+                        markets={categorizedMarkets.participating}
+                        onSelect={handleMarketSelect}
+                        formatDate={formatDate}
+                        getStatusClass={getStatusClass}
+                        getStatusLabel={getStatusLabel}
+                        getTimeRemaining={getTimeRemaining}
+                        showActions={false}
+                        canAccept={canAcceptMarket}
+                        isCreatorOfPending={isCreatorOfPendingMarket}
+                        onAccept={handleOpenAcceptance}
+                        account={account}
+                        isMarketUnread={isMarketUnread}
+                      />
+                      {hasMore && (
+                        <div className="mm-load-more-row">
+                          <button
+                            type="button"
+                            className="mm-load-more"
+                            onClick={loadMore}
+                            disabled={loading}
+                          >
+                            {loading ? 'Loading…' : 'Load more'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -646,22 +699,37 @@ function MyMarketsModal({
                       <p className="mm-hint">Use the quick actions on the dashboard to create your first wager.</p>
                     </div>
                   ) : (
-                    <MarketsTable
-                      markets={categorizedMarkets.created}
-                      onSelect={handleMarketSelect}
-                      formatDate={formatDate}
-                      getStatusClass={getStatusClass}
-                      getStatusLabel={getStatusLabel}
-                      getTimeRemaining={getTimeRemaining}
-                      canResolve={canResolve}
-                      canRespondToDispute={canRespondToDispute}
-                      isCreatorOfPending={isCreatorOfPendingMarket}
-                      onResolve={handleOpenResolution}
-                      onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
-                      showActions
-                      account={account}
-                      showResolveCountdown
-                    />
+                    <>
+                      <MarketsTable
+                        markets={categorizedMarkets.created}
+                        onSelect={handleMarketSelect}
+                        formatDate={formatDate}
+                        getStatusClass={getStatusClass}
+                        getStatusLabel={getStatusLabel}
+                        getTimeRemaining={getTimeRemaining}
+                        canResolve={canResolve}
+                        canRespondToDispute={canRespondToDispute}
+                        isCreatorOfPending={isCreatorOfPendingMarket}
+                        onResolve={handleOpenResolution}
+                        onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
+                        showActions
+                        account={account}
+                        showResolveCountdown
+                        isMarketUnread={isMarketUnread}
+                      />
+                      {hasMore && (
+                        <div className="mm-load-more-row">
+                          <button
+                            type="button"
+                            className="mm-load-more"
+                            onClick={loadMore}
+                            disabled={loading}
+                          >
+                            {loading ? 'Loading…' : 'Load more'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -689,15 +757,30 @@ function MyMarketsModal({
                       <p>Your resolved wagers will appear here.</p>
                     </div>
                   ) : (
-                    <MarketsTable
-                      markets={categorizedMarkets.history}
-                      onSelect={handleMarketSelect}
-                      formatDate={formatDate}
-                      getStatusClass={getStatusClass}
-                      getStatusLabel={getStatusLabel}
-                      getTimeRemaining={getTimeRemaining}
-                      showOutcome
-                    />
+                    <>
+                      <MarketsTable
+                        markets={categorizedMarkets.history}
+                        onSelect={handleMarketSelect}
+                        formatDate={formatDate}
+                        getStatusClass={getStatusClass}
+                        getStatusLabel={getStatusLabel}
+                        getTimeRemaining={getTimeRemaining}
+                        showOutcome
+                        isMarketUnread={isMarketUnread}
+                      />
+                      {hasMore && (
+                        <div className="mm-load-more-row">
+                          <button
+                            type="button"
+                            className="mm-load-more"
+                            onClick={loadMore}
+                            disabled={loading}
+                          >
+                            {loading ? 'Loading…' : 'Load more'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -801,7 +884,8 @@ function MarketsTable({
   onRespondToDispute,
   onAccept,
   account,
-  showResolveCountdown = false
+  showResolveCountdown = false,
+  isMarketUnread,
 }) {
   const { native: nativeSymbol } = useChainTokens()
   return (
@@ -826,11 +910,12 @@ function MarketsTable({
             const showUnderConsideration = isCreatorOfPending?.(market)
             const displayTitle = getMarketDisplayTitle(market, nativeSymbol || 'MATIC')
 
+            const unread = isMarketUnread ? isMarketUnread(market.id) : false
             return (
               <tr
                 key={`${market.marketType}-${market.id}`}
                 onClick={() => onSelect(market)}
-                className="mm-table-row"
+                className={`mm-table-row${unread ? ' mm-unread' : ''}`}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
@@ -847,13 +932,13 @@ function MarketsTable({
                         stroke="currentColor"
                         strokeWidth="2"
                         title="Private wager"
-                        style={{ marginRight: '6px', verticalAlign: 'middle', opacity: 0.7 }}
+                        style={{ flexShrink: 0, opacity: 0.7 }}
                       >
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0110 0v4"/>
                       </svg>
                     )}
-                    {displayTitle}
+                    <span>{displayTitle}</span>
                   </span>
                   {market.category && (
                     <span className="mm-table-category">{market.category}</span>

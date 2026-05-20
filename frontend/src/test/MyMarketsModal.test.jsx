@@ -15,6 +15,25 @@ vi.mock('../hooks', () => ({
     signer: {},
     isCorrectNetwork: true,
     switchNetwork: vi.fn()
+  })),
+  useMyWagers: vi.fn(() => ({
+    items: [],
+    sort: 'createdAt',
+    filter: {},
+    setSort: vi.fn(),
+    setFilter: vi.fn(),
+    loadMore: vi.fn(),
+    refresh: vi.fn().mockResolvedValue(undefined),
+    isLoading: false,
+    error: null,
+    hasMore: false,
+    totalKnown: 0
+  })),
+  useMyWagerNotifications: vi.fn(() => ({
+    unreadCount: 0,
+    unreadMarketIds: [],
+    markMarketAsRead: vi.fn(),
+    isMarketUnread: vi.fn(() => false)
   }))
 }))
 
@@ -386,7 +405,16 @@ describe('MyMarketsModal', () => {
       })
     })
 
-    it('should show tab badges with counts', async () => {
+    it('should show tab badges only for unread wagers (count circuit breaker)', async () => {
+      const { useMyWagerNotifications } = await import('../hooks')
+      // Mark wager id '1' (the user-created one) as unread
+      useMyWagerNotifications.mockReturnValueOnce({
+        unreadCount: 1,
+        unreadMarketIds: ['1'],
+        markMarketAsRead: vi.fn(),
+        isMarketUnread: (id) => String(id) === '1',
+      })
+
       await act(async () => {
         renderWithProviders(
           <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={mockMarkets} />

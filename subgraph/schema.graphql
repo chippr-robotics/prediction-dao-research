@@ -1,0 +1,76 @@
+"""
+Subgraph schema for the FriendGroupMarketFactory contract.
+
+Deployed to The Graph's decentralized network (public during development;
+hosted endpoint in the future). The frontend WagerRepository
+(SubgraphSource) queries this schema via GraphQL and paginates using the
+`createdAt`, `endTime`, `resolutionType`, or `status` fields directly in
+the `where` / `orderBy` clauses — keeping the visible page as the only
+data transferred, which is what unlocks the millions-of-bets NFR.
+
+Encrypted envelopes (metadataCipher) are stored as raw strings; the
+client decrypts them lazily via useLazyMarketDecryption.
+"""
+
+enum WagerStatus {
+  pending_acceptance
+  active
+  pending_resolution
+  challenged
+  resolved
+  cancelled
+  refunded
+  oracle_timed_out
+}
+
+enum MarketType {
+  oneVsOne
+  smallGroup
+  eventTracking
+  propBet
+  bookmaker
+}
+
+type User @entity(immutable: false) {
+  "lowercased wallet address"
+  id: ID!
+  wagers: [Wager!]! @derivedFrom(field: "participants")
+  created: [Wager!]! @derivedFrom(field: "creator")
+}
+
+type Wager @entity(immutable: false) {
+  "on-chain market id"
+  id: ID!
+
+  marketType: MarketType!
+  status: WagerStatus!
+  resolutionType: Int!
+
+  creator: User!
+  participants: [User!]!
+  arbitrator: Bytes
+
+  stakePerParticipant: BigInt!
+  stakeToken: Bytes!
+
+  tradingPeriodSeconds: BigInt!
+  createdAt: BigInt!
+  acceptanceDeadline: BigInt!
+  "Computed at index time: createdAt + tradingPeriodSeconds"
+  endTime: BigInt!
+
+  acceptedCount: BigInt!
+
+  "IPFS CID when the encrypted metadata is stored off-chain"
+  ipfsCid: String
+
+  "Raw description (may be the encrypted envelope JSON or a plaintext title)"
+  description: String!
+  isEncrypted: Boolean!
+  "Raw envelope (JSON string) when encryption is stored on-chain"
+  metadataCipher: String
+
+  resolvedAt: BigInt
+  winner: Bytes
+  outcomeBool: Boolean
+}
