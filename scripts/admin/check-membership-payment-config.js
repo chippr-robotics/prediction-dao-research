@@ -34,7 +34,7 @@ async function main() {
 
     // Check payment tokens
     const usdcToken = await mpm.paymentTokens(CONTRACTS.USDC_TOKEN);
-    console.log('\nUSC Token Configuration:');
+    console.log('\nUSDC Token Configuration:');
     console.log('  Address:', usdcToken.tokenAddress);
     console.log('  Active:', usdcToken.isActive);
     console.log('  Symbol:', usdcToken.symbol);
@@ -54,7 +54,7 @@ async function main() {
     // Check revenue collected
     try {
       const usdcRevenue = await mpm.revenueByToken(CONTRACTS.USDC_TOKEN);
-      console.log(`\nUSC Revenue collected: ${ethers.formatUnits(usdcRevenue, 6)} USDC`);
+      console.log(`\nUSDC Revenue collected: ${ethers.formatUnits(usdcRevenue, 6)} USDC`);
     } catch (e) {
       console.log('\nUSC Revenue: Unable to fetch');
     }

@@ -84,7 +84,7 @@ async function main() {
 
     // Check if USDC has any transfer restrictions
     const usdcCode = await ethers.provider.getCode(stakeToken);
-    console.log("\nUSC token code length:", usdcCode.length);
+    console.log("\nUSDC token code length:", usdcCode.length);
 
     // Try to simulate the transferFrom
     console.log("\nSimulating transferFrom...");

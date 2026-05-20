@@ -8,7 +8,7 @@ const hre = require("hardhat");
  * - Optional: Initial market deployment
  */
 
-// Token addresses on ETC (same for mainnet and Amoy testnet)
+// Token addresses on Polygon (same for mainnet and Amoy testnet)
 const TOKENS = {
   USDC: '0xDE093684c796204224BC081f937aa059D903c52a', // USDC Stablecoin
   WMATIC: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a' // Wrapped MATIC
@@ -24,7 +24,7 @@ async function main() {
   console.log("Deployer address:", deployer.address);
 
   const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("Account balance:", hre.ethers.formatEther(balance), "ETC");
+  console.log("Account balance:", hre.ethers.formatEther(balance), "MATIC");
   console.log("Network:", hre.network.name);
   console.log();
 
@@ -137,11 +137,11 @@ async function main() {
     const ethMarketInfo = await perpFactory.getMarket(1);
     console.log("    ETH-PERP deployed to:", ethMarketInfo.marketAddress);
 
-    // ETC-PERP market
-    console.log("  - Creating ETC-PERP market...");
-    const etcParams = {
+    // MATIC-PERP market
+    console.log("  - Creating MATIC-PERP market...");
+    const perpParams = {
       name: "Polygon Perpetual",
-      underlyingAsset: "ETC",
+      underlyingAsset: "MATIC",
       collateralToken: TOKENS.USDC,
       category: 0, // Crypto
       initialIndexPrice: hre.ethers.parseEther("30"), // $30
@@ -158,11 +158,11 @@ async function main() {
       }
     };
 
-    const etcTx = await perpFactory.createMarket(etcParams, { value: creationFee });
-    await etcTx.wait();
+    const perpTx = await perpFactory.createMarket(perpParams, { value: creationFee });
+    await perpTx.wait();
 
-    const etcMarketInfo = await perpFactory.getMarket(2);
-    console.log("    ETC-PERP deployed to:", etcMarketInfo.marketAddress);
+    const perpMarketInfo = await perpFactory.getMarket(2);
+    console.log("    MATIC-PERP deployed to:", perpMarketInfo.marketAddress);
     console.log();
 
     // ========================================
@@ -178,11 +178,11 @@ async function main() {
     console.log("Perpetual Markets:");
     console.log("  BTC-PERP (ID: 0):", btcMarketInfo.marketAddress);
     console.log("  ETH-PERP (ID: 1):", ethMarketInfo.marketAddress);
-    console.log("  ETC-PERP (ID: 2):", etcMarketInfo.marketAddress);
+    console.log("  MATIC-PERP (ID: 2):", perpMarketInfo.marketAddress);
     console.log();
     console.log("Configuration:");
     console.log("  Default Collateral:", TOKENS.USDC, "(USDC)");
-    console.log("  Creation Fee:", hre.ethers.formatEther(creationFee), "ETC");
+    console.log("  Creation Fee:", hre.ethers.formatEther(creationFee), "MATIC");
     console.log("  Max Leverage: 20x");
     console.log("  Funding Interval: 8 hours");
     console.log();
@@ -199,7 +199,7 @@ async function main() {
       markets: [
         { id: 0, name: "BTC-PERP", address: btcMarketInfo.marketAddress },
         { id: 1, name: "ETH-PERP", address: ethMarketInfo.marketAddress },
-        { id: 2, name: "ETC-PERP", address: etcMarketInfo.marketAddress }
+        { id: 2, name: "MATIC-PERP", address: perpMarketInfo.marketAddress }
       ],
       tokens: TOKENS
     };

@@ -267,7 +267,8 @@ async function main() {
     throw new Error("No deployer signer available");
   }
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC\n");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC
+");
 
   // Use v1.1 salt to deploy updated contract with fixed permissions
   // (v1.0 had onlyOwner restriction on addMarketToGroup, v1.1 allows group creator)

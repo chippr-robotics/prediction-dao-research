@@ -87,8 +87,8 @@ async function main() {
 
   // Check balances
   console.log("\n[2/6] Checking balances...");
-  const etcBalance = await provider.getBalance(wallet.address);
-  console.log("MATIC balance:", ethers.formatEther(etcBalance), "MATIC");
+  const maticBalance = await provider.getBalance(wallet.address);
+  console.log("MATIC balance:", ethers.formatEther(maticBalance), "MATIC");
 
   const usc = new ethers.Contract(CONTRACTS.usc, ERC20_ABI, wallet);
   const usdcBalance = await usc.balanceOf(wallet.address);

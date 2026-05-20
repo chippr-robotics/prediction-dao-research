@@ -168,7 +168,7 @@ await zkKeyManager.updateConfiguration(
 ### Security Reviews
 - ✅ Code review completed - addressed all feedback
 - ✅ Enhanced G2 curve validation documentation
-- ✅ Replaced prevrandao with nonce for ETC compatibility
+- ✅ Replaced prevrandao with nonce for Polygon compatibility
 - ✅ CodeQL security scan - 0 vulnerabilities found
 
 ### Gas Optimization
@@ -211,7 +211,7 @@ function verifyPositionProof(uint256 positionId) external view returns (bool) {
 ## Next Steps
 
 ### Immediate
-1. Deploy to testnet (Amoy for ETC)
+1. Deploy to testnet (Polygon Amoy)
 2. Perform trusted setup ceremony for ZKVerifier
 3. Monitor gas costs and optimize if needed
 4. Gather user feedback

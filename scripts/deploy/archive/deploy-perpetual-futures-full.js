@@ -7,7 +7,7 @@ const path = require("path");
  *
  * Features:
  * - Deploys FundingRateEngine and PerpetualFuturesFactory
- * - Creates initial BTC, ETH, ETC perpetual markets
+ * - Creates initial BTC, ETH, MATIC perpetual markets
  * - Verifies contracts on Blockscout
  * - Automatically updates frontend/src/config/contracts.js
  * - Saves deployment info to deployments/ directory
@@ -23,7 +23,7 @@ const path = require("path");
  *   UPDATE_FRONTEND=true|false Update frontend contracts.js (default: true)
  */
 
-// Token addresses on ETC (same for mainnet and Amoy testnet)
+// Token addresses on Polygon (same for mainnet and Amoy testnet)
 const TOKENS = {
   USDC: '0xDE093684c796204224BC081f937aa059D903c52a', // USDC Stablecoin
   WMATIC: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a' // Wrapped MATIC
@@ -211,7 +211,7 @@ async function main() {
   console.log("Deployer:", deployer.address);
 
   const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("Balance:", hre.ethers.formatEther(balance), "ETC");
+  console.log("Balance:", hre.ethers.formatEther(balance), "MATIC");
   console.log("Network:", hre.network.name);
   console.log("Chain ID:", (await hre.ethers.provider.getNetwork()).chainId.toString());
   console.log();
@@ -335,7 +335,7 @@ async function main() {
         },
         {
           name: "Polygon Perpetual",
-          underlyingAsset: "ETC",
+          underlyingAsset: "MATIC",
           collateralToken: TOKENS.USDC,
           category: 0,
           initialIndexPrice: hre.ethers.parseEther("30"),

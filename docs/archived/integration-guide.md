@@ -459,7 +459,7 @@ const tx = await exchange.fillOrder(order, signature, amount, {
 ### Order Signature Invalid
 
 - Verify EIP-712 domain parameters match
-- Check chainId is correct (61 for ETC mainnet)
+- Check chainId is correct (137 for Polygon mainnet)
 - Ensure order fields match exactly
 - Verify signer has proper permissions
 

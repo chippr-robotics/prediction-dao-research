@@ -61,7 +61,7 @@ async function main() {
 
   // Get the actual bytecode to see what kind of proxy it is
   const code = await provider.getCode(usdcAddress);
-  console.log("\nUSC proxy bytecode:", code);
+  console.log("\nUSDC proxy bytecode:", code);
 
   console.log("\n--- Test 4: Direct low-level call to factory ---");
   // Let's see what happens when we do a raw call

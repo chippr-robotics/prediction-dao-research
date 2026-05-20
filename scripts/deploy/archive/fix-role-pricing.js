@@ -111,7 +111,7 @@ async function main() {
     process.exit(1);
   }
   console.log("\nDeployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   // Connect to contracts
   const tierRegistry = new ethers.Contract(CONTRACTS.tierRegistry, TIER_REGISTRY_ABI, deployer);

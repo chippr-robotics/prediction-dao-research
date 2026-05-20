@@ -117,7 +117,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   // Deploy new ConditionalMarketFactory
   const saltPrefix = "FairWinsDAO-v1.0-";

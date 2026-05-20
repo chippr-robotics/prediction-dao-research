@@ -150,8 +150,8 @@ async function main() {
   // Step 3: Check balances
   console.log('\n[3/7] Checking balances...');
 
-  const etcBalance = await provider.getBalance(wallet.address);
-  console.log('MATIC balance:', ethers.formatEther(etcBalance), 'MATIC');
+  const maticBalance = await provider.getBalance(wallet.address);
+  console.log('MATIC balance:', ethers.formatEther(maticBalance), 'MATIC');
 
   const usdcContract = new ethers.Contract(USDC_TOKEN, ERC20_ABI, connectedWallet);
   const usdcBalance = await usdcContract.balanceOf(wallet.address);
@@ -178,15 +178,15 @@ async function main() {
   // Step 5: Calculate price and check USDC balance
   console.log('\n[5/7] Calculating purchase price...');
 
-  const priceUSC = TIER_PRICES.BRONZE;
-  const priceWei = ethers.parseUnits(priceUSC.toString(), usdcDecimals);
+  const priceUsdc = TIER_PRICES.BRONZE;
+  const priceWei = ethers.parseUnits(priceUsdc.toString(), usdcDecimals);
 
   console.log('Tier: BRONZE');
-  console.log('Price:', priceUSC, 'USDC');
+  console.log('Price:', priceUsdc, 'USDC');
 
   if (usdcBalance < priceWei) {
     console.error(`Error: Insufficient USDC balance`);
-    console.error(`  Required: ${priceUSC} USDC`);
+    console.error(`  Required: ${priceUsdc} USDC`);
     console.error(`  Available: ${ethers.formatUnits(usdcBalance, usdcDecimals)} USDC`);
     process.exit(1);
   }

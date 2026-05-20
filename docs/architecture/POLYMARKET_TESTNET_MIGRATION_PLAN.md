@@ -4,7 +4,7 @@
 
 The `etc-swap` integration was deferred because the app sits on **Polygon Amoy Polygon Amoy (chain 63)** while Polymarket lives on **Polygon (chain 137 prod / 80002 Amoy testnet)**. Friend-market side bets that settle by referenced lookup against a Polymarket condition cannot work cross-chain without a bridge — yet the resolution-by-Polymarket plumbing is already 80% built (`PolymarketOracleAdapter`, `pegToPolymarketCondition`, `resolveFromPolymarket`, `batchResolveFromPolymarket`, `ResolutionType.PolymarketOracle` enum value, `polymarketConditionId` field on `FriendMarket`).
 
-The unblock is to **co-locate on Polygon Amoy (Polymarket's testnet)** so the existing settle-by-reference path runs natively. Polygon Amoy stays live but is labeled limited functionality. Stablecoin acceptance switches to **Polymarket testnet USDC** so friend-market collateral is the same token Polymarket settles in. The previously-deferred swap layer generalizes from `ETCSwapV3Integration` to a chain-agnostic `DexV3Integration`, deployable against Dex on Polygon Amoy and Uniswap V3 (or fork) on Amoy.
+The unblock is to **co-locate on Polygon Amoy (Polymarket's testnet)** so the existing settle-by-reference path runs natively. Polygon Amoy stays live but is labeled limited functionality. Stablecoin acceptance switches to **Polymarket testnet USDC** so friend-market collateral is the same token Polymarket settles in. The previously-deferred swap layer generalizes from `DexV3Integration` to a chain-agnostic `DexV3Integration`, deployable against Dex on Polygon Amoy and Uniswap V3 (or fork) on Amoy.
 
 Outcome: a user can create a private friend-market wager on Amoy, peg it to a Polymarket Amoy `conditionId`, and have it settle automatically when Polymarket resolves — all in USDC, end to end.
 
@@ -21,22 +21,22 @@ Outcome: a user can create a private friend-market wager on Amoy, peg it to a Po
 
 ## Step 1 — Generalize the swap integration
 
-**Rename** (source-only; existing Polygon Amoy `ETCSwapV3Integration` deployment stays as-is):
+**Rename** (source-only; existing Polygon Amoy `DexV3Integration` deployment stays as-is):
 
-- `contracts/integrations/ETCSwapV3Integration.sol` → `contracts/integrations/DexV3Integration.sol` (rename file + `contract` identifier; constructor `(address _factory, address _swapRouter, address _positionManager)` unchanged; no chain assumptions exist in the body — confirmed by exploration)
-- Add `contracts/integrations/legacy/ETCSwapV3Integration.sol` — empty subclass shim so out-of-tree imports still compile
+- `contracts/integrations/DexV3Integration.sol` → `contracts/integrations/DexV3Integration.sol` (rename file + `contract` identifier; constructor `(address _factory, address _swapRouter, address _positionManager)` unchanged; no chain assumptions exist in the body — confirmed by exploration)
+- Add `contracts/integrations/legacy/DexV3Integration.sol` — empty subclass shim so out-of-tree imports still compile
 
 **`contracts/markets/ConditionalMarketFactory.sol`** (touchpoints from exploration):
 - Line 120: `etcSwapIntegration` → `dexIntegration`
-- Line 121: `useETCSwap` → `useDex`
-- Lines 301–306: `setETCSwapIntegration(address,bool)` → `setDexIntegration(address,bool)` (keep old name as forwarding alias for one release)
-- Lines 717, 844: branching `if (useETCSwap && address(etcSwapIntegration) != address(0))` → `useDex` / `dexIntegration`
-- Lines 203, 205: events `ETCSwapIntegrationUpdated`/`ETCSwapPoolsCreated` → `DexIntegrationUpdated`/`DexPoolsCreated` (emit both for one release)
-- Line 395–415: `createETCSwapPools` → `createDexPools` (alias forwarder retained)
+- Line 121: `useDex` → `useDex`
+- Lines 301–306: `setDexIntegration(address,bool)` → `setDexIntegration(address,bool)` (keep old name as forwarding alias for one release)
+- Lines 717, 844: branching `if (useDex && address(etcSwapIntegration) != address(0))` → `useDex` / `dexIntegration`
+- Lines 203, 205: events `DexIntegrationUpdated`/`DexPoolsCreated` → `DexIntegrationUpdated`/`DexPoolsCreated` (emit both for one release)
+- Line 395–415: `createDexPools` → `createDexPools` (alias forwarder retained)
 
 **Storage layout note**: identifier-only renames preserve slot order; safe whether we redeploy or upgrade. Recommend redeploy on Polygon Amoy since it is a testnet.
 
-**Tests touched**: `test/ETCSwapV3Integration.test.js`, `test/integration/dex/dex-trading.test.js` — pass-through via shim, no behavior change required.
+**Tests touched**: `test/DexV3Integration.test.js`, `test/integration/dex/dex-trading.test.js` — pass-through via shim, no behavior change required.
 
 ---
 

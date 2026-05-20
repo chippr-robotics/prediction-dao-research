@@ -61,8 +61,8 @@ function main() {
   const numMarkets = activeTemplates.length;
   const totalGas = (CONFIG.estimatedGasPerMarket * numMarkets + CONFIG.estimatedGasForApproval);
   const bufferedGas = Math.ceil(totalGas * CONFIG.gasBufferMultiplier);
-  const etcCostGwei = bufferedGas * CONFIG.assumedGasPriceGwei;
-  const etcCost = etcCostGwei / 1e9; // Convert gwei to native units
+  const maticCostGwei = bufferedGas * CONFIG.assumedGasPriceGwei;
+  const maticCost = maticCostGwei / 1e9; // Convert gwei to native units
 
   console.log("\n" + "=".repeat(60));
   console.log("FUNDING REQUIREMENTS");
@@ -77,12 +77,12 @@ function main() {
   console.log("\n--- MATIC (Gas for Transactions) ---");
   console.log(`  Markets to create: ${numMarkets}`);
   console.log(`  Estimated gas: ${bufferedGas.toLocaleString()} units`);
-  console.log(`  At ${CONFIG.assumedGasPriceGwei} gwei: ${etcCost.toFixed(4)} MATIC`);
-  console.log(`\n  Recommended: ${(etcCost * 1.5).toFixed(4)} MATIC (estimate + 50% buffer)`);
+  console.log(`  At ${CONFIG.assumedGasPriceGwei} gwei: ${maticCost.toFixed(4)} MATIC`);
+  console.log(`\n  Recommended: ${(maticCost * 1.5).toFixed(4)} MATIC (estimate + 50% buffer)`);
 
   console.log("\n--- SUMMARY ---");
   console.log(`  USDC needed: ~${Math.ceil(totalUscAvg).toLocaleString()} USDC`);
-  console.log(`  MATIC needed: ~${(etcCost * 1.5).toFixed(2)} MATIC`);
+  console.log(`  MATIC needed: ~${(maticCost * 1.5).toFixed(2)} MATIC`);
 
   console.log("\n--- BY CATEGORY BREAKDOWN ---");
   const byCategory = {};

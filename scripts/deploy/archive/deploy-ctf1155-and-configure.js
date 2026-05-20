@@ -28,7 +28,7 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
   console.log("Deployer account:", deployer.address);
   const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("Account balance:", hre.ethers.formatEther(balance), "ETC");
+  console.log("Account balance:", hre.ethers.formatEther(balance), "MATIC");
   console.log();
 
   // Step 1: Deploy CTF1155

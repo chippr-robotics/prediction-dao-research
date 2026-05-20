@@ -26,7 +26,7 @@ async function main() {
 
   const [signer] = await ethers.getSigners();
   console.log("\nSigner:", signer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(signer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(signer.address)), "MATIC");
 
   // Get contract instances
   const fundingRateEngine = await ethers.getContractAt("FundingRateEngine", FUNDING_RATE_ENGINE);
@@ -63,7 +63,7 @@ async function main() {
 
   try {
     const currentFee = await perpFactory.creationFee();
-    console.log("  Current fee:", ethers.formatEther(currentFee), "ETC");
+    console.log("  Current fee:", ethers.formatEther(currentFee), "MATIC");
 
     if (currentFee > 0n) {
       console.log("  Setting creation fee to 0...");
@@ -99,7 +99,7 @@ async function main() {
     },
     {
       name: "Polygon Perpetual",
-      underlyingAsset: "ETC",
+      underlyingAsset: "MATIC",
       category: 0,
       initialIndexPrice: ethers.parseEther("30"), // $30
       initialMarkPrice: ethers.parseEther("30"),

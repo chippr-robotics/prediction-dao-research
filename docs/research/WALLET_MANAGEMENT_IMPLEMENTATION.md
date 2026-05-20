@@ -9,7 +9,7 @@ This PR implements a comprehensive, site-wide wallet management system that harm
 Previously, wallet and transaction functionality was scattered across multiple contexts:
 - `Web3Context` - Basic wallet connection
 - `RoleContext` - RVAC role management (separate from wallet)
-- `ETCswapContext` - Token swaps with its own wallet access
+- `DexContext` - Token swaps with its own wallet access
 - Components directly accessing provider/signer
 
 This fragmentation led to:
@@ -48,7 +48,7 @@ Specialized hooks for different use cases:
 ### 2. Integration
 
 - Integrated `WalletProvider` into app hierarchy
-- Updated `ETCswapContext` to use `WalletContext`
+- Updated `DexContext` to use `WalletContext`
 - Maintained backwards compatibility with existing contexts
 - Updated key components to use new hooks
 
@@ -101,7 +101,7 @@ WagmiProvider
           └─ WalletProvider (NEW - Primary wallet management)
               ├─ Web3Provider (Legacy - backwards compatibility)
               ├─ RoleProvider (Legacy - backwards compatibility)
-              └─ ETCswapProvider (Updated to use WalletProvider)
+              └─ DexProvider (Updated to use WalletProvider)
 ```
 
 ## RVAC Integration
@@ -175,7 +175,7 @@ Existing code continues to work during migration period.
 
 **Updated Files:**
 - `frontend/src/main.jsx` - Integrated WalletProvider
-- `frontend/src/contexts/ETCswapContext.jsx` - Uses WalletContext
+- `frontend/src/contexts/DexContext.jsx` - Uses WalletContext
 - `frontend/src/contexts/index.js` - Exports WalletProvider
 - `frontend/src/hooks/index.js` - Exports wallet hooks
 - `frontend/src/App.jsx` - Uses unified hooks

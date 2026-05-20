@@ -29,7 +29,7 @@ async function main() {
   console.log("Deployer:", deployer.address);
 
   const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
   // Current contract addresses
   const ADDRESSES = {

@@ -6,7 +6,7 @@ Successfully implemented a comprehensive, production-ready integration with Dex 
 
 ## What Was Delivered
 
-### 1. Core Integration Contract (`ETCSwapV3Integration.sol`)
+### 1. Core Integration Contract (`DexV3Integration.sol`)
 
 A 600+ line production-ready contract providing:
 
@@ -41,7 +41,7 @@ Enhanced to support dual-mode operation:
 
 ### 4. Comprehensive Testing Infrastructure
 
-- **20 Unit Tests** for ETCSwapV3Integration (all passing)
+- **20 Unit Tests** for DexV3Integration (all passing)
   - Deployment and configuration
   - Pool management
   - Quote functions
@@ -69,7 +69,7 @@ All mocks include documentation about their limitations vs. production contracts
 
 ### 6. Comprehensive Documentation
 
-- **README-ETCSWAP.md**: 300+ lines covering:
+- **README-DEX.md**: 300+ lines covering:
   - Architecture overview
   - Deployment guide
   - Usage examples
@@ -164,7 +164,7 @@ All mocks include documentation about their limitations vs. production contracts
 
 ### Migration Path
 
-1. Deploy ETCSwapV3Integration contract
+1. Deploy DexV3Integration contract
 2. Configure ConditionalMarketFactory with integration address
 3. Create test market with Dex pools
 4. Verify trading works correctly
@@ -177,7 +177,7 @@ All mocks include documentation about their limitations vs. production contracts
 ### New Files (13)
 
 **Contracts:**
-- `contracts/ETCSwapV3Integration.sol`
+- `contracts/DexV3Integration.sol`
 - `contracts/interfaces/uniswap-v3/IUniswapV3Factory.sol`
 - `contracts/interfaces/uniswap-v3/IUniswapV3Pool.sol`
 - `contracts/interfaces/uniswap-v3/ISwapRouter.sol`
@@ -188,11 +188,11 @@ All mocks include documentation about their limitations vs. production contracts
 - `contracts/mocks/uniswap-v3/MockNonfungiblePositionManager.sol`
 
 **Tests:**
-- `test/ETCSwapV3Integration.test.js`
+- `test/DexV3Integration.test.js`
 - `test/integration/dex/dex-trading.test.js`
 
 **Documentation:**
-- `contracts/README-ETCSWAP.md`
+- `contracts/README-DEX.md`
 - `IMPLEMENTATION_SUMMARY.md` (this file)
 
 ### Modified Files (1)
@@ -237,7 +237,7 @@ The integration successfully addresses the TODO comments in the codebase and pro
 
 - [Dex v3 SDK](https://github.com/dex/v3-sdk)
 - [Uniswap V3 Documentation](https://docs.uniswap.org/contracts/v3/overview)
-- [Integration Documentation](./contracts/README-ETCSWAP.md)
+- [Integration Documentation](./contracts/README-DEX.md)
 - [Architecture Analysis](./docs/research/dex-v3-integration-analysis.md)
 
 ---

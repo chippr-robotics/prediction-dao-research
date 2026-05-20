@@ -192,7 +192,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       );
 
       // Create native-token-pegged market with wrapped-native collateral
-      const { market: etcMarket } = await createTestMarket(
+      const { market: perpMarket } = await createTestMarket(
         perpFactory,
         "MATIC Perpetual",
         "MATIC",
@@ -214,7 +214,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       expect(ethMarketConfig.fundingInterval).to.equal(4n * 3600n);
 
       // Verify MATIC market uses different collateral
-      expect(await etcMarket.collateralToken()).to.equal(await wmaticToken.getAddress());
+      expect(await perpMarket.collateralToken()).to.equal(await wmaticToken.getAddress());
 
       console.log("  ✓ BTC market created at:", await btcMarket.getAddress());
       console.log("  ✓ ETH market created with custom config");

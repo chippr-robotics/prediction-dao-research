@@ -148,7 +148,7 @@ const useTokenCreation = () => {
 │  Supply: 1,000,000                                      │
 │  Features: Burnable, Pausable                           │
 │                                                          │
-│  Estimated Gas: 0.0035 ETC                              │
+│  Estimated Gas: 0.0035 MATIC                              │
 │                                                          │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -243,7 +243,7 @@ Replace emoji-based checkboxes with clean toggle cards:
 │  ┌───────────────────────────────────────────────────┐  │
 │  │  Deployment Cost                                   │  │
 │  ├───────────────────────────────────────────────────┤  │
-│  │  Estimated Gas    ~0.0035 ETC                     │  │
+│  │  Estimated Gas    ~0.0035 MATIC                     │  │
 │  │  Network          Polygon Mainnet         │  │
 │  │  Deployer         0x1234...abcd                   │  │
 │  └───────────────────────────────────────────────────┘  │
@@ -430,7 +430,7 @@ Replace emoji-based checkboxes with clean toggle cards:
 
 **Web3 Integration: MISSING**
 - No web3 hooks imported
-- Actions (`onMint`, `onBurn`, `onTransfer`, `onListOnETCSwap`) are callbacks to parent
+- Actions (`onMint`, `onBurn`, `onTransfer`, `onListOnDex`) are callbacks to parent
 - Parent page (`TokenMintPage`) doesn't implement actual transactions
 
 **Style: MIXED**

@@ -22,7 +22,7 @@ PMKT/1 follows the Polymarket model of intent-based markets with cryptographical
 
 ### Faster than ISO 20022
 - ISO 20022 settlement: T+1 to T+3 days (ACH), or real-time (RTGS)
-- PMKT/1 settlement: 13 seconds (block time on ETC)
+- PMKT/1 settlement: 13 seconds (block time on Polygon)
 
 ### More Censorship-Resistant
 - AP2: HTTP servers (can be blocked)
@@ -68,7 +68,7 @@ Exchanged immediately after connection.
 ```
 [
   protocolVersion: uint,        // PMKT/1 version (currently 1)
-  networkId: uint,              // 61 for ETC, 63 for Amoy testnet
+  networkId: uint,              // 80001 for Polygon mainnet, 80002 for Amoy testnet
   genesisHash: bytes32,         // Genesis block hash for network
   supportedMarkets: [bytes32],  // List of supported market IDs
 ]
@@ -185,7 +185,7 @@ Orders are signed using EIP-712 typed data signatures for compatibility with wal
 {
   name: "PredictionMarketExchange",
   version: "1",
-  chainId: 61,  // ETC mainnet
+  chainId: 61,  // Polygon mainnet
   verifyingContract: <exchange_address>
 }
 ```

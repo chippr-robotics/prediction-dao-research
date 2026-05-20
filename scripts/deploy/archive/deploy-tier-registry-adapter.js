@@ -47,7 +47,7 @@ async function main() {
   console.log("\nDeployer:", deployer.address);
 
   const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
   // ========== Step 1: Deploy UsageTracker ==========
   console.log("\n[1/6] Deploying UsageTracker...");

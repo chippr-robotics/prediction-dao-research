@@ -26,7 +26,7 @@ const CONFIG = {
   defaultCollateralToken: "0xDE093684c796204224BC081f937aa059D903c52a", // USDC
   acceptedPaymentTokens: [
     "0xDE093684c796204224BC081f937aa059D903c52a", // USDC
-    "0x0000000000000000000000000000000000000000"  // Native ETC
+    "0x0000000000000000000000000000000000000000"  // Native MATIC
   ]
 };
 
@@ -43,7 +43,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   // Verify deployer is the expected owner
   if (deployer.address.toLowerCase() !== CONSTRUCTOR_ARGS.owner.toLowerCase()) {
@@ -91,7 +91,7 @@ async function main() {
 
   // Accept payment tokens
   for (const token of CONFIG.acceptedPaymentTokens) {
-    const tokenName = token === ethers.ZeroAddress ? "Native ETC" : "USDC";
+    const tokenName = token === ethers.ZeroAddress ? "Native MATIC" : "USDC";
     console.log(`Accepting ${tokenName} as payment token...`);
     tx = await factory.addAcceptedPaymentToken(token, true);
     await tx.wait();

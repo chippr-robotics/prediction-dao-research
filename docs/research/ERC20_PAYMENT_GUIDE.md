@@ -129,7 +129,7 @@ friendMarketFactory.addAcceptedPaymentToken(
 
 ```solidity
 // Set FRIEND_MARKET_ROLE prices in multiple tokens
-address[] memory tokens = [USDC_ADDRESS, USDT_ADDRESS, WETC_ADDRESS];
+address[] memory tokens = [USDC_ADDRESS, USDT_ADDRESS, WMATIC_ADDRESS];
 uint256[] memory prices = [
     50_000000,    // $50 USDC (6 decimals)
     50_000000,    // $50 USDT (6 decimals)
@@ -160,10 +160,10 @@ friendMarketFactory.addAcceptedPaymentToken(TOKEN_ADDRESS, false);
 ```javascript
 // Get token price in USD from Dex
 async function getTokenPriceUSD(tokenAddress, amount) {
-  const etcSwap = await ethers.getContractAt("ETCSwapV3Integration", ETCSWAP_ADDRESS);
+  const dex = await ethers.getContractAt("DexV3Integration", DEX_ADDRESS);
   
   // Get exchange rate from Dex pool
-  const quote = await etcSwap.getQuote(
+  const quote = await dex.getQuote(
     tokenAddress,
     USD_REFERENCE_TOKEN,  // USDC or other USD stablecoin
     amount
@@ -350,4 +350,4 @@ For questions or issues with ERC20 payments:
 - [MembershipPaymentManager Contract](../contracts/MembershipPaymentManager.sol)
 - [FriendGroupMarketFactory Contract](../contracts/FriendGroupMarketFactory.sol)
 - [TieredRoleManager Contract](../contracts/TieredRoleManager.sol)
-- [Dex Integration](../contracts/ETCSwapV3Integration.sol)
+- [Dex Integration](../contracts/DexV3Integration.sol)

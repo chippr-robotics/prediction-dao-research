@@ -79,7 +79,7 @@ Complete DevP2P wire protocol specification for decentralized order propagation:
 **Key Design Principles:**
 - Permissionless (any node can participate)
 - Censorship-resistant (DevP2P gossip, not HTTP)
-- Fast (13-second ETC block times)
+- Fast (2-second Polygon block times)
 - Accountable (cryptographic signatures)
 - Interoperable (open standard)
 
@@ -168,7 +168,7 @@ User Applications (Bots, Frontends)
 ### vs Polymarket
 - ✅ Fully open source
 - ✅ No permissioned operators
-- ✅ Works on ETC (cheaper gas)
+- ✅ Works on Polygon Amoy (cheaper gas)
 - ✅ Complete protocol specification
 
 ### vs UniswapV3 Pools

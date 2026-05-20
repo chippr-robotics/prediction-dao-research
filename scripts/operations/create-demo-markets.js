@@ -184,11 +184,11 @@ async function calculateRequirements(templates, usdcDecimals, gasPrice) {
 
   // Apply buffer and calculate MATIC gas cost
   const bufferedGas = (totalGasEstimate * BigInt(Math.floor(CONFIG.gasBufferMultiplier * 100))) / 100n;
-  const estimatedEtcCost = bufferedGas * gasPrice;
+  const estimatedMaticCost = bufferedGas * gasPrice;
 
   return {
     usdcRequired: totalUscLiquidity,
-    etcRequired: estimatedEtcCost,
+    maticRequired: estimatedMaticCost,
     gasEstimate: bufferedGas,
     numMarkets: templates.length,
   };
@@ -203,9 +203,9 @@ function displayRequirements(requirements, currentUsc, currentEtc, usdcDecimals)
   console.log("=".repeat(60));
 
   const usdcRequired = parseFloat(ethers.formatUnits(requirements.usdcRequired, usdcDecimals));
-  const etcRequired = parseFloat(ethers.formatEther(requirements.etcRequired));
+  const maticRequired = parseFloat(ethers.formatEther(requirements.maticRequired));
   const currentUscFloat = parseFloat(ethers.formatUnits(currentUsc, usdcDecimals));
-  const currentEtcFloat = parseFloat(ethers.formatEther(currentEtc));
+  const currentMaticFloat = parseFloat(ethers.formatEther(currentEtc));
 
   console.log(`\nMarkets to create: ${requirements.numMarkets}`);
   console.log(`Estimated gas: ${requirements.gasEstimate.toLocaleString()} gas units`);
@@ -221,22 +221,22 @@ function displayRequirements(requirements, currentUsc, currentEtc, usdcDecimals)
   }
 
   console.log("\n--- MATIC (Gas) ---");
-  console.log(`  Required:  ${etcRequired.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
-  console.log(`  Current:   ${currentEtcFloat.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
-  const etcShortfall = etcRequired - currentEtcFloat;
-  if (etcShortfall > 0) {
-    console.log(`  SHORTFALL: ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  console.log(`  Required:  ${maticRequired.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  console.log(`  Current:   ${currentMaticFloat.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  const maticShortfall = maticRequired - currentMaticFloat;
+  if (maticShortfall > 0) {
+    console.log(`  SHORTFALL: ${maticShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   } else {
-    console.log(`  Surplus:   ${Math.abs(etcShortfall).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+    console.log(`  Surplus:   ${Math.abs(maticShortfall).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   }
 
   console.log("\n--- TOTAL FUNDING NEEDED ---");
-  if (usdcShortfall > 0 || etcShortfall > 0) {
+  if (usdcShortfall > 0 || maticShortfall > 0) {
     if (usdcShortfall > 0) {
       console.log(`  Acquire ${usdcShortfall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} more USDC`);
     }
-    if (etcShortfall > 0) {
-      console.log(`  Acquire ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} more MATIC`);
+    if (maticShortfall > 0) {
+      console.log(`  Acquire ${maticShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} more MATIC`);
     }
   } else {
     console.log("  Account is sufficiently funded!");
@@ -246,9 +246,9 @@ function displayRequirements(requirements, currentUsc, currentEtc, usdcDecimals)
 
   return {
     usdcSufficient: usdcShortfall <= 0,
-    etcSufficient: etcShortfall <= 0,
+    maticSufficient: maticShortfall <= 0,
     usdcShortfall: Math.max(0, usdcShortfall),
-    etcShortfall: Math.max(0, etcShortfall),
+    maticShortfall: Math.max(0, maticShortfall),
   };
 }
 
@@ -379,7 +379,7 @@ async function main() {
   // Get current balances
   const usdcBalance = await usc.balanceOf(wallet.address);
   const usdcDecimals = await usc.decimals();
-  const etcBalance = await ethers.provider.getBalance(wallet.address);
+  const maticBalance = await ethers.provider.getBalance(wallet.address);
 
   // Get current gas price
   const feeData = await ethers.provider.getFeeData();
@@ -388,10 +388,10 @@ async function main() {
   // Calculate and display funding requirements
   console.log("\n[3/8] Calculating funding requirements...");
   const requirements = await calculateRequirements(templates, usdcDecimals, gasPrice);
-  const fundingStatus = displayRequirements(requirements, usdcBalance, etcBalance, usdcDecimals);
+  const fundingStatus = displayRequirements(requirements, usdcBalance, maticBalance, usdcDecimals);
 
   // Check if we can proceed
-  if (!fundingStatus.usdcSufficient || !fundingStatus.etcSufficient) {
+  if (!fundingStatus.usdcSufficient || !fundingStatus.maticSufficient) {
     console.error("\nInsufficient funds to create all markets!");
     if (!CONFIG.dryRun) {
       console.log("\nPlease fund the account and try again.");

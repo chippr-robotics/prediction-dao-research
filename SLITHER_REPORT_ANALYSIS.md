@@ -114,7 +114,7 @@ if (!found) {
 
 ## Medium Priority Issues (Impact: Medium)
 
-### 1. Divide-before-multiply in ETCSwapV3Integration.quoteSellTokens
+### 1. Divide-before-multiply in DexV3Integration.quoteSellTokens
 
 **Status: ✅ NOT A BUG - Correct Implementation**
 
@@ -148,7 +148,7 @@ Multiple instances of strict equality checks with bytes32(0)
 - ZKKeyManager._rotateKeyFor (line 234): oldKeyHash == bytes32(0)
 - ZKKeyManager.getPublicKey (line 341): keyHash == bytes32(0)
 - ZKKeyManager.hasValidKey (line 326): keyHash == bytes32(0)
-- TokenMintFactory._listOnETCSwap (line 253): tokens[tokenId].tokenType == TokenType.ERC20
+- TokenMintFactory._listOnDex (line 253): tokens[tokenId].tokenType == TokenType.ERC20
 ```
 
 **Resolution:** These are safe and idiomatic patterns:
@@ -205,13 +205,13 @@ Multiple functions ignore return values from external calls
 Examples:
 - ConditionalMarketFactory.buyTokens: ignores approve return value
 - ConditionalMarketFactory.sellTokens: ignores approve return value
-- ETCSwapV3Integration functions: ignore unused tuple elements from slot0()
+- DexV3Integration functions: ignore unused tuple elements from slot0()
 ```
 
 **Current Code Examples:**
 ```solidity
 // Using forceApprove instead of approve (safer)
-IERC20(market.collateralToken).forceApprove(address(etcSwapIntegration), amount);
+IERC20(market.collateralToken).forceApprove(address(dexIntegration), amount);
 
 // Intentionally ignoring unused tuple elements (using named returns where needed)
 (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
@@ -231,14 +231,14 @@ IERC20(market.collateralToken).forceApprove(address(etcSwapIntegration), amount)
 **Slither Finding:**
 ```
 Multiple reentrancy warnings in:
-- ETCSwapV3Integration.createMarketPools
+- DexV3Integration.createMarketPools
 - TieredRoleManager.purchaseRoleWithTierToken
 - TieredRoleManager.upgradeTierWithToken
 ```
 
 **Current Protection:**
 
-1. **ETCSwapV3Integration.createMarketPools** (Line 207):
+1. **DexV3Integration.createMarketPools** (Line 207):
 ```solidity
 function createMarketPools(...) external onlyOwner whenNotPaused returns (...)
 ```
