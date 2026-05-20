@@ -293,7 +293,7 @@ async function main() {
       console.log("Step 5: Creating initial perpetual futures markets...");
 
       const creationFee = await perpFactory.creationFee();
-      console.log(`  Creation fee: ${hre.ethers.formatEther(creationFee)} ETC`);
+      console.log(`  Creation fee: ${hre.ethers.formatEther(creationFee)} MATIC`);
 
       // Market configurations
       const marketConfigs = [
