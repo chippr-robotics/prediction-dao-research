@@ -19,6 +19,7 @@ export function UserPreferencesProvider({ children }) {
     recentSearches: [],
     favoriteMarkets: [],
     defaultSlippage: 0.5,
+    polymarketCategories: [],
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -32,6 +33,7 @@ export function UserPreferencesProvider({ children }) {
         recentSearches: [],
         favoriteMarkets: [],
         defaultSlippage: 0.5,
+        polymarketCategories: [],
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,11 +45,13 @@ export function UserPreferencesProvider({ children }) {
       const recentSearches = getUserPreference(walletAddress, 'recent_searches', [], true)
       const favoriteMarkets = getUserPreference(walletAddress, 'favorite_markets', [], true)
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
+      const polymarketCategories = getUserPreference(walletAddress, 'polymarket_categories', [], true)
 
       setPreferences({
         recentSearches,
         favoriteMarkets,
         defaultSlippage,
+        polymarketCategories,
       })
     } catch (error) {
       console.error('Error loading user preferences:', error)
@@ -111,6 +115,14 @@ export function UserPreferencesProvider({ children }) {
     setPreferences(prev => ({ ...prev, defaultSlippage: slippage }))
   }, [account])
 
+  const setPolymarketCategories = useCallback((categories) => {
+    if (!account) return
+
+    const next = Array.isArray(categories) ? categories : []
+    saveUserPreference(account, 'polymarket_categories', next, true)
+    setPreferences(prev => ({ ...prev, polymarketCategories: next }))
+  }, [account])
+
   const clearAllPreferences = useCallback(() => {
     if (!account) return
 
@@ -119,6 +131,7 @@ export function UserPreferencesProvider({ children }) {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
+      polymarketCategories: [],
     })
   }, [account])
 
@@ -129,6 +142,7 @@ export function UserPreferencesProvider({ children }) {
     clearRecentSearches,
     toggleFavoriteMarket,
     setDefaultSlippage,
+    setPolymarketCategories,
     savePreference,
     clearAllPreferences,
   }

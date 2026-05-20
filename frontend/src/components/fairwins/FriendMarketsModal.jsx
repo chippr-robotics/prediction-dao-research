@@ -17,6 +17,7 @@ import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } fr
 import QRScanner from '../ui/QRScanner'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
+import PolymarketBrowser from './PolymarketBrowser'
 
 // Fallback so the UI renders even if the enum export is missing in some environments
 const ResolutionType = _ResolutionType ?? {
@@ -92,7 +93,8 @@ function FriendMarketsModal({
   pendingTransaction = null,
   onClearPendingTransaction = () => {},
   initialTab = null,
-  initialType = null
+  initialType = null,
+  initialPolymarketMarket = null
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
@@ -216,19 +218,11 @@ function FriendMarketsModal({
   const [qrScannerOpen, setQrScannerOpen] = useState(false)
   const [qrScanTarget, setQrScanTarget] = useState(null) // 'opponent' or 'arbitrator'
 
-  // Polymarket event search state — drives the consolidated "Linked Market"
-  // resolution flow. We keep the local query state so the input is controlled,
-  // and selectedPolymarketMarket holds the picked event after the user clicks
-  // a result.
-  const [polymarketQuery, setPolymarketQuery] = useState('')
+  // Polymarket event selection — the PolymarketBrowser component below handles
+  // browsing/searching internally. We only need to track the picked market so
+  // its conditionId can be committed to formData.peggedMarketId.
   const [selectedPolymarketMarket, setSelectedPolymarketMarket] = useState(null)
-  const {
-    results: polymarketResults,
-    isLoading: polymarketLoading,
-    error: polymarketError,
-    search: searchPolymarket,
-    clear: clearPolymarket,
-  } = usePolymarketSearch({ limit: 10 })
+  const { clear: clearPolymarket } = usePolymarketSearch({ limit: 10 })
 
   // Market acceptance modal state
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false)
@@ -268,7 +262,6 @@ function FriendMarketsModal({
       oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER
     })
     setErrors({})
-    setPolymarketQuery('')
     setSelectedPolymarketMarket(null)
     clearPolymarket()
     setEnableEncryption(true)
@@ -289,8 +282,20 @@ function FriendMarketsModal({
       setSelectedMarket(null)
       setErrors({})
       resetForm()
+      // When opened from a Polymarket card on the dashboard, jump the user
+      // straight into the linked-market resolution flow with the chosen
+      // market and question pre-filled.
+      if (initialPolymarketMarket?.conditionId) {
+        setSelectedPolymarketMarket(initialPolymarketMarket)
+        setFormData((prev) => ({
+          ...prev,
+          resolutionType: ResolutionType.PolymarketOracle,
+          peggedMarketId: initialPolymarketMarket.conditionId,
+          description: prev.description || initialPolymarketMarket.question || '',
+        }))
+      }
     }
-  }, [isOpen, resetForm, initialTab, initialType])
+  }, [isOpen, resetForm, initialTab, initialType, initialPolymarketMarket])
 
   const handleClose = useCallback(() => {
     if (!submitting) {
@@ -405,22 +410,14 @@ function FriendMarketsModal({
     setQrScanTarget(null)
   }
 
-  // Polymarket event search — debounced via the hook. Picking a result
-  // commits the condition id to formData so submit-time validation passes.
-  const handlePolymarketQueryChange = (value) => {
-    setPolymarketQuery(value)
-    setSelectedPolymarketMarket(null)
-    handleFormChange('peggedMarketId', '')
-    searchPolymarket(value)
-  }
-
+  // Polymarket event selection — picking a market commits the condition id to
+  // formData so submit-time validation passes.
   const handleSelectPolymarketMarket = (market) => {
     setSelectedPolymarketMarket(market)
     handleFormChange('peggedMarketId', market.conditionId)
   }
 
   const clearPolymarketSelection = () => {
-    setPolymarketQuery('')
     setSelectedPolymarketMarket(null)
     handleFormChange('peggedMarketId', '')
     clearPolymarket()
@@ -1677,14 +1674,14 @@ function FriendMarketsModal({
                     )}
 
                     {/* Linked Market — Polymarket event lookup */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
                      formData.resolutionType === ResolutionType.PolymarketOracle && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-polymarket-search">
                           Linked Polymarket Event <span className="fm-required">*</span>
                         </label>
 
-                        {selectedPolymarketMarket ? (
+                        {selectedPolymarketMarket && (
                           <div className="fm-polymarket-selected">
                             <div className="fm-polymarket-selected-body">
                               <strong>{selectedPolymarketMarket.question}</strong>
@@ -1711,55 +1708,24 @@ function FriendMarketsModal({
                               Change
                             </button>
                           </div>
-                        ) : (
-                          <>
-                            <input
-                              id="fm-polymarket-search"
-                              type="search"
-                              value={polymarketQuery}
-                              onChange={(e) => handlePolymarketQueryChange(e.target.value)}
-                              placeholder="Search Polymarket events by name (e.g. 'US election', 'BTC 100k')"
-                              disabled={submitting}
-                              className={errors.peggedMarketId ? 'error' : ''}
-                              autoComplete="off"
-                            />
-                            <span className="fm-hint">
-                              Type an event name to search Polymarket. Pick a result to link this wager — it&apos;ll settle automatically when the Polymarket market resolves.
-                            </span>
-
-                            {polymarketLoading && (
-                              <div className="fm-polymarket-status">Searching Polymarket…</div>
-                            )}
-                            {polymarketError && (
-                              <div className="fm-polymarket-status fm-error">
-                                {polymarketError}
-                              </div>
-                            )}
-                            {!polymarketLoading && !polymarketError && polymarketQuery && polymarketResults.length === 0 && (
-                              <div className="fm-polymarket-status">No matching Polymarket events.</div>
-                            )}
-                            {polymarketResults.length > 0 && (
-                              <ul className="fm-polymarket-results" role="listbox">
-                                {polymarketResults.map((m) => (
-                                  <li key={m.conditionId}>
-                                    <button
-                                      type="button"
-                                      className="fm-polymarket-result"
-                                      onClick={() => handleSelectPolymarketMarket(m)}
-                                      disabled={submitting}
-                                    >
-                                      <span className="fm-polymarket-result-title">{m.question}</span>
-                                      <span className="fm-polymarket-result-meta">
-                                        {m.endDate && <span>Ends {formatDate(m.endDate)}</span>}
-                                        {m.volume != null && <span>Vol ${Math.round(m.volume).toLocaleString()}</span>}
-                                      </span>
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </>
                         )}
+
+                        <span className="fm-hint">
+                          Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.
+                        </span>
+
+                        <PolymarketBrowser
+                          variant="inline"
+                          showFilters
+                          limit={20}
+                          selectedConditionId={selectedPolymarketMarket?.conditionId}
+                          onSelectMarket={(m) => {
+                            handleSelectPolymarketMarket(m)
+                            if (!formData.description) {
+                              setFormData((prev) => ({ ...prev, description: m.question || prev.description }))
+                            }
+                          }}
+                        />
 
                         {errors.peggedMarketId && (
                           <span className="fm-error">{errors.peggedMarketId}</span>

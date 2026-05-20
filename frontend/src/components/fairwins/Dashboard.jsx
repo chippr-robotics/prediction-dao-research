@@ -8,6 +8,7 @@ import { ROLES } from '../../contexts/RoleContext'
 import { WAGER_DEFAULTS, WagerStatus } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
+import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
@@ -420,6 +421,9 @@ function Dashboard() {
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  // Pre-fill payload for the create-wager modal when launched from a
+  // Polymarket card. Cleared on modal close so subsequent opens start clean.
+  const [initialPolymarketMarket, setInitialPolymarketMarket] = useState(null)
 
   // Friend markets from shared context (single fetch, no duplication)
   const { friendMarkets, loading: wagersLoading } = useFriendMarkets()
@@ -553,6 +557,12 @@ function Dashboard() {
     setShowMyWagers(true)
   }, [])
 
+  const handlePolymarketCardClick = useCallback((market) => {
+    setInitialPolymarketMarket(market)
+    setCreateWagerType('oneVsOne')
+    setShowCreateWager(true)
+  }, [])
+
   const handleQrScanSuccess = useCallback((decodedText) => {
     setShowQrScanner(false)
 
@@ -642,6 +652,15 @@ function Dashboard() {
         <QuickActions onAction={handleQuickAction} />
       </section>
 
+      {/* Top Polymarket markets — self-gates on chain capability, renders
+          nothing on chains without Polymarket support. */}
+      <section className="dashboard-section">
+        <PolymarketBrowser
+          variant="feed"
+          onSelectMarket={handlePolymarketCardClick}
+        />
+      </section>
+
       {/* How It Works (collapsible) */}
       <section className="dashboard-section">
         <HowItWorksGuide />
@@ -691,9 +710,11 @@ function Dashboard() {
         onClose={() => {
           setShowCreateWager(false)
           setCreateWagerType(null)
+          setInitialPolymarketMarket(null)
         }}
         initialTab="create"
         initialType={createWagerType}
+        initialPolymarketMarket={initialPolymarketMarket}
         activeMarkets={activeFriendMarkets}
         pastMarkets={pastFriendMarkets}
       />
