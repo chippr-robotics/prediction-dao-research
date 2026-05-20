@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getNetwork } from '../config/networks'
 import { useChainId } from 'wagmi'
-import { getCurrentChainId } from '../config/networks'
+import { getNetwork, getCurrentChainId } from '../config/networks'
 import logger from '../utils/logger'
 
 const DEFAULT_LIMIT = 10

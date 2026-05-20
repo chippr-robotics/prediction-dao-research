@@ -3,7 +3,6 @@ import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { useDex } from '../../hooks/useDex'
-import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
@@ -111,7 +110,6 @@ function WalletButton({ className = '' }) {
     addresses: chainAddresses,
     tokens: chainTokens,
   } = useDex()
-  const { preferences } = useUserPreferences()
   const { isMainnet, isSwitching: isSwitchingNetwork, switchMode: switchNetworkMode } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
