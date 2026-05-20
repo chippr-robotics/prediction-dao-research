@@ -427,6 +427,7 @@ function LandingPage() {
                   className="footer-logo"
                   width="40"
                   height="40"
+                  loading="lazy"
                   onError={() => handleLogoError('fairwins')}
                 />
               ) : (
