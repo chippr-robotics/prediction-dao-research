@@ -5,7 +5,7 @@ import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications }
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
-import { TOKENS } from '../../constants/dex'
+import { useDex } from '../../hooks/useDex'
 import {
   WAGER_DEFAULTS,
   getDefaultEndDateTime,
@@ -16,6 +16,7 @@ import { getTransactionUrl } from '../../config/blockExplorer'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import { useChainTokens } from '../../hooks/useChainTokens'
+import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 
 // Fallback so the UI renders even if the enum export is missing in some environments
 const ResolutionType = _ResolutionType ?? {
@@ -30,13 +31,10 @@ import MarketAcceptanceModal from './MarketAcceptanceModal'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
 
-// Stake token options derived from the active chain's tokens.
-const STAKE_TOKEN_OPTIONS = [
-  { id: 'STABLE', ...TOKENS.STABLE, isDefault: true },
-  { id: 'WNATIVE', ...TOKENS.WNATIVE },
-  { id: 'NATIVE', ...TOKENS.NATIVE },
-  { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
-]
+// Stake token options derived from the active chain's tokens. The token
+// metadata is sourced from useDex() at render time so the Testnet/Mainnet
+// toggle picks up the right addresses without a reload.
+const CUSTOM_TOKEN_OPTION = { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
 
 // Helper to format stake amount as USD (rounded to nearest cent)
 const formatUSD = (amount, symbol) => {
@@ -101,9 +99,20 @@ function FriendMarketsModal({
 
   // Per-chain capabilities — drives which resolution-type options the user
   // sees. Polymarket-pegged side bets only render on chains where the
-  // Polymarket CTF is reachable (Polygon Amoy today).
+  // Polymarket CTF is reachable (Polygon Amoy and Mainnet).
   const { capabilities, networkName } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
+
+  // Chain-aware token metadata for the Stake Token dropdown. Recomputed
+  // whenever the user switches Testnet/Mainnet so the right addresses are
+  // submitted with the wager.
+  const { tokens: chainTokens } = useDex()
+  const STAKE_TOKEN_OPTIONS = useMemo(() => [
+    { id: 'STABLE', ...chainTokens.STABLE, isDefault: true },
+    { id: 'WNATIVE', ...chainTokens.WNATIVE },
+    { id: 'NATIVE', ...chainTokens.NATIVE },
+    CUSTOM_TOKEN_OPTION,
+  ], [chainTokens])
 
   // Built-in market creation handler used when no external onCreate is provided
   const { createFriendMarket } = useFriendMarketCreation()
@@ -207,11 +216,19 @@ function FriendMarketsModal({
   const [qrScannerOpen, setQrScannerOpen] = useState(false)
   const [qrScanTarget, setQrScanTarget] = useState(null) // 'opponent' or 'arbitrator'
 
-  // Market lookup state for event tracking
-  const [marketLookupId, setMarketLookupId] = useState('')
-  const [marketLookupLoading, setMarketLookupLoading] = useState(false)
-  const [marketLookupResult, setMarketLookupResult] = useState(null)
-  const [marketLookupError, setMarketLookupError] = useState(null)
+  // Polymarket event search state — drives the consolidated "Linked Market"
+  // resolution flow. We keep the local query state so the input is controlled,
+  // and selectedPolymarketMarket holds the picked event after the user clicks
+  // a result.
+  const [polymarketQuery, setPolymarketQuery] = useState('')
+  const [selectedPolymarketMarket, setSelectedPolymarketMarket] = useState(null)
+  const {
+    results: polymarketResults,
+    isLoading: polymarketLoading,
+    error: polymarketError,
+    search: searchPolymarket,
+    clear: clearPolymarket,
+  } = usePolymarketSearch({ limit: 10 })
 
   // Market acceptance modal state
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false)
@@ -251,11 +268,11 @@ function FriendMarketsModal({
       oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER
     })
     setErrors({})
-    setMarketLookupId('')
-    setMarketLookupResult(null)
-    setMarketLookupError(null)
+    setPolymarketQuery('')
+    setSelectedPolymarketMarket(null)
+    clearPolymarket()
     setEnableEncryption(true)
-  }, [])
+  }, [clearPolymarket])
 
   // Reset modal state when opened
   useEffect(() => {
@@ -305,11 +322,13 @@ function FriendMarketsModal({
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
 
-      // Clear arbitrator field when resolution type changes to not require it
+      // Clear arbitrator/linked-market state when switching to a resolution
+      // type that doesn't need it.
       if (field === 'resolutionType' &&
           value !== ResolutionType.ThirdParty &&
-          value !== ResolutionType.AutoPegged) {
+          value !== ResolutionType.PolymarketOracle) {
         updated.arbitrator = ''
+        updated.peggedMarketId = ''
       }
 
       return updated
@@ -386,49 +405,25 @@ function FriendMarketsModal({
     setQrScanTarget(null)
   }
 
-  // Market lookup for event tracking
-  const handleMarketLookup = async () => {
-    if (!marketLookupId.trim()) {
-      setMarketLookupError('Please enter a wager ID')
-      return
-    }
-
-    setMarketLookupLoading(true)
-    setMarketLookupError(null)
-    setMarketLookupResult(null)
-
-    try {
-      // TODO: Replace with actual API call or contract query
-      // This mock implementation should be replaced with real market lookup functionality
-      // Example: const marketData = await fetchMarketById(marketLookupId)
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      // Mock result for demo purposes
-      const mockMarket = {
-        id: marketLookupId,
-        description: 'Sample prediction market for demonstration',
-        question: 'Will ETH reach $5000 by end of Q1 2026?',
-        totalVolume: '1,234.56',
-        participants: 42,
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active'
-      }
-
-      setMarketLookupResult(mockMarket)
-      handleFormChange('peggedMarketId', marketLookupId)
-    } catch (error) {
-      console.error('Market lookup error:', error)
-      setMarketLookupError('Wager not found or unable to fetch details')
-    } finally {
-      setMarketLookupLoading(false)
-    }
+  // Polymarket event search — debounced via the hook. Picking a result
+  // commits the condition id to formData so submit-time validation passes.
+  const handlePolymarketQueryChange = (value) => {
+    setPolymarketQuery(value)
+    setSelectedPolymarketMarket(null)
+    handleFormChange('peggedMarketId', '')
+    searchPolymarket(value)
   }
 
-  const clearMarketLookup = () => {
-    setMarketLookupId('')
-    setMarketLookupResult(null)
-    setMarketLookupError(null)
+  const handleSelectPolymarketMarket = (market) => {
+    setSelectedPolymarketMarket(market)
+    handleFormChange('peggedMarketId', market.conditionId)
+  }
+
+  const clearPolymarketSelection = () => {
+    setPolymarketQuery('')
+    setSelectedPolymarketMarket(null)
     handleFormChange('peggedMarketId', '')
+    clearPolymarket()
   }
 
   // Market acceptance handlers
@@ -715,21 +710,20 @@ function FriendMarketsModal({
         } else if (formData.arbitrator.toLowerCase() === '0x0000000000000000000000000000000000000000') {
           newErrors.arbitrator = 'Cannot use the zero address'
         }
-      } else if (formData.resolutionType === ResolutionType.AutoPegged) {
-        // Market ID is required for AutoPegged resolution
-        if (!formData.arbitrator || !formData.arbitrator.trim()) {
-          newErrors.arbitrator = 'Linked market ID is required for auto-pegged resolution'
-        } else if (!/^\d+$/.test(formData.arbitrator.trim())) {
-          newErrors.arbitrator = 'Wager ID must be a number'
-        } else if (parseInt(formData.arbitrator.trim(), 10) < 0) {
-          newErrors.arbitrator = 'Wager ID must be a positive number'
+      } else if (formData.resolutionType === ResolutionType.PolymarketOracle) {
+        // Polymarket condition id (bytes32 hex) is required.
+        const cid = (formData.peggedMarketId || '').trim()
+        if (!cid) {
+          newErrors.peggedMarketId = 'Pick a Polymarket event to link this wager to'
+        } else if (!/^0x[a-fA-F0-9]{64}$/.test(cid)) {
+          newErrors.peggedMarketId = 'Invalid Polymarket condition id (expected 0x + 64 hex chars)'
         }
       }
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [formData, friendMarketType, account])
+  }, [formData, friendMarketType, account, STAKE_TOKEN_OPTIONS])
 
   const handleSelectType = (type) => {
     setFriendMarketType(type)
@@ -1080,7 +1074,7 @@ function FriendMarketsModal({
       }
     }
     return token
-  }, [formData.stakeTokenId, formData.customStakeTokenAddress])
+  }, [formData.stakeTokenId, formData.customStakeTokenAddress, STAKE_TOKEN_OPTIONS])
 
   // Helper to check if user is a participant/creator
   const isUserInMarket = useCallback((market) => {
@@ -1508,9 +1502,8 @@ function FriendMarketsModal({
                           <option value={ResolutionType.Initiator}>Creator Only</option>
                           <option value={ResolutionType.Receiver}>Opponent Only</option>
                           <option value={ResolutionType.ThirdParty}>Third Party Arbitrator</option>
-                          <option value={ResolutionType.AutoPegged}>Linked Wager (Auto)</option>
                           {polymarketSidebetsEnabled && (
-                            <option value={ResolutionType.PolymarketOracle}>Polymarket (Settle by Reference)</option>
+                            <option value={ResolutionType.PolymarketOracle}>Linked Market (Polymarket)</option>
                           )}
                         </select>
                         <span className="fm-hint">
@@ -1518,11 +1511,10 @@ function FriendMarketsModal({
                           {formData.resolutionType === ResolutionType.Initiator && 'Only you (the creator) can resolve the wager'}
                           {formData.resolutionType === ResolutionType.Receiver && 'Only your opponent can resolve the wager'}
                           {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
-                          {formData.resolutionType === ResolutionType.AutoPegged && 'Resolution follows a linked public wager'}
-                          {formData.resolutionType === ResolutionType.PolymarketOracle && 'Settles automatically when the linked Polymarket condition resolves'}
+                          {formData.resolutionType === ResolutionType.PolymarketOracle && 'Settles automatically when the linked Polymarket market resolves'}
                           {!polymarketSidebetsEnabled && (
                             <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
-                              Polymarket-pegged settlement is unavailable on {networkName}. Switch to Polygon Amoy to use it.
+                              Linked Market settlement requires a chain with the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.
                             </em>
                           )}
                         </span>
@@ -1646,14 +1638,12 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    {/* Arbitrator/Market ID field - only shown for ThirdParty or AutoPegged resolution */}
+                    {/* Arbitrator address field — for Third Party resolution */}
                     {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
-                     (formData.resolutionType === ResolutionType.ThirdParty || formData.resolutionType === ResolutionType.AutoPegged) && (
+                     formData.resolutionType === ResolutionType.ThirdParty && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-arbitrator">
-                          {formData.resolutionType === ResolutionType.ThirdParty
-                            ? 'Arbitrator Address'
-                            : 'Linked Wager ID'} <span className="fm-required">*</span>
+                          Arbitrator Address <span className="fm-required">*</span>
                         </label>
                         <div className="fm-input-with-action">
                           <input
@@ -1661,36 +1651,118 @@ function FriendMarketsModal({
                             type="text"
                             value={formData.arbitrator}
                             onChange={(e) => handleFormChange('arbitrator', e.target.value)}
-                            placeholder={formData.resolutionType === ResolutionType.ThirdParty
-                              ? '0x... (trusted third party address)'
-                              : 'Wager ID to follow (e.g., 123)'}
+                            placeholder="0x... (trusted third party address)"
                             disabled={submitting}
                             className={errors.arbitrator ? 'error' : ''}
                           />
-                          {formData.resolutionType === ResolutionType.ThirdParty && (
-                            <button
-                              type="button"
-                              className="fm-scan-btn"
-                              onClick={() => openQrScanner('arbitrator')}
-                              disabled={submitting}
-                              title="Scan QR code"
-                              aria-label="Scan QR code"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="3" width="7" height="7"/>
-                                <rect x="14" y="3" width="7" height="7"/>
-                                <rect x="3" y="14" width="7" height="7"/>
-                                <rect x="14" y="14" width="3" height="3"/>
-                                <path d="M17 14h4v4h-4zM14 17v4h4"/>
-                              </svg>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="fm-scan-btn"
+                            onClick={() => openQrScanner('arbitrator')}
+                            disabled={submitting}
+                            title="Scan QR code"
+                            aria-label="Scan QR code"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <rect x="3" y="3" width="7" height="7"/>
+                              <rect x="14" y="3" width="7" height="7"/>
+                              <rect x="3" y="14" width="7" height="7"/>
+                              <rect x="14" y="14" width="3" height="3"/>
+                              <path d="M17 14h4v4h-4zM14 17v4h4"/>
+                            </svg>
+                          </button>
                         </div>
                         {errors.arbitrator && <span className="fm-error">{errors.arbitrator}</span>}
-                        {formData.resolutionType === ResolutionType.AutoPegged && (
-                          <span className="fm-hint">
-                            This market will automatically resolve based on the outcome of the linked public market
-                          </span>
+                      </div>
+                    )}
+
+                    {/* Linked Market — Polymarket event lookup */}
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                     formData.resolutionType === ResolutionType.PolymarketOracle && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-polymarket-search">
+                          Linked Polymarket Event <span className="fm-required">*</span>
+                        </label>
+
+                        {selectedPolymarketMarket ? (
+                          <div className="fm-polymarket-selected">
+                            <div className="fm-polymarket-selected-body">
+                              <strong>{selectedPolymarketMarket.question}</strong>
+                              <div className="fm-polymarket-meta">
+                                {selectedPolymarketMarket.endDate && (
+                                  <span>Ends {formatDate(selectedPolymarketMarket.endDate)}</span>
+                                )}
+                                {selectedPolymarketMarket.outcomes?.length > 0 && (
+                                  <span>
+                                    {selectedPolymarketMarket.outcomes
+                                      .map((o) => `${o.name}${o.price != null ? ` ${Math.round(o.price * 100)}¢` : ''}`)
+                                      .join(' · ')}
+                                  </span>
+                                )}
+                              </div>
+                              <code className="fm-polymarket-cid">{selectedPolymarketMarket.conditionId}</code>
+                            </div>
+                            <button
+                              type="button"
+                              className="fm-link-btn"
+                              onClick={clearPolymarketSelection}
+                              disabled={submitting}
+                            >
+                              Change
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <input
+                              id="fm-polymarket-search"
+                              type="search"
+                              value={polymarketQuery}
+                              onChange={(e) => handlePolymarketQueryChange(e.target.value)}
+                              placeholder="Search Polymarket events by name (e.g. 'US election', 'BTC 100k')"
+                              disabled={submitting}
+                              className={errors.peggedMarketId ? 'error' : ''}
+                              autoComplete="off"
+                            />
+                            <span className="fm-hint">
+                              Type an event name to search Polymarket. Pick a result to link this wager — it&apos;ll settle automatically when the Polymarket market resolves.
+                            </span>
+
+                            {polymarketLoading && (
+                              <div className="fm-polymarket-status">Searching Polymarket…</div>
+                            )}
+                            {polymarketError && (
+                              <div className="fm-polymarket-status fm-error">
+                                {polymarketError}
+                              </div>
+                            )}
+                            {!polymarketLoading && !polymarketError && polymarketQuery && polymarketResults.length === 0 && (
+                              <div className="fm-polymarket-status">No matching Polymarket events.</div>
+                            )}
+                            {polymarketResults.length > 0 && (
+                              <ul className="fm-polymarket-results" role="listbox">
+                                {polymarketResults.map((m) => (
+                                  <li key={m.conditionId}>
+                                    <button
+                                      type="button"
+                                      className="fm-polymarket-result"
+                                      onClick={() => handleSelectPolymarketMarket(m)}
+                                      disabled={submitting}
+                                    >
+                                      <span className="fm-polymarket-result-title">{m.question}</span>
+                                      <span className="fm-polymarket-result-meta">
+                                        {m.endDate && <span>Ends {formatDate(m.endDate)}</span>}
+                                        {m.volume != null && <span>Vol ${Math.round(m.volume).toLocaleString()}</span>}
+                                      </span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </>
+                        )}
+
+                        {errors.peggedMarketId && (
+                          <span className="fm-error">{errors.peggedMarketId}</span>
                         )}
                       </div>
                     )}

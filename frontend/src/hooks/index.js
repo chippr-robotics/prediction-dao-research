@@ -88,6 +88,12 @@ export { useFriendMarketCreation } from './useFriendMarketCreation'
 // Friend market notification hooks
 export { useFriendMarketNotifications } from './useFriendMarketNotifications'
 
+// Testnet/Mainnet toggle
+export { useNetworkMode } from './useNetworkMode'
+
+// Polymarket Gamma API event search
+export { usePolymarketSearch } from './usePolymarketSearch'
+
 // IPFS hooks (for decentralized storage)
 export {
   useIpfs,

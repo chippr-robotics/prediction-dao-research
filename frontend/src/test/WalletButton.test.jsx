@@ -45,9 +45,22 @@ vi.mock('../hooks/useDex', () => ({
 
 vi.mock('../hooks/useUserPreferences', () => ({
   useUserPreferences: vi.fn(() => ({
-    preferences: { demoMode: false },
-    setDemoMode: vi.fn()
+    preferences: {}
   }))
+}))
+
+vi.mock('../hooks/useNetworkMode', () => ({
+  useNetworkMode: vi.fn(() => ({
+    mode: 'testnet',
+    isMainnet: false,
+    isTestnet: true,
+    isOtherChain: false,
+    network: { chainId: 80002, name: 'Polygon Amoy' },
+    chainId: 80002,
+    switchMode: vi.fn(),
+    isSwitching: false,
+    error: null,
+  })),
 }))
 
 // Mock modal components
@@ -171,8 +184,7 @@ describe('WalletButton Component - Wagers', () => {
       loading: false
     })
     useUserPreferences.mockReturnValue({
-      preferences: { demoMode: false },
-      setDemoMode: vi.fn()
+      preferences: {}
     })
   })
 

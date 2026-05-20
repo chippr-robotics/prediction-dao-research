@@ -48,14 +48,12 @@ describe('Dashboard Component', () => {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      demoMode: true
     },
     isLoading: false,
     addRecentSearch: vi.fn(),
     clearRecentSearches: vi.fn(),
     toggleFavoriteMarket: vi.fn(),
     setDefaultSlippage: vi.fn(),
-    setDemoMode: vi.fn(),
     savePreference: vi.fn(),
     clearAllPreferences: vi.fn()
   }
@@ -176,13 +174,9 @@ describe('Dashboard Component', () => {
   })
 
   describe('Not Connected State', () => {
-    it('should show welcome view when not connected and not demo mode', () => {
+    it('should show welcome view when not connected', () => {
       renderWithProviders(<Dashboard />, {
         walletContext: { ...defaultWalletContext, isConnected: false, account: null, connectWallet: vi.fn() },
-        preferencesContext: {
-          ...defaultPreferencesContext,
-          preferences: { ...defaultPreferencesContext.preferences, demoMode: false }
-        }
       })
       expect(screen.getByText('Create a wagerwith a friend')).toBeInTheDocument()
       expect(screen.getByText('How it works')).toBeInTheDocument()

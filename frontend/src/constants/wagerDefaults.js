@@ -27,7 +27,7 @@ export const WAGER_DEFAULTS = {
   /** Odds multiplier for equal-stake wagers (200 = 2×, 100 basis points) */
   ODDS_MULTIPLIER: 200,
 
-  /** Default resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged */
+  /** Default resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 5=PolymarketOracle (linked market) */
   RESOLUTION_TYPE: 0,
 
   /** Default trading / wager duration in days */

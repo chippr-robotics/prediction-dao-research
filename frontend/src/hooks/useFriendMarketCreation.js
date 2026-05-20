@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
+import { useDex } from './useDex'
 import { getContractAddress } from '../config/contracts'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 
@@ -73,6 +74,7 @@ export const clearPendingTransaction = () => {
  */
 export function useFriendMarketCreation({ onMarketCreated } = {}) {
   const { signer } = useWeb3()
+  const { addresses: chainAddresses, tokens: chainTokens } = useDex()
 
   const createFriendMarket = useCallback(async (data, modalSigner) => {
     const activeSigner = modalSigner || signer
@@ -109,15 +111,18 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         throw new Error('FriendGroupMarketFactory not deployed on this network')
       }
 
-      // Get stake token address
+      // Get stake token address. Prefer the chain-aware stablecoin address
+      // from the active DexContext so the Testnet/Mainnet toggle picks up
+      // the right USDC; fall back to module-level constants for back-compat.
       const rawCollateralToken = data.data?.collateralToken
       const isNativeToken = rawCollateralToken === null || rawCollateralToken === undefined
-      const stakeTokenAddress = isNativeToken ? ethers.ZeroAddress : (rawCollateralToken || DEX_ADDRESSES.STABLECOIN)
+      const fallbackStable = chainAddresses?.STABLECOIN || DEX_ADDRESSES.STABLECOIN
+      const stakeTokenAddress = isNativeToken ? ethers.ZeroAddress : (rawCollateralToken || fallbackStable)
 
       // Determine token decimals based on token address
       let tokenDecimals = 18
-      if (!isNativeToken && stakeTokenAddress.toLowerCase() === DEX_ADDRESSES.STABLECOIN.toLowerCase()) {
-        tokenDecimals = TOKENS.STABLE.decimals
+      if (!isNativeToken && fallbackStable && stakeTokenAddress.toLowerCase() === fallbackStable.toLowerCase()) {
+        tokenDecimals = chainTokens?.STABLE?.decimals ?? TOKENS.STABLE.decimals
       }
 
       console.log('Stake token config:', {
@@ -545,6 +550,29 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         friendMarketId = parsed?.args?.friendMarketId?.toString()
       }
 
+      // If the user picked "Linked Market (Polymarket)" we need to peg the
+      // newly-created wager to the chosen Polymarket condition id in a
+      // follow-up transaction. The create call only set the resolution
+      // type; the actual conditionId binding lives in pegToPolymarketCondition.
+      const RESOLUTION_TYPE_POLYMARKET = 5
+      const peggedConditionId = data.data?.peggedMarketId
+      if (resolutionType === RESOLUTION_TYPE_POLYMARKET && peggedConditionId && friendMarketId) {
+        try {
+          onProgress({ step: 'create', message: 'Linking to Polymarket condition…' })
+          const pegTx = await friendFactory.pegToPolymarketCondition(friendMarketId, peggedConditionId)
+          await pegTx.wait()
+          onProgress({ step: 'complete', message: 'Linked to Polymarket', txHash: pegTx.hash })
+        } catch (pegError) {
+          console.error('Failed to peg wager to Polymarket condition:', pegError)
+          // Surface the error; the wager exists but isn't linked yet.
+          throw new Error(
+            'Wager was created but linking to the chosen Polymarket event failed. ' +
+            'You can retry the link later. Original error: ' +
+            (pegError.shortMessage || pegError.reason || pegError.message || 'unknown')
+          )
+        }
+      }
+
       // Build the new market object
       const endDate = new Date(Date.now() + tradingPeriodDays * 24 * 60 * 60 * 1000)
 
@@ -618,7 +646,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
       throw error
     }
-  }, [signer, onMarketCreated])
+  }, [signer, onMarketCreated, chainAddresses, chainTokens])
 
   return {
     createFriendMarket,

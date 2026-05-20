@@ -1194,3 +1194,16 @@
     display: none;
   }
 }
+
+/* Network status helper text */
+.fwum-mode-chain {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #5A6772);
+  font-weight: 500;
+}
+
+.fwum-error-text {
+  margin-top: 0.5rem;
+  color: var(--danger-color, #dc2626);
+}

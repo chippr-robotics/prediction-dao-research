@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWallet, useWalletConnection, useWalletRoles, useTheme } from '../../hooks'
+import { useWallet, useWalletConnection, useWalletRoles, useTheme, useNetworkMode } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { usePrice } from '../../contexts/PriceContext'
@@ -19,7 +19,7 @@ import './FairWinsUserModal.css'
  * - Theme switching (light/dark mode)
  * - Currency display toggle (USD/native)
  * - Role management and purchasing
- * - Demo mode toggle
+ * - Testnet / Mainnet network toggle
  * - Market search
  * - Token swap integration
  * - Market creation launch
@@ -30,15 +30,24 @@ function FairWinsUserModal() {
   const { address, isConnected } = useWallet()
   const { disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
-  const { preferences, setDemoMode } = useUserPreferences()
+  const { preferences } = useUserPreferences()
   const { roles, hasRole } = useWalletRoles()
   const { toggleMode, isDark } = useTheme()
+  const {
+    mode: networkMode,
+    isMainnet,
+    isOtherChain,
+    network: activeNetwork,
+    switchMode,
+    isSwitching,
+    error: networkSwitchError,
+  } = useNetworkMode()
   const priceContext = usePrice() || {}
   const { showUsd = false, toggleCurrency = () => {} } = priceContext
   const { native: nativeSymbol } = useChainTokens()
   const symbol = nativeSymbol || 'MATIC'
   const navigate = useNavigate()
-  
+
   const [activeTab, setActiveTab] = useState('profile')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -49,14 +58,14 @@ function FairWinsUserModal() {
   }
 
   // === Event Handlers ===
-  
+
   const handleDisconnect = () => {
     disconnectWallet()
     hideModal()
   }
 
-  const handleToggleDemoMode = () => {
-    setDemoMode(!preferences.demoMode)
+  const handleToggleNetwork = () => {
+    switchMode('toggle')
   }
 
   const handleSearchSubmit = (e) => {
@@ -159,29 +168,40 @@ function FairWinsUserModal() {
               </div>
             </section>
 
-            {/* Data Source */}
+            {/* Network */}
             <section className="fwum-section">
               <h3 className="fwum-section-title">
-                <span aria-hidden="true">📡</span> Data Source
+                <span aria-hidden="true">📡</span> Network
               </h3>
               <div className="fwum-datasource-card">
                 <div className="fwum-status-row">
-                  <span className={`fwum-mode-badge ${preferences.demoMode ? 'demo' : 'live'}`}>
-                    <span aria-hidden="true">{preferences.demoMode ? '🎭' : '🌐'}</span>
-                    {preferences.demoMode ? 'Demo Mode' : 'Live Mode'}
+                  <span className={`fwum-mode-badge ${isMainnet ? 'live' : 'demo'}`}>
+                    <span aria-hidden="true">{isMainnet ? '🌐' : '🧪'}</span>
+                    {isMainnet ? 'Mainnet' : isOtherChain ? activeNetwork?.name || 'Other' : 'Testnet'}
                   </span>
+                  <span className="fwum-mode-chain">{activeNetwork?.name}</span>
                 </div>
                 <p className="fwum-description">
-                  {preferences.demoMode 
-                    ? 'Using mock data for testing and demonstrations. Switch to Live Mode to interact with real blockchain data.'
-                    : 'Connected to testnet blockchain. All transactions are real and require gas fees.'}
+                  {isMainnet
+                    ? 'Connected to Polygon Mainnet. Transactions use real funds and gas.'
+                    : isOtherChain
+                      ? `You're on ${activeNetwork?.name || 'an unsupported chain'}. Switch to Testnet (Polygon Amoy) or Mainnet (Polygon).`
+                      : 'Connected to Polygon Amoy testnet. Use a faucet for test MATIC.'}
                 </p>
-                <button 
-                  onClick={handleToggleDemoMode}
+                <button
+                  onClick={handleToggleNetwork}
                   className="fwum-action-btn secondary"
+                  disabled={isSwitching}
                 >
-                  Switch to {preferences.demoMode ? 'Live' : 'Demo'} Mode
+                  {isSwitching
+                    ? 'Switching…'
+                    : `Switch to ${isMainnet ? 'Testnet' : 'Mainnet'}`}
                 </button>
+                {networkSwitchError && (
+                  <p className="fwum-description fwum-error-text" role="alert">
+                    {networkSwitchError.shortMessage || networkSwitchError.message || 'Network switch failed.'}
+                  </p>
+                )}
               </div>
             </section>
 
@@ -328,33 +348,33 @@ function FairWinsUserModal() {
               </div>
             </section>
 
-            {/* Data & Privacy Section */}
+            {/* Network Section */}
             <section className="fwum-section">
               <h3 className="fwum-section-title">
-                <span aria-hidden="true">🔒</span> Data & Privacy
+                <span aria-hidden="true">📡</span> Network
               </h3>
-              
-              {/* Demo Mode Toggle */}
+
               <div className="fwum-setting-item">
                 <div className="fwum-setting-info">
                   <span className="fwum-setting-icon" aria-hidden="true">
-                    {preferences.demoMode ? '🎭' : '🌐'}
+                    {isMainnet ? '🌐' : '🧪'}
                   </span>
                   <div className="fwum-setting-text">
-                    <strong>Data Mode</strong>
-                    <p>{preferences.demoMode ? 'Using simulated data' : 'Connected to live blockchain'}</p>
+                    <strong>{isMainnet ? 'Mainnet' : 'Testnet'}</strong>
+                    <p>{activeNetwork?.name || (isMainnet ? 'Polygon' : 'Polygon Amoy')}</p>
                   </div>
                 </div>
                 <button
                   className="fwum-toggle-btn"
-                  onClick={handleToggleDemoMode}
-                  aria-pressed={preferences.demoMode}
-                  aria-label={`Switch to ${preferences.demoMode ? 'live' : 'demo'} mode`}
+                  onClick={handleToggleNetwork}
+                  aria-pressed={isMainnet}
+                  aria-label={`Switch to ${isMainnet ? 'Testnet' : 'Mainnet'}`}
+                  disabled={isSwitching}
                 >
                   <span className="fwum-toggle-track data">
-                    <span className={`fwum-toggle-thumb ${preferences.demoMode ? 'active' : ''}`} />
+                    <span className={`fwum-toggle-thumb ${isMainnet ? 'active' : ''}`} />
                   </span>
-                  <span className="fwum-toggle-label">{preferences.demoMode ? 'Demo' : 'Live'}</span>
+                  <span className="fwum-toggle-label">{isMainnet ? 'Mainnet' : 'Testnet'}</span>
                 </button>
               </div>
             </section>

@@ -405,11 +405,14 @@ function Dashboard() {
   const { isConnected, account } = useWallet()
   const { connectWallet } = useWalletConnection()
   const { native: nativeSymbol } = useChainTokens()
-  const { preferences } = useUserPreferences()
+  const { preferences: _preferences } = useUserPreferences()
   const { hasRole } = useWalletRoles()
   const { showModal, hideModal } = useModal()
   const navigate = useNavigate()
-  const demoMode = preferences?.demoMode ?? true
+  // Mock wager fallback is dev-only — set VITE_USE_MOCK_WAGERS=true in your
+  // .env to seed the dashboard with sample wagers when no live wagers exist.
+  // In production this is always false; users see real on-chain wagers only.
+  const demoMode = import.meta.env?.VITE_USE_MOCK_WAGERS === 'true'
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)

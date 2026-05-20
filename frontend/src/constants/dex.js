@@ -1,11 +1,10 @@
 /**
- * V3 DEX addresses and token metadata for the active chain.
+ * Uniswap V3 DEX addresses and token metadata for the active chain.
  *
- * Derives from frontend/src/config/networks.js. Polygon Amoy doesn't have an
- * official Uniswap V3 deployment at the time of writing, so `isDexAvailable`
- * is false and consumers must branch on it before exposing swap UI. The
- * friend-market settle-by-referenced-lookup flow does not require the DEX
- * path.
+ * Derives from frontend/src/config/networks.js. Polygon Mainnet has the
+ * canonical V3 deployment; Polygon Amoy is wired via VITE_AMOY_UNISWAP_*
+ * env vars when a community deployment is available. Consumers should gate
+ * any DEX-aware UI on `isDexAvailable`.
  */
 
 import { NETWORKS, getCurrentChainId, getNetwork } from '../config/networks'
@@ -16,35 +15,24 @@ const _activeNetwork = getNetwork(_activeChainId)
 // Whether the active chain has a V3 DEX deployment we can route swaps through.
 export const isDexAvailable = Boolean(_activeNetwork?.dex)
 
-// Core V3 DEX contracts for the active chain. Falls back to placeholder values
-// when the chain has no DEX deployment so that downstream code (which often
-// just reads the property) doesn't throw on undefined access.
+const ZERO = '0x0000000000000000000000000000000000000000'
+
+// Core V3 DEX contracts for the active chain. When the chain has no DEX
+// deployment, every address falls back to the zero address so that downstream
+// code (which often just reads the property) doesn't throw on undefined
+// access. Guard real usage with `isDexAvailable`.
 export const DEX_ADDRESSES = {
-  FACTORY: _activeNetwork?.dex?.factory || '0x0000000000000000000000000000000000000000',
-  SWAP_ROUTER_02: _activeNetwork?.dex?.swapRouter || '0x0000000000000000000000000000000000000000',
-  NONFUNGIBLE_TOKEN_POSITION_MANAGER: _activeNetwork?.dex?.positionManager || '0x0000000000000000000000000000000000000000',
+  FACTORY: _activeNetwork?.dex?.factory || ZERO,
+  SWAP_ROUTER_02: _activeNetwork?.dex?.swapRouter || ZERO,
+  NONFUNGIBLE_TOKEN_POSITION_MANAGER: _activeNetwork?.dex?.positionManager || ZERO,
+  QUOTER_V2: _activeNetwork?.dex?.quoter || ZERO,
 
-  // Ancillary V3 contracts. Polygon Amoy has no official deployment of these
-  // today; values default to zero on chains where dex is null. The presence of
-  // these values does not imply they're functional — gate any usage on
-  // isDexAvailable.
-  UNIVERSAL_ROUTER: '0x0000000000000000000000000000000000000000',
+  // Permit2 has the same address on every EVM chain Uniswap supports.
   PERMIT2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
-  MULTICALL_V3: '0x0000000000000000000000000000000000000000',
-  PROXY_ADMIN: '0x0000000000000000000000000000000000000000',
-  TICK_LENS: '0x0000000000000000000000000000000000000000',
-  NFT_DESCRIPTOR_LIBRARY: '0x0000000000000000000000000000000000000000',
-  NONFUNGIBLE_TOKEN_POSITION_DESCRIPTOR: '0x0000000000000000000000000000000000000000',
-  DESCRIPTOR_PROXY: '0x0000000000000000000000000000000000000000',
-  MIGRATOR: '0x0000000000000000000000000000000000000000',
-  STAKER: '0x0000000000000000000000000000000000000000',
-  QUOTER_V2: '0x0000000000000000000000000000000000000000',
 
-  // Wrapped-native and stablecoin addresses for the active chain. On Amoy
-  // these are WMATIC and USDC respectively; addresses default to zero when
-  // the chain doesn't have a DEX deployment.
-  WNATIVE: '0x0000000000000000000000000000000000000000',
-  STABLECOIN: _activeNetwork?.stablecoin?.address || '0x0000000000000000000000000000000000000000',
+  // Wrapped-native and stablecoin addresses for the active chain.
+  WNATIVE: _activeNetwork?.dex?.wnative || ZERO,
+  STABLECOIN: _activeNetwork?.stablecoin?.address || ZERO,
 }
 
 // Per-chain explorer URLs derived from networks.js for back-compat.
@@ -73,14 +61,14 @@ export const TOKENS = {
   },
   STABLE: _stable
     ? {
-        address: _stable.address || '0x0000000000000000000000000000000000000000',
+        address: _stable.address || ZERO,
         symbol: _stable.symbol,
         name: _stable.name,
         decimals: _stable.decimals,
         icon: '💵',
       }
     : {
-        address: '0x0000000000000000000000000000000000000000',
+        address: ZERO,
         symbol: 'STABLE',
         name: 'Stablecoin',
         decimals: 6,

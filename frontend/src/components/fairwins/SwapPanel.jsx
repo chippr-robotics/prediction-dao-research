@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useDex } from '../../hooks/useDex'
-import { SLIPPAGE_OPTIONS, getExplorerUrl, isDexAvailable } from '../../constants/dex'
+import { SLIPPAGE_OPTIONS, getExplorerUrl } from '../../constants/dex'
 import { useWallet } from '../../hooks'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import './SwapPanel.css'
@@ -21,6 +21,7 @@ function SwapPanel() {
     slippage,
     setSlippage,
     addresses,
+    isDexAvailable,
   } = useDex()
 
   const { isConnected, chainId } = useWallet()
@@ -155,13 +156,14 @@ function SwapPanel() {
       <div className="swap-panel">
         <div className="swap-header">
           <h2>Swap</h2>
-          <p className="subtitle">DEX integration is not available on this network</p>
+          <p className="subtitle">DEX is not available on this network</p>
         </div>
         <div className="connect-message">
           <p>
-            No Uniswap-V3-compatible DEX is configured for this chain yet. Friend
-            markets settle by referenced lookup against Polymarket — no swap is
-            required.
+            Uniswap V3 is wired on Polygon Mainnet. Switch to Mainnet from the
+            Testnet/Mainnet toggle to swap, or supply community Uniswap V3
+            addresses via the <code>VITE_AMOY_UNISWAP_*</code> env vars to
+            enable swaps on Amoy.
           </p>
         </div>
       </div>
