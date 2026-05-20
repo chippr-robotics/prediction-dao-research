@@ -62,6 +62,45 @@ export const DisputeStatus = {
   RESOLVED: 'resolved',
 }
 
+// ── Resolution types (on-chain enum) ────────────────────────────────
+// Mirrors contracts/markets/FriendGroupMarketTypes.sol ResolutionType
+export const ResolutionType = {
+  EITHER: 0,
+  INITIATOR: 1,
+  RECEIVER: 2,
+  THIRD_PARTY: 3,
+  AUTO_PEGGED: 4,
+  POLYMARKET_ORACLE: 5,
+}
+
+export const ResolutionTypeNames = {
+  0: 'Either',
+  1: 'Initiator',
+  2: 'Receiver',
+  3: 'Third Party',
+  4: 'Auto-Pegged',
+  5: 'Polymarket Oracle',
+}
+
+// Sort order for "Resolution type" grouping in My Wagers
+export const ResolutionTypeOrder = [0, 1, 2, 3, 4, 5]
+
+// ── Sort keys for My Wagers list ────────────────────────────────────
+export const WagerSortKey = {
+  CREATED: 'createdAt',
+  ENDS: 'endTime',
+  RESOLUTION_TYPE: 'resolutionType',
+  STATUS: 'status',
+}
+
+// Terminal statuses — wagers in these states are considered "history"
+export const TERMINAL_STATUSES = new Set([
+  'resolved',
+  'cancelled',
+  'refunded',
+  'oracle_timed_out',
+])
+
 // ── Date helpers ────────────────────────────────────────────────────
 /** Returns an ISO datetime-local string N days from now */
 export const getDefaultEndDateTime = (days = WAGER_DEFAULTS.WAGER_END_DAYS) => {

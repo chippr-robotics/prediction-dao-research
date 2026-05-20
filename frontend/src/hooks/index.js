@@ -87,6 +87,11 @@ export { useFriendMarketCreation } from './useFriendMarketCreation'
 
 // Friend market notification hooks
 export { useFriendMarketNotifications } from './useFriendMarketNotifications'
+export { useMyWagerNotifications } from './useMyWagerNotifications'
+export { createUnreadMarketTracker } from './useUnreadMarketTracker'
+
+// Paginated My Wagers query
+export { useMyWagers } from './useMyWagers'
 
 // Testnet/Mainnet toggle
 export { useNetworkMode } from './useNetworkMode'

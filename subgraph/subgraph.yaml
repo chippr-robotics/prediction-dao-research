@@ -1,0 +1,45 @@
+specVersion: 0.0.5
+description: FriendGroupMarketFactory wagers index for the prediction-dao-research app
+schema:
+  file: ./schema.graphql
+
+# Networks: polygon-amoy during development; switch to polygon for prod.
+# Replace ADDRESS and START_BLOCK with the values from
+# deployments/<network>/FriendGroupMarketFactory.json before running
+# `graph deploy`.
+dataSources:
+  - kind: ethereum
+    name: FriendGroupMarketFactory
+    network: polygon-amoy
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: FriendGroupMarketFactory
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Wager
+        - User
+      abis:
+        - name: FriendGroupMarketFactory
+          file: ../frontend/src/abis/FriendGroupMarketFactory.json
+      eventHandlers:
+        - event: MarketCreated(indexed uint256,indexed address,uint8,uint8)
+          handler: handleMarketCreated
+        - event: MemberAdded(indexed uint256,indexed address)
+          handler: handleMemberAdded
+        - event: MarketAccepted(indexed uint256,indexed address,uint256)
+          handler: handleMarketAccepted
+        - event: ResolutionProposed(indexed uint256,indexed address,bool)
+          handler: handleResolutionProposed
+        - event: MarketResolved(indexed uint256,indexed address,bool,uint256)
+          handler: handleMarketResolved
+        - event: MarketChallenged(indexed uint256,indexed address)
+          handler: handleMarketChallenged
+        - event: MarketCancelled(indexed uint256)
+          handler: handleMarketCancelled
+        - event: MarketRefunded(indexed uint256)
+          handler: handleMarketRefunded
+      file: ./src/mappings/factory.ts

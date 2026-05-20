@@ -1,0 +1,19 @@
+{
+  "name": "prediction-dao-research-subgraph",
+  "version": "0.1.0",
+  "description": "Subgraph for FriendGroupMarketFactory wagers — powers the My Wagers paginated view via The Graph's decentralized network.",
+  "private": true,
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy:studio": "graph deploy --node https://api.studio.thegraph.com/deploy/ prediction-dao-research",
+    "create-local": "graph create --node http://localhost:8020/ prediction-dao-research",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 prediction-dao-research",
+    "test": "graph test"
+  },
+  "devDependencies": {
+    "@graphprotocol/graph-cli": "0.80.0",
+    "@graphprotocol/graph-ts": "0.35.1",
+    "matchstick-as": "0.6.0"
+  }
+}
