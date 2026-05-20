@@ -123,9 +123,9 @@ sequenceDiagram
 
 All transactions require gas fees:
 
-- **Submit Proposal**: ~300,000 gas + 50  bond
+- **Submit Proposal**: ~300,000 gas + 50 MATIC bond
 - **Trade**: ~150,000 gas (varies with privacy proofs)
-- **Oracle Report**: ~200,000 gas + 100  bond
+- **Oracle Report**: ~200,000 gas + 100 MATIC bond
 - **Redeem Tokens**: ~80,000 gas
 
 !!! tip "Gas Optimization"
@@ -184,7 +184,7 @@ stateDiagram-v2
 
 === "Submission"
     
-    - Proposer submits with 50  bond
+    - Proposer submits with 50 MATIC bond
     - 7-day review period
     - Community can review and discuss
 
@@ -204,7 +204,7 @@ stateDiagram-v2
 === "Challenge"
     
     - 2-day challenge period
-    - Anyone can challenge with 150  bond
+    - Anyone can challenge with 150 MATIC bond
     - Evidence review
 
 === "Execution"

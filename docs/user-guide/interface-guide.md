@@ -24,7 +24,7 @@ When trading, select your token and amount. The interface shows price impact (LM
 
 ### ClearPath Proposals
 
-The submission flow requests title, description (markdown editor with preview), funding amount, recipient address (with verification warnings), welfare metric selection (dropdown with context), and milestones (flexible card-based builder). A review screen lets you check everything before posting the 50  bond.
+The submission flow requests title, description (markdown editor with preview), funding amount, recipient address (with verification warnings), welfare metric selection (dropdown with context), and milestones (flexible card-based builder). A review screen lets you check everything before posting the 50 MATIC bond.
 
 ### FairWins Markets
 

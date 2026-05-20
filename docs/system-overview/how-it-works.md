@@ -12,7 +12,7 @@ For a complete flow diagram, see the [Architecture documentation](../developer-g
 
 A proposer submits a proposal by:
 
-- Posting a 50  bond
+- Posting a 50 MATIC bond
 - Providing title, description, funding amount
 - Specifying recipient address
 - Selecting welfare metric for evaluation
@@ -56,7 +56,7 @@ When trading ends:
 
 - Oracle reporter submits welfare metric values for both scenarios
 - Provides evidence (typically IPFS hash to data)
-- Posts 100  bond
+- Posts 100 MATIC bond
 - 3-day settlement window begins
 
 ### 5. Challenge Phase
@@ -64,7 +64,7 @@ When trading ends:
 During the 2-day challenge period:
 
 - Anyone can challenge the oracle report
-- Challenger posts 150  bond (must exceed reporter's bond)
+- Challenger posts 150 MATIC bond (must exceed reporter's bond)
 - Provides counter-evidence
 - Escalates to UMA for arbitration if needed
 
@@ -153,7 +153,7 @@ Profit = (redemption_value - purchase_price) × token_amount
 
 **Phase 1: Report Submission**
 - First reporter gets priority
-- Posts 100  bond
+- Posts 100 MATIC bond
 - Submits PASS and FAIL values
 - Provides evidence URI
 
@@ -164,7 +164,7 @@ Profit = (redemption_value - purchase_price) × token_amount
 
 **Phase 3: Challenge**
 - 2-day challenge period
-- Requires 150  bond
+- Requires 150 MATIC bond
 - Must provide counter-evidence
 
 **Phase 4: Escalation** (if challenged)
@@ -190,9 +190,9 @@ Creates economic incentives for honest behavior:
 
 | Role | Bond | Returned If | Slashed If |
 |------|------|-------------|-----------|
-| Proposer | 50  | Good faith | Spam/malicious |
-| Reporter | 100  | Accurate report | False report |
-| Challenger | 150  | Challenge succeeds | Frivolous challenge |
+| Proposer | 50 MATIC | Good faith | Spam/malicious |
+| Reporter | 100 MATIC | Accurate report | False report |
+| Challenger | 150 MATIC | Challenge succeeds | Frivolous challenge |
 
 ### Timelock and Ragequit
 
@@ -215,8 +215,8 @@ Creates economic incentives for honest behavior:
 - Full decentralization by Year 4
 
 **Spending Limits**:
-- 50,000  per proposal max
-- 100,000  daily aggregate max
+- 50,000 MATIC per proposal max
+- 100,000 MATIC daily aggregate max
 - Prevents treasury drainage
 
 ## Welfare Metrics

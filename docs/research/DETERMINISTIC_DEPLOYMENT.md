@@ -17,7 +17,7 @@ All ClearPath DAO contracts are deployed using the [Safe Singleton Factory](http
 
 This factory is pre-deployed on many EVM networks including:
 - Ethereum Mainnet (Chain ID: 1)
-- Polygon Amoy Polygon Amoy (Polymarket testnet) (Chain ID: 63)
+- Polygon Amoy (Polymarket testnet) (Chain ID: 80002)
 - Polygon, Arbitrum, Optimism, and many others
 
 The factory uses the CREATE2 opcode to deploy contracts at deterministic addresses based on:
@@ -100,7 +100,7 @@ After deployment, you can verify contracts on block explorers:
 ### Polygon Amoy (Polymarket testnet)
 - **Explorer**: https://amoy.polygonscan.com/
 - **RPC**: https://rpc-amoy.polygon.technology
-- **Chain ID**: 63
+- **Chain ID**: 80002
 
 To verify a contract address:
 ```bash

@@ -40,7 +40,7 @@ async function main() {
 
   // Check current fee
   const currentFee = await factory.creationFee();
-  console.log(`Current creation fee: ${ethers.formatEther(currentFee)}MATIC`);
+  console.log(`Current creation fee: ${ethers.formatEther(currentFee)} MATIC`);
 
   // Check ownership
   const owner = await factory.owner();
@@ -61,7 +61,7 @@ async function main() {
     return;
   }
 
-  console.log(`\nSetting creation fee to: ${newFeeEther}MATIC`);
+  console.log(`\nSetting creation fee to: ${newFeeEther} MATIC`);
 
   // Send transaction
   const tx = await factory.setCreationFee(newFee);
@@ -72,7 +72,7 @@ async function main() {
 
   // Verify new fee
   const updatedFee = await factory.creationFee();
-  console.log(`\nUpdated creation fee: ${ethers.formatEther(updatedFee)}MATIC`);
+  console.log(`\nUpdated creation fee: ${ethers.formatEther(updatedFee)} MATIC`);
 
   console.log('\n' + '='.repeat(60));
   console.log('CREATION FEE UPDATE COMPLETE');

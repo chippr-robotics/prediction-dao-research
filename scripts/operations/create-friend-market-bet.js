@@ -108,7 +108,7 @@ async function main() {
   const balance = await provider.getBalance(wallet.address);
   console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
-  const liquidityWei = ethers.parseEther(BET_CONFIG.liquidityETC);
+  const liquidityWei = ethers.parseEther(BET_CONFIG.liquidityMATIC);
   if (balance < liquidityWei + ethers.parseEther("0.01")) {
     console.error("Insufficient balance for liquidity + gas");
     process.exit(1);
@@ -208,7 +208,7 @@ async function main() {
   console.log("Description:", BET_CONFIG.description);
   console.log("Trading period:", BET_CONFIG.tradingPeriodDays, "days");
   console.log("Arbitrator:", BET_CONFIG.arbitrator || "None (creator resolves)");
-  console.log("Liquidity:", BET_CONFIG.liquidityETC, "MATIC");
+  console.log("Liquidity:", BET_CONFIG.liquidityMATIC, "MATIC");
 
   // ========== Step 5: Create Friend Market ==========
   console.log("\n[5/6] Creating friend market bet...");

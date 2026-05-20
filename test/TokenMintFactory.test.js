@@ -387,7 +387,7 @@ describe("TokenMintFactory", function () {
 
       await expect(
         tokenMintFactory.connect(user1).listOnDex(1)
-      ).to.be.revertedWith("Only ERC20 can be listed on swap");
+      ).to.be.revertedWith("Only ERC20 can be listed on DEX");
     });
 
     it("Should not allow duplicate listing", async function () {

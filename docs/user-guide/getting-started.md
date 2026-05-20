@@ -37,28 +37,28 @@ Connect to the appropriate network:
 
     - **Network Name**: Polygon Amoy
     - **RPC URL**: Check with your preferred provider
-    - **Chain ID**: 61
-    - **Currency Symbol**:
+    - **Chain ID**: 80002
+    - **Currency Symbol**: MATIC
 
 === "Testnet (Polygon Amoy)"
 
-    - **Network Name**: Polygon Amoy Polygon Amoy
+    - **Network Name**: Polygon Amoy
     - **RPC URL**: https://rpc-amoy.polygon.technology
-    - **Chain ID**: 63
-    - **Currency Symbol**: mETC
+    - **Chain ID**: 80002
+    - **Currency Symbol**: MATIC mETC
 
 === "Local Development"
 
     - **Network Name**: Hardhat Local
     - **RPC URL**: http://127.0.0.1:8545
     - **Chain ID**: 1337
-    - **Currency Symbol**: ETH
+    - **Currency Symbol**: MATIC ETH
 
-### 3. Get  Tokens
+### 3. Get MATIC Tokens
 
 === "Mainnet"
 
-    Purchase  from a cryptocurrency exchange and transfer to your wallet.
+    Purchase MATIC from a cryptocurrency exchange and transfer to your wallet.
 
 === "Testnet"
 
@@ -100,7 +100,7 @@ The main dashboard shows:
 
 ### :material-lightbulb: Proposer
 
-Submit proposals for the DAO to consider. Requires a 50  bond.
+Submit proposals for the DAO to consider. Requires a 50 MATIC bond.
 
 [Learn more about submitting proposals →](submitting-proposals.md)
 
@@ -116,11 +116,11 @@ Participate in welfare metric selection and governance decisions.
 
 ### :material-gavel: Oracle Reporter
 
-Report welfare metric values after proposals execute. Requires a 100  bond.
+Report welfare metric values after proposals execute. Requires a 100 MATIC bond.
 
 ### :material-shield: Challenger
 
-Challenge incorrect oracle reports. Requires a 150  bond.
+Challenge incorrect oracle reports. Requires a 150 MATIC bond.
 
 ## Key Concepts
 

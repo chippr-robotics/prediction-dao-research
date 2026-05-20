@@ -1,7 +1,7 @@
 /**
  * Garden of Eden - Estimate Funding Requirements
  *
- * Quick script to estimate USDC and MATIC needed for demo market creation
+ * Quick script to estimate USC and MATIC needed for demo market creation
  * without requiring network connection.
  *
  * Usage:

@@ -6,7 +6,7 @@ This guide shows concrete scenarios users encounter, demonstrating how features 
 
 Sarah noticed her DAO needed better documentation. After surveying new members about their challenges, she prepared a proposal requesting funds to create comprehensive guides. She chose network activity as the welfare metric since better documentation should increase participation.
 
-Writing her proposal, she explained the current problem with examples, described deliverables, outlined a timeline with milestones, and detailed her technical writing experience. The 50  bond gave her pause, but she felt confident and submitted.
+Writing her proposal, she explained the current problem with examples, described deliverables, outlined a timeline with milestones, and detailed her technical writing experience. The 50 MATIC bond gave her pause, but she felt confident and submitted.
 
 During the review period, she answered community questions about budget and measurement. When trading began, PASS tokens climbed from 0.52 to 0.73 after a respected member endorsed the initiative. After resolution confirmed PASS tokens won, funds transferred and she began work, knowing oracle reporting in three months would measure actual network activity improvement.
 

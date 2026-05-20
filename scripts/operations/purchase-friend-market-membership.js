@@ -14,7 +14,7 @@
  * Prerequisites:
  *   1. Floppy must be mounted: npm run floppy:mount
  *   2. Keystore must exist: npm run floppy:create
- *   3. Wallet must have sufficient USDC for purchase and MATIC for gas
+ *   3. Wallet must have sufficient USC for purchase and MATIC for gas
  */
 const { ethers } = require('ethers');
 const fs = require('fs');

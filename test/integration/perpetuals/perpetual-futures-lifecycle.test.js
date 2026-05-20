@@ -15,14 +15,14 @@ async function deployPerpetualFuturesFixture() {
   await collateralToken.waitForDeployment();
 
   // Deploy a second collateral token (wrapped native)
-  const wetcToken = await MockERC20.deploy("Wrapped MATIC", "WMATIC", ethers.parseEther("100000000"));
-  await wetcToken.waitForDeployment();
+  const wmaticToken = await MockERC20.deploy("Wrapped MATIC", "WMATIC", ethers.parseEther("100000000"));
+  await wmaticToken.waitForDeployment();
 
   // Distribute tokens to test accounts
   const distributionAmount = ethers.parseEther("1000000");
   for (const account of [trader1, trader2, trader3, liquidator]) {
     await collateralToken.transfer(account.address, distributionAmount);
-    await wetcToken.transfer(account.address, distributionAmount);
+    await wmaticToken.transfer(account.address, distributionAmount);
   }
 
   // Deploy FundingRateEngine
@@ -41,7 +41,7 @@ async function deployPerpetualFuturesFixture() {
   await perpFactory.waitForDeployment();
 
   // Configure allowed collateral tokens
-  await perpFactory.setAllowedCollateralToken(await wetcToken.getAddress(), true);
+  await perpFactory.setAllowedCollateralToken(await wmaticToken.getAddress(), true);
 
   // Configure funding rate engine
   await fundingRateEngine.setPriceUpdater(await perpFactory.getAddress(), true);
@@ -52,7 +52,7 @@ async function deployPerpetualFuturesFixture() {
       fundingRateEngine,
       perpFactory,
       collateralToken,
-      wetcToken
+      wmaticToken
     },
     accounts: {
       owner,
@@ -158,7 +158,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
     it("Should create multiple markets with different configurations", async function () {
       const { contracts } = await loadFixture(deployPerpetualFuturesFixture);
-      const { perpFactory, collateralToken, wetcToken } = contracts;
+      const { perpFactory, collateralToken, wmaticToken } = contracts;
 
       console.log("\n=== Multi-Market Creation Test ===\n");
 
@@ -196,7 +196,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
         perpFactory,
         "MATIC Perpetual",
         "MATIC",
-        wetcToken,
+        wmaticToken,
         ethers.parseEther("25")
       );
 
@@ -214,7 +214,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       expect(ethMarketConfig.fundingInterval).to.equal(4n * 3600n);
 
       // Verify MATIC market uses different collateral
-      expect(await etcMarket.collateralToken()).to.equal(await wetcToken.getAddress());
+      expect(await etcMarket.collateralToken()).to.equal(await wmaticToken.getAddress());
 
       console.log("  ✓ BTC market created at:", await btcMarket.getAddress());
       console.log("  ✓ ETH market created with custom config");

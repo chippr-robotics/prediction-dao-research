@@ -10,11 +10,11 @@ Proposals are how the DAO makes decisions about allocating resources. Anyone can
 
 Before submitting a proposal, ensure you have:
 
-- ✅ **50  bond**: Required for all proposals (returned upon good-faith resolution)
+- ✅ **50 MATIC bond**: Required for all proposals (returned upon good-faith resolution)
 - ✅ **Proposal details**: Clear title, description, and justification
 - ✅ **Funding request**: Amount and recipient address
 - ✅ **Welfare metric**: Which metric will be used to evaluate success
-- ✅ **Connected wallet**: With sufficient  balance
+- ✅ **Connected wallet**: With sufficient MATIC balance
 
 ## Proposal Preparation
 
@@ -32,7 +32,7 @@ A good proposal includes:
 : Why this proposal benefits the DAO
 
 **Funding Amount**
-: How much  you're requesting (max 50,000  per proposal)
+: How much USDC you're requesting (max 50,000 USDC per proposal)
 
 **Recipient Address**
 : Where funds will be sent if approved
@@ -105,7 +105,7 @@ Milestone 3: Deployment (1 week)
 
 1. Connect your wallet
 2. Click **"Submit Proposal"** in the navigation
-3. Ensure you have 50  + gas fees
+3. Ensure you have 50 MATIC + gas fees
 
 #### 2. Fill in Proposal Details
 
@@ -129,8 +129,8 @@ graph TD
     
     - **Title**: Keep it clear and descriptive
     - **Description**: Use markdown for formatting
-    - **Funding Amount**: Enter in  (max 50,000)
-    - **Recipient**: Valid  address
+    - **Funding Amount**: Enter in USDC (max 50,000)
+    - **Recipient**: Valid recipient address
 
 === "Welfare Metric"
     
@@ -159,11 +159,11 @@ graph TD
 // Approximate gas costs
 Gas Limit: 300,000
 Bond Required: 50
-Total Cost: Gas fees + 50  bond
+Total Cost: Gas fees + 50 MATIC bond
 ```
 
 !!! warning "Bond Recovery"
-    Your 50  bond is returned when the proposal resolves, provided it was submitted in good faith. Spam or malicious proposals may result in bond forfeiture.
+    Your 50 MATIC bond is returned when the proposal resolves, provided it was submitted in good faith. Spam or malicious proposals may result in bond forfeiture.
 
 ## After Submission
 
@@ -271,7 +271,7 @@ After trading ends:
 ### Technical Errors
 
 - **Wrong recipient address**: Double-check before submitting
-- **Insufficient bond**: Ensure you have 50  + gas
+- **Insufficient bond**: Ensure you have 50 MATIC + gas
 - **Wrong network**: Verify you're on the correct network
 
 ### Content Issues
@@ -319,14 +319,14 @@ Monitor your proposal through each phase:
 1. **Timelock Period**: 2-day waiting period
 2. **Ragequit Window**: Dissenting members can exit
 3. **Execution**: Funds are transferred to recipient
-4. **Bond Return**: Your 50  bond is returned
+4. **Bond Return**: Your 50 MATIC bond is returned
 5. **Delivery**: Complete your proposed work
 
 ### If Your Proposal Fails
 
 1. **Market Resolution**: FAIL tokens win
 2. **No Execution**: Proposal is not executed
-3. **Bond Return**: Your 50  bond is returned
+3. **Bond Return**: Your 50 MATIC bond is returned
 4. **Learn and Iterate**: Consider feedback for future proposals
 
 ## Advanced Topics
@@ -377,7 +377,7 @@ For proposals that depend on others:
 
 **Q: What happens if I submit a spam proposal?**
 
-A: Your 50  bond may be forfeited. The community can identify spam during the review period.
+A: Your 50 MATIC bond may be forfeited. The community can identify spam during the review period.
 
 **Q: Can I cancel a proposal after submission?**
 
@@ -389,11 +389,11 @@ A: Minimum 16 days (7-day review + 7-day trading + 2-day resolution), typically 
 
 **Q: Can I submit multiple proposals?**
 
-A: Yes, but each requires a separate 50  bond.
+A: Yes, but each requires a separate 50 MATIC bond.
 
 **Q: What if the oracle reports incorrectly?**
 
-A: Anyone can challenge with a 150  bond during the 2-day challenge period.
+A: Anyone can challenge with a 150 MATIC bond during the 2-day challenge period.
 
 ## Next Steps
 

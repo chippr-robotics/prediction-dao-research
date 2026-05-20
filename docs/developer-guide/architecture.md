@@ -98,7 +98,7 @@ The primary user-facing system. For a detailed assessment, see [P2P Wager Platfo
 ```
 1. SUBMISSION
    User → ProposalRegistry
-   - Submit with 50  bond
+   - Submit with 50 MATIC bond
    - Define milestones
    - 7-day review period
 

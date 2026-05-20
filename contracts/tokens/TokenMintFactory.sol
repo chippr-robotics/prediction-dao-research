@@ -271,7 +271,7 @@ contract TokenMintFactory is ReentrancyGuard {
     }
 
     function _listOnDex(uint256 tokenId) internal {
-        require(tokens[tokenId].tokenType == TokenType.ERC20, "Only ERC20 can be listed on swap");
+        require(tokens[tokenId].tokenType == TokenType.ERC20, "Only ERC20 can be listed on DEX");
         require(!tokens[tokenId].listedOnDex, "Already listed");
 
         // TODO: Integrate with the active chain DEX contract

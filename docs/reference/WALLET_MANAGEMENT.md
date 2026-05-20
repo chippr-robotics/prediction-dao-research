@@ -51,7 +51,7 @@ The `WalletContext` is the central hub for all wallet-related state and operatio
 - **Multiple Connectors**: Support for injected wallets and WalletConnect
 - **Address Management**: Current wallet address and connection state
 - **Provider & Signer**: Ethers.js provider and signer instances for transactions
-- **Balance Tracking**:. WETC, and other token balances
+- **Balance Tracking**: Native token, wrapped native token, and other token balances
 - **Network Management**: Network detection, validation, and switching
 - **RVAC Integration**: Role management tied directly to wallet address
 - **Transaction Helpers**: Utilities for sending transactions and signing messages
@@ -78,7 +78,7 @@ function MyComponent() {
   const { 
     address,           // Current wallet address
     isConnected,       // Connection state
-    balances,          // { etc, wetc, tokens }
+    balances,          // { native, wnative, tokens }
     provider,          // Ethers provider
     signer,            // Ethers signer
     connectWallet,     // Connect function
@@ -119,7 +119,7 @@ function BalanceDisplay() {
   
   return (
     <div>
-      <p>MATIC Balance: {balances.etc}</p>
+      <p>MATIC Balance: {balances.native}</p>
       <button onClick={refreshBalances}>Refresh</button>
     </div>
   )
@@ -293,7 +293,7 @@ Automatically loaded when wallet connects and can be refreshed:
 ```jsx
 const { balances, refreshBalances } = useWallet()
 
-console.log(`MATIC Balance: ${balances.etc}`)
+console.log(`MATIC Balance: ${balances.native}`)
 await refreshBalances() // Manually refresh
 ```
 
@@ -303,10 +303,10 @@ Get and cache ERC20 token balances:
 ```jsx
 const { getTokenBalance } = useWallet()
 
-// Get WETC balance
-const wetcBalance = await getTokenBalance(WETC_ADDRESS)
+// Get wrapped-native balance
+const wrappedNativeBalance = await getTokenBalance(WRAPPED_NATIVE_ADDRESS)
 
-// Balance is now cached in balances.tokens[WETC_ADDRESS]
+// Balance is now cached in balances.tokens[WRAPPED_NATIVE_ADDRESS]
 ```
 
 ## Network Management
@@ -460,7 +460,7 @@ function CompleteExample() {
       {isConnected ? (
         <div>
           <p>Address: {address}</p>
-          <p>Balance: {balances.etc} MATIC</p>
+          <p>Balance: {balances.native} MATIC</p>
           {hasRole('MARKET_MAKER') ? (
             <p>You have Market Maker access!</p>
           ) : (
@@ -499,8 +499,8 @@ function CompleteExample() {
   
   // Balances
   balances: {
-    etc: string                       // Native  balance
-    wetc: string                      // WETC balance
+    native: string                    // Native token balance
+    wnative: string                   // Wrapped native balance
     tokens: Record<string, string>    // Token address -> balance
   }
   balancesLoading: boolean            // Loading balances?

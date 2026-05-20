@@ -123,7 +123,7 @@ Based on Gnosis Conditional Token Framework:
 **Challenge Period**:
 
 - 2-day community review
-- Anyone can challenge with 150  bond
+- Anyone can challenge with 150 MATIC bond
 - Escalate to UMA if disputed
 
 **Finalization**:
@@ -146,13 +146,13 @@ Based on Gnosis Conditional Token Framework:
 ### Complete Proposal Lifecycle
 
 1. **Submission** (Day 0)
-   - User submits proposal with 50  bond
+   - User submits proposal with 50 MATIC bond
    - Enters 7-day review period
    - Community discusses proposal
 
 2. **Market Creation** (Day 7)
    - Markets created with PASS/FAIL tokens
-   - Initial price: 0.50  each
+   - Initial price: 0.50 USDC each
    - Trading period begins (7-21 days)
 
 3. **Trading** (Days 7-28)
@@ -168,7 +168,7 @@ Based on Gnosis Conditional Token Framework:
 
 5. **Challenge** (Days 28-30)
    - Community can challenge report
-   - Challenger posts 150  bond
+   - Challenger posts 150 MATIC bond
    - Escalate to UMA if challenged
 
 6. **Execution** (Day 32)
