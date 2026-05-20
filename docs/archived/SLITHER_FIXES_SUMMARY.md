@@ -100,7 +100,7 @@ uint256 bondAmount = 0;
 #### 6. divide-before-multiply - FALSE POSITIVE
 **Issue:**
 ```solidity
-// ETCSwapV3Integration.sol lines 503-504
+// DexV3Integration.sol lines 503-504
 uint256 priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) / (1 << 96);
 estimatedCollateralAmount = (tokenAmount * priceX96) / (1 << 96);
 ```
@@ -175,7 +175,7 @@ All tests pass after fixes:
 - **ConditionalMarketFactory**: 50 passing
 - **RagequitModule**: 38 passing
 - **FutarchyGovernor**: 18 passing
-- **ETCSwapV3Integration**: 20 passing
+- **DexV3Integration**: 20 passing
 - **Total**: 520 passing tests
 
 ## Summary
@@ -201,7 +201,7 @@ All tests pass after fixes:
 
 ## Files Modified
 1. `contracts/ConditionalMarketFactory.sol` - Added SafeERC20, replaced unsafe transfers
-2. `contracts/ETCSwapV3Integration.sol` - Added documentation for Uniswap v3 math
+2. `contracts/DexV3Integration.sol` - Added documentation for Uniswap v3 math
 3. `contracts/OracleResolver.sol` - Already fixed (local variable initialization)
 4. `contracts/FutarchyGovernor.sol` - Already fixed (CEI pattern applied)
 5. `contracts/RagequitModule.sol` - Already fixed (SafeERC20 in use)

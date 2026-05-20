@@ -222,7 +222,7 @@ Approximately 5-10 minutes by skipping frontend and documentation.
 ### Changed Files
 ```
 test/OracleResolver.test.js
-test/integration/clearpath/end-to-end.test.js
+test/integration/fairwins/end-to-end.test.js
 ```
 
 ### Expected Behavior

@@ -2,7 +2,7 @@ const { ethers } = require('hardhat');
 
 async function main() {
   const FRIEND_FACTORY = '0x8cFE477e267bB36925047df8A6E30348f82b0085';
-  const USC = '0xDE093684c796204224BC081f937aa059D903c52a';
+  const USDC = '0xDE093684c796204224BC081f937aa059D903c52a';
   
   // Use a different account - let's use the deployer (index 0)
   // to test if the issue is specific to Tester1

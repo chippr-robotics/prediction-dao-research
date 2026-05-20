@@ -109,7 +109,7 @@ struct TokenInfo {
     string symbol;
     string metadataURI;  // IPFS CID
     uint256 createdAt;
-    bool listedOnETCSwap;
+    bool listedOnDex;
     bool isBurnable;
     bool isPausable;
 }
@@ -911,7 +911,7 @@ function MarketDisplay({ marketId }) {
     "decimals": 18,
     "created_at": "2024-09-01T00:00:00Z",
     "creator": "0xowner1234567890abcdef1234567890abcdef1234",
-    "listed_on_etcswap": true,
+    "listed_on_dex": true,
     "contract_verified": true,
     "tokenomics": {
       "initial_supply": 100000000,

@@ -2,7 +2,7 @@
  * Redeploy Perpetual Futures Contracts
  *
  * This script redeploys the PerpetualFuturesFactory and creates new markets
- * with the fixed decimal handling for non-18 decimal tokens (like USC with 6 decimals).
+ * with the fixed decimal handling for non-18 decimal tokens (like USDC with 6 decimals).
  *
  * Usage:
  *   npx hardhat run scripts/deploy/redeploy-perpetual-futures.js --network amoy
@@ -45,12 +45,12 @@ async function main() {
   console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   const networkName = hre.network.name;
-  const collateralToken = TOKENS[networkName]?.USC;
+  const collateralToken = TOKENS[networkName]?.USDC;
 
   if (!collateralToken) {
-    throw new Error(`No USC token configured for network: ${networkName}`);
+    throw new Error(`No USDC token configured for network: ${networkName}`);
   }
-  console.log("\nCollateral Token (USC):", collateralToken);
+  console.log("\nCollateral Token (USDC):", collateralToken);
 
   const deployments = {};
 
@@ -79,7 +79,7 @@ async function main() {
       deployer.address,           // _owner - explicit owner for CREATE2
       fundingRateEngine.address,  // _fundingRateEngine
       deployer.address,           // _feeRecipient (treasury)
-      collateralToken             // _defaultCollateralToken (USC)
+      collateralToken             // _defaultCollateralToken (USDC)
     ],
     generateSalt(PERP_SALT_PREFIX + "PerpetualFuturesFactory"),
     deployer
@@ -135,7 +135,7 @@ async function main() {
       initialMarkPrice: ethers.parseEther("4000"),
     },
     {
-      name: "Ethereum Classic Perpetual",
+      name: "Polygon Perpetual",
       underlyingAsset: "MATIC",
       category: 0,
       initialIndexPrice: ethers.parseEther("30"), // $30
@@ -235,8 +235,8 @@ async function main() {
     },
     markets: markets,
     tokens: {
-      USC: collateralToken,
-      WETC: TOKENS[networkName]?.WETC
+      USDC: collateralToken,
+      WMATIC: TOKENS[networkName]?.WMATIC
     }
   };
 

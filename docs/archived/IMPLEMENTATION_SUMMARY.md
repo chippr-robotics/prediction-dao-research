@@ -1,12 +1,12 @@
-# ETCSwap v3 Integration - Implementation Summary
+# Dex v3 Integration - Implementation Summary
 
 ## Overview
 
-Successfully implemented a comprehensive, production-ready integration with ETCSwap v3 for decentralized prediction market trading on Ethereum Classic.
+Successfully implemented a comprehensive, production-ready integration with Dex v3 for decentralized prediction market trading on Polygon.
 
 ## What Was Delivered
 
-### 1. Core Integration Contract (`ETCSwapV3Integration.sol`)
+### 1. Core Integration Contract (`DexV3Integration.sol`)
 
 A 600+ line production-ready contract providing:
 
@@ -30,7 +30,7 @@ Implemented all necessary Uniswap v3 interfaces:
 
 Enhanced to support dual-mode operation:
 
-- **ETCSwap Mode**: Full DEX trading with ERC20 collateral
+- **Dex Mode**: Full DEX trading with ERC20 collateral
   - Proper slippage protection using quotes
   - Try/catch pattern for graceful fallback
   - Automatic collateral token handling
@@ -41,7 +41,7 @@ Enhanced to support dual-mode operation:
 
 ### 4. Comprehensive Testing Infrastructure
 
-- **20 Unit Tests** for ETCSwapV3Integration (all passing)
+- **20 Unit Tests** for DexV3Integration (all passing)
   - Deployment and configuration
   - Pool management
   - Quote functions
@@ -50,7 +50,7 @@ Enhanced to support dual-mode operation:
   - Error handling
 
 - **Integration Tests** for end-to-end flow
-  - Market creation with ETCSwap pools
+  - Market creation with Dex pools
   - Trading lifecycle (buy/sell)
   - Fallback mode verification
 
@@ -69,7 +69,7 @@ All mocks include documentation about their limitations vs. production contracts
 
 ### 6. Comprehensive Documentation
 
-- **README-ETCSWAP.md**: 300+ lines covering:
+- **README-DEX.md**: 300+ lines covering:
   - Architecture overview
   - Deployment guide
   - Usage examples
@@ -137,7 +137,7 @@ All mocks include documentation about their limitations vs. production contracts
 - OpenZeppelin v5.4.0
 - Hardhat ^2.22.0
 - Ethers.js ^6.16.0
-- ETCSwap v3 / Uniswap v3 compatible
+- Dex v3 / Uniswap v3 compatible
 
 ## Deployment Readiness
 
@@ -157,16 +157,16 @@ All mocks include documentation about their limitations vs. production contracts
 
 ### Known Limitations
 
-1. **ERC20 Collateral Required**: ETCSwap mode requires ERC20 tokens (not native ETH)
+1. **ERC20 Collateral Required**: Dex mode requires ERC20 tokens (not native ETH)
 2. **Higher Gas Costs**: V3 swaps use ~150-300k gas vs ~100k for LMSR
 3. **Liquidity Dependency**: Pools need sufficient liquidity for efficient trading
 4. **Mock Simplifications**: Test mocks are simplified; production uses real V3 contracts
 
 ### Migration Path
 
-1. Deploy ETCSwapV3Integration contract
+1. Deploy DexV3Integration contract
 2. Configure ConditionalMarketFactory with integration address
-3. Create test market with ETCSwap pools
+3. Create test market with Dex pools
 4. Verify trading works correctly
 5. Gradually enable for production markets
 6. Monitor performance and liquidity
@@ -177,7 +177,7 @@ All mocks include documentation about their limitations vs. production contracts
 ### New Files (13)
 
 **Contracts:**
-- `contracts/ETCSwapV3Integration.sol`
+- `contracts/DexV3Integration.sol`
 - `contracts/interfaces/uniswap-v3/IUniswapV3Factory.sol`
 - `contracts/interfaces/uniswap-v3/IUniswapV3Pool.sol`
 - `contracts/interfaces/uniswap-v3/ISwapRouter.sol`
@@ -188,18 +188,18 @@ All mocks include documentation about their limitations vs. production contracts
 - `contracts/mocks/uniswap-v3/MockNonfungiblePositionManager.sol`
 
 **Tests:**
-- `test/ETCSwapV3Integration.test.js`
-- `test/integration/etcswap/etcswap-trading.test.js`
+- `test/DexV3Integration.test.js`
+- `test/integration/dex/dex-trading.test.js`
 
 **Documentation:**
-- `contracts/README-ETCSWAP.md`
+- `contracts/README-DEX.md`
 - `IMPLEMENTATION_SUMMARY.md` (this file)
 
 ### Modified Files (1)
 
 - `contracts/ConditionalMarketFactory.sol`
-  - Added ETCSwap integration support
-  - Implemented dual-mode operation (ETCSwap/LMSR)
+  - Added Dex integration support
+  - Implemented dual-mode operation (Dex/LMSR)
   - Added proper slippage protection
   - Enhanced event emissions
 
@@ -214,7 +214,7 @@ All mocks include documentation about their limitations vs. production contracts
 
 ## Conclusion
 
-This implementation delivers a **production-ready** ETCSwap v3 integration that:
+This implementation delivers a **production-ready** Dex v3 integration that:
 
 ✅ Provides complete DEX trading infrastructure  
 ✅ Maintains backward compatibility  
@@ -223,22 +223,22 @@ This implementation delivers a **production-ready** ETCSwap v3 integration that:
 ✅ Passes all security checks  
 ✅ Ready for testnet deployment
 
-The integration successfully addresses the TODO comments in the codebase and provides a robust foundation for decentralized prediction market trading on Ethereum Classic.
+The integration successfully addresses the TODO comments in the codebase and provides a robust foundation for decentralized prediction market trading on Polygon.
 
 ## Next Steps
 
-1. **Testnet Deployment**: Deploy to Mordor testnet for extended testing
+1. **Testnet Deployment**: Deploy to Amoy testnet for extended testing
 2. **Community Testing**: Gather feedback from test users
 3. **Professional Audit**: Engage security auditors for comprehensive review
-4. **Mainnet Deployment**: Deploy to Ethereum Classic mainnet
+4. **Mainnet Deployment**: Deploy to Polygon mainnet
 5. **Monitor & Iterate**: Track performance and make improvements
 
 ## References
 
-- [ETCSwap v3 SDK](https://github.com/etcswap/v3-sdk)
+- [Dex v3 SDK](https://github.com/dex/v3-sdk)
 - [Uniswap V3 Documentation](https://docs.uniswap.org/contracts/v3/overview)
-- [Integration Documentation](./contracts/README-ETCSWAP.md)
-- [Architecture Analysis](./docs/research/etcswap-v3-integration-analysis.md)
+- [Integration Documentation](./contracts/README-DEX.md)
+- [Architecture Analysis](./docs/research/dex-v3-integration-analysis.md)
 
 ---
 

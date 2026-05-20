@@ -172,9 +172,9 @@ function displayStats(templates) {
 /**
  * Calculate and display funding requirements
  */
-async function calculateRequirements(templates, uscDecimals, gasPrice) {
-  // Calculate total USC needed for liquidity
-  const totalUscLiquidity = calculateTotalLiquidity(templates, uscDecimals);
+async function calculateRequirements(templates, usdcDecimals, gasPrice) {
+  // Calculate total USDC needed for liquidity
+  const totalUscLiquidity = calculateTotalLiquidity(templates, usdcDecimals);
 
   // Calculate estimated gas costs
   const numMarkets = BigInt(templates.length);
@@ -184,11 +184,11 @@ async function calculateRequirements(templates, uscDecimals, gasPrice) {
 
   // Apply buffer and calculate MATIC gas cost
   const bufferedGas = (totalGasEstimate * BigInt(Math.floor(CONFIG.gasBufferMultiplier * 100))) / 100n;
-  const estimatedEtcCost = bufferedGas * gasPrice;
+  const estimatedMaticCost = bufferedGas * gasPrice;
 
   return {
-    uscRequired: totalUscLiquidity,
-    etcRequired: estimatedEtcCost,
+    usdcRequired: totalUscLiquidity,
+    maticRequired: estimatedMaticCost,
     gasEstimate: bufferedGas,
     numMarkets: templates.length,
   };
@@ -197,46 +197,46 @@ async function calculateRequirements(templates, uscDecimals, gasPrice) {
 /**
  * Display funding requirements summary
  */
-function displayRequirements(requirements, currentUsc, currentEtc, uscDecimals) {
+function displayRequirements(requirements, currentUsc, currentEtc, usdcDecimals) {
   console.log("\n" + "=".repeat(60));
   console.log("FUNDING REQUIREMENTS SUMMARY");
   console.log("=".repeat(60));
 
-  const uscRequired = parseFloat(ethers.formatUnits(requirements.uscRequired, uscDecimals));
-  const etcRequired = parseFloat(ethers.formatEther(requirements.etcRequired));
-  const currentUscFloat = parseFloat(ethers.formatUnits(currentUsc, uscDecimals));
-  const currentEtcFloat = parseFloat(ethers.formatEther(currentEtc));
+  const usdcRequired = parseFloat(ethers.formatUnits(requirements.usdcRequired, usdcDecimals));
+  const maticRequired = parseFloat(ethers.formatEther(requirements.maticRequired));
+  const currentUscFloat = parseFloat(ethers.formatUnits(currentUsc, usdcDecimals));
+  const currentMaticFloat = parseFloat(ethers.formatEther(currentEtc));
 
   console.log(`\nMarkets to create: ${requirements.numMarkets}`);
   console.log(`Estimated gas: ${requirements.gasEstimate.toLocaleString()} gas units`);
 
-  console.log("\n--- USC (Collateral) ---");
-  console.log(`  Required:  ${uscRequired.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC`);
-  console.log(`  Current:   ${currentUscFloat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC`);
-  const uscShortfall = uscRequired - currentUscFloat;
-  if (uscShortfall > 0) {
-    console.log(`  SHORTFALL: ${uscShortfall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC`);
+  console.log("\n--- USDC (Collateral) ---");
+  console.log(`  Required:  ${usdcRequired.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`);
+  console.log(`  Current:   ${currentUscFloat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`);
+  const usdcShortfall = usdcRequired - currentUscFloat;
+  if (usdcShortfall > 0) {
+    console.log(`  SHORTFALL: ${usdcShortfall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`);
   } else {
-    console.log(`  Surplus:   ${Math.abs(uscShortfall).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USC`);
+    console.log(`  Surplus:   ${Math.abs(usdcShortfall).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC`);
   }
 
   console.log("\n--- MATIC (Gas) ---");
-  console.log(`  Required:  ${etcRequired.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
-  console.log(`  Current:   ${currentEtcFloat.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
-  const etcShortfall = etcRequired - currentEtcFloat;
-  if (etcShortfall > 0) {
-    console.log(`  SHORTFALL: ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  console.log(`  Required:  ${maticRequired.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  console.log(`  Current:   ${currentMaticFloat.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+  const maticShortfall = maticRequired - currentMaticFloat;
+  if (maticShortfall > 0) {
+    console.log(`  SHORTFALL: ${maticShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   } else {
-    console.log(`  Surplus:   ${Math.abs(etcShortfall).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
+    console.log(`  Surplus:   ${Math.abs(maticShortfall).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} MATIC`);
   }
 
   console.log("\n--- TOTAL FUNDING NEEDED ---");
-  if (uscShortfall > 0 || etcShortfall > 0) {
-    if (uscShortfall > 0) {
-      console.log(`  Acquire ${uscShortfall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} more USC`);
+  if (usdcShortfall > 0 || maticShortfall > 0) {
+    if (usdcShortfall > 0) {
+      console.log(`  Acquire ${usdcShortfall.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} more USDC`);
     }
-    if (etcShortfall > 0) {
-      console.log(`  Acquire ${etcShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} more MATIC`);
+    if (maticShortfall > 0) {
+      console.log(`  Acquire ${maticShortfall.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} more MATIC`);
     }
   } else {
     console.log("  Account is sufficiently funded!");
@@ -245,10 +245,10 @@ function displayRequirements(requirements, currentUsc, currentEtc, uscDecimals) 
   console.log("=".repeat(60));
 
   return {
-    uscSufficient: uscShortfall <= 0,
-    etcSufficient: etcShortfall <= 0,
-    uscShortfall: Math.max(0, uscShortfall),
-    etcShortfall: Math.max(0, etcShortfall),
+    usdcSufficient: usdcShortfall <= 0,
+    maticSufficient: maticShortfall <= 0,
+    usdcShortfall: Math.max(0, usdcShortfall),
+    maticShortfall: Math.max(0, maticShortfall),
   };
 }
 
@@ -377,9 +377,9 @@ async function main() {
   console.log(`Owner: ${access.isOwner}, MARKET_MAKER_ROLE: ${access.hasMarketMakerRole}`);
 
   // Get current balances
-  const uscBalance = await usc.balanceOf(wallet.address);
-  const uscDecimals = await usc.decimals();
-  const etcBalance = await ethers.provider.getBalance(wallet.address);
+  const usdcBalance = await usc.balanceOf(wallet.address);
+  const usdcDecimals = await usc.decimals();
+  const maticBalance = await ethers.provider.getBalance(wallet.address);
 
   // Get current gas price
   const feeData = await ethers.provider.getFeeData();
@@ -387,11 +387,11 @@ async function main() {
 
   // Calculate and display funding requirements
   console.log("\n[3/8] Calculating funding requirements...");
-  const requirements = await calculateRequirements(templates, uscDecimals, gasPrice);
-  const fundingStatus = displayRequirements(requirements, uscBalance, etcBalance, uscDecimals);
+  const requirements = await calculateRequirements(templates, usdcDecimals, gasPrice);
+  const fundingStatus = displayRequirements(requirements, usdcBalance, maticBalance, usdcDecimals);
 
   // Check if we can proceed
-  if (!fundingStatus.uscSufficient || !fundingStatus.etcSufficient) {
+  if (!fundingStatus.usdcSufficient || !fundingStatus.maticSufficient) {
     console.error("\nInsufficient funds to create all markets!");
     if (!CONFIG.dryRun) {
       console.log("\nPlease fund the account and try again.");
@@ -401,7 +401,7 @@ async function main() {
     }
   }
 
-  const totalLiquidity = requirements.uscRequired;
+  const totalLiquidity = requirements.usdcRequired;
 
   // Upload metadata to IPFS
   console.log("\n[4/8] Uploading metadata to IPFS...");
@@ -419,19 +419,19 @@ async function main() {
     metadataUris = templates.map(() => null);
   }
 
-  // Approve USC spending
-  console.log("\n[5/8] Approving USC spending...");
+  // Approve USDC spending
+  console.log("\n[5/8] Approving USDC spending...");
   if (!CONFIG.dryRun) {
     const currentAllowance = await usc.allowance(wallet.address, CONTRACTS.conditionalMarketFactory);
     if (currentAllowance < totalLiquidity) {
       const approveTx = await usc.approve(CONTRACTS.conditionalMarketFactory, totalLiquidity);
       await approveTx.wait();
-      console.log(`Approved ${ethers.formatUnits(totalLiquidity, uscDecimals)} USC`);
+      console.log(`Approved ${ethers.formatUnits(totalLiquidity, usdcDecimals)} USDC`);
     } else {
       console.log("Already approved");
     }
   } else {
-    console.log("[DRY RUN] Would approve USC spending");
+    console.log("[DRY RUN] Would approve USDC spending");
   }
 
   // Create markets
@@ -452,11 +452,11 @@ async function main() {
     const minLiq = parseFloat(template.liquidity?.min || "100");
     const maxLiq = parseFloat(template.liquidity?.max || "200");
     const liquidity = minLiq + Math.random() * (maxLiq - minLiq);
-    const liquidityWei = ethers.parseUnits(liquidity.toFixed(2), uscDecimals);
-    const liquidityParam = ethers.parseUnits(CONFIG.liquidityParameter, uscDecimals);
+    const liquidityWei = ethers.parseUnits(liquidity.toFixed(2), usdcDecimals);
+    const liquidityParam = ethers.parseUnits(CONFIG.liquidityParameter, usdcDecimals);
 
     console.log(`\n[${i + 1}/${templates.length}] ${template.category}: ${template.question.slice(0, 50)}...`);
-    console.log(`  Liquidity: ${liquidity.toFixed(2)} USC, Trading: ${Math.floor(tradingPeriod / 86400)} days`);
+    console.log(`  Liquidity: ${liquidity.toFixed(2)} USDC, Trading: ${Math.floor(tradingPeriod / 86400)} days`);
 
     if (CONFIG.dryRun) {
       console.log("  [DRY RUN] Would create market");
@@ -569,7 +569,7 @@ async function main() {
     const finalUsc = await usc.balanceOf(wallet.address);
     const finalEtc = await ethers.provider.getBalance(wallet.address);
     console.log("\nFinal Balances:");
-    console.log(`  USC: ${ethers.formatUnits(finalUsc, uscDecimals)} USC`);
+    console.log(`  USDC: ${ethers.formatUnits(finalUsc, usdcDecimals)} USDC`);
     console.log(`  MATIC: ${ethers.formatEther(finalEtc)} MATIC`);
   }
 

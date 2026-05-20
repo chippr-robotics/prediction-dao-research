@@ -386,8 +386,6 @@ function AdminPanel() {
   // Available on-chain roles for dropdowns
   const onChainRoles = [
     { key: 'MARKET_MAKER_ROLE', name: 'Market Maker' },
-    { key: 'CLEARPATH_USER_ROLE', name: 'ClearPath User' },
-    { key: 'TOKENMINT_ROLE', name: 'Token Mint' },
     { key: 'FRIEND_MARKET_ROLE', name: 'Friend Markets' },
     { key: 'EMERGENCY_GUARDIAN_ROLE', name: 'Emergency Guardian' },
     { key: 'OPERATIONS_ADMIN_ROLE', name: 'Operations Admin' },
@@ -1030,7 +1028,7 @@ function AdminPanel() {
                   </div>
                   <div className="hierarchy-item level-3">
                     <span className="hierarchy-name">User Roles</span>
-                    <span className="hierarchy-desc">Market Maker, ClearPath, etc.</span>
+                    <span className="hierarchy-desc">Market Maker, Friend Markets</span>
                   </div>
                 </div>
               </div>

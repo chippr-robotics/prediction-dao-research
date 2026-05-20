@@ -53,7 +53,7 @@ proposalRegistry.submitProposal(
 **Execution Logic:**
 ```solidity
 if (fundingToken == address(0)) {
-    // Native token (ETH/ETC)
+    // Native token (ETH/MATIC)
     (bool success, ) = payable(recipient).call{value: fundingAmount}("");
     require(success, "Transfer failed");
 } else {
@@ -110,7 +110,7 @@ This ensures proposals are only executable within their specified time window.
 <div className="bond-notice">
   <strong>⚠️ Important:</strong>
   <ul>
-    <li>Submitting a proposal requires a bond of 50 ETC</li>
+    <li>Submitting a proposal requires a bond of 50 MATIC</li>
     <li>You must set an execution deadline to ensure time-bound execution</li>
     <li>Treasury must have approved tokens if using ERC20</li>
   </ul>
@@ -215,7 +215,7 @@ await token.connect(treasury).approve(
 await proposalRegistry.submitProposal(
     "Development Funding",
     "Fund Q1 development work",
-    ethers.parseEther("5000"), // 5000 ETC
+    ethers.parseEther("5000"), // 5000 MATIC
     developerAddress,
     0,
     ethers.ZeroAddress, // native token

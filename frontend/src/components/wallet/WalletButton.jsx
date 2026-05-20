@@ -3,7 +3,7 @@ import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { useDex } from '../../hooks/useDex'
-import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useChainTokens } from '../../hooks/useChainTokens'
@@ -104,8 +104,13 @@ function WalletButton({ className = '' }) {
   const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
-  const { balances, loading: balanceLoading } = useDex()
-  const { preferences, setDemoMode } = useUserPreferences()
+  const {
+    balances,
+    loading: balanceLoading,
+    addresses: chainAddresses,
+    tokens: chainTokens,
+  } = useDex()
+  const { isMainnet, isSwitching: isSwitchingNetwork, switchMode: switchNetworkMode } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
@@ -283,8 +288,8 @@ function WalletButton({ className = '' }) {
     setIsOpen(false)
   }
 
-  const handleToggleDemoMode = () => {
-    setDemoMode(!preferences.demoMode)
+  const handleToggleNetworkMode = () => {
+    switchNetworkMode('toggle')
   }
 
   const handleOpenPurchaseModal = (preselectedRole = null, action = 'purchase') => {
@@ -365,12 +370,13 @@ function WalletButton({ className = '' }) {
       // which uses ZeroAddress in the contract.
       const rawCollateralToken = data.data?.collateralToken
       const isNativeToken = rawCollateralToken === null || rawCollateralToken === undefined
-      const stakeTokenAddress = isNativeToken ? ethers.ZeroAddress : (rawCollateralToken || DEX_ADDRESSES.STABLECOIN)
+      const fallbackStable = chainAddresses?.STABLECOIN || DEX_ADDRESSES.STABLECOIN
+      const stakeTokenAddress = isNativeToken ? ethers.ZeroAddress : (rawCollateralToken || fallbackStable)
 
       // Stablecoins (USDC) have 6 decimals; the native token has 18.
       let tokenDecimals = 18
-      if (!isNativeToken && stakeTokenAddress.toLowerCase() === DEX_ADDRESSES.STABLECOIN.toLowerCase()) {
-        tokenDecimals = TOKENS.STABLE.decimals
+      if (!isNativeToken && fallbackStable && stakeTokenAddress.toLowerCase() === fallbackStable.toLowerCase()) {
+        tokenDecimals = chainTokens?.STABLE?.decimals ?? TOKENS.STABLE.decimals
       }
 
       console.log('Stake token config:', {
@@ -541,7 +547,7 @@ function WalletButton({ className = '' }) {
       // Check user balance for ERC20 tokens (creator needs to stake creatorStakeWei)
       if (!isNativeToken && stakeToken) {
         const balance = await stakeToken.balanceOf(userAddress)
-        const tokenSymbol = TOKENS.STABLE?.symbol || 'tokens'
+        const tokenSymbol = chainTokens?.STABLE?.symbol || TOKENS.STABLE?.symbol || 'tokens'
         const requiredAmount = ethers.formatUnits(creatorStakeWei, tokenDecimals)
         console.log('Token balance check:', {
           balance: balance.toString(),
@@ -1059,18 +1065,21 @@ function WalletButton({ className = '' }) {
                 </button>
               </div>
 
-              {/* Data Source Toggle */}
+              {/* Network Toggle */}
               <div className="dropdown-section">
                 <div className="toggle-row">
                   <span className="toggle-label">
-                    {preferences.demoMode ? '🎭 Demo Mode' : '🌐 Live Mode'}
+                    {isMainnet ? '🌐 Mainnet' : '🧪 Testnet'}
                   </span>
                   <button
-                    onClick={handleToggleDemoMode}
+                    onClick={handleToggleNetworkMode}
                     className="toggle-btn"
-                    aria-label={`Switch to ${preferences.demoMode ? 'Live' : 'Demo'} Mode`}
+                    aria-label={`Switch to ${isMainnet ? 'Testnet' : 'Mainnet'}`}
+                    disabled={isSwitchingNetwork}
                   >
-                    {preferences.demoMode ? 'Go Live' : 'Use Demo'}
+                    {isSwitchingNetwork
+                      ? 'Switching…'
+                      : isMainnet ? 'Use Testnet' : 'Use Mainnet'}
                   </button>
                 </div>
               </div>

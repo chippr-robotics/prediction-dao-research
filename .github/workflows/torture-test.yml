@@ -186,11 +186,11 @@ jobs:
             --contract DAOFactory --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on ETCSwapV3Integration
+      - name: Run Manticore on DexV3Integration
         run: |
-          echo "Running Manticore on ETCSwapV3Integration..."
-          timeout 600 python scripts/run-manticore.py contracts/ETCSwapV3Integration.sol \
-            --contract ETCSwapV3Integration --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on DexV3Integration..."
+          timeout 600 python scripts/run-manticore.py contracts/DexV3Integration.sol \
+            --contract DexV3Integration --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Run Manticore on FutarchyGovernor

@@ -9,7 +9,7 @@ const { ethers } = require('hardhat');
 
 // The ACTUAL MembershipPaymentManager used by PaymentProcessor
 const MEMBERSHIP_PAYMENT_MANAGER = '0x8b09cbC2275398C00D43854393e09D40334a1B81';
-const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+const USDC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
 // Role hashes
 const ROLE_HASHES = {
@@ -19,7 +19,7 @@ const ROLE_HASHES = {
   FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE")),
 };
 
-// Tier prices in USC (6 decimals)
+// Tier prices in USDC (6 decimals)
 const TIER_PRICES = {
   TOKENMINT: ethers.parseUnits("25", 6),      // Match TierRegistry Bronze price
   CLEARPATH_USER: ethers.parseUnits("25", 6), // Match TierRegistry Bronze price
@@ -70,25 +70,25 @@ async function main() {
     }
   }
 
-  // Check USC token
-  console.log("\n2. Checking USC payment token...");
+  // Check USDC token
+  console.log("\n2. Checking USDC payment token...");
   try {
-    const uscInfo = await paymentManager.paymentTokens(USC_ADDRESS);
-    console.log("   USC active:", uscInfo.isActive || uscInfo[1]);
-    if (!uscInfo.isActive && !uscInfo[1]) {
-      console.log("   Adding USC as payment token...");
-      const tx = await paymentManager.addPaymentToken(USC_ADDRESS, "USC", 6);
+    const usdcInfo = await paymentManager.paymentTokens(USDC_ADDRESS);
+    console.log("   USDC active:", usdcInfo.isActive || usdcInfo[1]);
+    if (!usdcInfo.isActive && !usdcInfo[1]) {
+      console.log("   Adding USDC as payment token...");
+      const tx = await paymentManager.addPaymentToken(USDC_ADDRESS, "USDC", 6);
       await tx.wait();
-      console.log("   ✅ USC added");
+      console.log("   ✅ USDC added");
     }
   } catch (e) {
-    console.log("   USC not found, adding...");
+    console.log("   USDC not found, adding...");
     try {
-      const tx = await paymentManager.addPaymentToken(USC_ADDRESS, "USC", 6);
+      const tx = await paymentManager.addPaymentToken(USDC_ADDRESS, "USDC", 6);
       await tx.wait();
-      console.log("   ✅ USC added");
+      console.log("   ✅ USDC added");
     } catch (addErr) {
-      console.log("   ❌ Could not add USC:", addErr.reason || addErr.message);
+      console.log("   ❌ Could not add USDC:", addErr.reason || addErr.message);
     }
   }
 
@@ -98,15 +98,15 @@ async function main() {
     const price = TIER_PRICES[roleName];
     console.log(`\n   ${roleName}:`);
     console.log(`   Role hash: ${roleHash}`);
-    console.log(`   Target price: ${ethers.formatUnits(price, 6)} USC`);
+    console.log(`   Target price: ${ethers.formatUnits(price, 6)} USDC`);
 
     try {
-      const currentPrice = await paymentManager.getRolePrice(roleHash, USC_ADDRESS);
-      console.log(`   Current price: ${ethers.formatUnits(currentPrice, 6)} USC`);
+      const currentPrice = await paymentManager.getRolePrice(roleHash, USDC_ADDRESS);
+      console.log(`   Current price: ${ethers.formatUnits(currentPrice, 6)} USDC`);
 
       if (currentPrice === 0n) {
         console.log(`   Setting price...`);
-        const tx = await paymentManager.setRolePrice(roleHash, USC_ADDRESS, price);
+        const tx = await paymentManager.setRolePrice(roleHash, USDC_ADDRESS, price);
         await tx.wait();
         console.log(`   ✅ Price set`);
       } else {
@@ -116,7 +116,7 @@ async function main() {
       console.log(`   Error reading: ${e.message}`);
       try {
         console.log(`   Attempting to set price...`);
-        const tx = await paymentManager.setRolePrice(roleHash, USC_ADDRESS, price);
+        const tx = await paymentManager.setRolePrice(roleHash, USDC_ADDRESS, price);
         await tx.wait();
         console.log(`   ✅ Price set`);
       } catch (setErr) {
@@ -129,8 +129,8 @@ async function main() {
   console.log("\n4. Verification...");
   for (const [roleName, roleHash] of Object.entries(ROLE_HASHES)) {
     try {
-      const price = await paymentManager.getRolePrice(roleHash, USC_ADDRESS);
-      console.log(`   ${roleName}: ${ethers.formatUnits(price, 6)} USC`);
+      const price = await paymentManager.getRolePrice(roleHash, USDC_ADDRESS);
+      console.log(`   ${roleName}: ${ethers.formatUnits(price, 6)} USDC`);
     } catch (e) {
       console.log(`   ${roleName}: Error - ${e.message}`);
     }

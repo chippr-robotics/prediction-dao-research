@@ -4,7 +4,6 @@ import { ThemeContext } from './ThemeContext'
 /**
  * ThemeProvider manages the application's theme state
  * - Supports light/dark mode
- * - Supports platform-specific themes (ClearPath, FairWins)
  * - Persists theme preference to localStorage
  * - Default is light mode
  */
@@ -15,27 +14,20 @@ export function ThemeProvider({ children }) {
     return savedMode || 'light'
   })
 
-  // Current platform (clearpath or fairwins)
-  const [platform, setPlatform] = useState(() => {
-    const savedPlatform = localStorage.getItem('themePlatform')
-    return savedPlatform || 'fairwins'
-  })
-
   // Apply theme to document root
   useEffect(() => {
     const root = document.documentElement
-    
+
     // Remove existing theme classes
     root.classList.remove('theme-light', 'theme-dark', 'platform-clearpath', 'platform-fairwins')
-    
+
     // Add current theme classes
     root.classList.add(`theme-${mode}`)
-    root.classList.add(`platform-${platform}`)
-    
+    root.classList.add('platform-fairwins')
+
     // Save to localStorage
     localStorage.setItem('themeMode', mode)
-    localStorage.setItem('themePlatform', platform)
-  }, [mode, platform])
+  }, [mode])
 
   const toggleMode = useCallback(() => {
     setMode(prev => prev === 'light' ? 'dark' : 'light')
@@ -47,22 +39,12 @@ export function ThemeProvider({ children }) {
     }
   }, [])
 
-  const setThemePlatform = useCallback((newPlatform) => {
-    if (newPlatform === 'clearpath' || newPlatform === 'fairwins') {
-      setPlatform(newPlatform)
-    }
-  }, [])
-
   const value = {
     mode,
-    platform,
     toggleMode,
     setThemeMode,
-    setThemePlatform,
     isDark: mode === 'dark',
     isLight: mode === 'light',
-    isClearPath: platform === 'clearpath',
-    isFairWins: platform === 'fairwins',
   }
 
   return (

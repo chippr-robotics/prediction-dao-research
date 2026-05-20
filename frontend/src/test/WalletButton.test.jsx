@@ -45,9 +45,22 @@ vi.mock('../hooks/useDex', () => ({
 
 vi.mock('../hooks/useUserPreferences', () => ({
   useUserPreferences: vi.fn(() => ({
-    preferences: { demoMode: false },
-    setDemoMode: vi.fn()
+    preferences: {}
   }))
+}))
+
+vi.mock('../hooks/useNetworkMode', () => ({
+  useNetworkMode: vi.fn(() => ({
+    mode: 'testnet',
+    isMainnet: false,
+    isTestnet: true,
+    isOtherChain: false,
+    network: { chainId: 80002, name: 'Polygon Amoy' },
+    chainId: 80002,
+    switchMode: vi.fn(),
+    isSwitching: false,
+    error: null,
+  })),
 }))
 
 // Mock modal components
@@ -171,8 +184,7 @@ describe('WalletButton Component - Wagers', () => {
       loading: false
     })
     useUserPreferences.mockReturnValue({
-      preferences: { demoMode: false },
-      setDemoMode: vi.fn()
+      preferences: {}
     })
   })
 
@@ -223,7 +235,7 @@ describe('WalletButton Component - Wagers', () => {
         // chains with no stablecoin defined render the "STABLE" fallback. The
         // the test setup uses an unrecognized chain (no stablecoin) so STABLE
         // is the expected value here — but match all symbols for safety.
-        expect(screen.getByText(/Get Access - \$50 (USC|USDC|STABLE) per Month/)).toBeInTheDocument()
+        expect(screen.getByText(/Get Access - \$50 (USDC|STABLE) per Month/)).toBeInTheDocument()
       })
     })
 

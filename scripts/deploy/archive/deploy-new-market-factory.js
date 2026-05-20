@@ -34,7 +34,7 @@ async function main() {
   }
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("Account balance:", ethers.formatEther(balance), "ETC");
+  console.log("Account balance:", ethers.formatEther(balance), "MATIC");
   console.log();
 
   // Step 1: Deploy new ConditionalMarketFactory

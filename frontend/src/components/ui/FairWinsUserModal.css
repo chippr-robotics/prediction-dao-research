@@ -3,7 +3,7 @@
  * 
  * Comprehensive styling for the user management modal
  * - Supports light/dark themes via CSS custom properties
- * - Supports platform-specific styling (FairWins/ClearPath)
+ * - FairWins styling
  * - Fully accessible with focus states and reduced motion support
  * - Responsive design for mobile/tablet/desktop
  */
@@ -247,7 +247,6 @@
    =========================== */
 
 .fwum-wallet-card,
-.fwum-clearpath-card,
 .fwum-datasource-card {
   padding: 1rem;
   background: var(--bg-primary, #f8fafc);
@@ -502,13 +501,6 @@
 }
 
 /* Special Sections */
-.fwum-clearpath-section {
-  background: linear-gradient(135deg, rgba(54, 179, 126, 0.05), rgba(102, 126, 234, 0.05));
-  padding: 1rem;
-  border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--brand-primary, #36B37E);
-}
-
 .fwum-admin-section {
   background: linear-gradient(135deg, rgba(237, 100, 166, 0.05), rgba(255, 77, 77, 0.05));
   padding: 1rem;
@@ -653,10 +645,6 @@
 
 .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.data {
   background: linear-gradient(135deg, #ed64a6, #d53f8c);
-}
-
-.fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track.clearpath {
-  background: linear-gradient(135deg, #4299e1, #3182ce);
 }
 
 .fwum-toggle-thumb {
@@ -1009,7 +997,6 @@
 }
 
 :root.theme-dark .fwum-wallet-card,
-:root.theme-dark .fwum-clearpath-card,
 :root.theme-dark .fwum-datasource-card,
 :root.theme-dark .fwum-role-card,
 :root.theme-dark .fwum-stat-card,
@@ -1059,74 +1046,6 @@
 
 :root.theme-dark .fwum-action-btn.secondary:hover {
   background: var(--bg-secondary, #1a202c);
-}
-
-/* ===========================
-   ClearPath Platform Theme
-   =========================== */
-
-:root.platform-clearpath .fwum-avatar {
-  border-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-tab.active {
-  color: var(--clearpath-primary, #4C9AFF);
-  border-bottom-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-action-btn {
-  background: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-action-btn:hover {
-  background: #3182ce;
-  box-shadow: 0 4px 12px rgba(76, 154, 255, 0.3);
-}
-
-:root.platform-clearpath .fwum-premium-btn {
-  background: linear-gradient(135deg, #4C9AFF, #667eea);
-}
-
-:root.platform-clearpath .fwum-role-badge {
-  color: var(--clearpath-primary, #4C9AFF);
-  background: rgba(76, 154, 255, 0.1);
-  border-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-stat-value {
-  color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-search-input:focus {
-  border-color: var(--clearpath-primary, #4C9AFF);
-  box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.15);
-}
-
-:root.platform-clearpath .fwum-search-btn,
-:root.platform-clearpath .fwum-launch-btn {
-  background: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-search-btn:hover,
-:root.platform-clearpath .fwum-launch-btn:hover {
-  background: #3182ce;
-  box-shadow: 0 6px 16px rgba(76, 154, 255, 0.4);
-}
-
-:root.platform-clearpath .fwum-toggle-btn[aria-pressed="true"] .fwum-toggle-track {
-  background: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-market-maker-badge {
-  color: var(--clearpath-primary, #4C9AFF);
-  background: rgba(76, 154, 255, 0.1);
-  border-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .fwum-setting-item:hover,
-:root.platform-clearpath .fwum-role-card:hover,
-:root.platform-clearpath .fwum-search-item:hover {
-  border-color: var(--clearpath-primary, #4C9AFF);
 }
 
 /* ===========================
@@ -1274,4 +1193,17 @@
   .fwum-launch-btn {
     display: none;
   }
+}
+
+/* Network status helper text */
+.fwum-mode-chain {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #5A6772);
+  font-weight: 500;
+}
+
+.fwum-error-text {
+  margin-top: 0.5rem;
+  color: var(--danger-color, #dc2626);
 }

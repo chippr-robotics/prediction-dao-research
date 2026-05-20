@@ -1,6 +1,6 @@
-# ClearPath & FairWins Frontend
+# FairWins Frontend
 
-A unified React application serving two distinct platforms: **ClearPath** (DAO Governance) and **FairWins** (Open Prediction Markets). Both applications share core infrastructure while providing specialized user experiences.
+A React application for FairWins — open prediction markets with private 1v1 and group wagers between friends as the core mechanic.
 
 ## 🔗 Unified Wallet Management
 
@@ -8,7 +8,7 @@ This application features a comprehensive, site-wide wallet management system th
 
 **Key Features:**
 - Single source of truth for wallet state across the entire app
-- Integrated RVAC (Role-Based Access Control) tied to wallet address
+- Integrated RBAC (Role-Based Access Control) tied to wallet address
 - Transaction helpers for signing and sending
 - Balance tracking and caching (native, wrapped-native, tokens)
 - Network validation and switching
@@ -21,37 +21,31 @@ import { useWallet, useWalletRoles } from './hooks'
 function MyComponent() {
   const { address, isConnected, balances, sendTransaction } = useWallet()
   const { hasRole, grantRole } = useWalletRoles()
-  
+
   // Use wallet functionality...
 }
 ```
 
 ## Architecture Overview
 
-This frontend implements a **dual-application architecture** with shared components and infrastructure:
-
 ```
 App.jsx (Root)
 ├── Wallet Connection & Network Detection
-├── Platform Routing
+├── Routing
 └── Shared Web3 Integration
-    ├── ClearPathApp (DAO Governance)
-    │   ├── Dashboard
-    │   ├── Proposal Management
-    │   ├── Welfare Metrics
-    │   └── DAO Launchpad
-    └── FairWinsApp (Prediction Markets)
-        ├── Market Trading
+    └── FairWins Dashboard
+        ├── Friend Markets (private 1v1 / group wagers)
+        ├── Public Market Trading
         ├── Market Creation
         └── Position Management
 ```
 
 ### Key Features
 
-- **ClearPath**: Institutional-grade DAO governance through futarchy-based decision-making
-- **FairWins**: Open prediction markets with flexible controls and resolution
-- **Shared Infrastructure**: Common Web3 integration, wallet management, and blockchain interaction
-- **Privacy-Preserving**: Built on secure, privacy-focused smart contracts
+- **Private Wagers**: 1v1, small group, and event-tracking markets settled between friends, with encrypted on-chain metadata
+- **Open Prediction Markets**: Public markets with flexible resolution and challenge periods
+- **Polymarket-Pegged Side Bets**: Settle by referenced lookup against Polymarket's Conditional Tokens Framework on Polygon Amoy
+- **Privacy-Preserving**: Encrypted envelope flow keyed to on-chain wallet public keys
 - **Responsive Design**: Mobile-first approach with accessibility compliance (WCAG 2.1 AA)
 
 ## Tech Stack
@@ -132,18 +126,12 @@ frontend/
 ├── public/                  # Static assets (logos, images)
 ├── src/
 │   ├── components/          # React components
-│   │   ├── ClearPathApp.jsx     # ClearPath main component
-│   │   ├── FairWinsApp.jsx      # FairWins main component
-│   │   ├── PlatformSelector.jsx # Platform selection screen
-│   │   ├── Dashboard.jsx        # ClearPath dashboard
-│   │   ├── ProposalDashboard.jsx
-│   │   ├── ProposalSubmission.jsx
-│   │   ├── ProposalList.jsx
-│   │   ├── WelfareMetrics.jsx
-│   │   ├── MetricsDashboard.jsx
-│   │   ├── MarketTrading.jsx
-│   │   ├── DAOLaunchpad.jsx
-│   │   ├── DAOList.jsx
+│   │   ├── fairwins/           # Active FairWins dashboard & private-wager flows
+│   │   ├── ui/                 # Reusable UI primitives
+│   │   ├── wallet/             # Wallet connection, role details
+│   │   ├── admin/              # Admin nullifier tab
+│   │   ├── AdminPanel.jsx
+│   │   ├── Header.jsx
 │   │   └── LandingPage.jsx
 │   ├── assets/              # Images, icons
 │   ├── App.jsx              # Root component with routing
@@ -160,19 +148,10 @@ frontend/
 
 ## Usage
 
-### Running Both Applications
-
 1. **Start the development server**: `npm run dev`
 2. **Navigate to** `http://localhost:5173`
-3. **Select your platform**:
-   - Click "Enter ClearPath" for DAO governance
-   - Click "Enter FairWins" for prediction markets
-4. **Connect your wallet** when prompted
-5. **Interact with the platform** of your choice
-
-### Switching Between Platforms
-
-Use the "Back" button in either application to return to the platform selector and switch between ClearPath and FairWins.
+3. **Connect your wallet** when prompted
+4. **Open the FairWins dashboard** and create or join a wager
 
 ## Development Guidelines
 
@@ -222,50 +201,9 @@ npm run test:e2e
 npm run cypress:open
 ```
 
-### Test Structure
-
-```
-src/test/
-├── setup.js                    # Test configuration and mocks
-├── Button.test.jsx             # Button component unit tests
-├── StatusIndicator.test.jsx    # Status indicator tests
-├── accessibility.test.jsx      # WCAG compliance tests
-└── web3-integration.test.js    # Web3 wallet integration tests
-
-cypress/
-├── e2e/                        # End-to-end test suites
-│   ├── 01-onboarding.cy.js     # User onboarding flow
-│   ├── 02-fairwins-trading.cy.js  # Market trading flow
-│   ├── 03-clearpath-governance.cy.js  # DAO governance flow
-│   ├── 04-positions-results.cy.js  # Portfolio management
-│   └── 05-integration.cy.js    # Full integration tests
-├── support/                    # Custom commands and utilities
-│   ├── commands.js             # Reusable Cypress commands
-│   └── e2e.js                  # Global configuration
-└── fixtures/                   # Test data
-```
-
-### Test Coverage
-
-Current test coverage:
-- **UI Components**: 30 unit tests for buttons, status indicators, forms
-- **Accessibility**: 24 tests for WCAG AA compliance with axe-core
-- **Web3 Integration**: 17 tests for wallet connection flows
-- **E2E Tests**: 82 tests covering major user flows and integrations
-- **Total**: 153+ tests ✅
-
 ### End-to-End Testing
 
-Comprehensive Cypress E2E tests validate complete user journeys:
-
-- **User Onboarding**: Landing page, platform selection, wallet connection (15 tests)
-- **Market Trading**: Browsing, filtering, trading interface (18 tests)
-- **DAO Governance**: Dashboard, proposals, voting (18 tests)
-- **Position Management**: Portfolio, balances, results (17 tests)
-- **Integration**: Full cross-platform user journeys (14 tests)
-
-See [CYPRESS_E2E_TESTING.md](./CYPRESS_E2E_TESTING.md) for detailed documentation.  
-See [E2E_TEST_OUTCOMES.md](./E2E_TEST_OUTCOMES.md) for test results and coverage.
+Cypress E2E suites cover the public trading flow, position management, market sorting, and nullifier management. See [CYPRESS_E2E_TESTING.md](./CYPRESS_E2E_TESTING.md) for documentation.
 
 ### Writing New Tests
 
@@ -308,14 +246,6 @@ npm test accessibility.test
 
 For comprehensive manual accessibility testing procedures, see:
 - [MANUAL_ACCESSIBILITY_TESTING.md](../MANUAL_ACCESSIBILITY_TESTING.md)
-
-Manual testing includes:
-- Keyboard navigation (Tab, Enter, Escape)
-- Screen reader testing (NVDA, JAWS, VoiceOver)
-- Color contrast verification
-- Color blindness simulation
-- Motion preferences testing
-- Mobile accessibility on iOS and Android
 
 ### CI/CD Testing
 

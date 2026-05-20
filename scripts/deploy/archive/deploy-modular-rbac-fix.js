@@ -18,7 +18,7 @@ const EXISTING = {
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
 };
 
-const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+const USDC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
 // Role hashes
 const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
@@ -169,20 +169,20 @@ async function main() {
   console.log("6. Configuring MembershipPaymentManager...");
   console.log("=".repeat(50));
 
-  // Add USC as payment token
-  console.log("   Adding USC as payment token...");
-  tx = await paymentManager.addPaymentToken(USC_ADDRESS, "USC", 6);
+  // Add USDC as payment token
+  console.log("   Adding USDC as payment token...");
+  tx = await paymentManager.addPaymentToken(USDC_ADDRESS, "USDC", 6);
   await tx.wait();
-  console.log("   ✅ USC added");
+  console.log("   ✅ USDC added");
 
   // Set role prices
-  console.log("   Setting MARKET_MAKER_ROLE price to 100 USC...");
-  tx = await paymentManager.setRolePrice(MARKET_MAKER_ROLE, USC_ADDRESS, ethers.parseUnits("100", 6));
+  console.log("   Setting MARKET_MAKER_ROLE price to 100 USDC...");
+  tx = await paymentManager.setRolePrice(MARKET_MAKER_ROLE, USDC_ADDRESS, ethers.parseUnits("100", 6));
   await tx.wait();
   console.log("   ✅ MARKET_MAKER_ROLE price set");
 
-  console.log("   Setting FRIEND_MARKET_ROLE price to 50 USC...");
-  tx = await paymentManager.setRolePrice(FRIEND_MARKET_ROLE, USC_ADDRESS, ethers.parseUnits("50", 6));
+  console.log("   Setting FRIEND_MARKET_ROLE price to 50 USDC...");
+  tx = await paymentManager.setRolePrice(FRIEND_MARKET_ROLE, USDC_ADDRESS, ethers.parseUnits("50", 6));
   await tx.wait();
   console.log("   ✅ FRIEND_MARKET_ROLE price set");
 
@@ -212,8 +212,8 @@ async function main() {
   const configuredMembershipManager = await paymentProcessor.membershipManager();
   const configuredPaymentManager = await paymentProcessor.paymentManager();
   const tier1Active = await tierRegistry.isTierActive(MARKET_MAKER_ROLE, MembershipTier.BRONZE);
-  const uscActive = await paymentManager.paymentTokens(USC_ADDRESS);
-  const mmPrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, USC_ADDRESS);
+  const usdcActive = await paymentManager.paymentTokens(USDC_ADDRESS);
+  const mmPrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, USDC_ADDRESS);
   const ppAuthorizedOnTierRegistry = await tierRegistry.authorizedExtensions(EXISTING.paymentProcessor);
   const ppAuthorizedOnMembershipManager = await membershipManager.authorizedExtensions(EXISTING.paymentProcessor);
 
@@ -221,8 +221,8 @@ async function main() {
   console.log("   PaymentProcessor.membershipManager:", configuredMembershipManager);
   console.log("   PaymentProcessor.paymentManager:", configuredPaymentManager);
   console.log("   TierRegistry MARKET_MAKER tier 1 active:", tier1Active);
-  console.log("   MembershipPaymentManager USC active:", uscActive.isActive);
-  console.log("   MembershipPaymentManager MARKET_MAKER price:", ethers.formatUnits(mmPrice, 6), "USC");
+  console.log("   MembershipPaymentManager USDC active:", usdcActive.isActive);
+  console.log("   MembershipPaymentManager MARKET_MAKER price:", ethers.formatUnits(mmPrice, 6), "USDC");
   console.log("   TierRegistry PaymentProcessor authorized:", ppAuthorizedOnTierRegistry);
   console.log("   MembershipManager PaymentProcessor authorized:", ppAuthorizedOnMembershipManager);
 
@@ -247,7 +247,7 @@ async function main() {
   console.log(`  membershipManager: '${membershipManagerAddress}',`);
   console.log(`  membershipPaymentManager: '${paymentManagerAddress}'`);
 
-  const allGood = tier1Active && uscActive.isActive && mmPrice > 0n && ppAuthorizedOnTierRegistry && ppAuthorizedOnMembershipManager;
+  const allGood = tier1Active && usdcActive.isActive && mmPrice > 0n && ppAuthorizedOnTierRegistry && ppAuthorizedOnMembershipManager;
   if (allGood) {
     console.log("\n✅ All configuration verified! Role purchases should now work.");
   } else {

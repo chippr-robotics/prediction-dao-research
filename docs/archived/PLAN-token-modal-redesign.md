@@ -69,7 +69,7 @@ Transform the single form into a guided 3-step wizard:
 - Token name, symbol, initial supply (ERC-20) / base URI (ERC-721)
 - Feature toggles (Burnable, Pausable, Mintable)
 - Metadata URI input with IPFS/URL validation
-- ETCSwap listing option with explanation
+- Dex listing option with explanation
 
 **Step 3: Review & Deploy**
 - Summary of all configuration
@@ -148,7 +148,7 @@ const useTokenCreation = () => {
 │  Supply: 1,000,000                                      │
 │  Features: Burnable, Pausable                           │
 │                                                          │
-│  Estimated Gas: 0.0035 ETC                              │
+│  Estimated Gas: 0.0035 MATIC                              │
 │                                                          │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -211,9 +211,9 @@ Replace emoji-based checkboxes with clean toggle cards:
 │ └─────────────────────────────────────────────────────┘ │
 │                                                         │
 │ ┌─────────────────────────────────────────────────────┐ │
-│ │  [Toggle]  List on ETCSwap               ERC-20 only│ │
+│ │  [Toggle]  List on Dex               ERC-20 only│ │
 │ │            Auto-create liquidity pool after deploy  │ │
-│ │            ⚠️ Requires additional ETC for liquidity │ │
+│ │            ⚠️ Requires additional MATIC for liquidity│ │
 │ └─────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -243,8 +243,8 @@ Replace emoji-based checkboxes with clean toggle cards:
 │  ┌───────────────────────────────────────────────────┐  │
 │  │  Deployment Cost                                   │  │
 │  ├───────────────────────────────────────────────────┤  │
-│  │  Estimated Gas    ~0.0035 ETC                     │  │
-│  │  Network          Ethereum Classic Mainnet         │  │
+│  │  Estimated Gas    ~0.0035 MATIC                     │  │
+│  │  Network          Polygon Mainnet         │  │
 │  │  Deployer         0x1234...abcd                   │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                          │
@@ -308,7 +308,7 @@ Replace emoji-based checkboxes with clean toggle cards:
 1. Add "Add to Wallet" functionality
 2. Transaction history integration
 3. IPFS metadata upload (future)
-4. ETCSwap auto-listing flow
+4. Dex auto-listing flow
 
 ---
 
@@ -370,7 +370,7 @@ Replace emoji-based checkboxes with clean toggle cards:
 - `ethers.js` - Contract interaction
 
 ### Optional Integrations
-- ETCSwap Router - For auto-listing
+- Dex Router - For auto-listing
 - IPFS gateway - For metadata upload
 
 ---
@@ -430,7 +430,7 @@ Replace emoji-based checkboxes with clean toggle cards:
 
 **Web3 Integration: MISSING**
 - No web3 hooks imported
-- Actions (`onMint`, `onBurn`, `onTransfer`, `onListOnETCSwap`) are callbacks to parent
+- Actions (`onMint`, `onBurn`, `onTransfer`, `onListOnDex`) are callbacks to parent
 - Parent page (`TokenMintPage`) doesn't implement actual transactions
 
 **Style: MIXED**

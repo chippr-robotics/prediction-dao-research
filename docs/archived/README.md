@@ -23,7 +23,7 @@ These files are preserved for reference but are no longer actively maintained.
 | PHASE2_IMPLEMENTATION_SUMMARY.md | Phase 2 privacy features |
 | PHASE2_PRIVACY_IMPLEMENTATION.md | Nightmarket/MACI privacy implementation |
 | PHASE3_ORACLE_INTEGRATION_TESTS.md | Phase 3 oracle integration tests |
-| IMPLEMENTATION_SUMMARY.md | ETCSwap v3 DEX integration |
+| IMPLEMENTATION_SUMMARY.md | Dex v3 DEX integration |
 
 ## Completed Fix Logs
 

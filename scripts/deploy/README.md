@@ -113,7 +113,7 @@ Each script saves a JSON file to `deployments/`:
 
 Contains centralized configuration:
 - `SINGLETON_FACTORY_ADDRESS` - Safe Singleton Factory
-- `TOKENS` - Token addresses per network (USC, WETC)
+- `TOKENS` - Token addresses per network (USDC, WMATIC)
 - `ROLE_HASHES` - Pre-computed role hashes
 - `MembershipTier` - Tier enum values
 - `FRIEND_MARKET_TIERS` / `MARKET_MAKER_TIERS` - Tier configurations

@@ -1,13 +1,13 @@
 const { ethers } = require("hardhat");
 
 /**
- * Debug USC implementation contract
+ * Debug USDC implementation contract
  */
 
 async function main() {
   const factoryAddress = "0xD9A26537947d99c6961C1013490f0B80d1DFE283";
-  const uscProxyAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
-  const uscImplAddress = "0xe856714d339ac62cb71242d25e30867a6358778a";
+  const usdcProxyAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usdcImplAddress = "0xe856714d339ac62cb71242d25e30867a6358778a";
   const tester1 = "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E";
   const stakeAmount = ethers.parseUnits("10", 6);
 
@@ -15,11 +15,11 @@ async function main() {
   const provider = deployer.provider;
 
   console.log("=".repeat(60));
-  console.log("Debug USC Implementation");
+  console.log("Debug USDC Implementation");
   console.log("=".repeat(60));
 
   // Get implementation bytecode size
-  const implCode = await provider.getCode(uscImplAddress);
+  const implCode = await provider.getCode(usdcImplAddress);
   console.log("Implementation code size:", implCode.length, "bytes");
 
   // Try to interact with the implementation
@@ -37,13 +37,13 @@ async function main() {
     "function isBlacklisted(address) view returns (bool)"
   ];
 
-  const uscProxy = new ethers.Contract(uscProxyAddress, erc20ABI, provider);
+  const usdcProxy = new ethers.Contract(usdcProxyAddress, erc20ABI, provider);
 
   console.log("\n--- Check for special restrictions ---");
 
   // Check if there's a pause mechanism
   try {
-    const paused = await uscProxy.paused();
+    const paused = await usdcProxy.paused();
     console.log("Contract paused:", paused);
   } catch (e) {
     console.log("No paused() function or error:", e.message);
@@ -51,21 +51,21 @@ async function main() {
 
   // Check if there's a blacklist
   try {
-    const isBlacklisted1 = await uscProxy.blacklist(tester1);
+    const isBlacklisted1 = await usdcProxy.blacklist(tester1);
     console.log("Tester1 blacklisted (blacklist):", isBlacklisted1);
   } catch (e) {
     console.log("No blacklist() function");
   }
 
   try {
-    const isBlacklisted2 = await uscProxy.blacklisted(tester1);
+    const isBlacklisted2 = await usdcProxy.blacklisted(tester1);
     console.log("Tester1 blacklisted (blacklisted):", isBlacklisted2);
   } catch (e) {
     console.log("No blacklisted() function");
   }
 
   try {
-    const isBlacklisted3 = await uscProxy.isBlacklisted(tester1);
+    const isBlacklisted3 = await usdcProxy.isBlacklisted(tester1);
     console.log("Tester1 blacklisted (isBlacklisted):", isBlacklisted3);
   } catch (e) {
     console.log("No isBlacklisted() function");
@@ -73,7 +73,7 @@ async function main() {
 
   // Check if factory is blacklisted
   try {
-    const factoryBlacklisted = await uscProxy.blacklist(factoryAddress);
+    const factoryBlacklisted = await usdcProxy.blacklist(factoryAddress);
     console.log("Factory blacklisted:", factoryBlacklisted);
   } catch (e) {
     // Already checked no blacklist function
@@ -81,8 +81,8 @@ async function main() {
 
   // Check owner
   try {
-    const owner = await uscProxy.owner();
-    console.log("USC owner:", owner);
+    const owner = await usdcProxy.owner();
+    console.log("USDC owner:", owner);
   } catch (e) {
     console.log("No owner() function or error:", e.message);
   }
@@ -95,7 +95,7 @@ async function main() {
   console.log("Calling transferFrom via eth_call (from factory perspective)...");
   try {
     const result = await provider.call({
-      to: uscProxyAddress,
+      to: usdcProxyAddress,
       from: factoryAddress,
       data: calldata
     });
@@ -155,11 +155,11 @@ async function main() {
   console.log("   Is invited (either):", isInvited || isArbitrator);
 
   console.log("\n6. Check stake requirements");
-  const balance = await uscProxy.balanceOf(tester1);
-  const allowance = await uscProxy.allowance(tester1, factoryAddress);
-  console.log("   Balance:", ethers.formatUnits(balance, 6), "USC");
-  console.log("   Allowance:", ethers.formatUnits(allowance, 6), "USC");
-  console.log("   Required:", ethers.formatUnits(market.stakePerParticipant, 6), "USC");
+  const balance = await usdcProxy.balanceOf(tester1);
+  const allowance = await usdcProxy.allowance(tester1, factoryAddress);
+  console.log("   Balance:", ethers.formatUnits(balance, 6), "USDC");
+  console.log("   Allowance:", ethers.formatUnits(allowance, 6), "USDC");
+  console.log("   Required:", ethers.formatUnits(market.stakePerParticipant, 6), "USDC");
   console.log("   Balance sufficient:", balance >= market.stakePerParticipant);
   console.log("   Allowance sufficient:", allowance >= market.stakePerParticipant);
 

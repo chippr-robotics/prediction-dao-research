@@ -14,7 +14,7 @@ A comprehensive key lifecycle management system with:
 - **Key Expiration**: Automatic (365 days) and manual expiration
 - **Status Tracking**: NONE → ACTIVE → ROTATED/REVOKED/EXPIRED
 - **Delegate Pattern**: Allows RoleManager to act on behalf of users
-- **Ethereum Classic Compatible**: Uses nonce instead of prevrandao
+- **Polygon Compatible**: Uses nonce instead of prevrandao
 
 ### 2. ZKVerifier Contract (`contracts/ZKVerifier.sol`)
 Production-grade Groth16 zkSNARK verification with:
@@ -80,13 +80,13 @@ Production-grade Groth16 zkSNARK verification with:
 2. **Expiration**: Forces periodic updates (365 days)
 3. **Revocation**: Immediate invalidation capability
 4. **Audit Trail**: Complete key history maintained
-5. **Nonce-Based Hashing**: Ethereum Classic compatible, unpredictable hashes
+5. **Nonce-Based Hashing**: Polygon compatible, unpredictable hashes
 6. **Access Control**: Multi-level permissions (admin, delegate, user)
 
-### Ethereum Classic Compatibility
+### Polygon Compatibility
 - Uses incrementing nonce instead of prevrandao
 - No dependency on post-merge Ethereum features
-- Works on both Ethereum and Ethereum Classic
+- Works on both Ethereum and Polygon
 
 ### Backward Compatibility
 - RoleManager works without ZKKeyManager (local storage)
@@ -168,7 +168,7 @@ await zkKeyManager.updateConfiguration(
 ### Security Reviews
 - ✅ Code review completed - addressed all feedback
 - ✅ Enhanced G2 curve validation documentation
-- ✅ Replaced prevrandao with nonce for ETC compatibility
+- ✅ Replaced prevrandao with nonce for Polygon compatibility
 - ✅ CodeQL security scan - 0 vulnerabilities found
 
 ### Gas Optimization
@@ -211,7 +211,7 @@ function verifyPositionProof(uint256 positionId) external view returns (bool) {
 ## Next Steps
 
 ### Immediate
-1. Deploy to testnet (Mordor for ETC)
+1. Deploy to testnet (Polygon Amoy)
 2. Perform trusted setup ceremony for ZKVerifier
 3. Monitor gas costs and optimize if needed
 4. Gather user feedback
@@ -243,7 +243,7 @@ function verifyPositionProof(uint256 positionId) external view returns (bool) {
 ✅ All 109 tests passing
 ✅ Zero security vulnerabilities detected
 ✅ Backward compatible (no breaking changes)
-✅ Ethereum Classic compatible
+✅ Polygon compatible
 ✅ Complete documentation
 ✅ Production-ready implementation
 
@@ -254,7 +254,7 @@ Successfully delivered a production-ready zero-knowledge key verification system
 - Manages complete key lifecycle (registration, rotation, revocation, expiration)
 - Provides enterprise-grade security features
 - Maintains backward compatibility
-- Works on both Ethereum and Ethereum Classic
+- Works on both Ethereum and Polygon
 - Has comprehensive test coverage (109 tests)
 - Is fully documented and ready for deployment
 

@@ -218,9 +218,9 @@ module.exports = {
       chainId: 11155111,
       accounts: floppyKeys,
     },
-    mordor: {
-      url: "https://rpc.mordor.etccooperative.org",
-      chainId: 63,
+    amoy: {
+      url: "https://rpc-amoy.polygon.technology",
+      chainId: 80002,
       accounts: floppyKeys,
     },
 

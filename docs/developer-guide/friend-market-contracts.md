@@ -346,7 +346,7 @@ Stores tier assignments independently from role grants. Used as the source of tr
 
 ### MembershipPaymentManager (`0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7`)
 
-Coordinates payment processing for role purchases. Integrates with the PaymentProcessor to handle ERC-20 token payments (primarily USC stablecoin).
+Coordinates payment processing for role purchases. Integrates with the PaymentProcessor to handle ERC-20 token payments (primarily USDC stablecoin).
 
 ### Role Sync
 

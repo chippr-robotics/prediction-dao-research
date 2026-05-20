@@ -46,11 +46,11 @@ async function main() {
   const currentTier = await tierRegistry.getUserTier(buyerAddress, MARKET_MAKER_ROLE);
   console.log("  Current tier:", currentTier.toString());
 
-  console.log("\n--- Step 4: Check USC balance and allowance ---");
-  const uscBalance = await usc.balanceOf(buyerAddress);
-  const uscAllowance = await usc.allowance(buyerAddress, CONTRACTS.paymentProcessor);
-  console.log("  USC balance:", ethers.formatUnits(uscBalance, 6));
-  console.log("  USC allowance for PP:", ethers.formatUnits(uscAllowance, 6));
+  console.log("\n--- Step 4: Check USDC balance and allowance ---");
+  const usdcBalance = await usc.balanceOf(buyerAddress);
+  const usdcAllowance = await usc.allowance(buyerAddress, CONTRACTS.paymentProcessor);
+  console.log("  USDC balance:", ethers.formatUnits(usdcBalance, 6));
+  console.log("  USDC allowance for PP:", ethers.formatUnits(usdcAllowance, 6));
 
   console.log("\n--- Step 5: Check PaymentProcessor authorization on TierRegistry ---");
   const ppAuthorized = await tierRegistry.authorizedExtensions(CONTRACTS.paymentProcessor);
@@ -61,11 +61,11 @@ async function main() {
   const paymentManagerAddr = await paymentProcessor.paymentManager();
   const paymentManager = await ethers.getContractAt("MembershipPaymentManager", paymentManagerAddr);
 
-  const uscTokenInfo = await paymentManager.paymentTokens(CONTRACTS.usc);
-  console.log("  USC token active:", uscTokenInfo.isActive);
+  const usdcTokenInfo = await paymentManager.paymentTokens(CONTRACTS.usc);
+  console.log("  USDC token active:", usdcTokenInfo.isActive);
 
   const mmRolePrice = await paymentManager.getRolePrice(MARKET_MAKER_ROLE, CONTRACTS.usc);
-  console.log("  MARKET_MAKER price:", ethers.formatUnits(mmRolePrice, 6), "USC");
+  console.log("  MARKET_MAKER price:", ethers.formatUnits(mmRolePrice, 6), "USDC");
 
   // Test calling setUserTier directly from PaymentProcessor's perspective
   console.log("\n--- Step 7: Simulate TierRegistry.setUserTier from PaymentProcessor ---");

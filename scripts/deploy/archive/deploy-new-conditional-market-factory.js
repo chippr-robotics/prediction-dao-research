@@ -117,7 +117,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   // Deploy new ConditionalMarketFactory
   const saltPrefix = "FairWinsDAO-v1.0-";
@@ -255,7 +255,7 @@ async function main() {
 
   const deploymentsDir = path.join(process.cwd(), "deployments");
   if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true });
-  const outPath = path.join(deploymentsDir, "mordor-new-conditional-market-factory.json");
+  const outPath = path.join(deploymentsDir, "amoy-new-conditional-market-factory.json");
   fs.writeFileSync(outPath, JSON.stringify(deploymentInfo, null, 2));
   console.log("\nDeployment info saved to:", outPath);
 }

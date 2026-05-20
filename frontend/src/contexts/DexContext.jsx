@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
+import { useChainId } from 'wagmi'
 import { useWallet } from '../hooks/useWalletManagement'
-import { DEX_ADDRESSES, TOKENS, FEE_TIERS, DEFAULT_SLIPPAGE, isDexAvailable } from '../constants/dex'
+import { FEE_TIERS, DEFAULT_SLIPPAGE } from '../constants/dex'
+import { getNetwork, getCurrentChainId } from '../config/networks'
 import { ERC20_ABI } from '../abis/ERC20'
 import { WNATIVE_ABI } from '../abis/WNative'
 import { SWAP_ROUTER_02_ABI } from '../abis/SwapRouter02'
@@ -9,14 +11,67 @@ import { QUOTER_V2_ABI } from '../abis/QuoterV2'
 import { DexContext } from './DexContext'
 import logger from '../utils/logger'
 
+const ZERO = '0x0000000000000000000000000000000000000000'
+
 /**
- * Provider for the active chain's V3 DEX (Uniswap-style). On chains where no
- * DEX is deployed (Polygon Amoy today) the provider stays inert — balances
- * stay at zero and actions throw — and callers should branch on
- * `isDexAvailable` from `constants/dex` before exposing swap UI.
+ * Per-chain DEX wiring. Reads the active chain at runtime so the Testnet/
+ * Mainnet toggle (wagmi.switchChain) transparently re-targets the right
+ * Uniswap V3 deployment. Components that surface swap UI should branch on
+ * `isDexAvailable` from the returned context.
  */
 export function DexProvider({ children }) {
   const { provider, signer, address, isConnected } = useWallet()
+  const wagmiChainId = useChainId()
+  const chainId = wagmiChainId || getCurrentChainId()
+  const network = getNetwork(chainId)
+
+  const dexConfig = network?.dex || null
+  const stableConfig = network?.stablecoin || null
+  const nativeConfig = network?.nativeCurrency || null
+
+  const isDexAvailable = Boolean(dexConfig)
+
+  const addresses = useMemo(() => ({
+    FACTORY: dexConfig?.factory || ZERO,
+    SWAP_ROUTER_02: dexConfig?.swapRouter || ZERO,
+    NONFUNGIBLE_TOKEN_POSITION_MANAGER: dexConfig?.positionManager || ZERO,
+    QUOTER_V2: dexConfig?.quoter || ZERO,
+    PERMIT2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
+    WNATIVE: dexConfig?.wnative || ZERO,
+    STABLECOIN: stableConfig?.address || ZERO,
+  }), [dexConfig, stableConfig])
+
+  const tokens = useMemo(() => ({
+    WNATIVE: {
+      address: addresses.WNATIVE,
+      symbol: nativeConfig?.symbol ? `W${nativeConfig.symbol}` : 'WNATIVE',
+      name: nativeConfig?.name ? `Wrapped ${nativeConfig.name}` : 'Wrapped Native',
+      decimals: 18,
+      icon: '🌐',
+    },
+    STABLE: stableConfig
+      ? {
+          address: stableConfig.address || ZERO,
+          symbol: stableConfig.symbol,
+          name: stableConfig.name,
+          decimals: stableConfig.decimals,
+          icon: '💵',
+        }
+      : {
+          address: ZERO,
+          symbol: 'STABLE',
+          name: 'Stablecoin',
+          decimals: 6,
+          icon: '💵',
+        },
+    NATIVE: {
+      address: 'native',
+      symbol: nativeConfig?.symbol || 'MATIC',
+      name: nativeConfig?.name || 'MATIC',
+      decimals: nativeConfig?.decimals || 18,
+      icon: '💎',
+    },
+  }), [addresses, stableConfig, nativeConfig])
 
   const [balances, setBalances] = useState({
     native: '0',
@@ -33,12 +88,12 @@ export function DexProvider({ children }) {
     if (!provider || !isDexAvailable) return null
 
     return {
-      wnative: new ethers.Contract(DEX_ADDRESSES.WNATIVE, WNATIVE_ABI, provider),
-      stable: new ethers.Contract(DEX_ADDRESSES.STABLECOIN, ERC20_ABI, provider),
-      swapRouter: new ethers.Contract(DEX_ADDRESSES.SWAP_ROUTER_02, SWAP_ROUTER_02_ABI, provider),
-      quoter: new ethers.Contract(DEX_ADDRESSES.QUOTER_V2, QUOTER_V2_ABI, provider),
+      wnative: new ethers.Contract(addresses.WNATIVE, WNATIVE_ABI, provider),
+      stable: new ethers.Contract(addresses.STABLECOIN, ERC20_ABI, provider),
+      swapRouter: new ethers.Contract(addresses.SWAP_ROUTER_02, SWAP_ROUTER_02_ABI, provider),
+      quoter: new ethers.Contract(addresses.QUOTER_V2, QUOTER_V2_ABI, provider),
     }
-  }, [provider])
+  }, [provider, isDexAvailable, addresses])
 
   const fetchBalances = useCallback(async () => {
     if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
@@ -57,7 +112,7 @@ export function DexProvider({ children }) {
       const newBalances = {
         native: ethers.formatEther(nativeBalance),
         wnative: ethers.formatEther(wnativeBalance),
-        stable: ethers.formatUnits(stableBalance, 6),
+        stable: ethers.formatUnits(stableBalance, tokens.STABLE.decimals),
       }
 
       setBalances(newBalances)
@@ -74,7 +129,13 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [provider, address, contracts])
+  }, [provider, address, contracts, tokens.STABLE.decimals])
+
+  // Reset balances when chain changes so the user doesn't see stale numbers.
+  useEffect(() => {
+    setBalances({ native: '0', wnative: '0', stable: '0' })
+    setBalanceHistory([])
+  }, [chainId])
 
   useEffect(() => {
     if (isConnected) {
@@ -130,34 +191,45 @@ export function DexProvider({ children }) {
     }
   }, [signer, contracts, fetchBalances])
 
-  const getQuote = useCallback(async (tokenIn, tokenOut, amountIn) => {
+  // Decimals lookup for a token by address used in quote/swap calls below.
+  // Defaults to 18 (native/wrapped) when the token isn't in our known set.
+  const decimalsOf = useCallback((tokenAddress) => {
+    const lower = tokenAddress?.toLowerCase?.()
+    if (lower === addresses.STABLECOIN.toLowerCase()) return tokens.STABLE.decimals
+    if (lower === addresses.WNATIVE.toLowerCase()) return 18
+    return 18
+  }, [addresses, tokens.STABLE.decimals])
+
+  const getQuote = useCallback(async (tokenIn, tokenOut, amountIn, feeTier = FEE_TIERS.MEDIUM) => {
     if (!contracts) {
-      throw new Error('DEX contracts not initialized on this chain')
+      throw new Error('DEX is not available on the current network')
     }
 
     try {
       setQuotingPrice(true)
-      const amountInWei = ethers.parseEther(amountIn)
+      const decIn = decimalsOf(tokenIn)
+      const decOut = decimalsOf(tokenOut)
+      const amountInWei = ethers.parseUnits(amountIn, decIn)
 
       const params = {
         tokenIn,
         tokenOut,
         amountIn: amountInWei,
-        fee: FEE_TIERS.MEDIUM,
+        fee: feeTier,
         sqrtPriceLimitX96: 0,
       }
 
       const result = await contracts.quoter.quoteExactInputSingle.staticCall(params)
-      return ethers.formatEther(result[0])
+      return ethers.formatUnits(result[0], decOut)
     } catch (error) {
       console.error('Error getting quote:', error)
       throw error
     } finally {
       setQuotingPrice(false)
     }
-  }, [contracts])
+  }, [contracts, decimalsOf])
 
-  const swap = useCallback(async (tokenIn, tokenOut, amountIn) => {
+  const swap = useCallback(async (tokenIn, tokenOut, amountIn, feeTier = FEE_TIERS.MEDIUM) => {
     if (!signer || !contracts || !address) {
       throw new Error('Wallet not connected')
     }
@@ -165,18 +237,20 @@ export function DexProvider({ children }) {
     try {
       setLoading(true)
 
-      const amountOut = await getQuote(tokenIn, tokenOut, amountIn)
-      const minAmountOut = (parseFloat(amountOut) * (10000 - slippage) / 10000).toString()
+      const decIn = decimalsOf(tokenIn)
+      const decOut = decimalsOf(tokenOut)
+      const amountOut = await getQuote(tokenIn, tokenOut, amountIn, feeTier)
+      const minAmountOut = (parseFloat(amountOut) * (10000 - slippage) / 10000).toFixed(decOut)
 
-      const amountInWei = ethers.parseEther(amountIn)
-      const minAmountOutWei = ethers.parseEther(minAmountOut)
+      const amountInWei = ethers.parseUnits(amountIn, decIn)
+      const minAmountOutWei = ethers.parseUnits(minAmountOut, decOut)
 
       const tokenInContract = new ethers.Contract(tokenIn, ERC20_ABI, signer)
-      const allowance = await tokenInContract.allowance(address, DEX_ADDRESSES.SWAP_ROUTER_02)
+      const allowance = await tokenInContract.allowance(address, addresses.SWAP_ROUTER_02)
 
       if (allowance < amountInWei) {
         const approveTx = await tokenInContract.approve(
-          DEX_ADDRESSES.SWAP_ROUTER_02,
+          addresses.SWAP_ROUTER_02,
           ethers.MaxUint256
         )
         await approveTx.wait()
@@ -186,7 +260,7 @@ export function DexProvider({ children }) {
       const params = {
         tokenIn,
         tokenOut,
-        fee: FEE_TIERS.MEDIUM,
+        fee: feeTier,
         recipient: address,
         amountIn: amountInWei,
         amountOutMinimum: minAmountOutWei,
@@ -204,7 +278,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [signer, contracts, address, slippage, getQuote, fetchBalances])
+  }, [signer, contracts, address, slippage, getQuote, fetchBalances, decimalsOf, addresses])
 
   const value = {
     balances,
@@ -220,9 +294,11 @@ export function DexProvider({ children }) {
     swap,
     setSlippage,
 
-    tokens: TOKENS,
-    addresses: DEX_ADDRESSES,
+    tokens,
+    addresses,
     isDexAvailable,
+    chainId,
+    network,
   }
 
   return (

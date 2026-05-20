@@ -222,8 +222,8 @@ async function main() {
   console.log("\n\n--- Configuring Role Prices ---");
 
   const networkName = hre.network.name;
-  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
-  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USC";
+  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USDC;
+  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USDC";
   const stableDecimals = STABLECOIN_DECIMALS[networkName] ?? 6;
 
   if (contracts.membershipPaymentManager && stableAddress) {

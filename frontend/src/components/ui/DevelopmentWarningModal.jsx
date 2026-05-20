@@ -46,34 +46,6 @@ function DevelopmentWarningModal() {
                 about any topic. Open to everyone, with transparent market-driven outcomes. For information contact: Howdy@FairWins.App
               </p>
               
-              <div className="platform-addons">
-                <h3 className="addons-title">Platform Add-ons:</h3>
-                <ul className="addons-list">
-                  <li>
-                    <img 
-                      src="/assets/clearpath_no-text_logo.svg" 
-                      alt="ClearPath" 
-                      className="addon-logo"
-                      onError={(e) => { e.target.style.display = 'none' }}
-                    />
-                    <div className="addon-content">
-                      <strong>ClearPath</strong> - DAO governance platform with futarchy-based decision-making
-                    </div>
-                  </li>
-                  <li>
-                    <img 
-                      src="/assets/tokenmint_no-text_logo.svg" 
-                      alt="TokenMint" 
-                      className="addon-logo"
-                      onError={(e) => { e.target.style.display = 'none' }}
-                    />
-                    <div className="addon-content">
-                      <strong>TokenMint</strong> - Token creation and management tools
-                    </div>
-                  </li>
-                </ul>
-              </div>
-              
               <div className="dev-warning-notice">
                 <p className="dev-warning-modal-message">
                   ⚠️ <strong>Development Notice:</strong> This site is under active development. 

@@ -1,7 +1,7 @@
 /**
  * Garden of Eden - Estimate Funding Requirements
  *
- * Quick script to estimate USC and MATIC needed for demo market creation
+ * Quick script to estimate USDC and MATIC needed for demo market creation
  * without requiring network connection.
  *
  * Usage:
@@ -17,7 +17,7 @@ const {
 
 // Configuration - same as create-demo-markets.js
 const CONFIG = {
-  uscDecimals: 6,
+  usdcDecimals: 6,
   estimatedGasPerMarket: 500000, // ~500k gas per market creation
   estimatedGasForApproval: 50000, // ~50k gas for ERC20 approval
   gasBufferMultiplier: 1.2, // 20% buffer
@@ -44,7 +44,7 @@ function main() {
   const activeTemplates = filterTemplates({ activeOnly: true });
   console.log(`\nActive templates (creatable now): ${activeTemplates.length}`);
 
-  // Calculate USC requirements
+  // Calculate USDC requirements
   let totalUscMin = 0;
   let totalUscMax = 0;
   let totalUscAvg = 0;
@@ -61,28 +61,28 @@ function main() {
   const numMarkets = activeTemplates.length;
   const totalGas = (CONFIG.estimatedGasPerMarket * numMarkets + CONFIG.estimatedGasForApproval);
   const bufferedGas = Math.ceil(totalGas * CONFIG.gasBufferMultiplier);
-  const etcCostGwei = bufferedGas * CONFIG.assumedGasPriceGwei;
-  const etcCost = etcCostGwei / 1e9; // Convert gwei to native units
+  const maticCostGwei = bufferedGas * CONFIG.assumedGasPriceGwei;
+  const maticCost = maticCostGwei / 1e9; // Convert gwei to native units
 
   console.log("\n" + "=".repeat(60));
   console.log("FUNDING REQUIREMENTS");
   console.log("=".repeat(60));
 
-  console.log("\n--- USC (Collateral for Liquidity) ---");
-  console.log(`  Minimum:  ${totalUscMin.toLocaleString(undefined, { minimumFractionDigits: 2 })} USC`);
-  console.log(`  Average:  ${totalUscAvg.toLocaleString(undefined, { minimumFractionDigits: 2 })} USC`);
-  console.log(`  Maximum:  ${totalUscMax.toLocaleString(undefined, { minimumFractionDigits: 2 })} USC`);
-  console.log(`\n  Recommended: ${Math.ceil(totalUscAvg * 1.1).toLocaleString()} USC (avg + 10% buffer)`);
+  console.log("\n--- USDC (Collateral for Liquidity) ---");
+  console.log(`  Minimum:  ${totalUscMin.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`);
+  console.log(`  Average:  ${totalUscAvg.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`);
+  console.log(`  Maximum:  ${totalUscMax.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDC`);
+  console.log(`\n  Recommended: ${Math.ceil(totalUscAvg * 1.1).toLocaleString()} USDC (avg + 10% buffer)`);
 
   console.log("\n--- MATIC (Gas for Transactions) ---");
   console.log(`  Markets to create: ${numMarkets}`);
   console.log(`  Estimated gas: ${bufferedGas.toLocaleString()} units`);
-  console.log(`  At ${CONFIG.assumedGasPriceGwei} gwei: ${etcCost.toFixed(4)} MATIC`);
-  console.log(`\n  Recommended: ${(etcCost * 1.5).toFixed(4)} MATIC (estimate + 50% buffer)`);
+  console.log(`  At ${CONFIG.assumedGasPriceGwei} gwei: ${maticCost.toFixed(4)} MATIC`);
+  console.log(`\n  Recommended: ${(maticCost * 1.5).toFixed(4)} MATIC (estimate + 50% buffer)`);
 
   console.log("\n--- SUMMARY ---");
-  console.log(`  USC needed: ~${Math.ceil(totalUscAvg).toLocaleString()} USC`);
-  console.log(`  MATIC needed: ~${(etcCost * 1.5).toFixed(2)} MATIC`);
+  console.log(`  USDC needed: ~${Math.ceil(totalUscAvg).toLocaleString()} USDC`);
+  console.log(`  MATIC needed: ~${(maticCost * 1.5).toFixed(2)} MATIC`);
 
   console.log("\n--- BY CATEGORY BREAKDOWN ---");
   const byCategory = {};
@@ -95,7 +95,7 @@ function main() {
     byCategory[template.category].maxUsc += parseFloat(template.liquidity?.max || "200");
   }
 
-  console.log("\n  Category          Count   Min USC    Max USC");
+  console.log("\n  Category          Count   Min USDC    Max USDC");
   console.log("  " + "-".repeat(50));
   for (const [category, data] of Object.entries(byCategory)) {
     const name = (CATEGORY_NAMES[category] || category).padEnd(16);

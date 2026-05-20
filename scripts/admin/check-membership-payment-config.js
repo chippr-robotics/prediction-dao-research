@@ -7,7 +7,7 @@ const { ethers } = require('hardhat');
 const CONTRACTS = {
   paymentProcessor: '0xC6A3D457b0a0D9Fa4859F4211A4c9551F8Ce1F63',
   membershipPaymentManager: '0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28',
-  USC_TOKEN: '0xDE093684c796204224BC081f937aa059D903c52a',
+  USDC_TOKEN: '0xDE093684c796204224BC081f937aa059D903c52a',
   tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
 };
 
@@ -33,19 +33,19 @@ async function main() {
     console.log('Treasury:', treasury);
 
     // Check payment tokens
-    const uscToken = await mpm.paymentTokens(CONTRACTS.USC_TOKEN);
-    console.log('\nUSC Token Configuration:');
-    console.log('  Address:', uscToken.tokenAddress);
-    console.log('  Active:', uscToken.isActive);
-    console.log('  Symbol:', uscToken.symbol);
-    console.log('  Decimals:', uscToken.decimals);
+    const usdcToken = await mpm.paymentTokens(CONTRACTS.USDC_TOKEN);
+    console.log('\nUSDC Token Configuration:');
+    console.log('  Address:', usdcToken.tokenAddress);
+    console.log('  Active:', usdcToken.isActive);
+    console.log('  Symbol:', usdcToken.symbol);
+    console.log('  Decimals:', usdcToken.decimals);
 
     // Check role prices
-    console.log('\nRole Prices (USC):');
+    console.log('\nRole Prices (USDC):');
     for (const [roleName, roleHash] of Object.entries(ROLES)) {
       try {
-        const price = await mpm.getRolePrice(roleHash, CONTRACTS.USC_TOKEN);
-        console.log(`  ${roleName}: ${ethers.formatUnits(price, 6)} USC`);
+        const price = await mpm.getRolePrice(roleHash, CONTRACTS.USDC_TOKEN);
+        console.log(`  ${roleName}: ${ethers.formatUnits(price, 6)} USDC`);
       } catch (e) {
         console.log(`  ${roleName}: Not configured`);
       }
@@ -53,10 +53,10 @@ async function main() {
 
     // Check revenue collected
     try {
-      const uscRevenue = await mpm.revenueByToken(CONTRACTS.USC_TOKEN);
-      console.log(`\nUSC Revenue collected: ${ethers.formatUnits(uscRevenue, 6)} USC`);
+      const usdcRevenue = await mpm.revenueByToken(CONTRACTS.USDC_TOKEN);
+      console.log(`\nUSDC Revenue collected: ${ethers.formatUnits(usdcRevenue, 6)} USDC`);
     } catch (e) {
-      console.log('\nUSC Revenue: Unable to fetch');
+      console.log('\nUSDC Revenue: Unable to fetch');
     }
   } catch (e) {
     console.log('Error:', e.message);
@@ -71,14 +71,14 @@ async function main() {
 
     const TIER_NAMES = ['NONE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM'];
 
-    console.log('\nTier Prices (USC):');
+    console.log('\nTier Prices (USDC):');
     for (const [roleName, roleHash] of Object.entries(ROLES)) {
       console.log(`\n${roleName}:`);
       for (let tier = 1; tier <= 4; tier++) {
         try {
           const price = await tierRegistry.getTierPrice(roleHash, tier);
           const isActive = await tierRegistry.isTierActive(roleHash, tier);
-          console.log(`  ${TIER_NAMES[tier]}: ${ethers.formatUnits(price, 6)} USC, active=${isActive}`);
+          console.log(`  ${TIER_NAMES[tier]}: ${ethers.formatUnits(price, 6)} USDC, active=${isActive}`);
         } catch (e) {
           console.log(`  ${TIER_NAMES[tier]}: Not configured`);
         }

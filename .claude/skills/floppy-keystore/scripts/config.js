@@ -89,18 +89,6 @@ const CHAINS = {
     addressPrefix: '',  // Base58 encoded, no prefix
     keyFormat: 'base58',
     networks: ['mainnet-beta', 'devnet', 'testnet']
-  },
-
-  // Ethereum Classic (uses same derivation as ETH but different coin type)
-  ethereumClassic: {
-    name: 'Ethereum Classic',
-    symbol: 'ETC',
-    coinType: 61,
-    curve: 'secp256k1',
-    derivationPath: "m/44'/61'/0'/0",
-    addressPrefix: '0x',
-    keyFormat: 'hex',
-    networks: ['mainnet', 'mordor']
   }
 };
 
@@ -112,8 +100,7 @@ const CHAIN_ALIASES = {
   'btc': 'bitcoin',
   'zec': 'zcash',
   'xmr': 'monero',
-  'sol': 'solana',
-  'etc': 'ethereumClassic'
+  'sol': 'solana'
 };
 
 /**

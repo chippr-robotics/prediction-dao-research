@@ -1,4 +1,4 @@
-# ETCswap v3 Integration Analysis for Prediction DAO
+# Dex v3 Integration Analysis for Prediction DAO
 
 **Research Date**: December 23, 2025  
 **Research Focus**: Exploring decentralized market mechanics integration  
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-This document analyzes the potential integration of ETCswap v3 (a fork of Uniswap v3) concentrated liquidity and automated market making mechanics into the Prediction DAO ecosystem. ETCswap v3 offers sophisticated liquidity management and trading mechanisms that could complement or enhance the current LMSR-based market mechanics used in both ClearPath and FairWins platforms.
+This document analyzes the potential integration of Dex v3 (a fork of Uniswap v3) concentrated liquidity and automated market making mechanics into the Prediction DAO ecosystem. Dex v3 offers sophisticated liquidity management and trading mechanisms that could complement or enhance the current LMSR-based market mechanics used in both ClearPath and FairWins platforms.
 
 ### Key Findings
 
@@ -21,7 +21,7 @@ This document analyzes the potential integration of ETCswap v3 (a fork of Uniswa
 ## Table of Contents
 
 1. [Background](#background)
-2. [ETCswap v3 Architecture](#etcswap-v3-architecture)
+2. [Dex v3 Architecture](#dex-v3-architecture)
 3. [Current Prediction DAO Market Mechanics](#current-prediction-dao-market-mechanics)
 4. [Comparative Analysis](#comparative-analysis)
 5. [Integration Approaches](#integration-approaches)
@@ -44,9 +44,9 @@ The current Prediction DAO market mechanics use LMSR (Logarithmic Market Scoring
 3. **Limited Price Discovery**: LMSR prices may lag active trading compared to order book systems
 4. **Single Liquidity Provider**: Typically requires protocol or creator to provide all liquidity
 
-### ETCswap v3 Overview
+### Dex v3 Overview
 
-ETCswap v3 is a decentralized exchange protocol forked from Uniswap v3, offering:
+Dex v3 is a decentralized exchange protocol forked from Uniswap v3, offering:
 
 - **Concentrated Liquidity**: Liquidity providers (LPs) can concentrate capital within custom price ranges
 - **Multiple Fee Tiers**: 0.05%, 0.3%, and 1.0% fee options for different asset pairs
@@ -56,7 +56,7 @@ ETCswap v3 is a decentralized exchange protocol forked from Uniswap v3, offering
 
 ---
 
-## ETCswap v3 Architecture
+## Dex v3 Architecture
 
 ### Core Components
 
@@ -232,7 +232,7 @@ Property: P_pass + P_fail = 1
 
 ### Market Mechanics Comparison
 
-| Aspect | LMSR (Current) | ETCswap v3 Concentrated Liquidity |
+| Aspect | LMSR (Current) | Dex v3 Concentrated Liquidity |
 |--------|----------------|-----------------------------------|
 | **Liquidity Model** | Single automated market maker | Multiple liquidity providers |
 | **Capital Efficiency** | Low - liquidity across full 0-1 range | High - liquidity concentrated where needed |
@@ -296,7 +296,7 @@ Risk: Impermanent loss if price moves outside range
 | **LP Privacy** | ✅ Single provider | ❌ All positions public |
 | **Implementation** | Mature (ClearPath) | Standard V3 (FairWins) |
 
-**Note**: FairWins will use ETCswap V3 without modification. Privacy is not required for public prediction markets, and V3 is deployed as-is for transparency and efficiency.
+**Note**: FairWins will use Dex V3 without modification. Privacy is not required for public prediction markets, and V3 is deployed as-is for transparency and efficiency.
 
 ---
 
@@ -383,7 +383,7 @@ During the research phase, four alternative integration approaches were evaluate
 
 These alternatives provided valuable insights but were not recommended given the platform-specific approach is optimal for the dual-platform structure. Each option had significant drawbacks including liquidity fragmentation, increased complexity, or misalignment with platform-specific requirements.
 
-**For detailed analysis of each alternative approach, see**: [Alternative Approaches Appendix](etcswap-v3-alternative-approaches.md)
+**For detailed analysis of each alternative approach, see**: [Alternative Approaches Appendix](dex-v3-alternative-approaches.md)
 
 ---
 
@@ -730,7 +730,7 @@ Impermanent loss: $2.4 (2%)
 
 **Objective**: Understand V3 mechanics and integration options
 
-- [x] Analyze Uniswap/ETCswap V3 architecture
+- [x] Analyze Uniswap/Dex V3 architecture
 - [x] Compare with current LMSR implementation
 - [x] Identify integration approaches
 - [x] Document findings (this document)
@@ -838,7 +838,7 @@ Impermanent loss: $2.4 (2%)
 
 ### Summary of Findings
 
-ETCswap v3's concentrated liquidity mechanisms offer compelling advantages for high-volume prediction markets:
+Dex v3's concentrated liquidity mechanisms offer compelling advantages for high-volume prediction markets:
 
 1. **Capital Efficiency**: 3-5x improvement for concentrated positions
 2. **Community Participation**: Permissionless liquidity provision
@@ -953,8 +953,8 @@ This platform-specific approach:
 - [Periphery Repository](https://github.com/Uniswap/v3-periphery)
 - [Documentation](https://docs.uniswap.org/protocol/concepts/V3-overview/concentrated-liquidity)
 
-**ETCswap Resources**:
-- [ETCswap v3 Core](https://github.com/etcswap/v3-core)
+**Dex Resources**:
+- [Dex v3 Core](https://github.com/dex/v3-core)
 
 **Prediction DAO Resources**:
 - [Architecture Documentation](../developer-guide/architecture.md)

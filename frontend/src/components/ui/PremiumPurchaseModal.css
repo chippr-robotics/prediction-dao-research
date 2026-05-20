@@ -3,7 +3,7 @@
  *
  * Modern, minimalist styling matching MarketCreationModal patterns.
  * Uses ppm- prefix for all classes.
- * Supports light/dark themes and ClearPath platform styling.
+ * Supports light/dark themes.
  */
 
 /* ===========================
@@ -1287,58 +1287,6 @@
 }
 
 /* ===========================
-   ClearPath Platform Theme
-   =========================== */
-
-:root.platform-clearpath .ppm-step.active {
-  color: var(--clearpath-primary, #4C9AFF);
-  border-bottom-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .ppm-step.active .ppm-step-icon {
-  background: rgba(76, 154, 255, 0.1);
-  color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .ppm-role-card:hover:not(.owned),
-:root.platform-clearpath .ppm-recipient-card:hover {
-  border-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .ppm-role-card.selected,
-:root.platform-clearpath .ppm-recipient-card.selected {
-  border-color: var(--clearpath-primary, #4C9AFF);
-  background: rgba(76, 154, 255, 0.03);
-}
-
-:root.platform-clearpath .ppm-role-price {
-  color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .ppm-field input:focus,
-:root.platform-clearpath .ppm-field textarea:focus {
-  border-color: var(--clearpath-primary, #4C9AFF);
-  box-shadow: 0 0 0 3px rgba(76, 154, 255, 0.15);
-}
-
-:root.platform-clearpath .ppm-btn-primary {
-  background: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .ppm-btn-primary:hover:not(:disabled) {
-  background: #3182ce;
-  box-shadow: 0 4px 12px rgba(76, 154, 255, 0.3);
-}
-
-:root.platform-clearpath .ppm-role-checkbox {
-  accent-color: var(--clearpath-primary, #4C9AFF);
-}
-
-:root.platform-clearpath .ppm-recipient-card input[type="radio"] {
-  accent-color: var(--clearpath-primary, #4C9AFF);
-}
-
-/* ===========================
    Tier Selection Step
    =========================== */
 
@@ -1530,18 +1478,6 @@
   align-items: center;
   gap: 0.5rem;
   color: var(--text-primary, #1a202c);
-}
-
-/* Token creation specific styling */
-.ppm-tier-limits--tokens {
-  border-left: 3px solid var(--tokenmint-color, #ffd700);
-  background: rgba(255, 215, 0, 0.05);
-}
-
-/* Governance specific styling */
-.ppm-tier-limits--governance {
-  border-left: 3px solid var(--clearpath-color, #36b37e);
-  background: rgba(54, 179, 126, 0.05);
 }
 
 /* ===========================

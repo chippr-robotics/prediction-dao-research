@@ -10,7 +10,7 @@ Friend group markets now support ERC20 token payments for membership fees, marke
 - **Native MATIC**: Original payment method (address(0))
 - **USDC**: USD Coin stablecoin support
 - **USDT**: Tether USD stablecoin support
-- **WETC**: Wrapped  support
+- **WMATIC**: Wrapped  support
 - **Custom tokens**: Any ERC20 token approved by managers
 
 ### 2. Use Cases
@@ -129,11 +129,11 @@ friendMarketFactory.addAcceptedPaymentToken(
 
 ```solidity
 // Set FRIEND_MARKET_ROLE prices in multiple tokens
-address[] memory tokens = [USDC_ADDRESS, USDT_ADDRESS, WETC_ADDRESS];
+address[] memory tokens = [USDC_ADDRESS, USDT_ADDRESS, WMATIC_ADDRESS];
 uint256[] memory prices = [
     50_000000,    // $50 USDC (6 decimals)
     50_000000,    // $50 USDT (6 decimals)
-    1_000000000000000000  // 1 WETC (18 decimals)
+    1_000000000000000000  // 1 WMATIC (18 decimals)
 ];
 
 paymentManager.setRolePrices(
@@ -155,15 +155,15 @@ friendMarketFactory.addAcceptedPaymentToken(TOKEN_ADDRESS, false);
 
 ## Price Display in USD
 
-### Frontend Integration with ETCSwap Oracle
+### Frontend Integration with Dex Oracle
 
 ```javascript
-// Get token price in USD from ETCSwap
+// Get token price in USD from Dex
 async function getTokenPriceUSD(tokenAddress, amount) {
-  const etcSwap = await ethers.getContractAt("ETCSwapV3Integration", ETCSWAP_ADDRESS);
+  const dex = await ethers.getContractAt("DexV3Integration", DEX_ADDRESS);
   
-  // Get exchange rate from ETCSwap pool
-  const quote = await etcSwap.getQuote(
+  // Get exchange rate from Dex pool
+  const quote = await dex.getQuote(
     tokenAddress,
     USD_REFERENCE_TOKEN,  // USDC or other USD stablecoin
     amount
@@ -187,10 +187,10 @@ async function displayMembershipPrice(tier) {
 // Display gas cost in USD
 async function displayGasCostUSD(gasUsed) {
   const gasPrice = await provider.getGasPrice();
-  const gasCostETC = gasUsed.mul(gasPrice);
+  const gasCostMatic = gasUsed.mul(gasPrice);
   
   // Convert to USD
-  const usdCost = await getTokenPriceUSD(ADDRESS_ZERO, gasCostETC);
+  const usdCost = await getTokenPriceUSD(ADDRESS_ZERO, gasCostMatic);
   
   // Display: "~$2.50 USD gas"
   return `~$${(usdCost / 1e6).toFixed(2)} USD gas`;
@@ -203,7 +203,7 @@ async function displayGasCostUSD(gasUsed) {
 - **Always show USD prices first**: `$50 USD` not `0.05 MATIC`
 - **Show token equivalents**: `$50 USD (50 USDC or 50 USDT)`
 - **Display gas in USD**: `Transaction cost: ~$2.50 USD gas`
-- **Update prices dynamically**: Fetch live rates from ETCSwap
+- **Update prices dynamically**: Fetch live rates from Dex
 - **Warn about volatility**: If using. show USD equivalent may change
 
 **Example UI:**
@@ -273,7 +273,7 @@ The contract uses OpenZeppelin's SafeERC20 library for secure transfers:
 - [ ] Complete membership purchase flow with stablecoins
 - [ ] Market creation with ERC20 from start to finish
 - [ ] Multi-token liquidity contributions
-- [ ] USD price display from ETCSwap
+- [ ] USD price display from Dex
 - [ ] Gas cost calculation in USD
 - [ ] Token whitelist management by managers
 
@@ -309,7 +309,7 @@ A: No, only tokens approved by FairWins managers. This prevents malicious token 
 A: The transaction will revert with "Payment token not accepted" error.
 
 **Q: How are prices set?**
-A: Managers set prices in USD terms for stablecoins (e.g., 50 USDC = $50 USD).  prices are converted to USD via ETCSwap oracle.
+A: Managers set prices in USD terms for stablecoins (e.g., 50 USDC = $50 USD).  prices are converted to USD via Dex oracle.
 
 **Q: Can I mix  and stablecoins?**
 A: Yes, you can pay membership in USDC and add market liquidity in USDT or.
@@ -350,4 +350,4 @@ For questions or issues with ERC20 payments:
 - [MembershipPaymentManager Contract](../contracts/MembershipPaymentManager.sol)
 - [FriendGroupMarketFactory Contract](../contracts/FriendGroupMarketFactory.sol)
 - [TieredRoleManager Contract](../contracts/TieredRoleManager.sol)
-- [ETCSwap Integration](../contracts/ETCSwapV3Integration.sol)
+- [Dex Integration](../contracts/DexV3Integration.sol)

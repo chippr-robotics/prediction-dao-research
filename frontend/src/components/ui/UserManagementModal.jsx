@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWallet, useWalletConnection, useWalletRoles } from '../../hooks'
+import { useWallet, useWalletConnection, useWalletRoles, useNetworkMode } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
@@ -14,7 +14,13 @@ function UserManagementModal({ onScanMarket }) {
   const { address, isConnected } = useWallet()
   const { disconnectWallet } = useWalletConnection()
   const { hideModal, showModal } = useModal()
-  const { preferences, setDemoMode } = useUserPreferences()
+  const { preferences } = useUserPreferences()
+  const {
+    isMainnet,
+    network: activeNetwork,
+    switchMode: switchNetworkMode,
+    isSwitching: isSwitchingNetwork,
+  } = useNetworkMode()
   const { roles, hasRole } = useWalletRoles()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profile')
@@ -31,8 +37,8 @@ function UserManagementModal({ onScanMarket }) {
     hideModal()
   }
 
-  const handleToggleDemoMode = () => {
-    setDemoMode(!preferences.demoMode)
+  const handleToggleNetwork = () => {
+    switchNetworkMode('toggle')
   }
 
   const handleSearchSubmit = (e) => {
@@ -54,11 +60,6 @@ function UserManagementModal({ onScanMarket }) {
       size: 'large',
       closable: false
     })
-  }
-
-  const handleNavigateToClearPath = () => {
-    hideModal()
-    navigate('/clearpath')
   }
 
   const handleNavigateToAdmin = () => {
@@ -150,23 +151,27 @@ function UserManagementModal({ onScanMarket }) {
             </div>
 
             <div className="section">
-              <h3>Data Source</h3>
+              <h3>Network</h3>
               <div className="demo-mode-section">
                 <div className="status-display">
-                  <span className={`status-badge ${preferences.demoMode ? 'demo' : 'live'}`}>
-                    {preferences.demoMode ? 'Demo Mode' : 'Live Mode'}
+                  <span className={`status-badge ${isMainnet ? 'live' : 'demo'}`}>
+                    {isMainnet ? 'Mainnet' : 'Testnet'}
                   </span>
+                  <span className="pref-value">{activeNetwork?.name}</span>
                 </div>
-                <button 
-                  onClick={handleToggleDemoMode}
+                <button
+                  onClick={handleToggleNetwork}
                   className="toggle-demo-btn"
+                  disabled={isSwitchingNetwork}
                 >
-                  Switch to {preferences.demoMode ? 'Live' : 'Demo'} Mode
+                  {isSwitchingNetwork
+                    ? 'Switching…'
+                    : `Switch to ${isMainnet ? 'Testnet' : 'Mainnet'}`}
                 </button>
                 <p className="demo-mode-description">
-                  {preferences.demoMode 
-                    ? <><span aria-hidden="true">🎭</span> Demo Mode: Using mock data for testing and demonstrations. Switch to Live Mode to interact with real blockchain data.</>
-                    : <><span aria-hidden="true">🌐</span> Live Mode: Connected to testnet blockchain. All transactions are real and require gas fees.</>}
+                  {isMainnet
+                    ? <><span aria-hidden="true">🌐</span> Mainnet: Connected to Polygon. Transactions use real funds and gas.</>
+                    : <><span aria-hidden="true">🧪</span> Testnet: Connected to Polygon Amoy. Use a faucet for test MATIC.</>}
                 </p>
               </div>
             </div>
@@ -200,21 +205,6 @@ function UserManagementModal({ onScanMarket }) {
                 </div>
               )}
             </div>
-
-            {hasRole(ROLES.CLEARPATH_USER) && (
-              <div className="section clearpath-management-section">
-                <h3>ClearPath Management</h3>
-                <p className="section-description">
-                  Access DAO governance and management features
-                </p>
-                <button 
-                  onClick={handleNavigateToClearPath}
-                  className="manage-org-btn"
-                >
-                  Manage Organizations
-                </button>
-              </div>
-            )}
 
             {hasRole(ROLES.ADMIN) && (
               <div className="section admin-section">

@@ -306,8 +306,8 @@ async function main() {
 
   // Resolve the chain stablecoin (USDC on Polygon Amoy).
   const networkName = hre.network.name;
-  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USC;
-  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USC";
+  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USDC;
+  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USDC";
 
   if (stableAddress) {
     // Add the chain stablecoin as a payment token

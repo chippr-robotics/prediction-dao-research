@@ -363,7 +363,7 @@ await privacyCoordinator.registerPublicKey(newKey);
 
 ### Testnet Deployment 🏗️
 
-- [ ] Deploy to Mordor testnet
+- [ ] Deploy to Amoy testnet
 - [ ] Run integration test suite
 - [ ] Monitor gas costs in production
 - [ ] Gather community feedback
@@ -395,7 +395,7 @@ await privacyCoordinator.registerPublicKey(newKey);
 
 1. 📋 Complete zkSNARK circuit integration
 2. 📋 Conduct trusted setup ceremony
-3. 📋 Deploy to Mordor testnet
+3. 📋 Deploy to Amoy testnet
 4. 📋 Community testing period
 5. 📋 Gas optimization round 2
 6. 📋 Security audit preparation

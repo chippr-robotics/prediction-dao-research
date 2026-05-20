@@ -24,9 +24,7 @@ const STABLE_DECIMALS = 6
 // Role hashes (computed from role names)
 const ROLE_HASHES = {
   FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
-  MARKET_MAKER: ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  CLEARPATH_USER: ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
-  TOKENMINT: ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE'))
+  MARKET_MAKER: ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE'))
 }
 
 // Tier IDs matching MembershipTier enum
@@ -40,10 +38,10 @@ const TIER_IDS = {
 // Fallback prices in stablecoin units (USDC, 6 decimals)
 // These match the TierRegistry configuration on Polygon Amoy
 const FALLBACK_PRICES = {
-  BRONZE: { FRIEND_MARKET: 50, MARKET_MAKER: 100, CLEARPATH_USER: 25, TOKENMINT: 25 },
-  SILVER: { FRIEND_MARKET: 100, MARKET_MAKER: 100, CLEARPATH_USER: 100, TOKENMINT: 100 },
-  GOLD: { FRIEND_MARKET: 250, MARKET_MAKER: 250, CLEARPATH_USER: 250, TOKENMINT: 250 },
-  PLATINUM: { FRIEND_MARKET: 500, MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500 }
+  BRONZE: { FRIEND_MARKET: 50, MARKET_MAKER: 100 },
+  SILVER: { FRIEND_MARKET: 100, MARKET_MAKER: 100 },
+  GOLD: { FRIEND_MARKET: 250, MARKET_MAKER: 250 },
+  PLATINUM: { FRIEND_MARKET: 500, MARKET_MAKER: 500 }
 }
 
 export function useTierPrices() {

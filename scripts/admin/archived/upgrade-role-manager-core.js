@@ -37,7 +37,7 @@ async function main() {
     process.exit(1);
   }
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
   console.log();
 
   // Step 1: Deploy new RoleManagerCore

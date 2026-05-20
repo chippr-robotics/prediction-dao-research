@@ -337,13 +337,6 @@
   background: var(--color-error-dark, #c53030);
 }
 
-/* ClearPath Status */
-.clearpath-status-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
 .status-display {
   display: flex;
   align-items: center;
@@ -393,13 +386,6 @@
 
 .toggle-status-btn:hover {
   background: var(--color-primary-dark);
-}
-
-.clearpath-description {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
 }
 
 /* Preferences */
@@ -841,36 +827,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* ClearPath Management Section */
-.clearpath-management-section {
-  background: linear-gradient(135deg, rgba(54, 179, 126, 0.05), rgba(102, 126, 234, 0.05));
-  padding: 20px !important;
-  border-radius: 8px;
-  border: 1px solid var(--color-primary);
-}
-
 .section-description {
   margin: 0 0 16px;
   font-size: 14px;
   color: var(--color-text-secondary);
   line-height: 1.6;
-}
-
-.manage-org-btn {
-  padding: 12px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  color: white;
-  background: var(--color-primary);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.manage-org-btn:hover {
-  background: var(--color-primary-dark);
-  transform: translateY(-1px);
 }
 
 /* Admin Section */
