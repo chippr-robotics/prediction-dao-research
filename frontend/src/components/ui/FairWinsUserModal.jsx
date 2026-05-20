@@ -34,7 +34,6 @@ function FairWinsUserModal() {
   const { roles, hasRole } = useWalletRoles()
   const { toggleMode, isDark } = useTheme()
   const {
-    mode: networkMode,
     isMainnet,
     isOtherChain,
     network: activeNetwork,

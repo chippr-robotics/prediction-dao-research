@@ -343,7 +343,6 @@ function PremiumPurchaseModal({ isOpen = true, onClose, preselectedRole = null, 
     setCurrentStep(normalizedRole && (isUpgradeFlow || isExtendFlow) ? 1 : 0)
     setSelectedRoles(normalizedRole ? [normalizedRole] : [])
     setSelectedTier('BRONZE')
-    setZkPublicKey('')
     setPurchaseResults([])
     setErrors({})
     setIsPurchasing(false)
