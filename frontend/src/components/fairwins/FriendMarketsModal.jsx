@@ -1847,7 +1847,6 @@ function FriendMarketsModal({
                             const outcome = selectedPolymarketMarket.outcomes?.[Number(idx)]
                             const fallback = idx === '0' ? 'YES' : 'NO'
                             const name = outcome?.name || fallback
-                            const price = outcome?.price != null ? `${Math.round(outcome.price * 100)}¢` : null
                             const active = formData.creatorSide === idx
                             return (
                               <button
@@ -1859,7 +1858,6 @@ function FriendMarketsModal({
                                 aria-pressed={active}
                               >
                                 <span className="fm-side-btn-label">I&apos;m taking {name}</span>
-                                {price && <span className="fm-side-btn-price">{price}</span>}
                               </button>
                             )
                           })}
