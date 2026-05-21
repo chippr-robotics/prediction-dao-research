@@ -4,6 +4,7 @@ import './QRScanner.css'
 
 function QRScanner({ isOpen, onClose, onScanSuccess }) {
   const [scanning, setScanning] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState(null)
   const [cameras, setCameras] = useState([])
   const [selectedCamera, setSelectedCamera] = useState(null)
@@ -79,11 +80,24 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
     }
   }, [isOpen, handleClose])
 
+  // Auto-start scanning as soon as a camera is selected.
+  // Skipping the "press Start" step is the intended UX — tapping a QR button
+  // in the parent should immediately activate the camera.
+  useEffect(() => {
+    if (!isOpen || !selectedCamera || scanning || starting || error) return
+    if (html5QrCodeRef.current) return
+    startScanning()
+    // startScanning closes over selectedCamera; re-running on its change is
+    // already covered by the deps. Other state values are checked above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedCamera, scanning, starting, error])
+
   const startScanning = async () => {
     if (!selectedCamera || html5QrCodeRef.current) return
 
     try {
       setError(null)
+      setStarting(true)
       const html5QrCode = new Html5Qrcode('qr-reader')
       html5QrCodeRef.current = html5QrCode
 
@@ -106,7 +120,10 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
       setScanning(true)
     } catch (err) {
       console.error('Error starting scanner:', err)
+      html5QrCodeRef.current = null
       setError('Failed to start camera. Please check permissions.')
+    } finally {
+      setStarting(false)
     }
   }
 
@@ -180,11 +197,11 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
         <div className="qr-scanner-content">
           <div className="scanner-container">
             <div id="qr-reader" ref={scannerRef}></div>
-            
+
             {!scanning && !error && (
               <div className="scanner-placeholder">
                 <span className="camera-icon">📷</span>
-                <p>Camera preview will appear here</p>
+                <p>{starting || selectedCamera ? 'Starting camera…' : 'Detecting cameras…'}</p>
               </div>
             )}
 
@@ -204,7 +221,7 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
                   id="camera-select"
                   value={selectedCamera || ''}
                   onChange={handleCameraChange}
-                  disabled={scanning}
+                  disabled={starting}
                 >
                   {cameras.map((camera) => (
                     <option key={camera.id} value={camera.id}>
@@ -215,17 +232,8 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
               </div>
             )}
 
-            <div className="scanner-actions">
-              {!scanning ? (
-                <button
-                  className="start-scan-btn"
-                  onClick={startScanning}
-                  disabled={!selectedCamera || !!error}
-                  aria-label="Start scanning QR code"
-                >
-                  📷 Start Scanning
-                </button>
-              ) : (
+            {scanning && (
+              <div className="scanner-actions">
                 <button
                   className="stop-scan-btn"
                   onClick={stopScanning}
@@ -233,14 +241,14 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
                 >
                   ⏹️ Stop Scanning
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="scanner-instructions">
             <h3>How to Scan</h3>
             <ol>
-              <li>Click "Start Scanning" to activate your camera</li>
+              <li>Allow camera access when prompted</li>
               <li>Point your camera at a market QR code</li>
               <li>Hold steady until the code is detected</li>
               <li>You'll be automatically redirected to the market</li>

@@ -492,19 +492,38 @@
   min-width: 0;
 }
 
+/* Wrapper so the AddressInput component (which has its own .container) takes
+   the remaining row width next to the QR scan button. */
+.fm-input-with-action .fm-address-input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
 .fm-scan-btn,
 .fm-lookup-btn {
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: stretch;
   width: 42px;
   min-width: 42px;
+  height: 44px;
   background: var(--bg-primary, #0E141B);
   border: 1px solid var(--border-color, #23303D);
   border-radius: 8px;
   color: var(--text-secondary, #AAB6C2);
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+/* When the adjacent field is the AddressInput (which can grow vertically
+   with the resolved-address hint), keep the QR button at the input row. */
+.fm-input-with-action:has(.fm-address-input-wrap) {
+  align-items: flex-start;
+}
+
+.fm-input-with-action:has(.fm-address-input-wrap) .fm-scan-btn {
+  align-self: flex-start;
 }
 
 .fm-scan-btn:hover:not(:disabled),
