@@ -193,14 +193,15 @@ describe("FriendGroupMarketFactory - Challenge Period", function () {
       expect(pending.proposer).to.equal(addr2.address);
     });
 
-    it("Should set correct challenge deadline (24 hours from proposal)", async function () {
+    it("Should set correct challenge deadline (matches current challengePeriod)", async function () {
       await createAndActivateMarket();
 
       const tx = await friendGroupFactory.connect(addr1).resolveFriendMarket(0, true);
       const block = await ethers.provider.getBlock(tx.blockNumber);
 
+      const challengePeriod = await friendGroupFactory.challengePeriod();
       const pending = await friendGroupFactory.pendingResolutions(0);
-      expect(pending.challengeDeadline).to.equal(block.timestamp + ONE_DAY);
+      expect(pending.challengeDeadline).to.equal(BigInt(block.timestamp) + challengePeriod);
     });
 
     it("Should reject resolution proposal from unauthorized party", async function () {

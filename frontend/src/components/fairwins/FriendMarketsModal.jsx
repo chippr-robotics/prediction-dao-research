@@ -9,7 +9,8 @@ import { useDex } from '../../hooks/useDex'
 import {
   WAGER_DEFAULTS,
   getDefaultEndDateTime,
-  getDefaultAcceptanceDeadline
+  getDefaultAcceptanceDeadline,
+  toDateTimeLocal
 } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -312,11 +313,15 @@ function FriendMarketsModal({
           if (!prev.description && seeded) {
             lastAutoDescriptionRef.current = seeded
           }
+          // Lock end time to the linked market's own end time so payouts settle
+          // when Polymarket resolves, not whatever the user typed.
+          const linkedEnd = toDateTimeLocal(initialPolymarketMarket.endDate)
           return {
             ...prev,
             resolutionType: ResolutionType.PolymarketOracle,
             peggedMarketId: initialPolymarketMarket.conditionId,
             description: seeded,
+            ...(linkedEnd ? { endDateTime: linkedEnd } : {}),
           }
         })
       }
@@ -471,6 +476,12 @@ function FriendMarketsModal({
     setSelectedPolymarketMarket(market)
     setFormData(prev => {
       const updated = { ...prev, peggedMarketId: market.conditionId }
+      // Lock the wager's end time to the linked market so the side bet can't
+      // resolve before (or long after) Polymarket does.
+      const linkedEnd = toDateTimeLocal(market.endDate)
+      if (linkedEnd) {
+        updated.endDateTime = linkedEnd
+      }
       const sideSynced = prev.creatorSide !== '' && (
         prev.description === '' || prev.description === lastAutoDescriptionRef.current
       )
@@ -493,11 +504,25 @@ function FriendMarketsModal({
         return newErrors
       })
     }
+    if (errors.endDateTime) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.endDateTime
+        return newErrors
+      })
+    }
   }
 
   const clearPolymarketSelection = () => {
     setSelectedPolymarketMarket(null)
-    setFormData(prev => ({ ...prev, peggedMarketId: '', creatorSide: '' }))
+    // End time was locked to the linked market — restore the default
+    // so the user can pick their own again.
+    setFormData(prev => ({
+      ...prev,
+      peggedMarketId: '',
+      creatorSide: '',
+      endDateTime: getDefaultEndDateTime(),
+    }))
     clearPolymarket()
     lastAutoDescriptionRef.current = ''
   }
@@ -771,18 +796,25 @@ function FriendMarketsModal({
       }
     }
 
-    // Validate end date/time
+    // Validate end date/time. Min mirrors the on-chain MIN_TRADING_PERIOD (1h)
+    // — comfortably past Polygon/Ethereum finality so a reorg can't unwind it.
     const endDate = new Date(formData.endDateTime)
     const now = new Date()
-    const minDate = new Date(now.getTime() + 24 * 60 * 60 * 1000) // At least 1 day from now
-    const maxDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000) // Max 1 year from now
+    const minDate = new Date(now.getTime() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000)
+    const maxDate = new Date(now.getTime() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000)
+    const isLinkedMarket = formData.resolutionType === ResolutionType.PolymarketOracle &&
+      selectedPolymarketMarket?.endDate
 
     if (!formData.endDateTime || isNaN(endDate.getTime())) {
       newErrors.endDateTime = 'Please select a valid end date and time'
+    } else if (isLinkedMarket) {
+      // End time is locked to the linked Polymarket and not user-editable —
+      // skip the standard min/max bounds. The on-chain min trading period is
+      // still enforced by ConditionalMarketFactory.
     } else if (endDate < minDate) {
-      newErrors.endDateTime = 'End date must be at least 1 day from now'
+      newErrors.endDateTime = 'End date must be at least 1 hour from now'
     } else if (endDate > maxDate) {
-      newErrors.endDateTime = 'End date must be within 1 year'
+      newErrors.endDateTime = 'End date must be within 21 days'
     }
 
     // Validate acceptance deadline
@@ -844,7 +876,7 @@ function FriendMarketsModal({
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [formData, friendMarketType, account, STAKE_TOKEN_OPTIONS])
+  }, [formData, friendMarketType, account, STAKE_TOKEN_OPTIONS, selectedPolymarketMarket?.endDate])
 
   const handleSelectType = (type) => {
     setFriendMarketType(type)
@@ -952,11 +984,17 @@ function FriendMarketsModal({
         }
       }
 
-      // Calculate trading period in days BEFORE building submit data
+      // Calculate trading period BEFORE building submit data
       // This must happen before onCreate so WalletButton receives the correct value
       const endDate = new Date(formData.endDateTime)
       const now = new Date()
-      const tradingPeriodDays = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      // Pass seconds directly so sub-day precision survives (e.g., a Polymarket
+      // event ending in 6 hours stays a 6-hour wager, not rounded up to 1 day).
+      // Floor to a whole second and clamp to the contract's min so we never
+      // submit a sub-minimum period.
+      const rawSeconds = Math.floor((endDate.getTime() - now.getTime()) / 1000)
+      const tradingPeriodSeconds = Math.max(rawSeconds, WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS)
+      const tradingPeriodDays = Math.max(1, Math.ceil(tradingPeriodSeconds / (60 * 60 * 24)))
 
       // Build submit data with token address for WalletButton
       const submitData = {
@@ -970,7 +1008,10 @@ function FriendMarketsModal({
           // address.
           opponent: formData.opponentResolved || formData.opponent,
           arbitrator: formData.arbitratorResolved || formData.arbitrator,
-          // Pass calculated trading period so WalletButton uses the user's selected end date
+          // Pass calculated trading period so downstream uses the user's selected end date.
+          // `tradingPeriodSeconds` is the source of truth; `tradingPeriod` (days)
+          // is kept for any legacy consumers that still parse it.
+          tradingPeriodSeconds,
           tradingPeriod: tradingPeriodDays,
           // Pass actual token address so WalletButton can use correct decimals
           // 'native' means the chain's native token (no ERC20 address), pass null for this case
@@ -1710,23 +1751,31 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    <div className="fm-form-group">
-                      <label htmlFor="fm-end-date">
-                        End Date & Time <span className="fm-required">*</span>
-                      </label>
-                      <input
-                        id="fm-end-date"
-                        type="datetime-local"
-                        value={formData.endDateTime}
-                        onChange={(e) => handleFormChange('endDateTime', e.target.value)}
-                        min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-                        max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-                        disabled={submitting}
-                        className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
-                      />
-                      <span className="fm-hint">When does this wager end? (min: 1 day, max: 1 year)</span>
-                      {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
-                    </div>
+                    {/*
+                      End date input. Hidden entirely when a Polymarket is
+                      linked — the wager's end time is locked to that market's
+                      own end time so the side bet can't settle before (or
+                      long after) the linked event.
+                    */}
+                    {!(formData.resolutionType === ResolutionType.PolymarketOracle && selectedPolymarketMarket) && (
+                      <div className="fm-form-group">
+                        <label htmlFor="fm-end-date">
+                          End Date &amp; Time <span className="fm-required">*</span>
+                        </label>
+                        <input
+                          id="fm-end-date"
+                          type="datetime-local"
+                          value={formData.endDateTime}
+                          onChange={(e) => handleFormChange('endDateTime', e.target.value)}
+                          min={toDateTimeLocal(new Date(Date.now() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000))}
+                          max={toDateTimeLocal(new Date(Date.now() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000))}
+                          disabled={submitting}
+                          className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
+                        />
+                        <span className="fm-hint">When does this wager end? (min: 1 hour, max: 21 days)</span>
+                        {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
+                      </div>
+                    )}
 
                     {/* Acceptance Deadline - for multi-party acceptance flow */}
                     <div className="fm-form-group">
@@ -1818,7 +1867,7 @@ function FriendMarketsModal({
                               <strong>{selectedPolymarketMarket.question}</strong>
                               <div className="fm-polymarket-meta">
                                 {selectedPolymarketMarket.endDate && (
-                                  <span>Ends {formatDate(selectedPolymarketMarket.endDate)}</span>
+                                  <span>Wager ends {formatDate(selectedPolymarketMarket.endDate)} (locked to linked market)</span>
                                 )}
                                 {selectedPolymarketMarket.outcomes?.length > 0 && (
                                   <span>

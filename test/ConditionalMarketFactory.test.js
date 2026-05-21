@@ -41,7 +41,7 @@ describe("ConditionalMarketFactory", function () {
     });
 
     it("Should set correct default trading period", async function () {
-      expect(await marketFactory.DEFAULT_TRADING_PERIOD()).to.equal(10 * 24 * 60 * 60); // 10 days
+      expect(await marketFactory.DEFAULT_TRADING_PERIOD()).to.equal(24 * 60 * 60); // 1 day
     });
   });
 
@@ -70,7 +70,8 @@ describe("ConditionalMarketFactory", function () {
       const collateralTokenAddr = await collateralToken.getAddress();
       const liquidityAmount = ethers.parseEther("1000");
       const liquidityParameter = ethers.parseEther("100");
-      const tradingPeriod = 1 * 24 * 60 * 60; // 1 day (too short)
+      // 30 minutes — below the 1-hour MIN_TRADING_PERIOD floor.
+      const tradingPeriod = 30 * 60;
 
       await expect(
         marketFactory.deployMarketPair(

@@ -127,7 +127,9 @@ contract FriendGroupMarketFactory is IFriendGroupErrors, Ownable, ReentrancyGuar
     mapping(uint256 => PendingResolutionData) public pendingResolutions;
 
     // Challenge configuration
-    uint256 public challengePeriod = 24 hours;  // How long before resolution finalizes
+    // 1 hour is comfortably past Polygon/Ethereum finality (~10 min), so a
+    // reorg can't unwind a finalized resolution while keeping payouts fast.
+    uint256 public challengePeriod = 1 hours;   // How long before resolution finalizes
     uint256 public challengeBond = 0.1 ether;   // Bond required to challenge
 
     // ========== Claim Timeout ==========

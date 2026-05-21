@@ -32,7 +32,7 @@ uint256 public constant DAILY_SPENDING_LIMIT = 100_000 ether;
 uint256 public constant REVIEW_PERIOD = 7 days;
 
 // Trading period range
-uint256 public constant MIN_TRADING_PERIOD = 7 days;
+uint256 public constant MIN_TRADING_PERIOD = 1 hours;
 uint256 public constant MAX_TRADING_PERIOD = 21 days;
 
 // Settlement window for oracle
