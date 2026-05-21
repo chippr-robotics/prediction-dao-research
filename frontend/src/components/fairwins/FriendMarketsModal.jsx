@@ -234,6 +234,10 @@ function FriendMarketsModal({
   // browsing/searching internally. We only need to track the picked market so
   // its conditionId can be committed to formData.peggedMarketId.
   const [selectedPolymarketMarket, setSelectedPolymarketMarket] = useState(null)
+  // Once a market is linked, the browse/search area collapses behind an
+  // accordion so the form stays compact. Users can re-open it to swap markets
+  // without losing their current pick.
+  const [polymarketBrowserOpen, setPolymarketBrowserOpen] = useState(false)
   const { clear: clearPolymarket } = usePolymarketSearch({ limit: 10 })
 
   // Tracks the last description we generated from (creatorSide + Polymarket
@@ -283,6 +287,7 @@ function FriendMarketsModal({
     })
     setErrors({})
     setSelectedPolymarketMarket(null)
+    setPolymarketBrowserOpen(false)
     clearPolymarket()
     lastAutoDescriptionRef.current = ''
     setEnableEncryption(true)
@@ -474,6 +479,7 @@ function FriendMarketsModal({
   // re-sync the description to the new question.
   const handleSelectPolymarketMarket = (market) => {
     setSelectedPolymarketMarket(market)
+    setPolymarketBrowserOpen(false)
     setFormData(prev => {
       const updated = { ...prev, peggedMarketId: market.conditionId }
       // Lock the wager's end time to the linked market so the side bet can't
@@ -515,6 +521,7 @@ function FriendMarketsModal({
 
   const clearPolymarketSelection = () => {
     setSelectedPolymarketMarket(null)
+    setPolymarketBrowserOpen(true)
     // End time was locked to the linked market — restore the default
     // so the user can pick their own again.
     setFormData(prev => ({
@@ -1890,17 +1897,62 @@ function FriendMarketsModal({
                           </div>
                         )}
 
-                        <span className="fm-hint">
-                          Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.
-                        </span>
+                        {selectedPolymarketMarket ? (
+                          <div className={`fm-polymarket-browse-accordion ${polymarketBrowserOpen ? 'open' : ''}`}>
+                            <button
+                              type="button"
+                              className="fm-polymarket-browse-toggle"
+                              onClick={() => setPolymarketBrowserOpen(o => !o)}
+                              aria-expanded={polymarketBrowserOpen}
+                              aria-controls="fm-polymarket-browse-panel"
+                              disabled={submitting}
+                            >
+                              <span>Browse other Polymarket events</span>
+                              <svg
+                                className="fm-polymarket-browse-chevron"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                            </button>
+                            {polymarketBrowserOpen && (
+                              <div id="fm-polymarket-browse-panel" className="fm-polymarket-browse-panel">
+                                <span className="fm-hint">
+                                  Browse top markets by category, or search for a specific event. Picking a different one will replace your current selection.
+                                </span>
+                                <PolymarketBrowser
+                                  variant="inline"
+                                  showFilters
+                                  limit={20}
+                                  selectedConditionId={selectedPolymarketMarket?.conditionId}
+                                  onSelectMarket={handleSelectPolymarketMarket}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <span className="fm-hint">
+                              Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.
+                            </span>
 
-                        <PolymarketBrowser
-                          variant="inline"
-                          showFilters
-                          limit={20}
-                          selectedConditionId={selectedPolymarketMarket?.conditionId}
-                          onSelectMarket={handleSelectPolymarketMarket}
-                        />
+                            <PolymarketBrowser
+                              variant="inline"
+                              showFilters
+                              limit={20}
+                              selectedConditionId={selectedPolymarketMarket?.conditionId}
+                              onSelectMarket={handleSelectPolymarketMarket}
+                            />
+                          </>
+                        )}
 
                         {errors.peggedMarketId && (
                           <span className="fm-error">{errors.peggedMarketId}</span>

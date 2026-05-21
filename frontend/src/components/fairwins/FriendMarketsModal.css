@@ -2533,6 +2533,57 @@
   background: var(--bg-primary, #F7F9FA);
 }
 
+.fm-polymarket-browse-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+}
+
+.fm-polymarket-browse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  color: var(--text-primary, #1F2933);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fm-polymarket-browse-toggle:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fm-polymarket-browse-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fm-polymarket-browse-chevron {
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.fm-polymarket-browse-accordion.open .fm-polymarket-browse-chevron {
+  transform: rotate(180deg);
+}
+
+.fm-polymarket-browse-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0 0.85rem 0.85rem;
+}
+
 .fm-side-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;
