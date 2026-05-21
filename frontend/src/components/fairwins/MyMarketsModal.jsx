@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet, useWeb3, useMyWagers, useMyWagerNotifications } from '../../hooks'
+import { useWallet, useWeb3, useMyWagers, useMyWagerNotifications, useLazyIpfsEnvelope } from '../../hooks'
+import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import {
   WagerStatus as MarketStatus,
@@ -15,6 +16,8 @@ import { getContractAddress } from '../../config/contracts'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
+import ShareWagerModal from './ShareWagerModal'
+import { getMarketUrl, getMarketDescription } from './marketHelpers'
 import './MyMarketsModal.css'
 
 /**
@@ -62,6 +65,13 @@ function MyMarketsModal({
   const [showAcceptanceModal, setShowAcceptanceModal] = useState(false)
   const [acceptanceMarket, setAcceptanceMarket] = useState(null)
 
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareMarketData, setShareMarketData] = useState(null)
+
+  // Cancellation state (creator cancelling a pending wager)
+  const [cancellingMarketId, setCancellingMarketId] = useState(null)
+
   // Filter state
   const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
   const [statusFilter, setStatusFilter] = useState('all')
@@ -92,6 +102,19 @@ function MyMarketsModal({
     filter: myWagersFilter,
   })
 
+  // Lazy IPFS envelope fetch + decryption so encrypted wagers can be
+  // unlocked from the detail view (mirrors FriendMarketsModal's pipeline).
+  // Markets stay encrypted until the user clicks "Click to decrypt".
+  const {
+    markets: wagersWithEnvelopes,
+    fetchEnvelope,
+  } = useLazyIpfsEnvelope(pagedWagers)
+  const {
+    markets: decryptedWagers,
+    decryptMarket,
+    isMarketDecrypting,
+  } = useLazyMarketDecryption(wagersWithEnvelopes)
+
   // Unread tracking (circuit-breaker for the count badge + mark-as-read).
   // Independent storage key from FriendMarketsModal so opening a wager in
   // one view does not mark it read in the other.
@@ -99,16 +122,16 @@ function MyMarketsModal({
     unreadMarketIds,
     markMarketAsRead,
     isMarketUnread,
-  } = useMyWagerNotifications(pagedWagers, account)
+  } = useMyWagerNotifications(decryptedWagers, account)
 
   // The pagedWagers are already gated on ownership/expiry/tab by the
   // repository. The remaining job for the modal is to merge in any
   // optimistic friend markets passed via props (e.g. just-created).
   const visibleWagers = useMemo(() => {
-    const seen = new Set(pagedWagers.map(w => String(w.id)))
+    const seen = new Set(decryptedWagers.map(w => String(w.id)))
     const optimistic = (friendMarkets || []).filter(m => !seen.has(String(m.id)))
-    return [...pagedWagers, ...optimistic]
-  }, [pagedWagers, friendMarkets])
+    return [...decryptedWagers, ...optimistic]
+  }, [decryptedWagers, friendMarkets])
 
   // Fetch markets data — now a thin wrapper that refreshes the paginated query
   const fetchMarketsData = useCallback(async () => {
@@ -328,10 +351,94 @@ function MyMarketsModal({
   const handleMarketSelect = (market) => {
     if (market?.id) markMarketAsRead(market.id)
     setSelectedMarket(market)
+    // Trigger lazy IPFS envelope fetch for encrypted wagers so the
+    // "Click to decrypt" affordance has data to work on.
+    if (market?.needsIpfsFetch && market?.ipfsCid) {
+      fetchEnvelope(market.id)
+    }
   }
 
   const handleBackToList = () => {
     setSelectedMarket(null)
+  }
+
+  // Share modal handlers
+  const handleOpenShareModal = (market) => {
+    setShareMarketData({
+      url: getMarketUrl(market, account),
+      description: getMarketDescription(market),
+      stakeAmount: market.stakeAmount,
+      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC'
+    })
+    setShowShareModal(true)
+  }
+
+  const handleCloseShareModal = () => {
+    setShowShareModal(false)
+    setShareMarketData(null)
+  }
+
+  // Cancel a pending-acceptance wager (creator only). On success refresh
+  // the page so the wager flips to cancelled in the list.
+  const handleCancelMarket = async (market) => {
+    if (!signer || !isCorrectNetwork) {
+      window.alert('Please connect your wallet and switch to the correct network')
+      return
+    }
+
+    const status = market.status?.toLowerCase()
+    if (status === 'cancelled' || status === 'canceled') {
+      window.alert('This wager has already been cancelled.')
+      return
+    }
+
+    const marketId = market.id
+    if (marketId === undefined || marketId === null) {
+      window.alert('Invalid market ID')
+      return
+    }
+
+    if (!window.confirm('Cancel this wager and refund all stakes? This cannot be undone.')) {
+      return
+    }
+
+    setCancellingMarketId(marketId)
+    try {
+      const factoryAddress = getContractAddress('friendGroupMarketFactory')
+      const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
+      const tx = await factory.cancelPendingMarket(marketId)
+      await tx.wait()
+
+      window.alert('Wager cancelled. Stakes have been refunded.')
+      setSelectedMarket(null)
+      await refreshPage()
+    } catch (err) {
+      console.error('Error cancelling market:', err)
+      let errorMessage = 'Failed to cancel wager'
+
+      const errorData = err.data || err.info?.error?.data
+      if (errorData) {
+        const selector = typeof errorData === 'string' ? errorData.slice(0, 10) : null
+        const knownErrors = {
+          '0x7dc6505a': 'This wager is no longer pending — it may have already been cancelled or activated.',
+          '0xba4ef4cb': 'Not authorized to cancel this wager.',
+        }
+        if (selector && knownErrors[selector]) {
+          errorMessage = knownErrors[selector]
+        } else if (err.reason) {
+          errorMessage += `: ${err.reason}`
+        } else if (err.message) {
+          errorMessage += `: ${err.message}`
+        }
+      } else if (err.reason) {
+        errorMessage += `: ${err.reason}`
+      } else if (err.message) {
+        errorMessage += `: ${err.message}`
+      }
+      window.alert(errorMessage)
+    } finally {
+      setCancellingMarketId(null)
+    }
   }
 
   // Check if market can be resolved (contract requires market.active == true, i.e. ACTIVE status)
@@ -630,6 +737,9 @@ function MyMarketsModal({
                       userPositions={userPositions}
                       canOpenDispute={canOpenDispute}
                       onOpenDispute={handleOpenDispute}
+                      onShare={handleOpenShareModal}
+                      onDecrypt={() => decryptMarket(selectedMarket.id)}
+                      isDecrypting={isMarketDecrypting(selectedMarket.id)}
                     />
                   ) : categorizedMarkets.participating.length === 0 ? (
                     <div className="mm-empty-state">
@@ -689,6 +799,11 @@ function MyMarketsModal({
                       canRespondToDispute={canRespondToDispute}
                       onOpenResolution={handleOpenResolution}
                       onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
+                      onShare={handleOpenShareModal}
+                      onCancel={handleCancelMarket}
+                      isCancelling={cancellingMarketId === selectedMarket.id}
+                      onDecrypt={() => decryptMarket(selectedMarket.id)}
+                      isDecrypting={isMarketDecrypting(selectedMarket.id)}
                       isCreatorView
                     />
                   ) : categorizedMarkets.created.length === 0 ? (
@@ -748,6 +863,8 @@ function MyMarketsModal({
                       getTimeRemaining={getTimeRemaining}
                       account={account}
                       userPositions={userPositions}
+                      onDecrypt={() => decryptMarket(selectedMarket.id)}
+                      isDecrypting={isMarketDecrypting(selectedMarket.id)}
                       isHistoryView
                     />
                   ) : categorizedMarkets.history.length === 0 ? (
@@ -831,6 +948,18 @@ function MyMarketsModal({
           onAccepted={handleMarketAccepted}
           contractAddress={getContractAddress('friendGroupMarketFactory')}
           contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
+        />
+      )}
+
+      {/* Share Modal — QR + copy-link for inviting participants */}
+      {showShareModal && shareMarketData && (
+        <ShareWagerModal
+          isOpen={showShareModal}
+          onClose={handleCloseShareModal}
+          url={shareMarketData.url}
+          description={shareMarketData.description}
+          stakeAmount={shareMarketData.stakeAmount}
+          stakeTokenSymbol={shareMarketData.stakeTokenSymbol}
         />
       )}
     </div>
@@ -1158,6 +1287,11 @@ function MarketDetailView({
   onOpenResolution,
   onOpenDispute,
   onRespondToDispute,
+  onShare,
+  onCancel,
+  isCancelling = false,
+  onDecrypt,
+  isDecrypting = false,
   isCreatorView = false,
   isHistoryView = false
 }) {
@@ -1165,6 +1299,11 @@ function MarketDetailView({
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
   const endTime = market.tradingEndTime || market.endDate
+  const isEncryptedWager = market.isPrivate || market.isEncrypted
+  const status = (market.status || '').toLowerCase()
+  const isPendingAcceptance = status === 'pending_acceptance' || status === 'pending'
+  const canShare = !isHistoryView && (isPendingAcceptance || status === 'active')
+  const canCancel = isCreator && isPendingAcceptance && typeof onCancel === 'function'
 
   return (
     <div className="mm-detail">
@@ -1217,6 +1356,62 @@ function MarketDetailView({
        market.description !== 'Private Wager' && (
         <div className="mm-detail-description">
           <p>{market.description}</p>
+        </div>
+      )}
+
+      {/* Encrypted Data Section — click to decrypt the bet terms */}
+      {isEncryptedWager && (
+        <div className="mm-encrypted-section">
+          <div className="mm-encrypted-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+            <span>Encrypted Data</span>
+            <span className="mm-encrypted-hint">Only visible to participants</span>
+          </div>
+          <div className="mm-encrypted-content">
+            <span className="mm-detail-label">Bet Terms</span>
+            <span className="mm-encrypted-value">
+              {market.encryptionStatus === 'decrypted' || market.encryptionStatus === 'not_encrypted' ? (
+                getMarketDescription(market)
+              ) : isDecrypting ? (
+                <span className="mm-decrypting-indicator">
+                  <span className="mm-spinner-small"></span>
+                  Decrypting...
+                </span>
+              ) : market.encryptionStatus === 'error' ? (
+                <div className="mm-decrypt-error">
+                  <span className="mm-decrypt-error-message">{market.decryptionError}</span>
+                  {onDecrypt && (
+                    <button type="button" className="mm-decrypt-btn" onClick={onDecrypt}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M23 4v6h-6M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                      </svg>
+                      Try Again
+                    </button>
+                  )}
+                </div>
+              ) : market.canView && onDecrypt ? (
+                <button type="button" className="mm-decrypt-btn" onClick={onDecrypt}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                  </svg>
+                  Click to decrypt
+                </button>
+              ) : (
+                <span className="mm-encrypted-placeholder">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"/>
+                  </svg>
+                  Not a participant
+                </span>
+              )}
+            </span>
+          </div>
         </div>
       )}
 
@@ -1357,6 +1552,46 @@ function MarketDetailView({
               <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             Open Dispute
+          </button>
+        )}
+        {canShare && typeof onShare === 'function' && (
+          <button
+            type="button"
+            className="mm-btn-secondary"
+            onClick={() => onShare(market)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="18" cy="5" r="3"/>
+              <circle cx="6" cy="12" r="3"/>
+              <circle cx="18" cy="19" r="3"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+            </svg>
+            Share
+          </button>
+        )}
+        {canCancel && (
+          <button
+            type="button"
+            className="mm-btn-danger"
+            onClick={() => onCancel(market)}
+            disabled={isCancelling}
+          >
+            {isCancelling ? (
+              <>
+                <span className="mm-spinner-small"></span>
+                Cancelling...
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                Cancel Wager
+              </>
+            )}
           </button>
         )}
       </div>

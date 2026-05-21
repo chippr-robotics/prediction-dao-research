@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
-import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications } from '../../hooks'
-import { useRoleDetails } from '../../hooks/useRoleDetails'
-import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
+import { useWallet, useWeb3 } from '../../hooks'
+import { useEncryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
 import { useDex } from '../../hooks/useDex'
 import {
@@ -12,15 +10,16 @@ import {
   getDefaultAcceptanceDeadline,
   toDateTimeLocal
 } from '../../constants/wagerDefaults'
-import { getContractAddress } from '../../config/contracts'
-import { getTransactionUrl } from '../../config/blockExplorer'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
+import { ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
 import AddressInput from '../ui/AddressInput'
 import { isEnsName } from '../../utils/validation'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 import PolymarketBrowser from './PolymarketBrowser'
+import { formatUSD, getMarketUrl } from './marketHelpers'
+import TransactionProgress from './TransactionProgress'
+import './FriendMarketsModal.css'
 
 // Fallback so the UI renders even if the enum export is missing in some environments
 const ResolutionType = _ResolutionType ?? {
@@ -31,71 +30,26 @@ const ResolutionType = _ResolutionType ?? {
   AutoPegged: 4,
   PolymarketOracle: 5,
 }
-import MarketAcceptanceModal from './MarketAcceptanceModal'
-import TransactionProgress from './TransactionProgress'
-import './FriendMarketsModal.css'
 
 // Stake token options derived from the active chain's tokens. The token
 // metadata is sourced from useDex() at render time so the Testnet/Mainnet
 // toggle picks up the right addresses without a reload.
 const CUSTOM_TOKEN_OPTION = { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
 
-// Helper to format stake amount as USD (rounded to nearest cent)
-const formatUSD = (amount, symbol) => {
-  const num = parseFloat(amount) || 0
-  // Only show USD formatting for stablecoins
-  const isStablecoin = symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
-
-  if (isStablecoin) {
-    if (num === 0) return '$0.00'
-    if (num < 0.01) return '< $0.01'
-    return `$${num.toFixed(2)}`
-  }
-  // For non-stablecoins, show raw amount with symbol
-  return `${num} ${symbol || 'tokens'}`
-}
-
-// Helper to get display description from a market (handles encrypted/decrypted metadata)
-const getMarketDescription = (market) => {
-  // If market has decrypted metadata, use it
-  if (market.metadata && market.canView !== false) {
-    // Decrypted metadata may have name, description, or question field
-    const title = market.metadata.name || market.metadata.description || market.metadata.question
-    if (title && title !== 'Private Market' && title !== 'Private Wager' && title !== 'Encrypted Market' && title !== 'Encrypted Wager') {
-      return title
-    }
-  }
-
-  // Check raw description, skip placeholder values
-  const desc = market.description
-  if (desc && desc !== 'Encrypted Market' && desc !== 'Encrypted Wager' && desc !== 'Private Market' && desc !== 'Private Wager') {
-    return desc
-  }
-
-  // For encrypted/private wagers, show stake and time info instead of generic label
-  const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'MATIC'}` : ''
-  return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
-}
-
 /**
- * FriendMarketsModal Component
+ * FriendMarketsModal
  *
- * A dedicated modal for managing friend markets:
- * - Create: Create new friend markets (1v1, Small Group, Event Tracking)
- * - Active: View and manage active friend markets
- * - Past: View completed/resolved friend markets
- *
- * Features QR code generation for sharing after creation
+ * Focused modal for creating a new friend market (1v1, Small Group,
+ * Event Tracking, or Bookmaker). Opens directly into the form for the
+ * provided initialType, defaulting to 1v1. Viewing/managing existing
+ * wagers lives in MyMarketsModal.
  */
 function FriendMarketsModal({
   isOpen,
   onClose,
   onCreate,
-  activeMarkets = [],
-  pastMarkets = [],
   pendingTransaction = null,
   onClearPendingTransaction = () => {},
-  initialTab = null,
   initialType = null,
   initialPolymarketMarket = null
 }) {
@@ -123,21 +77,6 @@ function FriendMarketsModal({
   const { createFriendMarket } = useFriendMarketCreation()
   const handleCreate = onCreate || createFriendMarket
 
-  // Role details for checking dual roles (required for Bookmaker)
-  const { roleDetails } = useRoleDetails()
-
-  // Check if user can create Bookmaker markets (requires both MARKET_MAKER and FRIEND_MARKET roles)
-  const hasBookmakerRoles = useMemo(() => {
-    const marketMaker = roleDetails?.MARKET_MAKER
-    const friendMarket = roleDetails?.FRIEND_MARKET
-    return (
-      marketMaker?.hasRole &&
-      marketMaker?.isActive &&
-      friendMarket?.hasRole &&
-      friendMarket?.isActive
-    )
-  }, [roleDetails])
-
   // Encryption hook for friend market privacy
   const {
     isInitialized: encryptionInitialized,
@@ -147,39 +86,9 @@ function FriendMarketsModal({
     addRecipientByPublicKey
   } = useEncryption()
 
-  // Lazy load IPFS envelopes - only fetches when user views a market
-  // This prevents hitting rate limits on page load
-  const {
-    markets: activeMarketsWithEnvelopes,
-    fetchEnvelope: fetchActiveEnvelope,
-    isMarketFetching: _isActiveEnvelopeFetching,
-    needsFetch: _activeNeedsFetch
-  } = useLazyIpfsEnvelope(activeMarkets)
-  const {
-    markets: pastMarketsWithEnvelopes,
-    fetchEnvelope: fetchPastEnvelope,
-    isMarketFetching: _isPastEnvelopeFetching,
-    needsFetch: _pastNeedsFetch
-  } = useLazyIpfsEnvelope(pastMarkets)
-
-  // Lazy decrypt markets for display - only decrypts when user clicks on a market
-  const {
-    markets: lazyActiveMarkets,
-    decryptMarket: decryptActiveMarket,
-    isMarketDecrypting: isActiveMarketDecrypting
-  } = useLazyMarketDecryption(activeMarketsWithEnvelopes)
-  const {
-    markets: lazyPastMarkets,
-    decryptMarket: decryptPastMarket,
-    isMarketDecrypting: isPastMarketDecrypting
-  } = useLazyMarketDecryption(pastMarketsWithEnvelopes)
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
-
   // Creation flow state
-  const [creationStep, setCreationStep] = useState('type') // 'type', 'form', 'success'
-  const [friendMarketType, setFriendMarketType] = useState(null)
+  const [creationStep, setCreationStep] = useState('form') // 'form', 'success'
+  const [friendMarketType, setFriendMarketType] = useState(initialType || 'oneVsOne')
   const [createdMarket, setCreatedMarket] = useState(null)
 
   // Form data
@@ -212,9 +121,6 @@ function FriendMarketsModal({
     resolutionType: WAGER_DEFAULTS.RESOLUTION_TYPE
   })
 
-  // Selected market for detail view
-  const [selectedMarket, setSelectedMarket] = useState(null)
-
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -244,23 +150,6 @@ function FriendMarketsModal({
   // question). If the user hasn't edited the field since, we may overwrite it
   // when those inputs change; once they edit, we leave their text alone.
   const lastAutoDescriptionRef = useRef('')
-
-  // Market acceptance modal state
-  const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false)
-  const [marketToAccept, setMarketToAccept] = useState(null)
-
-  // Market cancellation state
-  const [cancellingMarketId, setCancellingMarketId] = useState(null)
-
-  // Share modal state
-  const [showShareModal, setShowShareModal] = useState(false)
-  const [shareMarketData, setShareMarketData] = useState(null)
-
-  // Resolution state
-  const [resolvingMarket, setResolvingMarket] = useState(null)
-  const [resolveStep, setResolveStep] = useState('select') // 'select', 'confirm', 'submitting', 'success'
-  const [resolveError, setResolveError] = useState(null)
-  const [resolveTxHash, setResolveTxHash] = useState(null)
 
   // Encryption state
   const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
@@ -293,19 +182,14 @@ function FriendMarketsModal({
     setEnableEncryption(true)
   }, [clearPolymarket])
 
-  // Reset modal state when opened
+  // Reset modal state when opened. Always lands on the form for the
+  // provided initialType (1v1 by default), since this modal is now
+  // single-purpose.
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab || 'create')
-      if (initialType) {
-        setFriendMarketType(initialType)
-        setCreationStep('form')
-      } else {
-        setCreationStep('type')
-        setFriendMarketType(null)
-      }
+      setFriendMarketType(initialType || 'oneVsOne')
+      setCreationStep('form')
       setCreatedMarket(null)
-      setSelectedMarket(null)
       setErrors({})
       resetForm()
       // When opened from a Polymarket card on the dashboard, jump the user
@@ -331,7 +215,7 @@ function FriendMarketsModal({
         })
       }
     }
-  }, [isOpen, resetForm, initialTab, initialType, initialPolymarketMarket])
+  }, [isOpen, resetForm, initialType, initialPolymarketMarket])
 
   const handleClose = useCallback(() => {
     if (!submitting) {
@@ -566,158 +450,6 @@ function FriendMarketsModal({
     }
   }
 
-  // Market acceptance handlers
-  const handleOpenAcceptanceModal = (market) => {
-    // Mark this market as read (clears unread indicator)
-    markMarketAsRead(market.id)
-
-    // Transform market data to match what MarketAcceptanceModal expects
-    const marketData = {
-      id: market.id,
-      description: market.description,
-      creator: market.creator,
-      participants: market.participants || [],
-      arbitrator: market.arbitrator || null,
-      marketType: market.type || 'oneVsOne',
-      status: market.status,
-      acceptanceDeadline: typeof market.acceptanceDeadline === 'number'
-        ? market.acceptanceDeadline
-        : new Date(market.acceptanceDeadline).getTime(),
-      minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
-      stakePerParticipant: market.stakeAmount,
-      stakeToken: market.stakeTokenAddress || null,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC',
-      acceptances: market.acceptances || {},
-      acceptedCount: market.acceptedCount || 0,
-      // Encryption fields for decryption in the acceptance modal
-      isEncrypted: market.isEncrypted || false,
-      ipfsCid: market.ipfsCid || null,
-      rawDescription: market.metadata ? JSON.stringify(market.metadata) : null,
-    }
-
-    setMarketToAccept(marketData)
-    setAcceptanceModalOpen(true)
-  }
-
-  const handleCloseAcceptanceModal = () => {
-    setAcceptanceModalOpen(false)
-    setMarketToAccept(null)
-  }
-
-  const handleMarketAccepted = () => {
-    // Refresh data after acceptance - you may want to trigger a parent refresh
-    handleCloseAcceptanceModal()
-    // Force a refresh by closing and reopening the modal or triggering a data refresh
-    window.location.reload()
-  }
-
-  // Share modal handlers
-  const handleOpenShareModal = (market) => {
-    setShareMarketData({
-      url: getMarketUrl(market),
-      description: getMarketDescription(market),
-      stakeAmount: market.stakeAmount,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC'
-    })
-    setShowShareModal(true)
-  }
-
-  const handleCloseShareModal = () => {
-    setShowShareModal(false)
-    setShareMarketData(null)
-  }
-
-  // Cancel a pending market (creator only)
-  const handleCancelMarket = async (market) => {
-    if (!signer || !isCorrectNetwork) {
-      window.alert('Please connect your wallet and switch to the correct network')
-      return
-    }
-
-    if (market.status === 'cancelled' || market.status === 'canceled') {
-      window.alert('This wager has already been cancelled.')
-      return
-    }
-
-    const marketId = market.id
-    if (marketId === undefined || marketId === null) {
-      window.alert('Invalid market ID')
-      return
-    }
-
-    if (!window.confirm('Cancel this wager and refund all stakes? This cannot be undone.')) {
-      return
-    }
-
-    setCancellingMarketId(marketId)
-    try {
-      const factoryAddress = getContractAddress('friendGroupMarketFactory')
-      const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
-
-      console.log('Cancelling market:', marketId)
-      const tx = await factory.cancelPendingMarket(marketId)
-      console.log('Cancel transaction sent:', tx.hash)
-
-      await tx.wait()
-      console.log('Market cancelled successfully')
-
-      window.alert('Wager cancelled. Stakes have been refunded.')
-      // Refresh to show updated state
-      window.location.reload()
-    } catch (error) {
-      console.error('Error cancelling market:', error)
-      let errorMessage = 'Failed to cancel wager'
-
-      // Decode known custom error selectors
-      const errorData = error.data || error.info?.error?.data
-      if (errorData) {
-        const selector = typeof errorData === 'string' ? errorData.slice(0, 10) : null
-        const knownErrors = {
-          '0x7dc6505a': 'This wager is no longer pending — it may have already been cancelled or activated.',
-          '0xba4ef4cb': 'Not authorized to cancel this wager.',
-        }
-        if (selector && knownErrors[selector]) {
-          errorMessage = knownErrors[selector]
-        } else if (error.reason) {
-          errorMessage += `: ${error.reason}`
-        } else if (error.message) {
-          errorMessage += `: ${error.message}`
-        }
-      } else if (error.reason) {
-        errorMessage += `: ${error.reason}`
-      } else if (error.message) {
-        errorMessage += `: ${error.message}`
-      }
-      window.alert(errorMessage)
-    } finally {
-      setCancellingMarketId(null)
-    }
-  }
-
-  // Check if user can accept a pending market (invited but hasn't accepted yet)
-  const canUserAcceptMarket = useCallback((market) => {
-    if (!account || market.status !== 'pending_acceptance') return false
-
-    // User must be in participants list
-    const isInvited = market.participants?.some(
-      p => p.toLowerCase() === account.toLowerCase()
-    )
-
-    // User must NOT be the creator (creator has already accepted by creating)
-    const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
-
-    // User must not have already accepted
-    const hasAccepted = market.acceptances?.[account.toLowerCase()]?.hasAccepted
-
-    return isInvited && !isCreator && !hasAccepted
-  }, [account])
-
-  // Check if user is the creator of a pending market (shows "Under Consideration" status)
-  const isCreatorOfPendingMarket = useCallback((market) => {
-    if (!account || market.status !== 'pending_acceptance') return false
-    return market.creator?.toLowerCase() === account.toLowerCase()
-  }, [account])
-
   const validateForm = useCallback(() => {
     const newErrors = {}
 
@@ -884,18 +616,6 @@ function FriendMarketsModal({
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }, [formData, friendMarketType, account, STAKE_TOKEN_OPTIONS, selectedPolymarketMarket?.endDate])
-
-  const handleSelectType = (type) => {
-    setFriendMarketType(type)
-    setCreationStep('form')
-    resetForm()
-  }
-
-  const handleBackToType = () => {
-    setCreationStep('type')
-    setFriendMarketType(null)
-    resetForm()
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -1091,134 +811,15 @@ function FriendMarketsModal({
   }
 
   const handleCreateAnother = () => {
-    setCreationStep('type')
-    setFriendMarketType(null)
+    // Keep friendMarketType so the user starts a fresh wager of the same
+    // type rather than seeing a (now-removed) type picker.
+    setCreationStep('form')
     setCreatedMarket(null)
     resetForm()
     setTxProgress({ step: 'idle', message: '', txHash: null, error: null })
   }
 
-  const handleMarketSelect = (market, isActiveMarket = true) => {
-    // Just select the market - decryption happens when user clicks "Click to decrypt"
-    setSelectedMarket(market)
-
-    // Mark this market as read (clears unread indicator)
-    markMarketAsRead(market.id)
-
-    // If this market needs its IPFS envelope fetched, trigger the fetch
-    if (market.needsIpfsFetch && market.ipfsCid) {
-      if (isActiveMarket) {
-        fetchActiveEnvelope(market.id)
-      } else {
-        fetchPastEnvelope(market.id)
-      }
-    }
-  }
-
-  const handleBackToList = () => {
-    setSelectedMarket(null)
-  }
-
-  // Resolve state object to pass down to MarketDetailView
-  const resolveStateObj = useMemo(() => ({
-    step: resolveStep,
-    marketId: resolvingMarket?.id,
-    txHash: resolveTxHash,
-    error: resolveError
-  }), [resolveStep, resolvingMarket, resolveTxHash, resolveError])
-
-  // Handle market resolution
-  const handleResolveMarket = useCallback(async (market, outcomeBool) => {
-    if (!signer) {
-      setResolveError('Please connect your wallet to resolve this wager.')
-      return
-    }
-    if (!isCorrectNetwork) {
-      setResolveError('Please switch to the correct network.')
-      return
-    }
-
-    setResolvingMarket(market)
-    setResolveStep('submitting')
-    setResolveError(null)
-
-    try {
-      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
-      const friendFactory = new ethers.Contract(
-        friendFactoryAddress,
-        FRIEND_GROUP_MARKET_FACTORY_ABI,
-        signer
-      )
-
-      console.log('Resolving market on-chain:', { marketId: market.id, outcome: outcomeBool })
-
-      const tx = await friendFactory.resolveFriendMarket(
-        market.id,
-        outcomeBool,
-        { gasLimit: 500000n }
-      )
-      setResolveTxHash(tx.hash)
-
-      const receipt = await tx.wait()
-      if (receipt && receipt.status === 0) {
-        throw new Error('Transaction reverted on-chain.')
-      }
-      if (!receipt) {
-        throw new Error('Transaction was dropped. Please try again.')
-      }
-
-      setResolveStep('success')
-    } catch (err) {
-      console.error('Error resolving market:', err)
-      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
-        setResolveError('Transaction rejected in wallet.')
-      } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
-        setResolveError('Wager is not active. It may already be resolved or still pending acceptance.')
-      } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
-        setResolveError('You are not authorized to resolve this wager.')
-      } else {
-        setResolveError(err.reason || err.shortMessage || err.message || 'Failed to resolve.')
-      }
-      setResolveStep('confirm')
-    }
-  }, [signer, isCorrectNetwork])
-
-  // Generate market acceptance URL for QR code
-  const getMarketUrl = (market) => {
-    if (!market?.id) return `${window.location.origin}/friend-market/preview`
-
-    // Build acceptance URL with parameters for offline preview
-    const params = new URLSearchParams({
-      marketId: market.id,
-      creator: market.creator || account || '',
-      stake: market.stakeAmount || '0',
-      token: market.stakeTokenSymbol || 'MATIC',
-      deadline: market.acceptanceDeadline ? new Date(market.acceptanceDeadline).getTime().toString() : ''
-    })
-
-    // No shared signature needed — opponent decrypts using their own wallet-derived keys
-    // via the on-chain key registry (ZKKeyManager)
-    return `${window.location.origin}/friend-market/accept?${params.toString()}`
-  }
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    if (Number.isNaN(date.getTime())) return 'N/A'
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
-  // Format address for display
-  const formatAddress = (address) => {
-    if (!address) return 'N/A'
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
-  // Get type label
+  // Get type label (used on success screen)
   const getTypeLabel = (type) => {
     switch (type) {
       case 'oneVsOne': return '1v1'
@@ -1228,17 +829,16 @@ function FriendMarketsModal({
     }
   }
 
-  // Get status badge class
-  const getStatusClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'active': return 'status-active'
-      case 'pending': return 'status-pending'
-      case 'resolved': return 'status-resolved'
-      case 'won': return 'status-won'
-      case 'lost': return 'status-lost'
-      case 'expired': return 'status-expired'
-      default: return 'status-default'
-    }
+  // Format helpers used by the form and success screen
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return 'N/A'
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const formatAddress = (address) => {
+    if (!address) return 'N/A'
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
   // Get selected stake token info for display
@@ -1252,83 +852,6 @@ function FriendMarketsModal({
     }
     return token
   }, [formData.stakeTokenId, formData.customStakeTokenAddress, STAKE_TOKEN_OPTIONS])
-
-  // Helper to check if user is a participant/creator
-  const isUserInMarket = useCallback((market) => {
-    if (!account) return false
-    const userAddr = account.toLowerCase()
-    return market.participants?.some(p => p.toLowerCase() === userAddr) ||
-           market.creator?.toLowerCase() === userAddr
-  }, [account])
-
-  // Helper to check if a pending market invitation has expired
-  const isExpiredInvitation = useCallback((market) => {
-    if (market.status !== 'pending_acceptance') return false
-    if (!market.acceptanceDeadline) return false
-    const deadline = typeof market.acceptanceDeadline === 'number'
-      ? market.acceptanceDeadline
-      : new Date(market.acceptanceDeadline).getTime()
-    return deadline < Date.now()
-  }, [])
-
-  // Filter markets where user is participating
-  // Note: Show markets even if canView is false (encrypted), as long as user is a participant
-  // They should see these markets with "encrypted" placeholder to prompt acceptance
-  const isTerminalStatus = (status) =>
-    status === 'cancelled' || status === 'canceled' || status === 'resolved' || status === 'refunded' || status === 'oracle_timed_out'
-
-  const userActiveMarkets = useMemo(() => {
-    return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status !== 'pending_acceptance' && !isTerminalStatus(m.status)
-    )
-  }, [lazyActiveMarkets, isUserInMarket])
-
-  // Filter pending markets awaiting acceptance (exclude expired and cancelled)
-  const userPendingMarkets = useMemo(() => {
-    return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status === 'pending_acceptance' && !isExpiredInvitation(m) && m.status !== 'cancelled' && m.status !== 'canceled'
-    )
-  }, [lazyActiveMarkets, isUserInMarket, isExpiredInvitation])
-
-  // Filter expired pending invitations (show in past tab)
-  const userExpiredMarkets = useMemo(() => {
-    return lazyActiveMarkets.filter(m =>
-      isUserInMarket(m) && m.status === 'pending_acceptance' && isExpiredInvitation(m)
-    )
-  }, [lazyActiveMarkets, isUserInMarket, isExpiredInvitation])
-
-  // Combine active + pending markets for notification tracking
-  const allUserMarkets = useMemo(() =>
-    [...userActiveMarkets, ...userPendingMarkets],
-    [userActiveMarkets, userPendingMarkets]
-  )
-
-  // Track unread/unseen markets for badge counter
-  const {
-    unreadCount,
-    markMarketAsRead,
-    isMarketUnread
-  } = useFriendMarketNotifications(allUserMarkets, account)
-
-  const userPastMarkets = useMemo(() => {
-    // Include both completed past markets and expired pending invitations
-    const pastFromLazy = lazyPastMarkets.filter(m => isUserInMarket(m))
-    // Add expired invitations with a flag indicating they're expired
-    const expiredWithFlag = userExpiredMarkets.map(m => ({
-      ...m,
-      isExpiredInvitation: true
-    }))
-    return [...expiredWithFlag, ...pastFromLazy]
-  }, [lazyPastMarkets, isUserInMarket, userExpiredMarkets])
-
-  // Get current market state from lazy arrays (always up-to-date after decryption)
-  const currentMarket = useMemo(() => {
-    if (!selectedMarket) return null
-    const marketIdStr = String(selectedMarket.id)
-    return lazyActiveMarkets.find(m => String(m.id) === marketIdStr) ||
-           lazyPastMarkets.find(m => String(m.id) === marketIdStr) ||
-           selectedMarket // Fallback to selected if not found
-  }, [selectedMarket, lazyActiveMarkets, lazyPastMarkets])
 
   if (!isOpen) return null
 
@@ -1362,155 +885,12 @@ function FriendMarketsModal({
           </button>
         </header>
 
-        {/* Tab Navigation */}
-        <nav className="fm-tabs" role="tablist">
-          <button
-            className={`fm-tab ${activeTab === 'create' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('create'); setSelectedMarket(null) }}
-            role="tab"
-            aria-selected={activeTab === 'create'}
-            aria-controls="panel-create"
-            disabled={submitting}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 8v8M8 12h8"/>
-            </svg>
-            <span>Create</span>
-          </button>
-          <button
-            className={`fm-tab ${activeTab === 'active' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('active'); setSelectedMarket(null) }}
-            role="tab"
-            aria-selected={activeTab === 'active'}
-            aria-controls="panel-active"
-            disabled={submitting}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-            <span>Active</span>
-            {unreadCount > 0 && (
-              <span
-                className="fm-tab-badge fm-tab-badge-unread"
-                aria-label={`${unreadCount} unread markets`}
-              >
-                {unreadCount}
-              </span>
-            )}
-          </button>
-          <button
-            className={`fm-tab ${activeTab === 'past' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('past'); setSelectedMarket(null) }}
-            role="tab"
-            aria-selected={activeTab === 'past'}
-            aria-controls="panel-past"
-            disabled={submitting}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-            <span>Past</span>
-          </button>
-        </nav>
-
         {/* Content Area */}
         <div className="fm-content">
-          {/* Create Tab */}
-          {activeTab === 'create' && (
-            <div id="panel-create" role="tabpanel" className="fm-panel">
-              {/* Type Selection Step */}
-              {creationStep === 'type' && (
-                <div className="fm-type-selection">
-                  <h3 className="fm-section-title">Choose Wager Type</h3>
-                  <div className="fm-type-grid">
-                    <button
-                      className="fm-type-card"
-                      onClick={() => handleSelectType('oneVsOne')}
-                      type="button"
-                    >
-                      <div className="fm-type-icon">&#127919;</div>
-                      <div className="fm-type-info">
-                        <h4>1 vs 1</h4>
-                        <p>Head-to-head bet with a friend</p>
-                      </div>
-                      <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6"/>
-                      </svg>
-                    </button>
-                    <button
-                      className="fm-type-card"
-                      onClick={() => handleSelectType('smallGroup')}
-                      type="button"
-                    >
-                      <div className="fm-type-icon">&#128106;</div>
-                      <div className="fm-type-info">
-                        <h4>Small Group</h4>
-                        <p>Pool wagers with 2-10 friends</p>
-                      </div>
-                      <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6"/>
-                      </svg>
-                    </button>
-                    <button
-                      className="fm-type-card"
-                      onClick={() => handleSelectType('eventTracking')}
-                      type="button"
-                    >
-                      <div className="fm-type-icon">&#127942;</div>
-                      <div className="fm-type-info">
-                        <h4>Event Tracking</h4>
-                        <p>Competitive wagers for events</p>
-                      </div>
-                      <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6"/>
-                      </svg>
-                    </button>
-                    {hasBookmakerRoles && (
-                      <button
-                        className="fm-type-card fm-type-bookmaker"
-                        onClick={() => handleSelectType('bookmaker')}
-                        type="button"
-                      >
-                        <div className="fm-type-icon">&#128176;</div>
-                        <div className="fm-type-info">
-                          <h4>Bookmaker</h4>
-                          <p>Leveraged 1v1 with custom odds</p>
-                          <span className="fm-type-premium-badge">Premium</span>
-                        </div>
-                        <svg className="fm-type-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="9 18 15 12 9 6"/>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
+          <div className="fm-panel">
               {/* Form Step */}
               {creationStep === 'form' && (
                 <form className="fm-form" onSubmit={handleSubmit}>
-                  <div className="fm-form-header">
-                    <button
-                      type="button"
-                      className="fm-back-btn"
-                      onClick={handleBackToType}
-                      disabled={submitting}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="15 18 9 12 15 6"/>
-                      </svg>
-                      Back
-                    </button>
-                    <div className="fm-form-type-badge">
-                      {friendMarketType === 'oneVsOne' && <><span>🎯</span> 1v1</>}
-                      {friendMarketType === 'smallGroup' && <><span>👪</span> Group</>}
-                      {friendMarketType === 'eventTracking' && <><span>🏆</span> Event</>}
-                      {friendMarketType === 'bookmaker' && <><span>💰</span> Bookmaker</>}
-                    </div>
-                  </div>
-
                   <div className="fm-form-grid">
                     <div className="fm-form-group fm-form-full">
                       <label htmlFor="fm-description">
@@ -2170,7 +1550,7 @@ function FriendMarketsModal({
                     <button
                       type="button"
                       className="fm-btn-secondary"
-                      onClick={handleBackToType}
+                      onClick={handleClose}
                       disabled={submitting}
                     >
                       Cancel
@@ -2324,766 +1704,16 @@ function FriendMarketsModal({
                 </div>
               )}
             </div>
-          )}
-
-          {/* Active Markets Tab */}
-          {activeTab === 'active' && (
-            <div id="panel-active" role="tabpanel" className="fm-panel">
-              {currentMarket ? (
-                <MarketDetailView
-                  market={currentMarket}
-                  onBack={handleBackToList}
-                  formatDate={formatDate}
-                  formatAddress={formatAddress}
-                  getTypeLabel={getTypeLabel}
-                  getStatusClass={getStatusClass}
-                  account={account}
-                  onDecrypt={() => {
-                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(currentMarket.id))
-                    const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
-                    decryptFn(currentMarket.id).catch(err => console.error('Decrypt failed:', err))
-                  }}
-                  isDecrypting={isActiveMarketDecrypting(currentMarket.id) || isPastMarketDecrypting(currentMarket.id)}
-                  onResolve={handleResolveMarket}
-                  resolveState={resolveStateObj}
-                />
-              ) : (
-                <>
-                  {/* Pending Markets Section */}
-                  {userPendingMarkets.length > 0 && (
-                    <div className="fm-pending-section">
-                      <h4 className="fm-section-title">
-                        <span className="fm-pending-icon">&#9203;</span>
-                        Pending Offers ({userPendingMarkets.length})
-                      </h4>
-                      <div className="fm-pending-list">
-                        {userPendingMarkets.map((market, index) => {
-                          const isCreator = isCreatorOfPendingMarket(market)
-                          const canAccept = canUserAcceptMarket(market)
-                          const isUnread = isMarketUnread(market.id)
-                          return (
-                          <div key={`pending-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`} className={`fm-pending-card ${isUnread ? 'fm-unread' : ''}`}>
-                            <div className="fm-pending-header">
-                              <span className="fm-pending-type">{getTypeLabel(market.type)}</span>
-                              <span className={`fm-pending-badge ${isCreator ? 'fm-badge-consideration' : ''}`}>
-                                {isCreator ? 'Under Consideration' : 'Offer Received'}
-                              </span>
-                            </div>
-                            <p className="fm-pending-desc">{getMarketDescription(market)}</p>
-                            <div className="fm-pending-progress">
-                              <div className="fm-progress-bar">
-                                <div
-                                  className="fm-progress-fill"
-                                  style={{
-                                    width: `${((market.acceptedCount || 0) / (market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD)) * 100}%`
-                                  }}
-                                />
-                              </div>
-                              <span className="fm-progress-text">
-                                {market.acceptedCount || 0}/{market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD} accepted
-                              </span>
-                            </div>
-                            <div className="fm-pending-info">
-                              <span className="fm-pending-stake">
-                                {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
-                              </span>
-                              {market.acceptanceDeadline && (
-                                <span className="fm-pending-deadline">
-                                  Deadline: {new Date(market.acceptanceDeadline).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                            <div className="fm-pending-actions">
-                              {/* View Offer button for invited participants */}
-                              {canAccept && (
-                                <button
-                                  type="button"
-                                  className="fm-btn-accept"
-                                  onClick={() => handleOpenAcceptanceModal(market)}
-                                >
-                                  View Offer
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="fm-btn-outline"
-                                onClick={() => handleOpenShareModal(market)}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                                  <circle cx="18" cy="5" r="3"/>
-                                  <circle cx="6" cy="12" r="3"/>
-                                  <circle cx="18" cy="19" r="3"/>
-                                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                                </svg>
-                                Share
-                              </button>
-                              {isCreator && market.status !== 'cancelled' && market.status !== 'canceled' && (
-                                <button
-                                  type="button"
-                                  className="fm-btn-danger-outline"
-                                  onClick={() => handleCancelMarket(market)}
-                                  disabled={cancellingMarketId === market.id}
-                                >
-                                  {cancellingMarketId === market.id ? 'Cancelling...' : 'Cancel'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )})}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Active Markets Section */}
-                  {userActiveMarkets.length === 0 && userPendingMarkets.length === 0 ? (
-                    <div className="fm-empty-state">
-                      <div className="fm-empty-icon">&#128200;</div>
-                      <h3>No Active Markets</h3>
-                      <p>You don&apos;t have any active friend markets yet.</p>
-                      <button
-                        type="button"
-                        className="fm-btn-primary"
-                        onClick={() => setActiveTab('create')}
-                      >
-                        Create Your First Market
-                      </button>
-                    </div>
-                  ) : userActiveMarkets.length > 0 && (
-                    <>
-                      {userPendingMarkets.length > 0 && (
-                        <h4 className="fm-section-title fm-active-title">
-                          <span>&#128200;</span>
-                          Active Markets ({userActiveMarkets.length})
-                        </h4>
-                      )}
-                      <div className="fm-markets-list">
-                        <MarketsCompactTable
-                          markets={userActiveMarkets}
-                          onSelect={handleMarketSelect}
-                          formatDate={formatDate}
-                          formatAddress={formatAddress}
-                          getTypeLabel={getTypeLabel}
-                          getStatusClass={getStatusClass}
-                          isMarketDecrypting={isActiveMarketDecrypting}
-                          isMarketUnread={isMarketUnread}
-                        />
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Past Markets Tab */}
-          {activeTab === 'past' && (
-            <div id="panel-past" role="tabpanel" className="fm-panel">
-              {currentMarket ? (
-                <MarketDetailView
-                  market={currentMarket}
-                  onBack={handleBackToList}
-                  formatDate={formatDate}
-                  formatAddress={formatAddress}
-                  getTypeLabel={getTypeLabel}
-                  getStatusClass={getStatusClass}
-                  account={account}
-                  onDecrypt={() => {
-                    const isActiveMarket = lazyActiveMarkets.some(m => String(m.id) === String(currentMarket.id))
-                    const decryptFn = isActiveMarket ? decryptActiveMarket : decryptPastMarket
-                    decryptFn(currentMarket.id).catch(err => console.error('Decrypt failed:', err))
-                  }}
-                  isDecrypting={isActiveMarketDecrypting(currentMarket.id) || isPastMarketDecrypting(currentMarket.id)}
-                  onResolve={handleResolveMarket}
-                  resolveState={resolveStateObj}
-                />
-              ) : (
-                <>
-                  {userPastMarkets.length === 0 ? (
-                    <div className="fm-empty-state">
-                      <div className="fm-empty-icon">&#128203;</div>
-                      <h3>No Past Markets</h3>
-                      <p>Completed markets will appear here.</p>
-                    </div>
-                  ) : (
-                    <div className="fm-markets-list">
-                      <MarketsCompactTable
-                        markets={userPastMarkets}
-                        onSelect={(market) => handleMarketSelect(market, false)}
-                        formatDate={formatDate}
-                        formatAddress={formatAddress}
-                        getTypeLabel={getTypeLabel}
-                        getStatusClass={getStatusClass}
-                        isPast
-                        isMarketDecrypting={isPastMarketDecrypting}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* QR Scanner Modal */}
+      {/* QR Scanner Modal — opens for opponent/arbitrator address fields */}
       <QRScanner
         isOpen={qrScannerOpen}
         onClose={handleQrScannerClose}
         onScanSuccess={handleQrScanSuccess}
       />
-
-      {/* Market Acceptance Modal */}
-      {acceptanceModalOpen && marketToAccept && (
-        <MarketAcceptanceModal
-          isOpen={acceptanceModalOpen}
-          onClose={handleCloseAcceptanceModal}
-          marketId={marketToAccept.id}
-          marketData={marketToAccept}
-          onAccepted={handleMarketAccepted}
-          contractAddress={getContractAddress('friendGroupMarketFactory')}
-          contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
-        />
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && shareMarketData && (
-        <ShareModal
-          isOpen={showShareModal}
-          onClose={handleCloseShareModal}
-          url={shareMarketData.url}
-          description={shareMarketData.description}
-          stakeAmount={shareMarketData.stakeAmount}
-          stakeTokenSymbol={shareMarketData.stakeTokenSymbol}
-        />
-      )}
     </div>
   )
 }
-
-/**
- * Share Modal Component for QR code and link sharing
- */
-function ShareModal({
-  isOpen,
-  onClose,
-  url,
-  description,
-  stakeAmount,
-  stakeTokenSymbol
-}) {
-  const [copied, setCopied] = useState(false)
-
-  if (!isOpen) return null
-
-  const handleCopyLink = async () => {
-    if (!navigator.clipboard?.writeText) {
-      window.alert('Copy to clipboard is not supported in this browser. Please copy the link manually.')
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (error) {
-      console.error('Failed to copy link:', error)
-      window.alert('Failed to copy the link. Please copy it manually.')
-    }
-  }
-
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
-  }
-
-  return (
-    <div className="fm-share-modal-backdrop" onClick={handleBackdropClick}>
-      <div className="fm-share-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="fm-share-close" onClick={onClose} aria-label="Close">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </button>
-
-        <div className="fm-share-header">
-          <h3>Share Market</h3>
-          <p className="fm-share-desc">{description}</p>
-        </div>
-
-        <div className="fm-share-qr-section">
-          <div className="fm-share-qr-container">
-            <QRCodeSVG
-              value={url}
-              size={200}
-              level="H"
-              includeMargin={false}
-              fgColor="#36B37E"
-              bgColor="transparent"
-              aria-label="QR code to share this market"
-              imageSettings={{
-                src: '/assets/logo_fairwins.svg',
-                height: 32,
-                width: 32,
-                excavate: true,
-              }}
-            />
-          </div>
-          <p className="fm-share-qr-hint">
-            Scan to accept this market
-          </p>
-        </div>
-
-        <div className="fm-share-url-section">
-          <label htmlFor="share-url">Share link</label>
-          <div className="fm-share-url-row">
-            <input
-              id="share-url"
-              type="text"
-              value={url}
-              readOnly
-              onFocus={(e) => e.target.select()}
-            />
-            <button
-              type="button"
-              className="fm-share-copy-btn"
-              onClick={handleCopyLink}
-            >
-              {copied ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-                  </svg>
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {stakeAmount && (
-          <div className="fm-share-stake-info">
-            <span>Stake required:</span>
-            <strong>{stakeAmount} {stakeTokenSymbol}</strong>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Compact table component for displaying markets
- */
-function MarketsCompactTable({
-  markets,
-  onSelect,
-  formatDate,
-  getTypeLabel,
-  getStatusClass,
-  isPast = false,
-  isMarketDecrypting = () => false,
-  isMarketUnread = () => false
-}) {
-  return (
-    <table className="fm-table" role="table">
-      <thead>
-        <tr>
-          <th>Description</th>
-          <th>Type</th>
-          <th>Stake</th>
-          <th>{isPast ? 'Result' : 'Ends'}</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {markets.map((market, index) => {
-          const isDecrypting = isMarketDecrypting(market.id)
-          const needsUnlock = market.encryptionStatus === 'encrypted' && market.canView && !isDecrypting
-          const isUnread = isMarketUnread(market.id)
-
-          return (
-            <tr
-              key={`market-${market.uniqueId || `${market.contractAddress || 'local'}-${market.id}`}-${index}`}
-              onClick={() => onSelect(market)}
-              className={`fm-table-row ${isDecrypting ? 'decrypting' : ''} ${isUnread ? 'fm-unread' : ''}`}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
-            >
-              <td className="fm-table-desc">
-                <span className="fm-table-desc-text">
-                  {market.isPrivate && (
-                    <svg
-                      className={`fm-privacy-icon ${needsUnlock ? 'unlockable' : ''}`}
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      title={needsUnlock ? 'Click to unlock' : 'Encrypted wager'}
-                    >
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0110 0v4"/>
-                    </svg>
-                  )}
-                  {isDecrypting ? (
-                    <span className="fm-decrypting-indicator">
-                      <span className="fm-spinner-small"></span>
-                      Unlocking...
-                    </span>
-                  ) : (
-                    getMarketDescription(market)
-                  )}
-                </span>
-              </td>
-              <td>
-                <span className="fm-type-badge">{getTypeLabel(market.type)}</span>
-              </td>
-              <td className="fm-table-stake">
-                {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
-              </td>
-              <td className="fm-table-date">
-                {isPast
-                  ? (market.outcome || 'Resolved')
-                  : formatDate(market.endDate)
-                }
-              </td>
-              <td>
-                <span className={`fm-status-badge ${getStatusClass(market.isExpiredInvitation ? 'expired' : market.status)}`}>
-                  {market.isExpiredInvitation ? 'Expired' : market.status}
-                </span>
-              </td>
-            </tr>
-          )
-        })}
-      </tbody>
-    </table>
-  )
-}
-
-/**
- * Market detail view component
- */
-/**
- * Inline resolve controls for market detail view
- */
-function ResolveInline({ market, onResolve, resolveState }) {
-  const [showChoices, setShowChoices] = useState(false)
-  const { chainId } = useWeb3()
-
-  if (resolveState?.marketId === market.id && resolveState?.step === 'success') {
-    return (
-      <div className="fm-resolve-inline">
-        <span>Resolution proposed!</span>
-        {resolveState.txHash && (
-          <a href={getTransactionUrl(chainId, resolveState.txHash)} target="_blank" rel="noopener noreferrer">
-            View tx
-          </a>
-        )}
-      </div>
-    )
-  }
-
-  if (resolveState?.marketId === market.id && resolveState?.step === 'submitting') {
-    return <button type="button" className="fm-btn-primary" disabled>Resolving...</button>
-  }
-
-  if (!showChoices) {
-    return (
-      <button type="button" className="fm-btn-primary" onClick={() => setShowChoices(true)}>
-        Resolve Market
-      </button>
-    )
-  }
-
-  return (
-    <div className="fm-resolve-inline">
-      {resolveState?.error && resolveState?.marketId === market.id && (
-        <div className="fm-error-text">{resolveState.error}</div>
-      )}
-      <span>Resolve as:</span>
-      <button type="button" className="fm-btn-primary" onClick={() => onResolve(market, true)}>
-        Pass
-      </button>
-      <button type="button" className="fm-btn-secondary" onClick={() => onResolve(market, false)}>
-        Fail
-      </button>
-      <button type="button" className="fm-btn-link" onClick={() => setShowChoices(false)}>
-        Cancel
-      </button>
-    </div>
-  )
-}
-
-function MarketDetailView({
-  market,
-  onBack,
-  formatDate,
-  formatAddress,
-  getTypeLabel,
-  getStatusClass,
-  account,
-  onDecrypt,
-  isDecrypting = false,
-  onResolve,
-  resolveState
-}) {
-  const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
-  const isOpponent = market.participants?.length > 1 &&
-    market.participants[1]?.toLowerCase() === account?.toLowerCase()
-  const marketUrl = `${window.location.origin}/friend-market/${market.id}`
-
-  // Check if current user can resolve based on resolution type
-  const canResolve = (() => {
-    if (market.status !== 'active') return false
-    const resType = market.resolutionType ?? 0
-    if (resType === 0) return isCreator || isOpponent // Either
-    if (resType === 1) return isCreator // Initiator
-    if (resType === 2) return isOpponent // Receiver
-    // ThirdParty/AutoPegged not handled in this view
-    return false
-  })()
-
-  return (
-    <div className="fm-detail">
-      <button type="button" className="fm-back-btn" onClick={onBack}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        Back to list
-      </button>
-
-      <div className="fm-detail-header">
-        <h3>
-          {(market.isPrivate || market.isEncrypted) && (
-            <svg
-              className="fm-privacy-icon"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              title="Encrypted wager"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
-            </svg>
-          )}
-          {getMarketDescription(market)}
-        </h3>
-        <div className="fm-detail-badges">
-          <span className={`fm-status-badge ${getStatusClass(market.status)}`}>
-            {market.status}
-          </span>
-          {(market.isPrivate || market.isEncrypted) && (
-            <span className="fm-pq-badge-small">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
-              Encrypted
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Encrypted Data Section */}
-      {(market.isPrivate || market.isEncrypted) && (
-        <div className="fm-detail-section fm-encrypted-section">
-          <div className="fm-section-header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
-            </svg>
-            <span>Encrypted Data</span>
-            <span className="fm-section-hint">Only visible to participants</span>
-          </div>
-          <div className="fm-encrypted-content">
-            <div className="fm-detail-item fm-item-encrypted">
-              <span className="fm-detail-label">Bet Terms</span>
-              <span className="fm-detail-value fm-value-decrypted">
-                {market.encryptionStatus === 'decrypted' || market.encryptionStatus === 'not_encrypted' ? (
-                  getMarketDescription(market)
-                ) : isDecrypting ? (
-                  <span className="fm-decrypting-indicator">
-                    <span className="fm-spinner-small"></span>
-                    Decrypting...
-                  </span>
-                ) : market.encryptionStatus === 'error' ? (
-                  <div className="fm-decrypt-error">
-                    <span className="fm-error-message">{market.decryptionError}</span>
-                    <button
-                      type="button"
-                      className="fm-decrypt-btn fm-retry-btn"
-                      onClick={onDecrypt}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M23 4v6h-6M1 20v-6h6"/>
-                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                      </svg>
-                      Try Again
-                    </button>
-                  </div>
-                ) : market.canView ? (
-                  <button
-                    type="button"
-                    className="fm-decrypt-btn"
-                    onClick={onDecrypt}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0110 0v4"/>
-                    </svg>
-                    Click to decrypt
-                  </button>
-                ) : (
-                  <span className="fm-encrypted-placeholder">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                      <path d="M7 11V7a5 5 0 0110 0v4"/>
-                    </svg>
-                    Not a participant
-                  </span>
-                )}
-              </span>
-            </div>
-            <div className="fm-detail-item fm-item-encrypted">
-              <span className="fm-detail-label">Type</span>
-              <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Public Data Section */}
-      <div className={`fm-detail-section ${(market.isPrivate || market.isEncrypted) ? 'fm-public-section' : ''}`}>
-        {(market.isPrivate || market.isEncrypted) && (
-          <div className="fm-section-header fm-section-public">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-            <span>Public Data</span>
-            <span className="fm-section-hint">Visible on blockchain</span>
-          </div>
-        )}
-        <div className="fm-detail-grid">
-          {!(market.isPrivate || market.isEncrypted) && (
-            <div className="fm-detail-item">
-              <span className="fm-detail-label">Type</span>
-              <span className="fm-detail-value">{getTypeLabel(market.type)}</span>
-            </div>
-          )}
-          <div className="fm-detail-item">
-            <span className="fm-detail-label">Stake</span>
-            <span className="fm-detail-value">
-              {market.stakeTokenIcon || '💵'} {formatUSD(market.stakeAmount, market.stakeTokenSymbol)}
-            </span>
-          </div>
-          <div className="fm-detail-item">
-            <span className="fm-detail-label">Total Pool</span>
-            <span className="fm-detail-value">
-              {market.stakeTokenIcon || '💵'} {formatUSD(parseFloat(market.stakeAmount || 0) * (market.participants?.length || 2), market.stakeTokenSymbol)}
-            </span>
-          </div>
-          <div className="fm-detail-item">
-            <span className="fm-detail-label">Created</span>
-            <span className="fm-detail-value">{formatDate(market.createdAt)}</span>
-          </div>
-          <div className="fm-detail-item">
-            <span className="fm-detail-label">Ends</span>
-            <span className="fm-detail-value">{formatDate(market.endDate)}</span>
-          </div>
-          <div className="fm-detail-item">
-            <span className="fm-detail-label">Participants</span>
-            <span className="fm-detail-value">{market.participants?.length || 0}</span>
-          </div>
-        </div>
-      </div>
-
-      {market.participants && market.participants.length > 0 && (
-        <div className="fm-detail-participants">
-          <span className="fm-detail-label">Participants</span>
-          <div className="fm-participants-list">
-            {market.participants.map((participant, idx) => (
-              <div key={idx} className="fm-participant">
-                <span className="fm-participant-addr">{formatAddress(participant)}</span>
-                {participant.toLowerCase() === market.creator?.toLowerCase() && (
-                  <span className="fm-participant-tag">Creator</span>
-                )}
-                {participant.toLowerCase() === account?.toLowerCase() && (
-                  <span className="fm-participant-tag fm-you">You</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {market.arbitrator && (
-        <div className="fm-detail-arbitrator">
-          <span className="fm-detail-label">Arbitrator</span>
-          <span className="fm-detail-value">{formatAddress(market.arbitrator)}</span>
-        </div>
-      )}
-
-      <div className="fm-detail-qr">
-        <QRCodeSVG
-          value={marketUrl}
-          size={120}
-          level="M"
-          fgColor="#36B37E"
-          bgColor="transparent"
-          aria-label="QR code to share this market"
-        />
-        <p>Share this market</p>
-      </div>
-
-      <div className="fm-detail-actions">
-        <button
-          type="button"
-          className="fm-btn-secondary"
-          onClick={async () => {
-            if (!navigator.clipboard || !navigator.clipboard.writeText) {
-              window.alert('Copy to clipboard is not supported in this browser. Please copy the link manually.')
-              return
-            }
-            try {
-              await navigator.clipboard.writeText(marketUrl)
-              window.alert('Link copied to clipboard.')
-            } catch (error) {
-              console.error('Failed to copy link to clipboard:', error)
-              window.alert('Failed to copy the link. Please copy it manually.')
-            }
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-          </svg>
-          Copy Link
-        </button>
-        {canResolve && onResolve && (
-          <ResolveInline
-            market={market}
-            onResolve={onResolve}
-            resolveState={resolveState}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default FriendMarketsModal

@@ -34,6 +34,28 @@ vi.mock('../hooks', () => ({
     unreadMarketIds: [],
     markMarketAsRead: vi.fn(),
     isMarketUnread: vi.fn(() => false)
+  })),
+  useLazyIpfsEnvelope: vi.fn((markets) => ({
+    markets: markets || [],
+    fetchEnvelope: vi.fn().mockResolvedValue(null),
+    isMarketFetching: vi.fn().mockReturnValue(false),
+    needsFetch: vi.fn().mockReturnValue(false),
+    clearEnvelope: vi.fn()
+  }))
+}))
+
+vi.mock('../hooks/useEncryption', () => ({
+  useLazyMarketDecryption: vi.fn((markets) => ({
+    markets: (markets || []).map(m => ({
+      ...m,
+      encryptionStatus: 'not_encrypted',
+      isPrivate: false,
+      canView: true
+    })),
+    decryptMarket: vi.fn().mockResolvedValue({}),
+    isMarketDecrypting: vi.fn().mockReturnValue(false),
+    isAnyDecrypting: false,
+    clearCache: vi.fn()
   }))
 }))
 

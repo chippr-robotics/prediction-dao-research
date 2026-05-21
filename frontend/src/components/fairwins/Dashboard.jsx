@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
@@ -335,33 +335,6 @@ function Dashboard() {
   // Friend markets from shared context (single fetch, no duplication)
   const { friendMarkets } = useFriendMarkets()
 
-  // Split friend markets into active/past for the My Wagers modal
-  const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
-    const now = new Date()
-    const userAddr = account?.toLowerCase()
-
-    const userMarkets = friendMarkets.filter(m =>
-      m.creator?.toLowerCase() === userAddr ||
-      m.participants?.some(p => p.toLowerCase() === userAddr)
-    )
-
-    const isPastMarket = (m) => {
-      const endDate = new Date(m.endDate)
-      const status = m.status?.toLowerCase()
-      return endDate <= now ||
-             status === 'resolved' ||
-             status === 'cancelled' ||
-             status === 'canceled' ||
-             status === 'refunded' ||
-             status === 'oracle_timed_out'
-    }
-
-    return {
-      activeFriendMarkets: userMarkets.filter(m => !isPastMarket(m)),
-      pastFriendMarkets: userMarkets.filter(m => isPastMarket(m))
-    }
-  }, [friendMarkets, account])
-
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
       case 'create-1v1':
@@ -500,11 +473,8 @@ function Dashboard() {
           setCreateWagerType(null)
           setInitialPolymarketMarket(null)
         }}
-        initialTab="create"
         initialType={createWagerType}
         initialPolymarketMarket={initialPolymarketMarket}
-        activeMarkets={activeFriendMarkets}
-        pastMarkets={pastFriendMarkets}
       />
 
       {/* My Wagers Modal */}
