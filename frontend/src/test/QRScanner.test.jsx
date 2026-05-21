@@ -6,17 +6,42 @@ import QRScanner from '../components/ui/QRScanner'
 
 // Mock html5-qrcode
 vi.mock('html5-qrcode', () => {
-  const MockHtml5Qrcode = vi.fn().mockImplementation(() => ({
-    start: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-  }))
+  const Html5QrcodeScannerState = {
+    UNKNOWN: 0,
+    NOT_STARTED: 1,
+    SCANNING: 2,
+    PAUSED: 3,
+  }
+
+  function MockHtml5QrcodeImpl() {
+    let state = Html5QrcodeScannerState.NOT_STARTED
+    return {
+      start: vi.fn().mockImplementation(async () => {
+        state = Html5QrcodeScannerState.SCANNING
+      }),
+      stop: vi.fn().mockImplementation(async () => {
+        if (
+          state !== Html5QrcodeScannerState.SCANNING &&
+          state !== Html5QrcodeScannerState.PAUSED
+        ) {
+          throw new Error('Cannot stop, scanner is not running or paused.')
+        }
+        state = Html5QrcodeScannerState.NOT_STARTED
+      }),
+      getState: vi.fn(() => state),
+    }
+  }
+  const MockHtml5Qrcode = vi.fn().mockImplementation(function () {
+    return MockHtml5QrcodeImpl()
+  })
   MockHtml5Qrcode.getCameras = vi.fn().mockResolvedValue([
     { id: 'camera1', label: 'Mock Camera 1' },
     { id: 'camera2', label: 'Mock Back Camera' }
   ])
-  
+
   return {
-    Html5Qrcode: MockHtml5Qrcode
+    Html5Qrcode: MockHtml5Qrcode,
+    Html5QrcodeScannerState,
   }
 })
 
@@ -44,7 +69,7 @@ describe('QRScanner Component', () => {
       expect(container.firstChild).toBeNull()
     })
 
-    it('renders when isOpen is true', () => {
+    it('renders the scanner dialog when isOpen is true', () => {
       render(
         <QRScanner
           isOpen={true}
@@ -53,47 +78,20 @@ describe('QRScanner Component', () => {
         />
       )
       expect(screen.getByRole('dialog')).toBeInTheDocument()
-      expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
     })
 
-    it('shows a starting/detecting indicator before the camera is live', () => {
-      render(
+    it('renders only the camera view chrome — no instructional text', () => {
+      const { container } = render(
         <QRScanner
           isOpen={true}
           onClose={mockOnClose}
           onScanSuccess={mockOnScanSuccess}
         />
       )
-      // Auto-start UX: the user never sees a "press to scan" landing page —
-      // either we're detecting cameras or we're starting the stream.
-      expect(
-        screen.getByText(/Detecting cameras…|Starting camera…/)
-      ).toBeInTheDocument()
-    })
-
-    it('displays scanner instructions', () => {
-      render(
-        <QRScanner
-          isOpen={true}
-          onClose={mockOnClose}
-          onScanSuccess={mockOnScanSuccess}
-        />
-      )
-      expect(screen.getByText('How to Scan')).toBeInTheDocument()
-      expect(screen.getByText(/Allow camera access when prompted/i)).toBeInTheDocument()
-    })
-
-    it('displays privacy note', () => {
-      render(
-        <QRScanner
-          isOpen={true}
-          onClose={mockOnClose}
-          onScanSuccess={mockOnScanSuccess}
-        />
-      )
-      expect(
-        screen.getByText(/Your camera feed is processed locally/i)
-      ).toBeInTheDocument()
+      // The modal exposes the close button (a symbol) and the camera target;
+      // no headings, instructions, or privacy notes should appear.
+      expect(container.querySelectorAll('h1, h2, h3, p, ol, ul, li')).toHaveLength(0)
+      expect(container.querySelector('#qr-reader')).toBeInTheDocument()
     })
 
     it('does not render a manual "Start Scanning" button (scanning auto-starts)', () => {
@@ -122,7 +120,41 @@ describe('QRScanner Component', () => {
       const closeButton = screen.getByLabelText('Close QR scanner')
       await user.click(closeButton)
 
-      expect(mockOnClose).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    it('does not log "Cannot stop" when closing before scanner has started', async () => {
+      const user = userEvent.setup()
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      render(
+        <QRScanner
+          isOpen={true}
+          onClose={mockOnClose}
+          onScanSuccess={mockOnScanSuccess}
+        />
+      )
+
+      // Close immediately — before start() has resolved, the scanner is in
+      // NOT_STARTED. Previously this would surface the html5-qrcode error.
+      const closeButton = screen.getByLabelText('Close QR scanner')
+      await user.click(closeButton)
+
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled()
+      })
+
+      const stopCalls = consoleErrorSpy.mock.calls.filter((args) =>
+        args.some(
+          (arg) =>
+            typeof arg === 'string' && arg.includes('Error stopping scanner')
+        )
+      )
+      expect(stopCalls).toHaveLength(0)
+
+      consoleErrorSpy.mockRestore()
     })
 
     it('calls onClose when backdrop is clicked', async () => {
@@ -138,7 +170,9 @@ describe('QRScanner Component', () => {
       const backdrop = container.querySelector('.qr-scanner-backdrop')
       await user.click(backdrop)
 
-      expect(mockOnClose).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('does not close when modal content is clicked', async () => {
@@ -171,7 +205,9 @@ describe('QRScanner Component', () => {
 
       await user.keyboard('{Escape}')
 
-      expect(mockOnClose).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalledTimes(1)
+      })
     })
   })
 
@@ -199,12 +235,12 @@ describe('QRScanner Component', () => {
 
       const dialog = screen.getByRole('dialog')
       expect(dialog).toHaveAttribute('aria-modal', 'true')
-      expect(dialog).toHaveAttribute('aria-labelledby', 'qr-scanner-title')
+      expect(dialog).toHaveAttribute('aria-label', 'QR code scanner')
     })
   })
 
   describe('Error Handling', () => {
-    it('displays error message when camera access fails', async () => {
+    it('exposes an alert role when camera access fails', async () => {
       const { Html5Qrcode } = await import('html5-qrcode')
       Html5Qrcode.getCameras = vi.fn().mockRejectedValue(new Error('No cameras'))
 
@@ -217,9 +253,9 @@ describe('QRScanner Component', () => {
       )
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/Unable to access camera/i)
-        ).toBeInTheDocument()
+        const alert = screen.getByRole('alert')
+        expect(alert).toBeInTheDocument()
+        expect(alert).toHaveAttribute('aria-label', expect.stringMatching(/camera/i))
       })
     })
   })
