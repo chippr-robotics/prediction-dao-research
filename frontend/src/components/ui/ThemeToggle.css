@@ -1,26 +1,27 @@
 .theme-toggle {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: var(--radius-full);
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
-  transition: all var(--transition-base);
-  box-shadow: var(--shadow-lg);
-  z-index: 1000;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: background var(--transition-base), border-color var(--transition-base), transform var(--transition-base);
+  flex-shrink: 0;
 }
 
 .theme-toggle:hover {
-  transform: scale(1.1) rotate(15deg);
   border-color: var(--brand-primary);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  background: var(--surface-color, var(--bg-secondary));
+}
+
+.theme-toggle:active {
+  transform: scale(0.95);
 }
 
 .theme-toggle:focus-visible {
@@ -39,29 +40,18 @@
   transform: rotate(-15deg);
 }
 
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .theme-toggle {
-    bottom: 1rem;
-    right: 1rem;
-    width: 3rem;
-    height: 3rem;
-    font-size: 1.25rem;
-  }
-}
-
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle,
   .theme-toggle-icon {
     transition: none;
   }
-  
-  .theme-toggle:hover {
+
+  .theme-toggle:hover .theme-toggle-icon {
     transform: none;
   }
-  
-  .theme-toggle:hover .theme-toggle-icon {
+
+  .theme-toggle:active {
     transform: none;
   }
 }

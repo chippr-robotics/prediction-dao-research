@@ -1,11 +1,9 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
-import { useChainTokens } from '../../hooks/useChainTokens'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES } from '../../contexts/RoleContext'
-import { WAGER_DEFAULTS, WagerStatus } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
@@ -15,59 +13,12 @@ import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import './Dashboard.css'
 
 // ============================================================================
-// DEMO DATA CONSTANTS (computed once at module load, not during render)
-// ============================================================================
-
-const DEMO_END_30D = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-const DEMO_END_14D = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-const DEMO_END_45D = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString()
-const DEMO_END_PAST = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-
-// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
 const formatAddress = (addr) => {
   if (!addr) return ''
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-}
-
-const getTimeRemaining = (endTime) => {
-  const now = new Date()
-  const end = new Date(endTime)
-  const diff = end - now
-  if (diff <= 0) return 'Ended'
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  if (days > 0) return `${days}d ${hours}h`
-  return `${hours}h`
-}
-
-// ============================================================================
-// STATUS BADGE COMPONENT
-// ============================================================================
-
-function StatusBadge({ status }) {
-  const statusConfig = {
-    [WagerStatus.PENDING_ACCEPTANCE]: { label: 'Pending', className: 'status-pending' },
-    [WagerStatus.ACTIVE]: { label: 'Active', className: 'status-active' },
-    [WagerStatus.PENDING_RESOLUTION]: { label: 'Resolving', className: 'status-resolving' },
-    [WagerStatus.CHALLENGED]: { label: 'Challenged', className: 'status-disputed' },
-    [WagerStatus.DISPUTED]: { label: 'Disputed', className: 'status-disputed' },
-    [WagerStatus.RESOLVED]: { label: 'Resolved', className: 'status-resolved' },
-    [WagerStatus.EXPIRED]: { label: 'Expired', className: 'status-expired' },
-    [WagerStatus.CANCELLED]: { label: 'Cancelled', className: 'status-expired' },
-    [WagerStatus.REFUNDED]: { label: 'Refunded', className: 'status-expired' },
-    [WagerStatus.ORACLE_TIMED_OUT]: { label: 'Timed Out', className: 'status-expired' }
-  }
-
-  const config = statusConfig[status] || { label: status, className: '' }
-
-  return (
-    <span className={`wager-status-badge ${config.className}`}>
-      {config.label}
-    </span>
-  )
 }
 
 // ============================================================================
@@ -148,49 +99,6 @@ function QuickActions({ onAction }) {
           </div>
         </button>
       ))}
-    </div>
-  )
-}
-
-// ============================================================================
-// WAGER CARD COMPONENT
-// ============================================================================
-
-function WagerCard({ wager, onClick }) {
-  return (
-    <div
-      className="wager-card"
-      onClick={() => onClick?.(wager)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onClick?.(wager)}
-    >
-      <div className="wager-card-header">
-        <StatusBadge status={wager.status} />
-        <span className="wager-time">{getTimeRemaining(wager.endTime)}</span>
-      </div>
-      <h4 className="wager-card-title">{wager.description}</h4>
-      <div className="wager-card-details">
-        <div className="wager-detail">
-          <span className="wager-detail-label">Stake</span>
-          <span className="wager-detail-value">{wager.stakeAmount} {wager.stakeToken}</span>
-        </div>
-        <div className="wager-detail">
-          <span className="wager-detail-label">Type</span>
-          <span className="wager-detail-value">{wager.type}</span>
-        </div>
-        <div className="wager-detail">
-          <span className="wager-detail-label">Resolution</span>
-          <span className="wager-detail-value">{wager.resolution}</span>
-        </div>
-      </div>
-      <div className="wager-card-participants">
-        {wager.participants.map((p, i) => (
-          <span key={i} className="participant-badge" title={p}>
-            {formatAddress(p)}
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
@@ -405,14 +313,13 @@ function WelcomeView({ onConnect }) {
 function Dashboard() {
   const { isConnected, account } = useWallet()
   const { connectWallet } = useWalletConnection()
-  const { native: nativeSymbol } = useChainTokens()
   const { preferences: _preferences } = useUserPreferences()
   const { hasRole } = useWalletRoles()
   const { showModal, hideModal } = useModal()
   const navigate = useNavigate()
-  // Mock wager fallback is dev-only — set VITE_USE_MOCK_WAGERS=true in your
-  // .env to seed the dashboard with sample wagers when no live wagers exist.
-  // In production this is always false; users see real on-chain wagers only.
+  // Demo mode is dev-only — set VITE_USE_MOCK_WAGERS=true in your .env to
+  // bypass the wallet gate and view the dashboard with sample data. Production
+  // never sets this so the badge and welcome bypass stay off.
   const demoMode = import.meta.env?.VITE_USE_MOCK_WAGERS === 'true'
 
   // Modal state
@@ -426,25 +333,9 @@ function Dashboard() {
   const [initialPolymarketMarket, setInitialPolymarketMarket] = useState(null)
 
   // Friend markets from shared context (single fetch, no duplication)
-  const { friendMarkets, loading: wagersLoading } = useFriendMarkets()
+  const { friendMarkets } = useFriendMarkets()
 
-  // Transform friend markets into wager card format for live mode display
-  const liveWagers = useMemo(() => {
-    if (demoMode) return []
-    return friendMarkets.map(m => ({
-      id: m.id,
-      description: m.description,
-      status: m.status === 'pending' ? WagerStatus.PENDING_ACCEPTANCE : m.status,
-      stakeAmount: m.stakeAmount,
-      stakeToken: m.stakeTokenSymbol || nativeSymbol || 'MATIC',
-      type: m.type === 'oneVsOne' ? '1v1' : m.type === 'smallGroup' ? 'Group' : m.type,
-      resolution: m.arbitrator ? 'Third Party' : 'Either Party',
-      endTime: m.endDate,
-      participants: m.participants || []
-    }))
-  }, [friendMarkets, demoMode, nativeSymbol])
-
-  // Split friend markets into active/past for modals
+  // Split friend markets into active/past for the My Wagers modal
   const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
     const now = new Date()
     const userAddr = account?.toLowerCase()
@@ -471,67 +362,6 @@ function Dashboard() {
     }
   }, [friendMarkets, account])
 
-  // Mock wager data for demo mode
-  const mockWagers = useMemo(() => {
-    if (!demoMode) return []
-    return [
-      {
-        id: 1,
-        description: 'Will BTC be above $100k by March 2026?',
-        status: WagerStatus.ACTIVE,
-        stakeAmount: '50',
-        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
-        type: '1v1',
-        resolution: 'Either Party',
-        endTime: DEMO_END_30D,
-        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12']
-      },
-      {
-        id: 2,
-        description: 'Super Bowl LX winner - Chiefs or 49ers?',
-        status: WagerStatus.PENDING_ACCEPTANCE,
-        stakeAmount: '25',
-        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
-        type: '1v1',
-        resolution: 'Initiator Resolves',
-        endTime: DEMO_END_14D,
-        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12']
-      },
-      {
-        id: 3,
-        description: 'Will it snow in Austin before April?',
-        status: WagerStatus.ACTIVE,
-        stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
-        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
-        type: 'Group',
-        resolution: 'Either Party',
-        endTime: DEMO_END_45D,
-        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xabcdef1234567890abcdef1234567890abcdef12', '0x9876543210fedcba9876543210fedcba98765432']
-      },
-      {
-        id: 4,
-        description: 'ETH merge anniversary price prediction',
-        status: WagerStatus.RESOLVED,
-        stakeAmount: '100',
-        stakeToken: WAGER_DEFAULTS.STAKE_TOKEN_ID,
-        type: '1v1',
-        resolution: 'Third Party',
-        endTime: DEMO_END_PAST,
-        participants: ['0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', '0xfedcba0987654321fedcba0987654321fedcba09']
-      }
-    ]
-  }, [demoMode])
-
-  const activeWagers = useMemo(() => {
-    const wagers = demoMode ? mockWagers : liveWagers
-    return wagers.filter(w => (w.status === WagerStatus.ACTIVE || w.status === WagerStatus.PENDING_ACCEPTANCE) && w.status !== WagerStatus.CANCELLED)
-  }, [demoMode, mockWagers, liveWagers])
-
-  const pastWagers = useMemo(() => {
-    const wagers = demoMode ? mockWagers : liveWagers
-    return wagers.filter(w => w.status === WagerStatus.RESOLVED || w.status === WagerStatus.EXPIRED || w.status === WagerStatus.CANCELLED || w.status === WagerStatus.REFUNDED || w.status === WagerStatus.ORACLE_TIMED_OUT)
-  }, [demoMode, mockWagers, liveWagers])
-
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
       case 'create-1v1':
@@ -551,10 +381,6 @@ function Dashboard() {
       default:
         break
     }
-  }, [])
-
-  const handleWagerClick = useCallback(() => {
-    setShowMyWagers(true)
   }, [])
 
   const handlePolymarketCardClick = useCallback((market) => {
@@ -665,44 +491,6 @@ function Dashboard() {
       <section className="dashboard-section">
         <HowItWorksGuide />
       </section>
-
-      {/* Active Wagers */}
-      <section className="dashboard-section">
-        <div className="section-header">
-          <h3>Active Wagers</h3>
-          <span className="section-count">{activeWagers.length}</span>
-        </div>
-        {wagersLoading && !demoMode ? (
-          <div className="empty-state compact">
-            <p>Loading wagers...</p>
-          </div>
-        ) : activeWagers.length > 0 ? (
-          <div className="wagers-grid">
-            {activeWagers.map(wager => (
-              <WagerCard key={wager.id} wager={wager} onClick={handleWagerClick} />
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state compact">
-            <p>No active wagers yet. Create one to get started.</p>
-          </div>
-        )}
-      </section>
-
-      {/* Past Wagers */}
-      {pastWagers.length > 0 && (
-        <section className="dashboard-section">
-          <div className="section-header">
-            <h3>Past Wagers</h3>
-            <span className="section-count">{pastWagers.length}</span>
-          </div>
-          <div className="wagers-grid">
-            {pastWagers.map(wager => (
-              <WagerCard key={wager.id} wager={wager} onClick={handleWagerClick} />
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* Create Wager Modal */}
       <FriendMarketsModal
