@@ -640,7 +640,8 @@ describe("Integration: FairWins Market Lifecycle", function () {
       const { marketFactory, collateralToken } = contracts;
       const { owner } = accounts;
 
-      const tooShort = 5 * 24 * 3600; // 5 days (< 7 day minimum)
+      // 30 minutes — below the 1-hour MIN_TRADING_PERIOD floor.
+      const tooShort = 30 * 60;
 
       await expect(
         marketFactory.connect(owner).deployMarketPair(

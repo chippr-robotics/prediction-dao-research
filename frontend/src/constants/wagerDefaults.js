@@ -31,13 +31,23 @@ export const WAGER_DEFAULTS = {
   RESOLUTION_TYPE: 0,
 
   /** Default trading / wager duration in days */
-  WAGER_END_DAYS: 7,
+  WAGER_END_DAYS: 1,
 
   /** Default acceptance deadline in hours */
-  ACCEPTANCE_DEADLINE_HOURS: 48,
+  ACCEPTANCE_DEADLINE_HOURS: 6,
 
   /** Default trading period fallback in days (for chain submission) */
-  TRADING_PERIOD_DAYS: 7,
+  TRADING_PERIOD_DAYS: 1,
+
+  /**
+   * Minimum trading period in seconds. Mirrors
+   * ConditionalMarketFactory.MIN_TRADING_PERIOD — 1 hour is past Polygon /
+   * Ethereum finality (~10 min), so resolutions can't be unwound by a reorg.
+   */
+  MIN_TRADING_PERIOD_SECONDS: 60 * 60,
+
+  /** Maximum trading period in seconds (mirrors contract MAX_TRADING_PERIOD). */
+  MAX_TRADING_PERIOD_SECONDS: 21 * 24 * 60 * 60,
 }
 
 // ── Wager status strings (friend / P2P markets) ────────────────────
@@ -114,4 +124,20 @@ export const getDefaultAcceptanceDeadline = (hours = WAGER_DEFAULTS.ACCEPTANCE_D
   const date = new Date()
   date.setHours(date.getHours() + hours)
   return date.toISOString().slice(0, 16)
+}
+
+/**
+ * Convert any datetime-like value into the `<input type="datetime-local">`
+ * string format (`YYYY-MM-DDTHH:mm`) in the user's local timezone.
+ * Used when seeding the end-date field from a linked Polymarket's endDate.
+ */
+export const toDateTimeLocal = (value) => {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  )
 }

@@ -234,9 +234,13 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         console.warn('Membership check failed (will try transaction anyway):', membershipError.message)
       }
 
-      // Calculate trading period in seconds
-      const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 7
-      const tradingPeriodSeconds = tradingPeriodDays * 24 * 60 * 60
+      // Calculate trading period in seconds. Prefer the caller-supplied seconds
+      // value so sub-day wager durations survive without being rounded up.
+      const tradingPeriodSecondsRaw = parseInt(data.data.tradingPeriodSeconds, 10)
+      const tradingPeriodDays = parseInt(data.data.tradingPeriod) || 1
+      const tradingPeriodSeconds = Number.isFinite(tradingPeriodSecondsRaw) && tradingPeriodSecondsRaw > 0
+        ? tradingPeriodSecondsRaw
+        : tradingPeriodDays * 24 * 60 * 60
 
       // Check if this is a bookmaker market
       const isBookmaker = data.marketType === 'bookmaker'

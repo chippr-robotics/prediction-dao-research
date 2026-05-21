@@ -109,8 +109,10 @@ contract ConditionalMarketFactory is Ownable, ReentrancyGuard, IERC1155Receiver 
     mapping(uint256 => string) private marketMetadataUris;
 
     uint256 public marketCount;
-    uint256 public constant DEFAULT_TRADING_PERIOD = 10 days;
-    uint256 public constant MIN_TRADING_PERIOD = 7 days;
+    uint256 public constant DEFAULT_TRADING_PERIOD = 1 days;
+    // 1 hour minimum is comfortably above Polygon/Ethereum finality (~10 min)
+    // so resolution can't be undone by a reorg.
+    uint256 public constant MIN_TRADING_PERIOD = 1 hours;
     uint256 public constant MAX_TRADING_PERIOD = 21 days;
     uint256 public constant MAX_BATCH_SIZE = 50;
 
