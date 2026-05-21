@@ -123,9 +123,18 @@ vi.mock('wagmi', () => ({
   useWalletClient: () => ({
     data: null // Return null to prevent EIP-1193 provider errors and trigger window.ethereum fallback path in tests
   }),
+  // ENS resolution hooks used by AddressInput / useEnsResolution. Tests
+  // don't exercise real ENS, so stub these as resolved no-ops.
+  useEnsAddress: () => ({ data: null, isLoading: false, isError: false, error: null }),
+  useEnsName: () => ({ data: null, isLoading: false, isError: false, error: null }),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
   http: vi.fn(() => ({})),
+}))
+
+// wagmi/chains is imported by useEnsResolution
+vi.mock('wagmi/chains', () => ({
+  mainnet: { id: 1 },
 }))
 
 // Mock wagmi/connectors
@@ -469,8 +478,11 @@ describe('FriendMarketsModal', () => {
       await userEvent.type(screen.getByLabelText(/opponent address/i), 'invalid-address')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
+      // The field now accepts ENS names too, so the error wording is broader.
       await waitFor(() => {
-        expect(screen.getByText(/invalid ethereum address/i)).toBeInTheDocument()
+        expect(
+          screen.getByText(/valid ethereum address or ENS name/i)
+        ).toBeInTheDocument()
       })
     })
 

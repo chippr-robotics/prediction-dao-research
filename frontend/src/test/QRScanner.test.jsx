@@ -56,7 +56,7 @@ describe('QRScanner Component', () => {
       expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
     })
 
-    it('displays scanner placeholder initially', () => {
+    it('shows a starting/detecting indicator before the camera is live', () => {
       render(
         <QRScanner
           isOpen={true}
@@ -64,7 +64,11 @@ describe('QRScanner Component', () => {
           onScanSuccess={mockOnScanSuccess}
         />
       )
-      expect(screen.getByText('Camera preview will appear here')).toBeInTheDocument()
+      // Auto-start UX: the user never sees a "press to scan" landing page —
+      // either we're detecting cameras or we're starting the stream.
+      expect(
+        screen.getByText(/Detecting cameras…|Starting camera…/)
+      ).toBeInTheDocument()
     })
 
     it('displays scanner instructions', () => {
@@ -76,7 +80,7 @@ describe('QRScanner Component', () => {
         />
       )
       expect(screen.getByText('How to Scan')).toBeInTheDocument()
-      expect(screen.getByText(/Click "Start Scanning"/i)).toBeInTheDocument()
+      expect(screen.getByText(/Allow camera access when prompted/i)).toBeInTheDocument()
     })
 
     it('displays privacy note', () => {
@@ -92,7 +96,7 @@ describe('QRScanner Component', () => {
       ).toBeInTheDocument()
     })
 
-    it('displays start scanning button', () => {
+    it('does not render a manual "Start Scanning" button (scanning auto-starts)', () => {
       render(
         <QRScanner
           isOpen={true}
@@ -100,7 +104,7 @@ describe('QRScanner Component', () => {
           onScanSuccess={mockOnScanSuccess}
         />
       )
-      expect(screen.getByLabelText('Start scanning QR code')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Start scanning QR code')).not.toBeInTheDocument()
     })
   })
 
@@ -201,8 +205,6 @@ describe('QRScanner Component', () => {
 
   describe('Error Handling', () => {
     it('displays error message when camera access fails', async () => {
-      // This test would need more complex mocking of Html5Qrcode
-      // For now, we just verify the error state can be displayed
       const { Html5Qrcode } = await import('html5-qrcode')
       Html5Qrcode.getCameras = vi.fn().mockRejectedValue(new Error('No cameras'))
 
@@ -214,10 +216,10 @@ describe('QRScanner Component', () => {
         />
       )
 
-      // Wait for error to be displayed
       await waitFor(() => {
-        const startButton = screen.getByLabelText('Start scanning QR code')
-        expect(startButton).toBeInTheDocument()
+        expect(
+          screen.getByText(/Unable to access camera/i)
+        ).toBeInTheDocument()
       })
     })
   })

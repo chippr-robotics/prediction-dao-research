@@ -16,6 +16,8 @@ import { getContractAddress } from '../../config/contracts'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
 import QRScanner from '../ui/QRScanner'
+import AddressInput from '../ui/AddressInput'
+import { isEnsName } from '../../utils/validation'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 import PolymarketBrowser from './PolymarketBrowser'
@@ -184,6 +186,10 @@ function FriendMarketsModal({
   const [formData, setFormData] = useState({
     description: '',
     opponent: '',
+    // ENS-resolved opponent address. `opponent` holds the raw input (may be
+    // an ENS name); `opponentResolved` is the 0x address used for validation
+    // and contract submission.
+    opponentResolved: '',
     members: '',
     memberLimit: WAGER_DEFAULTS.MEMBER_LIMIT,
     endDateTime: getDefaultEndDateTime(),
@@ -191,6 +197,7 @@ function FriendMarketsModal({
     stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
+    arbitratorResolved: '',
     peggedMarketId: '',
     // Which outcome of a linked Polymarket the creator is taking. Stored as
     // the 0-based outcome index ('' = unset, '0' = YES/first, '1' = NO/second)
@@ -259,6 +266,7 @@ function FriendMarketsModal({
     setFormData({
       description: '',
       opponent: '',
+      opponentResolved: '',
       members: '',
       memberLimit: WAGER_DEFAULTS.MEMBER_LIMIT,
       endDateTime: getDefaultEndDateTime(),
@@ -266,6 +274,7 @@ function FriendMarketsModal({
       stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
       customStakeTokenAddress: '',
       arbitrator: '',
+      arbitratorResolved: '',
       peggedMarketId: '',
       creatorSide: '',
       acceptanceDeadline: getDefaultAcceptanceDeadline(),
@@ -345,7 +354,7 @@ function FriendMarketsModal({
     }
   }
 
-  const handleFormChange = (field, value) => {
+  const handleFormChange = useCallback((field, value) => {
     // If the user is typing in the description, treat it as a manual edit and
     // stop auto-syncing it from the side + Polymarket question.
     if (field === 'description' && value !== lastAutoDescriptionRef.current) {
@@ -353,6 +362,10 @@ function FriendMarketsModal({
     }
 
     setFormData(prev => {
+      // Skip no-op updates so callbacks driven by useEffect (e.g. the
+      // AddressInput resolved-address callback) don't cause re-render loops.
+      if (prev[field] === value) return prev
+
       const updated = { ...prev, [field]: value }
 
       // Clear arbitrator/linked-market state when switching to a resolution
@@ -361,6 +374,7 @@ function FriendMarketsModal({
           value !== ResolutionType.ThirdParty &&
           value !== ResolutionType.PolymarketOracle) {
         updated.arbitrator = ''
+        updated.arbitratorResolved = ''
         updated.peggedMarketId = ''
       }
       if (field === 'resolutionType' && value !== ResolutionType.PolymarketOracle) {
@@ -370,14 +384,13 @@ function FriendMarketsModal({
       return updated
     })
 
-    if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev }
-        delete newErrors[field]
-        return newErrors
-      })
-    }
-  }
+    setErrors(prev => {
+      if (!prev[field]) return prev
+      const newErrors = { ...prev }
+      delete newErrors[field]
+      return newErrors
+    })
+  }, [])
 
   // Build the canonical "I'm betting <SIDE>: <question>" phrasing so both
   // creator and counterparties can see which side of the linked market the
@@ -439,9 +452,12 @@ function FriendMarketsModal({
       }
     }
 
-    // Update the appropriate field
+    // Update the appropriate field. Also mirror the value into the
+    // *Resolved field so validation/submission skip the ENS resolution path
+    // for a scanned hex address.
     if (qrScanTarget && /^0x[a-fA-F0-9]{40}$/.test(address)) {
       handleFormChange(qrScanTarget, address)
+      handleFormChange(`${qrScanTarget}Resolved`, address)
     }
 
     setQrScannerOpen(false)
@@ -705,13 +721,17 @@ function FriendMarketsModal({
     }
 
     if (friendMarketType === 'oneVsOne') {
-      if (!formData.opponent.trim()) {
+      const rawOpponent = formData.opponent.trim()
+      const resolvedOpponent = (formData.opponentResolved || '').trim()
+      if (!rawOpponent) {
         newErrors.opponent = 'Opponent address is required'
-      } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.opponent.trim())) {
-        newErrors.opponent = 'Invalid Ethereum address'
-      } else if (formData.opponent.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+      } else if (!resolvedOpponent) {
+        newErrors.opponent = isEnsName(rawOpponent)
+          ? 'Could not resolve ENS name — check the name and try again'
+          : 'Enter a valid Ethereum address or ENS name'
+      } else if (resolvedOpponent.toLowerCase() === '0x0000000000000000000000000000000000000000') {
         newErrors.opponent = 'Cannot use the zero address'
-      } else if (formData.opponent.toLowerCase() === account?.toLowerCase()) {
+      } else if (resolvedOpponent.toLowerCase() === account?.toLowerCase()) {
         newErrors.opponent = 'Cannot bet against yourself'
       }
     }
@@ -827,11 +847,15 @@ function FriendMarketsModal({
     if ((friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker')) {
       if (formData.resolutionType === ResolutionType.ThirdParty) {
         // Arbitrator address is required for ThirdParty resolution
-        if (!formData.arbitrator || !formData.arbitrator.trim()) {
+        const rawArb = (formData.arbitrator || '').trim()
+        const resolvedArb = (formData.arbitratorResolved || '').trim()
+        if (!rawArb) {
           newErrors.arbitrator = 'Arbitrator address is required for third party resolution'
-        } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.arbitrator.trim())) {
-          newErrors.arbitrator = 'Invalid arbitrator address'
-        } else if (formData.arbitrator.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+        } else if (!resolvedArb) {
+          newErrors.arbitrator = isEnsName(rawArb)
+            ? 'Could not resolve ENS name — check the name and try again'
+            : 'Enter a valid Ethereum address or ENS name'
+        } else if (resolvedArb.toLowerCase() === '0x0000000000000000000000000000000000000000') {
           newErrors.arbitrator = 'Cannot use the zero address'
         }
       } else if (formData.resolutionType === ResolutionType.PolymarketOracle) {
@@ -919,7 +943,7 @@ function FriendMarketsModal({
         stakeAmount: formData.stakeAmount,
         stakeToken: stakeToken.symbol,
         endDateTime: formData.endDateTime,
-        arbitrator: formData.arbitrator || null,
+        arbitrator: formData.arbitratorResolved || null,
         createdAt: new Date().toISOString(),
         attributes: [
           { trait_type: 'Market Source', value: 'friend' },
@@ -931,9 +955,11 @@ function FriendMarketsModal({
       let finalMetadata = marketMetadata
 
       if (enableEncryption) {
-        // Look up opponent's on-chain encryption key before creating envelope
+        // Look up opponent's on-chain encryption key before creating envelope.
+        // Use the ENS-resolved address (falls back to raw input when the user
+        // typed a hex address, since onResolvedChange mirrors that value).
         const opponentAddress = friendMarketType === 'oneVsOne'
-          ? formData.opponent
+          ? formData.opponentResolved
           : null // For group markets, encrypt for creator only initially
 
         if (friendMarketType === 'oneVsOne' && opponentAddress) {
@@ -976,6 +1002,12 @@ function FriendMarketsModal({
         marketType: friendMarketType,
         data: {
           ...formData,
+          // Downstream hooks (useFriendMarketCreation) read `opponent` and
+          // `arbitrator` as 0x addresses. Substitute the ENS-resolved values
+          // so a user can enter `name.eth` and the contract still gets a hex
+          // address.
+          opponent: formData.opponentResolved || formData.opponent,
+          arbitrator: formData.arbitratorResolved || formData.arbitrator,
           // Pass calculated trading period so downstream uses the user's selected end date.
           // `tradingPeriodSeconds` is the source of truth; `tradingPeriod` (days)
           // is kept for any legacy consumers that still parse it.
@@ -1014,10 +1046,10 @@ function FriendMarketsModal({
         endDate: endDate.toISOString(),
         tradingPeriod: tradingPeriodDays,
         participants: friendMarketType === 'oneVsOne'
-          ? [account, formData.opponent]
+          ? [account, formData.opponentResolved]
           : [account, ...formData.members.split(',').map(a => a.trim())],
         creator: account,
-        arbitrator: formData.arbitrator || null,
+        arbitrator: formData.arbitratorResolved || null,
         createdAt: new Date().toISOString(),
         status: 'pending_acceptance',
         // Acceptance flow fields
@@ -1499,15 +1531,18 @@ function FriendMarketsModal({
                           Opponent Address <span className="fm-required">*</span>
                         </label>
                         <div className="fm-input-with-action">
-                          <input
-                            id="fm-opponent"
-                            type="text"
-                            value={formData.opponent}
-                            onChange={(e) => handleFormChange('opponent', e.target.value)}
-                            placeholder="0x..."
-                            disabled={submitting}
-                            className={errors.opponent ? 'error' : ''}
-                          />
+                          <div className="fm-address-input-wrap">
+                            <AddressInput
+                              id="fm-opponent"
+                              value={formData.opponent}
+                              onChange={(e) => handleFormChange('opponent', e.target.value)}
+                              onResolvedChange={(addr) => handleFormChange('opponentResolved', addr || '')}
+                              placeholder="0x... or ENS name (e.g., vitalik.eth)"
+                              disabled={submitting}
+                              error={!!errors.opponent}
+                              errorMessage={errors.opponent}
+                            />
+                          </div>
                           <button
                             type="button"
                             className="fm-scan-btn"
@@ -1516,16 +1551,11 @@ function FriendMarketsModal({
                             title="Scan QR code"
                             aria-label="Scan QR code"
                           >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="3" y="3" width="7" height="7"/>
-                              <rect x="14" y="3" width="7" height="7"/>
-                              <rect x="3" y="14" width="7" height="7"/>
-                              <rect x="14" y="14" width="3" height="3"/>
-                              <path d="M17 14h4v4h-4zM14 17v4h4"/>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z"/>
                             </svg>
                           </button>
                         </div>
-                        {errors.opponent && <span className="fm-error">{errors.opponent}</span>}
                       </div>
                     )}
 
@@ -1795,15 +1825,18 @@ function FriendMarketsModal({
                           Arbitrator Address <span className="fm-required">*</span>
                         </label>
                         <div className="fm-input-with-action">
-                          <input
-                            id="fm-arbitrator"
-                            type="text"
-                            value={formData.arbitrator}
-                            onChange={(e) => handleFormChange('arbitrator', e.target.value)}
-                            placeholder="0x... (trusted third party address)"
-                            disabled={submitting}
-                            className={errors.arbitrator ? 'error' : ''}
-                          />
+                          <div className="fm-address-input-wrap">
+                            <AddressInput
+                              id="fm-arbitrator"
+                              value={formData.arbitrator}
+                              onChange={(e) => handleFormChange('arbitrator', e.target.value)}
+                              onResolvedChange={(addr) => handleFormChange('arbitratorResolved', addr || '')}
+                              placeholder="0x... or ENS name (trusted third party)"
+                              disabled={submitting}
+                              error={!!errors.arbitrator}
+                              errorMessage={errors.arbitrator}
+                            />
+                          </div>
                           <button
                             type="button"
                             className="fm-scan-btn"
@@ -1812,16 +1845,11 @@ function FriendMarketsModal({
                             title="Scan QR code"
                             aria-label="Scan QR code"
                           >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="3" y="3" width="7" height="7"/>
-                              <rect x="14" y="3" width="7" height="7"/>
-                              <rect x="3" y="14" width="7" height="7"/>
-                              <rect x="14" y="14" width="3" height="3"/>
-                              <path d="M17 14h4v4h-4zM14 17v4h4"/>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z"/>
                             </svg>
                           </button>
                         </div>
-                        {errors.arbitrator && <span className="fm-error">{errors.arbitrator}</span>}
                       </div>
                     )}
 

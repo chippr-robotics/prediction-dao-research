@@ -90,6 +90,11 @@ function PolymarketBrowser({
   const [query, setQuery] = useState('')
   const trimmedQuery = query.trim()
 
+  // Feed-variant accordion state. Inline variant is always expanded.
+  const [isExpanded, setIsExpanded] = useState(false)
+  const isFeed = variant === 'feed'
+  const showContent = !isFeed || isExpanded
+
   const {
     results: topResults,
     isLoading: topLoading,
@@ -186,11 +191,20 @@ function PolymarketBrowser({
 
   return (
     <section className={rootClassName} aria-label="Polymarket markets">
-      {variant === 'feed' && (
-        <div className="pmb__header">
-          <h3 className="pmb__title">Top from Polymarket</h3>
-          <span className="pmb__subtitle">Tap a market to start a wager</span>
-        </div>
+      {isFeed && (
+        <button
+          type="button"
+          className="pmb__header pmb__header--toggle"
+          onClick={() => setIsExpanded((v) => !v)}
+          aria-expanded={isExpanded}
+          data-expanded={isExpanded ? 'true' : 'false'}
+        >
+          <span className="pmb__header-text">
+            <span className="pmb__title">Top from Polymarket</span>
+            <span className="pmb__subtitle">Tap a market to start a wager</span>
+          </span>
+          <span className="pmb__toggle-chevron" aria-hidden="true">{'▼'}</span>
+        </button>
       )}
 
       {variant === 'inline' && (
@@ -216,102 +230,106 @@ function PolymarketBrowser({
         </div>
       )}
 
-      {showFilters && (
-        <div className="pmb__filters" role="group" aria-label="Category filters">
-          {QUICK_FILTERS.map(({ slug, label }) => {
-            const isActive = activeCategories.includes(slug)
-            return (
-              <button
-                key={slug}
-                type="button"
-                className={`pmb__chip ${isActive ? 'pmb__chip--active' : ''}`}
-                onClick={() => toggleCategory(slug)}
-                aria-pressed={isActive}
-              >
-                {label}
-              </button>
-            )
-          })}
-          {activeCategories.length > 0 && (
-            <button
-              type="button"
-              className="pmb__chip pmb__chip--clear"
-              onClick={clearAllFilters}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-      )}
-
-      {error && (
-        <div className="pmb__error" role="alert">
-          <span>Could not load Polymarket markets: {error}</span>
-          <button type="button" className="pmb__retry" onClick={handleRetry}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {isLoading && !error && (
-        <div className={`pmb__grid pmb__grid--${variant}`} aria-busy="true">
-          {Array.from({ length: variant === 'inline' ? 4 : 6 }).map((_, i) => (
-            <div key={i} className="pmb__card pmb__card--skeleton" aria-hidden="true" />
-          ))}
-        </div>
-      )}
-
-      {!isLoading && !error && rankedResults.length === 0 && (
-        <div className="pmb__empty">
-          {isSearchMode ? (
-            <p>No matching Polymarket events.</p>
-          ) : activeCategories.length > 0 ? (
-            <>
-              <p>No active markets match these categories.</p>
-              <button type="button" className="pmb__link" onClick={clearAllFilters}>
-                Browse all categories
-              </button>
-            </>
-          ) : (
-            <p>No active Polymarket markets right now.</p>
-          )}
-        </div>
-      )}
-
-      {!isLoading && !error && rankedResults.length > 0 && (
-        <ul className={`pmb__grid pmb__grid--${variant}`} role="list">
-          {rankedResults.map((m) => {
-            const isSelected = selectedConditionId && m.conditionId === selectedConditionId
-            const topOutcome = m.outcomes?.[0]
-            const vol = formatVolume(m.volume)
-            return (
-              <li key={m.conditionId} className="pmb__card-wrapper">
+      {showContent && (
+        <>
+          {showFilters && (
+            <div className="pmb__filters" role="group" aria-label="Category filters">
+              {QUICK_FILTERS.map(({ slug, label }) => {
+                const isActive = activeCategories.includes(slug)
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    className={`pmb__chip ${isActive ? 'pmb__chip--active' : ''}`}
+                    onClick={() => toggleCategory(slug)}
+                    aria-pressed={isActive}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+              {activeCategories.length > 0 && (
                 <button
                   type="button"
-                  className={`pmb__card ${isSelected ? 'pmb__card--selected' : ''}`}
-                  onClick={() => onSelectMarket?.(m)}
+                  className="pmb__chip pmb__chip--clear"
+                  onClick={clearAllFilters}
                 >
-                  <div className="pmb__card-question">{m.question}</div>
-                  <div className="pmb__card-meta">
-                    {m.category && (
-                      <span className="pmb__card-tag">{normaliseCategoryString(m.category)}</span>
-                    )}
-                    {vol && <span className="pmb__card-volume">{vol} vol</span>}
-                  </div>
-                  {topOutcome && topOutcome.price != null && (
-                    <div className="pmb__card-outcome">
-                      <span className="pmb__card-outcome-name">{topOutcome.name}</span>
-                      <span className="pmb__card-outcome-price">
-                        {Math.round(topOutcome.price * 100)}¢
-                      </span>
-                    </div>
-                  )}
-                  {isSelected && <span className="pmb__card-selected-badge">Selected</span>}
+                  Clear
                 </button>
-              </li>
-            )
-          })}
-        </ul>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <div className="pmb__error" role="alert">
+              <span>Could not load Polymarket markets: {error}</span>
+              <button type="button" className="pmb__retry" onClick={handleRetry}>
+                Retry
+              </button>
+            </div>
+          )}
+
+          {isLoading && !error && (
+            <div className={`pmb__grid pmb__grid--${variant}`} aria-busy="true">
+              {Array.from({ length: variant === 'inline' ? 4 : 6 }).map((_, i) => (
+                <div key={i} className="pmb__card pmb__card--skeleton" aria-hidden="true" />
+              ))}
+            </div>
+          )}
+
+          {!isLoading && !error && rankedResults.length === 0 && (
+            <div className="pmb__empty">
+              {isSearchMode ? (
+                <p>No matching Polymarket events.</p>
+              ) : activeCategories.length > 0 ? (
+                <>
+                  <p>No active markets match these categories.</p>
+                  <button type="button" className="pmb__link" onClick={clearAllFilters}>
+                    Browse all categories
+                  </button>
+                </>
+              ) : (
+                <p>No active Polymarket markets right now.</p>
+              )}
+            </div>
+          )}
+
+          {!isLoading && !error && rankedResults.length > 0 && (
+            <ul className={`pmb__grid pmb__grid--${variant}`} role="list">
+              {rankedResults.map((m) => {
+                const isSelected = selectedConditionId && m.conditionId === selectedConditionId
+                const topOutcome = m.outcomes?.[0]
+                const vol = formatVolume(m.volume)
+                return (
+                  <li key={m.conditionId} className="pmb__card-wrapper">
+                    <button
+                      type="button"
+                      className={`pmb__card ${isSelected ? 'pmb__card--selected' : ''}`}
+                      onClick={() => onSelectMarket?.(m)}
+                    >
+                      <div className="pmb__card-question">{m.question}</div>
+                      <div className="pmb__card-meta">
+                        {m.category && (
+                          <span className="pmb__card-tag">{normaliseCategoryString(m.category)}</span>
+                        )}
+                        {vol && <span className="pmb__card-volume">{vol} vol</span>}
+                      </div>
+                      {topOutcome && topOutcome.price != null && (
+                        <div className="pmb__card-outcome">
+                          <span className="pmb__card-outcome-name">{topOutcome.name}</span>
+                          <span className="pmb__card-outcome-price">
+                            {Math.round(topOutcome.price * 100)}¢
+                          </span>
+                        </div>
+                      )}
+                      {isSelected && <span className="pmb__card-selected-badge">Selected</span>}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
     </section>
   )
