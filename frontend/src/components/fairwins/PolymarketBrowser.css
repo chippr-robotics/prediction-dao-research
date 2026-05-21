@@ -31,6 +31,32 @@
   border-bottom: 1px solid var(--pmb-border);
 }
 
+.pmb__header--toggle {
+  align-items: center;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--pmb-border);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.5rem 0;
+  text-align: left;
+}
+
+.pmb__header--toggle:focus-visible {
+  outline: 2px solid var(--pmb-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.pmb__header-text {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .pmb__title {
   font-size: 1.1rem;
   font-weight: 600;
@@ -41,6 +67,45 @@
 .pmb__subtitle {
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.pmb__toggle-chevron {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+  display: inline-block;
+  line-height: 1;
+}
+
+.pmb__header--toggle[data-expanded='true'] .pmb__toggle-chevron {
+  transform: rotate(180deg);
+}
+
+/* Subtle idle nudge while collapsed — draws the eye every ~6s without being noisy. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes pmb-chevron-nudge {
+    0%, 90%, 100% {
+      transform: translateY(0);
+      opacity: 0.75;
+    }
+    93% {
+      transform: translateY(2px);
+      opacity: 1;
+    }
+    96% {
+      transform: translateY(-1px);
+      opacity: 1;
+    }
+  }
+
+  .pmb__header--toggle[data-expanded='false'] .pmb__toggle-chevron {
+    animation: pmb-chevron-nudge 6s ease-in-out infinite;
+  }
+
+  .pmb__header--toggle[data-expanded='false']:hover .pmb__toggle-chevron,
+  .pmb__header--toggle[data-expanded='false']:focus-visible .pmb__toggle-chevron {
+    animation: none;
+  }
 }
 
 /* Search row (inline variant) */

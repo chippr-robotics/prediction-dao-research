@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import WalletButton from './wallet/WalletButton'
+import ThemeToggle from './ui/ThemeToggle'
 import './Header.css'
 
 function Header({ hideWalletButton = false, appMode = false }) {
@@ -93,6 +94,7 @@ function Header({ hideWalletButton = false, appMode = false }) {
 
         {/* Wallet Connection Section */}
         <div className="header-actions">
+          {appMode && <ThemeToggle />}
           {!hideWalletButton && (
             <WalletButton
                 theme="dark"
