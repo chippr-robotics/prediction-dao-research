@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
@@ -125,32 +125,6 @@ function WalletButton({ className = '' }) {
   const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
   const [pendingConnector, setPendingConnector] = useState(null)
 
-  // Filter friend markets into active and past based on end date and user
-  const { activeFriendMarkets, pastFriendMarkets } = useMemo(() => {
-    const now = new Date()
-    const userAddr = address?.toLowerCase()
-
-    // Filter markets for current user
-    const userMarkets = friendMarkets.filter(m =>
-      m.creator?.toLowerCase() === userAddr ||
-      m.participants?.some(p => p.toLowerCase() === userAddr)
-    )
-
-    // Markets that are ended, resolved, or cancelled go to past
-    const isPastMarket = (m) => {
-      const endDate = new Date(m.endDate)
-      const status = m.status?.toLowerCase()
-      return endDate <= now ||
-             status === 'resolved' ||
-             status === 'cancelled' ||
-             status === 'canceled'
-    }
-
-    const active = userMarkets.filter(m => !isPastMarket(m))
-    const past = userMarkets.filter(m => isPastMarket(m))
-
-    return { activeFriendMarkets: active, pastFriendMarkets: past }
-  }, [friendMarkets, address])
 
   // Check connector availability on mount and when connectors change
   useEffect(() => {
@@ -1162,8 +1136,6 @@ function WalletButton({ className = '' }) {
         isOpen={showFriendMarketModal}
         onClose={() => setShowFriendMarketModal(false)}
         onCreate={handleFriendMarketCreation}
-        activeMarkets={activeFriendMarkets}
-        pastMarkets={pastFriendMarkets}
         pendingTransaction={loadPendingTransaction()}
         onClearPendingTransaction={clearPendingTransaction}
       />
