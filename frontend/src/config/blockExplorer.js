@@ -5,19 +5,22 @@
  * All explorer links should use these utilities to ensure consistency.
  */
 
-// Blockscout base URLs by chain ID
+// Block explorer base URLs by chain ID
+// Note: Polygon networks use PolygonScan (Etherscan-style), ETC networks use Blockscout
 export const BLOCKSCOUT_URLS = {
-  61: 'https://etc.blockscout.com',      // ETC Mainnet
-  63: 'https://etc-mordor.blockscout.com', // Mordor Testnet
+  61: 'https://etc.blockscout.com',         // ETC Mainnet
+  63: 'https://etc-mordor.blockscout.com',  // Mordor Testnet
+  137: 'https://polygonscan.com',           // Polygon mainnet
+  80002: 'https://amoy.polygonscan.com',    // Polygon Amoy testnet
 }
 
 /**
- * Get the Blockscout base URL for a given chain ID
- * @param {number} chainId - The chain ID (61 for mainnet, 63 for Mordor)
- * @returns {string} The Blockscout base URL
+ * Get the block explorer base URL for a given chain ID
+ * @param {number} chainId - The chain ID
+ * @returns {string} The block explorer base URL
  */
 export const getBlockscoutBaseUrl = (chainId) => {
-  return BLOCKSCOUT_URLS[chainId] || BLOCKSCOUT_URLS[63] // Default to Mordor
+  return BLOCKSCOUT_URLS[chainId] || BLOCKSCOUT_URLS[80002] // Default to Amoy
 }
 
 /**

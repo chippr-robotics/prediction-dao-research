@@ -39,6 +39,44 @@ const mordor = {
   testnet: true,
 }
 
+// Define Polygon Amoy testnet
+const amoy = {
+  id: 80002,
+  name: 'Polygon Amoy',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'POL',
+    symbol: 'POL',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc-amoy.polygon.technology'] },
+    public: { http: ['https://rpc-amoy.polygon.technology'] },
+  },
+  blockExplorers: {
+    default: { name: 'PolygonScan', url: 'https://amoy.polygonscan.com' },
+  },
+  testnet: true,
+}
+
+// Define Polygon mainnet (for Polymarket integration)
+const polygon = {
+  id: 137,
+  name: 'Polygon',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'POL',
+    symbol: 'POL',
+  },
+  rpcUrls: {
+    default: { http: ['https://polygon-rpc.com'] },
+    public: { http: ['https://polygon-rpc.com'] },
+  },
+  blockExplorers: {
+    default: { name: 'PolygonScan', url: 'https://polygonscan.com' },
+  },
+  testnet: false,
+}
+
 // Define Hardhat local network (for development)
 const hardhat = {
   id: 1337,
@@ -55,13 +93,13 @@ const hardhat = {
   testnet: true,
 }
 
-// Get network ID from environment or default to Mordor testnet
-const networkId = import.meta.env.VITE_NETWORK_ID 
-  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10) 
-  : 63
+// Get network ID from environment or default to Polygon Amoy testnet
+const networkId = import.meta.env.VITE_NETWORK_ID
+  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10)
+  : 80002
 
 // Get RPC URL from environment
-const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org'
+const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc-amoy.polygon.technology'
 
 // Get WalletConnect project ID from environment
 // Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
@@ -101,7 +139,7 @@ const resolveAppUrl = () => {
 const appUrl = resolveAppUrl()
 
 // Define supported chains
-const chains = [ethereumClassic, mordor, hardhat]
+const chains = [amoy, polygon, ethereumClassic, mordor, hardhat]
 
 // Create wagmi config
 export const config = createConfig({
@@ -124,8 +162,10 @@ export const config = createConfig({
     }),
   ],
   transports: {
+    [amoy.id]: http(networkId === 80002 ? rpcUrl : 'https://rpc-amoy.polygon.technology'),
+    [polygon.id]: http(),
     [ethereumClassic.id]: http(),
-    [mordor.id]: http(rpcUrl),
+    [mordor.id]: http(networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org'),
     [hardhat.id]: http('http://localhost:8545'),
   },
 })
@@ -133,6 +173,10 @@ export const config = createConfig({
 // Helper to get expected chain info
 export const getExpectedChain = () => {
   switch (networkId) {
+    case 137:
+      return polygon
+    case 80002:
+      return amoy
     case 61:
       return ethereumClassic
     case 63:
@@ -140,7 +184,7 @@ export const getExpectedChain = () => {
     case 1337:
       return hardhat
     default:
-      return mordor
+      return amoy
   }
 }
 

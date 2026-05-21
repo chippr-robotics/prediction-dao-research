@@ -38,7 +38,11 @@ export default defineConfig({
     ],
     env: {
       NODE_ENV: 'test',
-      VITE_SKIP_BLOCKCHAIN_CALLS: 'true'
+      VITE_SKIP_BLOCKCHAIN_CALLS: 'true',
+      // Tests assert against the Mordor deployment (chain 63) since Amoy
+      // addresses are populated only after deployment. Override the .env
+      // VITE_NETWORK_ID=80002 setting for test runs.
+      VITE_NETWORK_ID: '63'
     },
     coverage: {
       provider: 'v8',

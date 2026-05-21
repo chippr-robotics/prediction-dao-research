@@ -20,6 +20,10 @@ function readJson(filePath) {
 }
 
 function findDeploymentFile({ deploymentsDir, network, chainId }) {
+  // Prefer v2 file (P2P betting architecture)
+  const v2 = path.join(deploymentsDir, `${network}-chain${chainId}-v2.json`)
+  if (fs.existsSync(v2)) return v2
+
   const explicit = path.join(deploymentsDir, `${network}-chain${chainId}-deterministic-deployment.json`)
   if (fs.existsSync(explicit)) return explicit
 
@@ -45,7 +49,44 @@ function findDeploymentFile({ deploymentsDir, network, chainId }) {
   return files[0]
 }
 
-function updateObjectLiteralValue(source, key, newValueLiteral) {
+/**
+ * Optionally scope a regex update to a named block (e.g. AMOY_CONTRACTS = { ... }).
+ * If blockName is null, behaves as before (updates first occurrence anywhere).
+ */
+function updateObjectLiteralValue(source, key, newValueLiteral, blockName = null) {
+  if (blockName) {
+    // Find the named block and constrain the update to its body.
+    const blockStartRe = new RegExp(`(?:const|let|var)\\s+${blockName}\\s*=\\s*\\{`)
+    const startMatch = blockStartRe.exec(source)
+    if (!startMatch) {
+      throw new Error(`Block ${blockName} not found in contracts file`)
+    }
+    const bodyStart = startMatch.index + startMatch[0].length
+    // Find matching closing brace by depth tracking
+    let depth = 1
+    let bodyEnd = bodyStart
+    for (let i = bodyStart; i < source.length; i++) {
+      const c = source[i]
+      if (c === '{') depth++
+      else if (c === '}') {
+        depth--
+        if (depth === 0) { bodyEnd = i; break }
+      }
+    }
+    const before = source.slice(0, bodyStart)
+    const block = source.slice(bodyStart, bodyEnd)
+    const after = source.slice(bodyEnd)
+
+    const re = new RegExp(`(^\\s*${key}\\s*:\\s*)([^,\\n]+)(\\s*,?)$`, 'm')
+    if (re.test(block)) {
+      const updated = block.replace(re, `$1${newValueLiteral}$3`)
+      return before + updated + after
+    }
+    // Insert at end of block (before closing brace)
+    const line = `  ${key}: ${newValueLiteral},\n`
+    return before + block + line + after
+  }
+
   // Matches: <spaces>key: <value>,
   // key is assumed to be a simple identifier (no quotes) as used in contracts.js.
   const re = new RegExp(`(^\\s*${key}\\s*:\\s*)([^,\\n]+)(\\s*,?)$`, 'm')
@@ -63,6 +104,21 @@ function updateObjectLiteralValue(source, key, newValueLiteral) {
   const after = source.slice(insertionPoint)
   const line = `  ${key}: ${newValueLiteral},\n`
   return `${before}${line}${after}`
+}
+
+/**
+ * Map chainId to the corresponding contracts block name in contracts.js.
+ * Returns null if no block is known for this chain (caller falls back to whole-file update).
+ */
+function blockNameForChain(chainId) {
+  const map = {
+    63: 'MORDOR_CONTRACTS',
+    80002: 'AMOY_CONTRACTS',
+    137: 'POLYGON_CONTRACTS',
+    1337: 'HARDHAT_CONTRACTS',
+    31337: 'HARDHAT_CONTRACTS',
+  }
+  return map[chainId] || null
 }
 
 function main() {
@@ -91,53 +147,63 @@ function main() {
 
   const deployment = readJson(deploymentFile)
   const deployed = deployment.contracts || {}
+  const isV2 = Boolean(deployed.wagerRegistry || deployed.membershipManager && deployed.keyRegistry)
 
   let source = fs.readFileSync(contractsFile, 'utf8')
 
-  // Update known keys used by the frontend.
-  const mapping = {
-    // Role manager contracts
-    tieredRoleManager: deployed.tieredRoleManager,
-    roleManager: deployed.tieredRoleManager,
-    roleManagerCore: deployed.roleManagerCore || deployed.tieredRoleManager,
+  // Build mapping. v2 = lean P2P architecture; v1 = legacy full futarchy stack.
+  const mapping = isV2
+    ? {
+        wagerRegistry: deployed.wagerRegistry,
+        membershipManager: deployed.membershipManager,
+        keyRegistry: deployed.keyRegistry,
+        polymarketAdapter: deployed.polymarketAdapter,
+        paymentToken: deployment.paymentToken,
+        wmatic: deployment.wmatic,
+      }
+    : {
+        // v1 mapping (kept for legacy Mordor reads)
+        tieredRoleManager: deployed.tieredRoleManager,
+        roleManager: deployed.tieredRoleManager,
+        roleManagerCore: deployed.roleManagerCore || deployed.tieredRoleManager,
+        tierRegistry: deployed.tierRegistry,
+        usageTracker: deployed.usageTracker,
+        membershipManager: deployed.membershipManager,
+        paymentProcessor: deployed.paymentProcessor,
+        membershipPaymentManager: deployed.membershipPaymentManager,
+        welfareRegistry: deployed.welfareRegistry,
+        proposalRegistry: deployed.proposalRegistry,
+        marketFactory: deployed.marketFactory,
+        privacyCoordinator: deployed.privacyCoordinator,
+        oracleResolver: deployed.oracleResolver,
+        ragequitModule: deployed.ragequitModule,
+        futarchyGovernor: deployed.futarchyGovernor,
+        tokenMintFactory: deployed.tokenMintFactory,
+        daoFactory: deployed.daoFactory,
+        ctf1155: deployed.ctf1155,
+        friendGroupMarketFactory: deployed.friendGroupMarketFactory,
+        marketCorrelationRegistry: deployed.marketCorrelationRegistry,
+        nullifierRegistry: deployed.nullifierRegistry,
+      }
 
-    // RBAC contracts
-    tierRegistry: deployed.tierRegistry,
-    usageTracker: deployed.usageTracker,
-    membershipManager: deployed.membershipManager,
-    paymentProcessor: deployed.paymentProcessor,
-    membershipPaymentManager: deployed.membershipPaymentManager,
-
-    // Core contracts
-    welfareRegistry: deployed.welfareRegistry,
-    proposalRegistry: deployed.proposalRegistry,
-    marketFactory: deployed.marketFactory,
-    privacyCoordinator: deployed.privacyCoordinator,
-    oracleResolver: deployed.oracleResolver,
-    ragequitModule: deployed.ragequitModule,
-    futarchyGovernor: deployed.futarchyGovernor,
-
-    // Factory contracts
-    tokenMintFactory: deployed.tokenMintFactory,
-    daoFactory: deployed.daoFactory,
-
-    // Market contracts
-    ctf1155: deployed.ctf1155,
-    friendGroupMarketFactory: deployed.friendGroupMarketFactory,
-
-    // Registry contracts
-    marketCorrelationRegistry: deployed.marketCorrelationRegistry,
-    nullifierRegistry: deployed.nullifierRegistry,
+  // Determine target block in contracts.js (multi-network layout). If the file
+  // doesn't have a per-chain block, blockName stays null and we update globally
+  // (preserves backwards compatibility with the test fixture).
+  const deploymentChainId = Number(deployment.chainId) || chainId
+  let blockName = blockNameForChain(deploymentChainId)
+  if (blockName) {
+    const hasBlock = new RegExp(`(?:const|let|var)\\s+${blockName}\\s*=\\s*\\{`).test(source)
+    if (!hasBlock) blockName = null
   }
 
   for (const [key, value] of Object.entries(mapping)) {
     if (!value) continue
-    source = updateObjectLiteralValue(source, key, `'${value}'`)
+    source = updateObjectLiteralValue(source, key, `'${value}'`, blockName)
   }
 
   // Keep deployer in sync too (use explicit field if present).
   if (deployment.deployer) {
-    source = updateObjectLiteralValue(source, 'deployer', `'${deployment.deployer}'`)
+    source = updateObjectLiteralValue(source, 'deployer', `'${deployment.deployer}'`, blockName)
   }
 
   fs.writeFileSync(contractsFile, source)

@@ -1,14 +1,14 @@
 /**
  * Key Registry Service
  *
- * Wraps ZKKeyManager on-chain reads/writes for encryption key management.
+ * Wraps KeyRegistry on-chain reads/writes for encryption key management.
  * Users register their X25519 public keys on-chain so that wager creators
  * can look up an opponent's key and encrypt wager details for them without
  * any shared secret or direct interaction.
  */
 
 import { ethers } from 'ethers'
-import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
+import { KEY_REGISTRY_ABI } from '../abis/KeyRegistry'
 import { getContractAddress } from '../config/contracts'
 
 // In-memory cache: address → { publicKeyHex, timestamp }
@@ -16,16 +16,15 @@ const keyCache = new Map()
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 /**
- * Get a read-only ZKKeyManager contract instance
- * @param {ethers.Provider} provider
- * @returns {ethers.Contract}
+ * Get a read-only KeyRegistry contract instance.
+ * Falls back to legacy `zkKeyManager` config field for Mordor deployments.
  */
-function getZKKeyManagerContract(provider) {
-  const address = getContractAddress('zkKeyManager')
+function getKeyRegistryContract(provider) {
+  const address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
   if (!address) {
-    throw new Error('ZKKeyManager contract address not configured')
+    throw new Error('KeyRegistry contract address not configured')
   }
-  return new ethers.Contract(address, ZK_KEY_MANAGER_ABI, provider)
+  return new ethers.Contract(address, KEY_REGISTRY_ABI, provider)
 }
 
 /**
@@ -70,7 +69,7 @@ export async function lookupPublicKey(address, provider) {
   }
 
   try {
-    const contract = getZKKeyManagerContract(provider)
+    const contract = getKeyRegistryContract(provider)
     const publicKeyHex = await contract.getPublicKey(address)
 
     if (!publicKeyHex || publicKeyHex === '') {
@@ -106,7 +105,11 @@ export async function hasRegisteredKey(address, provider) {
   if (!address || !provider) return false
 
   try {
-    const contract = getZKKeyManagerContract(provider)
+    const contract = getKeyRegistryContract(provider)
+    // v2 KeyRegistry uses hasKey(); legacy ZKKeyManager used hasValidKey()
+    if (typeof contract.hasKey === 'function') {
+      return await contract.hasKey(address)
+    }
     return await contract.hasValidKey(address)
   } catch (error) {
     console.error(`[keyRegistry] Failed to check key for ${address}:`, error.message)
@@ -129,13 +132,14 @@ export async function registerEncryptionKey(signer, publicKeyBytes) {
 
   const publicKeyHex = bytesToHex(publicKeyBytes)
 
-  const address = getContractAddress('zkKeyManager')
+  const address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
   if (!address) {
-    throw new Error('ZKKeyManager contract not configured')
+    throw new Error('KeyRegistry contract not configured')
   }
 
-  const contract = new ethers.Contract(address, ZK_KEY_MANAGER_ABI, signer)
-  const tx = await contract.registerKey(publicKeyHex)
+  const contract = new ethers.Contract(address, KEY_REGISTRY_ABI, signer)
+  // Both old ZKKeyManager (string param) and new KeyRegistry (bytes param) accept a 0x-prefixed hex string.
+  const tx = await contract.registerKey('0x' + publicKeyHex)
   const receipt = await tx.wait()
 
   // Invalidate cache for this user

@@ -28,15 +28,52 @@ const TOKENS = {
   mordor: {
     USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // USC Stablecoin (6 decimals)
     WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC
+    WMATIC: null,
+  },
+  amoy: {
+    // Circle USDC on Polygon Amoy (6 decimals)
+    USC: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+    WETC: null,
+    // Wrapped MATIC on Amoy (used as alternative wager stake token)
+    WMATIC: "0x0ae690AAD8663aaB12a671A6A0d74242332de85f",
+  },
+  polygon: {
+    USC: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",   // Circle USDC on Polygon mainnet
+    WETC: null,
+    WMATIC: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
   },
   localhost: {
     USC: null,   // Deploy mock in test
-    WETC: null,  // Deploy mock in test
+    WETC: null,
+    WMATIC: null,
   },
   hardhat: {
     USC: null,
     WETC: null,
+    WMATIC: null,
   }
+};
+
+// =============================================================================
+// POLYMARKET INTEGRATION ADDRESSES
+// =============================================================================
+
+/**
+ * Polymarket CTF (Conditional Tokens Framework) contract addresses
+ * Used by PolymarketOracleAdapter to query market resolutions
+ *
+ * Polymarket uses Gnosis CTF on Polygon. The same CTF contract is used on
+ * Polygon mainnet. On Amoy testnet, a test deployment of CTF is used.
+ *
+ * If null, deploy a Mock CTF for testing or use a custom address via
+ * the POLYMARKET_CTF env var when running deployment.
+ */
+const POLYMARKET_CTF = {
+  polygon: "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",  // Polymarket CTF on Polygon mainnet
+  amoy: null,    // No canonical Polymarket CTF on Amoy - set via POLYMARKET_CTF env var
+  mordor: null,
+  localhost: null,
+  hardhat: null,
 };
 
 // =============================================================================
@@ -234,6 +271,7 @@ const SALT_PREFIXES = {
   FRIEND_MARKETS: "ClearPathDAO-FGMF-v1.1-",
   PERPETUALS: "ClearPathDAO-Perp-v1.0-",
   CORRELATION: "ClearPathDAO-MCR-v1.0-",
+  V2: "FairWins-P2P-v2.0-",
 };
 
 // =============================================================================
@@ -249,6 +287,12 @@ const NETWORK_CONFIG = {
     name: "Mordor Testnet",
     rpcUrl: "https://rpc.mordor.etccooperative.org",
     blockExplorer: "https://etc-mordor.blockscout.com",
+  },
+  amoy: {
+    chainId: 80002,
+    name: "Polygon Amoy Testnet",
+    rpcUrl: "https://rpc-amoy.polygon.technology",
+    blockExplorer: "https://amoy.polygonscan.com",
   },
   localhost: {
     chainId: 1337,
@@ -282,7 +326,7 @@ const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 // MAINNET CHAIN IDS (for safety checks)
 // =============================================================================
 
-const MAINNET_CHAIN_IDS = [1, 61]; // Ethereum Mainnet, Ethereum Classic Mainnet
+const MAINNET_CHAIN_IDS = [1, 61, 137]; // Ethereum, Ethereum Classic, Polygon mainnets
 
 // =============================================================================
 // EXPORTS
@@ -294,6 +338,7 @@ module.exports = {
 
   // Tokens
   TOKENS,
+  POLYMARKET_CTF,
 
   // Roles
   ROLE_HASHES,

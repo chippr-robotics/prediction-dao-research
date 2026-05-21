@@ -1,50 +1,89 @@
 /**
- * Deployed Contract Addresses on Mordor Testnet
+ * Deployed Contract Addresses
  *
- * These addresses are deterministically deployed and should remain consistent
- * across deployments. Update these if contracts are redeployed.
+ * Active network is selected via VITE_NETWORK_ID. Each network has its own
+ * deployment record. Addresses are deterministic via Safe Singleton Factory,
+ * so re-running deploy scripts produces the same addresses.
  *
- * Last updated: 2026-03-06 (P2P wager focus refactor)
+ * Last updated: 2026-05-09 (Amoy network added for Polymarket integration)
  */
 
-export const DEPLOYED_CONTRACTS = {
-  // Deployer / Treasury
+// Mordor (Ethereum Classic testnet) legacy v1 deployment — read-only at this point.
+const MORDOR_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-
-  // Core Contracts
   roleManagerCore: '0x6a6422Ed3198332AC8DA2852BBff4749B66a3D8D',
   ragequitModule: '0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c',
-
-  // RBAC Contracts (02-deploy-rbac.js)
   tieredRoleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
   tierRegistry: '0x476cf3dEA109D6FC95aD19d246FD4e95693c47a3',
   usageTracker: '0x10f1b557a53C05A92DF820CCfDC77EaB0c732Bde',
   membershipManager: '0xCD172d9888a6F47203dD6f0684f250f6Ac56f6Ed',
   paymentProcessor: '0x6e063138809263820F61146c34a74EB3B2629A59',
   membershipPaymentManager: '0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7',
-
-  // P2P Wager Contracts (03-deploy-markets.js) - v7 with external library refactor
   friendGroupResolutionLib: '0x1C8780a84539c3c2F98530a2275fB9D2E4eA5aE9',
   friendGroupClaimsLib: '0xca3b4c3e0E04E5Ffcb0983d6e2DfE793BbEEfBbc',
   friendGroupCreationLib: '0xB3060ED1dc17dB2297021D5874821ce13777A657',
   friendGroupMarketFactory: '0xE1eC8d34b36f55015ed636337121CA8EFbA96227',
-
-  // Privacy & Key Management
   nullifierRegistry: '0x5569FEe7f8Bab39EEd08bf448Dd6824640C7d272',
   zkKeyManager: '0xF75bcd3673E379E0a85CC944AA147B7596c7AE67',
-
-  // Back-compat aliases
   roleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
 }
 
+// Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
+const HARDHAT_CONTRACTS = {
+  deployer: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+  treasury: '',
+  wagerRegistry: '0x31F2B0a0d14a8814af2430154ee39E551b66BA8A',
+  membershipManager: '0x9D29Dfe091111099dCd317159Fa41f8E80F50489',
+  keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
+  polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',
+  paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
+  wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
+}
+
+// Polygon Amoy testnet deployment (v2 — P2P betting architecture)
+// Run: npx hardhat run scripts/deploy/deploy.js --network amoy
+//      npm run sync:frontend-contracts -- --network amoy --chainId 80002
+const AMOY_CONTRACTS = {
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  // v2 core (populated by `npm run sync:frontend-contracts -- --network amoy --chainId 80002`)
+  wagerRegistry: '',
+  membershipManager: '',
+  keyRegistry: '',
+  polymarketAdapter: '',
+  // Stake / payment tokens (Circle USDC + Wrapped MATIC on Amoy)
+  paymentToken: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
+  wmatic: '0x0ae690AAD8663aaB12a671A6A0d74242332de85f',
+}
+
+const NETWORK_CONTRACTS = {
+  63: MORDOR_CONTRACTS,     // Mordor (legacy v1)
+  80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
+  1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
+}
+
+// Default to Mordor (63) when VITE_NETWORK_ID isn't set so existing tests pass.
+// The .env / .env.example files set VITE_NETWORK_ID=80002 for the live frontend.
+const ACTIVE_CHAIN_ID = parseInt(import.meta.env.VITE_NETWORK_ID || '63', 10)
+
+export const DEPLOYED_CONTRACTS =
+  NETWORK_CONTRACTS[ACTIVE_CHAIN_ID] || MORDOR_CONTRACTS
+
 /**
  * Deployment block numbers for event scanning.
- * Used as the starting block when no cached index exists, avoiding full-chain scans.
+ * Keyed by chain ID; used as the starting block when no cached index exists.
+ *
+ * v1 used friendGroupMarketFactory; v2 uses wagerRegistry. Both kept here to
+ * support legacy Mordor reads while Amoy migrates.
  */
-export const DEPLOYMENT_BLOCKS = {
-  friendGroupMarketFactory: 15658191,
+const DEPLOYMENT_BLOCKS_BY_CHAIN = {
+  63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0 },
+  80002: { friendGroupMarketFactory: 0, wagerRegistry: 0 },
 }
+
+export const DEPLOYMENT_BLOCKS =
+  DEPLOYMENT_BLOCKS_BY_CHAIN[ACTIVE_CHAIN_ID] || { friendGroupMarketFactory: 0, wagerRegistry: 0 }
 
 /**
  * Get contract address from environment or use deployed default
@@ -70,11 +109,31 @@ export function getContractAddress(contractName) {
 }
 
 /**
- * Network configuration for Mordor testnet
+ * Network configuration, derived from VITE_NETWORK_ID
  */
+const NETWORK_INFO_BY_CHAIN = {
+  63: {
+    name: 'Mordor Testnet',
+    rpcUrl: 'https://rpc.mordor.etccooperative.org',
+    blockExplorer: 'https://etc-mordor.blockscout.com',
+  },
+  80002: {
+    name: 'Polygon Amoy',
+    rpcUrl: 'https://rpc-amoy.polygon.technology',
+    blockExplorer: 'https://amoy.polygonscan.com',
+  },
+  137: {
+    name: 'Polygon',
+    rpcUrl: 'https://polygon-rpc.com',
+    blockExplorer: 'https://polygonscan.com',
+  },
+}
+
+const _activeNetwork = NETWORK_INFO_BY_CHAIN[ACTIVE_CHAIN_ID] || NETWORK_INFO_BY_CHAIN[63]
+
 export const NETWORK_CONFIG = {
-  chainId: parseInt(import.meta.env.VITE_NETWORK_ID || '63', 10),
-  name: 'Mordor Testnet',
-  rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.mordor.etccooperative.org',
-  blockExplorer: 'https://etc-mordor.blockscout.com'
+  chainId: ACTIVE_CHAIN_ID,
+  name: _activeNetwork.name,
+  rpcUrl: import.meta.env.VITE_RPC_URL || _activeNetwork.rpcUrl,
+  blockExplorer: _activeNetwork.blockExplorer,
 }
