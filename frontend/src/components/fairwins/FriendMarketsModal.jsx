@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications } from '../../hooks'
@@ -191,6 +191,10 @@ function FriendMarketsModal({
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
     peggedMarketId: '',
+    // Which outcome of a linked Polymarket the creator is taking. Stored as
+    // the 0-based outcome index ('' = unset, '0' = YES/first, '1' = NO/second)
+    // to match PolymarketOracleAdapter's payouts ordering (YES=0, NO=1).
+    creatorSide: '',
     // Multi-party acceptance fields
     acceptanceDeadline: getDefaultAcceptanceDeadline(),
     minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
@@ -223,6 +227,11 @@ function FriendMarketsModal({
   // its conditionId can be committed to formData.peggedMarketId.
   const [selectedPolymarketMarket, setSelectedPolymarketMarket] = useState(null)
   const { clear: clearPolymarket } = usePolymarketSearch({ limit: 10 })
+
+  // Tracks the last description we generated from (creatorSide + Polymarket
+  // question). If the user hasn't edited the field since, we may overwrite it
+  // when those inputs change; once they edit, we leave their text alone.
+  const lastAutoDescriptionRef = useRef('')
 
   // Market acceptance modal state
   const [acceptanceModalOpen, setAcceptanceModalOpen] = useState(false)
@@ -257,6 +266,7 @@ function FriendMarketsModal({
       customStakeTokenAddress: '',
       arbitrator: '',
       peggedMarketId: '',
+      creatorSide: '',
       acceptanceDeadline: getDefaultAcceptanceDeadline(),
       minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
       oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER
@@ -264,6 +274,7 @@ function FriendMarketsModal({
     setErrors({})
     setSelectedPolymarketMarket(null)
     clearPolymarket()
+    lastAutoDescriptionRef.current = ''
     setEnableEncryption(true)
   }, [clearPolymarket])
 
@@ -287,12 +298,18 @@ function FriendMarketsModal({
       // market and question pre-filled.
       if (initialPolymarketMarket?.conditionId) {
         setSelectedPolymarketMarket(initialPolymarketMarket)
-        setFormData((prev) => ({
-          ...prev,
-          resolutionType: ResolutionType.PolymarketOracle,
-          peggedMarketId: initialPolymarketMarket.conditionId,
-          description: prev.description || initialPolymarketMarket.question || '',
-        }))
+        setFormData((prev) => {
+          const seeded = prev.description || initialPolymarketMarket.question || ''
+          if (!prev.description && seeded) {
+            lastAutoDescriptionRef.current = seeded
+          }
+          return {
+            ...prev,
+            resolutionType: ResolutionType.PolymarketOracle,
+            peggedMarketId: initialPolymarketMarket.conditionId,
+            description: seeded,
+          }
+        })
       }
     }
   }, [isOpen, resetForm, initialTab, initialType, initialPolymarketMarket])
@@ -324,6 +341,12 @@ function FriendMarketsModal({
   }
 
   const handleFormChange = (field, value) => {
+    // If the user is typing in the description, treat it as a manual edit and
+    // stop auto-syncing it from the side + Polymarket question.
+    if (field === 'description' && value !== lastAutoDescriptionRef.current) {
+      lastAutoDescriptionRef.current = ''
+    }
+
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
 
@@ -334,6 +357,9 @@ function FriendMarketsModal({
           value !== ResolutionType.PolymarketOracle) {
         updated.arbitrator = ''
         updated.peggedMarketId = ''
+      }
+      if (field === 'resolutionType' && value !== ResolutionType.PolymarketOracle) {
+        updated.creatorSide = ''
       }
 
       return updated
@@ -347,6 +373,18 @@ function FriendMarketsModal({
       })
     }
   }
+
+  // Build the canonical "I'm betting <SIDE>: <question>" phrasing so both
+  // creator and counterparties can see which side of the linked market the
+  // creator is on. `sideIndex` is the 0-based outcome index ('0' or '1').
+  const buildSideDescription = useCallback((market, sideIndex) => {
+    if (!market || sideIndex === '' || sideIndex == null) return ''
+    const question = (market.question || '').trim()
+    const outcomeName = market.outcomes?.[Number(sideIndex)]?.name?.trim()
+    const sideLabel = outcomeName || (sideIndex === '0' ? 'YES' : 'NO')
+    if (!question) return `I'm betting ${sideLabel}`
+    return `I'm betting ${sideLabel}: ${question}`
+  }, [])
 
   // QR Scanner handlers
   const openQrScanner = (target) => {
@@ -411,16 +449,73 @@ function FriendMarketsModal({
   }
 
   // Polymarket event selection — picking a market commits the condition id to
-  // formData so submit-time validation passes.
+  // formData so submit-time validation passes. If a side is already chosen,
+  // re-sync the description to the new question.
   const handleSelectPolymarketMarket = (market) => {
     setSelectedPolymarketMarket(market)
-    handleFormChange('peggedMarketId', market.conditionId)
+    setFormData(prev => {
+      const updated = { ...prev, peggedMarketId: market.conditionId }
+      const sideSynced = prev.creatorSide !== '' && (
+        prev.description === '' || prev.description === lastAutoDescriptionRef.current
+      )
+      if (sideSynced) {
+        const next = buildSideDescription(market, prev.creatorSide)
+        updated.description = next
+        lastAutoDescriptionRef.current = next
+      } else if (!prev.description) {
+        // Preserve prior behavior: seed an empty description with the question
+        // so users have a starting point even before they pick a side.
+        updated.description = market.question || ''
+        lastAutoDescriptionRef.current = updated.description
+      }
+      return updated
+    })
+    if (errors.peggedMarketId) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.peggedMarketId
+        return newErrors
+      })
+    }
   }
 
   const clearPolymarketSelection = () => {
     setSelectedPolymarketMarket(null)
-    handleFormChange('peggedMarketId', '')
+    setFormData(prev => ({ ...prev, peggedMarketId: '', creatorSide: '' }))
     clearPolymarket()
+    lastAutoDescriptionRef.current = ''
+  }
+
+  // User picks which Polymarket outcome they're taking. Auto-sync the
+  // description to the canonical phrasing unless they've already customized
+  // it past the last auto-generated value.
+  const handleSelectCreatorSide = (sideIndex) => {
+    setFormData(prev => {
+      const updated = { ...prev, creatorSide: sideIndex }
+      const canOverwrite = prev.description === '' ||
+        prev.description === lastAutoDescriptionRef.current ||
+        prev.description === selectedPolymarketMarket?.question
+      if (canOverwrite && selectedPolymarketMarket) {
+        const next = buildSideDescription(selectedPolymarketMarket, sideIndex)
+        updated.description = next
+        lastAutoDescriptionRef.current = next
+      }
+      return updated
+    })
+    if (errors.creatorSide) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.creatorSide
+        return newErrors
+      })
+    }
+    if (errors.description) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors.description
+        return newErrors
+      })
+    }
   }
 
   // Market acceptance handlers
@@ -714,6 +809,11 @@ function FriendMarketsModal({
           newErrors.peggedMarketId = 'Pick a Polymarket event to link this wager to'
         } else if (!/^0x[a-fA-F0-9]{64}$/.test(cid)) {
           newErrors.peggedMarketId = 'Invalid Polymarket condition id (expected 0x + 64 hex chars)'
+        }
+        // Creator must declare which side of the linked market they're taking
+        // so the bet description unambiguously identifies who is on which side.
+        if (formData.creatorSide !== '0' && formData.creatorSide !== '1') {
+          newErrors.creatorSide = 'Pick which side of the linked market you are taking'
         }
       }
     }
@@ -1341,11 +1441,14 @@ function FriendMarketsModal({
                         type="text"
                         value={formData.description}
                         onChange={(e) => handleFormChange('description', e.target.value)}
-                        placeholder="e.g., Patriots win the Super Bowl"
+                        placeholder="e.g., I'm betting YES that the Patriots win the Super Bowl"
                         disabled={submitting}
                         className={errors.description ? 'error' : ''}
                         maxLength={200}
                       />
+                      <span className="fm-hint">
+                        Phrase this so it&apos;s clear which side you&apos;re on (e.g., &ldquo;I&apos;m betting YES that...&rdquo;). Your opponent takes the opposite side.
+                      </span>
                       {errors.description && <span className="fm-error">{errors.description}</span>}
                     </div>
 
@@ -1719,16 +1822,57 @@ function FriendMarketsModal({
                           showFilters
                           limit={20}
                           selectedConditionId={selectedPolymarketMarket?.conditionId}
-                          onSelectMarket={(m) => {
-                            handleSelectPolymarketMarket(m)
-                            if (!formData.description) {
-                              setFormData((prev) => ({ ...prev, description: m.question || prev.description }))
-                            }
-                          }}
+                          onSelectMarket={handleSelectPolymarketMarket}
                         />
 
                         {errors.peggedMarketId && (
                           <span className="fm-error">{errors.peggedMarketId}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Creator side — which outcome of the linked Polymarket are you taking? */}
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                     formData.resolutionType === ResolutionType.PolymarketOracle &&
+                     selectedPolymarketMarket && (
+                      <div className="fm-form-group fm-form-full">
+                        <label>
+                          Your side of the bet <span className="fm-required">*</span>
+                        </label>
+                        <span className="fm-hint">
+                          Pick which outcome you&apos;re taking. Your opponent will be on the other side, and the bet description will say so explicitly.
+                        </span>
+                        <div className="fm-side-picker">
+                          {['0', '1'].map((idx) => {
+                            const outcome = selectedPolymarketMarket.outcomes?.[Number(idx)]
+                            const fallback = idx === '0' ? 'YES' : 'NO'
+                            const name = outcome?.name || fallback
+                            const active = formData.creatorSide === idx
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                className={`fm-side-btn ${active ? 'active' : ''}`}
+                                onClick={() => handleSelectCreatorSide(idx)}
+                                disabled={submitting}
+                                aria-pressed={active}
+                              >
+                                <span className="fm-side-btn-label">I&apos;m taking {name}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {formData.creatorSide !== '' && (
+                          <span className="fm-hint">
+                            Your opponent will be taking{' '}
+                            <strong>
+                              {selectedPolymarketMarket.outcomes?.[formData.creatorSide === '0' ? 1 : 0]?.name
+                                || (formData.creatorSide === '0' ? 'NO' : 'YES')}
+                            </strong>.
+                          </span>
+                        )}
+                        {errors.creatorSide && (
+                          <span className="fm-error">{errors.creatorSide}</span>
                         )}
                       </div>
                     )}
