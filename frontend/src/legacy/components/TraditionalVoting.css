@@ -1,0 +1,348 @@
+.traditional-voting {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.traditional-voting.loading,
+.traditional-voting.error {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+}
+
+.traditional-voting.error {
+  color: #e74c3c;
+}
+
+.voting-header {
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.voting-header h2 {
+  margin: 0;
+  color: var(--clearpath-primary, #2c3e50);
+}
+
+.voting-info {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.info-item .label {
+  font-size: 12px;
+  color: #7f8c8d;
+  text-transform: uppercase;
+}
+
+.info-item .value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--clearpath-primary, #2c3e50);
+}
+
+.no-proposals {
+  text-align: center;
+  padding: 60px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.no-proposals p {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 16px;
+}
+
+.proposals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.voting-proposal-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.voting-proposal-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.proposal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.proposal-header h3 {
+  margin: 0;
+  color: var(--clearpath-primary, #2c3e50);
+  font-size: 20px;
+  flex: 1;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-badge.blue {
+  background: #3498db20;
+  color: #3498db;
+}
+
+.status-badge.green {
+  background: #27ae6020;
+  color: #27ae60;
+}
+
+.status-badge.red {
+  background: #e74c3c20;
+  color: #e74c3c;
+}
+
+.status-badge.orange {
+  background: #f39c1220;
+  color: #f39c12;
+}
+
+.status-badge.gray {
+  background: #95a5a620;
+  color: #7f8c8d;
+}
+
+.proposal-description {
+  color: #7f8c8d;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.proposal-details {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.detail-row:not(:last-child) {
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.detail-row .label {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.detail-row .value {
+  color: var(--clearpath-primary, #2c3e50);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.voting-stats {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 150px;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 12px;
+}
+
+.stat-row:last-child {
+  margin-bottom: 0;
+}
+
+.stat-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--clearpath-primary, #2c3e50);
+}
+
+.stat-bar-container {
+  height: 24px;
+  background: #e8e8e8;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.stat-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.stat-bar.for {
+  background: linear-gradient(90deg, #27ae60, #2ecc71);
+}
+
+.stat-bar.against {
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+}
+
+.stat-bar.abstain {
+  background: linear-gradient(90deg, #95a5a6, #7f8c8d);
+}
+
+.stat-value {
+  font-size: 13px;
+  color: #7f8c8d;
+  text-align: right;
+}
+
+.quorum-row {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 2px solid #dee2e6;
+}
+
+.user-vote-indicator {
+  background: #e8f5e9;
+  border-left: 4px solid #27ae60;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  color: #1e7e34;
+  font-size: 14px;
+}
+
+.voting-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.vote-button {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vote-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vote-button.for {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: white;
+}
+
+.vote-button.for:hover:not(:disabled) {
+  background: linear-gradient(135deg, #229954, #27ae60);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.vote-button.against {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+}
+
+.vote-button.against:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c0392b, #a93226);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+.vote-button.abstain {
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  color: white;
+}
+
+.vote-button.abstain:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7f8c8d, #6c7a89);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(149, 165, 166, 0.3);
+}
+
+.vote-button.queue {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: white;
+  flex: 1;
+  max-width: 300px;
+}
+
+.vote-button.queue:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e67e22, #d35400);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .voting-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .voting-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stat-row {
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
+  }
+
+  .stat-value {
+    grid-column: 2;
+    text-align: left;
+    margin-top: 5px;
+  }
+
+  .voting-buttons {
+    flex-direction: column;
+  }
+
+  .vote-button {
+    width: 100%;
+  }
+
+  .vote-button.queue {
+    max-width: none;
+  }
+}

@@ -1,23 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { useWallet, useWeb3, useMyWagers, useMyWagerNotifications, useLazyIpfsEnvelope } from '../../hooks'
-import { useLazyMarketDecryption } from '../../hooks/useEncryption'
-import { useChainTokens } from '../../hooks/useChainTokens'
-import {
-  WagerStatus as MarketStatus,
-  DisputeStatus,
-  WAGER_DEFAULTS,
-  WagerSortKey,
-  ResolutionTypeNames,
-  ResolutionTypeOrder,
-  TERMINAL_STATUSES,
-} from '../../constants/wagerDefaults'
+import { useWallet, useWeb3 } from '../../hooks'
+import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
-import { getTransactionUrl } from '../../config/blockExplorer'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
+import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
-import ShareWagerModal from './ShareWagerModal'
-import { getMarketUrl, getMarketDescription } from './marketHelpers'
 import './MyMarketsModal.css'
 
 /**
@@ -40,13 +27,14 @@ function MyMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
-  const { native: nativeSymbol } = useChainTokens()
 
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
 
-  // Optimistic data state (legacy — kept for any callers still wiring positions)
-  const [userPositions] = useState([])
+  // Markets data state
+  const [markets, setMarkets] = useState([])
+  const [userPositions, setUserPositions] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   // Selected market for detail view
@@ -65,92 +53,34 @@ function MyMarketsModal({
   const [showAcceptanceModal, setShowAcceptanceModal] = useState(false)
   const [acceptanceMarket, setAcceptanceMarket] = useState(null)
 
-  // Share modal state
-  const [showShareModal, setShowShareModal] = useState(false)
-  const [shareMarketData, setShareMarketData] = useState(null)
-
-  // Cancellation state (creator cancelling a pending wager)
-  const [cancellingMarketId, setCancellingMarketId] = useState(null)
-
   // Filter state
   const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
   const [statusFilter, setStatusFilter] = useState('all')
-  const [resolutionTypeFilter, setResolutionTypeFilter] = useState('all') // 'all' | '0'..'5'
-  const [sortKey, setSortKey] = useState(WagerSortKey.CREATED)
 
-  // Paginated wagers via the WagerRepository (subgraph primary, events fallback).
-  // The hook keeps decryption out of the data path — encrypted envelopes are
-  // returned as raw metadataCipher and unwrapped by useLazyMarketDecryption.
-  const myWagersFilter = useMemo(() => ({
-    marketTypes: marketTypeFilter === 'all' ? null : [marketTypeFilter],
-    statuses: statusFilter === 'all' ? null : [statusFilter],
-    resolutionTypes: resolutionTypeFilter === 'all' ? null : [Number(resolutionTypeFilter)],
-    includeExpired: activeTab === 'history',
-  }), [marketTypeFilter, statusFilter, resolutionTypeFilter, activeTab])
-
-  const {
-    items: pagedWagers,
-    loadMore,
-    refresh: refreshPage,
-    isLoading: pageLoading,
-    error: pageError,
-    hasMore,
-  } = useMyWagers({
-    account,
-    tab: activeTab,
-    sort: sortKey,
-    filter: myWagersFilter,
-  })
-
-  // Lazy IPFS envelope fetch + decryption so encrypted wagers can be
-  // unlocked from the detail view (mirrors FriendMarketsModal's pipeline).
-  // Markets stay encrypted until the user clicks "Click to decrypt".
-  const {
-    markets: wagersWithEnvelopes,
-    fetchEnvelope,
-  } = useLazyIpfsEnvelope(pagedWagers)
-  const {
-    markets: decryptedWagers,
-    decryptMarket,
-    isMarketDecrypting,
-  } = useLazyMarketDecryption(wagersWithEnvelopes)
-
-  // Unread tracking (circuit-breaker for the count badge + mark-as-read).
-  // Independent storage key from FriendMarketsModal so opening a wager in
-  // one view does not mark it read in the other.
-  const {
-    unreadMarketIds,
-    markMarketAsRead,
-    isMarketUnread,
-  } = useMyWagerNotifications(decryptedWagers, account)
-
-  // The pagedWagers are already gated on ownership/expiry/tab by the
-  // repository. The remaining job for the modal is to merge in any
-  // optimistic friend markets passed via props (e.g. just-created).
-  const visibleWagers = useMemo(() => {
-    const seen = new Set(decryptedWagers.map(w => String(w.id)))
-    const optimistic = (friendMarkets || []).filter(m => !seen.has(String(m.id)))
-    return [...decryptedWagers, ...optimistic]
-  }, [decryptedWagers, friendMarkets])
-
-  // Fetch markets data — now a thin wrapper that refreshes the paginated query
+  // Fetch markets data (friend markets are passed via props)
   const fetchMarketsData = useCallback(async () => {
     if (!account) return
+
+    setLoading(true)
     setError(null)
+
     try {
-      await refreshPage()
+      setMarkets([])
+      setUserPositions([])
     } catch (err) {
       console.error('Error fetching markets data:', err)
       setError('Failed to load wagers. Please try again.')
+    } finally {
+      setLoading(false)
     }
-  }, [account, refreshPage])
+  }, [account])
 
-  const loading = pageLoading
-
-  // Surface page-level errors
+  // Load data when modal opens
   useEffect(() => {
-    if (pageError) setError(pageError)
-  }, [pageError])
+    if (isOpen && account) {
+      fetchMarketsData()
+    }
+  }, [isOpen, account, fetchMarketsData])
 
   // Reset state when modal opens
   useEffect(() => {
@@ -161,8 +91,6 @@ function MyMarketsModal({
       setShowDisputeModal(false)
       setMarketTypeFilter('all')
       setStatusFilter('all')
-      setResolutionTypeFilter('all')
-      setSortKey(WagerSortKey.CREATED)
     }
   }, [isOpen])
 
@@ -194,67 +122,108 @@ function MyMarketsModal({
     }
   }
 
-  // Annotate each visible wager with a computedStatus derived from its
-  // chain status + endTime. The repository already gated by tab, so we
-  // only need the lightweight status decoration here.
-  const annotatedWagers = useMemo(() => {
-    if (!account) return []
-    const userAddr = account.toLowerCase()
-    // eslint-disable-next-line react-hooks/purity -- Date.now() is calculated once per memo evaluation; recomputed when deps change
-    const now = Date.now()
-    return visibleWagers.map(market => {
-      const statusLower = market.status?.toLowerCase()
-      let computedStatus
-      if (statusLower === 'cancelled' || statusLower === 'canceled') {
-        computedStatus = MarketStatus.CANCELLED
-      } else if (statusLower === 'resolved') {
-        computedStatus = MarketStatus.RESOLVED
-      } else if (statusLower === 'refunded') {
-        computedStatus = MarketStatus.REFUNDED
-      } else if (statusLower === 'oracle_timed_out') {
-        computedStatus = MarketStatus.ORACLE_TIMED_OUT
-      } else if (statusLower === 'challenged') {
-        computedStatus = MarketStatus.CHALLENGED
-      } else if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
-        computedStatus = MarketStatus.PENDING_ACCEPTANCE
-      } else if (statusLower === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
-        computedStatus = MarketStatus.DISPUTED
-      } else if (statusLower === 'pending_resolution') {
-        computedStatus = MarketStatus.PENDING_RESOLUTION
-      } else {
-        const endTime = market.endTime
-          || (market.endDate ? new Date(market.endDate).getTime() : 0)
-        computedStatus = endTime && now > endTime
-          ? MarketStatus.PENDING_RESOLUTION
-          : MarketStatus.ACTIVE
-      }
-      return { ...market, computedStatus, marketType: market.marketType || 'friend' }
-    }).filter(m => {
-      // Defensive ownership double-gate against any optimistic injections
-      return m.creator?.toLowerCase() === userAddr
-        || (m.participants || []).some(p => p?.toLowerCase() === userAddr)
-    })
-  }, [visibleWagers, account])
-
-  // Split the visible page into tab buckets for the existing UI shape.
+  // Combine and categorize markets
   const categorizedMarkets = useMemo(() => {
-    if (!account) return { participating: [], created: [], history: [] }
-    const userAddr = account.toLowerCase()
-    const isCreator = (m) => m.creator?.toLowerCase() === userAddr
-    const isTerminal = (m) => TERMINAL_STATUSES.has(m.status?.toLowerCase())
+    const userAddr = account?.toLowerCase()
+    if (!userAddr) return { participating: [], created: [], history: [] }
+
+    // Combine fetched and friend markets
+    const allMarkets = [
+      ...markets.map(m => ({ ...m, marketType: 'friend' })),
+      ...friendMarkets.map(m => ({ ...m, marketType: 'friend' }))
+    ]
+
+    // Remove duplicates by id
+    const uniqueMarkets = allMarkets.reduce((acc, market) => {
+      const key = `${market.marketType}-${market.id}`
+      if (!acc[key]) acc[key] = market
+      return acc
+    }, {})
+
+    const marketsList = Object.values(uniqueMarkets)
+
+    // Determine market status helper
+    const getMarketStatus = (market) => {
+      const now = Date.now()
+      const endTime = market.tradingEndTime
+        ? (typeof market.tradingEndTime === 'bigint'
+          ? Number(market.tradingEndTime) * 1000
+          : new Date(market.tradingEndTime).getTime())
+        : (market.endDate ? new Date(market.endDate).getTime() : 0)
+
+      // Check for terminal statuses first
+      const statusLower = market.status?.toLowerCase()
+      if (statusLower === 'cancelled' || statusLower === 'canceled') {
+        return MarketStatus.CANCELLED
+      }
+      if (statusLower === 'resolved') return MarketStatus.RESOLVED
+      if (statusLower === 'refunded') return MarketStatus.REFUNDED
+      if (statusLower === 'oracle_timed_out') return MarketStatus.ORACLE_TIMED_OUT
+      if (statusLower === 'challenged') return MarketStatus.CHALLENGED
+
+      // Check for pending_acceptance status (friend markets awaiting participant stakes)
+      if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
+        return MarketStatus.PENDING_ACCEPTANCE
+      }
+      if (statusLower === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
+        return MarketStatus.DISPUTED
+      }
+      if (endTime && now > endTime) return MarketStatus.PENDING_RESOLUTION
+      return MarketStatus.ACTIVE
+    }
+
+    // Check if user has position in market
+    const hasPosition = (marketId) => {
+      return userPositions.some(p => String(p.marketId) === String(marketId))
+    }
+
+    // Check if user is creator
+    const isCreator = (market) => {
+      return market.creator?.toLowerCase() === userAddr
+    }
+
+    // Check if user is participant
+    const isParticipant = (market) => {
+      return market.participants?.some(p => p.toLowerCase() === userAddr) ||
+        hasPosition(market.id)
+    }
+
+    // Categorize markets
     const participating = []
     const created = []
     const history = []
-    for (const market of annotatedWagers) {
-      if (isTerminal(market)) {
-        history.push(market)
-        continue
+
+    marketsList.forEach(market => {
+      const status = getMarketStatus(market)
+      const marketWithStatus = { ...market, computedStatus: status }
+
+      // Apply type filter
+      if (marketTypeFilter !== 'all' && market.marketType !== marketTypeFilter) {
+        return
       }
-      if (isCreator(market)) created.push(market)
-      else participating.push(market)
-    }
+
+      // Apply status filter
+      if (statusFilter !== 'all' && status !== statusFilter) {
+        return
+      }
+
+      // Terminal markets go to history
+      if (status === MarketStatus.RESOLVED || status === MarketStatus.CANCELLED || status === MarketStatus.REFUNDED || status === MarketStatus.ORACLE_TIMED_OUT) {
+        if (isCreator(market) || isParticipant(market)) {
+          history.push(marketWithStatus)
+        }
+      } else {
+        if (isCreator(market)) {
+          created.push(marketWithStatus)
+        }
+        if (isParticipant(market) && !isCreator(market)) {
+          participating.push(marketWithStatus)
+        }
+      }
+    })
+
     return { participating, created, history }
-  }, [annotatedWagers, account])
+  }, [markets, friendMarkets, userPositions, account, marketTypeFilter, statusFilter])
 
   // Format helpers
   const formatDate = (dateValue) => {
@@ -349,96 +318,11 @@ function MyMarketsModal({
   }
 
   const handleMarketSelect = (market) => {
-    if (market?.id) markMarketAsRead(market.id)
     setSelectedMarket(market)
-    // Trigger lazy IPFS envelope fetch for encrypted wagers so the
-    // "Click to decrypt" affordance has data to work on.
-    if (market?.needsIpfsFetch && market?.ipfsCid) {
-      fetchEnvelope(market.id)
-    }
   }
 
   const handleBackToList = () => {
     setSelectedMarket(null)
-  }
-
-  // Share modal handlers
-  const handleOpenShareModal = (market) => {
-    setShareMarketData({
-      url: getMarketUrl(market, account),
-      description: getMarketDescription(market),
-      stakeAmount: market.stakeAmount,
-      stakeTokenSymbol: market.stakeTokenSymbol || 'MATIC'
-    })
-    setShowShareModal(true)
-  }
-
-  const handleCloseShareModal = () => {
-    setShowShareModal(false)
-    setShareMarketData(null)
-  }
-
-  // Cancel a pending-acceptance wager (creator only). On success refresh
-  // the page so the wager flips to cancelled in the list.
-  const handleCancelMarket = async (market) => {
-    if (!signer || !isCorrectNetwork) {
-      window.alert('Please connect your wallet and switch to the correct network')
-      return
-    }
-
-    const status = market.status?.toLowerCase()
-    if (status === 'cancelled' || status === 'canceled') {
-      window.alert('This wager has already been cancelled.')
-      return
-    }
-
-    const marketId = market.id
-    if (marketId === undefined || marketId === null) {
-      window.alert('Invalid market ID')
-      return
-    }
-
-    if (!window.confirm('Cancel this wager and refund all stakes? This cannot be undone.')) {
-      return
-    }
-
-    setCancellingMarketId(marketId)
-    try {
-      const factoryAddress = getContractAddress('friendGroupMarketFactory')
-      const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
-      const tx = await factory.cancelPendingMarket(marketId)
-      await tx.wait()
-
-      window.alert('Wager cancelled. Stakes have been refunded.')
-      setSelectedMarket(null)
-      await refreshPage()
-    } catch (err) {
-      console.error('Error cancelling market:', err)
-      let errorMessage = 'Failed to cancel wager'
-
-      const errorData = err.data || err.info?.error?.data
-      if (errorData) {
-        const selector = typeof errorData === 'string' ? errorData.slice(0, 10) : null
-        const knownErrors = {
-          '0x7dc6505a': 'This wager is no longer pending — it may have already been cancelled or activated.',
-          '0xba4ef4cb': 'Not authorized to cancel this wager.',
-        }
-        if (selector && knownErrors[selector]) {
-          errorMessage = knownErrors[selector]
-        } else if (err.reason) {
-          errorMessage += `: ${err.reason}`
-        } else if (err.message) {
-          errorMessage += `: ${err.message}`
-        }
-      } else if (err.reason) {
-        errorMessage += `: ${err.reason}`
-      } else if (err.message) {
-        errorMessage += `: ${err.message}`
-      }
-      window.alert(errorMessage)
-    } finally {
-      setCancellingMarketId(null)
-    }
   }
 
   // Check if market can be resolved (contract requires market.active == true, i.e. ACTIVE status)
@@ -525,7 +409,7 @@ function MyMarketsModal({
       minAcceptanceThreshold: market.minAcceptanceThreshold || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
       stakePerParticipant: market.stakeAmount,
       stakeToken: market.stakeTokenAddress || null,
-      stakeTokenSymbol: market.stakeTokenSymbol || nativeSymbol || 'MATIC',
+      stakeTokenSymbol: market.stakeTokenSymbol || 'ETC',
       acceptances: market.acceptances || {},
       acceptedCount: market.acceptedCount || 0
     }
@@ -587,11 +471,9 @@ function MyMarketsModal({
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
             <span>Participating</span>
-            {(() => {
-              const ids = new Set(unreadMarketIds.map(String))
-              const n = categorizedMarkets.participating.filter(m => ids.has(String(m.id))).length
-              return n > 0 ? <span className="mm-tab-badge mm-tab-badge-unread">{n}</span> : null
-            })()}
+            {categorizedMarkets.participating.length > 0 && (
+              <span className="mm-tab-badge">{categorizedMarkets.participating.length}</span>
+            )}
           </button>
           <button
             className={`mm-tab ${activeTab === 'created' ? 'active' : ''}`}
@@ -605,11 +487,9 @@ function MyMarketsModal({
               <path d="M2 12l10 5 10-5"/>
             </svg>
             <span>Created</span>
-            {(() => {
-              const ids = new Set(unreadMarketIds.map(String))
-              const n = categorizedMarkets.created.filter(m => ids.has(String(m.id))).length
-              return n > 0 ? <span className="mm-tab-badge mm-tab-badge-unread">{n}</span> : null
-            })()}
+            {categorizedMarkets.created.length > 0 && (
+              <span className="mm-tab-badge">{categorizedMarkets.created.length}</span>
+            )}
           </button>
           <button
             className={`mm-tab ${activeTab === 'history' ? 'active' : ''}`}
@@ -622,11 +502,9 @@ function MyMarketsModal({
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span>History</span>
-            {(() => {
-              const ids = new Set(unreadMarketIds.map(String))
-              const n = categorizedMarkets.history.filter(m => ids.has(String(m.id))).length
-              return n > 0 ? <span className="mm-tab-badge mm-tab-badge-unread">{n}</span> : null
-            })()}
+            {categorizedMarkets.history.length > 0 && (
+              <span className="mm-tab-badge">{categorizedMarkets.history.length}</span>
+            )}
           </button>
         </nav>
 
@@ -656,32 +534,6 @@ function MyMarketsModal({
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
               <option value={MarketStatus.DISPUTED}>Disputed</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>
-            </select>
-          </div>
-          <div className="mm-filter-group">
-            <label>Resolution:</label>
-            <select
-              value={resolutionTypeFilter}
-              onChange={(e) => setResolutionTypeFilter(e.target.value)}
-              className="mm-filter-select"
-            >
-              <option value="all">Any</option>
-              {ResolutionTypeOrder.map(rt => (
-                <option key={rt} value={String(rt)}>{ResolutionTypeNames[rt]}</option>
-              ))}
-            </select>
-          </div>
-          <div className="mm-filter-group">
-            <label>Sort:</label>
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value)}
-              className="mm-filter-select"
-            >
-              <option value={WagerSortKey.CREATED}>Created</option>
-              <option value={WagerSortKey.ENDS}>Ends</option>
-              <option value={WagerSortKey.RESOLUTION_TYPE}>Resolution type</option>
-              <option value={WagerSortKey.STATUS}>Status</option>
             </select>
           </div>
           <button
@@ -737,9 +589,6 @@ function MyMarketsModal({
                       userPositions={userPositions}
                       canOpenDispute={canOpenDispute}
                       onOpenDispute={handleOpenDispute}
-                      onShare={handleOpenShareModal}
-                      onDecrypt={() => decryptMarket(selectedMarket.id)}
-                      isDecrypting={isMarketDecrypting(selectedMarket.id)}
                     />
                   ) : categorizedMarkets.participating.length === 0 ? (
                     <div className="mm-empty-state">
@@ -749,34 +598,19 @@ function MyMarketsModal({
                       <p className="mm-hint">Create or accept a wager to see them here.</p>
                     </div>
                   ) : (
-                    <>
-                      <MarketsTable
-                        markets={categorizedMarkets.participating}
-                        onSelect={handleMarketSelect}
-                        formatDate={formatDate}
-                        getStatusClass={getStatusClass}
-                        getStatusLabel={getStatusLabel}
-                        getTimeRemaining={getTimeRemaining}
-                        showActions={false}
-                        canAccept={canAcceptMarket}
-                        isCreatorOfPending={isCreatorOfPendingMarket}
-                        onAccept={handleOpenAcceptance}
-                        account={account}
-                        isMarketUnread={isMarketUnread}
-                      />
-                      {hasMore && (
-                        <div className="mm-load-more-row">
-                          <button
-                            type="button"
-                            className="mm-load-more"
-                            onClick={loadMore}
-                            disabled={loading}
-                          >
-                            {loading ? 'Loading…' : 'Load more'}
-                          </button>
-                        </div>
-                      )}
-                    </>
+                    <MarketsTable
+                      markets={categorizedMarkets.participating}
+                      onSelect={handleMarketSelect}
+                      formatDate={formatDate}
+                      getStatusClass={getStatusClass}
+                      getStatusLabel={getStatusLabel}
+                      getTimeRemaining={getTimeRemaining}
+                      showActions={false}
+                      canAccept={canAcceptMarket}
+                      isCreatorOfPending={isCreatorOfPendingMarket}
+                      onAccept={handleOpenAcceptance}
+                      account={account}
+                    />
                   )}
                 </div>
               )}
@@ -799,11 +633,6 @@ function MyMarketsModal({
                       canRespondToDispute={canRespondToDispute}
                       onOpenResolution={handleOpenResolution}
                       onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
-                      onShare={handleOpenShareModal}
-                      onCancel={handleCancelMarket}
-                      isCancelling={cancellingMarketId === selectedMarket.id}
-                      onDecrypt={() => decryptMarket(selectedMarket.id)}
-                      isDecrypting={isMarketDecrypting(selectedMarket.id)}
                       isCreatorView
                     />
                   ) : categorizedMarkets.created.length === 0 ? (
@@ -814,37 +643,22 @@ function MyMarketsModal({
                       <p className="mm-hint">Use the quick actions on the dashboard to create your first wager.</p>
                     </div>
                   ) : (
-                    <>
-                      <MarketsTable
-                        markets={categorizedMarkets.created}
-                        onSelect={handleMarketSelect}
-                        formatDate={formatDate}
-                        getStatusClass={getStatusClass}
-                        getStatusLabel={getStatusLabel}
-                        getTimeRemaining={getTimeRemaining}
-                        canResolve={canResolve}
-                        canRespondToDispute={canRespondToDispute}
-                        isCreatorOfPending={isCreatorOfPendingMarket}
-                        onResolve={handleOpenResolution}
-                        onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
-                        showActions
-                        account={account}
-                        showResolveCountdown
-                        isMarketUnread={isMarketUnread}
-                      />
-                      {hasMore && (
-                        <div className="mm-load-more-row">
-                          <button
-                            type="button"
-                            className="mm-load-more"
-                            onClick={loadMore}
-                            disabled={loading}
-                          >
-                            {loading ? 'Loading…' : 'Load more'}
-                          </button>
-                        </div>
-                      )}
-                    </>
+                    <MarketsTable
+                      markets={categorizedMarkets.created}
+                      onSelect={handleMarketSelect}
+                      formatDate={formatDate}
+                      getStatusClass={getStatusClass}
+                      getStatusLabel={getStatusLabel}
+                      getTimeRemaining={getTimeRemaining}
+                      canResolve={canResolve}
+                      canRespondToDispute={canRespondToDispute}
+                      isCreatorOfPending={isCreatorOfPendingMarket}
+                      onResolve={handleOpenResolution}
+                      onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
+                      showActions
+                      account={account}
+                      showResolveCountdown
+                    />
                   )}
                 </div>
               )}
@@ -863,8 +677,6 @@ function MyMarketsModal({
                       getTimeRemaining={getTimeRemaining}
                       account={account}
                       userPositions={userPositions}
-                      onDecrypt={() => decryptMarket(selectedMarket.id)}
-                      isDecrypting={isMarketDecrypting(selectedMarket.id)}
                       isHistoryView
                     />
                   ) : categorizedMarkets.history.length === 0 ? (
@@ -874,30 +686,15 @@ function MyMarketsModal({
                       <p>Your resolved wagers will appear here.</p>
                     </div>
                   ) : (
-                    <>
-                      <MarketsTable
-                        markets={categorizedMarkets.history}
-                        onSelect={handleMarketSelect}
-                        formatDate={formatDate}
-                        getStatusClass={getStatusClass}
-                        getStatusLabel={getStatusLabel}
-                        getTimeRemaining={getTimeRemaining}
-                        showOutcome
-                        isMarketUnread={isMarketUnread}
-                      />
-                      {hasMore && (
-                        <div className="mm-load-more-row">
-                          <button
-                            type="button"
-                            className="mm-load-more"
-                            onClick={loadMore}
-                            disabled={loading}
-                          >
-                            {loading ? 'Loading…' : 'Load more'}
-                          </button>
-                        </div>
-                      )}
-                    </>
+                    <MarketsTable
+                      markets={categorizedMarkets.history}
+                      onSelect={handleMarketSelect}
+                      formatDate={formatDate}
+                      getStatusClass={getStatusClass}
+                      getStatusLabel={getStatusLabel}
+                      getTimeRemaining={getTimeRemaining}
+                      showOutcome
+                    />
                   )}
                 </div>
               )}
@@ -946,20 +743,8 @@ function MyMarketsModal({
           marketId={acceptanceMarket.id}
           marketData={acceptanceMarket}
           onAccepted={handleMarketAccepted}
-          contractAddress={getContractAddress('friendGroupMarketFactory')}
-          contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
-        />
-      )}
-
-      {/* Share Modal — QR + copy-link for inviting participants */}
-      {showShareModal && shareMarketData && (
-        <ShareWagerModal
-          isOpen={showShareModal}
-          onClose={handleCloseShareModal}
-          url={shareMarketData.url}
-          description={shareMarketData.description}
-          stakeAmount={shareMarketData.stakeAmount}
-          stakeTokenSymbol={shareMarketData.stakeTokenSymbol}
+          contractAddress={getContractAddress('wagerRegistry')}
+          contractABI={WAGER_REGISTRY_ABI}
         />
       )}
     </div>
@@ -972,7 +757,7 @@ function MyMarketsModal({
 /**
  * Get display title for a market, handling encrypted markets
  */
-function getMarketDisplayTitle(market, nativeSymbol = 'MATIC') {
+function getMarketDisplayTitle(market) {
   // First check decrypted metadata (from useDecryptedMarkets hook)
   if (market.metadata && market.canView !== false) {
     const title = market.metadata.name || market.metadata.description || market.metadata.question
@@ -989,7 +774,7 @@ function getMarketDisplayTitle(market, nativeSymbol = 'MATIC') {
       return desc
     }
     // If encrypted/private, show stake and time info
-    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || nativeSymbol}` : ''
+    const stakeInfo = market.stakeAmount ? `${market.stakeAmount} ${market.stakeTokenSymbol || 'ETC'}` : ''
     return `Private Bet${stakeInfo ? ` - ${stakeInfo}` : ''}`
   }
 
@@ -1013,10 +798,8 @@ function MarketsTable({
   onRespondToDispute,
   onAccept,
   account,
-  showResolveCountdown = false,
-  isMarketUnread,
+  showResolveCountdown = false
 }) {
-  const { native: nativeSymbol } = useChainTokens()
   return (
     <div className="mm-table-container">
       <table className="mm-table" role="table">
@@ -1037,14 +820,13 @@ function MarketsTable({
             const showDisputeBtn = showActions && canRespondToDispute?.(market)
             const showAcceptBtn = canAccept?.(market)
             const showUnderConsideration = isCreatorOfPending?.(market)
-            const displayTitle = getMarketDisplayTitle(market, nativeSymbol || 'MATIC')
+            const displayTitle = getMarketDisplayTitle(market)
 
-            const unread = isMarketUnread ? isMarketUnread(market.id) : false
             return (
               <tr
                 key={`${market.marketType}-${market.id}`}
                 onClick={() => onSelect(market)}
-                className={`mm-table-row${unread ? ' mm-unread' : ''}`}
+                className="mm-table-row"
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
@@ -1061,13 +843,13 @@ function MarketsTable({
                         stroke="currentColor"
                         strokeWidth="2"
                         title="Private wager"
-                        style={{ flexShrink: 0, opacity: 0.7 }}
+                        style={{ marginRight: '6px', verticalAlign: 'middle', opacity: 0.7 }}
                       >
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0110 0v4"/>
                       </svg>
                     )}
-                    <span>{displayTitle}</span>
+                    {displayTitle}
                   </span>
                   {market.category && (
                     <span className="mm-table-category">{market.category}</span>
@@ -1287,23 +1069,12 @@ function MarketDetailView({
   onOpenResolution,
   onOpenDispute,
   onRespondToDispute,
-  onShare,
-  onCancel,
-  isCancelling = false,
-  onDecrypt,
-  isDecrypting = false,
   isCreatorView = false,
   isHistoryView = false
 }) {
-  const { native: nativeSymbol } = useChainTokens()
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
   const endTime = market.tradingEndTime || market.endDate
-  const isEncryptedWager = market.isPrivate || market.isEncrypted
-  const status = (market.status || '').toLowerCase()
-  const isPendingAcceptance = status === 'pending_acceptance' || status === 'pending'
-  const canShare = !isHistoryView && (isPendingAcceptance || status === 'active')
-  const canCancel = isCreator && isPendingAcceptance && typeof onCancel === 'function'
 
   return (
     <div className="mm-detail">
@@ -1333,7 +1104,7 @@ function MarketDetailView({
                 <path d="M7 11V7a5 5 0 0110 0v4"/>
               </svg>
             )}
-            {getMarketDisplayTitle(market, nativeSymbol || 'MATIC')}
+            {getMarketDisplayTitle(market)}
           </h3>
           <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
             {getStatusLabel(market.computedStatus)}
@@ -1356,62 +1127,6 @@ function MarketDetailView({
        market.description !== 'Private Wager' && (
         <div className="mm-detail-description">
           <p>{market.description}</p>
-        </div>
-      )}
-
-      {/* Encrypted Data Section — click to decrypt the bet terms */}
-      {isEncryptedWager && (
-        <div className="mm-encrypted-section">
-          <div className="mm-encrypted-header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
-            </svg>
-            <span>Encrypted Data</span>
-            <span className="mm-encrypted-hint">Only visible to participants</span>
-          </div>
-          <div className="mm-encrypted-content">
-            <span className="mm-detail-label">Bet Terms</span>
-            <span className="mm-encrypted-value">
-              {market.encryptionStatus === 'decrypted' || market.encryptionStatus === 'not_encrypted' ? (
-                getMarketDescription(market)
-              ) : isDecrypting ? (
-                <span className="mm-decrypting-indicator">
-                  <span className="mm-spinner-small"></span>
-                  Decrypting...
-                </span>
-              ) : market.encryptionStatus === 'error' ? (
-                <div className="mm-decrypt-error">
-                  <span className="mm-decrypt-error-message">{market.decryptionError}</span>
-                  {onDecrypt && (
-                    <button type="button" className="mm-decrypt-btn" onClick={onDecrypt}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M23 4v6h-6M1 20v-6h6"/>
-                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                      </svg>
-                      Try Again
-                    </button>
-                  )}
-                </div>
-              ) : market.canView && onDecrypt ? (
-                <button type="button" className="mm-decrypt-btn" onClick={onDecrypt}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4"/>
-                  </svg>
-                  Click to decrypt
-                </button>
-              ) : (
-                <span className="mm-encrypted-placeholder">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4"/>
-                  </svg>
-                  Not a participant
-                </span>
-              )}
-            </span>
-          </div>
         </div>
       )}
 
@@ -1554,46 +1269,6 @@ function MarketDetailView({
             Open Dispute
           </button>
         )}
-        {canShare && typeof onShare === 'function' && (
-          <button
-            type="button"
-            className="mm-btn-secondary"
-            onClick={() => onShare(market)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="18" cy="5" r="3"/>
-              <circle cx="6" cy="12" r="3"/>
-              <circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
-            Share
-          </button>
-        )}
-        {canCancel && (
-          <button
-            type="button"
-            className="mm-btn-danger"
-            onClick={() => onCancel(market)}
-            disabled={isCancelling}
-          >
-            {isCancelling ? (
-              <>
-                <span className="mm-spinner-small"></span>
-                Cancelling...
-              </>
-            ) : (
-              <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="15" y1="9" x2="9" y2="15"/>
-                  <line x1="9" y1="9" x2="15" y2="15"/>
-                </svg>
-                Cancel Wager
-              </>
-            )}
-          </button>
-        )}
       </div>
     </div>
   )
@@ -1610,8 +1285,6 @@ function ResolutionModal({
   isCorrectNetwork,
   switchNetwork
 }) {
-  const { chainId } = useWeb3()
-  const { native: nativeSymbol } = useChainTokens()
   const [selectedOutcome, setSelectedOutcome] = useState(null)
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1643,28 +1316,27 @@ function ResolutionModal({
     setError(null)
 
     try {
-      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
-      const friendFactory = new ethers.Contract(
-        friendFactoryAddress,
-        FRIEND_GROUP_MARKET_FACTORY_ABI,
+      const registryAddress = getContractAddress('wagerRegistry')
+      const registry = new ethers.Contract(
+        registryAddress,
+        WAGER_REGISTRY_ABI,
         signer
       )
 
-      // outcome: true = first option wins (Pass/Yes), false = second option wins (Fail/No)
+      // outcome: true = first option wins (Pass/Yes/creator), false = second option (Fail/No/opponent)
       const outcomeBool = selectedOutcome === outcomes[0]
 
-      console.log('Resolving market on-chain:', {
+      const w = await registry.getWager(market.id)
+      const winner = outcomeBool ? w.creator : w.opponent
+      console.log('Resolving wager on-chain:', {
         marketId: market.id,
+        winner,
         outcome: outcomeBool,
         selectedOutcome,
-        notes: resolutionNotes
+        notes: resolutionNotes,
       })
 
-      const tx = await friendFactory.resolveFriendMarket(
-        market.id,
-        outcomeBool,
-        { gasLimit: 500000n }
-      )
+      const tx = await registry.declareWinner(market.id, winner)
       setTxHash(tx.hash)
 
       const receipt = await tx.wait()
@@ -1726,7 +1398,7 @@ function ResolutionModal({
           {step === 'select' && (
             <>
               <div className="mm-resolution-market-info">
-                <h4>{getMarketDisplayTitle(market, nativeSymbol || 'MATIC')}</h4>
+                <h4>{getMarketDisplayTitle(market)}</h4>
                 <p className="mm-resolution-hint">
                   Select the winning outcome for this wager. This action will distribute
                   winnings to participants who chose correctly.
@@ -1856,7 +1528,7 @@ function ResolutionModal({
               </p>
               {txHash && (
                 <p className="mm-success-hint">
-                  <a href={getTransactionUrl(chainId, txHash)} target="_blank" rel="noopener noreferrer">
+                  <a href={`https://etc-mordor.blockscout.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer">
                     View transaction
                   </a>
                 </p>
@@ -1887,7 +1559,6 @@ function DisputeModal({
   isCorrectNetwork,
   switchNetwork
 }) {
-  const { native: nativeSymbol } = useChainTokens()
   const [disputeReason, setDisputeReason] = useState('')
   const [evidenceUrl, setEvidenceUrl] = useState('')
   const [responseText, setResponseText] = useState('')
@@ -1984,7 +1655,7 @@ function DisputeModal({
           {step === 'form' && (
             <>
               <div className="mm-dispute-market-info">
-                <h4>{getMarketDisplayTitle(market, nativeSymbol || 'MATIC')}</h4>
+                <h4>{getMarketDisplayTitle(market)}</h4>
                 {market.outcome && (
                   <p className="mm-dispute-current-outcome">
                     Current resolution: <strong>{market.outcome}</strong>

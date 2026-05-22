@@ -1,34 +1,27 @@
 /**
- * Block Explorer Configuration
+ * Blockscout Block Explorer Configuration
  *
- * Centralized utilities for explorer URLs. The actual per-chain base URLs are
- * defined in frontend/src/config/networks.js — this file derives from there so
- * adding a new chain only requires touching one config.
- *
- * Helper names that contain "Blockscout" are historical and are kept as
- * aliases; the URL-shape helpers below work with Polygonscan on Amoy.
+ * Centralized configuration for Blockscout URLs across the application.
+ * All explorer links should use these utilities to ensure consistency.
  */
 
-import { NETWORKS, getNetwork } from './networks'
-
-// Base URLs by chain ID, derived from NETWORKS. Preserved as a named export
-// for any consumer that read the constant directly.
-export const BLOCKSCOUT_URLS = Object.fromEntries(
-  Object.values(NETWORKS)
-    .filter((n) => n.explorer?.baseUrl)
-    .map((n) => [n.chainId, n.explorer.baseUrl])
-)
-
-/**
- * Get the explorer base URL for a given chain ID. Falls back to the configured
- * primary chain when an unknown chainId is passed.
- */
-export const getExplorerBaseUrl = (chainId) => {
-  return getNetwork(chainId)?.explorer?.baseUrl || ''
+// Block explorer base URLs by chain ID
+// Note: Polygon networks use PolygonScan (Etherscan-style), ETC networks use Blockscout
+export const BLOCKSCOUT_URLS = {
+  61: 'https://etc.blockscout.com',         // ETC Mainnet
+  63: 'https://etc-mordor.blockscout.com',  // Mordor Testnet
+  137: 'https://polygonscan.com',           // Polygon mainnet
+  80002: 'https://amoy.polygonscan.com',    // Polygon Amoy testnet
 }
 
-// Legacy alias preserved for back-compat with existing call sites.
-export const getBlockscoutBaseUrl = getExplorerBaseUrl
+/**
+ * Get the block explorer base URL for a given chain ID
+ * @param {number} chainId - The chain ID
+ * @returns {string} The block explorer base URL
+ */
+export const getBlockscoutBaseUrl = (chainId) => {
+  return BLOCKSCOUT_URLS[chainId] || BLOCKSCOUT_URLS[80002] // Default to Amoy
+}
 
 /**
  * Get the full Blockscout URL for an address, transaction, or block

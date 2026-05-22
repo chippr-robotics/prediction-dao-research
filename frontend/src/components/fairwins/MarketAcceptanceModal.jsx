@@ -10,7 +10,7 @@ import {
   deriveKeyPairFromSignature,
   isXWingEnvelope,
 } from '../../utils/crypto/envelopeEncryption'
-import { DEX_ADDRESSES } from '../../constants/dex'
+import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { getContractAddress } from '../../config/contracts'
@@ -20,7 +20,7 @@ import './MarketAcceptanceModal.css'
 const formatUSD = (amount, symbol) => {
   const num = parseFloat(amount) || 0
   // Only show USD formatting for stablecoins
-  const isStablecoin = symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
+  const isStablecoin = symbol === 'USC' || symbol === 'USDC' || symbol === 'USDT' || symbol === 'DAI'
 
   if (isStablecoin) {
     if (num === 0) return '$0.00'
@@ -320,167 +320,51 @@ function MarketAcceptanceModal({
         signer
       )
 
+      // v2: ERC20-only stakes. Pull on-chain wager to get authoritative stake amounts.
+      const w = await contract.getWager(marketId)
+      const stakeAmount = w.opponentStake
+      const stakeTokenAddress = w.token
+
+      if (!stakeTokenAddress || stakeTokenAddress === ethers.ZeroAddress) {
+        throw new Error('Wager has no stake token configured. (Native stakes are not supported in v2.)')
+      }
+
+      const tokenContract = new ethers.Contract(
+        stakeTokenAddress,
+        [
+          'function approve(address,uint256) returns (bool)',
+          'function allowance(address,address) view returns (uint256)',
+          'function balanceOf(address) view returns (uint256)',
+          'function symbol() view returns (string)',
+          'function decimals() view returns (uint8)',
+        ],
+        signer
+      )
+
+      const balance = await tokenContract.balanceOf(account)
+      let tokenSymbol = marketData?.stakeTokenSymbol || 'tokens'
+      let tokenDecimals = marketData?.stakeTokenDecimals || 18
+      try { tokenSymbol = await tokenContract.symbol() } catch {}
+      try { tokenDecimals = Number(await tokenContract.decimals()) } catch {}
+
+      if (balance < stakeAmount) {
+        throw new Error(
+          `Insufficient ${tokenSymbol} balance. ` +
+          `Have ${ethers.formatUnits(balance, tokenDecimals)}, ` +
+          `need ${ethers.formatUnits(stakeAmount, tokenDecimals)}.`
+        )
+      }
+
+      const currentAllowance = await tokenContract.allowance(account, contractAddress)
+      if (currentAllowance < stakeAmount) {
+        console.log('Approving stake token for WagerRegistry...')
+        const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
+        await approveTx.wait()
+      }
+
       let tx
-      let txOverrides = {}
-
-      if (isArbitrator) {
-        // Arbitrators don't stake - no special overrides needed
-      } else {
-        // CRITICAL: Fetch the actual on-chain stake value - don't rely on formatted data
-        // The contract will use the raw on-chain value for the transfer, so we must match it
-        const onChainMarket = await contract.getFriendMarketWithStatus(marketId)
-        const stakeAmount = onChainMarket.stakePerParticipant
-        const stakeTokenAddress = onChainMarket.stakeToken
-
-        // Determine token decimals for display purposes
-        const isStable = stakeTokenAddress &&
-          stakeTokenAddress.toLowerCase() === DEX_ADDRESSES?.STABLECOIN?.toLowerCase()
-        const tokenDecimals = isStable ? 6 : 18
-
-        console.log('Stake calculation (using on-chain value):', {
-          stakePerParticipantFormatted: marketData.stakePerParticipant,
-          stakePerParticipantOnChain: stakeAmount.toString(),
-          stakeToken: stakeTokenAddress,
-          isStable,
-          tokenDecimals
-        })
-
-        if (!stakeTokenAddress || stakeTokenAddress === ethers.ZeroAddress) {
-          // Native token stake - check balance first
-          const balance = await signer.provider.getBalance(account)
-          console.log('Native balance check:', {
-            balance: balance.toString(),
-            balanceFormatted: ethers.formatEther(balance),
-            required: stakeAmount.toString(),
-            requiredFormatted: ethers.formatUnits(stakeAmount, 18)
-          })
-          if (balance < stakeAmount) {
-            throw new Error(
-              `Insufficient balance. You have ${ethers.formatEther(balance)} but need ${ethers.formatUnits(stakeAmount, 18)} ${marketData?.stakeTokenSymbol || 'tokens'}.`
-            )
-          }
-          txOverrides = { value: stakeAmount }
-        } else {
-          // ERC20 token - check balance and approval
-          const tokenContract = new ethers.Contract(
-            stakeTokenAddress,
-            [
-              'function approve(address,uint256) returns (bool)',
-              'function allowance(address,address) view returns (uint256)',
-              'function balanceOf(address) view returns (uint256)',
-              'function symbol() view returns (string)'
-            ],
-            signer
-          )
-
-          // Check balance first
-          const balance = await tokenContract.balanceOf(account)
-          let tokenSymbol = marketData.stakeTokenSymbol || 'tokens'
-          try {
-            tokenSymbol = await tokenContract.symbol()
-          } catch {
-            // Use default from marketData
-          }
-
-          console.log('ERC20 balance check:', {
-            balance: balance.toString(),
-            balanceFormatted: ethers.formatUnits(balance, tokenDecimals),
-            required: stakeAmount.toString(),
-            requiredFormatted: ethers.formatUnits(stakeAmount, tokenDecimals),
-            tokenSymbol
-          })
-
-          if (balance < stakeAmount) {
-            throw new Error(
-              `Insufficient ${tokenSymbol} balance. You have ${ethers.formatUnits(balance, tokenDecimals)} but need ${ethers.formatUnits(stakeAmount, tokenDecimals)} ${tokenSymbol}.`
-            )
-          }
-
-          // Check if we already have enough allowance
-          const currentAllowance = await tokenContract.allowance(account, contractAddress)
-          console.log('Allowance check:', {
-            currentAllowance: currentAllowance.toString(),
-            required: stakeAmount.toString(),
-            sufficient: currentAllowance >= stakeAmount
-          })
-
-          if (currentAllowance < stakeAmount) {
-            console.log('Approving token for contract...')
-            const approveTx = await tokenContract.approve(contractAddress, stakeAmount)
-            await approveTx.wait()
-            console.log('Token approved')
-          }
-
-          // Use higher gas limit for acceptMarket + activation flow
-          // The full flow (stake collection + market activation + deployMarketPair) needs ~1M gas
-          txOverrides = { gasLimit: 1200000 }
-        }
-      }
-
-      // Pre-flight check: detect proposalId collisions that would cause activation
-      // to revert. This is more reliable than staticCall on chains where eth_call
-      // may not fully propagate cross-contract revert reasons.
-      console.log('Running pre-flight activation check...')
-      try {
-        const [acceptedCountRaw, marketData] = await Promise.all([
-          contract.acceptedParticipantCount(marketId),
-          contract.getFriendMarketWithStatus(marketId)
-        ])
-        const currentAccepted = Number(acceptedCountRaw)
-        const required = Number(marketData.minThreshold)
-        const arbitratorAddr = marketData.arbitrator
-        const arbitratorRequired = arbitratorAddr && arbitratorAddr !== ethers.ZeroAddress
-        let arbitratorAccepted = true
-        if (arbitratorRequired) {
-          const arbRecord = await contract.getParticipantAcceptance(marketId, arbitratorAddr)
-          arbitratorAccepted = arbRecord.hasAccepted
-        }
-
-        // Will this acceptance trigger market activation?
-        // Activation triggers when accepted >= required AND arbitrator is OK
-        const willTriggerActivation = !isArbitrator
-          && (currentAccepted + 1) >= required
-          && (arbitratorAccepted || !arbitratorRequired)
-
-        if (willTriggerActivation) {
-          // Check if the proposalId already exists in ConditionalMarketFactory.
-          // The deployed contract uses: proposalId = keccak256(abi.encodePacked(contractAddress, friendMarketId))
-          const contractAddress = getContractAddress('friendGroupMarketFactory')
-          const encoded = ethers.solidityPacked(['address', 'uint256'], [contractAddress, marketId])
-          const proposalId = BigInt(ethers.keccak256(encoded))
-
-          const cmfAddress = getContractAddress('marketFactory')
-          if (cmfAddress) {
-            const cmf = new ethers.Contract(
-              cmfAddress,
-              ['function hasMarketForProposal(uint256 proposalId) view returns (bool)'],
-              signer.provider
-            )
-            const exists = await cmf.hasMarketForProposal(proposalId)
-            if (exists) {
-              throw new Error(
-                'This wager cannot be activated because a market with the same internal ID already exists from a previous contract deployment. ' +
-                'The wager contract needs to be redeployed to resolve this conflict. Please contact the administrator.'
-              )
-            }
-          }
-          console.log('Activation pre-check passed: proposalId is available')
-        } else {
-          console.log('Acceptance will not trigger activation yet (accepted:', currentAccepted, '/', required, ')')
-        }
-      } catch (preflight) {
-        // If this is our own thrown error (proposalId collision), re-throw it
-        if (preflight.message?.includes('cannot be activated')) {
-          throw preflight
-        }
-        // For other pre-check errors (network issues, etc.), log and continue
-        // The actual transaction will catch any real issues
-        console.warn('Pre-flight check failed (non-fatal):', preflight.message)
-      }
-
-      // Send the transaction
-      console.log('Sending acceptMarket transaction...')
-      tx = await contract.acceptMarket(marketId, txOverrides)
+      console.log('Sending acceptWager transaction...')
+      tx = await contract.acceptWager(marketId)
 
       setTxHash(tx.hash)
       await tx.wait()
@@ -491,25 +375,15 @@ function MarketAcceptanceModal({
     } catch (err) {
       console.error('Error accepting offer:', err)
 
-      // Decode known FriendGroupMarketFactory error selectors
-      const errorSelectors = {
-        '0x06417a60': 'Invalid wager ID - the wager does not exist',
-        '0x7dc6505a': 'Wager is not pending - it may have already been activated or cancelled',
-        '0x70f65caa': 'Acceptance deadline has passed - the offer has expired',
-        '0x1aa8064c': 'Already accepted - you have already accepted this offer',
-        '0x779a6f41': 'Not invited - you are not a participant in this wager',
-        '0x90b8ec18': 'Transfer failed - check your token balance and approval',
-        '0xcd1c8867': 'Insufficient payment - not enough tokens sent'
-      }
-
-      // Known revert reason strings from downstream contracts
+      // v2 WagerRegistry custom-error string matches (selectors omitted — ethers v6
+      // already surfaces the named error in err.shortMessage / err.reason)
+      const errorSelectors = {}
       const knownRevertReasons = {
-        'Market already exists': 'This wager cannot be activated because of a conflict with a previous deployment. The contract needs to be redeployed to fix this.',
-        'Requires owner or MARKET_MAKER_ROLE': 'The wager contract is not authorized. Please contact the administrator.',
-        'Market creation limit exceeded': 'The wager creation limit has been reached. Please try again later.',
-        'Invalid trading period': 'The trading period for this wager is outside the allowed range.',
-        'CTF1155 not set': 'The wager system is not fully configured. Please contact the administrator.',
-        'CTF requires ERC20 collateral': 'This wager requires an ERC20 token for collateral, but native currency was configured.'
+        'NotOpen': 'Wager is not open. It may have already been accepted or cancelled.',
+        'NotOpponent': 'You are not the named opponent for this wager.',
+        'AcceptExpired': 'Acceptance deadline has passed; this offer has expired.',
+        'EnforcedPause': 'The wager system is paused. Try again later.',
+        'NotAllowedToken': 'The wager stake token is not on the allowlist.',
       }
 
       let errorMessage = err.reason || err.message || 'Failed to accept offer'

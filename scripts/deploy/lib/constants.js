@@ -22,44 +22,58 @@ const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 // =============================================================================
 
 /**
- * Token addresses by network. Polygon Amoy is the only supported testnet;
- * Hardhat / localhost mock tokens are deployed at test time. Deploy scripts
- * should look up the stablecoin via TOKENS[networkName]?.USDC.
+ * Token addresses by network
  */
 const TOKENS = {
+  mordor: {
+    USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // USC Stablecoin (6 decimals)
+    WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC
+    WMATIC: null,
+  },
   amoy: {
-    // Polymarket testnet USDC on Polygon Amoy. The exact address must be verified
-    // from Polymarket's docs at deploy time; provided via env var so it can be
-    // overridden without a code change.
-    USDC: process.env.AMOY_USDC || null,
-    WMATIC: process.env.AMOY_WMATIC || null,
+    // Circle USDC on Polygon Amoy (6 decimals)
+    USC: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+    WETC: null,
+    // Wrapped MATIC on Amoy (used as alternative wager stake token)
+    WMATIC: "0x0ae690AAD8663aaB12a671A6A0d74242332de85f",
+  },
+  polygon: {
+    USC: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",   // Circle USDC on Polygon mainnet
+    WETC: null,
+    WMATIC: "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
   },
   localhost: {
-    USDC: null,    // Deploy mock in test
-    WMATIC: null,  // Deploy mock in test
+    USC: null,   // Deploy mock in test
+    WETC: null,
+    WMATIC: null,
   },
   hardhat: {
-    USDC: null,
+    USC: null,
+    WETC: null,
     WMATIC: null,
   }
 };
 
-/**
- * Stablecoin decimals by network. Polygon Amoy USDC is 6-decimal; local mocks
- * default to 18.
- */
-const STABLECOIN_DECIMALS = {
-  amoy: 6,
-  localhost: 18,
-  hardhat: 18,
-};
+// =============================================================================
+// POLYMARKET INTEGRATION ADDRESSES
+// =============================================================================
 
 /**
- * Polymarket CTF (Conditional Token Framework) addresses per network. Only set
- * on networks where Polymarket-pegged settlement is supported.
+ * Polymarket CTF (Conditional Tokens Framework) contract addresses
+ * Used by PolymarketOracleAdapter to query market resolutions
+ *
+ * Polymarket uses Gnosis CTF on Polygon. The same CTF contract is used on
+ * Polygon mainnet. On Amoy testnet, a test deployment of CTF is used.
+ *
+ * If null, deploy a Mock CTF for testing or use a custom address via
+ * the POLYMARKET_CTF env var when running deployment.
  */
 const POLYMARKET_CTF = {
-  amoy: process.env.AMOY_POLYMARKET_CTF || null,
+  polygon: "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",  // Polymarket CTF on Polygon mainnet
+  amoy: null,    // No canonical Polymarket CTF on Amoy - set via POLYMARKET_CTF env var
+  mordor: null,
+  localhost: null,
+  hardhat: null,
 };
 
 // =============================================================================
@@ -95,176 +109,129 @@ const MembershipTier = {
 };
 
 /**
- * Build tier configurations for a given stablecoin decimal count. Tier prices
- * and limits are token amounts that must be encoded with the same decimals as
- * the stablecoin used to pay them. Polygon Amoy USDC is 6-decimal; the helper
- * keeps the encoding correct if a future chain ships with a different decimal
- * stablecoin (e.g. 18-dec DAI).
+ * Friend Market tier configurations.
  *
- * Historical note: previous versions of this file used ethers.parseEther for
- * these amounts, which encoded them with 18 decimals. Combined with a 6-dec
- * stablecoin, the on-chain price ended up 1e12x too large. Always call this
- * factory with the resolved stablecoin decimals for the deploy network.
+ * NOTE: only `monthlyMarketCreation` and `maxConcurrentMarkets` are enforced
+ * on-chain by MembershipManager. The other fields are unused but left in the
+ * shape so v1 reporting/scripts don't break. `deploy.js` only reads the two
+ * enforced limits.
  */
-const _amount = (decimals) => (s) => ethers.parseUnits(s, decimals);
-
-function buildFriendMarketTiers(stableDecimals) {
-  const u = _amount(stableDecimals);
-  return [
-    {
-      tier: MembershipTier.BRONZE,
-      name: "Friend Market Bronze",
-      description: "Basic friend market creation - 15 markets/month",
-      price: u("50"),
-      limits: {
-        dailyBetLimit: 5,
-        weeklyBetLimit: 20,
-        monthlyMarketCreation: 15,
-        maxPositionSize: u("5"),
-        maxConcurrentMarkets: 5,
-        withdrawalLimit: u("25"),
-        canCreatePrivateMarkets: true,
-        canUseAdvancedFeatures: false,
-        feeDiscount: 10000  // 100% discount (no fees for friend markets)
-      }
-    },
-    {
-      tier: MembershipTier.SILVER,
-      name: "Friend Market Silver",
-      description: "Enhanced friend market creation - 30 markets/month",
-      price: u("100"),
-      limits: {
-        dailyBetLimit: 10,
-        weeklyBetLimit: 50,
-        monthlyMarketCreation: 30,
-        maxPositionSize: u("15"),
-        maxConcurrentMarkets: 10,
-        withdrawalLimit: u("100"),
-        canCreatePrivateMarkets: true,
-        canUseAdvancedFeatures: true,
-        feeDiscount: 10000
-      }
-    },
-    {
-      tier: MembershipTier.GOLD,
-      name: "Friend Market Gold",
-      description: "Advanced friend market creation - 100 markets/month",
-      price: u("200"),
-      limits: {
-        dailyBetLimit: 35,
-        weeklyBetLimit: 200,
-        monthlyMarketCreation: 100,
-        maxPositionSize: u("50"),
-        maxConcurrentMarkets: 30,
-        withdrawalLimit: u("500"),
-        canCreatePrivateMarkets: true,
-        canUseAdvancedFeatures: true,
-        feeDiscount: 10000
-      }
-    },
-    {
-      tier: MembershipTier.PLATINUM,
-      name: "Friend Market Platinum",
-      description: "Unlimited friend market creation",
-      price: u("400"),
-      limits: {
-        dailyBetLimit: ethers.MaxUint256,
-        weeklyBetLimit: ethers.MaxUint256,
-        monthlyMarketCreation: ethers.MaxUint256,
-        maxPositionSize: ethers.MaxUint256,
-        maxConcurrentMarkets: ethers.MaxUint256,
-        withdrawalLimit: ethers.MaxUint256,
-        canCreatePrivateMarkets: true,
-        canUseAdvancedFeatures: true,
-        feeDiscount: 10000
-      }
+const FRIEND_MARKET_TIERS = [
+  {
+    tier: MembershipTier.BRONZE,
+    name: "Friend Market Bronze",
+    description: "Entry-tier friend wagers — 15 markets/month, 5 concurrent",
+    price: ethers.parseEther("1"),
+    limits: {
+      monthlyMarketCreation: 15,
+      maxConcurrentMarkets: 5,
     }
-  ];
-}
-
-function buildMarketMakerTiers(stableDecimals) {
-  const u = _amount(stableDecimals);
-  return [
-    {
-      tier: MembershipTier.BRONZE,
-      name: "Market Maker Bronze",
-      description: "Basic market creation capabilities",
-      price: u("100"),
-      limits: {
-        dailyBetLimit: 10,
-        weeklyBetLimit: 50,
-        monthlyMarketCreation: 5,
-        maxPositionSize: u("10"),
-        maxConcurrentMarkets: 3,
-        withdrawalLimit: u("50"),
-        canCreatePrivateMarkets: false,
-        canUseAdvancedFeatures: false,
-        feeDiscount: 0
-      }
-    },
-    {
-      tier: MembershipTier.SILVER,
-      name: "Market Maker Silver",
-      description: "Enhanced market creation with more limits",
-      price: u("150"),
-      limits: {
-        dailyBetLimit: 25,
-        weeklyBetLimit: 150,
-        monthlyMarketCreation: 15,
-        maxPositionSize: u("50"),
-        maxConcurrentMarkets: 10,
-        withdrawalLimit: u("200"),
-        canCreatePrivateMarkets: false,
-        canUseAdvancedFeatures: true,
-        feeDiscount: 500  // 5% discount
-      }
-    },
-    {
-      tier: MembershipTier.GOLD,
-      name: "Market Maker Gold",
-      description: "Professional market creation capabilities",
-      price: u("250"),
-      limits: {
-        dailyBetLimit: 100,
-        weeklyBetLimit: 500,
-        monthlyMarketCreation: 50,
-        maxPositionSize: u("200"),
-        maxConcurrentMarkets: 30,
-        withdrawalLimit: u("1000"),
-        canCreatePrivateMarkets: true,
-        canUseAdvancedFeatures: true,
-        feeDiscount: 1000  // 10% discount
-      }
-    },
-    {
-      tier: MembershipTier.PLATINUM,
-      name: "Market Maker Platinum",
-      description: "Unlimited market creation for institutions",
-      price: u("500"),
-      limits: {
-        dailyBetLimit: ethers.MaxUint256,
-        weeklyBetLimit: ethers.MaxUint256,
-        monthlyMarketCreation: ethers.MaxUint256,
-        maxPositionSize: ethers.MaxUint256,
-        maxConcurrentMarkets: ethers.MaxUint256,
-        withdrawalLimit: ethers.MaxUint256,
-        canCreatePrivateMarkets: true,
-        canUseAdvancedFeatures: true,
-        feeDiscount: 2000  // 20% discount
-      }
+  },
+  {
+    tier: MembershipTier.SILVER,
+    name: "Friend Market Silver",
+    description: "Casual usage — 30 markets/month, 10 concurrent",
+    price: ethers.parseEther("5"),
+    limits: {
+      monthlyMarketCreation: 30,
+      maxConcurrentMarkets: 10,
     }
-  ];
-}
+  },
+  {
+    tier: MembershipTier.GOLD,
+    name: "Friend Market Gold",
+    description: "Active wagering — 100 markets/month, 30 concurrent",
+    price: ethers.parseEther("25"),
+    limits: {
+      monthlyMarketCreation: 100,
+      maxConcurrentMarkets: 30,
+    }
+  },
+  {
+    tier: MembershipTier.PLATINUM,
+    name: "Friend Market Platinum",
+    description: "Unlimited friend wager creation",
+    price: ethers.parseEther("100"),
+    limits: {
+      monthlyMarketCreation: 0,    // 0 = unlimited
+      maxConcurrentMarkets: 0,
+    }
+  }
+];
 
 /**
- * Default tiers (legacy export). Deploy scripts that have not been updated to
- * resolve the network's stablecoin decimals fall back to 6-dec encoding, which
- * matches Polygon Amoy USDC. NOTE: this is a behavior change from a previous
- * version of this file, which encoded with 18 decimals — see
- * buildFriendMarketTiers for the rationale.
+ * Market Maker tier configurations
  */
-const FRIEND_MARKET_TIERS = buildFriendMarketTiers(6);
-const MARKET_MAKER_TIERS = buildMarketMakerTiers(6);
+const MARKET_MAKER_TIERS = [
+  {
+    tier: MembershipTier.BRONZE,
+    name: "Market Maker Bronze",
+    description: "Basic market creation capabilities",
+    price: ethers.parseEther("100"),
+    limits: {
+      dailyBetLimit: 10,
+      weeklyBetLimit: 50,
+      monthlyMarketCreation: 5,
+      maxPositionSize: ethers.parseEther("10"),
+      maxConcurrentMarkets: 3,
+      withdrawalLimit: ethers.parseEther("50"),
+      canCreatePrivateMarkets: false,
+      canUseAdvancedFeatures: false,
+      feeDiscount: 0
+    }
+  },
+  {
+    tier: MembershipTier.SILVER,
+    name: "Market Maker Silver",
+    description: "Enhanced market creation with more limits",
+    price: ethers.parseEther("150"),
+    limits: {
+      dailyBetLimit: 25,
+      weeklyBetLimit: 150,
+      monthlyMarketCreation: 15,
+      maxPositionSize: ethers.parseEther("50"),
+      maxConcurrentMarkets: 10,
+      withdrawalLimit: ethers.parseEther("200"),
+      canCreatePrivateMarkets: false,
+      canUseAdvancedFeatures: true,
+      feeDiscount: 500  // 5% discount
+    }
+  },
+  {
+    tier: MembershipTier.GOLD,
+    name: "Market Maker Gold",
+    description: "Professional market creation capabilities",
+    price: ethers.parseEther("250"),
+    limits: {
+      dailyBetLimit: 100,
+      weeklyBetLimit: 500,
+      monthlyMarketCreation: 50,
+      maxPositionSize: ethers.parseEther("200"),
+      maxConcurrentMarkets: 30,
+      withdrawalLimit: ethers.parseEther("1000"),
+      canCreatePrivateMarkets: true,
+      canUseAdvancedFeatures: true,
+      feeDiscount: 1000  // 10% discount
+    }
+  },
+  {
+    tier: MembershipTier.PLATINUM,
+    name: "Market Maker Platinum",
+    description: "Unlimited market creation for institutions",
+    price: ethers.parseEther("500"),
+    limits: {
+      dailyBetLimit: ethers.MaxUint256,
+      weeklyBetLimit: ethers.MaxUint256,
+      monthlyMarketCreation: ethers.MaxUint256,
+      maxPositionSize: ethers.MaxUint256,
+      maxConcurrentMarkets: ethers.MaxUint256,
+      withdrawalLimit: ethers.MaxUint256,
+      canCreatePrivateMarkets: true,
+      canUseAdvancedFeatures: true,
+      feeDiscount: 2000  // 20% discount
+    }
+  }
+];
 
 // =============================================================================
 // SALT PREFIXES
@@ -281,6 +248,7 @@ const SALT_PREFIXES = {
   FRIEND_MARKETS: "ClearPathDAO-FGMF-v1.1-",
   PERPETUALS: "ClearPathDAO-Perp-v1.0-",
   CORRELATION: "ClearPathDAO-MCR-v1.0-",
+  V2: "FairWins-P2P-v2.0-",
 };
 
 // =============================================================================
@@ -291,10 +259,16 @@ const SALT_PREFIXES = {
  * Network-specific configurations
  */
 const NETWORK_CONFIG = {
+  mordor: {
+    chainId: 63,
+    name: "Mordor Testnet",
+    rpcUrl: "https://rpc.mordor.etccooperative.org",
+    blockExplorer: "https://etc-mordor.blockscout.com",
+  },
   amoy: {
     chainId: 80002,
-    name: "Polygon Amoy",
-    rpcUrl: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+    name: "Polygon Amoy Testnet",
+    rpcUrl: "https://rpc-amoy.polygon.technology",
     blockExplorer: "https://amoy.polygonscan.com",
   },
   localhost: {
@@ -329,9 +303,7 @@ const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 // MAINNET CHAIN IDS (for safety checks)
 // =============================================================================
 
-// Polygon mainnet (137) included to block accidental deploys when targeting the
-// Amoy testnet — Amoy is 80002 and is intentionally not in this list.
-const MAINNET_CHAIN_IDS = [1, 137]; // Ethereum Mainnet, Polygon Mainnet
+const MAINNET_CHAIN_IDS = [1, 61, 137]; // Ethereum, Ethereum Classic, Polygon mainnets
 
 // =============================================================================
 // EXPORTS
@@ -343,9 +315,6 @@ module.exports = {
 
   // Tokens
   TOKENS,
-  STABLECOIN_DECIMALS,
-
-  // Oracle adapters
   POLYMARKET_CTF,
 
   // Roles
@@ -355,8 +324,6 @@ module.exports = {
   MembershipTier,
   FRIEND_MARKET_TIERS,
   MARKET_MAKER_TIERS,
-  buildFriendMarketTiers,
-  buildMarketMakerTiers,
 
   // Salts
   SALT_PREFIXES,

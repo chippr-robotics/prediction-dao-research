@@ -1,28 +1,105 @@
 import { http, createConfig } from 'wagmi'
 import { injected, walletConnect } from 'wagmi/connectors'
-import { NETWORKS, getCurrentChainId, getNetwork } from './config/networks'
 
-// Chain definitions are derived from the per-chain config in
-// frontend/src/config/networks.js. This keeps wagmi, thirdweb, the block
-// explorer config, and the swap context aligned on a single source of truth.
-const toViemChain = (n) => ({
-  id: n.chainId,
-  name: n.name,
-  nativeCurrency: n.nativeCurrency,
-  rpcUrls: {
-    default: { http: [n.rpcUrl] },
-    public: { http: [n.rpcUrl] },
+// Define Ethereum Classic mainnet
+const ethereumClassic = {
+  id: 61,
+  name: 'Ethereum Classic',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETC',
   },
-  blockExplorers: n.explorer?.baseUrl
-    ? { default: { name: n.explorer.name, url: n.explorer.baseUrl } }
-    : undefined,
-  testnet: n.isTestnet,
-})
+  rpcUrls: {
+    default: { http: ['https://etc.rivet.link'] },
+    public: { http: ['https://etc.rivet.link'] },
+  },
+  blockExplorers: {
+    default: { name: 'Blockscout', url: 'https://etc.blockscout.com' },
+  },
+  testnet: false,
+}
 
-const networkId = getCurrentChainId()
+// Define Mordor testnet
+const mordor = {
+  id: 63,
+  name: 'Mordor',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Mordor Ether',
+    symbol: 'METC',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc.mordor.etccooperative.org'] },
+    public: { http: ['https://rpc.mordor.etccooperative.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Blockscout', url: 'https://etc-mordor.blockscout.com' },
+  },
+  testnet: true,
+}
 
-// RPC URL override for the active chain via VITE_RPC_URL.
-const rpcUrl = import.meta.env.VITE_RPC_URL || getNetwork(networkId).rpcUrl
+// Define Polygon Amoy testnet
+const amoy = {
+  id: 80002,
+  name: 'Polygon Amoy',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'POL',
+    symbol: 'POL',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc-amoy.polygon.technology'] },
+    public: { http: ['https://rpc-amoy.polygon.technology'] },
+  },
+  blockExplorers: {
+    default: { name: 'PolygonScan', url: 'https://amoy.polygonscan.com' },
+  },
+  testnet: true,
+}
+
+// Define Polygon mainnet (for Polymarket integration)
+const polygon = {
+  id: 137,
+  name: 'Polygon',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'POL',
+    symbol: 'POL',
+  },
+  rpcUrls: {
+    default: { http: ['https://polygon-rpc.com'] },
+    public: { http: ['https://polygon-rpc.com'] },
+  },
+  blockExplorers: {
+    default: { name: 'PolygonScan', url: 'https://polygonscan.com' },
+  },
+  testnet: false,
+}
+
+// Define Hardhat local network (for development)
+const hardhat = {
+  id: 1337,
+  name: 'Hardhat',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: { http: ['http://127.0.0.1:8545'] },
+    public: { http: ['http://127.0.0.1:8545'] },
+  },
+  testnet: true,
+}
+
+// Get network ID from environment or default to Polygon Amoy testnet
+const networkId = import.meta.env.VITE_NETWORK_ID
+  ? parseInt(import.meta.env.VITE_NETWORK_ID, 10)
+  : 80002
+
+// Get RPC URL from environment
+const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc-amoy.polygon.technology'
 
 // Get WalletConnect project ID from environment
 // Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
@@ -61,18 +138,8 @@ const resolveAppUrl = () => {
 
 const appUrl = resolveAppUrl()
 
-// All chains in NETWORKS are advertised to wagmi. The user's connected chain
-// must be one of these for the app to function.
-const chains = Object.values(NETWORKS).map(toViemChain)
-
-// Per-chain transports. The active network gets its RPC overridable via
-// VITE_RPC_URL; everything else uses the chain's default URL.
-const transports = Object.fromEntries(
-  Object.values(NETWORKS).map((n) => [
-    n.chainId,
-    n.chainId === networkId ? http(rpcUrl) : http(n.rpcUrl),
-  ])
-)
+// Define supported chains
+const chains = [amoy, polygon, ethereumClassic, mordor, hardhat]
 
 // Create wagmi config
 export const config = createConfig({
@@ -94,13 +161,31 @@ export const config = createConfig({
       showQrModal: true,
     }),
   ],
-  transports,
+  transports: {
+    [amoy.id]: http(networkId === 80002 ? rpcUrl : 'https://rpc-amoy.polygon.technology'),
+    [polygon.id]: http(),
+    [ethereumClassic.id]: http(),
+    [mordor.id]: http(networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org'),
+    [hardhat.id]: http('http://localhost:8545'),
+  },
 })
 
 // Helper to get expected chain info
 export const getExpectedChain = () => {
-  const network = getNetwork(networkId)
-  return toViemChain(network)
+  switch (networkId) {
+    case 137:
+      return polygon
+    case 80002:
+      return amoy
+    case 61:
+      return ethereumClassic
+    case 63:
+      return mordor
+    case 1337:
+      return hardhat
+    default:
+      return amoy
+  }
 }
 
 export const EXPECTED_CHAIN_ID = networkId
