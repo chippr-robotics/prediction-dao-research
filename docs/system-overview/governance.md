@@ -2,6 +2,35 @@
 
 Governance structure and progressive decentralization roadmap for Prediction DAO.
 
+## On-chain operator roles
+
+The protocol's privileged actions are split across four OpenZeppelin
+AccessControl roles, deliberately separated so no single key carries blanket
+authority. For the full privilege matrix see
+[Roles and Tiers](roles-and-tiers.md).
+
+| Role | Power | Holder |
+|---|---|---|
+| `DEFAULT_ADMIN_ROLE` | Tier configuration, treasury withdrawal, grant/revoke all other admin roles | Guardian Multisig |
+| `GUARDIAN_ROLE` | Pause / unpause `WagerRegistry` in response to security incidents | Guardian Multisig + on-call signer(s) |
+| `ACCOUNT_MODERATOR_ROLE` | Per-account freeze / unfreeze on `WagerRegistry`. See [Account Moderation Policy](account-moderation.md). | Trust-and-safety multisig |
+| `ROLE_MANAGER_ROLE` | Grant / revoke `WAGER_PARTICIPANT` memberships outside the purchase flow | Ops multisig |
+
+### The right to pause
+
+`GUARDIAN_ROLE` holders can pause `WagerRegistry`, halting wager creation and
+acceptance protocol-wide. Already-active wagers can still settle and pay
+out — pause is not a fund freeze. Every `pause()` and `unpause()` emits the
+OpenZeppelin `Paused` / `Unpaused` events with the caller's address.
+
+### The right to freeze
+
+`ACCOUNT_MODERATOR_ROLE` holders can freeze an individual account on
+`WagerRegistry`. A frozen account cannot create, accept, settle, claim, or
+refund wagers until unfrozen. Every freeze emits `AccountFrozen(user,
+moderator, reason)`; every unfreeze emits `AccountUnfrozen(user, moderator)`.
+The full disclosure is in [Account Moderation Policy](account-moderation.md).
+
 ## Current Governance Structure
 
 ### Guardian Multisig
@@ -9,8 +38,8 @@ Governance structure and progressive decentralization roadmap for Prediction DAO
 **Composition**: 5-of-7 multisig
 
 **Powers**:
-- Emergency pause capability
-- Initial parameter tuning
+- Holds `GUARDIAN_ROLE` and `DEFAULT_ADMIN_ROLE` during the guarded launch
+- Initial parameter tuning (tier prices, allowlisted tokens)
 - Temporary intervention if critical issues
 
 **Members**: TBD during launch phase

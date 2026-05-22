@@ -101,7 +101,7 @@ function WalletPage() {
   }
 
   const handleNavigateToAdmin = () => {
-    navigate('/admin/roles')
+    navigate('/admin')
   }
 
   const handleCheckKeyStatus = useCallback(async () => {
@@ -303,7 +303,7 @@ function WalletPage() {
 
                     <div className="section">
                       <h3>Membership</h3>
-                      {hasRole(ROLES.FRIEND_MARKET) ? (
+                      {hasRole(ROLES.WAGER_PARTICIPANT) ? (
                         <div className="membership-active">
                           <div className="membership-status-badge active">Active</div>
                           <p>You have access to create and accept P2P wagers.</p>

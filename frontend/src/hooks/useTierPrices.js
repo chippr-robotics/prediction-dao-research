@@ -4,21 +4,18 @@ import { getContractAddress, NETWORK_CONFIG } from '../config/contracts'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
 /**
- * Hook to fetch tier prices + limits from MembershipManager (v2).
+ * Hook to fetch tier prices + limits from MembershipManager.
  *
- * v2 collapses the old TierRegistry into MembershipManager. Each role/tier has
- * one priceUSDC (6-decimals) plus two limits: monthlyMarketCreation and
- * maxConcurrentMarkets. UI guardrails (daily/weekly/max-position) live entirely
- * in the frontend now and are exposed via FALLBACK_LIMITS below.
+ * The protocol has a single paid role (`WAGER_PARTICIPANT_ROLE`) with four
+ * tiers (Bronze/Silver/Gold/Platinum) priced at $2/$8/$25/$100 USDC.
+ * The on-chain `Limits` struct enforces only `monthlyMarketCreation` and
+ * `maxConcurrentMarkets`; everything else is UI-side presentation.
  */
 
 const USDC_DECIMALS = 6
 
 const ROLE_HASHES = {
-  FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
-  MARKET_MAKER: ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  CLEARPATH_USER: ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
-  TOKENMINT: ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE'))
+  WAGER_PARTICIPANT: ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE')),
 }
 
 const TIER_IDS = {
@@ -28,14 +25,13 @@ const TIER_IDS = {
   PLATINUM: 4
 }
 
-// Fallback prices in USDC when MembershipManager is not yet deployed.
-// Friend Market is the only role users are expected to hit in v2; others
-// preserved here only so the UI doesn't crash if a stale role is requested.
+// Fallback prices in USDC when MembershipManager is not yet deployed or a
+// network call fails. Anchored at $2 Bronze per the v3 ladder.
 const FALLBACK_PRICES = {
-  BRONZE:   { FRIEND_MARKET: 1,   MARKET_MAKER: 100, CLEARPATH_USER: 25,  TOKENMINT: 25  },
-  SILVER:   { FRIEND_MARKET: 5,   MARKET_MAKER: 150, CLEARPATH_USER: 100, TOKENMINT: 100 },
-  GOLD:     { FRIEND_MARKET: 25,  MARKET_MAKER: 250, CLEARPATH_USER: 250, TOKENMINT: 250 },
-  PLATINUM: { FRIEND_MARKET: 100, MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500 },
+  BRONZE:   { WAGER_PARTICIPANT: 2   },
+  SILVER:   { WAGER_PARTICIPANT: 8   },
+  GOLD:     { WAGER_PARTICIPANT: 25  },
+  PLATINUM: { WAGER_PARTICIPANT: 100 },
 }
 
 export function useTierPrices() {
@@ -68,7 +64,6 @@ export function useTierPrices() {
         for (const [tierName, tierId] of Object.entries(TIER_IDS)) {
           try {
             const cfg = await contract.getTierConfig(roleHash, tierId)
-            // cfg: { priceUSDC, durationDays, active, limits: { monthlyMarketCreation, maxConcurrentMarkets } }
             prices[tierName][roleKey] = parseFloat(ethers.formatUnits(cfg.priceUSDC, USDC_DECIMALS))
             limits[tierName][roleKey] = {
               monthlyMarketCreation: Number(cfg.limits.monthlyMarketCreation),
@@ -76,7 +71,7 @@ export function useTierPrices() {
               durationDays: Number(cfg.durationDays),
               isActive: cfg.active,
             }
-          } catch (e) {
+          } catch {
             prices[tierName][roleKey] = FALLBACK_PRICES[tierName]?.[roleKey] ?? 0
           }
         }
@@ -126,6 +121,7 @@ export function useTierPrices() {
     getLimits,
     isTierActive,
     TIER_IDS,
+    ROLE_HASHES,
     FALLBACK_PRICES,
   }
 }

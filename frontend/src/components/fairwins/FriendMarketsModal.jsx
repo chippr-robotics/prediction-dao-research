@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications } from '../../hooks'
-import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
 import { TOKENS } from '../../constants/etcswap'
@@ -103,20 +102,10 @@ function FriendMarketsModal({
   const { createFriendMarket } = useFriendMarketCreation()
   const handleCreate = onCreate || createFriendMarket
 
-  // Role details for checking dual roles (required for Bookmaker)
-  const { roleDetails } = useRoleDetails()
-
-  // Check if user can create Bookmaker markets (requires both MARKET_MAKER and FRIEND_MARKET roles)
-  const hasBookmakerRoles = useMemo(() => {
-    const marketMaker = roleDetails?.MARKET_MAKER
-    const friendMarket = roleDetails?.FRIEND_MARKET
-    return (
-      marketMaker?.hasRole &&
-      marketMaker?.isActive &&
-      friendMarket?.hasRole &&
-      friendMarket?.isActive
-    )
-  }, [roleDetails])
+  // The post-refactor protocol exposes only `WAGER_PARTICIPANT` and the new
+  // WagerRegistry doesn't have a Bookmaker resolution type — leave the
+  // capability flag false so the bookmaker tile renders nowhere.
+  const hasBookmakerRoles = false
 
   // Encryption hook for friend market privacy
   const {

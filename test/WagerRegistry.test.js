@@ -5,7 +5,9 @@ const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers"
 const Tier = { None: 0, Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
 const Resolution = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4 };
 const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5 };
-const FRIEND_MARKET_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE"));
+const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
+const GUARDIAN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("GUARDIAN_ROLE"));
+const ACCOUNT_MODERATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACCOUNT_MODERATOR_ROLE"));
 
 const usdc = (n) => ethers.parseUnits(String(n), 6);
 
@@ -32,7 +34,7 @@ describe("WagerRegistry", function () {
     await mgr.waitForDeployment();
     // Bronze: monthly=100, concurrent=10 — generous for tests
     await mgr.connect(admin).setTier(
-      FRIEND_MARKET_ROLE, Tier.Bronze,
+      WAGER_PARTICIPANT_ROLE, Tier.Bronze,
       usdc(50), 30,
       { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 },
       true
@@ -56,7 +58,7 @@ describe("WagerRegistry", function () {
       await usdcToken.connect(u).approve(await mgr.getAddress(), ethers.MaxUint256);
       await usdcToken.connect(u).approve(await reg.getAddress(), ethers.MaxUint256);
       await wmatic.connect(u).approve(await reg.getAddress(), ethers.MaxUint256);
-      await mgr.connect(u).purchaseTier(FRIEND_MARKET_ROLE, Tier.Bronze);
+      await mgr.connect(u).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
     }
 
     return { reg, mgr, usdcToken, wmatic, ctf, adapter, admin, alice, bob, charlie, treasury };
@@ -106,7 +108,7 @@ describe("WagerRegistry", function () {
       const w = await reg.getWager(wagerId);
       expect(w.status).to.equal(Status.Open);
       expect(w.creator).to.equal(alice.address);
-      const m = await mgr.getMembership(alice.address, FRIEND_MARKET_ROLE);
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
       expect(m.activeCount).to.equal(1);
       expect(m.monthCount).to.equal(1);
     });
@@ -168,7 +170,7 @@ describe("WagerRegistry", function () {
 
     it("blocks if Polymarket condition is already resolved (stale-condition mitigation)", async () => {
       const fx = await loadFixture(deployFixture);
-      const { ctf, alice } = fx;
+      const { ctf } = fx;
       const oracle = "0x0000000000000000000000000000000000000001";
       const qid = ethers.id("Q1");
       await ctf.prepareCondition(oracle, qid, 2);
@@ -180,7 +182,7 @@ describe("WagerRegistry", function () {
 
     it("rejects if membership inactive", async () => {
       const fx = await loadFixture(deployFixture);
-      const { mgr, reg, alice } = fx;
+      const { reg } = fx;
       // Let alice's membership lapse
       await time.increase(31 * 24 * 3600);
       await expect(createDefault(reg, fx)).to.be.revertedWithCustomError(reg, "MembershipDenied");
@@ -222,7 +224,7 @@ describe("WagerRegistry", function () {
       const balBefore = await usdcToken.balanceOf(alice.address);
       await reg.connect(alice).cancelOpen(id);
       expect(await usdcToken.balanceOf(alice.address) - balBefore).to.equal(usdc(10));
-      const m = await mgr.getMembership(alice.address, FRIEND_MARKET_ROLE);
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
       expect(m.activeCount).to.equal(0);
     });
 
@@ -419,7 +421,7 @@ describe("WagerRegistry", function () {
     it("Open + not expired: NotRefundable", async () => {
       const fx = await loadFixture(deployFixture);
       const id = await createDefault(fx.reg, fx);
-      await expect(fx.reg.claimRefund(id))
+      await expect(fx.reg.connect(fx.alice).claimRefund(id))
         .to.be.revertedWithCustomError(fx.reg, "NotRefundable");
     });
 
@@ -431,7 +433,7 @@ describe("WagerRegistry", function () {
       await time.increase(86401);
       const aBal = await usdcToken.balanceOf(alice.address);
       const bBal = await usdcToken.balanceOf(bob.address);
-      await reg.claimRefund(id);
+      await reg.connect(fx.charlie).claimRefund(id);
       expect(await usdcToken.balanceOf(alice.address) - aBal).to.equal(usdc(10));
       expect(await usdcToken.balanceOf(bob.address) - bBal).to.equal(usdc(10));
     });
@@ -443,7 +445,7 @@ describe("WagerRegistry", function () {
       await reg.connect(bob).acceptWager(id);
       await reg.connect(alice).declareWinner(id, alice.address);
       await time.increase(86401);
-      await expect(reg.claimRefund(id))
+      await expect(reg.connect(fx.charlie).claimRefund(id))
         .to.be.revertedWithCustomError(reg, "NotRefundable");
     });
   });
@@ -465,12 +467,26 @@ describe("WagerRegistry", function () {
     });
   });
 
-  describe("admin", () => {
-    it("pause blocks createWager", async () => {
+  describe("admin (AccessControl)", () => {
+    it("pause blocks createWager and acceptWager", async () => {
       const fx = await loadFixture(deployFixture);
       await fx.reg.connect(fx.admin).pause();
       await expect(createDefault(fx.reg, fx))
         .to.be.revertedWithCustomError(fx.reg, "EnforcedPause");
+    });
+
+    it("non-guardian cannot pause", async () => {
+      const fx = await loadFixture(deployFixture);
+      await expect(fx.reg.connect(fx.alice).pause())
+        .to.be.revertedWithCustomError(fx.reg, "AccessControlUnauthorizedAccount");
+    });
+
+    it("DEFAULT_ADMIN can grant GUARDIAN_ROLE to another account", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, alice } = fx;
+      await reg.connect(admin).grantRole(GUARDIAN_ROLE, alice.address);
+      await reg.connect(alice).pause();
+      expect(await reg.paused()).to.be.true;
     });
 
     it("setTokenAllowed toggles allowlist", async () => {
@@ -479,6 +495,12 @@ describe("WagerRegistry", function () {
       await fx.reg.connect(fx.admin).setTokenAllowed(usdcAddr, false);
       await expect(createDefault(fx.reg, fx))
         .to.be.revertedWithCustomError(fx.reg, "NotAllowedToken");
+    });
+
+    it("non-admin cannot setTokenAllowed", async () => {
+      const fx = await loadFixture(deployFixture);
+      await expect(fx.reg.connect(fx.alice).setTokenAllowed(await fx.usdcToken.getAddress(), false))
+        .to.be.revertedWithCustomError(fx.reg, "AccessControlUnauthorizedAccount");
     });
 
     it("setPolymarketAdapter to zero disables Polymarket type", async () => {
@@ -491,6 +513,128 @@ describe("WagerRegistry", function () {
       const cid = ethers.keccak256(ethers.solidityPacked(["address", "bytes32", "uint256"], [oracle, qid, 2]));
       await expect(createDefault(reg, fx, { resolutionType: Resolution.Polymarket, polymarketConditionId: cid }))
         .to.be.revertedWithCustomError(reg, "AdapterNotSet");
+    });
+  });
+
+  describe("account moderation (freeze / unfreeze)", () => {
+    it("non-moderator cannot freeze", async () => {
+      const fx = await loadFixture(deployFixture);
+      await expect(fx.reg.connect(fx.alice).freezeAccount(fx.bob.address, "test"))
+        .to.be.revertedWithCustomError(fx.reg, "AccessControlUnauthorizedAccount");
+    });
+
+    it("freezeAccount emits event and isFrozen returns true", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, alice } = fx;
+      await expect(reg.connect(admin).freezeAccount(alice.address, "abuse"))
+        .to.emit(reg, "AccountFrozen")
+        .withArgs(alice.address, admin.address, "abuse");
+      expect(await reg.isFrozen(alice.address)).to.be.true;
+    });
+
+    it("frozen creator cannot createWager", async () => {
+      const fx = await loadFixture(deployFixture);
+      await fx.reg.connect(fx.admin).freezeAccount(fx.alice.address, "test");
+      await expect(createDefault(fx.reg, fx))
+        .to.be.revertedWithCustomError(fx.reg, "AccountFrozenError")
+        .withArgs(fx.alice.address);
+    });
+
+    it("frozen opponent cannot acceptWager", async () => {
+      const fx = await loadFixture(deployFixture);
+      const id = await createDefault(fx.reg, fx);
+      await fx.reg.connect(fx.admin).freezeAccount(fx.bob.address, "test");
+      await expect(fx.reg.connect(fx.bob).acceptWager(id))
+        .to.be.revertedWithCustomError(fx.reg, "AccountFrozenError")
+        .withArgs(fx.bob.address);
+    });
+
+    it("frozen creator cannot cancelOpen", async () => {
+      const fx = await loadFixture(deployFixture);
+      const id = await createDefault(fx.reg, fx);
+      await fx.reg.connect(fx.admin).freezeAccount(fx.alice.address, "test");
+      await expect(fx.reg.connect(fx.alice).cancelOpen(id))
+        .to.be.revertedWithCustomError(fx.reg, "AccountFrozenError");
+    });
+
+    it("frozen party cannot declareWinner", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, alice, bob } = fx;
+      const id = await createDefault(reg, fx);
+      await reg.connect(bob).acceptWager(id);
+      await reg.connect(admin).freezeAccount(alice.address, "test");
+      await expect(reg.connect(alice).declareWinner(id, alice.address))
+        .to.be.revertedWithCustomError(reg, "AccountFrozenError");
+    });
+
+    it("frozen winner cannot claimPayout", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, alice, bob } = fx;
+      const id = await createDefault(reg, fx);
+      await reg.connect(bob).acceptWager(id);
+      await reg.connect(alice).declareWinner(id, alice.address);
+      await reg.connect(admin).freezeAccount(alice.address, "test");
+      await expect(reg.connect(alice).claimPayout(id))
+        .to.be.revertedWithCustomError(reg, "AccountFrozenError");
+    });
+
+    it("frozen caller cannot claimRefund (even if not a participant)", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, charlie } = fx;
+      const id = await createDefault(reg, fx);
+      await time.increase(3601);
+      await reg.connect(admin).freezeAccount(charlie.address, "test");
+      await expect(reg.connect(charlie).claimRefund(id))
+        .to.be.revertedWithCustomError(reg, "AccountFrozenError");
+    });
+
+    it("autoResolveFromPolymarket still works against a frozen creator (settlement is permissionless)", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, ctf, alice, bob, charlie } = fx;
+      const oracle = "0x0000000000000000000000000000000000000001";
+      const qid = ethers.id("Polymarket Q-frozen");
+      await ctf.prepareCondition(oracle, qid, 2);
+      const cid = ethers.keccak256(ethers.solidityPacked(["address", "bytes32", "uint256"], [oracle, qid, 2]));
+      const id = await createDefault(reg, fx, {
+        resolutionType: Resolution.Polymarket,
+        polymarketConditionId: cid,
+        creatorIsYes: true,
+      });
+      await reg.connect(bob).acceptWager(id);
+      // Freeze creator AFTER acceptance
+      await reg.connect(admin).freezeAccount(alice.address, "post-acceptance");
+      // Polymarket resolves YES → alice (creator) is winner
+      await ctf.resolveCondition(cid, [1, 0]);
+      // Any non-frozen account triggers settlement
+      await reg.connect(charlie).autoResolveFromPolymarket(id);
+      const w = await reg.getWager(id);
+      expect(w.status).to.equal(Status.Resolved);
+      expect(w.winner).to.equal(alice.address);
+      // …but alice still can't claim while frozen
+      await expect(reg.connect(alice).claimPayout(id))
+        .to.be.revertedWithCustomError(reg, "AccountFrozenError");
+    });
+
+    it("unfreezeAccount restores access", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, alice } = fx;
+      await reg.connect(admin).freezeAccount(alice.address, "test");
+      await expect(createDefault(reg, fx))
+        .to.be.revertedWithCustomError(reg, "AccountFrozenError");
+      await expect(reg.connect(admin).unfreezeAccount(alice.address))
+        .to.emit(reg, "AccountUnfrozen")
+        .withArgs(alice.address, admin.address);
+      expect(await reg.isFrozen(alice.address)).to.be.false;
+      const id = await createDefault(reg, fx);
+      expect(id).to.be.gt(0);
+    });
+
+    it("DEFAULT_ADMIN can grant ACCOUNT_MODERATOR_ROLE to a delegate", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin, alice, bob } = fx;
+      await reg.connect(admin).grantRole(ACCOUNT_MODERATOR_ROLE, alice.address);
+      await reg.connect(alice).freezeAccount(bob.address, "delegated freeze");
+      expect(await reg.isFrozen(bob.address)).to.be.true;
     });
   });
 });

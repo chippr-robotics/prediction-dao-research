@@ -2,6 +2,10 @@
 
 Detailed explanation of how the Prediction DAO system operates.
 
+> See also: [Roles and Tiers](roles-and-tiers.md) for the membership /
+> admin-role model, and the [Account Moderation Policy](account-moderation.md)
+> for the per-account freeze power.
+
 ## System Flow
 
 For a complete flow diagram, see the [Architecture documentation](../developer-guide/architecture.md).

@@ -2,6 +2,12 @@
 
 **Private wagers with friends, powered by trustless oracles** — A platform suite built on shared, privacy-preserving infrastructure.
 
+> **Important**: Before purchasing a tier or interacting with the protocol,
+> please read the [Roles and Tiers](system-overview/roles-and-tiers.md)
+> overview and the [Account Moderation Policy](system-overview/account-moderation.md).
+> The protocol can be paused by a Guardian role holder, and individual
+> accounts can be frozen for cause by an Account Moderator role holder.
+
 ## Platform Suite Overview
 
 ### 🎯 FairWins — P2P Wager Management Layer

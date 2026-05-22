@@ -32,7 +32,7 @@ import { WalletContext } from '../contexts/WalletContext'
  *         <div>
  *           <p>Address: {address}</p>
  *           <p>Balance: {balances.native} MATIC</p>
- *           {hasRole('MARKET_MAKER') && <p>Market Maker Access</p>}
+ *           {hasRole('WAGER_PARTICIPANT') && <p>Wager Access</p>}
  *         </div>
  *       ) : (
  *         <button onClick={connectWallet}>Connect</button>
@@ -131,11 +131,11 @@ export function useWalletTransactions() {
  * function RoleGatedFeature() {
  *   const { roles, hasRole, grantRole } = useWalletRoles()
  *   
- *   if (!hasRole('MARKET_MAKER')) {
+ *   if (!hasRole('WAGER_PARTICIPANT')) {
  *     return <div>Access denied</div>
  *   }
- *   
- *   return <MarketMakerPanel />
+ *
+ *   return <WagerPanel />
  * }
  * ```
  */

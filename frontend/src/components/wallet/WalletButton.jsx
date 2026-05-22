@@ -275,7 +275,7 @@ function WalletButton({ className = '' }) {
 
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
-    navigate('/admin/roles')
+    navigate('/admin')
   }
 
   const shortenAddress = (addr) => {
@@ -430,7 +430,7 @@ function WalletButton({ className = '' }) {
               {/* Wagers Section - Unified */}
               <div className="dropdown-section">
                 <span className="wallet-section-title">Wagers</span>
-                {hasRole(ROLES.FRIEND_MARKET) ? (
+                {hasRole(ROLES.WAGER_PARTICIPANT) ? (
                   <button
                     onClick={handleOpenFriendMarket}
                     className="action-button friend-market-btn"
