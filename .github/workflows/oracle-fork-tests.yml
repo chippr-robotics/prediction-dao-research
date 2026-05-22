@@ -54,15 +54,25 @@ jobs:
       - name: Compile contracts
         run: npm run compile
 
-      - name: Confirm AMOY_RPC_URL secret is configured
+      # Soft check: fork tests rely on an archive-mode Amoy RPC. Without the
+      # AMOY_RPC_URL secret the test file enters describe.skip and the job
+      # passes as a no-op (PRs from forks won't have the secret). Schedule and
+      # workflow_dispatch runs hard-fail to surface a misconfigured secret.
+      - name: Report secret availability
+        id: secret
         env:
           AMOY_RPC_URL: ${{ secrets.AMOY_RPC_URL }}
         run: |
           if [ -z "$AMOY_RPC_URL" ]; then
-            echo "::error::AMOY_RPC_URL secret is not set. Configure an archive Amoy RPC (Alchemy/Infura/QuickNode) in repo secrets."
-            exit 1
+            echo "::warning::AMOY_RPC_URL secret is not set; fork tests will be skipped. Configure an archive Amoy RPC (Alchemy/Infura/QuickNode) in repo secrets to enable them."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "::error::AMOY_RPC_URL secret is required for scheduled/manual runs."
+              exit 1
+            fi
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "AMOY_RPC_URL secret is present (value masked)."
 
       - name: Run Amoy fork tests
         env:
