@@ -1,8 +1,8 @@
 # Friend Market Contracts (P2P Wager System)
 
-This document covers the smart contract ecosystem that powers end-to-end encrypted peer-to-peer wagers on the Mordor testnet (chain ID 63).
+This document covers the smart contract ecosystem that powers end-to-end encrypted peer-to-peer wagers on the Polygon Amoy (Polymarket testnet) (chain ID 80002).
 
-## Deployed Addresses (Mordor Testnet)
+## Deployed Addresses (Polygon Amoy (Polymarket testnet))
 
 | Contract | Address |
 |----------|---------|
@@ -18,8 +18,8 @@ This document covers the smart contract ecosystem that powers end-to-end encrypt
 | RagequitModule | `0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c` |
 | ZKKeyManager | Not yet deployed (see `scripts/deploy/deploy-zk-key-manager.js`) |
 
-RPC endpoint: `https://rpc.mordor.etccooperative.org`
-Block explorer: `https://etc-mordor.blockscout.com`
+RPC endpoint: `https://rpc-amoy.polygon.technology`
+Block explorer: `https://amoy.polygonscan.com`
 Deployment start block: `15658191`
 
 ---
@@ -346,7 +346,7 @@ Stores tier assignments independently from role grants. Used as the source of tr
 
 ### MembershipPaymentManager (`0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7`)
 
-Coordinates payment processing for role purchases. Integrates with the PaymentProcessor to handle ERC-20 token payments (primarily USC stablecoin).
+Coordinates payment processing for role purchases. Integrates with the PaymentProcessor to handle ERC-20 token payments (primarily USDC stablecoin).
 
 ### Role Sync
 

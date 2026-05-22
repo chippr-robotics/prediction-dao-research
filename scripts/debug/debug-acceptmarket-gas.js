@@ -40,28 +40,28 @@ async function main() {
   // First let's check if the deployer can accept market 1 (not already accepted by them)
   // Wait - deployer IS the creator, so they've already "accepted" all markets they created
 
-  console.log("\n--- Test 3: Check USC proxy implementation ---");
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  console.log("\n--- Test 3: Check USDC proxy implementation ---");
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
 
   // Try to get implementation via storage slot (EIP-1967)
   // Implementation slot: 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
   const implSlot = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
-  const implAddress = await provider.getStorage(uscAddress, implSlot);
+  const implAddress = await provider.getStorage(usdcAddress, implSlot);
   console.log("EIP-1967 implementation slot:", implAddress);
 
   // Try beacon slot
   const beaconSlot = "0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50";
-  const beaconAddress = await provider.getStorage(uscAddress, beaconSlot);
+  const beaconAddress = await provider.getStorage(usdcAddress, beaconSlot);
   console.log("EIP-1967 beacon slot:", beaconAddress);
 
   // Try admin slot
   const adminSlot = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-  const adminAddress = await provider.getStorage(uscAddress, adminSlot);
+  const adminAddress = await provider.getStorage(usdcAddress, adminSlot);
   console.log("EIP-1967 admin slot:", adminAddress);
 
   // Get the actual bytecode to see what kind of proxy it is
-  const code = await provider.getCode(uscAddress);
-  console.log("\nUSC proxy bytecode:", code);
+  const code = await provider.getCode(usdcAddress);
+  console.log("\nUSDC proxy bytecode:", code);
 
   console.log("\n--- Test 4: Direct low-level call to factory ---");
   // Let's see what happens when we do a raw call

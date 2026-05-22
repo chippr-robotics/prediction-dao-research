@@ -4,12 +4,12 @@ This directory contains in-depth research and analysis documents for proposed en
 
 ## Available Research
 
-### [ETCswap v3 Integration Analysis](etcswap-v3-integration-analysis.md)
+### [Dex v3 Integration Analysis](dex-v3-integration-analysis.md)
 
 **Status**: Final - Ready for Review  
 **Date**: December 23, 2025
 
-A comprehensive analysis exploring the integration of ETCswap v3 (Uniswap v3 fork) concentrated liquidity mechanics into Prediction DAO. This research document covers:
+A comprehensive analysis exploring the integration of Dex v3 (Uniswap v3 fork) concentrated liquidity mechanics into Prediction DAO. This research document covers:
 
 - **Architecture Analysis**: Deep dive into V3's concentrated liquidity mechanisms, tick mathematics, and fee structures
 - **Comparative Study**: Detailed comparison between current LMSR markets and V3 AMM approaches
@@ -20,7 +20,7 @@ A comprehensive analysis exploring the integration of ETCswap v3 (Uniswap v3 for
 
 **Key Recommendation**: Platform-specific approach where ClearPath uses LMSR with Nightmarket privacy for governance (privacy-first), and FairWins uses V3 concentrated liquidity for prediction markets (efficiency-first).
 
-### [Alternative Approaches (Appendix)](etcswap-v3-alternative-approaches.md)
+### [Alternative Approaches (Appendix)](dex-v3-alternative-approaches.md)
 
 **Status**: Reference Material  
 **Date**: December 23, 2025

@@ -11,7 +11,7 @@
  * - Already terminal (Resolved/Cancelled/Refunded) → skip
  *
  * Usage:
- *   npx hardhat run scripts/admin/resolve-admin-markets.js --network mordor
+ *   npx hardhat run scripts/admin/resolve-admin-markets.js --network amoy
  *
  * Environment:
  *   ADMIN_ADDRESS - override the target address (default: signer address)
@@ -50,7 +50,7 @@ async function main() {
   console.log("Signer:", signer.address);
   console.log("Target admin:", adminAddress);
 
-  // Contract address — FriendGroupMarketFactory on Mordor
+  // Contract address — FriendGroupMarketFactory on Polygon Amoy
   const FRIEND_GROUP_FACTORY = "0xE1eC8d34b36f55015ed636337121CA8EFbA96227";
 
   // Use minimal ABI matching the actual contract return types

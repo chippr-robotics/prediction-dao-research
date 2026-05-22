@@ -112,7 +112,7 @@ Contracts for integrating with external protocols.
 
 | Contract | Description |
 |----------|-------------|
-| `ETCSwapV3Integration.sol` | Uniswap V3-compatible DEX integration |
+| `DexV3Integration.sol` | Uniswap V3-compatible DEX integration |
 | `GovernanceIntentHandler.sol` | EIP-712 intent handling for gasless operations |
 
 ### `metadata/` - Metadata Contracts

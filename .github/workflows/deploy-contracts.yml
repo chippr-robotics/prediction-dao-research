@@ -1,15 +1,7 @@
-name: Deploy DAO Contracts to Mordor Testnet
+name: Deploy DAO Contracts
 
 on:
   workflow_dispatch:
-    inputs:
-      network:
-        description: 'Target network for deployment'
-        required: false
-        default: 'mordor'
-        type: choice
-        options:
-          - mordor
   push:
     branches:
       - main
@@ -33,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only auto-deploy on main branch, require manual trigger for other branches
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,10 +42,9 @@ jobs:
       - name: Compile contracts
         run: npm run compile
 
-      - name: Deploy contracts to Mordor testnet (Deterministic)
+      - name: Deploy contracts (Deterministic)
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-          NETWORK: ${{ github.event.inputs.network || 'mordor' }}
         run: |
           if [ -z "$PRIVATE_KEY" ]; then
             echo "❌ ERROR: PRIVATE_KEY secret not configured"
@@ -62,16 +53,13 @@ jobs:
             exit 1
           fi
 
-          echo "🚀 Deploying contracts deterministically to $NETWORK network..."
-          echo "Network: $NETWORK"
+          echo "🚀 Deploying contracts deterministically to Polygon Amoy..."
           echo "Using Safe Singleton Factory for deterministic deployments"
           echo "Factory Address: 0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7"
           echo ""
-          
-          # Run deterministic deployment script
-          npx hardhat run scripts/deploy-deterministic.js --network $NETWORK | tee deployment.log
-          
-          # Check if deployment was successful
+
+          npx hardhat run scripts/deploy-deterministic.js --network amoy | tee deployment.log
+
           if [ $? -eq 0 ]; then
             echo "✅ Deployment completed successfully!"
           else
@@ -83,31 +71,33 @@ jobs:
         id: extract
         if: success()
         run: |
-          # Extract contract addresses from deployment log
           echo "📝 Extracting deployment information..."
-          
+
+          NETWORK_LABEL="Polygon Amoy (Chain ID: 80002)"
+          EXPLORER_NAME="Polygonscan"
+          EXPLORER_BASE="https://amoy.polygonscan.com"
+          RPC_URL="https://rpc-amoy.polygon.technology"
+
           if [ -f deployment.log ]; then
-            # Create a summary of deployed contracts
             echo "## 🎉 Contract Deployment Summary" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Network:** Mordor Testnet (Chain ID: 63)" >> $GITHUB_STEP_SUMMARY
+            echo "**Network:** $NETWORK_LABEL" >> $GITHUB_STEP_SUMMARY
             echo "**Deployed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Deployed Contracts" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            
-            # Extract contract addresses
+
             grep -E "(WelfareMetricRegistry|ProposalRegistry|ConditionalMarketFactory|PrivacyCoordinator|OracleResolver|RagequitModule|FutarchyGovernor) deployed to:" deployment.log | while IFS= read -r line; do
               contract=$(echo "$line" | awk '{print $1}')
               address=$(echo "$line" | awk '{print $NF}')
               echo "- **$contract**: \`$address\`" >> $GITHUB_STEP_SUMMARY
-              echo "  - [View on Blockscout](https://etc-mordor.blockscout.com/address/$address)" >> $GITHUB_STEP_SUMMARY
+              echo "  - [View on $EXPLORER_NAME]($EXPLORER_BASE/address/$address)" >> $GITHUB_STEP_SUMMARY
             done
-            
+
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Blockscout Links" >> $GITHUB_STEP_SUMMARY
-            echo "- [Mordor Testnet Explorer](https://etc-mordor.blockscout.com/)" >> $GITHUB_STEP_SUMMARY
-            echo "- [Mordor Testnet RPC](https://rpc.mordor.etccooperative.org)" >> $GITHUB_STEP_SUMMARY
+            echo "### Network Links" >> $GITHUB_STEP_SUMMARY
+            echo "- [$NETWORK_LABEL Explorer]($EXPLORER_BASE/)" >> $GITHUB_STEP_SUMMARY
+            echo "- [$NETWORK_LABEL RPC]($RPC_URL)" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload deployment logs
@@ -125,18 +115,21 @@ jobs:
           script: |
             const fs = require('fs');
             let logContent = '';
-            
+
             try {
               logContent = fs.readFileSync('deployment.log', 'utf8');
             } catch (error) {
               console.log('No deployment log found');
               return;
             }
-            
-            // Extract contract addresses
+
+            const networkLabel = 'Polygon Amoy (Chain ID: 80002)';
+            const explorerName = 'Polygonscan';
+            const explorerBase = 'https://amoy.polygonscan.com';
+
             const contracts = [];
             const lines = logContent.split('\n');
-            
+
             for (const line of lines) {
               if (line.includes('deployed to:')) {
                 const match = line.match(/(\w+) deployed to: (0x[a-fA-F0-9]{40})/);
@@ -148,20 +141,20 @@ jobs:
                 }
               }
             }
-            
+
             if (contracts.length === 0) {
               return;
             }
-            
+
             let comment = '## 🚀 Contract Deployment Results\n\n';
-            comment += '**Network:** Mordor Testnet (Chain ID: 63)\n\n';
+            comment += `**Network:** ${networkLabel}\n\n`;
             comment += '### Deployed Contracts\n\n';
-            
+
             for (const contract of contracts) {
               comment += `- **${contract.name}**: \`${contract.address}\`\n`;
-              comment += `  - [View on Blockscout](https://etc-mordor.blockscout.com/address/${contract.address})\n`;
+              comment += `  - [View on ${explorerName}](${explorerBase}/address/${contract.address})\n`;
             }
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,

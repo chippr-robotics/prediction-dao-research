@@ -50,7 +50,7 @@ function TestWalletComponent() {
       {isConnected ? (
         <>
           <div data-testid="address">{address}</div>
-          <div data-testid="balance">{balances.etc} ETC</div>
+          <div data-testid="balance">{balances.native} MATIC</div>
           <div data-testid="role-status">
             {hasRole('MARKET_MAKER') ? 'Has Role' : 'No Role'}
           </div>

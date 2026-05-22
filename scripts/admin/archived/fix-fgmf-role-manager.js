@@ -10,7 +10,7 @@ const { ethers } = require("hardhat");
  * causing friend market creation to fail.
  *
  * Run with admin floppy:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/fix-fgmf-role-manager.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/fix-fgmf-role-manager.js --network amoy
  */
 
 const CONTRACTS = {

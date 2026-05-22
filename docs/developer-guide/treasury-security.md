@@ -30,7 +30,7 @@ The TreasuryVault contract provides secure custody of DAO funds with multiple la
 Per-transaction maximum withdrawal amounts prevent large single withdrawals.
 
 ```solidity
-// Set max 10 ETC per transaction
+// Set max 10  per transaction
 treasury.setTransactionLimit(address(0), 10 ether);
 
 // Set max 1000 FWN per transaction
@@ -42,7 +42,7 @@ treasury.setTransactionLimit(fairWinsToken, 1000 ether);
 Time-based spending caps prevent rapid draining of funds.
 
 ```solidity
-// Max 50 ETC per 24 hours
+// Max 50  per 24 hours
 treasury.setRateLimit(address(0), 86400, 50 ether);
 
 // Max 5000 FWN per 24 hours
@@ -111,8 +111,8 @@ Production Multi-Sig Configuration:
             ▼
 ┌─────────────────────────────────────────┐
 │  TreasuryVault                          │
-│    ├── ETH Tx Limit: 10 ETC             │
-│    ├── ETH Daily Limit: 50 ETC          │
+│    ├── ETH Tx Limit: 10              │
+│    ├── ETH Daily Limit: 50           │
 │    ├── FWN Tx Limit: 1000 FWN           │
 │    └── FWN Daily Limit: 5000 FWN        │
 └─────────────────────────────────────────┘
@@ -148,7 +148,7 @@ Production Multi-Sig Configuration:
 ## Contract Address
 
 ```
-TreasuryVault: 0x93F7ee39C02d99289E3c29696f1F3a70656d0772 (Mordor)
+TreasuryVault: 0x93F7ee39C02d99289E3c29696f1F3a70656d0772 (Polygon Amoy)
 ```
 
 ## Configuration Scripts
@@ -156,13 +156,13 @@ TreasuryVault: 0x93F7ee39C02d99289E3c29696f1F3a70656d0772 (Mordor)
 ### Set Spending Limits
 
 ```bash
-npx hardhat run scripts/admin/configure-treasury-limits.js --network mordor
+npx hardhat run scripts/admin/configure-treasury-limits.js --network amoy
 ```
 
 ### Current Configuration
 
 The script configures:
-- ETH: 10 ETC per transaction, 50 ETC per day
+- ETH: 10  per transaction, 50  per day
 - FWN: 1000 FWN per transaction, 5000 FWN per day
 
 Adjust `CONFIG` object in the script for different limits.

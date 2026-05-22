@@ -23,12 +23,12 @@ const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
 
 // Contract addresses - UPDATE THESE for your network
 const NETWORK_CONFIG = {
-  mordor: {
+  amoy: {
     marketFactory: "0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac",
     ragequitModule: "0x1D30f1DBF2f7B9C050F5de8b98Dc63C54Bfff1e7",  // Checksummed
     tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",  // New optimized TieredRoleManager
     paymentManager: "0xA61C3a81e25E8E5E7A6A7EceBEd7e1BF58533e28",
-    collateralToken: "0xDE093684c796204224BC081f937aa059D903c52a"  // USC stablecoin
+    collateralToken: "0xDE093684c796204224BC081f937aa059D903c52a"  // USDC stablecoin
   },
   hardhat: {
     // Will be deployed in sequence
@@ -200,12 +200,12 @@ async function main() {
       }
     }
 
-    // Add USC as accepted payment token
+    // Add USDC as accepted payment token
     if (config.collateralToken) {
       try {
         const tx = await friendGroupMarketFactory.contract.addAcceptedPaymentToken(config.collateralToken, true);
         await tx.wait();
-        console.log("  ✓ USC added as accepted payment token");
+        console.log("  ✓ USDC added as accepted payment token");
       } catch (error) {
         console.warn("  ⚠️  Failed to add payment token:", error.message?.split("\n")[0]);
       }

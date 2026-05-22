@@ -76,7 +76,7 @@ async function main() {
 
   console.log("\n--- Check if there's a different RPC endpoint ---");
   // Try calling through an alternative RPC if available
-  const altRpcUrl = "https://geth-mordor.etc-network.info";
+  const altRpcUrl = "https://rpc-amoy.polygon.technology";
   try {
     const altProvider = new ethers.JsonRpcProvider(altRpcUrl);
     const result = await altProvider.call({
@@ -115,21 +115,21 @@ async function main() {
   // Let's create a brand new market and immediately try to accept it from tester1
   // This will help us rule out any state issues with existing markets
 
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
-  const usc = await ethers.getContractAt("IERC20", uscAddress, deployer);
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usc = await ethers.getContractAt("IERC20", usdcAddress, deployer);
 
   // Approve and create a fresh market
-  const stakeAmount = ethers.parseUnits("1", 6); // 1 USC
+  const stakeAmount = ethers.parseUnits("1", 6); // 1 USDC
   const deadline = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // 24 hours from now
 
   console.log("Creating fresh market...");
-  console.log("  Stake:", "1 USC");
+  console.log("  Stake:", "1 USDC");
   console.log("  Opponent:", tester1);
   console.log("  Deadline:", new Date(deadline * 1000).toISOString());
 
-  // Check if deployer has enough USC
+  // Check if deployer has enough USDC
   const deployerBalance = await usc.balanceOf(deployer.address);
-  console.log("  Deployer USC balance:", ethers.formatUnits(deployerBalance, 6));
+  console.log("  Deployer USDC balance:", ethers.formatUnits(deployerBalance, 6));
 
   if (deployerBalance >= stakeAmount) {
     // Approve
@@ -140,12 +140,12 @@ async function main() {
     // Create market
     const createTx = await factory.createOneVsOneMarketPending(
       tester1,
-      "Fresh debug market - 1 USC - 24hr deadline",
+      "Fresh debug market - 1 USDC - 24hr deadline",
       7 * 24 * 60 * 60, // 7 days trading period
       ethers.ZeroAddress, // No arbitrator
       deadline,
       stakeAmount,
-      uscAddress
+      usdcAddress
     );
     const receipt = await createTx.wait();
 
@@ -165,7 +165,7 @@ async function main() {
       console.log("\n  *** Tester1 should try accepting market", marketId.toString(), "***");
     }
   } else {
-    console.log("  Not enough USC to create market");
+    console.log("  Not enough USDC to create market");
   }
 }
 

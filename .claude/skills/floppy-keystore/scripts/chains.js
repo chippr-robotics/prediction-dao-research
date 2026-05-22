@@ -10,7 +10,6 @@
  * - Zcash (ZEC) - Transparent addresses
  * - Monero (XMR) - Derived from BIP-39 (not native 25-word)
  * - Solana (SOL)
- * - Ethereum Classic (ETC)
  *
  * @module chains
  */
@@ -88,7 +87,6 @@ async function deriveSecp256k1Keys(mnemonic, chain, options) {
     // Generate chain-specific address
     switch (chain.symbol) {
       case 'ETH':
-      case 'ETC':
         result.address = wallet.address;
         break;
 
@@ -487,11 +485,6 @@ async function deriveKeysFromXprv(xprv, chainId, options = {}) {
       publicKey: wallet.publicKey,
       address: wallet.address
     };
-
-    // Handle ETC (Ethereum Classic) - same format as ETH
-    if (chain.symbol === 'ETC') {
-      result.network = chain.networks?.[0] || 'mainnet';
-    }
 
     results.push(result);
   }

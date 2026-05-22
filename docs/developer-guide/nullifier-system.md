@@ -147,17 +147,17 @@ function verifyNonMembership(bytes32 element, bytes proof) external view returns
 
 ### Contract Address
 ```
-NullifierRegistry: 0x239C06E7AD066b5087Ed84686475f04f364ACBb7 (Mordor)
+NullifierRegistry: 0x239C06E7AD066b5087Ed84686475f04f364ACBb7 (Polygon Amoy)
 ```
 
 ### Deployment Script
 ```bash
-npx hardhat run scripts/deploy-nullifier-registry.js --network mordor
+npx hardhat run scripts/deploy-nullifier-registry.js --network amoy
 ```
 
 ### Granting Admin Access
 ```bash
-npx hardhat run scripts/admin/grant-nullifier-role-quick.js --network mordor
+npx hardhat run scripts/admin/grant-nullifier-role-quick.js --network amoy
 ```
 
 ## Frontend Integration

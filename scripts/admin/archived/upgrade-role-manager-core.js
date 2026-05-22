@@ -12,7 +12,7 @@ const { ethers } = require("hardhat");
  * 2. Grants MARKET_MAKER_ROLE to the user who purchased it
  * 3. Updates the factory to use the new RoleManagerCore
  *
- * Run with: npx hardhat run scripts/upgrade-role-manager-core.js --network mordor
+ * Run with: npx hardhat run scripts/upgrade-role-manager-core.js --network amoy
  */
 
 // Existing addresses
@@ -37,7 +37,7 @@ async function main() {
     process.exit(1);
   }
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
   console.log();
 
   // Step 1: Deploy new RoleManagerCore

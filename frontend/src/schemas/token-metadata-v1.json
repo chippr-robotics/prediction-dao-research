@@ -58,7 +58,7 @@
         "decimals": { "type": "number" },
         "created_at": { "type": "string", "format": "date-time" },
         "creator": { "type": "string" },
-        "listed_on_etcswap": { "type": "boolean" },
+        "listed_on_dex": { "type": "boolean" },
         "contract_verified": { "type": "boolean" },
         "tokenomics": { "type": "object" },
         "utility": {

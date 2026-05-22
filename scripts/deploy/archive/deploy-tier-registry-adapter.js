@@ -17,10 +17,10 @@ const { ethers } = require("hardhat");
  * 6. Instructions to update FriendGroupMarketFactory
  *
  * Usage:
- *   npx hardhat run scripts/deploy/deploy-tier-registry-adapter.js --network mordor
+ *   npx hardhat run scripts/deploy/deploy-tier-registry-adapter.js --network amoy
  */
 
-// Deployed modular RBAC addresses (Mordor)
+// Deployed modular RBAC addresses (Amoy)
 const CONTRACTS = {
   roleManagerCore: '0x888332df7621EC341131d85e2228f00407777dD7',
   tierRegistry: '0x4eb93BaF14f668F8f67922121A3b9FC3FB5b8A0d',
@@ -47,7 +47,7 @@ async function main() {
   console.log("\nDeployer:", deployer.address);
 
   const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
   // ========== Step 1: Deploy UsageTracker ==========
   console.log("\n[1/6] Deploying UsageTracker...");

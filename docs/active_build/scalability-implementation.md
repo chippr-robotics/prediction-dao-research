@@ -247,7 +247,7 @@ All breaking changes are documented and existing tests updated.
 4. Review of access controls
 
 ### Phase 2: Testnet Deployment
-1. Deploy to Mordor testnet
+1. Deploy to Polygon Amoy (Polymarket testnet)
 2. Run integration tests
 3. Monitor performance metrics
 4. Gather community feedback

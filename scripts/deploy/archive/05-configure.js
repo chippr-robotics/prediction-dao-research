@@ -12,7 +12,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/05-configure.js --network localhost
- *   npx hardhat run scripts/deploy/05-configure.js --network mordor
+ *   npx hardhat run scripts/deploy/05-configure.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -20,6 +20,8 @@ const { ethers } = require("hardhat");
 
 const {
   TOKENS,
+  STABLECOIN_DECIMALS,
+  POLYMARKET_CTF,
   ROLE_HASHES,
   MembershipTier,
   FRIEND_MARKET_TIERS,
@@ -50,6 +52,7 @@ async function main() {
   const coreDeployment = loadDeployment(getDeploymentFilename(network, "core-deployment"));
   const rbacDeployment = loadDeployment(getDeploymentFilename(network, "rbac-deployment"));
   const marketsDeployment = loadDeployment(getDeploymentFilename(network, "markets-deployment"));
+  const registriesDeployment = loadDeployment(getDeploymentFilename(network, "registries-deployment"));
 
   if (!coreDeployment?.contracts) {
     throw new Error("Core deployment not found. Run 01-deploy-core.js first.");
@@ -219,9 +222,11 @@ async function main() {
   console.log("\n\n--- Configuring Role Prices ---");
 
   const networkName = hre.network.name;
-  const uscAddress = TOKENS[networkName]?.USC;
+  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USDC;
+  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USDC";
+  const stableDecimals = STABLECOIN_DECIMALS[networkName] ?? 6;
 
-  if (contracts.membershipPaymentManager && uscAddress) {
+  if (contracts.membershipPaymentManager && stableAddress) {
     const additionalRoles = [
       { role: ROLE_HASHES.TOKENMINT_ROLE, name: "TOKENMINT_ROLE", price: "25" },
       { role: ROLE_HASHES.CLEARPATH_USER_ROLE, name: "CLEARPATH_USER_ROLE", price: "10" },
@@ -229,12 +234,12 @@ async function main() {
 
     for (const { role, name, price } of additionalRoles) {
       try {
-        const currentPrice = await contracts.membershipPaymentManager.rolePrices(role, uscAddress);
+        const currentPrice = await contracts.membershipPaymentManager.rolePrices(role, stableAddress);
         if (currentPrice === 0n) {
-          const priceWei = ethers.parseUnits(price, 6);
-          const tx = await contracts.membershipPaymentManager.setRolePrice(role, uscAddress, priceWei);
+          const priceWei = ethers.parseUnits(price, stableDecimals);
+          const tx = await contracts.membershipPaymentManager.setRolePrice(role, stableAddress, priceWei);
           await tx.wait();
-          console.log(`  ✓ ${name} price set to ${price} USC`);
+          console.log(`  ✓ ${name} price set to ${price} ${stableSymbol}`);
         } else {
           console.log(`  ✓ ${name} price already set`);
         }
@@ -242,8 +247,8 @@ async function main() {
         console.warn(`  ⚠️  ${name} price configuration skipped: ${error.message?.split("\n")[0]}`);
       }
     }
-  } else if (!uscAddress) {
-    console.log("  ⚠️  No USC address for this network - skipping role prices");
+  } else if (!stableAddress) {
+    console.log(`  ⚠️  No stablecoin address for ${networkName} - skipping role prices`);
   }
 
   // =========================================================================
@@ -312,6 +317,35 @@ async function main() {
   }
 
   // =========================================================================
+  // Wire PolymarketOracleAdapter into FriendGroupMarketFactory
+  // =========================================================================
+  console.log("\n\n--- Wiring Polymarket Oracle Adapter ---");
+
+  const polymarketAdapterAddress = registriesDeployment?.contracts?.polymarketOracleAdapter;
+  if (friendGroupMarketFactoryAddress && polymarketAdapterAddress) {
+    try {
+      const friendFactoryArtifact = await ethers.getContractAt(
+        "FriendGroupMarketFactory",
+        friendGroupMarketFactoryAddress
+      );
+      const currentAdapter = await friendFactoryArtifact.polymarketAdapter();
+      if (currentAdapter.toLowerCase() === polymarketAdapterAddress.toLowerCase()) {
+        console.log(`  ✓ PolymarketAdapter already wired: ${polymarketAdapterAddress}`);
+      } else {
+        const tx = await friendFactoryArtifact.setPolymarketAdapter(polymarketAdapterAddress);
+        await tx.wait();
+        console.log(`  ✓ PolymarketAdapter wired into FriendGroupMarketFactory: ${polymarketAdapterAddress}`);
+      }
+    } catch (error) {
+      console.warn(`  ⚠️  Polymarket adapter wiring skipped: ${error.message?.split("\n")[0]}`);
+    }
+  } else if (!polymarketAdapterAddress) {
+    console.log("  ⚠️  No PolymarketOracleAdapter deployed - skipping (Polymarket-pegged side bets unavailable)");
+  } else {
+    console.log("  ⚠️  FriendGroupMarketFactory not deployed - skipping adapter wiring");
+  }
+
+  // =========================================================================
   // Summary
   // =========================================================================
   console.log("\n\n" + "=".repeat(60));
@@ -323,11 +357,11 @@ async function main() {
   console.log("  - PaymentProcessor → TieredRoleManager");
   console.log("  - PaymentProcessor.roleManagerCore → TieredRoleManager (for role grants)");
   console.log("\nRole prices configured:");
-  if (uscAddress) {
-    console.log("  - TOKENMINT_ROLE: 25 USC");
-    console.log("  - CLEARPATH_USER_ROLE: 10 USC");
+  if (stableAddress) {
+    console.log(`  - TOKENMINT_ROLE: 25 ${stableSymbol}`);
+    console.log(`  - CLEARPATH_USER_ROLE: 10 ${stableSymbol}`);
   } else {
-    console.log("  - Skipped (no USC on this network)");
+    console.log(`  - Skipped (no stablecoin on ${networkName})`);
   }
   console.log("\nFactory roles configured:");
   if (friendGroupMarketFactoryAddress) {

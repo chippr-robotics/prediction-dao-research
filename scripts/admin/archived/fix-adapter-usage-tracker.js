@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
  * Fix TierRegistryAdapter's UsageTracker configuration
  *
  * Run with admin floppy disk:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/fix-adapter-usage-tracker.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/fix-adapter-usage-tracker.js --network amoy
  */
 
 const CONTRACTS = {

@@ -10,7 +10,7 @@ import {
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
-  ETCswapProvider,
+  DexProvider,
   PriceProvider
 } from '../contexts'
 
@@ -22,21 +22,14 @@ let mockWalletState = {
 let mockWeb3State = {
   isCorrectNetwork: true
 }
-let mockNotificationState = {
-  unreadCount: 0,
-  unreadMarketIds: [],
-  isMarketUnread: vi.fn().mockReturnValue(false)
-}
 
 // Mock the hooks module directly
 vi.mock('../hooks', () => {
-  // Create mock signer inside the factory function
   const mockSigner = {
     signMessage: vi.fn().mockResolvedValue('0xmocksignature123456789'),
     getAddress: vi.fn().mockResolvedValue('0x1234567890123456789012345678901234567890')
   }
 
-  // Access the outer scope variables
   return {
     useWallet: () => ({
       isConnected: mockWalletState.isConnected,
@@ -47,24 +40,11 @@ vi.mock('../hooks', () => {
       signer: mockSigner,
       isCorrectNetwork: mockWeb3State.isCorrectNetwork,
       switchNetwork: vi.fn()
-    }),
-    useLazyIpfsEnvelope: (markets) => ({
-      markets: markets || [],
-      fetchEnvelope: vi.fn().mockResolvedValue(null),
-      isMarketFetching: vi.fn().mockReturnValue(false),
-      needsFetch: vi.fn().mockReturnValue(false),
-      clearEnvelope: vi.fn()
-    }),
-    useFriendMarketNotifications: () => ({
-      unreadCount: mockNotificationState.unreadCount,
-      unreadMarketIds: mockNotificationState.unreadMarketIds,
-      markMarketAsRead: vi.fn(),
-      isMarketUnread: mockNotificationState.isMarketUnread
     })
   }
 })
 
-// Mock useEncryption separately since it's imported from a different path
+// Mock useEncryption — only the create-flow methods are exercised now.
 vi.mock('../hooks/useEncryption', () => ({
   useEncryption: () => ({
     createEncrypted: vi.fn().mockResolvedValue({
@@ -82,28 +62,6 @@ vi.mock('../hooks/useEncryption', () => ({
     addRecipientByPublicKey: vi.fn().mockReturnValue({ version: '1.0', recipients: [] }),
     isInitialized: true,
     isInitializing: false
-  }),
-  useDecryptedMarkets: (markets) => ({
-    markets: markets || [],
-    isDecrypting: false
-  }),
-  useLazyMarketDecryption: (markets) => ({
-    markets: (markets || []).map(m => ({
-      ...m,
-      encryptionStatus: 'not_encrypted',
-      isPrivate: false,
-      canView: true,
-      decryptedMetadata: null,
-      decryptionError: null,
-      isDecrypting: false
-    })),
-    decryptMarket: vi.fn().mockResolvedValue({}),
-    isMarketDecrypting: vi.fn().mockReturnValue(false),
-    isAnyDecrypting: false,
-    clearCache: vi.fn(),
-    viewableMarkets: markets || [],
-    privateMarkets: [],
-    publicMarkets: markets || []
   })
 }))
 
@@ -120,21 +78,23 @@ vi.mock('wagmi', () => ({
   useDisconnect: () => mockUseDisconnect(),
   useChainId: () => mockUseChainId(),
   useSwitchChain: () => mockUseSwitchChain(),
-  useWalletClient: () => ({
-    data: null // Return null to prevent EIP-1193 provider errors and trigger window.ethereum fallback path in tests
-  }),
+  useWalletClient: () => ({ data: null }),
+  useEnsAddress: () => ({ data: null, isLoading: false, isError: false, error: null }),
+  useEnsName: () => ({ data: null, isLoading: false, isError: false, error: null }),
   WagmiProvider: ({ children }) => children,
   createConfig: vi.fn(() => ({})),
   http: vi.fn(() => ({})),
 }))
 
-// Mock wagmi/connectors
+vi.mock('wagmi/chains', () => ({
+  mainnet: { id: 1 },
+}))
+
 vi.mock('wagmi/connectors', () => ({
   injected: vi.fn(() => ({})),
   walletConnect: vi.fn(() => ({})),
 }))
 
-// Mock qrcode.react
 vi.mock('qrcode.react', () => ({
   QRCodeSVG: ({ value, ...props }) => (
     <svg data-testid="qr-code" data-value={value} {...props}>
@@ -143,75 +103,11 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
-// Sample test data
-const mockActiveMarkets = [
-  {
-    id: 'market-1',
-    type: 'oneVsOne',
-    description: 'Patriots will win the Super Bowl',
-    stakeAmount: '10',
-    stakeTokenId: 'USC',
-    stakeTokenSymbol: 'USC',
-    stakeTokenIcon: '💵',
-    tradingPeriod: '7',
-    participants: ['0x1234567890123456789012345678901234567890', '0xabcdef1234567890123456789012345678901234'],
-    creator: '0x1234567890123456789012345678901234567890',
-    createdAt: '2024-01-15T10:00:00Z',
-    endDate: '2024-01-22T10:00:00Z',
-    status: 'active'
-  },
-  {
-    id: 'market-2',
-    type: 'smallGroup',
-    description: 'BTC will reach $100k by EOY',
-    stakeAmount: '25',
-    stakeTokenId: 'USC',
-    stakeTokenSymbol: 'USC',
-    stakeTokenIcon: '💵',
-    tradingPeriod: '30',
-    participants: [
-      '0x1234567890123456789012345678901234567890',
-      '0xabcdef1234567890123456789012345678901234',
-      '0x9876543210987654321098765432109876543210'
-    ],
-    creator: '0xabcdef1234567890123456789012345678901234',
-    createdAt: '2024-01-10T10:00:00Z',
-    endDate: '2024-02-10T10:00:00Z',
-    status: 'pending'
-  }
-]
-
-const mockPastMarkets = [
-  {
-    id: 'market-3',
-    type: 'eventTracking',
-    description: 'World Cup Final Winner',
-    stakeAmount: '50',
-    stakeTokenId: 'USC',
-    stakeTokenSymbol: 'USC',
-    stakeTokenIcon: '💵',
-    tradingPeriod: '14',
-    participants: [
-      '0x1234567890123456789012345678901234567890',
-      '0xabcdef1234567890123456789012345678901234',
-      '0x9876543210987654321098765432109876543210',
-      '0x1111222233334444555566667777888899990000'
-    ],
-    creator: '0x1234567890123456789012345678901234567890',
-    createdAt: '2023-12-01T10:00:00Z',
-    endDate: '2023-12-15T10:00:00Z',
-    status: 'resolved',
-    outcome: 'Won'
-  }
-]
-
 const renderWithProviders = (ui, { isConnected = true, account = '0x1234567890123456789012345678901234567890', isCorrectNetwork = true } = {}) => {
-  // Set up mock state for hooks
   mockWalletState.isConnected = isConnected
   mockWalletState.account = isConnected ? account : null
   mockWeb3State.isCorrectNetwork = isCorrectNetwork
 
-  // Set up mocks based on connection state
   mockUseAccount.mockReturnValue({
     address: isConnected ? account : null,
     isConnected
@@ -228,7 +124,6 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
     switchChain: vi.fn()
   })
 
-  // Create a new QueryClient for each test
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -242,13 +137,13 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
         <ThemeProvider>
           <WalletProvider>
             <UserPreferencesProvider>
-              <ETCswapProvider>
+              <DexProvider>
                 <UIProvider>
                   <PriceProvider>
                     {ui}
                   </PriceProvider>
                 </UIProvider>
-              </ETCswapProvider>
+              </DexProvider>
             </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>
@@ -262,9 +157,6 @@ describe('FriendMarketsModal', () => {
     isOpen: true,
     onClose: vi.fn(),
     onCreate: vi.fn(),
-    activeMarkets: mockActiveMarkets,
-    pastMarkets: mockPastMarkets,
-    onMarketClick: vi.fn(),
     pendingTransaction: null,
     onClearPendingTransaction: vi.fn()
   }
@@ -273,16 +165,11 @@ describe('FriendMarketsModal', () => {
     vi.clearAllMocks()
     sessionStorage.clear()
     localStorage.clear()
-    // Reset mock state to defaults
     mockWalletState.isConnected = true
     mockWalletState.account = '0x1234567890123456789012345678901234567890'
     mockWeb3State.isCorrectNetwork = true
-    mockNotificationState.unreadCount = 0
-    mockNotificationState.unreadMarketIds = []
-    mockNotificationState.isMarketUnread = vi.fn().mockReturnValue(false)
-    
-    // Mock window.ethereum to avoid provider creation errors
-    // This prevents the WalletContext from trying to create providers during tests
+
+    // Avoid provider creation errors during tests
     global.window.ethereum = undefined
   })
 
@@ -332,116 +219,44 @@ describe('FriendMarketsModal', () => {
     })
   })
 
-  describe('Tab Navigation', () => {
-    it('should render all three tabs', () => {
+  describe('Direct-to-form behavior', () => {
+    it('opens directly into the 1v1 form when no initialType is passed', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      expect(screen.getByRole('tab', { name: /create/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /active/i })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /past/i })).toBeInTheDocument()
-    })
-
-    it('should have Create tab selected by default', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      const createTab = screen.getByRole('tab', { name: /create/i })
-      expect(createTab).toHaveAttribute('aria-selected', 'true')
-    })
-
-    it('should switch to Active tab when clicked', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      expect(screen.getByRole('tab', { name: /active/i })).toHaveAttribute('aria-selected', 'true')
-    })
-
-    it('should switch to Past tab when clicked', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /past/i }))
-      expect(screen.getByRole('tab', { name: /past/i })).toHaveAttribute('aria-selected', 'true')
-    })
-
-    it('should show unread markets count badge', () => {
-      // Set up unread notifications
-      const unreadMarkets = ['market-1', 'market-2']
-      mockNotificationState.unreadCount = 2
-      mockNotificationState.unreadMarketIds = unreadMarkets
-      mockNotificationState.isMarketUnread = vi.fn((id) => 
-        unreadMarkets.includes(id)
-      )
-      
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      // Should show unread count badge
-      expect(screen.getByText('2')).toBeInTheDocument()
-      expect(screen.getByLabelText('2 unread markets')).toBeInTheDocument()
-    })
-  })
-
-  describe('Create Tab - Type Selection', () => {
-    it('should display market type selection by default', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      expect(screen.getByText('Choose Wager Type')).toBeInTheDocument()
-      expect(screen.getByText('1 vs 1')).toBeInTheDocument()
-      expect(screen.getByText('Small Group')).toBeInTheDocument()
-      expect(screen.getByText('Event Tracking')).toBeInTheDocument()
-    })
-
-    it('should display type descriptions', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      expect(screen.getByText('Head-to-head bet with a friend')).toBeInTheDocument()
-      expect(screen.getByText('Pool wagers with 2-10 friends')).toBeInTheDocument()
-      expect(screen.getByText('Competitive wagers for events')).toBeInTheDocument()
-    })
-
-    it('should navigate to form when 1v1 type is selected', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByText('1 vs 1'))
-      expect(screen.getByText("What's the bet?")).toBeInTheDocument()
+      expect(screen.getByLabelText(/what's the bet/i)).toBeInTheDocument()
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
     })
 
-    it('should navigate to form when Small Group type is selected', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+    it('opens into the 1v1 form when initialType="oneVsOne"', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="oneVsOne" />)
+      expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
+    })
 
-      await userEvent.click(screen.getByText('Small Group'))
-      expect(screen.getByText("What's the bet?")).toBeInTheDocument()
+    it('opens into the Small Group form when initialType="smallGroup"', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="smallGroup" />)
       expect(screen.getByLabelText(/member addresses/i)).toBeInTheDocument()
     })
 
-    it('should navigate to form when Event Tracking type is selected', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByText('Event Tracking'))
-      expect(screen.getByText("What's the bet?")).toBeInTheDocument()
+    it('opens into the Event Tracking form when initialType="eventTracking"', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="eventTracking" />)
       expect(screen.getByLabelText(/member addresses/i)).toBeInTheDocument()
+    })
+
+    it('no longer renders a type-selector or Back link', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      expect(screen.queryByText('Choose Wager Type')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^back$/i })).not.toBeInTheDocument()
+    })
+
+    it('no longer renders the Active/Past tab strip', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     })
   })
 
-  describe('Create Tab - Form', () => {
-    it('should have a back button to return to type selection', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByText('1 vs 1'))
-      await userEvent.click(screen.getByText('Back'))
-
-      expect(screen.getByText('Choose Wager Type')).toBeInTheDocument()
-    })
-
-    it('should display type badge in form header', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByText('1 vs 1'))
-      // The badge contains the type icon and label
-      expect(screen.getByText(/1v1/i)).toBeInTheDocument()
-    })
-
+  describe('Create Form', () => {
     it('should validate required fields', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
@@ -452,7 +267,6 @@ describe('FriendMarketsModal', () => {
     it('should validate description minimum length', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Short')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
@@ -464,22 +278,21 @@ describe('FriendMarketsModal', () => {
     it('should validate opponent address for 1v1', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
       await userEvent.type(screen.getByLabelText(/opponent address/i), 'invalid-address')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
-        expect(screen.getByText(/invalid ethereum address/i)).toBeInTheDocument()
+        expect(
+          screen.getByText(/valid ethereum address or ENS name/i)
+        ).toBeInTheDocument()
       })
     })
 
     it('should not allow betting against yourself', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
-      // Enter the same address as the connected wallet
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0x1234567890123456789012345678901234567890'
@@ -491,37 +304,29 @@ describe('FriendMarketsModal', () => {
       })
     })
 
-    it('should have stake input with default value', async () => {
+    it('should have stake input with default value', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
-      // Use more specific label to avoid matching "Stake Token" dropdown
       const stakeInput = screen.getByLabelText(/stake amount/i)
-      // Default stake value should be 10
       expect(stakeInput).toHaveValue(10)
-      // Stake input should have min attribute for validation
       expect(stakeInput).toHaveAttribute('min', '0.1')
     })
 
     it('should validate member addresses for group markets', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="smallGroup" />)
 
-      await userEvent.click(screen.getByText('Small Group'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'BTC will reach $100k by end of year')
-      // Need at least 2 members to pass minimum count check and hit address validation
       await userEvent.type(screen.getByLabelText(/member addresses/i), '0xinvalid, 0xalsobad')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
-        // Error message includes the truncated address
         expect(screen.getByText(/Invalid address:/i)).toBeInTheDocument()
       })
     })
 
     it('should validate minimum members for event tracking', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="eventTracking" />)
 
-      await userEvent.click(screen.getByText('Event Tracking'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Who will win the tournament')
       await userEvent.type(
         screen.getByLabelText(/member addresses/i),
@@ -538,7 +343,6 @@ describe('FriendMarketsModal', () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
@@ -550,20 +354,31 @@ describe('FriendMarketsModal', () => {
         expect(onCreate).toHaveBeenCalled()
       })
     })
+
+    it('Cancel button closes the modal', async () => {
+      const onClose = vi.fn()
+      renderWithProviders(<FriendMarketsModal {...defaultProps} onClose={onClose} />)
+
+      await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }))
+      expect(onClose).toHaveBeenCalled()
+    })
   })
 
-  describe('Create Tab - Success State', () => {
-    it('should show success state with QR code after creation', async () => {
-      const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
-      renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
-
-      await userEvent.click(screen.getByText('1 vs 1'))
+  describe('Success State', () => {
+    const fillAndSubmit = async () => {
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
       await userEvent.type(
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+    }
+
+    it('should show success state with QR code after creation', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
+      renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+
+      await fillAndSubmit()
 
       await waitFor(() => {
         expect(screen.getByText('Wager Created!')).toBeInTheDocument()
@@ -576,30 +391,18 @@ describe('FriendMarketsModal', () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
-      await userEvent.type(
-        screen.getByLabelText(/opponent address/i),
-        '0xabcdef1234567890123456789012345678901234'
-      )
-      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await fillAndSubmit()
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /create another/i })).toBeInTheDocument()
       })
     })
 
-    it('should return to type selection when Create Another is clicked', async () => {
+    it('Create Another resets to a fresh form of the same type (no selector)', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
-      await userEvent.type(
-        screen.getByLabelText(/opponent address/i),
-        '0xabcdef1234567890123456789012345678901234'
-      )
-      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await fillAndSubmit()
 
       await waitFor(() => {
         expect(screen.getByText('Wager Created!')).toBeInTheDocument()
@@ -607,20 +410,17 @@ describe('FriendMarketsModal', () => {
 
       await userEvent.click(screen.getByRole('button', { name: /create another/i }))
 
-      expect(screen.getByText('Choose Wager Type')).toBeInTheDocument()
+      // Back on a fresh 1v1 form, NOT a (removed) type selector.
+      expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
+      expect(screen.queryByText('Choose Wager Type')).not.toBeInTheDocument()
+      expect(screen.getByLabelText(/what's the bet/i)).toHaveValue('')
     })
 
     it('should have Copy Link button in success state', async () => {
       const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
       renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
-      await userEvent.type(
-        screen.getByLabelText(/opponent address/i),
-        '0xabcdef1234567890123456789012345678901234'
-      )
-      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await fillAndSubmit()
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /copy link/i })).toBeInTheDocument()
@@ -628,188 +428,19 @@ describe('FriendMarketsModal', () => {
     })
   })
 
-  describe('Active Markets Tab', () => {
-    it('should display active markets in a table', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-
-      expect(screen.getByText('Patriots will win the Super Bowl')).toBeInTheDocument()
-      expect(screen.getByText('BTC will reach $100k by EOY')).toBeInTheDocument()
-    })
-
-    it('should display market type badges', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-
-      expect(screen.getByText('1v1')).toBeInTheDocument()
-      expect(screen.getByText('Group')).toBeInTheDocument()
-    })
-
-    it('should display stake amounts with token symbol', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-
-      // Stakes now display with USD formatting for stablecoins (formatUSD function)
-      // Use getAllByText since multiple elements may contain the stake text
-      const stakeElements10 = screen.getAllByText((_, node) => node?.textContent?.includes('$10.00'))
-      const stakeElements25 = screen.getAllByText((_, node) => node?.textContent?.includes('$25.00'))
-      expect(stakeElements10.length).toBeGreaterThan(0)
-      expect(stakeElements25.length).toBeGreaterThan(0)
-    })
-
-    it('should display empty state when no active markets', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} activeMarkets={[]} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-
-      expect(screen.getByText('No Active Markets')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /create your first market/i })).toBeInTheDocument()
-    })
-
-    it('should navigate to create tab when clicking Create Your First Market', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} activeMarkets={[]} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByRole('button', { name: /create your first market/i }))
-
-      expect(screen.getByRole('tab', { name: /create/i })).toHaveAttribute('aria-selected', 'true')
-    })
-  })
-
-  describe('Past Markets Tab', () => {
-    it('should display past markets in a table', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /past/i }))
-
-      expect(screen.getByText('World Cup Final Winner')).toBeInTheDocument()
-    })
-
-    it('should display outcome instead of end date for past markets', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /past/i }))
-
-      expect(screen.getByText('Won')).toBeInTheDocument()
-    })
-
-    it('should display empty state when no past markets', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} pastMarkets={[]} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /past/i }))
-
-      expect(screen.getByText('No Past Markets')).toBeInTheDocument()
-      expect(screen.getByText('Completed markets will appear here.')).toBeInTheDocument()
-    })
-  })
-
-  describe('Market Detail View', () => {
-    it('should show detail view when clicking on a market', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByText('Patriots will win the Super Bowl'))
-
-      await waitFor(() => {
-        expect(screen.getByText('Back to list')).toBeInTheDocument()
-      })
-    })
-
-    it('should display market details', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByText('Patriots will win the Super Bowl'))
-
-      await waitFor(() => {
-        // Check for detail view elements
-        expect(screen.getByText('Back to list')).toBeInTheDocument()
-        // Stake now displays with USD formatting for stablecoins (formatUSD function)
-        // Use getAllByText since stake appears in multiple places (stake + total pool)
-        const stakeElements = screen.getAllByText((_, node) => node?.textContent?.includes('$10.00'))
-        expect(stakeElements.length).toBeGreaterThan(0)
-        expect(screen.getByText('Share this market')).toBeInTheDocument()
-      })
-    })
-
-    it('should display QR code in detail view', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByText('Patriots will win the Super Bowl'))
-
-      await waitFor(() => {
-        expect(screen.getByText('Share this market')).toBeInTheDocument()
-        expect(screen.getAllByTestId('qr-code').length).toBeGreaterThanOrEqual(1)
-      })
-    })
-
-    it('should return to list when clicking Back to list', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByText('Patriots will win the Super Bowl'))
-
-      await waitFor(() => {
-        expect(screen.getByText('Back to list')).toBeInTheDocument()
-      })
-
-      await userEvent.click(screen.getByText('Back to list'))
-
-      expect(screen.getByText('BTC will reach $100k by EOY')).toBeInTheDocument()
-    })
-
-    it('should mark current user as You in participants list', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByText('Patriots will win the Super Bowl'))
-
-      await waitFor(() => {
-        // The "You" tag should appear in participant list
-        const youTag = screen.queryByText('You')
-        expect(youTag).toBeInTheDocument()
-      })
-    })
-
-    it('should mark creator in participants list', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-      await userEvent.click(screen.getByText('Patriots will win the Super Bowl'))
-
-      await waitFor(() => {
-        // The "Creator" tag should appear in participant list
-        const creatorTag = screen.queryByText('Creator')
-        expect(creatorTag).toBeInTheDocument()
-      })
-    })
-  })
-
   describe('Wallet Connection', () => {
-    it('should have create button enabled when wallet is connected and on correct network', async () => {
-      // Default state is connected with correct network
+    it('should have create button enabled when wallet is connected and on correct network', () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByText('1 vs 1'))
-      // Button should be enabled (not disabled) when wallet is connected
       const createButton = screen.getByRole('button', { name: /create wager/i })
       expect(createButton).not.toBeDisabled()
     })
 
     it('should show validation errors when form is submitted with invalid data', async () => {
-      // When connected, validation errors should be displayed
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
 
-      await userEvent.click(screen.getByText('1 vs 1'))
-      // Leave description empty and try to submit
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
-        // Should show validation error
         expect(screen.getByText(/description is required/i)).toBeInTheDocument()
       })
     })
@@ -824,27 +455,14 @@ describe('FriendMarketsModal', () => {
 
       expect(onClose).toHaveBeenCalled()
     })
-
-    it('should allow keyboard navigation on table rows', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-
-      const row = screen.getByText('Patriots will win the Super Bowl').closest('tr')
-      fireEvent.keyDown(row, { key: 'Enter' })
-
-      await waitFor(() => {
-        expect(screen.getByText('Back to list')).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Transaction Progress', () => {
-    it('should display pending transaction banner when pendingTransaction exists', async () => {
+    it('should display pending transaction banner when pendingTransaction exists', () => {
       const pendingTransaction = {
         step: 'create',
         txHash: '0xabc123',
-        timestamp: Date.now() - 60000, // 1 minute ago
+        timestamp: Date.now() - 60000,
         data: {
           description: 'Test pending market',
           opponent: '0xabcdef1234567890123456789012345678901234',
@@ -855,9 +473,6 @@ describe('FriendMarketsModal', () => {
         <FriendMarketsModal {...defaultProps} pendingTransaction={pendingTransaction} />
       )
 
-      await userEvent.click(screen.getByText('1 vs 1'))
-
-      // Should show pending transaction banner
       expect(screen.getByText('Previous transaction in progress')).toBeInTheDocument()
     })
 
@@ -881,47 +496,9 @@ describe('FriendMarketsModal', () => {
         />
       )
 
-      await userEvent.click(screen.getByText('1 vs 1'))
       await userEvent.click(screen.getByText('Start Fresh'))
 
       expect(onClearPendingTransaction).toHaveBeenCalled()
-    })
-  })
-
-  describe('Accessibility', () => {
-    it('should have proper tab roles', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      const tablist = screen.getByRole('tablist')
-      expect(tablist).toBeInTheDocument()
-
-      const tabs = screen.getAllByRole('tab')
-      expect(tabs).toHaveLength(3)
-    })
-
-    it('should have proper tabpanel role', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      const tabpanel = screen.getByRole('tabpanel')
-      expect(tabpanel).toBeInTheDocument()
-    })
-
-    it('should have aria-selected on tabs', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      const createTab = screen.getByRole('tab', { name: /create/i })
-      expect(createTab).toHaveAttribute('aria-selected', 'true')
-
-      const activeTab = screen.getByRole('tab', { name: /active/i })
-      expect(activeTab).toHaveAttribute('aria-selected', 'false')
-    })
-
-    it('should have proper table roles', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-
-      await userEvent.click(screen.getByRole('tab', { name: /active/i }))
-
-      expect(screen.getByRole('table')).toBeInTheDocument()
     })
   })
 })

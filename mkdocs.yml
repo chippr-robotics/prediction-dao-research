@@ -1,5 +1,5 @@
-site_name: ClearPath & FairWins
-site_description: DAO governance and prediction markets with privacy-preserving mechanisms - clarity in collective decision-making
+site_name: FairWins
+site_description: Prediction markets with private wagers between friends — clarity in collective decision-making
 site_author: Chippr Robotics
 site_url: https://docs.FairWins.app
 
@@ -127,8 +127,8 @@ nav:
     - ADR-001 Trail of Bits Toolchain: adr/001-trail-of-bits-toolchain.md
     - ADR-002 Integration Testing Strategy: adr/002-integration-testing-strategy.md
   - Research:
-    - ETCswap v3 Integration Analysis: research/etcswap-v3-integration-analysis.md
-    - Alternative Approaches (Appendix): research/etcswap-v3-alternative-approaches.md
+    - Dex v3 Integration Analysis: research/dex-v3-integration-analysis.md
+    - Alternative Approaches (Appendix): research/dex-v3-alternative-approaches.md
   - Reference:
     - API Reference: reference/api.md
     - Contract Interfaces: reference/contracts.md

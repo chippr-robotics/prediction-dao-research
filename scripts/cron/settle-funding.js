@@ -12,8 +12,8 @@
  * - Detailed logging for monitoring
  *
  * Usage:
- *   npx hardhat run scripts/cron/settle-funding.js --network mordor
- *   DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network mordor
+ *   npx hardhat run scripts/cron/settle-funding.js --network amoy
+ *   DRY_RUN=true npx hardhat run scripts/cron/settle-funding.js --network amoy
  *
  * Exit codes:
  *   0 - All settlements succeeded (or none were due)
@@ -214,7 +214,7 @@ async function main() {
   logInfo(`Operator: ${signer.address}`);
 
   const balance = await ethers.provider.getBalance(signer.address);
-  logInfo(`Operator balance: ${ethers.formatEther(balance)} ETC`);
+  logInfo(`Operator balance: ${ethers.formatEther(balance)} MATIC`);
 
   if (balance < ethers.parseEther("0.01")) {
     logWarn("Low balance! May not have enough gas for settlements");

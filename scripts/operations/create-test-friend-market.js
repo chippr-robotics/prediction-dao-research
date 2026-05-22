@@ -5,32 +5,32 @@ async function main() {
   console.log("Creating friend market from:", deployer.address);
   
   const factoryAddress = "0xD9A26537947d99c6961C1013490f0B80d1DFE283";
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
   const opponent = "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E";
   
   const factory = await ethers.getContractAt("FriendGroupMarketFactory", factoryAddress);
-  const usc = await ethers.getContractAt("IERC20", uscAddress);
+  const usc = await ethers.getContractAt("IERC20", usdcAddress);
   
   // Market parameters
   const description = "Test Market: Will this transaction succeed?";
   const tradingPeriodSeconds = 7 * 24 * 60 * 60; // 7 days
   const arbitrator = ethers.ZeroAddress; // No arbitrator
   const acceptanceDeadline = Math.floor(Date.now() / 1000) + (48 * 60 * 60); // 48 hours from now
-  const stakeAmount = ethers.parseUnits("10", 6); // 10 USC
+  const stakeAmount = ethers.parseUnits("10", 6); // 10 USDC
   
   console.log("\n--- Market Parameters ---");
   console.log("Description:", description);
   console.log("Opponent:", opponent);
-  console.log("Stake:", "10 USC");
+  console.log("Stake:", "10 USDC");
   console.log("Trading period:", "7 days");
   console.log("Acceptance deadline:", new Date(acceptanceDeadline * 1000).toISOString());
   
-  // Check USC balance and approve
+  // Check USDC balance and approve
   const balance = await usc.balanceOf(deployer.address);
-  console.log("\nDeployer USC balance:", ethers.formatUnits(balance, 6));
+  console.log("\nDeployer USDC balance:", ethers.formatUnits(balance, 6));
   
-  // Approve USC
-  console.log("\nApproving USC...");
+  // Approve USDC
+  console.log("\nApproving USDC...");
   const approveTx = await usc.approve(factoryAddress, stakeAmount);
   await approveTx.wait();
   console.log("Approved!");
@@ -45,7 +45,7 @@ async function main() {
       arbitrator,
       acceptanceDeadline,
       stakeAmount,
-      uscAddress
+      usdcAddress
     );
     console.log("TX hash:", tx.hash);
     

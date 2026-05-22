@@ -27,7 +27,7 @@ When you create or join a friend group prediction market, you are interacting wi
 
 ### 3. **This Is Real Money**
 
-- All bets use real cryptocurrency (ETH/ETC)
+- All bets use real cryptocurrency (the chain native token)
 - **You can lose all funds you commit**  
 - Only bet what you can afford to lose
 - Friend markets are not FDIC insured or backed by any institution

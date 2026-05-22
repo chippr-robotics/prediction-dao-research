@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * so it can call ConditionalMarketFactory.deployMarketPair() when friend markets activate.
  *
  * Usage:
- *   npx hardhat run scripts/grant-factory-role-on-old-rolemanager.js --network mordor
+ *   npx hardhat run scripts/grant-factory-role-on-old-rolemanager.js --network amoy
  */
 
 const CONTRACTS = {

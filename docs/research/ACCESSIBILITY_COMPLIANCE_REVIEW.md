@@ -484,13 +484,13 @@ button {
 <div className="price-item pass">
   <span className="token-icon" aria-hidden="true">↑</span>
   <label>PASS Token</label>
-  <div className="price" aria-live="polite">0.52 ETC</div>
+  <div className="price" aria-live="polite">0.52 MATIC</div>
 </div>
 
 <div className="price-item fail">
   <span className="token-icon" aria-hidden="true">↓</span>
   <label>FAIL Token</label>
-  <div className="price" aria-live="polite">0.48 ETC</div>
+  <div className="price" aria-live="polite">0.48 MATIC</div>
 </div>
 ```
 
@@ -957,7 +957,7 @@ import StatusIcon from './StatusIcon'
 <div className="price-item pass">
   <span className="token-icon" aria-hidden="true">↑</span>
   <label>PASS Token</label>
-  <div className="price">0.52 ETC</div>
+  <div className="price">0.52 MATIC</div>
   <div className="probability">52% probability</div>
 </div>
 ```

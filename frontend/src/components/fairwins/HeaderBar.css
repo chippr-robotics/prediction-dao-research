@@ -1,6 +1,6 @@
 .header-bar {
   position: fixed;
-  top: var(--dev-banner-height, 0);
+  top: var(--dev-banner-height, 0px);
   left: 0;
   right: 0;
   width: 100%;
@@ -111,19 +111,6 @@
   flex-shrink: 0;
 }
 
-/* Compact button sizes for header */
-.header-bar .header-right .tokenmint-button,
-.header-bar .header-right .clearpath-button {
-  width: 44px;
-  height: 44px;
-}
-
-.header-bar .header-right .tokenmint-button-container,
-.header-bar .header-right .clearpath-button-container {
-  margin: 0;
-  padding: 0;
-}
-
 /* Ensure wallet button container positions dropdown correctly */
 .header-bar .header-right .wallet-button-container {
   position: relative;
@@ -156,12 +143,6 @@
 
 .header-bar .header-right .wallet-icon {
   filter: brightness(0) invert(1);
-}
-
-/* TokenMint and ClearPath dropdown positioning in header */
-.header-bar .header-right .tokenmint-dropdown,
-.header-bar .header-right .clearpath-dropdown {
-  max-width: calc(100vw - 2rem);
 }
 
 .wallet-info-compact {
@@ -527,20 +508,3 @@
   justify-content: center;
 }
 
-.clearpath-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 80px;
-  height: 80px;
-  background: var(--color-success);
-  color: white;
-  border-radius: 0%;
-  font-size: 10px;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0px solid var(--brand-primary);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}

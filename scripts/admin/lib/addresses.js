@@ -38,7 +38,7 @@ function loadDeploymentFile(filename) {
  */
 function getDeploymentFilename(prefix) {
   const network = hre.network.name;
-  const chainId = hre.network.config.chainId || 63;
+  const chainId = hre.network.config.chainId || 80002;
   return `${network}-chain${chainId}-${prefix}.json`;
 }
 
@@ -62,67 +62,17 @@ const registriesDeployment = loadDeploymentFile(getDeploymentFilename("registrie
 const perpDeployment = loadDeploymentFile(`${hre.network.name}-perpetual-futures-v2.1-deployment.json`) || {};
 
 // =============================================================================
-// FALLBACK ADDRESSES (MORDOR TESTNET)
-// =============================================================================
-
-/**
- * Known-good addresses for Mordor testnet
- * These are used as fallbacks if deployment files are not found
- */
-const MORDOR_ADDRESSES = {
-  // Deployer / Treasury
-  deployer: "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
-  treasury: "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
-
-  // Core Contracts
-  roleManagerCore: "0x6a6422Ed3198332AC8DA2852BBff4749B66a3D8D",
-  welfareRegistry: "0x034494F9eA0821FB6167EcA41A6850fd2D11b8b1",
-  proposalRegistry: "0x095146344Ab39a0cbF37494Cb50fb293E55AF76E",
-  marketFactory: "0xc56631DB29c44bb553a511DD3d4b90d64C95Cd9C",
-  privacyCoordinator: "0x9897CBb96b1931A3c019A9d2126dab59630D4414",
-  oracleResolver: "0x2AaCC0D91AF255667683ece0A363649Cc9Ed8776",
-  ragequitModule: "0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c",
-  futarchyGovernor: "0x0292a5bdf60E851c043bDceE378D505801A6aEef",
-  tokenMintFactory: "0x5bBa4c4985c36525D14D7d7627Ab479B8b2E2205",
-  daoFactory: "0x9B1692272D54CA7b4dEAa7622aBddb6059eb8202",
-
-  // RBAC Contracts
-  tieredRoleManager: "0x55e6346Be542B13462De504FCC379a2477D227f0",
-  tierRegistry: "0x476cf3dEA109D6FC95aD19d246FD4e95693c47a3",
-  usageTracker: "0x10f1b557a53C05A92DF820CCfDC77EaB0c732Bde",
-  membershipManager: "0xCD172d9888a6F47203dD6f0684f250f6Ac56f6Ed",
-  paymentProcessor: "0x6e063138809263820F61146c34a74EB3B2629A59",
-  membershipPaymentManager: "0x9CDc3D0Aff85F89C04d03b6b9E9Ba99fDf033E34",
-
-  // Market Contracts
-  ctf1155: "0xc7b69289c70f4b2f8FA860eEdE976E1501207DD9",
-  friendGroupMarketFactory: "0xE1eC8d34b36f55015ed636337121CA8EFbA96227",
-
-  // Registry Contracts
-  marketCorrelationRegistry: "0x2a820A38997743fC3303cDcA56b996598963B909",
-  nullifierRegistry: "0x5569FEe7f8Bab39EEd08bf448Dd6824640C7d272",
-
-  // Perpetual Futures v2.1
-  fundingRateEngine: "0x32AD4F7a1e05138fc0F485c786aeDB90dBE100e8",
-  perpFactory: "0xE3B84aecc9Ee0D2a35530BfAcb3D184c372cdc71",
-
-  // Tokens
-  USC: "0xDE093684c796204224BC081f937aa059D903c52a",
-  WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",
-};
-
-// =============================================================================
 // MERGED ADDRESSES
 // =============================================================================
 
 /**
- * Merge addresses from deployment files with fallbacks
+ * Build the contract address map for the active network by stitching together
+ * the per-stage deployment files (core, rbac, markets, registries, perpetual
+ * futures, tokens). All values come from the on-disk deployment artifacts —
+ * there are no committed network-specific fallbacks.
  */
 function getMergedAddresses() {
-  const network = hre.network.name;
-
-  // Start with fallbacks for mordor, empty for others
-  const addresses = network === "mordor" ? { ...MORDOR_ADDRESSES } : {};
+  const addresses = {};
 
   // Override with deployment file values
   if (coreDeployment.contracts) {
@@ -259,7 +209,7 @@ function printAddresses() {
     "Market Contracts": ["ctf1155", "friendGroupMarketFactory"],
     "Perpetual Futures": ["fundingRateEngine", "perpFactory"],
     "Registry Contracts": ["marketCorrelationRegistry", "nullifierRegistry"],
-    "Tokens": ["USC", "WETC"],
+    "Tokens": ["USDC", "WMATIC"],
   };
 
   for (const [category, names] of Object.entries(categories)) {
@@ -295,6 +245,4 @@ module.exports = {
   // Tier enum
   MembershipTier,
 
-  // For compatibility
-  MORDOR_ADDRESSES,
 };

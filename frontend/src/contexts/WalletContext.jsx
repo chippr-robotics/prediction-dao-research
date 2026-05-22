@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { ethers } from 'ethers'
-import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
+import { isSupportedChainId, getNetwork, listSupportedChainIds, PRIMARY_CHAIN_ID } from '../config/networks'
 import {
   getUserRoles,
   addUserRole,
@@ -28,8 +28,8 @@ export function WalletProvider({ children }) {
   
   // Balances (cached)
   const [balances, setBalances] = useState({
-    etc: '0',
-    wetc: '0',
+    native: '0',
+    wnative: '0',
     tokens: {} // For other ERC20 tokens
   })
   const [balancesLoading, setBalancesLoading] = useState(false)
@@ -108,11 +108,19 @@ export function WalletProvider({ children }) {
     return () => { cancelled = true }
   }, [isConnected, address, walletClient])
 
-  // Check network compatibility
+  // Check network compatibility. Only emit a network error when the wallet
+  // is on a chain we don't recognize (anything other than Polygon Amoy or
+  // local Hardhat).
   useEffect(() => {
-    if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
-      const expectedChain = getExpectedChain()
-      setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
+    if (isConnected && !isSupportedChainId(chainId)) {
+      const supported = listSupportedChainIds()
+        .map((id) => getNetwork(id)?.name)
+        .filter(Boolean)
+        .join(' or ')
+      const primary = getNetwork(PRIMARY_CHAIN_ID)
+      setNetworkError(
+        `Wrong network. Please switch to ${supported || primary?.name || 'a supported network'}.`
+      )
     } else {
       setNetworkError(null)
     }
@@ -150,7 +158,7 @@ export function WalletProvider({ children }) {
    * If a role exists locally but not on-chain, remove it (expired)
    */
   const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
-    const premiumRoles = ['MARKET_MAKER', 'CLEARPATH_USER', 'TOKENMINT', 'FRIEND_MARKET']
+    const premiumRoles = ['MARKET_MAKER', 'FRIEND_MARKET']
     const adminRoles = ['ADMIN', 'CORE_SYSTEM_ADMIN', 'OPERATIONS_ADMIN', 'EMERGENCY_GUARDIAN', 'OVERSIGHT_COMMITTEE']
     const allSyncedRoles = [...premiumRoles, ...adminRoles]
     const updatedRoles = []
@@ -248,12 +256,12 @@ export function WalletProvider({ children }) {
     
     setBalancesLoading(true)
     try {
-      // Get native ETC balance
-      const etcBalance = await provider.getBalance(walletAddress)
-      
+      // Get native token balance
+      const nativeBalance = await provider.getBalance(walletAddress)
+
       setBalances(prev => ({
         ...prev,
-        etc: ethers.formatEther(etcBalance)
+        native: ethers.formatEther(nativeBalance)
       }))
     } catch (error) {
       console.error('Error fetching balances:', error)
@@ -269,7 +277,7 @@ export function WalletProvider({ children }) {
       fetchBalances(address)
     } else {
       setRoles([])
-      setBalances({ etc: '0', wetc: '0', tokens: {} })
+      setBalances({ native: '0', wnative: '0', tokens: {} })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected])
@@ -348,7 +356,7 @@ export function WalletProvider({ children }) {
   const disconnectWallet = useCallback(() => {
     disconnect()
     setRoles([])
-    setBalances({ etc: '0', wetc: '0', tokens: {} })
+    setBalances({ native: '0', wnative: '0', tokens: {} })
 
     // Clear wagmi and WalletConnect persistence from storage
     try {
@@ -383,14 +391,18 @@ export function WalletProvider({ children }) {
     }
   }, [disconnect])
 
-  // Switch to correct network
+  // Switch to the configured primary network (Polygon Amoy). Invoked from
+  // the network-error banner / "Switch Network" button when the user is on
+  // an unsupported chain.
   const switchNetwork = useCallback(async () => {
+    const target = PRIMARY_CHAIN_ID
     try {
-      await switchChain({ chainId: EXPECTED_CHAIN_ID })
+      await switchChain({ chainId: target })
       return true
     } catch (error) {
       console.error('Error switching network:', error)
-      throw new Error(`Please manually switch to ${getExpectedChain().name} in your wallet`)
+      const targetNet = getNetwork(target)
+      throw new Error(`Please manually switch to ${targetNet?.name || 'Polygon Amoy'} in your wallet`)
     }
   }, [switchChain])
 
@@ -475,9 +487,11 @@ export function WalletProvider({ children }) {
     }
   }, [address])
 
-  // Computed values
+  // Computed values. "Correct" here means a supported chain (Polygon Amoy
+  // or local Hardhat). Per-chain feature gates (e.g. polymarketSidebets) are
+  // enforced via the capabilities map in networks.js.
   const isCorrectNetwork = useMemo(
-    () => isConnected && chainId === EXPECTED_CHAIN_ID,
+    () => isConnected && isSupportedChainId(chainId),
     [isConnected, chainId]
   )
 

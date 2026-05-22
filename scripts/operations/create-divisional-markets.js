@@ -9,7 +9,7 @@ const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
  *
  * Usage:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/operations/create-divisional-markets.js --network mordor
+ *   npx hardhat run scripts/operations/create-divisional-markets.js --network amoy
  */
 
 // Contract addresses
@@ -29,7 +29,7 @@ const MATCHUPS = [
 // Configuration
 const CONFIG = {
   opponent: "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E",
-  stakeAmount: "0.5", // ETC per participant
+  stakeAmount: "0.5", // MATIC per participant
   tradingPeriodDays: 7,
   acceptanceDeadlineDays: 7,
 };
@@ -63,7 +63,7 @@ async function main() {
 
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
   // Check membership
   console.log("\n[2/4] Verifying membership...");
@@ -92,11 +92,11 @@ async function main() {
   const estimatedGas = ethers.parseEther("0.1"); // Conservative estimate
 
   console.log("\n[3/4] Cost estimate:");
-  console.log("  Stake per market:", CONFIG.stakeAmount, "ETC");
+  console.log("  Stake per market:", CONFIG.stakeAmount, "MATIC");
   console.log("  Number of markets:", MATCHUPS.length);
-  console.log("  Total stake:", ethers.formatEther(totalStake), "ETC");
-  console.log("  Estimated gas:", ethers.formatEther(estimatedGas), "ETC");
-  console.log("  Total required:", ethers.formatEther(totalStake + estimatedGas), "ETC");
+  console.log("  Total stake:", ethers.formatEther(totalStake), "MATIC");
+  console.log("  Estimated gas:", ethers.formatEther(estimatedGas), "MATIC");
+  console.log("  Total required:", ethers.formatEther(totalStake + estimatedGas), "MATIC");
 
   if (balance < totalStake + estimatedGas) {
     console.error("Error: Insufficient balance");
@@ -128,7 +128,7 @@ async function main() {
         ethers.ZeroAddress, // no arbitrator
         acceptanceDeadline,
         stakeWei,
-        ethers.ZeroAddress, // native ETC
+        ethers.ZeroAddress, // native MATIC
         { value: stakeWei }
       );
 
@@ -164,14 +164,14 @@ async function main() {
   }
 
   console.log("\nOpponent:", CONFIG.opponent);
-  console.log("Stake per market:", CONFIG.stakeAmount, "ETC");
+  console.log("Stake per market:", CONFIG.stakeAmount, "MATIC");
   console.log("Acceptance deadline:", new Date(acceptanceDeadline * 1000).toISOString());
-  console.log("\nOpponent must accept each market with", CONFIG.stakeAmount, "ETC to activate.");
+  console.log("\nOpponent must accept each market with", CONFIG.stakeAmount, "MATIC to activate.");
 
   // Final balance
   const finalBalance = await provider.getBalance(wallet.address);
-  console.log("\nFinal balance:", ethers.formatEther(finalBalance), "ETC");
-  console.log("Total spent:", ethers.formatEther(balance - finalBalance), "ETC");
+  console.log("\nFinal balance:", ethers.formatEther(finalBalance), "MATIC");
+  console.log("Total spent:", ethers.formatEther(balance - finalBalance), "MATIC");
 }
 
 main()

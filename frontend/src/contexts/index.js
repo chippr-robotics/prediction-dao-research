@@ -8,9 +8,10 @@ export { ThemeProvider } from './ThemeContext.jsx'
 export { usePrice } from './PriceContext.js'
 export { PriceProvider } from './PriceContext.jsx'
 
-// ETCswap context
-export { ETCswapContext } from './ETCswapContext.js'
-export { ETCswapProvider } from './ETCswapContext.jsx'
+// DEX context (active chain's V3 DEX — Polygon Amoy has no Uniswap deployment
+// today, so consumers must branch on `isDexAvailable` from constants/dex).
+export { DexContext } from './DexContext.js'
+export { DexProvider } from './DexContext.jsx'
 
 // User preferences context
 export { UserPreferencesContext } from './UserPreferencesContext.js'

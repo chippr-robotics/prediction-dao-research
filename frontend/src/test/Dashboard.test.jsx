@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
-import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext } from '../contexts'
+import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
 
 describe('Dashboard Component', () => {
   const defaultWalletContext = {
@@ -48,16 +48,12 @@ describe('Dashboard Component', () => {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      clearPathStatus: { active: false, lastUpdated: null },
-      demoMode: true
     },
     isLoading: false,
     addRecentSearch: vi.fn(),
     clearRecentSearches: vi.fn(),
     toggleFavoriteMarket: vi.fn(),
     setDefaultSlippage: vi.fn(),
-    setClearPathStatus: vi.fn(),
-    setDemoMode: vi.fn(),
     savePreference: vi.fn(),
     clearAllPreferences: vi.fn()
   }
@@ -70,12 +66,42 @@ describe('Dashboard Component', () => {
     setFriendMarkets: vi.fn()
   }
 
+  // Minimal DexContext stub so child modals that call useDex() (e.g.
+  // FriendMarketsModal for chain-aware stake-token options) don't throw
+  // when Dashboard mounts them with isOpen=false.
+  const defaultDexContext = {
+    balances: { native: '0', wnative: '0', stable: '0' },
+    balanceHistory: [],
+    loading: false,
+    quotingPrice: false,
+    slippage: 50,
+    fetchBalances: vi.fn(),
+    wrapNative: vi.fn(),
+    unwrapNative: vi.fn(),
+    getQuote: vi.fn(),
+    swap: vi.fn(),
+    setSlippage: vi.fn(),
+    tokens: {
+      WNATIVE: { address: '0x0', symbol: 'WMATIC', name: 'Wrapped MATIC', decimals: 18, icon: '🌐' },
+      STABLE: { address: '0x0', symbol: 'USDC', name: 'USD Coin', decimals: 6, icon: '💵' },
+      NATIVE: { address: 'native', symbol: 'MATIC', name: 'MATIC', decimals: 18, icon: '💎' },
+    },
+    addresses: {
+      FACTORY: '0x0', SWAP_ROUTER_02: '0x0', NONFUNGIBLE_TOKEN_POSITION_MANAGER: '0x0',
+      QUOTER_V2: '0x0', PERMIT2: '0x0', WNATIVE: '0x0', STABLECOIN: '0x0',
+    },
+    isDexAvailable: false,
+    chainId: 80002,
+    network: { chainId: 80002, name: 'Polygon Amoy' },
+  }
+
   const renderWithProviders = (component, options = {}) => {
     const {
       walletContext = defaultWalletContext,
       preferencesContext = defaultPreferencesContext,
       friendMarketsContext = defaultFriendMarketsContext,
-      uiContext = defaultUIContext
+      uiContext = defaultUIContext,
+      dexContext = defaultDexContext
     } = options
 
     return render(
@@ -84,7 +110,9 @@ describe('Dashboard Component', () => {
           <WalletContext.Provider value={walletContext}>
             <UserPreferencesContext.Provider value={preferencesContext}>
               <FriendMarketsContext.Provider value={friendMarketsContext}>
-                {component}
+                <DexContext.Provider value={dexContext}>
+                  {component}
+                </DexContext.Provider>
               </FriendMarketsContext.Provider>
             </UserPreferencesContext.Provider>
           </WalletContext.Provider>
@@ -103,9 +131,12 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('Your Wagers')).toBeInTheDocument()
     })
 
-    it('should show demo mode badge in demo mode', () => {
+    it('should not show the demo mode badge by default', () => {
+      // The demo badge only renders when VITE_USE_MOCK_WAGERS=true (a dev-only
+      // env var). In production tests the toggle is gone, so the badge should
+      // be absent.
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Demo Mode')).toBeInTheDocument()
+      expect(screen.queryByText('Demo Mode')).not.toBeInTheDocument()
     })
 
     it('should show connected wallet address', () => {
@@ -147,44 +178,10 @@ describe('Dashboard Component', () => {
     })
   })
 
-  describe('Active Wagers', () => {
-    it('should render active wagers section in demo mode', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Active Wagers')).toBeInTheDocument()
-    })
-
-    it('should display demo wager cards', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Will BTC be above $100k by March 2026?')).toBeInTheDocument()
-    })
-
-    it('should show wager status badges', () => {
-      renderWithProviders(<Dashboard />)
-      const activeBadges = screen.getAllByText('Active')
-      expect(activeBadges.length).toBeGreaterThan(0)
-    })
-  })
-
-  describe('Past Wagers', () => {
-    it('should render past wagers section when there are resolved wagers', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Past Wagers')).toBeInTheDocument()
-    })
-
-    it('should display resolved wager', () => {
-      renderWithProviders(<Dashboard />)
-      expect(screen.getByText('ETH merge anniversary price prediction')).toBeInTheDocument()
-    })
-  })
-
   describe('Not Connected State', () => {
-    it('should show welcome view when not connected and not demo mode', () => {
+    it('should show welcome view when not connected', () => {
       renderWithProviders(<Dashboard />, {
         walletContext: { ...defaultWalletContext, isConnected: false, account: null, connectWallet: vi.fn() },
-        preferencesContext: {
-          ...defaultPreferencesContext,
-          preferences: { ...defaultPreferencesContext.preferences, demoMode: false }
-        }
       })
       expect(screen.getByText('Create a wagerwith a friend')).toBeInTheDocument()
       expect(screen.getByText('How it works')).toBeInTheDocument()

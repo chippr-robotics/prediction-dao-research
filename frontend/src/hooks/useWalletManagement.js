@@ -6,7 +6,7 @@ import { WalletContext } from '../contexts/WalletContext'
  * 
  * Provides complete wallet functionality including:
  * - Address and connection state
- * - Balances (ETC, WETC, tokens)
+ * - Balances (native, wrapped-native, tokens)
  * - Transaction signing and sending
  * - RVAC role management
  * - Network state and switching
@@ -31,7 +31,7 @@ import { WalletContext } from '../contexts/WalletContext'
  *       {isConnected ? (
  *         <div>
  *           <p>Address: {address}</p>
- *           <p>Balance: {balances.etc} ETC</p>
+ *           <p>Balance: {balances.native} MATIC</p>
  *           {hasRole('MARKET_MAKER') && <p>Market Maker Access</p>}
  *         </div>
  *       ) : (
@@ -82,7 +82,7 @@ export function useWalletAddress() {
  *   
  *   return (
  *     <div>
- *       <p>ETC: {balances.etc}</p>
+ *       <p>Native: {balances.native}</p>
  *       <button onClick={refreshBalances}>Refresh</button>
  *     </div>
  *   )

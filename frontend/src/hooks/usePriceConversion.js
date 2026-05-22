@@ -2,34 +2,34 @@ import { useState, useEffect, useCallback } from 'react'
 import logger from '../utils/logger'
 
 /**
- * Hook to fetch and manage ETC/USD exchange rate
- * Uses CoinGecko public API for price data
+ * Hook to fetch and manage MATIC/USD exchange rate.
+ *
+ * Polygon Amoy is the only supported testnet, so the native token tracked
+ * here is MATIC. Uses CoinGecko's public API; falls back to
+ * VITE_MATIC_USD_FALLBACK (or 0.5) when the request fails.
  */
 function usePriceConversion() {
-  const [etcUsdRate, setEtcUsdRate] = useState(null)
+  const [nativeUsdRate, setNativeUsdRate] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [showUsd, setShowUsd] = useState(true) // USD is default
+  const [showUsd, setShowUsd] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
 
-  const fetchEtcPrice = useCallback(async () => {
-    // Skip price fetching in test environment
+  const fetchNativePrice = useCallback(async () => {
     if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
-      // Set a mock price for tests
-      setEtcUsdRate(25.50)
+      setNativeUsdRate(0.5)
       setLoading(false)
       setLastUpdate(new Date())
       return
     }
-    
+
     try {
       setLoading(true)
       setError(null)
-      
-      // Using CoinGecko API (free, no API key required)
-      // ETC ID on CoinGecko is 'ethereum-classic'
+
+      // MATIC's CoinGecko ID is 'matic-network'.
       const response = await fetch(
-        'https://api.coingecko.com/api/v3/simple/price?ids=ethereum-classic&vs_currencies=usd',
+        'https://api.coingecko.com/api/v3/simple/price?ids=matic-network&vs_currencies=usd',
         {
           method: 'GET',
           headers: {
@@ -43,55 +43,50 @@ function usePriceConversion() {
       }
 
       const data = await response.json()
-      
-      if (data['ethereum-classic'] && data['ethereum-classic'].usd) {
-        setEtcUsdRate(data['ethereum-classic'].usd)
+
+      if (data['matic-network'] && data['matic-network'].usd) {
+        setNativeUsdRate(data['matic-network'].usd)
         setLastUpdate(new Date())
       } else {
         throw new Error('Invalid response format')
       }
     } catch (err) {
-      logger.error('Error fetching ETC price:', err)
+      logger.error('Error fetching MATIC price:', err)
       setError(err.message)
-      // Set a fallback rate if fetch fails (approximate historical average)
-      // Use environment variable fallback value or default to 20
-      const fallbackRate = import.meta.env.VITE_ETC_USD_FALLBACK || 20
-      setEtcUsdRate(fallbackRate)
+      const fallbackRate = import.meta.env.VITE_MATIC_USD_FALLBACK || 0.5
+      setNativeUsdRate(fallbackRate)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    // Initial fetch
-    fetchEtcPrice()
-
-    // Refresh every 5 minutes (reduced from 60s to minimize API rate limiting)
-    const interval = setInterval(fetchEtcPrice, 300000)
-
+    fetchNativePrice()
+    // Refresh every 5 minutes to stay polite with the public CoinGecko API.
+    const interval = setInterval(fetchNativePrice, 300000)
     return () => clearInterval(interval)
-  }, [fetchEtcPrice])
+  }, [fetchNativePrice])
 
   const toggleCurrency = useCallback(() => {
     setShowUsd((prev) => !prev)
   }, [])
 
-  const convertToUsd = useCallback((etcAmount) => {
-    if (!etcUsdRate || etcAmount == null) return 0
-    return parseFloat(etcAmount) * etcUsdRate
-  }, [etcUsdRate])
+  const convertToUsd = useCallback((nativeAmount) => {
+    if (!nativeUsdRate || nativeAmount == null) return 0
+    return parseFloat(nativeAmount) * nativeUsdRate
+  }, [nativeUsdRate])
 
-  const formatPrice = useCallback((etcAmount, options = {}) => {
+  const formatPrice = useCallback((nativeAmount, options = {}) => {
     const {
       showBoth = false,
       decimals = 2,
-      compact = false
+      compact = false,
+      symbol = 'MATIC',
     } = options
 
-    const amount = parseFloat(etcAmount) || 0
+    const amount = parseFloat(nativeAmount) || 0
     const usdAmount = convertToUsd(amount)
 
-    // Format USD with compact notation for large numbers
     const formatUsd = (value) => {
       if (compact && value >= 1000000) {
         return `$${(value / 1000000).toFixed(2)}M`
@@ -102,29 +97,28 @@ function usePriceConversion() {
       return `$${value.toFixed(decimals)}`
     }
 
-    // Format ETC
-    const formatEtc = (value) => {
+    const formatNative = (value) => {
       if (compact && value >= 1000) {
-        return `${(value / 1000).toFixed(1)}K ETC`
+        return `${(value / 1000).toFixed(1)}K ${symbol}`
       }
-      return `${value.toFixed(decimals)} ETC`
+      return `${value.toFixed(decimals)} ${symbol}`
     }
 
     if (showBoth) {
-      // Show both currencies
       if (showUsd) {
-        return `${formatUsd(usdAmount)} (${formatEtc(amount)})`
+        return `${formatUsd(usdAmount)} (${formatNative(amount)})`
       } else {
-        return `${formatEtc(amount)} (${formatUsd(usdAmount)})`
+        return `${formatNative(amount)} (${formatUsd(usdAmount)})`
       }
     } else {
-      // Show only the selected currency
-      return showUsd ? formatUsd(usdAmount) : formatEtc(amount)
+      return showUsd ? formatUsd(usdAmount) : formatNative(amount)
     }
   }, [convertToUsd, showUsd])
 
   return {
-    etcUsdRate,
+    // Back-compat alias: many callers still destructure `etcUsdRate`.
+    etcUsdRate: nativeUsdRate,
+    nativeUsdRate,
     loading,
     error,
     showUsd,
@@ -132,7 +126,7 @@ function usePriceConversion() {
     convertToUsd,
     formatPrice,
     lastUpdate,
-    refreshPrice: fetchEtcPrice
+    refreshPrice: fetchNativePrice
   }
 }
 

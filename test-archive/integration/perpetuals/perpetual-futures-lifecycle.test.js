@@ -9,20 +9,20 @@ const { loadFixture, time } = require("@nomicfoundation/hardhat-network-helpers"
 async function deployPerpetualFuturesFixture() {
   const [owner, trader1, trader2, trader3, liquidator, feeRecipient, priceUpdater] = await ethers.getSigners();
 
-  // Deploy mock ERC20 token for collateral (USC stablecoin)
+  // Deploy mock ERC20 token for collateral (USDC stablecoin)
   const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
-  const collateralToken = await MockERC20.deploy("USD Coin", "USC", ethers.parseEther("100000000"));
+  const collateralToken = await MockERC20.deploy("USD Coin", "USDC", ethers.parseEther("100000000"));
   await collateralToken.waitForDeployment();
 
-  // Deploy a second collateral token (WETC)
-  const wetcToken = await MockERC20.deploy("Wrapped ETC", "WETC", ethers.parseEther("100000000"));
-  await wetcToken.waitForDeployment();
+  // Deploy a second collateral token (wrapped native)
+  const wmaticToken = await MockERC20.deploy("Wrapped MATIC", "WMATIC", ethers.parseEther("100000000"));
+  await wmaticToken.waitForDeployment();
 
   // Distribute tokens to test accounts
   const distributionAmount = ethers.parseEther("1000000");
   for (const account of [trader1, trader2, trader3, liquidator]) {
     await collateralToken.transfer(account.address, distributionAmount);
-    await wetcToken.transfer(account.address, distributionAmount);
+    await wmaticToken.transfer(account.address, distributionAmount);
   }
 
   // Deploy FundingRateEngine
@@ -41,7 +41,7 @@ async function deployPerpetualFuturesFixture() {
   await perpFactory.waitForDeployment();
 
   // Configure allowed collateral tokens
-  await perpFactory.setAllowedCollateralToken(await wetcToken.getAddress(), true);
+  await perpFactory.setAllowedCollateralToken(await wmaticToken.getAddress(), true);
 
   // Configure funding rate engine
   await fundingRateEngine.setPriceUpdater(await perpFactory.getAddress(), true);
@@ -52,7 +52,7 @@ async function deployPerpetualFuturesFixture() {
       fundingRateEngine,
       perpFactory,
       collateralToken,
-      wetcToken
+      wmaticToken
     },
     accounts: {
       owner,
@@ -158,7 +158,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
     it("Should create multiple markets with different configurations", async function () {
       const { contracts } = await loadFixture(deployPerpetualFuturesFixture);
-      const { perpFactory, collateralToken, wetcToken } = contracts;
+      const { perpFactory, collateralToken, wmaticToken } = contracts;
 
       console.log("\n=== Multi-Market Creation Test ===\n");
 
@@ -191,12 +191,12 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
         ethConfig
       );
 
-      // Create ETC market with WETC collateral
-      const { market: etcMarket } = await createTestMarket(
+      // Create native-token-pegged market with wrapped-native collateral
+      const { market: perpMarket } = await createTestMarket(
         perpFactory,
-        "ETC Perpetual",
-        "ETC",
-        wetcToken,
+        "MATIC Perpetual",
+        "MATIC",
+        wmaticToken,
         ethers.parseEther("25")
       );
 
@@ -213,12 +213,12 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       expect(ethMarketConfig.maxLeverage).to.equal(15n * 10000n);
       expect(ethMarketConfig.fundingInterval).to.equal(4n * 3600n);
 
-      // Verify ETC market uses different collateral
-      expect(await etcMarket.collateralToken()).to.equal(await wetcToken.getAddress());
+      // Verify MATIC market uses different collateral
+      expect(await perpMarket.collateralToken()).to.equal(await wmaticToken.getAddress());
 
       console.log("  ✓ BTC market created at:", await btcMarket.getAddress());
       console.log("  ✓ ETH market created with custom config");
-      console.log("  ✓ ETC market created with WETC collateral");
+      console.log("  ✓ MATIC market created with WMATIC collateral");
     });
 
     it("Should retrieve markets by category and asset", async function () {
@@ -262,7 +262,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       );
 
       const initialBalance = await collateralToken.balanceOf(trader1.address);
-      console.log("  Initial balance:", ethers.formatEther(initialBalance), "USC");
+      console.log("  Initial balance:", ethers.formatEther(initialBalance), "USDC");
 
       // Open long position
       // For a 1 BTC position at $50,000, notional = $50,000
@@ -299,7 +299,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       // Check unrealized PnL (should be positive for long)
       const pnl = await market.getUnrealizedPnL(positionId);
       expect(pnl).to.be.gt(0);
-      console.log("  ✓ Unrealized PnL:", ethers.formatEther(pnl), "USC");
+      console.log("  ✓ Unrealized PnL:", ethers.formatEther(pnl), "USDC");
 
       // Deposit to insurance fund to cover profit payout
       const { trader2 } = accounts;
@@ -312,8 +312,8 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       const finalBalance = await collateralToken.balanceOf(trader1.address);
       const profit = finalBalance - initialBalance + collateral;
       console.log("  ✓ Position closed");
-      console.log("  Final balance:", ethers.formatEther(finalBalance), "USC");
-      console.log("  Net profit:", ethers.formatEther(profit), "USC");
+      console.log("  Final balance:", ethers.formatEther(finalBalance), "USDC");
+      console.log("  Net profit:", ethers.formatEther(profit), "USDC");
 
       // Verify profit was realized
       expect(finalBalance).to.be.gt(initialBalance - collateral);
@@ -362,7 +362,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       // Check unrealized PnL (should be negative for short when price goes up)
       const pnl = await market.getUnrealizedPnL(positionId);
       expect(pnl).to.be.lt(0);
-      console.log("  ✓ Unrealized PnL (loss):", ethers.formatEther(pnl), "USC");
+      console.log("  ✓ Unrealized PnL (loss):", ethers.formatEther(pnl), "USDC");
 
       // Close position
       await market.connect(trader1).closePosition(positionId);
@@ -560,7 +560,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
       const liquidatorProfit = liquidatorBalanceAfter - liquidatorBalanceBefore;
 
       console.log("  ✓ Position liquidated");
-      console.log("  Liquidator reward:", ethers.formatEther(liquidatorProfit), "USC");
+      console.log("  Liquidator reward:", ethers.formatEther(liquidatorProfit), "USDC");
 
       // Verify position is closed
       const position = await market.getPosition(positionId);
@@ -568,7 +568,7 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
       // Check insurance fund balance (may be 0 if position was severely underwater)
       const insuranceFund = await market.insuranceFund();
-      console.log("  Insurance fund balance:", ethers.formatEther(insuranceFund), "USC");
+      console.log("  Insurance fund balance:", ethers.formatEther(insuranceFund), "USDC");
     });
 
     it("Should liquidate undercollateralized short position", async function () {
@@ -715,8 +715,8 @@ describe("Integration: Perpetual Futures Lifecycle", function () {
 
       expect(longPnL).to.be.gt(0);
       expect(shortPnL).to.be.lt(0);
-      console.log("  ✓ Long PnL:", ethers.formatEther(longPnL), "USC");
-      console.log("  ✓ Short PnL:", ethers.formatEther(shortPnL), "USC");
+      console.log("  ✓ Long PnL:", ethers.formatEther(longPnL), "USDC");
+      console.log("  ✓ Short PnL:", ethers.formatEther(shortPnL), "USDC");
 
       // PnL magnitudes should be approximately equal (before fees)
       const pnlDiff = longPnL > -shortPnL ? longPnL + shortPnL : -shortPnL - longPnL;

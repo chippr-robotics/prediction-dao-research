@@ -109,7 +109,7 @@ async function storeAdminKey() {
     },
     meta: {
       createdAt: new Date().toISOString(),
-      description: 'Admin/Deployer private key for Mordor testnet'
+      description: 'Admin/Deployer private key for Polygon Amoy testnet'
     }
   };
 

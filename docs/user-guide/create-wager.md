@@ -4,23 +4,23 @@ This guide walks you through creating an end-to-end encrypted peer-to-peer wager
 
 ## Prerequisites
 
-- A browser wallet (MetaMask or compatible) connected to the Mordor testnet (chain ID 63)
-- ETC for gas fees
-- Stake tokens (ETC or USC stablecoin) for your wager amount
+- A browser wallet (MetaMask or compatible) connected to the Polygon Amoy (Polymarket testnet) (chain ID 80002)
+- MATIC for gas fees
+- Stake tokens (MATIC or USDC stablecoin) for your wager amount
 - Your opponent's wallet address
 
 ## Step-by-Step Walkthrough
 
 ### 1. Connect Your Wallet
 
-Navigate to the FairWins app and click **Connect Wallet**. Select Mordor testnet from the network dropdown. If Mordor is not listed, add it manually:
+Navigate to the FairWins app and click **Connect Wallet**. Select Polygon Amoy (Polymarket testnet) from the network dropdown. If Polygon Amoy is not listed, add it manually:
 
 | Setting | Value |
 |---------|-------|
-| Network Name | Mordor Testnet |
-| RPC URL | `https://rpc.mordor.etccooperative.org` |
-| Chain ID | 63 |
-| Block Explorer | `https://etc-mordor.blockscout.com` |
+| Network Name | Polygon Amoy (Polymarket testnet) |
+| RPC URL | `https://rpc-amoy.polygon.technology` |
+| Chain ID | 80002 |
+| Block Explorer | `https://amoy.polygonscan.com` |
 
 ### 2. Register Your Encryption Key (One-Time)
 
@@ -53,8 +53,8 @@ Complete the creation form:
 
 - **Opponent Address** (1v1/Bookmaker) or **Invited Members** (Small Group) -- the wallet address(es) of who you are wagering with
 - **Description** -- what you are betting on, stated clearly so both sides understand the terms
-- **Stake Amount** -- how much each participant puts up (default: 10 USC)
-- **Stake Token** -- ETC (native) or USC (stablecoin)
+- **Stake Amount** -- how much each participant puts up (default: 10 USDC)
+- **Stake Token** -- MATIC (native) or USDC (stablecoin)
 - **Wager End Date** -- when the trading period expires and resolution can begin (default: 7 days)
 - **Acceptance Deadline** -- how long the opponent has to accept (default: 48 hours)
 - **Resolution Type** -- who can propose the outcome:
@@ -114,7 +114,7 @@ After creation, copy the wager link and send it to your opponent through any cha
 
 | Parameter | Default Value |
 |-----------|--------------|
-| Stake Amount | 10 USC |
+| Stake Amount | 10 USDC |
 | Wager Duration | 7 days |
 | Acceptance Deadline | 48 hours |
 | Min Acceptance Threshold | 2 participants |
@@ -125,11 +125,11 @@ After creation, copy the wager link and send it to your opponent through any cha
 
 ## Troubleshooting
 
-**"MembershipRequired" error** -- You need an active FRIEND_MARKET_ROLE membership. Purchase one through the membership page using USC stablecoin.
+**"MembershipRequired" error** -- You need an active FRIEND_MARKET_ROLE membership. Purchase one through the membership page using USDC stablecoin.
 
 **"AddressNullified" error** -- Either your address or your opponent's address has been flagged. Contact support for review.
 
-**"Insufficient balance" error** -- Ensure you have enough of the selected stake token plus ETC for gas.
+**"Insufficient balance" error** -- Ensure you have enough of the selected stake token plus MATIC for gas.
 
 **Opponent cannot decrypt** -- The opponent must connect the same wallet address that was invited. If they use a different address, they will not be able to view the wager terms.
 

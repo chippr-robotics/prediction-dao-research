@@ -25,16 +25,16 @@ npm run sync:frontend-contracts -- --network localhost --chainId 1337
 npm run seed:local
 ```
 
-### Mordor Testnet
+### Polygon Amoy (Polymarket testnet)
 
 ```bash
-# Deploy to Mordor
-npx hardhat run scripts/deploy/01-deploy-core.js --network mordor
-npx hardhat run scripts/deploy/02-deploy-rbac.js --network mordor
-npx hardhat run scripts/deploy/03-deploy-markets.js --network mordor
-npx hardhat run scripts/deploy/04-deploy-registries.js --network mordor
-npx hardhat run scripts/deploy/05-configure.js --network mordor
-npx hardhat run scripts/deploy/06-verify.js --network mordor
+# Deploy to Polygon Amoy
+npx hardhat run scripts/deploy/01-deploy-core.js --network amoy
+npx hardhat run scripts/deploy/02-deploy-rbac.js --network amoy
+npx hardhat run scripts/deploy/03-deploy-markets.js --network amoy
+npx hardhat run scripts/deploy/04-deploy-registries.js --network amoy
+npx hardhat run scripts/deploy/05-configure.js --network amoy
+npx hardhat run scripts/deploy/06-verify.js --network amoy
 ```
 
 ## Script Overview
@@ -113,7 +113,7 @@ Each script saves a JSON file to `deployments/`:
 
 Contains centralized configuration:
 - `SINGLETON_FACTORY_ADDRESS` - Safe Singleton Factory
-- `TOKENS` - Token addresses per network (USC, WETC)
+- `TOKENS` - Token addresses per network (USDC, WMATIC)
 - `ROLE_HASHES` - Pre-computed role hashes
 - `MembershipTier` - Tier enum values
 - `FRIEND_MARKET_TIERS` / `MARKET_MAKER_TIERS` - Tier configurations

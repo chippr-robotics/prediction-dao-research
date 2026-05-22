@@ -18,12 +18,12 @@ DAOFactory.userDAOs (contracts/DAOFactory.sol#46) is never initialized. It is us
 	- DAOFactory._grantDAORole(uint256,address,bytes32) (contracts/DAOFactory.sol#368-385)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-state-variables
 
-ETCSwapV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#491-505) performs a multiplication on the result of a division:
-	- priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) / (1 << 96) (contracts/ETCSwapV3Integration.sol#503)
-	- estimatedCollateralAmount = (tokenAmount * priceX96) / (1 << 96) (contracts/ETCSwapV3Integration.sol#504)
+DexV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/DexV3Integration.sol#491-505) performs a multiplication on the result of a division:
+	- priceX96 = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) / (1 << 96) (contracts/DexV3Integration.sol#503)
+	- estimatedCollateralAmount = (tokenAmount * priceX96) / (1 << 96) (contracts/DexV3Integration.sol#504)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#divide-before-multiply
 
-TokenMintFactory._listOnETCSwap(uint256) (contracts/TokenMintFactory.sol#252-261) uses a dangerous strict equality:
+TokenMintFactory._listOnDex(uint256) (contracts/TokenMintFactory.sol#252-261) uses a dangerous strict equality:
 	- require(bool,string)(tokens[tokenId].tokenType == TokenType.ERC20,Only ERC20 can be listed on swap) (contracts/TokenMintFactory.sol#253)
 ZKKeyManager._rotateKeyFor(address,string) (contracts/ZKKeyManager.sol#232-286) uses a dangerous strict equality:
 	- oldKeyHash == bytes32(0) (contracts/ZKKeyManager.sol#234)
@@ -33,25 +33,25 @@ ZKKeyManager.hasValidKey(address) (contracts/ZKKeyManager.sol#324-332) uses a da
 	- keyHash == bytes32(0) (contracts/ZKKeyManager.sol#326)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
 
-Reentrancy in ETCSwapV3Integration.createMarketPools(uint256,address,address,address,uint24,uint160) (contracts/ETCSwapV3Integration.sol#207-240):
+Reentrancy in DexV3Integration.createMarketPools(uint256,address,address,address,uint24,uint160) (contracts/DexV3Integration.sol#207-240):
 	External calls:
-	- passPool = _getOrCreatePool(passToken,collateralToken,fee) (contracts/ETCSwapV3Integration.sol#224)
-		- pool = factory.createPool(tokenA,tokenB,fee) (contracts/ETCSwapV3Integration.sol#618)
-	- _initializePoolIfNeeded(passPool,initialSqrtPriceX96) (contracts/ETCSwapV3Integration.sol#225)
-		- IUniswapV3Pool(pool).initialize(sqrtPriceX96) (contracts/ETCSwapV3Integration.sol#632)
-	- failPool = _getOrCreatePool(failToken,collateralToken,fee) (contracts/ETCSwapV3Integration.sol#228)
-		- pool = factory.createPool(tokenA,tokenB,fee) (contracts/ETCSwapV3Integration.sol#618)
-	- _initializePoolIfNeeded(failPool,initialSqrtPriceX96) (contracts/ETCSwapV3Integration.sol#229)
-		- IUniswapV3Pool(pool).initialize(sqrtPriceX96) (contracts/ETCSwapV3Integration.sol#632)
+	- passPool = _getOrCreatePool(passToken,collateralToken,fee) (contracts/DexV3Integration.sol#224)
+		- pool = factory.createPool(tokenA,tokenB,fee) (contracts/DexV3Integration.sol#618)
+	- _initializePoolIfNeeded(passPool,initialSqrtPriceX96) (contracts/DexV3Integration.sol#225)
+		- IUniswapV3Pool(pool).initialize(sqrtPriceX96) (contracts/DexV3Integration.sol#632)
+	- failPool = _getOrCreatePool(failToken,collateralToken,fee) (contracts/DexV3Integration.sol#228)
+		- pool = factory.createPool(tokenA,tokenB,fee) (contracts/DexV3Integration.sol#618)
+	- _initializePoolIfNeeded(failPool,initialSqrtPriceX96) (contracts/DexV3Integration.sol#229)
+		- IUniswapV3Pool(pool).initialize(sqrtPriceX96) (contracts/DexV3Integration.sol#632)
 	State variables written after the call(s):
-	- marketPools[marketId] = PoolConfig({passPool:passPool,failPool:failPool,fee:fee,initialized:true}) (contracts/ETCSwapV3Integration.sol#232-237)
-	ETCSwapV3Integration.marketPools (contracts/ETCSwapV3Integration.sol#69) can be used in cross function reentrancies:
-	- ETCSwapV3Integration.createMarketPools(uint256,address,address,address,uint24,uint160) (contracts/ETCSwapV3Integration.sol#207-240)
-	- ETCSwapV3Integration.getMarketPools(uint256) (contracts/ETCSwapV3Integration.sol#566-569)
-	- ETCSwapV3Integration.getPoolPrice(uint256,bool) (contracts/ETCSwapV3Integration.sol#578-588)
-	- ETCSwapV3Integration.marketPools (contracts/ETCSwapV3Integration.sol#69)
-	- ETCSwapV3Integration.quoteBuyTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#466-481)
-	- ETCSwapV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#491-505)
+	- marketPools[marketId] = PoolConfig({passPool:passPool,failPool:failPool,fee:fee,initialized:true}) (contracts/DexV3Integration.sol#232-237)
+	DexV3Integration.marketPools (contracts/DexV3Integration.sol#69) can be used in cross function reentrancies:
+	- DexV3Integration.createMarketPools(uint256,address,address,address,uint24,uint160) (contracts/DexV3Integration.sol#207-240)
+	- DexV3Integration.getMarketPools(uint256) (contracts/DexV3Integration.sol#566-569)
+	- DexV3Integration.getPoolPrice(uint256,bool) (contracts/DexV3Integration.sol#578-588)
+	- DexV3Integration.marketPools (contracts/DexV3Integration.sol#69)
+	- DexV3Integration.quoteBuyTokens(uint256,bool,uint256) (contracts/DexV3Integration.sol#466-481)
+	- DexV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/DexV3Integration.sol#491-505)
 Reentrancy in TieredRoleManager.purchaseRoleWithTierToken(bytes32,TieredRoleManager.MembershipTier,address,uint256) (contracts/TieredRoleManager.sol#382-425):
 	External calls:
 	- paymentId = paymentManager.processPayment(address(this),msg.sender,role,paymentToken,amount,uint8(tier)) (contracts/TieredRoleManager.sol#406-413)
@@ -97,27 +97,27 @@ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uniniti
 
 ConditionalMarketFactory.buyTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#452-532) ignores return value by IERC20(market.collateralToken).approve(address(etcSwapIntegration),amount) (contracts/ConditionalMarketFactory.sol#475)
 ConditionalMarketFactory.sellTokens(uint256,bool,uint256) (contracts/ConditionalMarketFactory.sol#542-619) ignores return value by IERC20(outcomeToken).approve(address(etcSwapIntegration),tokenAmount) (contracts/ConditionalMarketFactory.sol#564)
-ETCSwapV3Integration.quoteBuyTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#466-481) ignores return value by (sqrtPriceX96,None,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#475)
-ETCSwapV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/ETCSwapV3Integration.sol#491-505) ignores return value by (sqrtPriceX96,None,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#500)
-ETCSwapV3Integration.getPoolPrice(uint256,bool) (contracts/ETCSwapV3Integration.sol#578-588) ignores return value by (sqrtPriceX96,tick,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#587)
-ETCSwapV3Integration._initializePoolIfNeeded(address,uint160) (contracts/ETCSwapV3Integration.sol#627-634) ignores return value by (currentPrice,None,None,None,None,None,unlocked) = IUniswapV3Pool(pool).slot0() (contracts/ETCSwapV3Integration.sol#628)
+DexV3Integration.quoteBuyTokens(uint256,bool,uint256) (contracts/DexV3Integration.sol#466-481) ignores return value by (sqrtPriceX96,None,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/DexV3Integration.sol#475)
+DexV3Integration.quoteSellTokens(uint256,bool,uint256) (contracts/DexV3Integration.sol#491-505) ignores return value by (sqrtPriceX96,None,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/DexV3Integration.sol#500)
+DexV3Integration.getPoolPrice(uint256,bool) (contracts/DexV3Integration.sol#578-588) ignores return value by (sqrtPriceX96,tick,None,None,None,None,None) = IUniswapV3Pool(pool).slot0() (contracts/DexV3Integration.sol#587)
+DexV3Integration._initializePoolIfNeeded(address,uint160) (contracts/DexV3Integration.sol#627-634) ignores return value by (currentPrice,None,None,None,None,None,unlocked) = IUniswapV3Pool(pool).slot0() (contracts/DexV3Integration.sol#628)
 FutarchyGovernor.finalizeProposal(uint256) (contracts/FutarchyGovernor.sol#208-244) ignores return value by (None,passValue,failValue,finalized) = oracleResolver.getResolution(govProposal.proposalId) (contracts/FutarchyGovernor.sol#213-218)
 FutarchyGovernor.executeProposal(uint256) (contracts/FutarchyGovernor.sol#250-305) ignores return value by (None,None,None,fundingAmount,recipient,None,status,fundingToken,startDate,executionDeadline) = proposalRegistry.getProposal(govProposal.proposalId) (contracts/FutarchyGovernor.sol#257-268)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
 
-TokenMintFactory.createERC20(string,string,uint256,string,bool,bool,bool).listOnETCSwap (contracts/TokenMintFactory.sol#130) shadows:
-	- TokenMintFactory.listOnETCSwap(uint256) (contracts/TokenMintFactory.sol#245-250) (function)
+TokenMintFactory.createERC20(string,string,uint256,string,bool,bool,bool).listOnDex (contracts/TokenMintFactory.sol#130) shadows:
+	- TokenMintFactory.listOnDex(uint256) (contracts/TokenMintFactory.sol#245-250) (function)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#local-variable-shadowing
 
 WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) has external calls inside a loop: metric = registry.getMetric(i) (contracts/WelfareMetricRegistryFuzzTest.sol#40)
 WelfareMetricRegistryFuzzTest.property_total_weight_bounded() (contracts/WelfareMetricRegistryFuzzTest.sol#34-46) has external calls inside a loop: metric.weight > registry.TOTAL_WEIGHT() (contracts/WelfareMetricRegistryFuzzTest.sol#41)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation/#calls-inside-a-loop
 
-Reentrancy in ETCSwapV3Integration.addLiquidity(uint256,address,address,address,uint256,uint256,uint256,uint256,int24,int24,uint256) (contracts/ETCSwapV3Integration.sol#259-318):
+Reentrancy in DexV3Integration.addLiquidity(uint256,address,address,address,uint256,uint256,uint256,uint256,int24,int24,uint256) (contracts/DexV3Integration.sol#259-318):
 	External calls:
-	- (tokenId,liquidity,amount0,amount1) = positionManager.mint(params) (contracts/ETCSwapV3Integration.sol#312)
+	- (tokenId,liquidity,amount0,amount1) = positionManager.mint(params) (contracts/DexV3Integration.sol#312)
 	State variables written after the call(s):
-	- marketPositions[marketId] = tokenId (contracts/ETCSwapV3Integration.sol#315)
+	- marketPositions[marketId] = tokenId (contracts/DexV3Integration.sol#315)
 Reentrancy in ConditionalMarketFactory.batchDeployMarkets(ConditionalMarketFactory.MarketCreationParams[]) (contracts/ConditionalMarketFactory.sol#373-442):
 	External calls:
 	- checkMarketCreationLimit() (contracts/ConditionalMarketFactory.sol#375)

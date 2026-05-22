@@ -14,7 +14,7 @@ const USER_ADDRESS = process.argv[2] || process.env.USER_ADDRESS || '';
 
 async function main() {
   if (!USER_ADDRESS) {
-    console.log("Usage: npx hardhat run scripts/deploy/check-user-tier.js --network mordor -- <user_address>");
+    console.log("Usage: npx hardhat run scripts/deploy/check-user-tier.js --network amoy -- <user_address>");
     console.log("Or set USER_ADDRESS env var");
     return;
   }

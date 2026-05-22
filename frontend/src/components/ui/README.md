@@ -1,6 +1,6 @@
 # UI Component Library
 
-A reusable React component library for the ClearPath & FairWins platform suite. All components follow the brand design system defined in `DESIGN_GUIDE.md` and implement WCAG 2.1 AA accessibility standards.
+A reusable React component library for the FairWins platform. All components follow the brand design system defined in `DESIGN_GUIDE.md` and implement WCAG 2.1 AA accessibility standards.
 
 ## Components
 

@@ -256,38 +256,38 @@ async function main() {
   // ========== Configure MembershipPaymentManager ==========
   console.log("\nConfiguring MembershipPaymentManager...");
 
-  // USC stablecoin on Mordor (from ETCSwap)
-  const USC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
+  // USDC stablecoin on Amoy (from Dex)
+  const USDC_ADDRESS = '0xDE093684c796204224BC081f937aa059D903c52a';
 
-  // Add USC as payment token
+  // Add USDC as payment token
   try {
     const tx = await membershipPaymentManager.contract.addPaymentToken(
-      USC_ADDRESS,
-      "USC",
-      6  // USC has 6 decimals
+      USDC_ADDRESS,
+      "USDC",
+      6  // USDC has 6 decimals
     );
     await tx.wait();
-    console.log("  ✓ USC added as payment token");
+    console.log("  ✓ USDC added as payment token");
   } catch (error) {
-    console.warn("  ⚠️  USC may already be configured as payment token");
+    console.warn("  ⚠️  USDC may already be configured as payment token");
   }
 
   // Get role hashes from RoleManagerCore
   const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
   const FRIEND_MARKET_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE"));
 
-  // Set role prices (in USC with 6 decimals)
+  // Set role prices (in USDC with 6 decimals)
   const rolePrices = [
-    { role: MARKET_MAKER_ROLE, name: "MARKET_MAKER_ROLE", price: "100" },    // 100 USC
-    { role: FRIEND_MARKET_ROLE, name: "FRIEND_MARKET_ROLE", price: "50" }     // 50 USC
+    { role: MARKET_MAKER_ROLE, name: "MARKET_MAKER_ROLE", price: "100" },    // 100 USDC
+    { role: FRIEND_MARKET_ROLE, name: "FRIEND_MARKET_ROLE", price: "50" }     // 50 USDC
   ];
 
   for (const { role, name, price } of rolePrices) {
     try {
       const priceWei = ethers.parseUnits(price, 6);
-      const tx = await membershipPaymentManager.contract.setRolePrice(role, USC_ADDRESS, priceWei);
+      const tx = await membershipPaymentManager.contract.setRolePrice(role, USDC_ADDRESS, priceWei);
       await tx.wait();
-      console.log(`  ✓ ${name} price set to ${price} USC`);
+      console.log(`  ✓ ${name} price set to ${price} USDC`);
     } catch (error) {
       console.warn(`  ⚠️  ${name} price may already be set`);
     }
@@ -308,7 +308,7 @@ async function main() {
   console.log("\n✓ Modular deployment completed!");
   console.log("\nFrontend Integration:");
   console.log("  - Use PaymentProcessor address for role purchases");
-  console.log("  - Call purchaseTierWithToken(role, tier, uscAddress, amount)");
+  console.log("  - Call purchaseTierWithToken(role, tier, usdcAddress, amount)");
   console.log("  - RoleManagerCore address is used for hasRole checks");
   console.log("\nNext steps:");
   console.log("  1. Update frontend/src/config/contracts.js with PaymentProcessor address");

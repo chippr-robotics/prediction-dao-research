@@ -1,8 +1,6 @@
 /**
- * Multicall3 ABI for batching multiple contract calls into a single RPC request
- *
- * Contract address on ETC networks: 0x1E4282069e4822D5E6Fb88B2DbDE014f3E0625a9
- * (Also available via ETCSWAP_ADDRESSES.MULTICALL_V3)
+ * Multicall3 ABI for batching multiple contract calls into a single RPC request.
+ * Per-chain addresses live in DEX_ADDRESSES.MULTICALL_V3 (when applicable).
  */
 export const MULTICALL3_ABI = [
   // aggregate3 - primary batching function with per-call failure handling

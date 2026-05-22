@@ -9,7 +9,7 @@ const { ethers } = require("hardhat");
  * Usage:
  *   # Mount admin floppy disk
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/admin/grant-market-maker-to-user.js --network mordor
+ *   npx hardhat run scripts/admin/grant-market-maker-to-user.js --network amoy
  */
 
 const CONTRACTS = {
@@ -97,7 +97,7 @@ async function main() {
       console.log("\nUser can now create public prediction markets!");
       console.log("Next steps:");
       console.log("  1. Switch back to user floppy disk");
-      console.log("  2. Run: npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+      console.log("  2. Run: npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
     } else {
       console.log("\nFAILED: Role was not granted");
     }

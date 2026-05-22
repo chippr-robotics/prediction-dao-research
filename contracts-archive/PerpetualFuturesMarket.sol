@@ -21,7 +21,7 @@ import "./interfaces/IRoleManager.sol";
  * - Real-time PnL tracking
  *
  * Integration with FairWins:
- * - Uses same collateral tokens (USC, WETC, ETC)
+ * - Uses the same collateral tokens as the rest of the protocol (the chain stablecoin and wrapped/native tokens)
  * - Role-based access control via IRoleManager
  * - Oracle integration for index price feeds
  */
@@ -103,7 +103,7 @@ contract PerpetualFuturesMarket is Ownable, ReentrancyGuard {
     /// @notice Underlying asset symbol (e.g., "BTC", "ETH", "PREDICTION_OUTCOME")
     string public underlyingAsset;
 
-    /// @notice Collateral token (e.g., USC stablecoin)
+    /// @notice Collateral token (e.g., USDC stablecoin)
     IERC20 public collateralToken;
 
     /// @notice Collateral token decimals (for normalizing calculations)

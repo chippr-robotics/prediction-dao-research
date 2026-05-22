@@ -233,7 +233,7 @@ npx hardhat clean
 npm run deploy:local
 
 # Deploy to testnet
-npx hardhat run scripts/deploy.js --network mordor
+npx hardhat run scripts/deploy.js --network amoy
 ```
 
 ### Frontend Commands

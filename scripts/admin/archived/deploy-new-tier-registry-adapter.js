@@ -8,7 +8,7 @@ const { ethers } = require("hardhat");
  * before commit e29016e which added the MARKET_MAKER_ROLE() function.
  *
  * Usage:
- *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/deploy-new-tier-registry-adapter.js --network mordor
+ *   FLOPPY_KEYSTORE_PASSWORD=password npx hardhat run scripts/admin/deploy-new-tier-registry-adapter.js --network amoy
  */
 
 const MODULAR_SYSTEM = {

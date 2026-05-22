@@ -190,7 +190,7 @@ const { loadFloppyKeysSync } = require('./scripts/loader');
 const ethKeys = loadFloppyKeysSync(false);
 
 // Other chain
-const etcKeys = loadFloppyKeysSync(false, 'ethereumClassic');
+const btcKeys = loadFloppyKeysSync(false, 'bitcoin');
 
 // With fallback for development
 const devKeys = loadFloppyKeysSync(true);  // Falls back to PRIVATE_KEY env var
@@ -261,7 +261,7 @@ console.log(btcConfig.derivationPath);  // "m/84'/0'/0'/0"
 
 // List all chain IDs
 const chainIds = listChains();
-// ['ethereum', 'bitcoin', 'zcash', 'monero', 'solana', 'ethereumClassic']
+// ['ethereum', 'bitcoin', 'zcash', 'monero', 'solana']
 ```
 
 ### Chain Aliases
@@ -274,7 +274,6 @@ const { CHAIN_ALIASES } = require('./scripts/config');
 // zec -> zcash
 // xmr -> monero
 // sol -> solana
-// etc -> ethereumClassic
 ```
 
 ### Supported Chains
@@ -286,7 +285,6 @@ const { CHAIN_ALIASES } = require('./scripts/config');
 | zcash | 133 | secp256k1 | m/44'/133'/0'/0 |
 | monero | 128 | ed25519 | m/44'/128'/0'/0 |
 | solana | 501 | ed25519 | m/44'/501'/0'/0' |
-| ethereumClassic | 61 | secp256k1 | m/44'/61'/0'/0 |
 
 ---
 

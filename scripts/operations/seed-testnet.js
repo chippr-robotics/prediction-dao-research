@@ -2,9 +2,9 @@ const hre = require("hardhat");
 const { ethers } = require("hardhat");
 
 /**
- * Garden of Eden - Mordor Testnet Seeding Script
+ * Polygon Amoy Testnet Seeding Script
  * 
- * This script seeds the Mordor testnet with dummy data and markets to simulate
+ * This script seeds the Polygon Amoy testnet with dummy data and markets to simulate
  * real-world usage of the prediction market platform. It creates markets and
  * simulates trading activity with multiple actors over time.
  * 
@@ -70,7 +70,7 @@ const CONFIG = {
 const MARKET_TEMPLATES = [
   { question: "Will ETH price exceed $5000 in the next 6 months?", category: "crypto" },
   { question: "Will Bitcoin dominance fall below 40% within 12 months?", category: "crypto" },
-  { question: "Will Ethereum Classic reach 100 TPS within the next year?", category: "tech" },
+  { question: "Will Polygon reach 100 TPS within the next year?", category: "tech" },
   { question: "Will DAO treasury grow by 20% in 6 months?", category: "governance" },
   { question: "Will new DEX integration complete successfully?", category: "tech" },
   { question: "Will community proposal #X pass?", category: "governance" },
@@ -460,7 +460,7 @@ function setupSignalHandlers() {
 async function main() {
   console.log(`
 ${'='.repeat(70)}
-🌱 Garden of Eden - Mordor Testnet Seeding Service
+🌱 Polygon Amoy Testnet Seeding Service
 ${'='.repeat(70)}
   
 Configuration:

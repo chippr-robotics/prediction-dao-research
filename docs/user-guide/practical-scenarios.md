@@ -6,7 +6,7 @@ This guide shows concrete scenarios users encounter, demonstrating how features 
 
 Sarah noticed her DAO needed better documentation. After surveying new members about their challenges, she prepared a proposal requesting funds to create comprehensive guides. She chose network activity as the welfare metric since better documentation should increase participation.
 
-Writing her proposal, she explained the current problem with examples, described deliverables, outlined a timeline with milestones, and detailed her technical writing experience. The 50 ETC bond gave her pause, but she felt confident and submitted.
+Writing her proposal, she explained the current problem with examples, described deliverables, outlined a timeline with milestones, and detailed her technical writing experience. The 50 MATIC bond gave her pause, but she felt confident and submitted.
 
 During the review period, she answered community questions about budget and measurement. When trading began, PASS tokens climbed from 0.52 to 0.73 after a respected member endorsed the initiative. After resolution confirmed PASS tokens won, funds transferred and she began work, knowing oracle reporting in three months would measure actual network activity improvement.
 
@@ -26,17 +26,17 @@ She staked her creator bond, provided 100 USDC initial liquidity, and set a 90-d
 
 David specialized in welfare metric verification. When a developer grant proposal entered resolution, he calculated baseline GitHub metrics (commits, PRs, contributors, watchers) yielding a composite score of 8,234. Projecting conservative improvements from the grant program, he estimated 9,105 (10.6% growth).
 
-He documented methodology thoroughly in an IPFS report, posted his 100 ETC bond, and submitted values. One community member questioned his conservative projections. David explained his reasoning about hiring delays and conversion rates. No formal challenges emerged, his values were accepted, and his bond returned with a reporting fee. Careful, conservative reporting built his reputation as essential infrastructure enabling futarchy to function properly.
+He documented methodology thoroughly in an IPFS report, posted his 100  bond, and submitted values. One community member questioned his conservative projections. David explained his reasoning about hiring delays and conversion rates. No formal challenges emerged, his values were accepted, and his bond returned with a reporting fee. Careful, conservative reporting built his reputation as essential infrastructure enabling futarchy to function properly.
 
 ## Lisa Challenges Incorrect Data
 
-Lisa noticed an oracle reporter claimed baseline treasury value of 42.3 million ETC when her tracking showed 38.7 million. Investigating carefully before risking her 150 ETC challenge bond, she discovered the reporter included a price spike from wash trading that should have been filtered per welfare metric definitions.
+Lisa noticed an oracle reporter claimed baseline treasury value of 42.3 million  when her tracking showed 38.7 million. Investigating carefully before risking her 150  challenge bond, she discovered the reporter included a price spike from wash trading that should have been filtered per welfare metric definitions.
 
 She submitted her challenge with detailed evidence: cleaned TWAP calculations, wash trading transaction data, and governance discussions about filtering manipulation. UMA voters examined both submissions, debating proper interpretation of "clean market data." The vote favored Lisa. The reporter's bond was slashed, Lisa received a reward, and corrected values were used for resolution. The challenge mechanism worked as intended, providing accountability and correction when needed.
 
 ## Robert Exercises Ragequit
 
-Robert strongly opposed a passed proposal that he believed misaligned with DAO values. Despite his FAIL tokens losing (0.68 to 0.32), he had options. Ragequit let him withdraw his proportional treasury share during the timelock period. Calculating his 1.8% token holdings against the 18 million ETC treasury meant 324,000 ETC in mixed assets.
+Robert strongly opposed a passed proposal that he believed misaligned with DAO values. Despite his FAIL tokens losing (0.68 to 0.32), he had options. Ragequit let him withdraw his proportional treasury share during the timelock period. Calculating his 1.8% token holdings against the 18 million  treasury meant 324,000  in mixed assets.
 
 The decision wasn't purely financial but about principle. After discussing with others who shared concerns, Robert initiated ragequit. His governance tokens burned, and he received his proportional allocation. The community noted the ragequit as healthy system function rather than hostile action, demonstrating minority protection working as designed.
 

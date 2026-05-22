@@ -1,4 +1,6 @@
 import React from 'react'
+import { useChainId } from 'wagmi'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import './TransactionProgress.css'
 
 /**
@@ -39,9 +41,10 @@ function TransactionProgress({
   onCancel,
   pendingState = null  // For resuming: { step, txHash, timestamp }
 }) {
+  const chainId = useChainId()
   const steps = STEP_CONFIGS[type] || STEP_CONFIGS.friend_market
 
-  // Filter out optional steps when not needed (e.g., no token approval for native ETC)
+  // Filter out optional steps when not needed (e.g. no token approval needed for the native token).
   const activeSteps = steps.filter(step => {
     if (step.optional && step.id === 'approve' && isNativeToken) {
       return false
@@ -66,7 +69,7 @@ function TransactionProgress({
             <p>You have a pending transaction from {new Date(pendingState.timestamp).toLocaleString()}</p>
             {pendingState.txHash && (
               <a
-                href={`https://blockscout.com/etc/mordor/tx/${pendingState.txHash}`}
+                href={getTransactionUrl(chainId, pendingState.txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="tp-tx-link"
@@ -156,7 +159,7 @@ function TransactionProgress({
             <strong>Transaction Complete!</strong>
             {txHash && (
               <a
-                href={`https://blockscout.com/etc/mordor/tx/${txHash}`}
+                href={getTransactionUrl(chainId, txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="tp-tx-link"
@@ -174,7 +177,7 @@ function TransactionProgress({
           <span className="tp-spinner-small"></span>
           <span>Waiting for confirmation...</span>
           <a
-            href={`https://blockscout.com/etc/mordor/tx/${txHash}`}
+            href={getTransactionUrl(chainId, txHash)}
             target="_blank"
             rel="noopener noreferrer"
             className="tp-tx-link"

@@ -62,13 +62,13 @@ The batch processing approach naturally prevents this. Your encrypted position g
 
 The platform uses financial stakes to align incentives with honest behavior. This bond system creates a situation where honesty becomes the most profitable strategy.
 
-When you submit a proposal, you post a 50 ETC bond. This bond gets returned if your proposal goes through the process in good faith, even if it ultimately gets rejected by the markets. But if you submit spam or clearly malicious proposals, the bond gets slashed.
+When you submit a proposal, you post a 50  bond. This bond gets returned if your proposal goes through the process in good faith, even if it ultimately gets rejected by the markets. But if you submit spam or clearly malicious proposals, the bond gets slashed.
 
-This creates a simple calculation: is the potential gain from spamming the system worth losing 50 ETC? For genuine proposers, the bond represents a recoverable deposit. For spammers, it becomes an expensive barrier.
+This creates a simple calculation: is the potential gain from spamming the system worth losing 50 MATIC? For genuine proposers, the bond represents a recoverable deposit. For spammers, it becomes an expensive barrier.
 
-Oracle reporters face a similar dynamic but with higher stakes. Reporting welfare metric values requires a 100 ETC bond. If the community accepts your report, you get the bond back. If someone successfully challenges your report as inaccurate, you lose the bond.
+Oracle reporters face a similar dynamic but with higher stakes. Reporting welfare metric values requires a 100  bond. If the community accepts your report, you get the bond back. If someone successfully challenges your report as inaccurate, you lose the bond.
 
-The interesting part comes with challenges. To challenge an oracle report, you must post a 150 ETC bond that exceeds the reporter's stake. This asymmetry serves a purpose. Challenging should be accessible enough that false reports get caught, but expensive enough that frivolous challenges don't clog the system.
+The interesting part comes with challenges. To challenge an oracle report, you must post a 150  bond that exceeds the reporter's stake. This asymmetry serves a purpose. Challenging should be accessible enough that false reports get caught, but expensive enough that frivolous challenges don't clog the system.
 
 If your challenge succeeds, you get your bond back plus a portion of the slashed reporter bond as a reward. If your challenge fails because the original report was accurate, you lose your bond. This creates a two-sided incentive: reporters want to tell the truth to keep their bond, and challengers want to only challenge when they have strong evidence.
 
@@ -80,7 +80,7 @@ Initially, the guardian multisig requires 5 signatures out of 7 total guardians.
 
 Every proposal includes a 2-day timelock before execution. This delay serves multiple purposes. First, it gives the community time to review the proposal one last time and notice any issues. Second, it opens a window for the ragequit mechanism, allowing dissenting token holders to exit with their proportional share of the treasury if they strongly disagree with an approved proposal.
 
-Spending limits add another layer of defense. No single proposal can request more than 50,000 ETC, and the daily aggregate across all proposals caps at 100,000 ETC. These limits prevent a compromised system or malicious proposal from draining the entire treasury at once.
+Spending limits add another layer of defense. No single proposal can request more than 50,000. and the daily aggregate across all proposals caps at 100,000. These limits prevent a compromised system or malicious proposal from draining the entire treasury at once.
 
 ### Progressive Decentralization Over Time
 
@@ -100,7 +100,7 @@ The platform uses a multi-stage process designed to encourage accurate reporting
 
 ### Designated Reporting Phase
 
-Anyone can become the designated reporter by being first to submit a report with the required 100 ETC bond. This report includes welfare metric values for both scenarios (what would happen if the proposal passes, what would happen if it fails) along with evidence supporting those values.
+Anyone can become the designated reporter by being first to submit a report with the required 100  bond. This report includes welfare metric values for both scenarios (what would happen if the proposal passes, what would happen if it fails) along with evidence supporting those values.
 
 The evidence typically takes the form of an IPFS hash pointing to a detailed document showing methodology, data sources, calculations, and timestamps. This transparency allows the community to verify the reporter's work.
 
@@ -108,9 +108,9 @@ For three days, the report sits in a settlement window. During this time, the co
 
 ### Challenge Period
 
-Following settlement, a two-day challenge period begins. If someone believes the report is inaccurate, they can challenge it by posting a 150 ETC bond and providing counter-evidence.
+Following settlement, a two-day challenge period begins. If someone believes the report is inaccurate, they can challenge it by posting a 150  bond and providing counter-evidence.
 
-The higher bond requirement for challenges prevents cheap griefing while ensuring serious challenges can proceed. If you genuinely believe a report is false and you have strong evidence, risking 150 ETC to correct it and potentially earn rewards makes sense. If you're just hoping to delay things or cause trouble, the high cost deters you.
+The higher bond requirement for challenges prevents cheap griefing while ensuring serious challenges can proceed. If you genuinely believe a report is false and you have strong evidence, risking 150  to correct it and potentially earn rewards makes sense. If you're just hoping to delay things or cause trouble, the high cost deters you.
 
 ### Escalation and Final Resolution
 
@@ -150,7 +150,7 @@ Every sensitive function checks that the caller has appropriate permissions. Onl
 
 Before any mainnet deployment, the platform requires a minimum of two independent security audits from reputable firms. These audits involve expert security researchers examining the code line-by-line, looking for vulnerabilities, testing edge cases, and verifying that the implementation matches the specification.
 
-Following audits, a bug bounty program with 100,000 USD in ETC reserves rewards security researchers who find and responsibly disclose vulnerabilities. This ongoing incentive helps catch issues even after deployment.
+Following audits, a bug bounty program with 100,000 USD in  reserves rewards security researchers who find and responsibly disclose vulnerabilities. This ongoing incentive helps catch issues even after deployment.
 
 Formal verification of critical functions uses mathematical proofs to guarantee certain properties hold under all possible conditions. While formal verification can't catch every bug, it provides extremely high confidence in core invariants like "the total bond pool always equals the sum of individual bonds."
 
@@ -172,15 +172,15 @@ Finally, the multi-day trading period (7-21 days) means Alice would need to main
 
 ### Scenario: False Oracle Report
 
-Bob becomes a designated reporter and submits welfare metric values. He posts the required 100 ETC bond and provides an IPFS hash to his evidence. But Bob has made a critical error in his calculations, or perhaps he is deliberately trying to manipulate the outcome.
+Bob becomes a designated reporter and submits welfare metric values. He posts the required 100  bond and provides an IPFS hash to his evidence. But Bob has made a critical error in his calculations, or perhaps he is deliberately trying to manipulate the outcome.
 
 During the three-day settlement window, community member Carol reviews Bob's evidence. She notices the error and gathers correct data showing the actual welfare metric values differ significantly from Bob's report.
 
-Carol decides to challenge the report. She posts a 150 ETC bond and submits her counter-evidence with corrected calculations. The dispute escalates to UMA's oracle system.
+Carol decides to challenge the report. She posts a 150  bond and submits her counter-evidence with corrected calculations. The dispute escalates to UMA's oracle system.
 
 UMA token holders examine both sides' evidence. Carol's evidence includes raw data, correct methodology, and independently verifiable calculations. Bob's evidence contains the error. UMA voters recognize Carol's submission as accurate and vote accordingly.
 
-As a result, Bob loses his 100 ETC bond (slashed for false reporting), Carol gets her 150 ETC back plus a portion of Bob's slashed bond as a reward, and the market resolves using the correct values Carol provided.
+As a result, Bob loses his 100  bond (slashed for false reporting), Carol gets her 150  back plus a portion of Bob's slashed bond as a reward, and the market resolves using the correct values Carol provided.
 
 This outcome accomplishes several things. Bob faced real financial consequences for his error or attempted manipulation. Carol got compensated for doing the work to correct the record. Future reporters see that accuracy matters and sloppy or malicious reporting carries costs. The market participants ultimately get the correct resolution despite Bob's initial false report.
 
@@ -276,7 +276,7 @@ Current deployments are research code on testnet. Before mainnet launch, several
 
 Two independent security audits from reputable firms provide professional review of the codebase. Different auditors catch different issues, and multiple perspectives improve coverage.
 
-The bug bounty program with 100,000 USD in ETC reserves rewards ongoing security research. This incentive helps discover vulnerabilities before attackers can exploit them.
+The bug bounty program with 100,000 USD in  reserves rewards ongoing security research. This incentive helps discover vulnerabilities before attackers can exploit them.
 
 Formal verification of critical functions provides mathematical proofs that certain properties always hold. While expensive and time-consuming, formal verification offers the highest confidence for core components.
 

@@ -325,8 +325,8 @@ The ConditionalMarketFactory supports various binary prediction markets:
 
 The ConditionalMarketFactory supports two trading modes:
 
-### ETCSwap Mode (Production)
-When enabled, integrates with ETC Swap v3 for decentralized exchange trading:
+### DEX Mode (Production)
+When enabled, integrates with the active chain's Uniswap V3-compatible DEX:
 - Creates liquidity pools for PASS/collateral and FAIL/collateral pairs
 - Full DEX trading with slippage protection
 - Market-driven pricing based on supply/demand
@@ -341,7 +341,7 @@ Simplified LMSR-based automated market maker:
 
 - **ConditionalMarketFactory**: Main contract for creating and managing markets
 - **CTF1155**: Gnosis Conditional Token Framework for position tokens
-- **ETCSwapV3Integration**: DEX integration for advanced trading
+- **DexV3Integration**: DEX integration for advanced trading
 - **TieredRoleManager**: Role-based access control for market creation
 
 ## See Also

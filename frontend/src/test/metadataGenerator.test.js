@@ -253,13 +253,13 @@ describe('generateProposalMetadata', () => {
 describe('generateDAOMetadata', () => {
   it('should generate basic DAO metadata', () => {
     const metadata = generateDAOMetadata({
-      name: 'ETC Treasury DAO',
+      name: 'Polymarket Demo Treasury',
       description: 'Main governance DAO',
       daoAddress: '0xdao123',
       governanceType: 'futarchy'
     })
 
-    expect(metadata.name).toBe('ETC Treasury DAO')
+    expect(metadata.name).toBe('Polymarket Demo Treasury')
     expect(metadata.description).toBe('Main governance DAO')
     expect(metadata.properties.dao_address).toBe('0xdao123')
     expect(metadata.attributes).toContainEqual({

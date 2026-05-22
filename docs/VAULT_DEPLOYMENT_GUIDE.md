@@ -47,7 +47,7 @@ This guide provides step-by-step instructions for deploying the TreasuryVault an
 
 ### Required Access
 
-- Private key with sufficient ETH/ETC for deployment gas
+- Private key with sufficient the chain native token for deployment gas
 - RPC endpoint for target network(s)
 - Block explorer API key (optional, for verification)
 
@@ -84,8 +84,7 @@ Create a `.env` file in the project root:
 cat > .env << 'EOF'
 # Network RPC URLs
 ETHEREUM_RPC=https://mainnet.infura.io/v3/YOUR_INFURA_KEY
-ETHEREUM_CLASSIC_RPC=https://www.ethercluster.com/etc
-MORDOR_RPC=https://rpc.mordor.etccooperative.org
+AMOY_RPC=https://rpc-amoy.polygon.technology
 POLYGON_RPC=https://polygon-rpc.com
 ARBITRUM_RPC=https://arb1.arbitrum.io/rpc
 OPTIMISM_RPC=https://mainnet.optimism.io
@@ -158,7 +157,7 @@ main()
 EOF
 
 # Run the check
-npx hardhat run scripts/check-factory.js --network mordor
+npx hardhat run scripts/check-factory.js --network amoy
 ```
 
 ---
@@ -220,7 +219,7 @@ main()
     });
 EOF
 
-npx hardhat run scripts/check-balance.js --network mordor
+npx hardhat run scripts/check-balance.js --network amoy
 ```
 
 ### Step 2: Compile Contracts
@@ -475,7 +474,7 @@ main()
 EOF
 
 # Deploy to network
-npx hardhat run scripts/deploy-vaults.js --network mordor
+npx hardhat run scripts/deploy-vaults.js --network amoy
 ```
 
 ### Step 5: Deploy Vault Instances
@@ -544,7 +543,7 @@ main()
 EOF
 
 # Deploy vault instance
-npx hardhat run scripts/deploy-vault-instance.js --network mordor
+npx hardhat run scripts/deploy-vault-instance.js --network amoy
 ```
 
 ### Step 6: Initialize Vaults
@@ -598,7 +597,7 @@ main()
 EOF
 
 # Initialize (if needed)
-VAULT_ADDRESS=0x... npx hardhat run scripts/initialize-vault.js --network mordor
+VAULT_ADDRESS=0x... npx hardhat run scripts/initialize-vault.js --network amoy
 ```
 
 ### Step 7: Configure Vault Settings
@@ -666,7 +665,7 @@ main()
 EOF
 
 # Configure vault
-VAULT_ADDRESS=0x... GOVERNOR_ADDRESS=0x... npx hardhat run scripts/configure-vault.js --network mordor
+VAULT_ADDRESS=0x... GOVERNOR_ADDRESS=0x... npx hardhat run scripts/configure-vault.js --network amoy
 ```
 
 ### Step 8: Verify Deployments
@@ -737,7 +736,7 @@ main()
 EOF
 
 # Verify deployment
-VAULT_ADDRESS=0x... npx hardhat run scripts/verify-deployment.js --network mordor
+VAULT_ADDRESS=0x... npx hardhat run scripts/verify-deployment.js --network amoy
 ```
 
 ---
@@ -752,7 +751,7 @@ cat > scripts/deploy-multi-chain.sh << 'EOF'
 #!/bin/bash
 
 # Networks to deploy to
-NETWORKS=("ethereum" "mordor" "polygon" "arbitrum" "optimism")
+NETWORKS=("ethereum" "amoy" "polygon" "arbitrum" "optimism")
 
 # Track results
 SUCCESS=0
@@ -927,7 +926,7 @@ Before deploying to mainnet, verify:
 **Solution**:
 ```bash
 # Check balance
-npx hardhat run scripts/check-balance.js --network mordor
+npx hardhat run scripts/check-balance.js --network amoy
 
 # Send more ETH to deployer address
 # Estimated cost: 0.05-0.1 ETH per deployment
@@ -954,7 +953,7 @@ npx hardhat run scripts/compute-addresses.js
 **Solution**:
 ```bash
 # Check current state
-VAULT_ADDRESS=0x... npx hardhat run scripts/verify-deployment.js --network mordor
+VAULT_ADDRESS=0x... npx hardhat run scripts/verify-deployment.js --network amoy
 
 # The vault can only be initialized once
 # If needed, deploy a new instance
@@ -985,7 +984,7 @@ npx hardhat run scripts/check-factory.js --network <each-network>
 **Solution**:
 ```bash
 # Check transaction receipt
-npx hardhat console --network mordor
+npx hardhat console --network amoy
 
 # In console:
 const tx = await ethers.provider.getTransaction("0x...");
@@ -999,7 +998,7 @@ console.log(receipt);
 
 ## Complete Deployment Example
 
-Here's a complete end-to-end deployment on Mordor testnet:
+Here's a complete end-to-end deployment on Polygon Amoy (Polymarket testnet):
 
 ```bash
 # 1. Setup
@@ -1009,8 +1008,8 @@ cp .env.example .env
 # Edit .env with your settings
 
 # 2. Verify environment
-npx hardhat run scripts/check-factory.js --network mordor
-npx hardhat run scripts/check-balance.js --network mordor
+npx hardhat run scripts/check-factory.js --network amoy
+npx hardhat run scripts/check-balance.js --network amoy
 
 # 3. Compile
 npx hardhat clean
@@ -1020,21 +1019,21 @@ npx hardhat compile
 npx hardhat run scripts/compute-addresses.js
 
 # 5. Deploy implementations
-npx hardhat run scripts/deploy-vaults.js --network mordor
+npx hardhat run scripts/deploy-vaults.js --network amoy
 
 # 6. Deploy instance
-npx hardhat run scripts/deploy-vault-instance.js --network mordor
+npx hardhat run scripts/deploy-vault-instance.js --network amoy
 
 # 7. Configure vault
 VAULT_ADDRESS=0x... GOVERNOR_ADDRESS=0x... \
-  npx hardhat run scripts/configure-vault.js --network mordor
+  npx hardhat run scripts/configure-vault.js --network amoy
 
 # 8. Verify
 VAULT_ADDRESS=0x... \
-  npx hardhat run scripts/verify-deployment.js --network mordor
+  npx hardhat run scripts/verify-deployment.js --network amoy
 
 # 9. (Optional) Verify on block explorer
-npx hardhat verify --network mordor 0x... arg1 arg2
+npx hardhat verify --network amoy 0x... arg1 arg2
 
 echo "✅ Deployment complete!"
 ```

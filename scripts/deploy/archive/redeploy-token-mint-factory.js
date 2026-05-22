@@ -9,7 +9,7 @@
  * This caused users who purchased TOKENMINT role to fail role verification.
  *
  * Usage:
- *   npx hardhat run scripts/deploy/redeploy-token-mint-factory.js --network mordor
+ *   npx hardhat run scripts/deploy/redeploy-token-mint-factory.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -45,7 +45,7 @@ async function main() {
     throw new Error("No deployer signer available");
   }
   console.log("\nDeployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC");
 
   console.log("\nUsing TieredRoleManager:", TIERED_ROLE_MANAGER);
 

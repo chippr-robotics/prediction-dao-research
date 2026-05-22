@@ -8,7 +8,7 @@ const { loadMnemonicFromFloppy, keystoreExists, CONFIG } = require("./floppy-key
  * Create a 1v1 Friend Market Bet using the floppy wallet
  *
  * This creates a simple 1v1 bet between two addresses using the
- * FriendGroupMarketFactory on Mordor testnet.
+ * FriendGroupMarketFactory on Polygon Amoy.
  *
  * Requirements:
  * - Floppy disk mounted
@@ -17,10 +17,10 @@ const { loadMnemonicFromFloppy, keystoreExists, CONFIG } = require("./floppy-key
  *
  * Usage:
  *   export FLOPPY_PASSWORD=your_password
- *   npx hardhat run scripts/operations/create-friend-market-bet.js --network mordor
+ *   npx hardhat run scripts/operations/create-friend-market-bet.js --network amoy
  */
 
-// Contract addresses on Mordor
+// Contract addresses on Polygon Amoy
 const CONTRACTS = {
   friendGroupMarketFactory: "0x8cFE477e267bB36925047df8A6E30348f82b0085",
   tierRegistryAdapter: "0x8e3A4C65a6C22d88515FD356cB00732adac4f4d7",
@@ -31,11 +31,11 @@ const CONTRACTS = {
 // Bet parameters (customize these)
 const BET_CONFIG = {
   opponent: "0x52502d049571C7893447b86c4d8B38e6184bF6e1", // Use deployer as opponent for test
-  description: "Will ETC price be above $30 by end of January 2026?",
+  description: "Will MATIC price be above $1 by end of January 2026?",
   tradingPeriodDays: 14, // 14 day trading period
   arbitrator: ethers.ZeroAddress, // No arbitrator (creator can resolve)
   peggedPublicMarketId: 0, // Not pegged to any public market
-  liquidityETC: "0.01", // 0.01 ETC liquidity
+  liquidityMATIC: "0.01", // 0.01 MATIC liquidity
 };
 
 // Minimal ABIs
@@ -106,9 +106,9 @@ async function main() {
 
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
-  console.log("Balance:", ethers.formatEther(balance), "ETC");
+  console.log("Balance:", ethers.formatEther(balance), "MATIC");
 
-  const liquidityWei = ethers.parseEther(BET_CONFIG.liquidityETC);
+  const liquidityWei = ethers.parseEther(BET_CONFIG.liquidityMATIC);
   if (balance < liquidityWei + ethers.parseEther("0.01")) {
     console.error("Insufficient balance for liquidity + gas");
     process.exit(1);
@@ -208,7 +208,7 @@ async function main() {
   console.log("Description:", BET_CONFIG.description);
   console.log("Trading period:", BET_CONFIG.tradingPeriodDays, "days");
   console.log("Arbitrator:", BET_CONFIG.arbitrator || "None (creator resolves)");
-  console.log("Liquidity:", BET_CONFIG.liquidityETC, "ETC");
+  console.log("Liquidity:", BET_CONFIG.liquidityMATIC, "MATIC");
 
   // ========== Step 5: Create Friend Market ==========
   console.log("\n[5/6] Creating friend market bet...");
@@ -266,7 +266,7 @@ async function main() {
       console.log(
         "  Liquidity:",
         ethers.formatEther(marketInfo.liquidityAmount),
-        "ETC"
+        "MATIC"
       );
     }
 

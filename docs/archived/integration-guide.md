@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide demonstrates how to integrate the CTF 1155 conditional tokens with the PredictionMarketExchange for gas-efficient, permissionless prediction market trading on Ethereum Classic.
+This guide demonstrates how to integrate the CTF 1155 conditional tokens with the PredictionMarketExchange for gas-efficient, permissionless prediction market trading on Polygon.
 
 ## Architecture
 
@@ -445,7 +445,7 @@ const tx = await exchange.fillOrder(order, signature, amount, {
 - [ ] Set fee recipient
 - [ ] Configure fee percentage (if not using default 0.1%)
 - [ ] Deploy or identify collateral token contracts
-- [ ] Test on testnet (Mordor) first
+- [ ] Test on testnet (Amoy) first
 - [ ] Verify contracts on block explorer
 - [ ] Set up PMKT/1 nodes for order propagation
 - [ ] Deploy monitoring and analytics
@@ -459,7 +459,7 @@ const tx = await exchange.fillOrder(order, signature, amount, {
 ### Order Signature Invalid
 
 - Verify EIP-712 domain parameters match
-- Check chainId is correct (61 for ETC mainnet)
+- Check chainId is correct (137 for Polygon mainnet)
 - Ensure order fields match exactly
 - Verify signer has proper permissions
 

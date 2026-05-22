@@ -9,7 +9,7 @@ const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
  *
  * Usage:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor
+ *   npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy
  */
 
 // Contract addresses
@@ -17,7 +17,7 @@ const CONTRACTS = {
   conditionalMarketFactory: "0xd6F4a7059Ed5E1dc7fC8123768C5BC0fbc54A93a",
   ctf1155: "0xE56d9034591C6A6A5C023883354FAeB435E3b441",
   tieredRoleManager: "0xA6F794292488C628f91A0475dDF8dE6cEF2706EF",
-  usc: "0xDE093684c796204224BC081f937aa059D903c52a", // USC stablecoin (6 decimals)
+  usc: "0xDE093684c796204224BC081f937aa059D903c52a", // USDC stablecoin (6 decimals)
 };
 
 // NFL Divisional Round matchups (January 17-18, 2026)
@@ -31,7 +31,7 @@ const MATCHUPS = [
 // Configuration
 const CONFIG = {
   tradingPeriodDays: 7,       // 7 days trading period
-  liquidityAmount: "100",     // 100 USC initial liquidity
+  liquidityAmount: "100",     // 100 USDC initial liquidity
   liquidityParameter: "100",  // LMSR beta parameter
   betType: 8,                 // WinLose enum value
 };
@@ -73,15 +73,15 @@ async function main() {
 
   console.log("Wallet address:", wallet.address);
   const balance = await provider.getBalance(wallet.address);
-  console.log("ETC Balance:", ethers.formatEther(balance), "ETC");
+  console.log("MATIC Balance:", ethers.formatEther(balance), "MATIC");
 
-  // Check USC balance
-  console.log("\n[2/5] Checking USC balance...");
+  // Check USDC balance
+  console.log("\n[2/5] Checking USDC balance...");
   const usc = new ethers.Contract(CONTRACTS.usc, ERC20_ABI, wallet);
-  const uscBalance = await usc.balanceOf(wallet.address);
-  const uscDecimals = await usc.decimals();
-  const uscSymbol = await usc.symbol();
-  console.log("USC Balance:", ethers.formatUnits(uscBalance, uscDecimals), uscSymbol);
+  const usdcBalance = await usc.balanceOf(wallet.address);
+  const usdcDecimals = await usc.decimals();
+  const usdcSymbol = await usc.symbol();
+  console.log("USDC Balance:", ethers.formatUnits(usdcBalance, usdcDecimals), usdcSymbol);
 
   // Check factory configuration
   console.log("\n[3/5] Checking factory configuration...");
@@ -121,28 +121,28 @@ async function main() {
   }
 
   // Calculate costs
-  const liquidityWei = ethers.parseUnits(CONFIG.liquidityAmount, uscDecimals);
+  const liquidityWei = ethers.parseUnits(CONFIG.liquidityAmount, usdcDecimals);
   const totalLiquidity = liquidityWei * BigInt(MATCHUPS.length);
 
   console.log("\n[4/5] Cost estimate:");
-  console.log("  Liquidity per market:", CONFIG.liquidityAmount, "USC");
+  console.log("  Liquidity per market:", CONFIG.liquidityAmount, "USDC");
   console.log("  Number of markets:", MATCHUPS.length);
-  console.log("  Total USC needed:", ethers.formatUnits(totalLiquidity, uscDecimals), "USC");
+  console.log("  Total USDC needed:", ethers.formatUnits(totalLiquidity, usdcDecimals), "USDC");
 
-  if (uscBalance < totalLiquidity) {
-    console.error("\nError: Insufficient USC balance");
-    console.log("Required:", ethers.formatUnits(totalLiquidity, uscDecimals), "USC");
-    console.log("Available:", ethers.formatUnits(uscBalance, uscDecimals), "USC");
+  if (usdcBalance < totalLiquidity) {
+    console.error("\nError: Insufficient USDC balance");
+    console.log("Required:", ethers.formatUnits(totalLiquidity, usdcDecimals), "USDC");
+    console.log("Available:", ethers.formatUnits(usdcBalance, usdcDecimals), "USDC");
     process.exit(1);
   }
 
-  // Approve USC spending
-  console.log("\n  Approving USC spending...");
+  // Approve USDC spending
+  console.log("\n  Approving USDC spending...");
   const currentAllowance = await usc.allowance(wallet.address, CONTRACTS.conditionalMarketFactory);
   if (currentAllowance < totalLiquidity) {
     const approveTx = await usc.approve(CONTRACTS.conditionalMarketFactory, totalLiquidity);
     await approveTx.wait();
-    console.log("  Approved:", ethers.formatUnits(totalLiquidity, uscDecimals), "USC");
+    console.log("  Approved:", ethers.formatUnits(totalLiquidity, usdcDecimals), "USDC");
   } else {
     console.log("  Already approved");
   }
@@ -150,7 +150,7 @@ async function main() {
   // Create markets
   console.log("\n[5/5] Creating public markets...");
   const tradingPeriod = CONFIG.tradingPeriodDays * 24 * 60 * 60;
-  const liquidityParameter = ethers.parseUnits(CONFIG.liquidityParameter, uscDecimals);
+  const liquidityParameter = ethers.parseUnits(CONFIG.liquidityParameter, usdcDecimals);
 
   const createdMarkets = [];
 
@@ -218,7 +218,7 @@ async function main() {
     console.log(`    Tx: ${market.txHash}`);
   }
 
-  console.log("\nCollateral token:", CONTRACTS.usc, "(USC)");
+  console.log("\nCollateral token:", CONTRACTS.usc, "(USDC)");
   console.log("Trading period:", CONFIG.tradingPeriodDays, "days");
   console.log("Bet type: WinLose");
 
@@ -229,8 +229,8 @@ async function main() {
   const finalUscBalance = await usc.balanceOf(wallet.address);
   const finalEtcBalance = await provider.getBalance(wallet.address);
   console.log("\nFinal balances:");
-  console.log("  USC:", ethers.formatUnits(finalUscBalance, uscDecimals), "USC");
-  console.log("  ETC:", ethers.formatEther(finalEtcBalance), "ETC");
+  console.log("  USDC:", ethers.formatUnits(finalUscBalance, usdcDecimals), "USDC");
+  console.log("  MATIC:", ethers.formatEther(finalEtcBalance), "MATIC");
 }
 
 main()

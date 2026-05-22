@@ -10,7 +10,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/04-deploy-registries.js --network localhost
- *   npx hardhat run scripts/deploy/04-deploy-registries.js --network mordor
+ *   npx hardhat run scripts/deploy/04-deploy-registries.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -18,6 +18,7 @@ const { ethers } = require("hardhat");
 
 const {
   SALT_PREFIXES,
+  POLYMARKET_CTF,
 } = require("./lib/constants");
 
 const {
@@ -87,6 +88,48 @@ async function main() {
   await tryInitialize("NullifierRegistry", nullifierRegistry.contract, deployer);
 
   // =========================================================================
+  // Deploy OracleRegistry + PolymarketOracleAdapter (only on chains where
+  // Polymarket has a CTF deployment we can read from)
+  // =========================================================================
+  const networkName = hre.network.name;
+  const polymarketCTF = POLYMARKET_CTF[networkName];
+
+  if (polymarketCTF) {
+    console.log("\n\n--- Deploying OracleRegistry ---");
+    const oracleRegistry = await deployDeterministic(
+      "OracleRegistry",
+      [deployer.address],
+      generateSalt(saltPrefix + "OracleRegistry-v1"),
+      deployer
+    );
+    deployments.oracleRegistry = oracleRegistry.address;
+
+    console.log("\n\n--- Deploying PolymarketOracleAdapter ---");
+    console.log(`  Polymarket CTF (${networkName}): ${polymarketCTF}`);
+    const polymarketAdapter = await deployDeterministic(
+      "PolymarketOracleAdapter",
+      [polymarketCTF],
+      generateSalt(saltPrefix + "PolymarketAdapter-v1"),
+      deployer
+    );
+    deployments.polymarketOracleAdapter = polymarketAdapter.address;
+
+    // Register the adapter under keccak256("POLYMARKET") so FriendGroupMarketFactory
+    // and any oracle-routed code can resolve it through the registry.
+    const POLYMARKET_ID = ethers.keccak256(ethers.toUtf8Bytes("POLYMARKET"));
+    try {
+      const tx = await oracleRegistry.contract.registerAdapter(POLYMARKET_ID, polymarketAdapter.address);
+      await tx.wait();
+      console.log(`  ✓ PolymarketOracleAdapter registered under keccak256("POLYMARKET")`);
+    } catch (error) {
+      console.warn(`  ⚠️  Polymarket adapter registration skipped: ${error.message?.split("\n")[0]}`);
+    }
+  } else {
+    console.log(`\n\n--- Skipping Polymarket oracle deploy (no POLYMARKET_CTF for ${networkName}) ---`);
+    console.log(`    Set AMOY_POLYMARKET_CTF in your environment to enable Polymarket-pegged settlement.`);
+  }
+
+  // =========================================================================
   // Verify contracts
   // =========================================================================
   console.log("\n\n--- Verifying Contracts ---");
@@ -95,6 +138,20 @@ async function main() {
     { name: "MarketCorrelationRegistry", address: correlationRegistry.address, constructorArguments: [] },
     { name: "NullifierRegistry", address: nullifierRegistry.address, constructorArguments: [] },
   ];
+  if (deployments.oracleRegistry) {
+    verificationTargets.push({
+      name: "OracleRegistry",
+      address: deployments.oracleRegistry,
+      constructorArguments: [deployer.address],
+    });
+  }
+  if (deployments.polymarketOracleAdapter) {
+    verificationTargets.push({
+      name: "PolymarketOracleAdapter",
+      address: deployments.polymarketOracleAdapter,
+      constructorArguments: [polymarketCTF],
+    });
+  }
 
   for (const target of verificationTargets) {
     console.log(`Verifying ${target.name}...`);

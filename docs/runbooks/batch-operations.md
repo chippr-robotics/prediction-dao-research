@@ -126,7 +126,7 @@ from eth_account import Account
 import json
 
 # Connect to network
-w3 = Web3(Web3.HTTPProvider('https://rpc.mordor.etccooperative.org'))
+w3 = Web3(Web3.HTTPProvider('https://rpc-amoy.polygon.technology'))
 account = Account.from_key('your_private_key')
 
 # Load contract

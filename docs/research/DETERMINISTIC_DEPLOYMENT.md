@@ -17,7 +17,7 @@ All ClearPath DAO contracts are deployed using the [Safe Singleton Factory](http
 
 This factory is pre-deployed on many EVM networks including:
 - Ethereum Mainnet (Chain ID: 1)
-- Ethereum Classic Mordor Testnet (Chain ID: 63)
+- Polygon Amoy (Polymarket testnet) (Chain ID: 80002)
 - Polygon, Arbitrum, Optimism, and many others
 
 The factory uses the CREATE2 opcode to deploy contracts at deterministic addresses based on:
@@ -39,7 +39,7 @@ Each contract adds its name to this prefix:
 The deterministic deployment is handled by `scripts/deploy-deterministic.js`:
 
 ```bash
-npx hardhat run scripts/deploy-deterministic.js --network mordor
+npx hardhat run scripts/deploy-deterministic.js --network amoy
 ```
 
 ### How It Works
@@ -79,7 +79,7 @@ Because deployment is deterministic, we can predict the addresses:
 The `.github/workflows/deploy-contracts.yml` workflow automatically:
 
 1. Compiles all contracts
-2. Deploys them deterministically to Mordor testnet
+2. Deploys them deterministically to Polygon Amoy (Polymarket testnet)
 3. Configures contract ownerships
 4. Outputs deployment information
 5. Creates deployment logs as artifacts
@@ -89,23 +89,23 @@ The `.github/workflows/deploy-contracts.yml` workflow automatically:
 **Automatic**: Pushes to `main` branch with contract changes
 
 **Manual**: 
-1. Go to Actions → "Deploy DAO Contracts to Mordor Testnet"
+1. Go to Actions → "Deploy DAO Contracts to Polygon Amoy (Polymarket testnet)"
 2. Click "Run workflow"
-3. Select the network (default: mordor)
+3. Select the network (default: amoy)
 
 ## Verifying Deployments
 
 After deployment, you can verify contracts on block explorers:
 
-### Mordor Testnet
-- **Explorer**: https://etc-mordor.blockscout.com/
-- **RPC**: https://rpc.mordor.etccooperative.org
-- **Chain ID**: 63
+### Polygon Amoy (Polymarket testnet)
+- **Explorer**: https://amoy.polygonscan.com/
+- **RPC**: https://rpc-amoy.polygon.technology
+- **Chain ID**: 80002
 
 To verify a contract address:
 ```bash
 # Check if contract is deployed
-curl -X POST https://rpc.mordor.etccooperative.org \
+curl -X POST https://rpc-amoy.polygon.technology \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_getCode","params":["<CONTRACT_ADDRESS>","latest"],"id":1}'
 ```
@@ -131,7 +131,7 @@ export PRIVATE_KEY=your_private_key
 npx hardhat run scripts/deploy-deterministic.js --network yourNetwork
 ```
 
-3. **Result**: Contracts will be deployed at the **exact same addresses** as on Mordor!
+3. **Result**: Contracts will be deployed at the **exact same addresses** as on Polygon Amoy!
 
 ## Benefits of Deterministic Deployment
 

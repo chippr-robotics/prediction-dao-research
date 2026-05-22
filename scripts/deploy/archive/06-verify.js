@@ -13,7 +13,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/06-verify.js --network localhost
- *   npx hardhat run scripts/deploy/06-verify.js --network mordor
+ *   npx hardhat run scripts/deploy/06-verify.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -315,18 +315,18 @@ async function main() {
   console.log("\n\n--- 9. Payment Token Configuration ---");
 
   const networkName = hre.network.name;
-  const uscAddress = TOKENS[networkName]?.USC;
+  const usdcAddress = TOKENS[networkName]?.USDC;
 
-  if (rbacDeployment?.contracts?.membershipPaymentManager && uscAddress) {
+  if (rbacDeployment?.contracts?.membershipPaymentManager && usdcAddress) {
     try {
       const Factory = await ethers.getContractFactory("MembershipPaymentManager", deployer);
       const paymentManager = Factory.attach(rbacDeployment.contracts.membershipPaymentManager);
 
-      const tokenInfo = await paymentManager.acceptedTokens(uscAddress);
+      const tokenInfo = await paymentManager.acceptedTokens(usdcAddress);
       if (tokenInfo && tokenInfo.isAccepted) {
-        pass(`USC (${uscAddress}) is accepted payment token`);
+        pass(`USDC (${usdcAddress}) is accepted payment token`);
       } else {
-        fail(`USC (${uscAddress}) NOT configured as payment token`);
+        fail(`USDC (${usdcAddress}) NOT configured as payment token`);
       }
 
       // Check role prices
@@ -336,9 +336,9 @@ async function main() {
       ];
 
       for (const { hash, name } of roles) {
-        const price = await paymentManager.rolePrices(hash, uscAddress);
+        const price = await paymentManager.rolePrices(hash, usdcAddress);
         if (price > 0n) {
-          pass(`${name} price: ${ethers.formatUnits(price, 6)} USC`);
+          pass(`${name} price: ${ethers.formatUnits(price, 6)} USDC`);
         } else {
           warn(`${name} price not set`);
         }
@@ -346,8 +346,8 @@ async function main() {
     } catch (error) {
       warn(`Could not verify payment configuration: ${error.message?.split("\n")[0]}`);
     }
-  } else if (!uscAddress) {
-    warn("No USC address configured for this network");
+  } else if (!usdcAddress) {
+    warn("No USDC address configured for this network");
   }
 
   // =========================================================================

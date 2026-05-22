@@ -24,7 +24,7 @@ async function main() {
   console.log('\n--- Contract Balances ---');
   for (const [name, address] of Object.entries(CONTRACTS)) {
     const balance = await provider.getBalance(address);
-    console.log(`${name}: ${ethers.formatEther(balance)} ETC`);
+    console.log(`${name}: ${ethers.formatEther(balance)} MATIC`);
   }
 
   // Check FriendGroupMarketFactory configuration
@@ -57,7 +57,7 @@ async function main() {
     try {
       const price = await tierRegistry.getTierPrice(FRIEND_MARKET_ROLE, tier);
       const isActive = await tierRegistry.isTierActive(FRIEND_MARKET_ROLE, tier);
-      console.log(`  ${tierNames[tier]}: price=${ethers.formatUnits(price, 6)} USC, active=${isActive}`);
+      console.log(`  ${tierNames[tier]}: price=${ethers.formatUnits(price, 6)} USDC, active=${isActive}`);
     } catch (e) {
       console.log(`  ${tierNames[tier]}: Error - ${e.message}`);
     }
@@ -69,16 +69,16 @@ async function main() {
 
   try {
     const paymentToken = await mpm.paymentToken();
-    console.log('Payment token (USC):', paymentToken);
+    console.log('Payment token (USDC):', paymentToken);
 
-    // Check USC token balance of MembershipPaymentManager
+    // Check USDC token balance of MembershipPaymentManager
     const erc20 = await ethers.getContractAt('IERC20', paymentToken);
     const mpmBalance = await erc20.balanceOf(CONTRACTS.membershipPaymentManager);
-    console.log('MembershipPaymentManager USC balance:', ethers.formatUnits(mpmBalance, 6), 'USC');
+    console.log('MembershipPaymentManager USDC balance:', ethers.formatUnits(mpmBalance, 6), 'USDC');
 
     // Check treasury balance
     const treasuryBalance = await erc20.balanceOf(CONTRACTS.treasuryVault);
-    console.log('TreasuryVault USC balance:', ethers.formatUnits(treasuryBalance, 6), 'USC');
+    console.log('TreasuryVault USDC balance:', ethers.formatUnits(treasuryBalance, 6), 'USDC');
   } catch (e) {
     console.log('Error:', e.message);
   }
@@ -92,7 +92,7 @@ async function main() {
   const events = await trm.queryFilter(filter, 12000000);
   console.log(`TieredRoleManager (${CONTRACTS.tieredRoleManager}): ${events.length} TierPurchased events`);
   for (const event of events.slice(0, 10)) {
-    console.log(`  User: ${event.args.user}, Amount: ${ethers.formatEther(event.args.amount)} ETC`);
+    console.log(`  User: ${event.args.user}, Amount: ${ethers.formatEther(event.args.amount)} MATIC`);
   }
 
   // Check FriendGroupMarketFactory for payment events
@@ -102,7 +102,7 @@ async function main() {
     const membershipEvents = await fgmf.queryFilter(membershipFilter, 12000000);
     console.log(`MembershipPurchased events: ${membershipEvents.length}`);
     for (const event of membershipEvents.slice(0, 10)) {
-      console.log(`  User: ${event.args.user}, Tier: ${event.args.tier}, Amount: ${ethers.formatEther(event.args.amount)} ETC`);
+      console.log(`  User: ${event.args.user}, Tier: ${event.args.tier}, Amount: ${ethers.formatEther(event.args.amount)} MATIC`);
     }
   } catch (e) {
     console.log('MembershipPurchased events: not found -', e.message);
@@ -115,7 +115,7 @@ async function main() {
     const paymentEvents = await mpm.queryFilter(paymentFilter, 12000000);
     console.log(`MembershipPaymentManager: ${paymentEvents.length} MembershipPayment events`);
     for (const event of paymentEvents.slice(0, 10)) {
-      console.log(`  User: ${event.args.user}, Role: ${event.args.role}, Tier: ${event.args.tier}, Amount: ${ethers.formatUnits(event.args.amount, 6)} USC`);
+      console.log(`  User: ${event.args.user}, Role: ${event.args.role}, Tier: ${event.args.tier}, Amount: ${ethers.formatUnits(event.args.amount, 6)} USDC`);
     }
   } catch (e) {
     console.log('MembershipPayment events error:', e.message);

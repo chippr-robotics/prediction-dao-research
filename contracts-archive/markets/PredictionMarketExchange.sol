@@ -12,14 +12,14 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 /**
  * @title PredictionMarketExchange
  * @notice Permissionless order matching with CTF 1155 integration
- * @dev Gas-optimized exchange for ETC with EIP-712 signature verification
+ * @dev Gas-optimized exchange for the chain native token with EIP-712 signature verification
  * 
  * Features:
  * - Three matching modes: single fill, batch fill, maker-to-maker
  * - EIP-712 signature verification for off-chain order submission
  * - Nonce-based cancellation system
  * - Fee mechanism (0.1% default, configurable)
- * - Gas-optimized for ETC (~150k per order)
+ * - Gas-optimized for the native token (~150k per order)
  * - CTF 1155 token support for conditional outcomes
  * 
  * Based on pmkt/1 protocol specification and Polymarket CLOB design

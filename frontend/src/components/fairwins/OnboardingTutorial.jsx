@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useChainTokens } from '../../hooks/useChainTokens'
 import './OnboardingTutorial.css'
 
 /**
@@ -9,7 +10,10 @@ import './OnboardingTutorial.css'
  * Shows once per wallet address and can be permanently dismissed.
  */
 
-const TUTORIAL_STEPS = [
+// Tutorial steps include example wager amounts denominated in the chain
+// stablecoin (USDC on Polygon Amoy). The factory takes the symbol so the
+// labels render correctly when the symbol differs from the default.
+const buildTutorialSteps = (stable) => [
   {
     id: 'welcome',
     title: 'Welcome to FairWins',
@@ -107,7 +111,7 @@ const TUTORIAL_STEPS = [
             </div>
             <div className="anatomy-title">Will BTC hit $100k by March?</div>
             <div className="anatomy-stats">
-              <span>50 USC</span>
+              <span>{`50 ${stable}`}</span>
               <span>1v1 &bull; Either Party</span>
             </div>
           </div>
@@ -199,12 +203,12 @@ const TUTORIAL_STEPS = [
         <div className="tutorial-positions-preview">
           <div className="position-row winning">
             <div className="position-market">BTC above $100k</div>
-            <div className="position-shares">50 USC staked</div>
-            <div className="position-pnl positive">Won &mdash; Claim 100 USC</div>
+            <div className="position-shares">{`50 ${stable} staked`}</div>
+            <div className="position-pnl positive">{`Won — Claim 100 ${stable}`}</div>
           </div>
           <div className="position-row losing">
             <div className="position-market">Snow in Austin</div>
-            <div className="position-shares">10 USC staked</div>
+            <div className="position-shares">{`10 ${stable} staked`}</div>
             <div className="position-pnl negative">Active &mdash; 12d left</div>
           </div>
         </div>
@@ -270,6 +274,8 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
   const [dontShowAgain, setDontShowAgain] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
   const modalRef = useRef(null)
+  const { stable: stableSymbol } = useChainTokens()
+  const TUTORIAL_STEPS = useMemo(() => buildTutorialSteps(stableSymbol), [stableSymbol])
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
 

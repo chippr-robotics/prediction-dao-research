@@ -55,7 +55,7 @@ This document describes the integration of ClearPath DAO Governance pages into t
 ### Acquiring the CLEARPATH_USER Role
 Users can purchase the CLEARPATH_USER role via:
 - Navigate to `/purchase-roles` route
-- Select "ClearPath User" individual role (250 ETC) or bundle package
+- Select "ClearPath User" individual role (250 MATIC) or bundle package
 - Complete purchase with connected wallet
 - Role is automatically assigned to wallet address
 - Refresh page to see ClearPath option appear in sidebar

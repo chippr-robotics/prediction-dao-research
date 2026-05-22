@@ -14,7 +14,7 @@
  *
  * Usage:
  *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network localhost
- *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network mordor
+ *   npx hardhat run scripts/deploy/02-deploy-rbac.js --network amoy
  */
 
 const hre = require("hardhat");
@@ -23,10 +23,11 @@ const { ethers } = require("hardhat");
 const {
   SALT_PREFIXES,
   TOKENS,
+  STABLECOIN_DECIMALS,
   ROLE_HASHES,
   MembershipTier,
-  FRIEND_MARKET_TIERS,
-  MARKET_MAKER_TIERS,
+  buildFriendMarketTiers,
+  buildMarketMakerTiers,
 } = require("./lib/constants");
 
 const {
@@ -97,9 +98,16 @@ async function main() {
     }
   }
 
+  // Build tier configs using the chain stablecoin's decimals so prices and
+  // limits encode to the correct on-chain unit count. Polygon Amoy stablecoin (USDC) is 6-dec; STABLECOIN_DECIMALS
+  // encodes this per network and preserves compatibility for local mocks.
+  const stableDecimals = STABLECOIN_DECIMALS[hre.network.name] ?? 6;
+  const friendMarketTiers = buildFriendMarketTiers(stableDecimals);
+  const marketMakerTiers = buildMarketMakerTiers(stableDecimals);
+
   // Configure Friend Market tiers
-  console.log("\n  Configuring Friend Market tiers...");
-  for (const tierConfig of FRIEND_MARKET_TIERS) {
+  console.log(`\n  Configuring Friend Market tiers (encoded with ${stableDecimals} decimals)...`);
+  for (const tierConfig of friendMarketTiers) {
     await configureTier(
       tieredRoleManager.contract,
       ROLE_HASHES.FRIEND_MARKET_ROLE,
@@ -110,7 +118,7 @@ async function main() {
 
   // Configure Market Maker tiers
   console.log("\n  Configuring Market Maker tiers...");
-  for (const tierConfig of MARKET_MAKER_TIERS) {
+  for (const tierConfig of marketMakerTiers) {
     await configureTier(
       tieredRoleManager.contract,
       ROLE_HASHES.MARKET_MAKER_ROLE,
@@ -296,25 +304,26 @@ async function main() {
   // =========================================================================
   console.log("\n\n--- Configuring Payment Manager ---");
 
-  // Get USC address for network
+  // Resolve the chain stablecoin (USDC on Polygon Amoy).
   const networkName = hre.network.name;
-  const uscAddress = TOKENS[networkName]?.USC;
+  const stableAddress = TOKENS[networkName]?.USDC ?? TOKENS[networkName]?.USDC;
+  const stableSymbol = TOKENS[networkName]?.USDC ? "USDC" : "USDC";
 
-  if (uscAddress) {
-    // Add USC as payment token
+  if (stableAddress) {
+    // Add the chain stablecoin as a payment token
     try {
       const tx = await membershipPaymentManager.contract.addPaymentToken(
-        uscAddress,
-        "USC",
-        6  // USC has 6 decimals
+        stableAddress,
+        stableSymbol,
+        stableDecimals
       );
       await tx.wait();
-      console.log(`  ✓ USC added as payment token: ${uscAddress}`);
+      console.log(`  ✓ ${stableSymbol} added as payment token: ${stableAddress}`);
     } catch (error) {
-      console.warn("  ⚠️  USC may already be configured");
+      console.warn(`  ⚠️  ${stableSymbol} may already be configured`);
     }
 
-    // Set role prices
+    // Set role prices in stablecoin units
     const rolePrices = [
       { role: ROLE_HASHES.MARKET_MAKER_ROLE, name: "MARKET_MAKER_ROLE", price: "100" },
       { role: ROLE_HASHES.FRIEND_MARKET_ROLE, name: "FRIEND_MARKET_ROLE", price: "50" },
@@ -324,16 +333,16 @@ async function main() {
 
     for (const { role, name, price } of rolePrices) {
       try {
-        const priceWei = ethers.parseUnits(price, 6);
-        const tx = await membershipPaymentManager.contract.setRolePrice(role, uscAddress, priceWei);
+        const priceWei = ethers.parseUnits(price, stableDecimals);
+        const tx = await membershipPaymentManager.contract.setRolePrice(role, stableAddress, priceWei);
         await tx.wait();
-        console.log(`  ✓ ${name} price set to ${price} USC`);
+        console.log(`  ✓ ${name} price set to ${price} ${stableSymbol}`);
       } catch (error) {
         console.warn(`  ⚠️  ${name} price may already be set`);
       }
     }
   } else {
-    console.log("  ⚠️  No USC address configured for this network - skipping payment setup");
+    console.log(`  ⚠️  No stablecoin address configured for ${networkName} - skipping payment setup`);
   }
 
   // =========================================================================

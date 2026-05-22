@@ -1,7 +1,9 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWallet, useWalletConnection, useWalletRoles } from '../hooks'
 import { useEncryption } from '../hooks/useEncryption'
+import { useUserPreferences } from '../hooks/useUserPreferences'
+import { useChainTokens } from '../hooks/useChainTokens'
 import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
@@ -30,12 +32,28 @@ const getConnectorInfo = (connector) => {
   return connector.name || connector.id
 }
 
+// Canonical Polymarket category slugs — kept here to keep WalletPage
+// self-contained. Order matches PolymarketBrowser's quick-filter row.
+const POLYMARKET_CATEGORY_OPTIONS = [
+  { slug: 'politics', label: 'Politics' },
+  { slug: 'sports', label: 'Sports' },
+  { slug: 'crypto', label: 'Crypto' },
+  { slug: 'pop-culture', label: 'Pop Culture' },
+  { slug: 'business', label: 'Business' },
+  { slug: 'science', label: 'Science' },
+  { slug: 'entertainment', label: 'Entertainment' },
+  { slug: 'tech', label: 'Tech' },
+]
+
 function WalletPage() {
   const { address, isConnected, connectors, provider, signer } = useWallet()
   const { connectWallet, disconnectWallet } = useWalletConnection()
   const { showModal, hideModal } = useModal()
   const { roles, hasRole } = useWalletRoles()
   const { isInitialized, isInitializing, ensureInitialized } = useEncryption()
+  const { preferences, setPolymarketCategories } = useUserPreferences()
+  const { capabilities } = useChainTokens()
+  const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('account')
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
@@ -140,6 +158,19 @@ function WalletPage() {
     }
   }, [activeTab, isConnected, keyRegistered, handleCheckKeyStatus])
 
+  const selectedPolymarketCategories = useMemo(
+    () => preferences?.polymarketCategories || [],
+    [preferences?.polymarketCategories],
+  )
+
+  const togglePolymarketCategory = useCallback((slug) => {
+    if (!isConnected) return
+    const next = selectedPolymarketCategories.includes(slug)
+      ? selectedPolymarketCategories.filter((s) => s !== slug)
+      : [...selectedPolymarketCategories, slug]
+    setPolymarketCategories(next)
+  }, [isConnected, selectedPolymarketCategories, setPolymarketCategories])
+
   const shortenAddress = (address) => {
     if (!address) return ''
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
@@ -216,6 +247,7 @@ function WalletPage() {
                 <button role="tab" aria-selected={activeTab === 'account'} className={`tab ${activeTab === 'account' ? 'active' : ''}`} onClick={() => setActiveTab('account')}>Account</button>
                 <button role="tab" aria-selected={activeTab === 'membership'} className={`tab ${activeTab === 'membership' ? 'active' : ''}`} onClick={() => setActiveTab('membership')}>Membership</button>
                 <button role="tab" aria-selected={activeTab === 'security'} className={`tab ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security</button>
+                <button role="tab" aria-selected={activeTab === 'preferences'} className={`tab ${activeTab === 'preferences' ? 'active' : ''}`} onClick={() => setActiveTab('preferences')}>Preferences</button>
                 <button role="tab" aria-selected={activeTab === 'swap'} className={`tab ${activeTab === 'swap' ? 'active' : ''}`} onClick={() => setActiveTab('swap')}>Swap</button>
               </div>
 
@@ -335,6 +367,49 @@ function WalletPage() {
                           </button>
                         )}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'preferences' && (
+                  <div className="preferences-section" role="tabpanel">
+                    <div className="section">
+                      <h3>Polymarket Categories</h3>
+                      <p className="section-description">
+                        Pick the categories you care about. Your dashboard feed will surface markets in these categories first, and the in-wager market browser uses them as the default filter.
+                      </p>
+
+                      {!polymarketSidebetsEnabled && (
+                        <div className="key-error" role="note">
+                          Polymarket integration is only available on Polygon chains. Switch your network to use these preferences.
+                        </div>
+                      )}
+
+                      <div className="polymarket-category-grid">
+                        {POLYMARKET_CATEGORY_OPTIONS.map(({ slug, label }) => {
+                          const checked = selectedPolymarketCategories.includes(slug)
+                          return (
+                            <label key={slug} className={`polymarket-category-option ${checked ? 'checked' : ''}`}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => togglePolymarketCategory(slug)}
+                              />
+                              <span>{label}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+
+                      {selectedPolymarketCategories.length > 0 && (
+                        <button
+                          type="button"
+                          className="key-action-btn secondary"
+                          onClick={() => setPolymarketCategories([])}
+                        >
+                          Clear all
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

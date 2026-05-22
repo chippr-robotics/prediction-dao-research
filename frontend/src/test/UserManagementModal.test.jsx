@@ -9,7 +9,7 @@ import {
   UserPreferencesProvider,
   UIProvider,
   ThemeProvider,
-  ETCswapProvider,
+  DexProvider,
   PriceProvider
 } from '../contexts'
 
@@ -76,13 +76,13 @@ const renderWithProviders = (ui, { isConnected = true, connectors } = {}) => {
         <ThemeProvider>
           <WalletProvider>
             <UserPreferencesProvider>
-              <ETCswapProvider>
+              <DexProvider>
                 <UIProvider>
                   <PriceProvider>
                     {ui}
                   </PriceProvider>
                 </UIProvider>
-              </ETCswapProvider>
+              </DexProvider>
             </UserPreferencesProvider>
           </WalletProvider>
         </ThemeProvider>

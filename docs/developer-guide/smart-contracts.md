@@ -371,13 +371,13 @@ uint256 public guardianThreshold;
 ### Bond System
 
 ```solidity
-// Proposal bond: 50 ETC
+// Proposal bond: 50
 uint256 public constant PROPOSAL_BOND = 50 ether;
 
-// Oracle bond: 100 ETC
+// Oracle bond: 100
 uint256 public constant ORACLE_BOND = 100 ether;
 
-// Challenge bond: 150 ETC
+// Challenge bond: 150
 uint256 public constant CHALLENGE_BOND = 150 ether;
 ```
 

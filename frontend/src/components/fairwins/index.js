@@ -6,3 +6,4 @@ export { default as Dashboard } from './Dashboard'
 // Modal Components
 export { default as FriendMarketsModal } from './FriendMarketsModal'
 export { default as MyMarketsModal } from './MyMarketsModal'
+export { default as ShareWagerModal } from './ShareWagerModal'

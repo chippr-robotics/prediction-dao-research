@@ -13,7 +13,7 @@ const path = require("path");
  * - Saves deployment info to deployments/ directory
  *
  * Usage:
- *   npx hardhat run scripts/deploy-correlation-registry.js --network mordor
+ *   npx hardhat run scripts/deploy-correlation-registry.js --network amoy
  *
  * Environment variables:
  *   VERIFY=true|false           Enable/disable Blockscout verification (default: true)
@@ -267,7 +267,8 @@ async function main() {
     throw new Error("No deployer signer available");
   }
   console.log("Deployer:", deployer.address);
-  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETC\n");
+  console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "MATIC
+");
 
   // Use v1.1 salt to deploy updated contract with fixed permissions
   // (v1.0 had onlyOwner restriction on addMarketToGroup, v1.1 allows group creator)
@@ -374,7 +375,7 @@ async function main() {
   console.log(`   marketCorrelationRegistry: '${correlationRegistry.address}'`);
   console.log();
   console.log("2. Optionally set role manager:");
-  console.log("   ROLE_MANAGER_ADDRESS=0x... npx hardhat run scripts/deploy-correlation-registry.js --network mordor");
+  console.log("   ROLE_MANAGER_ADDRESS=0x... npx hardhat run scripts/deploy-correlation-registry.js --network amoy");
   console.log();
   console.log("3. Create correlation groups for related markets");
   console.log();

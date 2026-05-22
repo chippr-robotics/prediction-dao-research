@@ -7,9 +7,7 @@ import './RoleDetailsCard.css'
  */
 const ROLE_DISPLAY_NAMES = {
   MARKET_MAKER: 'Market Maker',
-  FRIEND_MARKET: 'Friend Markets',
-  CLEARPATH_USER: 'ClearPath',
-  TOKENMINT: 'TokenMint'
+  FRIEND_MARKET: 'Friend Markets'
 }
 
 /**
@@ -17,9 +15,7 @@ const ROLE_DISPLAY_NAMES = {
  */
 const ROLE_DESCRIPTIONS = {
   MARKET_MAKER: 'Create prediction markets with liquidity pools',
-  FRIEND_MARKET: 'Create private 1v1 and group markets with friends',
-  CLEARPATH_USER: 'Access to ClearPath analytics',
-  TOKENMINT: 'Create custom tokens'
+  FRIEND_MARKET: 'Create private 1v1 and group markets with friends'
 }
 
 /**

@@ -5,7 +5,7 @@ import { createContext } from 'react'
  * 
  * This context provides a single source of truth for all wallet-related state and operations:
  * - Wallet connection and address management
- * - Balance tracking (ETC, WETC, tokens)
+ * - Balance tracking (native, wrapped-native, tokens)
  * - Provider and signer for transactions
  * - RVAC role management integrated with wallet
  * - Network state and switching

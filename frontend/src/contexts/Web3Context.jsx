@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi'
 import { ethers } from 'ethers'
-import { EXPECTED_CHAIN_ID, getExpectedChain } from '../wagmi'
+import { isSupportedChainId, getNetwork, listSupportedChainIds, PRIMARY_CHAIN_ID } from '../config/networks'
 import { Web3Context } from './Web3Context'
 
 export function Web3Provider({ children }) {
@@ -44,15 +44,22 @@ export function Web3Provider({ children }) {
     return () => { ignore = true }
   }, [isConnected, address])
 
-  // Check network compatibility
+  // Check network compatibility. Only emit a network error when the connected
+  // chain is not in the supported set (Polygon Amoy or local Hardhat).
   useEffect(() => {
     let ignore = false
 
     const checkNetwork = async () => {
-      if (isConnected && chainId !== EXPECTED_CHAIN_ID) {
-        const expectedChain = getExpectedChain()
+      if (isConnected && !isSupportedChainId(chainId)) {
+        const supported = listSupportedChainIds()
+          .map((id) => getNetwork(id)?.name)
+          .filter(Boolean)
+          .join(' or ')
+        const primary = getNetwork(PRIMARY_CHAIN_ID)
         if (!ignore) {
-          setNetworkError(`Wrong network. Please switch to ${expectedChain.name} (Chain ID: ${EXPECTED_CHAIN_ID})`)
+          setNetworkError(
+            `Wrong network. Please switch to ${supported || primary?.name || 'a supported network'}.`
+          )
         }
       } else {
         if (!ignore) {
@@ -99,13 +106,18 @@ export function Web3Provider({ children }) {
   }, [disconnect])
 
   const handleSwitchNetwork = useCallback(async () => {
+    // Switch to the configured primary chain (Polygon Amoy). This path only
+    // runs when the user is on an unrecognized network.
+    const target = PRIMARY_CHAIN_ID
     try {
-      await switchChain({ chainId: EXPECTED_CHAIN_ID })
+      await switchChain({ chainId: target })
     } catch (error) {
       console.error('Error switching network:', error)
-      
-      // If switching failed, show instructions
-      alert(`Please manually switch to the correct network in MetaMask:\nNetwork: ${getExpectedChain().name}\nChain ID: ${EXPECTED_CHAIN_ID}`)
+      const targetNet = getNetwork(target)
+      alert(
+        `Please manually switch to the correct network in your wallet:\n` +
+        `Network: ${targetNet?.name || 'Polygon Amoy'}\nChain ID: ${target}`
+      )
     }
   }, [switchChain])
 
@@ -119,9 +131,11 @@ export function Web3Provider({ children }) {
     provider,
     signer,
     
-    // Network state
+    // Network state — "correct" means the user is on a supported chain
+    // (Polygon Amoy or local Hardhat). Use capabilities from networks.js to
+    // decide whether a feature is available on the connected chain.
     networkError,
-    isCorrectNetwork: isConnected && chainId === EXPECTED_CHAIN_ID,
+    isCorrectNetwork: isConnected && isSupportedChainId(chainId),
     
     // Actions
     connectWallet,

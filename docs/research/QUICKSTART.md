@@ -107,10 +107,10 @@ prediction-dao-research/
 3. Fill in:
    - Title (max 100 characters)
    - Description
-   - Funding amount (max 50,000 ETC)
+   - Funding amount (max 50,000)
    - Recipient address
    - Welfare metric
-4. Ensure you have 50 ETC for bond
+4. Ensure you have 50  for bond
 5. Click "Submit Proposal"
 
 ### Trade on Markets

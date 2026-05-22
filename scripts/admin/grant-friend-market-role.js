@@ -5,8 +5,8 @@ const { requireAddress, MembershipTier, getRoleHash } = require("./lib/addresses
  * Grant FRIEND_MARKET_ROLE to a user on TieredRoleManager
  *
  * Usage:
- *   USER=0x123... npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor
- *   USER=0x123... TIER=SILVER npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor
+ *   USER=0x123... npx hardhat run scripts/admin/grant-friend-market-role.js --network amoy
+ *   USER=0x123... TIER=SILVER npx hardhat run scripts/admin/grant-friend-market-role.js --network amoy
  */
 
 async function main() {
@@ -15,7 +15,7 @@ async function main() {
   if (!userAddress || !ethers.isAddress(userAddress)) {
     console.error("Error: Valid USER address required");
     console.log("\nUsage:");
-    console.log("  USER=0x123... npx hardhat run scripts/admin/grant-friend-market-role.js --network mordor");
+    console.log("  USER=0x123... npx hardhat run scripts/admin/grant-friend-market-role.js --network amoy");
     process.exit(1);
   }
 

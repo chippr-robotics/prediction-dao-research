@@ -355,23 +355,30 @@
 
 .toggle-label {
   font-size: 0.875rem;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
 }
 
-.toggle-btn {
-  padding: 0.25rem 0.5rem;
-  background: var(--surface-hover, #2a2a2a);
-  color: var(--text-primary, #ffffff);
-  border: 1px solid var(--border-color, #333);
-  border-radius: 4px;
+.wallet-dropdown .toggle-btn {
+  padding: 0.375rem 0.75rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   font-size: 0.75rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.toggle-btn:hover {
-  background: var(--surface-color, #1a1a1a);
-  border-color: var(--primary-color, #4a9eff);
+.wallet-dropdown .toggle-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--brand-primary, var(--primary-color));
+  color: var(--brand-primary, var(--primary-color));
+}
+
+.wallet-dropdown .toggle-btn:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--primary-color));
+  outline-offset: 2px;
 }
 
 .status-active {
@@ -483,17 +490,17 @@
 /* Dropdown Actions */
 .dropdown-actions {
   padding: 0.5rem;
-  border-top: 1px solid var(--border-color, #333);
+  border-top: 1px solid var(--border-color);
 }
 
-.action-button {
+.wallet-dropdown .dropdown-actions .action-button {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
   background: transparent;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   border: 1px solid transparent;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -503,30 +510,30 @@
   text-align: left;
 }
 
-.action-button:hover {
-  background: var(--surface-hover, #2a2a2a);
-  border-color: var(--border-color, #333);
+.wallet-dropdown .dropdown-actions .action-button:hover {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
 }
 
-.action-button:focus-visible {
-  outline: 2px solid var(--primary-color, #4a9eff);
+.wallet-dropdown .dropdown-actions .action-button:focus-visible {
+  outline: 2px solid var(--brand-primary, var(--primary-color));
   outline-offset: -2px;
 }
 
-.disconnect-button:hover {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #ef4444;
+.wallet-dropdown .dropdown-actions .disconnect-button:hover {
+  background: rgba(229, 83, 61, 0.12);
+  border-color: rgba(229, 83, 61, 0.35);
+  color: var(--danger-color, #ef4444);
 }
 
-.get-usdc-btn {
+.wallet-dropdown .dropdown-actions .get-usdc-btn {
   text-decoration: none;
   color: var(--success-color, #4caf50);
 }
 
-.get-usdc-btn:hover {
-  background: rgba(76, 175, 80, 0.1);
-  border-color: rgba(76, 175, 80, 0.3);
+.wallet-dropdown .dropdown-actions .get-usdc-btn:hover {
+  background: rgba(46, 204, 113, 0.12);
+  border-color: rgba(46, 204, 113, 0.35);
   color: var(--success-color, #4caf50);
 }
 

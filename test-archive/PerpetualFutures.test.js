@@ -13,7 +13,7 @@ describe("Perpetual Futures System", function () {
 
     // Deploy mock ERC20 token for collateral
     const MockToken = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
-    mockCollateralToken = await MockToken.deploy("Mock USC", "mUSC", ethers.parseEther("10000000"));
+    mockCollateralToken = await MockToken.deploy("Mock USDC", "mUSDC", ethers.parseEther("10000000"));
     await mockCollateralToken.waitForDeployment();
 
     // Mint tokens to traders

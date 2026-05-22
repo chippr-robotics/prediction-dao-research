@@ -116,7 +116,7 @@ function calculateTradingPeriod(template, currentDate = new Date()) {
 /**
  * Calculate liquidity amount from template config
  * @param {Object} template - Market template
- * @param {number} decimals - Token decimals (default 6 for USC)
+ * @param {number} decimals - Token decimals (default 6 for USDC)
  * @returns {BigInt} Liquidity amount in wei
  */
 function calculateLiquidity(template, decimals = 6) {
@@ -211,19 +211,19 @@ function selectDiverseTemplates(templates, count, currentDate = new Date()) {
 /**
  * Build complete market parameters from template
  * @param {Object} template - Market template
- * @param {string} uscAddress - USC token address
+ * @param {string} usdcAddress - USDC token address
  * @param {number} decimals - Token decimals
  * @param {Date} currentDate - Current date
  * @returns {Object} Market creation parameters
  */
-function buildMarketParams(template, uscAddress, decimals = 6, currentDate = new Date()) {
+function buildMarketParams(template, usdcAddress, decimals = 6, currentDate = new Date()) {
   return {
     question: template.question,
     description: template.description || "",
     category: template.category,
     subcategory: template.subcategory,
     proposalId: generateProposalId(template, currentDate),
-    collateralToken: uscAddress,
+    collateralToken: usdcAddress,
     liquidity: calculateLiquidity(template, decimals),
     liquidityParam: ethers.parseUnits("100", decimals),
     tradingPeriod: calculateTradingPeriod(template, currentDate),

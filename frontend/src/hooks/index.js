@@ -17,8 +17,8 @@ export {
   useWalletConnection
 } from './useWalletManagement'
 
-// ETCswap hooks
-export { useETCswap } from './useETCswap'
+// DEX hooks
+export { useDex } from './useDex'
 
 // UI hooks
 export { 
@@ -87,6 +87,17 @@ export { useFriendMarketCreation } from './useFriendMarketCreation'
 
 // Friend market notification hooks
 export { useFriendMarketNotifications } from './useFriendMarketNotifications'
+export { useMyWagerNotifications } from './useMyWagerNotifications'
+export { createUnreadMarketTracker } from './useUnreadMarketTracker'
+
+// Paginated My Wagers query
+export { useMyWagers } from './useMyWagers'
+
+// Testnet/Mainnet toggle
+export { useNetworkMode } from './useNetworkMode'
+
+// Polymarket Gamma API event search
+export { usePolymarketSearch } from './usePolymarketSearch'
 
 // IPFS hooks (for decentralized storage)
 export {

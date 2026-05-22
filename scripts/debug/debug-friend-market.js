@@ -39,15 +39,15 @@ async function main() {
   
   // Now let's try to create a fresh market and accept it to prove the contract works
   console.log("\n=== CREATING FRESH TEST MARKET ===");
-  const uscAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
+  const usdcAddress = "0xDE093684c796204224BC081f937aa059D903c52a";
   const tester1 = "0xB8594B2d60261C89E49B9D64C7165B2f33fFB90E";
-  const usc = await ethers.getContractAt("IERC20", uscAddress);
+  const usc = await ethers.getContractAt("IERC20", usdcAddress);
   
-  // Use a very small stake - 1 USC
+  // Use a very small stake - 1 USDC
   const stakeAmount = ethers.parseUnits("1", 6);
   
   // Approve
-  console.log("Approving 1 USC...");
+  console.log("Approving 1 USDC...");
   const approveTx = await usc.approve(factoryAddress, stakeAmount);
   await approveTx.wait();
   
@@ -56,12 +56,12 @@ async function main() {
   console.log("Creating market...");
   const createTx = await factory.createOneVsOneMarketPending(
     tester1,
-    "Fresh test with 1 USC",
+    "Fresh test with 1 USDC",
     604800,
     ethers.ZeroAddress,
     deadline,
     stakeAmount,
-    uscAddress
+    usdcAddress
   );
   const receipt = await createTx.wait();
   
@@ -75,14 +75,14 @@ async function main() {
   
   // Check Tester1's allowance
   const allowance = await usc.allowance(tester1, factoryAddress);
-  console.log("\nTester1 allowance:", ethers.formatUnits(allowance, 6), "USC");
-  console.log("Required:", "1 USC");
+  console.log("\nTester1 allowance:", ethers.formatUnits(allowance, 6), "USDC");
+  console.log("Required:", "1 USDC");
   console.log("Sufficient:", allowance >= stakeAmount);
   
   console.log("\n=== INSTRUCTIONS FOR TESTER 1 ===");
   console.log("Market ID:", marketId.toString());
-  console.log("Stake: 1 USC");
-  console.log("Tester1 needs to approve at least 1 USC if allowance < 1");
+  console.log("Stake: 1 USDC");
+  console.log("Tester1 needs to approve at least 1 USDC if allowance < 1");
   console.log("Then call acceptMarket(" + marketId + ")");
 }
 

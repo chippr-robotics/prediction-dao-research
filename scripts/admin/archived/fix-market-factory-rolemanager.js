@@ -5,7 +5,7 @@
  * Sets the roleManager on ConditionalMarketFactory through FutarchyGovernor.
  *
  * Usage:
- *   npx hardhat run scripts/admin/fix-market-factory-rolemanager.js --network mordor
+ *   npx hardhat run scripts/admin/fix-market-factory-rolemanager.js --network amoy
  */
 
 const hre = require("hardhat");

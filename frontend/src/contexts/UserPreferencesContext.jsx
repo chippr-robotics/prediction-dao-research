@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWeb3 } from '../hooks/useWeb3'
-import { 
-  saveUserPreference, 
-  getUserPreference, 
+import {
+  saveUserPreference,
+  getUserPreference,
   clearUserPreferences,
-  getDemoMode,
-  updateDemoMode
 } from '../utils/userStorage'
 import { UserPreferencesContext } from './UserPreferencesContext.js'
 
@@ -21,7 +19,7 @@ export function UserPreferencesProvider({ children }) {
     recentSearches: [],
     favoriteMarkets: [],
     defaultSlippage: 0.5,
-    demoMode: false // Default to live mode (blockchain data)
+    polymarketCategories: [],
   })
   const [isLoading, setIsLoading] = useState(false)
 
@@ -35,7 +33,7 @@ export function UserPreferencesProvider({ children }) {
         recentSearches: [],
         favoriteMarkets: [],
         defaultSlippage: 0.5,
-        demoMode: false
+        polymarketCategories: [],
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,13 +45,13 @@ export function UserPreferencesProvider({ children }) {
       const recentSearches = getUserPreference(walletAddress, 'recent_searches', [], true)
       const favoriteMarkets = getUserPreference(walletAddress, 'favorite_markets', [], true)
       const defaultSlippage = getUserPreference(walletAddress, 'default_slippage', 0.5, true)
-      const demoMode = getDemoMode(walletAddress)
+      const polymarketCategories = getUserPreference(walletAddress, 'polymarket_categories', [], true)
 
       setPreferences({
         recentSearches,
         favoriteMarkets,
         defaultSlippage,
-        demoMode
+        polymarketCategories,
       })
     } catch (error) {
       console.error('Error loading user preferences:', error)
@@ -104,7 +102,7 @@ export function UserPreferencesProvider({ children }) {
       const favorites = isFavorite
         ? prev.favoriteMarkets.filter(id => id !== marketId)
         : [...prev.favoriteMarkets, marketId]
-      
+
       saveUserPreference(account, 'favorite_markets', favorites, true)
       return { ...prev, favoriteMarkets: favorites }
     })
@@ -117,14 +115,12 @@ export function UserPreferencesProvider({ children }) {
     setPreferences(prev => ({ ...prev, defaultSlippage: slippage }))
   }, [account])
 
-  const setDemoMode = useCallback((enabled) => {
+  const setPolymarketCategories = useCallback((categories) => {
     if (!account) return
 
-    updateDemoMode(account, enabled)
-    setPreferences(prev => ({
-      ...prev,
-      demoMode: enabled
-    }))
+    const next = Array.isArray(categories) ? categories : []
+    saveUserPreference(account, 'polymarket_categories', next, true)
+    setPreferences(prev => ({ ...prev, polymarketCategories: next }))
   }, [account])
 
   const clearAllPreferences = useCallback(() => {
@@ -135,7 +131,7 @@ export function UserPreferencesProvider({ children }) {
       recentSearches: [],
       favoriteMarkets: [],
       defaultSlippage: 0.5,
-      demoMode: false
+      polymarketCategories: [],
     })
   }, [account])
 
@@ -146,7 +142,7 @@ export function UserPreferencesProvider({ children }) {
     clearRecentSearches,
     toggleFavoriteMarket,
     setDefaultSlippage,
-    setDemoMode,
+    setPolymarketCategories,
     savePreference,
     clearAllPreferences,
   }

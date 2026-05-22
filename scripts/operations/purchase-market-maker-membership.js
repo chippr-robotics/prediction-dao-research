@@ -2,14 +2,14 @@ const { ethers } = require("hardhat");
 const { loadMnemonicFromFloppy } = require("./floppy-key/loader");
 
 /**
- * Purchase MARKET_MAKER_ROLE membership using USC
+ * Purchase MARKET_MAKER_ROLE membership using USDC
  *
  * This grants the ability to create PUBLIC prediction markets
  * on the ConditionalMarketFactory.
  *
  * Usage:
  *   export FLOPPY_KEYSTORE_PASSWORD="password"
- *   npx hardhat run scripts/operations/purchase-market-maker-membership.js --network mordor
+ *   npx hardhat run scripts/operations/purchase-market-maker-membership.js --network amoy
  */
 
 // Contract addresses (modular RBAC system)
@@ -24,12 +24,12 @@ const CONTRACTS = {
 // Role hash
 const MARKET_MAKER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE"));
 
-// Tier prices in USC (6 decimals)
+// Tier prices in USDC (6 decimals)
 const TIER_PRICES = {
-  BRONZE: 100,   // 100 USC
-  SILVER: 200,   // 200 USC
-  GOLD: 350,     // 350 USC
-  PLATINUM: 600, // 600 USC
+  BRONZE: 100,   // 100 USDC
+  SILVER: 200,   // 200 USDC
+  GOLD: 350,     // 350 USDC
+  PLATINUM: 600, // 600 USDC
 };
 
 const MembershipTier = {
@@ -87,13 +87,13 @@ async function main() {
 
   // Check balances
   console.log("\n[2/6] Checking balances...");
-  const etcBalance = await provider.getBalance(wallet.address);
-  console.log("ETC balance:", ethers.formatEther(etcBalance), "ETC");
+  const maticBalance = await provider.getBalance(wallet.address);
+  console.log("MATIC balance:", ethers.formatEther(maticBalance), "MATIC");
 
   const usc = new ethers.Contract(CONTRACTS.usc, ERC20_ABI, wallet);
-  const uscBalance = await usc.balanceOf(wallet.address);
-  const uscDecimals = await usc.decimals();
-  console.log("USC balance:", ethers.formatUnits(uscBalance, uscDecimals), "USC");
+  const usdcBalance = await usc.balanceOf(wallet.address);
+  const usdcDecimals = await usc.decimals();
+  console.log("USDC balance:", ethers.formatUnits(usdcBalance, usdcDecimals), "USDC");
 
   // Check current membership status
   console.log("\n[3/6] Checking current membership status...");
@@ -120,7 +120,7 @@ async function main() {
       console.log("Expires:", new Date(Number(expiration) * 1000).toISOString());
     }
     console.log("\nYou can create public markets. Run:");
-    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
     return;
   }
 
@@ -136,18 +136,18 @@ async function main() {
   const paymentManager = new ethers.Contract(paymentManagerAddr, PAYMENT_MANAGER_ABI, provider);
 
   const price = await paymentManager.getRolePrice(roleHash, CONTRACTS.usc);
-  console.log("MARKET_MAKER_ROLE price:", ethers.formatUnits(price, uscDecimals), "USC");
+  console.log("MARKET_MAKER_ROLE price:", ethers.formatUnits(price, usdcDecimals), "USDC");
 
   // Use price from contract, fallback to TIER_PRICES if zero
-  const priceWei = price > 0n ? price : ethers.parseUnits(TIER_PRICES.BRONZE.toString(), uscDecimals);
-  const priceFormatted = ethers.formatUnits(priceWei, uscDecimals);
+  const priceWei = price > 0n ? price : ethers.parseUnits(TIER_PRICES.BRONZE.toString(), usdcDecimals);
+  const priceFormatted = ethers.formatUnits(priceWei, usdcDecimals);
 
-  console.log("Using price:", priceFormatted, "USC");
+  console.log("Using price:", priceFormatted, "USDC");
 
-  if (uscBalance < priceWei) {
-    console.error("\nError: Insufficient USC balance");
-    console.log("Required:", priceFormatted, "USC");
-    console.log("Available:", ethers.formatUnits(uscBalance, uscDecimals), "USC");
+  if (usdcBalance < priceWei) {
+    console.error("\nError: Insufficient USDC balance");
+    console.log("Required:", priceFormatted, "USDC");
+    console.log("Available:", ethers.formatUnits(usdcBalance, usdcDecimals), "USDC");
     process.exit(1);
   }
 
@@ -161,19 +161,19 @@ async function main() {
     process.exit(1);
   }
 
-  // Approve USC and execute purchase
+  // Approve USDC and execute purchase
   console.log("\n[5/6] Executing purchase...");
 
   // Check and set allowance
   const allowance = await usc.allowance(wallet.address, CONTRACTS.paymentProcessor);
   if (allowance < priceWei) {
-    console.log("Approving USC for PaymentProcessor...");
+    console.log("Approving USDC for PaymentProcessor...");
     const approveTx = await usc.approve(CONTRACTS.paymentProcessor, priceWei);
     console.log("Approval TX:", approveTx.hash);
     await approveTx.wait();
     console.log("Approval confirmed");
   } else {
-    console.log("USC already approved");
+    console.log("USDC already approved");
   }
 
   // Execute purchase
@@ -210,7 +210,7 @@ async function main() {
   if (newHasRole) {
     console.log("SUCCESS: MARKET_MAKER_ROLE membership purchased!");
     console.log("\nYou can now create public prediction markets:");
-    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network mordor");
+    console.log("  npx hardhat run scripts/operations/create-divisional-public-markets.js --network amoy");
   } else {
     console.log("WARNING: Transaction completed but role not granted");
     console.log("Check transaction on block explorer");
@@ -220,8 +220,8 @@ async function main() {
   // Show new balances
   const newEtcBalance = await provider.getBalance(wallet.address);
   const newUscBalance = await usc.balanceOf(wallet.address);
-  console.log("\nNew ETC balance:", ethers.formatEther(newEtcBalance), "ETC");
-  console.log("New USC balance:", ethers.formatUnits(newUscBalance, uscDecimals), "USC");
+  console.log("\nNew MATIC balance:", ethers.formatEther(newEtcBalance), "MATIC");
+  console.log("New USDC balance:", ethers.formatUnits(newUscBalance, usdcDecimals), "USDC");
 }
 
 main()

@@ -7,12 +7,12 @@
  *    - setRoleManager(roleManagerAddress)
  *    - setCTF1155(ctf1155Address)
  *
- * Run with: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network mordor
+ * Run with: npx hardhat run scripts/deploy-ctf1155-and-configure.js --network amoy
  */
 
 const hre = require("hardhat");
 
-// Deployed contract addresses from mordor-chain63-deterministic-deployment.json
+// Deployed contract addresses from amoy-chain63-deterministic-deployment.json
 const DEPLOYED_CONTRACTS = {
   tieredRoleManager: '0x3759B1F153193471Dd48401eE198F664f2d7FeB8',
   marketFactory: '0x37b9086Cc0d03C8a1030cC50256593B8D0d369Ac'
@@ -28,7 +28,7 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
   console.log("Deployer account:", deployer.address);
   const balance = await hre.ethers.provider.getBalance(deployer.address);
-  console.log("Account balance:", hre.ethers.formatEther(balance), "ETC");
+  console.log("Account balance:", hre.ethers.formatEther(balance), "MATIC");
   console.log();
 
   // Step 1: Deploy CTF1155

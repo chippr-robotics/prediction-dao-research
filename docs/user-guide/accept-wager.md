@@ -4,9 +4,9 @@ This guide walks you through accepting a wager that someone has created for you 
 
 ## Prerequisites
 
-- A browser wallet (MetaMask or compatible) connected to the Mordor testnet (chain ID 63)
-- ETC for gas fees
-- Enough stake tokens (ETC or USC) to match the required wager amount
+- A browser wallet (MetaMask or compatible) connected to the Polygon Amoy (Polymarket testnet) (chain ID 80002)
+- MATIC for gas fees
+- Enough stake tokens (MATIC or USDC) to match the required wager amount
 - The wager link or ID from the creator
 
 ## Step-by-Step Walkthrough
@@ -21,7 +21,7 @@ If you received just a wager ID instead of a link, navigate to the FairWins app 
 
 Click **Connect Wallet** and select the wallet address that the creator invited. You must connect with the exact address that was specified during wager creation -- a different address will not work.
 
-Make sure you are on the Mordor testnet (chain ID 63). If not, the app prompts you to switch networks.
+Make sure you are on the Polygon Amoy (Polymarket testnet) (chain ID 80002). If not, the app prompts you to switch networks.
 
 ### 3. Register Your Encryption Key (One-Time)
 
@@ -54,7 +54,7 @@ Before accepting, review all terms carefully:
 
 - **Description** -- What the wager is about and how the outcome is determined
 - **Stake Amount** -- How much you need to put up (the required amount is fixed by the creator)
-- **Stake Token** -- Which token is used (ETC or USC stablecoin)
+- **Stake Token** -- Which token is used (MATIC or USDC stablecoin)
 - **Odds** -- For bookmaker wagers, the payout multiplier (e.g., 2x means you win double your stake)
 - **Wager End Date** -- When the trading period expires and resolution begins
 - **Acceptance Deadline** -- How long you have to accept before the wager expires
@@ -75,15 +75,15 @@ When you are satisfied with the terms, click the **Accept Wager** button. This t
 2. Records your acceptance on-chain
 3. Emits a `MarketAccepted` event
 
-For **ERC-20 tokens** (like USC), you may see two transaction prompts:
+For **ERC-20 tokens** (like USDC), you may see two transaction prompts:
 1. **Approve** -- Allow the factory contract to spend your tokens
 2. **Accept** -- The actual acceptance transaction
 
-For **native ETC** stakes, only one transaction is needed.
+For **native MATIC** stakes, only one transaction is needed.
 
 ### 7. Transaction Confirmation
 
-Wait for the transaction to confirm on Mordor testnet. Once confirmed:
+Wait for the transaction to confirm on Polygon Amoy (Polymarket testnet). Once confirmed:
 
 - The wager status updates. For 1v1 wagers, it transitions immediately to **Active**. For group wagers, it transitions to Active once the minimum acceptance threshold is met.
 - Your stake is locked in the contract for the duration of the wager.
@@ -109,8 +109,8 @@ See [Resolving a Wager](resolve-wager.md) for the next steps.
 
 **"AddressNullified" error** -- Your address has been flagged. Contact support.
 
-**Cannot see wager details** -- Make sure you signed the encryption message when prompted. Try refreshing the page. Ensure you are on Mordor testnet.
+**Cannot see wager details** -- Make sure you signed the encryption message when prompted. Try refreshing the page. Ensure you are on Polygon Amoy (Polymarket testnet).
 
-**"Insufficient balance" error** -- You need enough of the required stake token plus ETC for gas. Check your balance matches or exceeds the displayed stake amount.
+**"Insufficient balance" error** -- You need enough of the required stake token plus MATIC for gas. Check your balance matches or exceeds the displayed stake amount.
 
 **Wager shows "Encrypted Market"** -- Your encryption key has not been derived yet. Ensure you signed the encryption message. If the ZKKeyManager is not deployed, the system may use a legacy shared-signature flow instead.
