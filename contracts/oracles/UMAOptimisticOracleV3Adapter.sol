@@ -131,8 +131,9 @@ contract UMAOptimisticOracleV3Adapter is
 
         // CEI: reserve the pending-assertion slot with a sentinel before the
         // external call so a cross-function reentry can't see an empty mapping
-        // and start a second concurrent assertion for the same condition. The
-        // real assertionId is patched in after the call returns.
+        // and start a second concurrent assertion for the same condition.
+        // The real assertionId-to-conditionId link lives in assertionToCondition
+        // (written post-call); conditionToAssertion is never updated post-call.
         conditionToAssertion[conditionId] = _PENDING_SENTINEL;
 
         IERC20 currency = IERC20(cfg.bondCurrency);
