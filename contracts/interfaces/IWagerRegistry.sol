@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 /// @title IWagerRegistry
 /// @notice Public surface area for off-chain integrators (frontend, indexers).
 interface IWagerRegistry {
-    enum ResolutionType { Either, Creator, Opponent, ThirdParty, Polymarket }
+    enum ResolutionType { Either, Creator, Opponent, ThirdParty, Polymarket, ChainlinkDataFeed, ChainlinkFunctions, UMA }
     enum Status { None, Open, Active, Resolved, Cancelled, Refunded }
 
     struct Wager {
@@ -41,6 +41,13 @@ interface IWagerRegistry {
     event WagerRefunded(uint256 indexed wagerId, address indexed creator, address indexed opponent);
     event PayoutClaimed(uint256 indexed wagerId, address indexed winner, uint256 amount);
     event PolymarketLinked(uint256 indexed wagerId, bytes32 indexed conditionId, bool creatorIsYes);
+    event OracleAdapterUpdated(ResolutionType indexed resolutionType, address indexed adapter);
+    event OracleConditionLinked(
+        uint256 indexed wagerId,
+        ResolutionType indexed resolutionType,
+        bytes32 indexed conditionId,
+        bool creatorIsYes
+    );
 
     function createWager(
         address opponent,
@@ -60,6 +67,7 @@ interface IWagerRegistry {
     function cancelOpen(uint256 wagerId) external;
     function declareWinner(uint256 wagerId, address winner) external;
     function autoResolveFromPolymarket(uint256 wagerId) external;
+    function autoResolveFromOracle(uint256 wagerId) external;
     function claimPayout(uint256 wagerId) external;
     function claimRefund(uint256 wagerId) external;
 
