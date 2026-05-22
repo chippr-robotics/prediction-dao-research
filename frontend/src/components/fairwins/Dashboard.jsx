@@ -428,11 +428,11 @@ function Dashboard() {
       </header>
 
       {/* Membership CTA Banner */}
-      {isConnected && !bannerDismissed && !hasRole(ROLES.FRIEND_MARKET) && (
+      {isConnected && !bannerDismissed && !hasRole(ROLES.WAGER_PARTICIPANT) && (
         <div className="dashboard-cta-banner">
           <div className="cta-banner-content">
-            <strong>Get access to create and accept wagers</strong>
-            <p>Purchase a membership to start creating P2P wagers with friends.</p>
+            <strong>Get access to create and accept peer-to-peer wagers</strong>
+            <p>Purchase the Wager Participant role to start creating P2P wagers.</p>
           </div>
           <div className="cta-banner-actions">
             <button

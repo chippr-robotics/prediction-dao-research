@@ -1,5 +1,11 @@
 # Introduction to Prediction DAO
 
+> Before purchasing a membership, please read
+> [Roles and Tiers](roles-and-tiers.md) and the
+> [Account Moderation Policy](account-moderation.md) — the protocol can be
+> paused by a Guardian role holder and individual accounts can be frozen by
+> an Account Moderator role holder.
+
 ## What is Prediction DAO?
 
 Prediction DAO is a futarchy-based governance system that uses prediction markets to make decisions about resource allocation and protocol changes.

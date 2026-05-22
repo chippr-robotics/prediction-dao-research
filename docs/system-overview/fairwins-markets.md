@@ -1,5 +1,18 @@
 # FairWins Prediction Markets
 
+> **Note (v3 P2P refactor):** The core mechanic is now **peer-to-peer wagers**
+> via the `WagerRegistry` contract — not LMSR market making. The rest of this
+> page describes the legacy LMSR design and is preserved for historical
+> context. For the current mechanic see [How it Works](how-it-works.md), and
+> for the role / tier / pricing structure see
+> [Roles and Tiers](roles-and-tiers.md).
+>
+> **Before you purchase a tier**, please read the
+> [Account Moderation Policy](account-moderation.md) and the
+> [Operator powers section in security.md](security.md#operator-powers) —
+> the protocol can be paused by a Guardian role holder and individual
+> accounts can be frozen by an Account Moderator role holder.
+
 ## Overview
 
 **FairWins** is an open prediction market platform built on the same infrastructure as ClearPath, but designed for general-purpose event predictions rather than DAO governance. While ClearPath uses futarchy for institutional decision-making, FairWins enables anyone to create and trade on prediction markets for any topic.

@@ -201,11 +201,11 @@ describe('WalletButton Component - Wagers', () => {
       })
     })
 
-    it('shows Create Wager button for users with FRIEND_MARKET role', async () => {
+    it('shows Create Wager button for users with WAGER_PARTICIPANT role', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
-        roles: [ROLES.FRIEND_MARKET],
-        hasRole: vi.fn((role) => role === ROLES.FRIEND_MARKET)
+        roles: [ROLES.WAGER_PARTICIPANT],
+        hasRole: vi.fn((role) => role === ROLES.WAGER_PARTICIPANT)
       })
 
       renderWithProviders(<WalletButton />)
@@ -218,7 +218,7 @@ describe('WalletButton Component - Wagers', () => {
       })
     })
 
-    it('shows purchase access prompt for users without FRIEND_MARKET role', async () => {
+    it('shows purchase access prompt for users without WAGER_PARTICIPANT role', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
         roles: [],
@@ -231,11 +231,7 @@ describe('WalletButton Component - Wagers', () => {
       await user.click(button)
 
       await waitFor(() => {
-        // Stable symbol is chain-aware (USDC on Polygon Amoy);
-        // chains with no stablecoin defined render the "STABLE" fallback. The
-        // the test setup uses an unrecognized chain (no stablecoin) so STABLE
-        // is the expected value here — but match all symbols for safety.
-        expect(screen.getByText(/Get Access - \$50 (USDC|STABLE) per Month/)).toBeInTheDocument()
+        expect(screen.getByText(/Get Access - from \$2 USDC \/ month/)).toBeInTheDocument()
       })
     })
 
@@ -273,8 +269,8 @@ describe('WalletButton Component - Wagers', () => {
     it('opens wager creation modal when Create Wager button is clicked', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
-        roles: [ROLES.FRIEND_MARKET],
-        hasRole: vi.fn((role) => role === ROLES.FRIEND_MARKET)
+        roles: [ROLES.WAGER_PARTICIPANT],
+        hasRole: vi.fn((role) => role === ROLES.WAGER_PARTICIPANT)
       })
 
       renderWithProviders(<WalletButton />)
@@ -293,8 +289,8 @@ describe('WalletButton Component - Wagers', () => {
     it('closes dropdown when Create Wager button is clicked', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
-        roles: [ROLES.FRIEND_MARKET],
-        hasRole: vi.fn((role) => role === ROLES.FRIEND_MARKET)
+        roles: [ROLES.WAGER_PARTICIPANT],
+        hasRole: vi.fn((role) => role === ROLES.WAGER_PARTICIPANT)
       })
 
       renderWithProviders(<WalletButton />)
@@ -316,8 +312,8 @@ describe('WalletButton Component - Wagers', () => {
     it('all wager actions are within a single Wagers section', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
-        roles: [ROLES.FRIEND_MARKET, ROLES.MARKET_MAKER],
-        hasRole: vi.fn((role) => role === ROLES.FRIEND_MARKET || role === ROLES.MARKET_MAKER)
+        roles: [ROLES.WAGER_PARTICIPANT, ROLES.WAGER_PARTICIPANT],
+        hasRole: vi.fn((role) => role === ROLES.WAGER_PARTICIPANT || role === ROLES.WAGER_PARTICIPANT)
       })
 
       renderWithProviders(<WalletButton />)
@@ -345,8 +341,8 @@ describe('WalletButton Component - Wagers', () => {
     it('Create Wager button has correct role', async () => {
       const user = userEvent.setup()
       useWalletRoles.mockReturnValue({
-        roles: [ROLES.FRIEND_MARKET],
-        hasRole: vi.fn((role) => role === ROLES.FRIEND_MARKET)
+        roles: [ROLES.WAGER_PARTICIPANT],
+        hasRole: vi.fn((role) => role === ROLES.WAGER_PARTICIPANT)
       })
 
       renderWithProviders(<WalletButton />)

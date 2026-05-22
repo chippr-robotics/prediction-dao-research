@@ -31,7 +31,7 @@ const PENDING_TX_KEY = 'pendingFriendMarketTx'
 const savePendingTransaction = (txData) => {
   try {
     localStorage.setItem(PENDING_TX_KEY, JSON.stringify({ ...txData, timestamp: Date.now() }))
-  } catch {}
+  } catch { /* localStorage may be unavailable; ignore */ }
 }
 
 export const loadPendingTransaction = () => {
@@ -48,7 +48,7 @@ export const loadPendingTransaction = () => {
 }
 
 export const clearPendingTransaction = () => {
-  try { localStorage.removeItem(PENDING_TX_KEY) } catch {}
+  try { localStorage.removeItem(PENDING_TX_KEY) } catch { /* ignore */ }
 }
 
 /**
@@ -237,7 +237,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
             wagerId = parsed.args.wagerId.toString()
             break
           }
-        } catch {}
+        } catch { /* localStorage may be unavailable; ignore */ }
       }
 
       onProgress({ step: 'complete', message: 'Wager created!', txHash: receipt.hash })

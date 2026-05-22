@@ -3,90 +3,73 @@ import { createContext } from 'react'
 export const RoleContext = createContext(null)
 
 /**
- * Available roles in the system
+ * Roles in the P2P wager system.
+ *
+ * One user-purchasable role (`WAGER_PARTICIPANT`) and four on-chain admin
+ * roles enforced via OpenZeppelin AccessControl on MembershipManager and
+ * WagerRegistry. Each admin role gates a distinct piece of the operator
+ * surface; see docs/system-overview/roles-and-tiers.md for the canonical
+ * description of who can do what.
  */
 export const ROLES = {
-  // User-facing roles
-  MARKET_MAKER: 'MARKET_MAKER',
-  FRIEND_MARKET: 'FRIEND_MARKET',
+  // Sole user-purchasable role
+  WAGER_PARTICIPANT: 'WAGER_PARTICIPANT',
 
-  // Administrative roles (hierarchical)
-  ADMIN: 'ADMIN', // Top-level admin (DEFAULT_ADMIN_ROLE on-chain)
-  CORE_SYSTEM_ADMIN: 'CORE_SYSTEM_ADMIN', // System-wide admin with timelock
-  OPERATIONS_ADMIN: 'OPERATIONS_ADMIN', // Day-to-day operations
-  EMERGENCY_GUARDIAN: 'EMERGENCY_GUARDIAN', // Can pause contracts
-  OVERSIGHT_COMMITTEE: 'OVERSIGHT_COMMITTEE', // Independent verification
+  // Administrative roles (on-chain via AccessControl)
+  ADMIN: 'ADMIN',                          // DEFAULT_ADMIN_ROLE
+  GUARDIAN: 'GUARDIAN',                    // GUARDIAN_ROLE — pause/unpause
+  ACCOUNT_MODERATOR: 'ACCOUNT_MODERATOR',  // ACCOUNT_MODERATOR_ROLE — freeze
+  ROLE_MANAGER: 'ROLE_MANAGER',            // ROLE_MANAGER_ROLE — grant/revoke memberships
 }
 
-/**
- * Role display names and descriptions
- */
 export const ROLE_INFO = {
-  [ROLES.MARKET_MAKER]: {
-    name: 'Market Maker',
-    description: 'Ability to create and manage prediction markets',
-    premium: true,
-    isAdminRole: false
-  },
-  [ROLES.FRIEND_MARKET]: {
-    name: 'Friend Markets',
-    description: 'Create private prediction markets with friends',
+  [ROLES.WAGER_PARTICIPANT]: {
+    name: 'Wager Participant',
+    description: 'Create and accept peer-to-peer wagers in USDC or WMATIC',
     premium: true,
     isAdminRole: false
   },
   [ROLES.ADMIN]: {
     name: 'Administrator',
-    description: 'Full system access including role management and contract configuration',
+    description: 'Full system access: tier config, treasury, and authority to grant other admin roles',
     premium: false,
     isAdminRole: true
   },
-  [ROLES.CORE_SYSTEM_ADMIN]: {
-    name: 'Core System Admin',
-    description: 'System-wide administrative access with multi-sig and timelock requirements',
-    premium: false,
-    isAdminRole: true
-  },
-  [ROLES.OPERATIONS_ADMIN]: {
-    name: 'Operations Admin',
-    description: 'Day-to-day operational control including tier configuration and user management',
-    premium: false,
-    isAdminRole: true
-  },
-  [ROLES.EMERGENCY_GUARDIAN]: {
+  [ROLES.GUARDIAN]: {
     name: 'Emergency Guardian',
-    description: 'Emergency response capability to pause contracts when security issues arise',
+    description: 'Pause and unpause the WagerRegistry in response to security incidents',
     premium: false,
     isAdminRole: true
   },
-  [ROLES.OVERSIGHT_COMMITTEE]: {
-    name: 'Oversight Committee',
-    description: 'Independent verification and audit access for governance transparency',
+  [ROLES.ACCOUNT_MODERATOR]: {
+    name: 'Account Moderator',
+    description: 'Freeze and unfreeze individual accounts. See the account moderation policy for criteria',
     premium: false,
     isAdminRole: true
-  }
+  },
+  [ROLES.ROLE_MANAGER]: {
+    name: 'Role Manager',
+    description: 'Grant or revoke memberships outside the purchase flow (gifts, support, dispute resolution)',
+    premium: false,
+    isAdminRole: true
+  },
 }
 
 /**
- * Admin roles that grant access to the admin panel
+ * Admin roles that grant access to the admin portal.
+ * Each individual tab inside the portal is gated separately by its role.
  */
 export const ADMIN_ROLES = [
   ROLES.ADMIN,
-  ROLES.CORE_SYSTEM_ADMIN,
-  ROLES.OPERATIONS_ADMIN,
-  ROLES.EMERGENCY_GUARDIAN,
-  ROLES.OVERSIGHT_COMMITTEE
+  ROLES.GUARDIAN,
+  ROLES.ACCOUNT_MODERATOR,
+  ROLES.ROLE_MANAGER,
 ]
 
-/**
- * Check if a role is an administrative role
- */
 export function isAdminRole(role) {
   return ADMIN_ROLES.includes(role)
 }
 
-/**
- * Get the display-friendly name for a role
- */
 export function getRoleName(role) {
   return ROLE_INFO[role]?.name || role
 }

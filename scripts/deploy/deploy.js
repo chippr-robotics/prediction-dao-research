@@ -7,8 +7,9 @@
  *
  * Deployed:
  *   - PolymarketOracleAdapter (or MockPolymarketCTF first if needed)
- *   - MembershipManager (seeds FRIEND_MARKET + MARKET_MAKER tiers)
- *   - WagerRegistry (allowlists USDC + WMATIC)
+ *   - MembershipManager (seeds WAGER_PARTICIPANT tiers at $2/$8/$25/$100)
+ *   - WagerRegistry (allowlists USDC + WMATIC; admin seeded with GUARDIAN +
+ *     ACCOUNT_MODERATOR + DEFAULT_ADMIN roles)
  *   - KeyRegistry
  *
  * Usage:
@@ -29,8 +30,7 @@ const {
   SALT_PREFIXES,
   TOKENS,
   POLYMARKET_CTF,
-  FRIEND_MARKET_TIERS,
-  MARKET_MAKER_TIERS,
+  WAGER_PARTICIPANT_TIERS,
   MAINNET_CHAIN_IDS,
   ROLE_HASHES,
   SINGLETON_FACTORY_ADDRESS,
@@ -195,8 +195,7 @@ async function main() {
   const membershipManager = mgrDeploy.contract;
 
   if (!mgrDeploy.alreadyDeployed) {
-    await seedTiers(membershipManager, deployer, ROLE_HASHES.FRIEND_MARKET_ROLE, "FRIEND_MARKET", FRIEND_MARKET_TIERS);
-    await seedTiers(membershipManager, deployer, ROLE_HASHES.MARKET_MAKER_ROLE, "MARKET_MAKER", MARKET_MAKER_TIERS);
+    await seedTiers(membershipManager, deployer, ROLE_HASHES.WAGER_PARTICIPANT_ROLE, "WAGER_PARTICIPANT", WAGER_PARTICIPANT_TIERS);
   } else {
     console.log("\nMembershipManager already deployed — skipping tier seed (idempotent re-runs should re-seed manually if config changed)");
   }

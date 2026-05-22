@@ -2,6 +2,15 @@
 
 Overview of the smart contracts powering the FairWins P2P wager platform and ClearPath governance system.
 
+> **Note (v3 P2P refactor):** the active P2P stack is now
+> `contracts/access/MembershipManager.sol` + `contracts/wagers/WagerRegistry.sol`,
+> with OpenZeppelin AccessControl gating four admin roles
+> (`DEFAULT_ADMIN_ROLE`, `GUARDIAN_ROLE`, `ACCOUNT_MODERATOR_ROLE`,
+> `ROLE_MANAGER_ROLE`) and one paid user role (`WAGER_PARTICIPANT_ROLE`).
+> The `FriendGroupMarketFactory` / `TieredRoleManager` / `TierRegistry` chain
+> below is historical. See [Roles and Tiers](../system-overview/roles-and-tiers.md)
+> and [Account Moderation Policy](../system-overview/account-moderation.md).
+
 ## Contract Architecture
 
 The system has two main contract groups: the **P2P Wager** contracts (FairWins) and the **Governance** contracts (ClearPath), sharing common infrastructure.

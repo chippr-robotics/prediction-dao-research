@@ -6,11 +6,11 @@ import { getContractAddress } from '../config/contracts'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
 /**
- * Hook to read per-user role + tier details from MembershipManager (v2).
+ * Hook to read per-user role + tier details from MembershipManager.
  *
- * Replaces the multi-contract v1 reads (TieredRoleManager + TierRegistry +
- * MembershipManager-old) with a single contract: MembershipManager.
- * Two RPC calls per role: getMembership(user, role) + getTierConfig(role, tier).
+ * The protocol has a single user-purchasable role (`WAGER_PARTICIPANT_ROLE`).
+ * For each fetch we read `getMembership(user, role)` + `getTierConfig(role, tier)`
+ * and project both into the shape consumed by RoleDetailsCard / Dashboard.
  */
 
 export const MembershipTier = {
@@ -38,10 +38,7 @@ export const TIER_COLORS = {
 }
 
 export const ROLE_BYTES32 = {
-  MARKET_MAKER: ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  FRIEND_MARKET: ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
-  CLEARPATH_USER: ethers.keccak256(ethers.toUtf8Bytes('CLEARPATH_USER_ROLE')),
-  TOKENMINT: ethers.keccak256(ethers.toUtf8Bytes('TOKENMINT_ROLE')),
+  WAGER_PARTICIPANT: ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE')),
 }
 
 function emptyDetails(roleName) {
@@ -56,10 +53,10 @@ function emptyDetails(roleName) {
     isExpired: false,
     daysRemaining: null,
     hasRole: false,
-    marketsCreated: 0,
-    marketLimit: 0,
-    canCreateMarket: false,
-    activeMarkets: 0,
+    wagersCreated: 0,
+    wagerLimit: 0,
+    canCreateWager: false,
+    activeWagers: 0,
     concurrentLimit: 0,
   }
 }
@@ -87,8 +84,8 @@ export function useRoleDetails() {
       details.tier = Number(m.tier)
       details.tierName = TIER_NAMES[details.tier] || 'Unknown'
       details.tierColor = TIER_COLORS[details.tier] || '#666'
-      details.marketsCreated = Number(m.monthCount)
-      details.activeMarkets = Number(m.activeCount)
+      details.wagersCreated = Number(m.monthCount)
+      details.activeWagers = Number(m.activeCount)
 
       const expiresAt = Number(m.expiresAt)
       if (expiresAt > 0) {
@@ -104,12 +101,12 @@ export function useRoleDetails() {
       if (details.tier > 0) {
         try {
           const cfg = await mgr.getTierConfig(roleBytes, details.tier)
-          details.marketLimit = Number(cfg.limits.monthlyMarketCreation)
+          details.wagerLimit = Number(cfg.limits.monthlyMarketCreation)
           details.concurrentLimit = Number(cfg.limits.maxConcurrentMarkets)
           // 0 = unlimited
-          const monthlyOk = details.marketLimit === 0 || details.marketsCreated < details.marketLimit
-          const concurrentOk = details.concurrentLimit === 0 || details.activeMarkets < details.concurrentLimit
-          details.canCreateMarket = details.isActive && monthlyOk && concurrentOk
+          const monthlyOk = details.wagerLimit === 0 || details.wagersCreated < details.wagerLimit
+          const concurrentOk = details.concurrentLimit === 0 || details.activeWagers < details.concurrentLimit
+          details.canCreateWager = details.isActive && monthlyOk && concurrentOk
         } catch (e) {
           console.debug(`getTierConfig failed for ${roleName}:`, e.message)
         }
@@ -130,7 +127,7 @@ export function useRoleDetails() {
     setLoading(true)
     setError(null)
     try {
-      const roles = ['MARKET_MAKER', 'FRIEND_MARKET', 'CLEARPATH_USER', 'TOKENMINT']
+      const roles = ['WAGER_PARTICIPANT']
       const details = {}
       await Promise.all(roles.map(async (roleName) => {
         const detail = await fetchRoleDetails(roleName)
@@ -163,7 +160,7 @@ export function useRoleDetails() {
     [roleDetails])
   const getRolesAtLimit = useCallback(() =>
     Object.values(roleDetails).filter(r =>
-      r.hasRole && r.isActive && r.marketLimit > 0 && !r.canCreateMarket),
+      r.hasRole && r.isActive && r.wagerLimit > 0 && !r.canCreateWager),
     [roleDetails])
 
   return {

@@ -1,5 +1,14 @@
 # Role-Based Access Control (RBAC) Implementation
 
+> **Historical — superseded by the v3 P2P refactor.** The legacy RBAC system
+> (TieredRoleManager + TierRegistry + ClearpathUser / MarketMaker / TokenMint
+> / OversightCommittee roles) has been replaced by OpenZeppelin AccessControl
+> on `MembershipManager` (`DEFAULT_ADMIN_ROLE`, `ROLE_MANAGER_ROLE`) and
+> `WagerRegistry` (`DEFAULT_ADMIN_ROLE`, `GUARDIAN_ROLE`,
+> `ACCOUNT_MODERATOR_ROLE`), with a single paid user role
+> (`WAGER_PARTICIPANT_ROLE`). See
+> [Roles and Tiers](../system-overview/roles-and-tiers.md).
+
 ## Overview
 
 This implementation provides a comprehensive Role-Based Access Control (RBAC) system for the Prediction DAO platform, focusing on premium features and administrative capabilities.

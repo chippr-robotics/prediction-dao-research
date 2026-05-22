@@ -1,413 +1,281 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { ethers } from 'ethers'
 import { useRoles } from '../hooks/useRoles'
 import { useWeb3 } from '../hooks/useWeb3'
 import { useNotification } from '../hooks/useUI'
 import { useEnsResolution } from '../hooks/useEnsResolution'
-import { useAdminContracts, CONTRACT_STATE_REFRESH_INTERVAL } from '../hooks/useAdminContracts'
-import { useTreasuryVault } from '../hooks/useTreasuryVault'
 import { useChainTokens } from '../hooks/useChainTokens'
-import { ROLES, ROLE_INFO, ADMIN_ROLES } from '../contexts/RoleContext'
+import { ROLES, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
-import { NETWORK_CONFIG, DEPLOYED_CONTRACTS } from '../config/contracts'
-import NullifierTab from './admin/NullifierTab'
+import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddress } from '../config/contracts'
+import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import './AdminPanel.css'
 
-// Minimum withdrawal amount to prevent gas waste on dust transactions
-const MIN_WITHDRAWAL_AMOUNT = 0.000000000000000001
+const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
+const USDC_DECIMALS = 6
 
-// Maximum tier duration in days to prevent overflow issues
-const MAX_TIER_DURATION_DAYS = 3650 // ~10 years
+const ROLE_HASHES = {
+  WAGER_PARTICIPANT: ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE')),
+  GUARDIAN: ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  ACCOUNT_MODERATOR: ethers.keccak256(ethers.toUtf8Bytes('ACCOUNT_MODERATOR_ROLE')),
+  ROLE_MANAGER: ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
+  DEFAULT_ADMIN: ethers.ZeroHash,
+}
+
+// Minimal ABI fragments — we read/write enough of WagerRegistry +
+// MembershipManager that pulling the full artifacts would be overkill, and the
+// JSON ABIs may not yet be regenerated after the rename.
+const WAGER_REGISTRY_ADMIN_ABI = [
+  'function paused() view returns (bool)',
+  'function pause()',
+  'function unpause()',
+  'function isFrozen(address user) view returns (bool)',
+  'function freezeAccount(address user, string reason)',
+  'function unfreezeAccount(address user)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function grantRole(bytes32 role, address account)',
+  'function revokeRole(bytes32 role, address account)',
+]
+
+const MEMBERSHIP_ADMIN_ABI = [
+  'function setTier(bytes32 role, uint8 tier, uint128 priceUSDC, uint32 durationDays, (uint32 monthlyMarketCreation,uint32 maxConcurrentMarkets) limits, bool active)',
+  'function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)',
+  'function revokeMembership(address user, bytes32 role)',
+  'function withdrawFees(uint128 amount, address to)',
+  'function hasRole(bytes32 role, address account) view returns (bool)',
+  'function grantRole(bytes32 role, address account)',
+  'function revokeRole(bytes32 role, address account)',
+  'function accruedFees() view returns (uint128)',
+]
+
+function shortAddr(address) {
+  return address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : ''
+}
 
 /**
- * Consolidated Admin Panel
+ * Admin Panel — gated per-tab by the on-chain role each action requires.
  *
- * Provides a unified interface for all administrative functions:
- * - System overview and contract status
- * - Emergency controls (pause/unpause)
- * - Tier configuration for membership pricing
- * - On-chain role management
- * - Treasury withdrawals
- *
- * Access is restricted to users with administrative roles.
+ * Tabs:
+ *   Overview          (any admin role)
+ *   Emergency         (GUARDIAN_ROLE)
+ *   Tiers             (DEFAULT_ADMIN_ROLE)
+ *   Members           (ROLE_MANAGER_ROLE)
+ *   Account Moderation (ACCOUNT_MODERATOR_ROLE)
+ *   Admin Roles       (DEFAULT_ADMIN_ROLE)
+ *   Treasury          (DEFAULT_ADMIN_ROLE)
  */
 function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
   const { account, signer, provider } = useWeb3()
   const { showNotification } = useNotification()
-  // Native-token symbol for the connected chain (MATIC on Polygon Amoy).
-  // The 'NATIVE' string in withdrawalData.tokenType is an internal selector
-  // value; user-facing labels render via nativeSymbol.
   const { native: nativeSymbol } = useChainTokens()
-  const {
-    isLoading,
-    // error is available but handled via showNotification
-    contractState,
-    emergencyPause,
-    emergencyUnpause,
-    configureTier,
-    grantTier,
-    grantRoleOnChain,
-    withdraw,
-    withdrawFromFriendMarketFactory,
-    fetchContractState
-  } = useAdminContracts()
 
-  // Treasury Vault hook for proper treasury management
-  const {
-    treasuryState,
-    isTreasuryAvailable,
-    canWithdraw: canWithdrawFromVault,
-    isOwner: isTreasuryOwner,
-    withdrawETH: withdrawFromTreasuryETH,
-    withdrawERC20: withdrawFromTreasuryERC20,
-    fairWinsTokenAddress
-  } = useTreasuryVault({ signer, provider, account })
-
-  const [activeTab, setActiveTab] = useState('overview')
-  const [confirmAction, setConfirmAction] = useState(null)
-  const [pendingTx, setPendingTx] = useState(false)
-  
-  // Refs for focus management in confirmation dialogs
-  const confirmDialogRef = useRef(null)
-  const previousFocusRef = useRef(null)
-
-  // Check admin access with proper null checks
-  const isAdmin = ROLES?.ADMIN ? hasRole(ROLES.ADMIN) : false
-  const isOperationsAdmin = ROLES?.OPERATIONS_ADMIN ? hasRole(ROLES.OPERATIONS_ADMIN) : false
-  const isEmergencyGuardian = ROLES?.EMERGENCY_GUARDIAN ? hasRole(ROLES.EMERGENCY_GUARDIAN) : false
+  const isAdmin = hasRole(ROLES.ADMIN)
+  const isGuardian = hasRole(ROLES.GUARDIAN)
+  const isAccountModerator = hasRole(ROLES.ACCOUNT_MODERATOR)
+  const isRoleManager = hasRole(ROLES.ROLE_MANAGER)
   const hasAdminAccess = hasAnyRole(ADMIN_ROLES)
 
-  // Note: Pause vs. unpause is intentionally asymmetric:
-  // - ADMIN, OPERATIONS_ADMIN and EMERGENCY_GUARDIAN can trigger an emergency pause.
-  // - Only ADMIN is allowed to unpause and restore normal operation.
-  const canPause = isAdmin || isOperationsAdmin || isEmergencyGuardian
-  const canUnpause = isAdmin // Only full admin can unpause
-  const canConfigureTiers = isAdmin
-  const canGrantRoles = isAdmin || isOperationsAdmin
-  const canWithdraw = isAdmin
-  const canManageNullifier = isAdmin || isOperationsAdmin
-
-  // Tier Configuration State
-  const [tierConfig, setTierConfig] = useState({
-    roleKey: 'MARKET_MAKER_ROLE',
-    tier: 1,
-    price: '0.1',
-    isActive: true
+  const [activeTab, setActiveTab] = useState('overview')
+  const [pendingTx, setPendingTx] = useState(false)
+  const [contractState, setContractState] = useState({
+    isPaused: false,
+    accruedFees: '0',
+    isLoaded: false,
   })
 
-  // Role Grant State
-  const [roleGrant, setRoleGrant] = useState({
-    roleKey: 'MARKET_MAKER_ROLE',
-    userAddress: '',
-    tier: 1,
-    durationDays: 30
+  // Tier configuration form
+  const [tierForm, setTierForm] = useState({
+    tier: 1, price: '2', durationDays: 30, monthly: 15, concurrent: 5, active: true
   })
 
-  // Withdrawal State
-  const [withdrawalData, setWithdrawalData] = useState({
-    toAddress: '',
-    amount: '',
-    tokenType: 'NATIVE', // 'NATIVE' or 'FAIRWINS'
-    source: 'ROLEMANAGER' // 'ROLEMANAGER' or 'TREASURY'
+  // Membership grant form
+  const [grantForm, setGrantForm] = useState({
+    address: '', tier: 1, durationDays: 30
   })
+  const grantEns = useEnsResolution(grantForm.address || '')
 
-  // ENS resolution for role grant user address
-  const {
-    resolvedAddress: resolvedRoleGrantAddress,
-    isLoading: isResolvingRoleGrantAddress,
-    error: roleGrantAddressError,
-    isEns: isRoleGrantEns
-  } = useEnsResolution(roleGrant.userAddress || '')
+  // Revoke membership form
+  const [revokeForm, setRevokeForm] = useState({ address: '' })
+  const revokeEns = useEnsResolution(revokeForm.address || '')
 
-  // ENS resolution for withdrawal recipient address
-  const {
-    resolvedAddress: resolvedWithdrawalAddress,
-    isLoading: isResolvingWithdrawalAddress,
-    error: withdrawalAddressError,
-    isEns: isWithdrawalEns
-  } = useEnsResolution(withdrawalData.toAddress || '')
+  // Freeze form
+  const [freezeForm, setFreezeForm] = useState({ address: '', reason: '' })
+  const freezeEns = useEnsResolution(freezeForm.address || '')
 
-  // Refresh contract state periodically and clean up properly
-  useEffect(() => {
-    // Initial fetch
-    fetchContractState()
-    
-    // Set up periodic refresh
-    const interval = setInterval(() => {
-      // Only fetch if not currently fetching to avoid race conditions
-      fetchContractState()
-    }, CONTRACT_STATE_REFRESH_INTERVAL)
-    
-    return () => {
-      clearInterval(interval)
-    }
-  }, [fetchContractState]) // Include fetchContractState for lint compliance
-  
-  // Manage focus for confirmation dialogs
-  useEffect(() => {
-    if (confirmAction && confirmDialogRef.current) {
-      previousFocusRef.current = document.activeElement
-      confirmDialogRef.current.focus()
-    } else if (!confirmAction && previousFocusRef.current) {
-      previousFocusRef.current.focus()
-      previousFocusRef.current = null
-    }
-  }, [confirmAction])
-  
-  // Handle Escape key to close dialog
-  useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape' && confirmAction) {
-        setConfirmAction(null)
-      }
-    }
-    
-    if (confirmAction) {
-      document.addEventListener('keydown', handleEscape)
-      return () => document.removeEventListener('keydown', handleEscape)
-    }
-  }, [confirmAction])
+  // Admin-role grant/revoke form
+  const [adminRoleForm, setAdminRoleForm] = useState({ address: '', role: 'GUARDIAN' })
+  const adminRoleEns = useEnsResolution(adminRoleForm.address || '')
 
-  const handleEmergencyPause = useCallback(async () => {
-    setPendingTx(true)
+  // Withdraw form
+  const [withdrawForm, setWithdrawForm] = useState({ to: '', amount: '' })
+  const withdrawEns = useEnsResolution(withdrawForm.to || '')
+
+  const wagerRegistryAddr = getContractAddress('wagerRegistry')
+  const membershipManagerAddr = getContractAddress('membershipManager')
+
+  const wagerRegistryRead = useMemo(() => {
+    if (!wagerRegistryAddr) return null
+    const p = provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+    return new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, p)
+  }, [provider, wagerRegistryAddr])
+
+  const membershipManagerRead = useMemo(() => {
+    if (!membershipManagerAddr) return null
+    const p = provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+    return new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, p)
+  }, [provider, membershipManagerAddr])
+
+  const fetchContractState = useCallback(async () => {
+    if (!wagerRegistryRead || !membershipManagerRead) return
     try {
-      await emergencyPause()
-      showNotification('Contract paused successfully', 'success')
-      setConfirmAction(null)
-    } catch (err) {
-      showNotification(err.message, 'error')
-    } finally {
-      setPendingTx(false)
-    }
-  }, [emergencyPause, showNotification])
-
-  const handleEmergencyUnpause = useCallback(async () => {
-    setPendingTx(true)
-    try {
-      await emergencyUnpause()
-      showNotification('Contract unpaused successfully', 'success')
-      setConfirmAction(null)
-    } catch (err) {
-      showNotification(err.message, 'error')
-    } finally {
-      setPendingTx(false)
-    }
-  }, [emergencyUnpause, showNotification])
-
-  const handleConfigureTier = useCallback(async () => {
-    const roleHash = contractState.roleHashes[tierConfig.roleKey]
-    if (!roleHash || roleHash === null) {
-      showNotification('Invalid role hash. Role may not exist on this contract.', 'error')
-      return
-    }
-    
-    // Validate price for potential issues
-    const priceNum = parseFloat(tierConfig.price)
-    if (priceNum === 0) {
-      // Confirm setting a free tier using the confirmation dialog
-      setConfirmAction({
-        title: 'Confirm Free Tier',
-        message: 'Setting price to 0 will make this a free tier. Are you sure you want to continue?',
-        warning: 'Users will be able to access this tier without payment.',
-        confirmText: 'Yes, Set as Free',
-        danger: false,
-        onConfirm: async () => {
-          setPendingTx(true)
-          try {
-            await configureTier(roleHash, tierConfig.tier, tierConfig.price, tierConfig.isActive)
-            showNotification('Tier configured successfully', 'success')
-            setConfirmAction(null)
-          } catch (err) {
-            showNotification(err.message, 'error')
-          } finally {
-            setPendingTx(false)
-          }
-        }
+      const [paused, fees] = await Promise.all([
+        wagerRegistryRead.paused().catch(() => false),
+        membershipManagerRead.accruedFees().catch(() => 0n),
+      ])
+      setContractState({
+        isPaused: paused,
+        accruedFees: ethers.formatUnits(fees, USDC_DECIMALS),
+        isLoaded: true,
       })
-      return
+    } catch (err) {
+      console.warn('[AdminPanel] state fetch failed:', err)
     }
+  }, [wagerRegistryRead, membershipManagerRead])
 
+  useEffect(() => {
+    fetchContractState()
+    const interval = setInterval(fetchContractState, 30000)
+    return () => clearInterval(interval)
+  }, [fetchContractState])
+
+  const runTx = useCallback(async (fn, successMsg) => {
+    if (!signer) return showNotification('Connect your wallet first', 'error')
     setPendingTx(true)
     try {
-      await configureTier(roleHash, tierConfig.tier, tierConfig.price, tierConfig.isActive)
-      showNotification('Tier configured successfully', 'success')
+      const tx = await fn()
+      await tx.wait()
+      showNotification(successMsg, 'success')
+      fetchContractState()
     } catch (err) {
-      showNotification(err.message, 'error')
+      console.error(err)
+      showNotification(err.shortMessage || err.message, 'error')
     } finally {
       setPendingTx(false)
     }
-  }, [tierConfig, contractState.roleHashes, configureTier, showNotification])
+  }, [signer, showNotification, fetchContractState])
 
-  const handleGrantTier = useCallback(async () => {
-    // Check if still resolving ENS
-    if (isResolvingRoleGrantAddress) {
-      showNotification('Please wait for ENS name to resolve', 'error')
-      return
-    }
+  const handlePause = () => runTx(
+    () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).pause(),
+    'WagerRegistry paused'
+  )
 
-    // Check for resolution errors
-    if (roleGrantAddressError) {
-      showNotification(roleGrantAddressError, 'error')
-      return
-    }
+  const handleUnpause = () => runTx(
+    () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).unpause(),
+    'WagerRegistry unpaused'
+  )
 
-    // Validate resolved address
-    if (!resolvedRoleGrantAddress || !isValidEthereumAddress(resolvedRoleGrantAddress)) {
-      showNotification('Invalid Ethereum address or ENS name', 'error')
-      return
-    }
-
-    const roleHash = contractState.roleHashes[roleGrant.roleKey]
-    if (!roleHash || roleHash === null) {
-      showNotification('Invalid role hash. Role may not exist on this contract.', 'error')
-      return
-    }
-
-    // Validate duration (tiered membership deployments only)
-    if (contractState.supportsTiers && roleGrant.durationDays > MAX_TIER_DURATION_DAYS) {
-      showNotification(`Duration cannot exceed ${MAX_TIER_DURATION_DAYS} days`, 'error')
-      return
-    }
-
-    setPendingTx(true)
-    try {
-      if (contractState.supportsTiers) {
-        await grantTier(resolvedRoleGrantAddress, roleHash, roleGrant.tier, roleGrant.durationDays)
-        showNotification('Tier granted successfully', 'success')
-      } else {
-        await grantRoleOnChain(roleHash, resolvedRoleGrantAddress)
-        showNotification('Role granted successfully', 'success')
-      }
-      setRoleGrant(prev => ({ ...prev, userAddress: '' }))
-    } catch (err) {
-      showNotification(err.message, 'error')
-    } finally {
-      setPendingTx(false)
-    }
-  }, [roleGrant, contractState.roleHashes, contractState.supportsTiers, grantTier, grantRoleOnChain, showNotification, resolvedRoleGrantAddress, isResolvingRoleGrantAddress, roleGrantAddressError])
-
-  const handleWithdraw = useCallback(async () => {
-    // Check if still resolving ENS
-    if (isResolvingWithdrawalAddress) {
-      showNotification('Please wait for ENS name to resolve', 'error')
-      return
-    }
-
-    // Check for resolution errors
-    if (withdrawalAddressError) {
-      showNotification(withdrawalAddressError, 'error')
-      return
-    }
-
-    // Validate resolved address
-    if (!resolvedWithdrawalAddress || !isValidEthereumAddress(resolvedWithdrawalAddress)) {
-      showNotification('Invalid recipient address or ENS name', 'error')
-      return
-    }
-
-    const rawAmount = (withdrawalData.amount ?? '').toString().trim()
-
-    // Validate amount: non-empty, valid decimal string, finite, and above minimum
-    if (!rawAmount) {
-      showNotification('Invalid withdrawal amount', 'error')
-      return
-    }
-
-    // Allow decimal representations like '0.5', '.5', '5.0', and '5'
-    if (!/^\d+(\.\d*)?$|^\.\d+$/.test(rawAmount)) {
-      showNotification('Invalid withdrawal amount format', 'error')
-      return
-    }
-
-    const amountNum = Number(rawAmount)
-    if (!Number.isFinite(amountNum) || amountNum < MIN_WITHDRAWAL_AMOUNT) {
-      showNotification('Invalid withdrawal amount', 'error')
-      return
-    }
-
-    // Check balance based on source and token type
-    const isFromTreasury = withdrawalData.source === 'TREASURY'
-    const isTokenWithdrawal = withdrawalData.tokenType === 'FAIRWINS'
-
-    let availableBalance
-    if (isFromTreasury) {
-      availableBalance = isTokenWithdrawal
-        ? parseFloat(treasuryState.fairWinsBalance || '0')
-        : parseFloat(treasuryState.ethBalance || '0')
-    } else {
-      // RoleManager only holds the chain native token
-      if (isTokenWithdrawal) {
-        showNotification(`RoleManager only holds ${nativeSymbol}. Select Treasury Vault for token withdrawals.`, 'error')
-        return
-      }
-      availableBalance = parseFloat(contractState.contractBalance || '0')
-    }
-
-    if (amountNum > availableBalance) {
-      const unit = isTokenWithdrawal ? 'FWN' : nativeSymbol
-      const source = isFromTreasury ? 'Treasury Vault' : 'RoleManager'
-      showNotification(`Withdrawal amount exceeds ${source} balance (${availableBalance} ${unit})`, 'error')
-      return
-    }
-
-    setPendingTx(true)
-    try {
-      if (isFromTreasury) {
-        // Withdraw from TreasuryVault
-        if (!isTreasuryAvailable) {
-          showNotification('Treasury Vault is not available', 'error')
-          setPendingTx(false)
-          return
-        }
-        if (isTokenWithdrawal && fairWinsTokenAddress) {
-          await withdrawFromTreasuryERC20(fairWinsTokenAddress, resolvedWithdrawalAddress, rawAmount)
-        } else {
-          await withdrawFromTreasuryETH(resolvedWithdrawalAddress, rawAmount)
-        }
-      } else {
-        // Withdraw from RoleManager (tier revenue)
-        await withdraw(resolvedWithdrawalAddress, rawAmount)
-      }
-      showNotification('Withdrawal successful', 'success')
-      setWithdrawalData({ toAddress: '', amount: '', tokenType: 'NATIVE', source: 'ROLEMANAGER' })
-      setConfirmAction(null)
-    } catch (err) {
-      showNotification(err.message, 'error')
-    } finally {
-      setPendingTx(false)
-    }
-  }, [withdrawalData, contractState.contractBalance, treasuryState, withdraw, withdrawFromTreasuryETH, withdrawFromTreasuryERC20, showNotification, resolvedWithdrawalAddress, isResolvingWithdrawalAddress, withdrawalAddressError, isTreasuryAvailable, fairWinsTokenAddress, nativeSymbol])
-
-  const shortenAddress = (address) => {
-    if (!address) return ''
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  const handleConfigureTier = () => {
+    const priceUSDC = ethers.parseUnits(String(tierForm.price), USDC_DECIMALS)
+    return runTx(
+      () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).setTier(
+        ROLE_HASHES.WAGER_PARTICIPANT,
+        tierForm.tier,
+        priceUSDC,
+        tierForm.durationDays,
+        { monthlyMarketCreation: tierForm.monthly, maxConcurrentMarkets: tierForm.concurrent },
+        tierForm.active
+      ),
+      `Tier ${TIER_NAMES[tierForm.tier]} configured at $${tierForm.price} USDC`
+    )
   }
 
-  // Available on-chain roles for dropdowns
-  const onChainRoles = [
-    { key: 'MARKET_MAKER_ROLE', name: 'Market Maker' },
-    { key: 'FRIEND_MARKET_ROLE', name: 'Friend Markets' },
-    { key: 'EMERGENCY_GUARDIAN_ROLE', name: 'Emergency Guardian' },
-    { key: 'OPERATIONS_ADMIN_ROLE', name: 'Operations Admin' },
-    { key: 'CORE_SYSTEM_ADMIN_ROLE', name: 'Core System Admin' },
-    { key: 'OVERSIGHT_COMMITTEE_ROLE', name: 'Oversight Committee' }
-  ]
+  const handleGrantMembership = () => {
+    const target = grantEns.resolvedAddress || grantForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    return runTx(
+      () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).grantMembership(
+        target, ROLE_HASHES.WAGER_PARTICIPANT, grantForm.tier, grantForm.durationDays
+      ),
+      `Granted ${TIER_NAMES[grantForm.tier]} membership to ${shortAddr(target)}`
+    )
+  }
 
-  // Unauthorized view
+  const handleRevokeMembership = () => {
+    const target = revokeEns.resolvedAddress || revokeForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    return runTx(
+      () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).revokeMembership(
+        target, ROLE_HASHES.WAGER_PARTICIPANT
+      ),
+      `Revoked membership for ${shortAddr(target)}`
+    )
+  }
+
+  const handleFreeze = () => {
+    const target = freezeEns.resolvedAddress || freezeForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    if (!freezeForm.reason.trim()) return showNotification('Reason is required (recorded on-chain)', 'error')
+    return runTx(
+      () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).freezeAccount(
+        target, freezeForm.reason.trim()
+      ),
+      `Account ${shortAddr(target)} frozen`
+    )
+  }
+
+  const handleUnfreeze = () => {
+    const target = freezeEns.resolvedAddress || freezeForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    return runTx(
+      () => new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, signer).unfreezeAccount(target),
+      `Account ${shortAddr(target)} unfrozen`
+    )
+  }
+
+  const handleGrantAdminRole = () => {
+    const target = adminRoleEns.resolvedAddress || adminRoleForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    const roleHash = ROLE_HASHES[adminRoleForm.role]
+    // ROLE_MANAGER lives on MembershipManager; everything else on WagerRegistry
+    const addr = adminRoleForm.role === 'ROLE_MANAGER' ? membershipManagerAddr : wagerRegistryAddr
+    return runTx(
+      () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).grantRole(roleHash, target),
+      `Granted ${adminRoleForm.role} to ${shortAddr(target)}`
+    )
+  }
+
+  const handleRevokeAdminRole = () => {
+    const target = adminRoleEns.resolvedAddress || adminRoleForm.address
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    const roleHash = ROLE_HASHES[adminRoleForm.role]
+    const addr = adminRoleForm.role === 'ROLE_MANAGER' ? membershipManagerAddr : wagerRegistryAddr
+    return runTx(
+      () => new ethers.Contract(addr, WAGER_REGISTRY_ADMIN_ABI, signer).revokeRole(roleHash, target),
+      `Revoked ${adminRoleForm.role} from ${shortAddr(target)}`
+    )
+  }
+
+  const handleWithdraw = () => {
+    const target = withdrawEns.resolvedAddress || withdrawForm.to
+    if (!isValidEthereumAddress(target)) return showNotification('Invalid address', 'error')
+    const amount = ethers.parseUnits(String(withdrawForm.amount || '0'), USDC_DECIMALS)
+    if (amount === 0n) return showNotification('Amount must be greater than 0', 'error')
+    return runTx(
+      () => new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, signer).withdrawFees(amount, target),
+      `Withdrew ${withdrawForm.amount} USDC to ${shortAddr(target)}`
+    )
+  }
+
   if (!hasAdminAccess) {
     return (
       <div className="admin-panel">
         <div className="admin-unauthorized">
-          <div className="unauthorized-icon" aria-hidden="true">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-          </div>
+          <div className="unauthorized-icon" aria-hidden="true">🔒</div>
           <h2>Access Restricted</h2>
           <p>This admin panel is only accessible to users with administrative privileges.</p>
           <p className="unauthorized-hint">
-            Administrative roles include: Administrator, Operations Admin, Emergency Guardian, and Oversight Committee.
+            Administrative roles include: Administrator, Emergency Guardian, Account Moderator, and Role Manager.
           </p>
         </div>
       </div>
@@ -416,19 +284,19 @@ function AdminPanel() {
 
   return (
     <div className="admin-panel">
-      {/* Header */}
       <header className="admin-panel-header">
         <div className="admin-panel-header-content">
           <div className="admin-panel-title-section">
             <h1>Admin Panel</h1>
             <span className="admin-badge">
-              {isAdmin ? 'Full Admin' :
-               isOperationsAdmin ? 'Operations' :
-               isEmergencyGuardian ? 'Guardian' : 'Committee'}
+              {isAdmin ? 'Administrator' :
+                isGuardian ? 'Guardian' :
+                  isAccountModerator ? 'Moderator' :
+                    isRoleManager ? 'Role Manager' : 'Admin'}
             </span>
           </div>
           <p className="admin-panel-subtitle">
-            Consolidated administrative controls for contract management
+            On-chain controls for the P2P wager protocol. Each tab is gated by the role it requires.
           </p>
         </div>
         <div className="admin-panel-status">
@@ -441,258 +309,108 @@ function AdminPanel() {
         </div>
       </header>
 
-      {/* Confirmation Dialog */}
-      {confirmAction && (
-        <div 
-          className="confirm-overlay" 
-          role="dialog" 
-          aria-modal="true"
-          aria-labelledby="confirm-dialog-title"
-          onClick={(e) => {
-            // Close on backdrop click
-            if (e.target.classList.contains('confirm-overlay')) {
-              setConfirmAction(null)
-            }
-          }}
-        >
-          <div 
-            className="confirm-dialog"
-            ref={confirmDialogRef}
-            tabIndex={-1}
-          >
-            <h3 id="confirm-dialog-title">{confirmAction.title}</h3>
-            <p>{confirmAction.message}</p>
-            {confirmAction.warning && (
-              <div className="confirm-warning">
-                <span className="warning-icon">!</span>
-                {confirmAction.warning}
-              </div>
-            )}
-            <div className="confirm-actions">
-              <button
-                onClick={confirmAction.onConfirm}
-                className={`confirm-btn ${confirmAction.danger ? 'danger' : 'primary'}`}
-                disabled={pendingTx}
-              >
-                {pendingTx ? 'Processing...' : confirmAction.confirmText}
-              </button>
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="confirm-btn secondary"
-                disabled={pendingTx}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Tabs */}
       <nav className="admin-panel-tabs" role="tablist">
-        <button
-          role="tab"
-          aria-selected={activeTab === 'overview'}
+        <button role="tab" aria-selected={activeTab === 'overview'}
           className={`admin-panel-tab ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          <span className="tab-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-            </svg>
-          </span>
-          Overview
-        </button>
+          onClick={() => setActiveTab('overview')}>Overview</button>
 
-        {canPause && (
-          <button
-            role="tab"
-            aria-selected={activeTab === 'emergency'}
+        {isGuardian && (
+          <button role="tab" aria-selected={activeTab === 'emergency'}
             className={`admin-panel-tab ${activeTab === 'emergency' ? 'active' : ''}`}
-            onClick={() => setActiveTab('emergency')}
-          >
-            <span className="tab-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </span>
-            Emergency
-          </button>
+            onClick={() => setActiveTab('emergency')}>Emergency</button>
         )}
 
-        {canConfigureTiers && (
-          <button
-            role="tab"
-            aria-selected={activeTab === 'tiers'}
+        {isAdmin && (
+          <button role="tab" aria-selected={activeTab === 'tiers'}
             className={`admin-panel-tab ${activeTab === 'tiers' ? 'active' : ''}`}
-            onClick={() => setActiveTab('tiers')}
-          >
-            <span className="tab-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5"/>
-                <path d="M2 12l10 5 10-5"/>
-              </svg>
-            </span>
-            Tiers
-          </button>
+            onClick={() => setActiveTab('tiers')}>Tiers</button>
         )}
 
-        {canGrantRoles && (
-          <button
-            role="tab"
-            aria-selected={activeTab === 'roles'}
-            className={`admin-panel-tab ${activeTab === 'roles' ? 'active' : ''}`}
-            onClick={() => setActiveTab('roles')}
-          >
-            <span className="tab-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </span>
-            Roles
-          </button>
+        {isRoleManager && (
+          <button role="tab" aria-selected={activeTab === 'members'}
+            className={`admin-panel-tab ${activeTab === 'members' ? 'active' : ''}`}
+            onClick={() => setActiveTab('members')}>Members</button>
         )}
 
-        {canWithdraw && (
-          <button
-            role="tab"
-            aria-selected={activeTab === 'treasury'}
+        {isAccountModerator && (
+          <button role="tab" aria-selected={activeTab === 'moderation'}
+            className={`admin-panel-tab ${activeTab === 'moderation' ? 'active' : ''}`}
+            onClick={() => setActiveTab('moderation')}>Account Moderation</button>
+        )}
+
+        {isAdmin && (
+          <button role="tab" aria-selected={activeTab === 'admin-roles'}
+            className={`admin-panel-tab ${activeTab === 'admin-roles' ? 'active' : ''}`}
+            onClick={() => setActiveTab('admin-roles')}>Admin Roles</button>
+        )}
+
+        {isAdmin && (
+          <button role="tab" aria-selected={activeTab === 'treasury'}
             className={`admin-panel-tab ${activeTab === 'treasury' ? 'active' : ''}`}
-            onClick={() => setActiveTab('treasury')}
-          >
-            <span className="tab-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-            </span>
-            Treasury
-          </button>
+            onClick={() => setActiveTab('treasury')}>Treasury</button>
         )}
-
-        {canManageNullifier && (
-          <button
-            role="tab"
-            aria-selected={activeTab === 'nullifier'}
-            className={`admin-panel-tab ${activeTab === 'nullifier' ? 'active' : ''}`}
-            onClick={() => setActiveTab('nullifier')}
-          >
-            <span className="tab-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-              </svg>
-            </span>
-            Nullifier
-          </button>
-        )}
-
       </nav>
 
-      {/* Tab Content */}
       <main className="admin-panel-content">
-        {/* Overview Tab */}
+        {/* Overview */}
         {activeTab === 'overview' && (
           <div className="admin-tab-content" role="tabpanel">
             <div className="overview-grid">
-              {/* System Status Card */}
               <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>System Status</h3>
-                  <button
-                    onClick={fetchContractState}
-                    className="refresh-btn"
-                    aria-label="Refresh status"
-                    disabled={isLoading}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M23 4v6h-6"/>
-                      <path d="M1 20v-6h6"/>
-                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                    </svg>
-                  </button>
-                </div>
+                <div className="admin-card-header"><h3>System Status</h3></div>
                 <div className="status-details">
                   <div className="status-row">
-                    <span className="status-label">Contract State</span>
+                    <span className="status-label">WagerRegistry</span>
                     <span className={`status-value ${contractState.isPaused ? 'paused' : 'active'}`}>
                       {contractState.isPaused ? 'Paused' : 'Active'}
                     </span>
                   </div>
                   <div className="status-row">
-                    <span className="status-label">Contract Balance</span>
-                    <span className="status-value">{contractState.contractBalance} {nativeSymbol}</span>
+                    <span className="status-label">Accrued tier fees</span>
+                    <span className="status-value">{contractState.accruedFees} USDC</span>
                   </div>
                   <div className="status-row">
                     <span className="status-label">Network</span>
                     <span className="status-value">{NETWORK_CONFIG.name}</span>
                   </div>
+                  <div className="status-row">
+                    <span className="status-label">Connected as</span>
+                    <span className="status-value">{shortAddr(account)} ({nativeSymbol})</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Your Permissions Card */}
               <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>Your Permissions</h3>
-                </div>
+                <div className="admin-card-header"><h3>Your Permissions</h3></div>
                 <div className="permissions-list">
-                  <div className={`permission-item ${canPause ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{canPause ? '✓' : '×'}</span>
-                    <span className="permission-name">Emergency Pause</span>
+                  <div className={`permission-item ${isAdmin ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isAdmin ? '✓' : '×'}</span>
+                    <span className="permission-name">Administrator (tier config, treasury, grant admin roles)</span>
                   </div>
-                  <div className={`permission-item ${canUnpause ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{canUnpause ? '✓' : '×'}</span>
-                    <span className="permission-name">Emergency Unpause</span>
+                  <div className={`permission-item ${isGuardian ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isGuardian ? '✓' : '×'}</span>
+                    <span className="permission-name">Guardian (pause / unpause WagerRegistry)</span>
                   </div>
-                  <div className={`permission-item ${canConfigureTiers ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{canConfigureTiers ? '✓' : '×'}</span>
-                    <span className="permission-name">Configure Tiers</span>
+                  <div className={`permission-item ${isAccountModerator ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isAccountModerator ? '✓' : '×'}</span>
+                    <span className="permission-name">Account Moderator (freeze / unfreeze accounts)</span>
                   </div>
-                  <div className={`permission-item ${canGrantRoles ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{canGrantRoles ? '✓' : '×'}</span>
-                    <span className="permission-name">Grant Roles</span>
-                  </div>
-                  <div className={`permission-item ${canWithdraw ? 'enabled' : 'disabled'}`}>
-                    <span className="permission-icon">{canWithdraw ? '✓' : '×'}</span>
-                    <span className="permission-name">Withdraw Funds</span>
+                  <div className={`permission-item ${isRoleManager ? 'enabled' : 'disabled'}`}>
+                    <span className="permission-icon">{isRoleManager ? '✓' : '×'}</span>
+                    <span className="permission-name">Role Manager (grant / revoke memberships)</span>
                   </div>
                 </div>
               </div>
 
-              {/* Contract Addresses Card */}
               <div className="admin-card full-width">
-                <div className="admin-card-header">
-                  <h3>Contract Addresses</h3>
-                </div>
+                <div className="admin-card-header"><h3>Contract Addresses</h3></div>
                 <div className="contract-addresses">
-                  {Object.entries(DEPLOYED_CONTRACTS).map(([name, address]) => (
+                  {Object.entries(DEPLOYED_CONTRACTS).filter(([, v]) => v).map(([name, address]) => (
                     <div key={name} className="contract-row">
                       <span className="contract-name">{name}</span>
-                      <code className="contract-address" title={address}>
-                        {shortenAddress(address)}
-                      </code>
-                      <a
-                        href={`${NETWORK_CONFIG.blockExplorer}/address/${address}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="contract-link"
-                        aria-label={`View ${name} on block explorer`}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                          <polyline points="15,3 21,3 21,9"/>
-                          <line x1="10" y1="14" x2="21" y2="3"/>
-                        </svg>
-                      </a>
+                      <code className="contract-address" title={address}>{shortAddr(address)}</code>
+                      <a href={`${NETWORK_CONFIG.blockExplorer}/address/${address}`}
+                        target="_blank" rel="noopener noreferrer" className="contract-link">↗</a>
                     </div>
                   ))}
                 </div>
@@ -701,646 +419,161 @@ function AdminPanel() {
           </div>
         )}
 
-        {/* Emergency Tab */}
-        {activeTab === 'emergency' && canPause && (
+        {/* Emergency */}
+        {activeTab === 'emergency' && isGuardian && (
           <div className="admin-tab-content" role="tabpanel">
-            <div className="emergency-section">
-              <div className="admin-card warning-card">
-                <div className="admin-card-header">
-                  <h3>Emergency Controls</h3>
-                </div>
-                <div className="emergency-info">
-                  <p className="info-text">
-                    Emergency controls allow authorized personnel to pause contract operations
-                    when security issues are detected. Use with caution.
-                  </p>
-                  <div className="current-state">
-                    <span className="state-label">Current State:</span>
-                    <span className={`state-badge ${contractState.isPaused ? 'paused' : 'active'}`}>
-                      {contractState.isPaused ? 'PAUSED' : 'ACTIVE'}
-                    </span>
-                  </div>
-                </div>
+            <div className="admin-card">
+              <h3>Emergency Pause</h3>
+              <p>Pausing halts wager creation, acceptance, and settlement protocol-wide. Use only in response to a security incident. Unpausing restores normal operation.</p>
+              <div className="emergency-actions">
+                {!contractState.isPaused ? (
+                  <button className="confirm-btn danger" onClick={handlePause} disabled={pendingTx}>
+                    {pendingTx ? 'Processing...' : 'Pause Protocol'}
+                  </button>
+                ) : (
+                  <button className="confirm-btn primary" onClick={handleUnpause} disabled={pendingTx}>
+                    {pendingTx ? 'Processing...' : 'Unpause Protocol'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
+        {/* Tiers */}
+        {activeTab === 'tiers' && isAdmin && (
+          <div className="admin-tab-content" role="tabpanel">
+            <div className="admin-card">
+              <h3>Configure Tier: Wager Participant</h3>
+              <p>Set price (USDC), duration, monthly cap, and concurrent cap for each tier. 0 = unlimited.</p>
+              <div className="admin-form">
+                <label>
+                  Tier
+                  <select value={tierForm.tier} onChange={(e) => setTierForm({ ...tierForm, tier: Number(e.target.value) })}>
+                    {[1, 2, 3, 4].map(t => <option key={t} value={t}>{TIER_NAMES[t]}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Price (USDC)
+                  <input type="number" min="0" step="0.01" value={tierForm.price}
+                    onChange={(e) => setTierForm({ ...tierForm, price: e.target.value })} />
+                </label>
+                <label>
+                  Duration (days)
+                  <input type="number" min="1" max="3650" value={tierForm.durationDays}
+                    onChange={(e) => setTierForm({ ...tierForm, durationDays: Number(e.target.value) })} />
+                </label>
+                <label>
+                  Monthly cap (0 = unlimited)
+                  <input type="number" min="0" value={tierForm.monthly}
+                    onChange={(e) => setTierForm({ ...tierForm, monthly: Number(e.target.value) })} />
+                </label>
+                <label>
+                  Concurrent cap (0 = unlimited)
+                  <input type="number" min="0" value={tierForm.concurrent}
+                    onChange={(e) => setTierForm({ ...tierForm, concurrent: Number(e.target.value) })} />
+                </label>
+                <label className="admin-checkbox">
+                  <input type="checkbox" checked={tierForm.active}
+                    onChange={(e) => setTierForm({ ...tierForm, active: e.target.checked })} />
+                  Active (available for purchase)
+                </label>
+                <button className="confirm-btn primary" onClick={handleConfigureTier} disabled={pendingTx}>
+                  {pendingTx ? 'Saving...' : 'Save Tier Config'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Members */}
+        {activeTab === 'members' && isRoleManager && (
+          <div className="admin-tab-content" role="tabpanel">
+            <div className="admin-card">
+              <h3>Grant Membership</h3>
+              <p>Grant a Wager Participant membership directly, bypassing the purchase flow. Use for support, gifts, or dispute resolution.</p>
+              <div className="admin-form">
+                <label>
+                  Recipient (address or ENS)
+                  <input type="text" value={grantForm.address}
+                    placeholder="0x… or name.eth"
+                    onChange={(e) => setGrantForm({ ...grantForm, address: e.target.value })} />
+                  {grantEns.isLoading && <span className="hint">Resolving…</span>}
+                  {grantEns.resolvedAddress && grantEns.isEns && (
+                    <span className="hint">→ {shortAddr(grantEns.resolvedAddress)}</span>
+                  )}
+                </label>
+                <label>
+                  Tier
+                  <select value={grantForm.tier} onChange={(e) => setGrantForm({ ...grantForm, tier: Number(e.target.value) })}>
+                    {[1, 2, 3, 4].map(t => <option key={t} value={t}>{TIER_NAMES[t]}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Duration (days)
+                  <input type="number" min="1" max="3650" value={grantForm.durationDays}
+                    onChange={(e) => setGrantForm({ ...grantForm, durationDays: Number(e.target.value) })} />
+                </label>
+                <button className="confirm-btn primary" onClick={handleGrantMembership} disabled={pendingTx}>
+                  {pendingTx ? 'Granting...' : 'Grant Membership'}
+                </button>
+              </div>
+            </div>
+
+            <div className="admin-card">
+              <h3>Revoke Membership</h3>
+              <p>Sets the user's Wager Participant tier back to <code>None</code>. Does not refund any USDC.</p>
+              <div className="admin-form">
+                <label>
+                  Account
+                  <input type="text" value={revokeForm.address}
+                    placeholder="0x… or name.eth"
+                    onChange={(e) => setRevokeForm({ ...revokeForm, address: e.target.value })} />
+                  {revokeEns.resolvedAddress && revokeEns.isEns && (
+                    <span className="hint">→ {shortAddr(revokeEns.resolvedAddress)}</span>
+                  )}
+                </label>
+                <button className="confirm-btn danger" onClick={handleRevokeMembership} disabled={pendingTx}>
+                  {pendingTx ? 'Revoking...' : 'Revoke Membership'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account Moderation */}
+        {activeTab === 'moderation' && isAccountModerator && (
+          <div className="admin-tab-content" role="tabpanel">
+            <div className="admin-card">
+              <h3>Freeze / Unfreeze Account</h3>
+              <p>
+                A frozen account cannot create wagers, accept wagers, cancel, declare a winner,
+                claim payouts, or claim refunds on WagerRegistry. Polymarket auto-resolution is
+                permissionless and continues to work — but the winner still cannot claim while
+                frozen. See <a href="/docs/system-overview/account-moderation" target="_blank" rel="noreferrer">policy</a>.
+              </p>
+              <div className="admin-form">
+                <label>
+                  Account (address or ENS)
+                  <input type="text" value={freezeForm.address}
+                    placeholder="0x… or name.eth"
+                    onChange={(e) => setFreezeForm({ ...freezeForm, address: e.target.value })} />
+                  {freezeEns.resolvedAddress && freezeEns.isEns && (
+                    <span className="hint">→ {shortAddr(freezeEns.resolvedAddress)}</span>
+                  )}
+                </label>
+                <label>
+                  Reason (recorded on-chain in the AccountFrozen event)
+                  <input type="text" value={freezeForm.reason}
+                    placeholder="e.g. fraud investigation, court order, TOS violation"
+                    onChange={(e) => setFreezeForm({ ...freezeForm, reason: e.target.value })} />
+                </label>
                 <div className="emergency-actions">
-                  {!contractState.isPaused ? (
-                    <div className="action-block">
-                      <h4>Pause Contract</h4>
-                      <p className="action-description">
-                        Pausing will halt all user-facing operations including tier purchases
-                        and membership renewals. Administrative functions will remain accessible.
-                      </p>
-                      <button
-                        onClick={() => setConfirmAction({
-                          title: 'Confirm Emergency Pause',
-                          message: 'This will pause all user-facing contract operations. Users will not be able to purchase tiers or interact with the contract until it is unpaused.',
-                          warning: 'This action should only be taken in response to a security incident or critical bug.',
-                          confirmText: 'Pause Contract',
-                          danger: true,
-                          onConfirm: handleEmergencyPause
-                        })}
-                        className="emergency-btn pause"
-                        disabled={pendingTx || isLoading}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="6" y="4" width="4" height="16"/>
-                          <rect x="14" y="4" width="4" height="16"/>
-                        </svg>
-                        Emergency Pause
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="action-block">
-                      <h4>Unpause Contract</h4>
-                      <p className="action-description">
-                        Unpausing will restore normal contract operations. Ensure any security
-                        issues have been fully resolved before unpausing.
-                      </p>
-                      {canUnpause ? (
-                        <button
-                          onClick={() => setConfirmAction({
-                            title: 'Confirm Unpause',
-                            message: 'This will restore normal contract operations. Make sure any security issues have been resolved.',
-                            confirmText: 'Unpause Contract',
-                            danger: false,
-                            onConfirm: handleEmergencyUnpause
-                          })}
-                          className="emergency-btn unpause"
-                          disabled={pendingTx || isLoading}
-                        >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polygon points="5,3 19,12 5,21"/>
-                          </svg>
-                          Unpause Contract
-                        </button>
-                      ) : (
-                        <div className="permission-notice">
-                          <span className="notice-icon">!</span>
-                          Only the Administrator role can unpause the contract.
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tiers Tab */}
-        {activeTab === 'tiers' && canConfigureTiers && (
-          <div className="admin-tab-content" role="tabpanel">
-            <div className="tiers-grid">
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>Configure Tier Pricing</h3>
-                </div>
-                <p className="card-info">
-                  Set the price and availability for membership tiers. Each role can have
-                  multiple tiers (Bronze, Silver, Gold, Platinum) with different pricing.
-                </p>
-
-                <div className="tier-form">
-                  {!contractState.supportsTiers && (
-                    <div className="permission-notice">
-                      <span className="notice-icon">!</span>
-                      Tier pricing is not available on this deployment. Deploy the modular tier extensions to enable tiers.
-                    </div>
-                  )}
-                  <div className="form-group">
-                    <label htmlFor="tier-role">Role</label>
-                    <select
-                      id="tier-role"
-                      value={tierConfig.roleKey}
-                      onChange={(e) => setTierConfig(prev => ({ ...prev, roleKey: e.target.value }))}
-                      className="admin-select"
-                    >
-                      {onChainRoles.map(role => (
-                        <option key={role.key} value={role.key}>{role.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="tier-level">Tier Level</label>
-                    <select
-                      id="tier-level"
-                      value={tierConfig.tier}
-                      onChange={(e) => setTierConfig(prev => ({ ...prev, tier: Number(e.target.value) }))}
-                      className="admin-select"
-                    >
-                      <option value={1}>Bronze</option>
-                      <option value={2}>Silver</option>
-                      <option value={3}>Gold</option>
-                      <option value={4}>Platinum</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="tier-price">Price ({nativeSymbol})</label>
-                    <input
-                      id="tier-price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={tierConfig.price}
-                      onChange={(e) => setTierConfig(prev => ({ ...prev, price: e.target.value }))}
-                      className="admin-input"
-                      placeholder="0.1"
-                    />
-                  </div>
-
-                  <div className="form-group checkbox-group">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={tierConfig.isActive}
-                        onChange={(e) => setTierConfig(prev => ({ ...prev, isActive: e.target.checked }))}
-                      />
-                      <span className="checkbox-text">Tier is active (available for purchase)</span>
-                    </label>
-                  </div>
-
-                  <button
-                    onClick={handleConfigureTier}
-                    className="admin-btn primary"
-                    disabled={pendingTx || isLoading || !contractState.supportsTiers}
-                  >
-                    {pendingTx ? 'Configuring...' : 'Configure Tier'}
+                  <button className="confirm-btn danger" onClick={handleFreeze} disabled={pendingTx}>
+                    {pendingTx ? 'Processing...' : 'Freeze Account'}
                   </button>
-                </div>
-              </div>
-
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>Tier Information</h3>
-                </div>
-                <div className="tier-info-list">
-                  <div className="tier-info-item bronze">
-                    <span className="tier-name">Bronze</span>
-                    <span className="tier-desc">Entry level access with basic features</span>
-                  </div>
-                  <div className="tier-info-item silver">
-                    <span className="tier-name">Silver</span>
-                    <span className="tier-desc">Enhanced access with additional capabilities</span>
-                  </div>
-                  <div className="tier-info-item gold">
-                    <span className="tier-name">Gold</span>
-                    <span className="tier-desc">Premium access with priority features</span>
-                  </div>
-                  <div className="tier-info-item platinum">
-                    <span className="tier-name">Platinum</span>
-                    <span className="tier-desc">Full access with all features unlocked</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Roles Tab */}
-        {activeTab === 'roles' && canGrantRoles && (
-          <div className="admin-tab-content" role="tabpanel">
-            <div className="roles-grid">
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>{contractState.supportsTiers ? 'Grant Role & Tier' : 'Grant Role'}</h3>
-                </div>
-                <p className="card-info">
-                  {contractState.supportsTiers
-                    ? 'Grant a role with a specific tier to a user. This creates an on-chain record of their membership with an expiration date.'
-                    : 'Grant a role to a user using on-chain AccessControl (no tiered membership extensions deployed).'}
-                </p>
-
-                <div className="role-form">
-                  <div className="form-group">
-                    <label htmlFor="grant-address">User Address or ENS Name</label>
-                    <div className="address-input-wrapper">
-                      <input
-                        id="grant-address"
-                        type="text"
-                        value={roleGrant.userAddress}
-                        onChange={(e) => setRoleGrant(prev => ({ ...prev, userAddress: e.target.value }))}
-                        className={`admin-input ${roleGrantAddressError ? 'input-error' : ''} ${resolvedRoleGrantAddress && !roleGrantAddressError ? 'input-success' : ''}`}
-                        placeholder="0x... or vitalik.eth"
-                      />
-                      {isResolvingRoleGrantAddress && (
-                        <span className="address-status resolving" aria-label="Resolving ENS name">
-                          <span className="spinner-small"></span>
-                        </span>
-                      )}
-                      {resolvedRoleGrantAddress && !isResolvingRoleGrantAddress && !roleGrantAddressError && (
-                        <span className="address-status success" aria-label="Valid address">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
-                    {isRoleGrantEns && resolvedRoleGrantAddress && !isResolvingRoleGrantAddress && !roleGrantAddressError && (
-                      <div className="resolved-address-hint">
-                        Resolves to: <code>{shortenAddress(resolvedRoleGrantAddress)}</code>
-                      </div>
-                    )}
-                    {roleGrantAddressError && (
-                      <div className="input-error-message">{roleGrantAddressError}</div>
-                    )}
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="grant-role">Role</label>
-                    <select
-                      id="grant-role"
-                      value={roleGrant.roleKey}
-                      onChange={(e) => setRoleGrant(prev => ({ ...prev, roleKey: e.target.value }))}
-                      className="admin-select"
-                    >
-                      {onChainRoles.map(role => (
-                        <option key={role.key} value={role.key}>{role.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label htmlFor="grant-tier">Tier</label>
-                      <select
-                        id="grant-tier"
-                        value={roleGrant.tier}
-                        onChange={(e) => setRoleGrant(prev => ({ ...prev, tier: Number(e.target.value) }))}
-                        className="admin-select"
-                        disabled={!contractState.supportsTiers}
-                      >
-                        <option value={1}>Bronze</option>
-                        <option value={2}>Silver</option>
-                        <option value={3}>Gold</option>
-                        <option value={4}>Platinum</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor="grant-duration">Duration (days)</label>
-                      <input
-                        id="grant-duration"
-                        type="number"
-                        min="1"
-                        max={MAX_TIER_DURATION_DAYS}
-                        value={roleGrant.durationDays}
-                        onChange={(e) => setRoleGrant(prev => ({ ...prev, durationDays: Number(e.target.value) }))}
-                        className="admin-input"
-                        placeholder="30"
-                        disabled={!contractState.supportsTiers}
-                      />
-                      <small className="input-hint">Maximum: {MAX_TIER_DURATION_DAYS} days</small>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleGrantTier}
-                    className="admin-btn primary"
-                    disabled={pendingTx || isLoading || !roleGrant.userAddress}
-                  >
-                    {pendingTx ? 'Granting...' : (contractState.supportsTiers ? 'Grant Role & Tier' : 'Grant Role')}
-                  </button>
-                </div>
-              </div>
-
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>Role Hierarchy</h3>
-                </div>
-                <div className="role-hierarchy">
-                  <div className="hierarchy-item level-0">
-                    <span className="hierarchy-name">Default Admin</span>
-                    <span className="hierarchy-desc">Contract owner, full control</span>
-                  </div>
-                  <div className="hierarchy-item level-1">
-                    <span className="hierarchy-name">Core System Admin</span>
-                    <span className="hierarchy-desc">Requires 3-sig, 7-day timelock</span>
-                  </div>
-                  <div className="hierarchy-item level-2">
-                    <span className="hierarchy-name">Operations Admin</span>
-                    <span className="hierarchy-desc">Day-to-day ops, 2-sig, 2-day timelock</span>
-                  </div>
-                  <div className="hierarchy-item level-3">
-                    <span className="hierarchy-name">Emergency Guardian</span>
-                    <span className="hierarchy-desc">Can pause contracts</span>
-                  </div>
-                  <div className="hierarchy-item level-3">
-                    <span className="hierarchy-name">User Roles</span>
-                    <span className="hierarchy-desc">Market Maker, Friend Markets</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Treasury Tab */}
-        {activeTab === 'treasury' && canWithdraw && (
-          <div className="admin-tab-content" role="tabpanel">
-            <div className="treasury-section">
-              {/* Tier Revenue (RoleManager Balance) */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>Tier Revenue</h3>
-                  <span className="status-badge active">RoleManager</span>
-                </div>
-                <div className="balance-grid">
-                  <div className="balance-item">
-                    <div className="balance-display">
-                      <span className="balance-value">{contractState.contractBalance}</span>
-                      <span className="balance-unit">{nativeSymbol}</span>
-                    </div>
-                    <span className="balance-label">From Tier Purchases</span>
-                  </div>
-                </div>
-                <p className="card-info">
-                  Funds collected from tier purchases are held in the RoleManager contract.
-                  Use the withdraw form below to transfer funds to another address.
-                </p>
-              </div>
-
-              {/* Market Stake Revenue (FriendGroupMarketFactory Balance) */}
-              {contractState.friendMarketFactoryDeployed && (
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h3>Market Stake Revenue</h3>
-                    <span className="status-badge active">FriendGroupMarketFactory</span>
-                  </div>
-                  <div className="balance-grid">
-                    <div className="balance-item">
-                      <div className="balance-display">
-                        <span className="balance-value">{contractState.friendMarketBalance}</span>
-                        <span className="balance-unit">{nativeSymbol}</span>
-                      </div>
-                      <span className="balance-label">From Market Stakes</span>
-                    </div>
-                  </div>
-                  <p className="card-info">
-                    Funds from friend market stakes (forfeitures, unclaimed amounts) accumulate here.
-                    Withdraw sends all collected fees to the contract owner.
-                  </p>
-                  {parseFloat(contractState.friendMarketBalance) > 0 && (
-                    <button
-                      className="btn btn-primary"
-                      onClick={async () => {
-                        try {
-                          setPendingTx(true)
-                          await withdrawFromFriendMarketFactory()
-                          showNotification(`Successfully withdrew ${contractState.friendMarketBalance} ${nativeSymbol}`, 'success')
-                        } catch (err) {
-                          showNotification(err.message, 'error')
-                        } finally {
-                          setPendingTx(false)
-                        }
-                      }}
-                      disabled={pendingTx || isLoading}
-                    >
-                      {pendingTx ? 'Withdrawing...' : `Withdraw ${contractState.friendMarketBalance} ${nativeSymbol}`}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* TreasuryVault Balances (if available) */}
-              {isTreasuryAvailable && (
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h3>Treasury Vault</h3>
-                    <span className="status-badge active">TreasuryVault</span>
-                  </div>
-                  <div className="balance-grid">
-                    <div className="balance-item">
-                      <div className="balance-display">
-                        <span className="balance-value">{treasuryState.ethBalance}</span>
-                        <span className="balance-unit">{nativeSymbol}</span>
-                      </div>
-                      <span className="balance-label">Native Currency</span>
-                    </div>
-                    {fairWinsTokenAddress && (
-                      <div className="balance-item">
-                        <div className="balance-display">
-                          <span className="balance-value">{treasuryState.fairWinsBalance}</span>
-                          <span className="balance-unit">FWN</span>
-                        </div>
-                        <span className="balance-label">FairWins Token</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="card-info">
-                    TreasuryVault provides spending limits and rate controls for secure fund management.
-                  </p>
-                </div>
-              )}
-
-              {/* Spending Limits Info */}
-              {isTreasuryAvailable && (
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h3>Spending Controls</h3>
-                    {treasuryState.isPaused && (
-                      <span className="status-badge paused">Vault Paused</span>
-                    )}
-                  </div>
-                  <div className="spending-limits-grid">
-                    <div className="limit-item">
-                      <span className="limit-label">{nativeSymbol} Transaction Limit</span>
-                      <span className="limit-value">
-                        {parseFloat(treasuryState.ethTransactionLimit) > 0
-                          ? `${treasuryState.ethTransactionLimit} ${nativeSymbol}`
-                          : 'Unlimited'}
-                      </span>
-                    </div>
-                    <div className="limit-item">
-                      <span className="limit-label">{nativeSymbol} Period Allowance</span>
-                      <span className="limit-value">
-                        {treasuryState.ethRateLimitPeriod > 0
-                          ? `${treasuryState.ethRemainingAllowance} / ${treasuryState.ethPeriodLimit} ${nativeSymbol}`
-                          : 'Unlimited'}
-                      </span>
-                    </div>
-                    {fairWinsTokenAddress && (
-                      <>
-                        <div className="limit-item">
-                          <span className="limit-label">FWN Transaction Limit</span>
-                          <span className="limit-value">
-                            {parseFloat(treasuryState.fairWinsTransactionLimit) > 0
-                              ? `${treasuryState.fairWinsTransactionLimit} FWN`
-                              : 'Unlimited'}
-                          </span>
-                        </div>
-                        <div className="limit-item">
-                          <span className="limit-label">FWN Period Allowance</span>
-                          <span className="limit-value">
-                            {treasuryState.fairWinsRateLimitPeriod > 0
-                              ? `${treasuryState.fairWinsRemainingAllowance} / ${treasuryState.fairWinsPeriodLimit} FWN`
-                              : 'Unlimited'}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <div className="security-info">
-                    <p className="card-info">
-                      <strong>Authorization Status:</strong> {canWithdrawFromVault || isTreasuryOwner ? 'Authorized Spender' : 'Not Authorized'}
-                    </p>
-                    {!treasuryState.ethRateLimitPeriod && !parseFloat(treasuryState.ethTransactionLimit) && (
-                      <p className="card-info warning-text">
-                        <span className="warning-icon">!</span>
-                        No spending limits configured. Consider setting transaction limits for production use.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Withdraw Form */}
-              <div className="admin-card">
-                <div className="admin-card-header">
-                  <h3>Withdraw Funds</h3>
-                </div>
-                <p className="card-info warning-text">
-                  <span className="warning-icon">!</span>
-                  Withdrawals are irreversible. Double-check the recipient address before confirming.
-                </p>
-
-                <div className="withdraw-form">
-                  {/* Source Selector */}
-                  <div className="form-group">
-                    <label htmlFor="withdraw-source">Withdraw From</label>
-                    <select
-                      id="withdraw-source"
-                      value={withdrawalData.source}
-                      onChange={(e) => setWithdrawalData(prev => ({
-                        ...prev,
-                        source: e.target.value,
-                        tokenType: 'NATIVE', // Reset to native when changing source
-                        amount: ''
-                      }))}
-                      className="admin-select"
-                    >
-                      <option value="ROLEMANAGER">Tier Revenue (RoleManager) - {contractState.contractBalance} {nativeSymbol}</option>
-                      {isTreasuryAvailable && (
-                        <option value="TREASURY">Treasury Vault - {treasuryState.ethBalance} {nativeSymbol}</option>
-                      )}
-                    </select>
-                  </div>
-
-                  {/* Token Type Selector - only for Treasury */}
-                  {withdrawalData.source === 'TREASURY' && isTreasuryAvailable && fairWinsTokenAddress && (
-                    <div className="form-group">
-                      <label htmlFor="withdraw-token-type">Token Type</label>
-                      <select
-                        id="withdraw-token-type"
-                        value={withdrawalData.tokenType}
-                        onChange={(e) => setWithdrawalData(prev => ({ ...prev, tokenType: e.target.value, amount: '' }))}
-                        className="admin-select"
-                      >
-                        <option value="NATIVE">{nativeSymbol} (Native Currency)</option>
-                        <option value="FAIRWINS">FWN (FairWins Token) - {treasuryState.fairWinsBalance} FWN</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="form-group">
-                    <label htmlFor="withdraw-address">Recipient Address or ENS Name</label>
-                    <div className="address-input-wrapper">
-                      <input
-                        id="withdraw-address"
-                        type="text"
-                        value={withdrawalData.toAddress}
-                        onChange={(e) => setWithdrawalData(prev => ({ ...prev, toAddress: e.target.value }))}
-                        className={`admin-input ${withdrawalAddressError ? 'input-error' : ''} ${resolvedWithdrawalAddress && !withdrawalAddressError ? 'input-success' : ''}`}
-                        placeholder="0x... or vitalik.eth"
-                      />
-                      {isResolvingWithdrawalAddress && (
-                        <span className="address-status resolving" aria-label="Resolving ENS name">
-                          <span className="spinner-small"></span>
-                        </span>
-                      )}
-                      {resolvedWithdrawalAddress && !isResolvingWithdrawalAddress && !withdrawalAddressError && (
-                        <span className="address-status success" aria-label="Valid address">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
-                    {isWithdrawalEns && resolvedWithdrawalAddress && !isResolvingWithdrawalAddress && !withdrawalAddressError && (
-                      <div className="resolved-address-hint">
-                        Resolves to: <code>{shortenAddress(resolvedWithdrawalAddress)}</code>
-                      </div>
-                    )}
-                    {withdrawalAddressError && (
-                      <div className="input-error-message">{withdrawalAddressError}</div>
-                    )}
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="withdraw-amount">
-                      Amount ({withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : nativeSymbol})
-                    </label>
-                    <div className="input-with-action">
-                      <input
-                        id="withdraw-amount"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max={
-                          withdrawalData.source === 'TREASURY'
-                            ? (withdrawalData.tokenType === 'FAIRWINS' ? treasuryState.fairWinsBalance : treasuryState.ethBalance)
-                            : contractState.contractBalance
-                        }
-                        value={withdrawalData.amount}
-                        onChange={(e) => setWithdrawalData(prev => ({ ...prev, amount: e.target.value }))}
-                        className="admin-input"
-                        placeholder="0.0"
-                      />
-                      <button
-                        type="button"
-                        className="max-btn"
-                        onClick={() => {
-                          let maxAmount
-                          if (withdrawalData.source === 'TREASURY') {
-                            maxAmount = withdrawalData.tokenType === 'FAIRWINS'
-                              ? treasuryState.fairWinsBalance
-                              : treasuryState.ethBalance
-                          } else {
-                            maxAmount = contractState.contractBalance
-                          }
-                          setWithdrawalData(prev => ({ ...prev, amount: maxAmount }))
-                        }}
-                      >
-                        MAX
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const sourceLabel = withdrawalData.source === 'TREASURY' ? 'Treasury Vault' : 'RoleManager (Tier Revenue)'
-                      const tokenLabel = withdrawalData.tokenType === 'FAIRWINS' ? 'FWN' : nativeSymbol
-                      setConfirmAction({
-                        title: 'Confirm Withdrawal',
-                        message: `You are about to withdraw ${withdrawalData.amount} ${tokenLabel} from ${sourceLabel} to ${isWithdrawalEns ? `${withdrawalData.toAddress} (${shortenAddress(resolvedWithdrawalAddress)})` : shortenAddress(resolvedWithdrawalAddress || withdrawalData.toAddress)}.`,
-                        warning: 'This action cannot be undone. Please verify the recipient address is correct.',
-                        confirmText: 'Confirm Withdrawal',
-                        danger: true,
-                        onConfirm: handleWithdraw
-                      })
-                    }}
-                    className="admin-btn primary"
-                    disabled={
-                      pendingTx ||
-                      isLoading ||
-                      !withdrawalData.toAddress ||
-                      !withdrawalData.amount ||
-                      parseFloat(withdrawalData.amount) <= 0 ||
-                      (withdrawalData.source === 'TREASURY' && isTreasuryAvailable && treasuryState.isPaused)
-                    }
-                  >
-                    {pendingTx ? 'Processing...' : 'Withdraw'}
+                  <button className="confirm-btn secondary" onClick={handleUnfreeze} disabled={pendingTx}>
+                    {pendingTx ? 'Processing...' : 'Unfreeze Account'}
                   </button>
                 </div>
               </div>
@@ -1348,16 +581,83 @@ function AdminPanel() {
           </div>
         )}
 
-        {/* Nullifier Tab */}
-        {activeTab === 'nullifier' && canManageNullifier && (
-          <NullifierTab
-            provider={provider}
-            signer={signer}
-            account={account}
-            marketFactoryAddress={DEPLOYED_CONTRACTS.marketFactory}
-          />
+        {/* Admin Roles */}
+        {activeTab === 'admin-roles' && isAdmin && (
+          <div className="admin-tab-content" role="tabpanel">
+            <div className="admin-card">
+              <h3>Grant / Revoke Admin Roles</h3>
+              <p>
+                Only the holder of <code>DEFAULT_ADMIN_ROLE</code> can grant other admin roles.
+                Grant sparingly: each role is a distinct privilege and a foothold.
+              </p>
+              <div className="admin-form">
+                <label>
+                  Account (address or ENS)
+                  <input type="text" value={adminRoleForm.address}
+                    placeholder="0x… or name.eth"
+                    onChange={(e) => setAdminRoleForm({ ...adminRoleForm, address: e.target.value })} />
+                  {adminRoleEns.resolvedAddress && adminRoleEns.isEns && (
+                    <span className="hint">→ {shortAddr(adminRoleEns.resolvedAddress)}</span>
+                  )}
+                </label>
+                <label>
+                  Role
+                  <select value={adminRoleForm.role}
+                    onChange={(e) => setAdminRoleForm({ ...adminRoleForm, role: e.target.value })}>
+                    <option value="GUARDIAN">Guardian — pause/unpause</option>
+                    <option value="ACCOUNT_MODERATOR">Account Moderator — freeze/unfreeze</option>
+                    <option value="ROLE_MANAGER">Role Manager — grant/revoke memberships</option>
+                    <option value="DEFAULT_ADMIN">Default Admin — full control (rare)</option>
+                  </select>
+                </label>
+                <div className="emergency-actions">
+                  <button className="confirm-btn primary" onClick={handleGrantAdminRole} disabled={pendingTx}>
+                    {pendingTx ? 'Processing...' : 'Grant Role'}
+                  </button>
+                  <button className="confirm-btn danger" onClick={handleRevokeAdminRole} disabled={pendingTx}>
+                    {pendingTx ? 'Processing...' : 'Revoke Role'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
+        {/* Treasury */}
+        {activeTab === 'treasury' && isAdmin && (
+          <div className="admin-tab-content" role="tabpanel">
+            <div className="admin-card">
+              <h3>Treasury Withdrawal</h3>
+              <p>
+                Withdraws accrued tier fees from MembershipManager in USDC. Current balance:{' '}
+                <strong>{contractState.accruedFees} USDC</strong>.
+              </p>
+              <div className="admin-form">
+                <label>
+                  Recipient (address or ENS)
+                  <input type="text" value={withdrawForm.to}
+                    placeholder="0x… or name.eth"
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, to: e.target.value })} />
+                  {withdrawEns.resolvedAddress && withdrawEns.isEns && (
+                    <span className="hint">→ {shortAddr(withdrawEns.resolvedAddress)}</span>
+                  )}
+                </label>
+                <label>
+                  Amount (USDC)
+                  <input type="number" min="0" step="0.01" value={withdrawForm.amount}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })} />
+                  <button type="button" className="hint-btn"
+                    onClick={() => setWithdrawForm({ ...withdrawForm, amount: contractState.accruedFees })}>
+                    Max
+                  </button>
+                </label>
+                <button className="confirm-btn primary" onClick={handleWithdraw} disabled={pendingTx}>
+                  {pendingTx ? 'Withdrawing...' : 'Withdraw Fees'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

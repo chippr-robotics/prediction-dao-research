@@ -1,5 +1,22 @@
 # Friend Market Contracts (P2P Wager System)
 
+> **Historical — superseded by the v3 P2P refactor.**
+>
+> This page describes the pre-refactor architecture (FriendGroupMarketFactory
+> + TieredRoleManager + TierRegistry + MembershipPaymentManager) which has
+> been replaced by a leaner two-contract surface:
+>
+> - `contracts/access/MembershipManager.sol` — paid tiers + on-chain admin
+>   roles via OpenZeppelin AccessControl.
+> - `contracts/wagers/WagerRegistry.sol` — 1v1 P2P wager escrow with
+>   Pausable + per-account freeze.
+>
+> The user-purchasable role was renamed from `FRIEND_MARKET_ROLE` to
+> `WAGER_PARTICIPANT_ROLE`. See [Roles and Tiers](../system-overview/roles-and-tiers.md)
+> for the current model, [Account Moderation Policy](../system-overview/account-moderation.md)
+> for the freeze power, and `contracts/wagers/WagerRegistry.sol` /
+> `contracts/access/MembershipManager.sol` for the source of truth.
+
 This document covers the smart contract ecosystem that powers end-to-end encrypted peer-to-peer wagers on the Polygon Amoy (Polymarket testnet) (chain ID 80002).
 
 ## Deployed Addresses (Polygon Amoy (Polymarket testnet))

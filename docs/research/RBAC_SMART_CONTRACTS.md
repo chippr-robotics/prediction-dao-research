@@ -1,5 +1,9 @@
 # RBAC Smart Contract Implementation
 
+> **Historical — superseded by the v3 P2P refactor.** See
+> [Roles and Tiers](../system-overview/roles-and-tiers.md) for the current
+> AccessControl-based model on `MembershipManager` and `WagerRegistry`.
+
 ## Overview
 
 Comprehensive Role-Based Access Control (RBAC) smart contract system implementing enterprise-grade security patterns with tiered membership levels.
