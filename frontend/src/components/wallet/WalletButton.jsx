@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
-import { useETCswap } from '../../hooks/useETCswap'
+import { useDex } from '../../hooks/useDex'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useWalletRoles, useWeb3 } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
@@ -10,9 +10,9 @@ import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { getContractAddress } from '../../config/contracts'
-import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
-import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
+import { useFriendMarketCreation, loadPendingTransaction, clearPendingTransaction } from '../../hooks/useFriendMarketCreation'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
@@ -48,7 +48,7 @@ function WalletButton({ className = '' }) {
   const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
-  const { balances, loading: balanceLoading } = useETCswap()
+  const { balances, loading: balanceLoading } = useDex()
   const { preferences, setDemoMode } = useUserPreferences()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
@@ -448,7 +448,7 @@ function WalletButton({ className = '' }) {
                       role="menuitem"
                     >
                       <span aria-hidden="true">🔓</span>
-                      <span>Get Access - $50 USC per Month</span>
+                      <span>Get Access - from $2 USDC / month</span>
                     </button>
                   </div>
                 )}

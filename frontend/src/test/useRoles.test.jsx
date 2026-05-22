@@ -125,7 +125,10 @@ describe('useRoles hook', () => {
 
     // Should have ROLES constants available
     expect(result.current.ROLES).toBeDefined()
-    expect(result.current.ROLES.MARKET_MAKER).toBe('MARKET_MAKER')
+    expect(result.current.ROLES.WAGER_PARTICIPANT).toBe('WAGER_PARTICIPANT')
     expect(result.current.ROLES.ADMIN).toBe('ADMIN')
+    expect(result.current.ROLES.GUARDIAN).toBe('GUARDIAN')
+    expect(result.current.ROLES.ACCOUNT_MODERATOR).toBe('ACCOUNT_MODERATOR')
+    expect(result.current.ROLES.ROLE_MANAGER).toBe('ROLE_MANAGER')
   })
 })

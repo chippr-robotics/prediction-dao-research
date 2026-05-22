@@ -10,7 +10,7 @@ import {
   deriveKeyPairFromSignature,
   isXWingEnvelope,
 } from '../../utils/crypto/envelopeEncryption'
-import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { DEX_ADDRESSES } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import { getContractAddress } from '../../config/contracts'
