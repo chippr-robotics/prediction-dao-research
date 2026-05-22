@@ -1,5 +1,11 @@
 # P2P Friend Group Betting - Implementation Summary
 
+> **Historical — superseded by the v3 P2P refactor.** The canonical reference
+> for the active P2P stack is `contracts/wagers/WagerRegistry.sol` and
+> `contracts/access/MembershipManager.sol`. See
+> [Roles and Tiers](../system-overview/roles-and-tiers.md) and
+> [Account Moderation Policy](../system-overview/account-moderation.md).
+
 ## Overview
 
 This implementation adds peer-to-peer (P2P) prediction markets for friend groups to the FairWins platform, addressing the need for small-scale betting between trusted parties with reduced costs and simplified operations.

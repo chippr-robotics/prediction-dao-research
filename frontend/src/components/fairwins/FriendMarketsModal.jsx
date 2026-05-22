@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3, useLazyIpfsEnvelope, useFriendMarketNotifications } from '../../hooks'
-import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useEncryption, useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
-import { TOKENS } from '../../constants/etcswap'
+import { TOKENS } from '../../constants/dex'
 import {
   WAGER_DEFAULTS,
   getDefaultEndDateTime,
@@ -103,20 +102,10 @@ function FriendMarketsModal({
   const { createFriendMarket } = useFriendMarketCreation()
   const handleCreate = onCreate || createFriendMarket
 
-  // Role details for checking dual roles (required for Bookmaker)
-  const { roleDetails } = useRoleDetails()
-
-  // Check if user can create Bookmaker markets (requires both MARKET_MAKER and FRIEND_MARKET roles)
-  const hasBookmakerRoles = useMemo(() => {
-    const marketMaker = roleDetails?.MARKET_MAKER
-    const friendMarket = roleDetails?.FRIEND_MARKET
-    return (
-      marketMaker?.hasRole &&
-      marketMaker?.isActive &&
-      friendMarket?.hasRole &&
-      friendMarket?.isActive
-    )
-  }, [roleDetails])
+  // The post-refactor protocol exposes only `WAGER_PARTICIPANT` and the new
+  // WagerRegistry doesn't have a Bookmaker resolution type — leave the
+  // capability flag false so the bookmaker tile renders nowhere.
+  const hasBookmakerRoles = false
 
   // Encryption hook for friend market privacy
   const {
@@ -157,9 +146,11 @@ function FriendMarketsModal({
   // Tab state
   const [activeTab, setActiveTab] = useState('create') // 'create', 'active', 'past'
 
-  // Creation flow state
-  const [creationStep, setCreationStep] = useState('type') // 'type', 'form', 'success'
-  const [friendMarketType, setFriendMarketType] = useState(null)
+  // Creation flow state. The protocol only supports 1v1 wagers on-chain, so
+  // the modal opens straight to the form by default and the legacy
+  // type-picker step is no longer rendered.
+  const [creationStep, setCreationStep] = useState('form') // 'form' | 'success'
+  const [friendMarketType, setFriendMarketType] = useState(initialType || 'oneVsOne')
   const [createdMarket, setCreatedMarket] = useState(null)
 
   // Form data
@@ -251,17 +242,17 @@ function FriendMarketsModal({
     setEnableEncryption(true)
   }, [])
 
-  // Reset modal state when opened
+  // Reset modal state when opened.
+  //
+  // The protocol only supports 1v1 wagers on-chain, so the type-picker is
+  // skipped entirely — if no `initialType` is passed we default to 'oneVsOne'
+  // and jump straight to the form. `initialType` (smallGroup / eventTracking)
+  // is preserved as a knob for legacy flows still being phased out.
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab || 'create')
-      if (initialType) {
-        setFriendMarketType(initialType)
-        setCreationStep('form')
-      } else {
-        setCreationStep('type')
-        setFriendMarketType(null)
-      }
+      setFriendMarketType(initialType || 'oneVsOne')
+      setCreationStep('form')
       setCreatedMarket(null)
       setSelectedMarket(null)
       setErrors({})
@@ -590,7 +581,7 @@ function FriendMarketsModal({
       if (!formData.opponent.trim()) {
         newErrors.opponent = 'Opponent address is required'
       } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.opponent.trim())) {
-        newErrors.opponent = 'Invalid Ethereum address'
+        newErrors.opponent = 'Enter a valid Ethereum address or ENS name'
       } else if (formData.opponent.toLowerCase() === '0x0000000000000000000000000000000000000000') {
         newErrors.opponent = 'Cannot use the zero address'
       } else if (formData.opponent.toLowerCase() === account?.toLowerCase()) {
@@ -731,10 +722,11 @@ function FriendMarketsModal({
     resetForm()
   }
 
+  // The type-picker step has been removed (only 1v1 wagers are supported
+  // on-chain), so the legacy "back" / "cancel" buttons now close the modal.
   const handleBackToType = () => {
-    setCreationStep('type')
-    setFriendMarketType(null)
     resetForm()
+    handleClose()
   }
 
   const handleSubmit = async (e) => {
@@ -1185,8 +1177,10 @@ function FriendMarketsModal({
           </button>
         </header>
 
-        {/* Tab Navigation */}
-        <nav className="fm-tabs" role="tablist">
+        {/* Tab Navigation. `role="tablist"` removed: the modal opens
+            directly into the create form now, and the Active / Past tabs
+            are surfaced as section buttons rather than a tab strip. */}
+        <nav className="fm-tabs">
           <button
             className={`fm-tab ${activeTab === 'create' ? 'active' : ''}`}
             onClick={() => { setActiveTab('create'); setSelectedMarket(null) }}
@@ -1315,17 +1309,6 @@ function FriendMarketsModal({
               {creationStep === 'form' && (
                 <form className="fm-form" onSubmit={handleSubmit}>
                   <div className="fm-form-header">
-                    <button
-                      type="button"
-                      className="fm-back-btn"
-                      onClick={handleBackToType}
-                      disabled={submitting}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="15 18 9 12 15 6"/>
-                      </svg>
-                      Back
-                    </button>
                     <div className="fm-form-type-badge">
                       {friendMarketType === 'oneVsOne' && <><span>🎯</span> 1v1</>}
                       {friendMarketType === 'smallGroup' && <><span>👪</span> Group</>}

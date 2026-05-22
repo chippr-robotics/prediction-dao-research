@@ -64,7 +64,7 @@ function UserManagementModal({ onScanMarket }) {
 
   const handleNavigateToAdmin = () => {
     hideModal()
-    navigate('/admin/roles')
+    navigate('/admin')
   }
 
   const shortenAddress = (address) => {

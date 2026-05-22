@@ -1,18 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
-import { ethers } from 'ethers'
-import { useETCswap } from '../../hooks/useETCswap'
+import { useDex } from '../../hooks/useDex'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { useWalletRoles, useWeb3 } from '../../hooks'
+import { useWalletRoles } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
-import { getContractAddress } from '../../config/contracts'
-import { ETCSWAP_ADDRESSES, TOKENS } from '../../constants/etcswap'
+import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
-import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
+import { useFriendMarketCreation, loadPendingTransaction, clearPendingTransaction } from '../../hooks/useFriendMarketCreation'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
@@ -41,14 +39,14 @@ function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
-  const { friendMarkets, addMarket: addFriendMarket } = useFriendMarkets()
+  const { friendMarkets } = useFriendMarkets()
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
   const chainId = useChainId()
   const navigate = useNavigate()
   const { showModal } = useModal()
-  const { balances, loading: balanceLoading } = useETCswap()
+  const { balances, loading: balanceLoading } = useDex()
   const { preferences, setDemoMode } = useUserPreferences()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
@@ -56,7 +54,6 @@ function WalletButton({ className = '' }) {
     loading: roleDetailsLoading,
     refresh: refreshRoleDetails
   } = useRoleDetails()
-  const { signer } = useWeb3()
   const { toggleMode, isDark } = useTheme()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
@@ -275,7 +272,7 @@ function WalletButton({ className = '' }) {
 
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
-    navigate('/admin/roles')
+    navigate('/admin')
   }
 
   const shortenAddress = (addr) => {
@@ -430,7 +427,7 @@ function WalletButton({ className = '' }) {
               {/* Wagers Section - Unified */}
               <div className="dropdown-section">
                 <span className="wallet-section-title">Wagers</span>
-                {hasRole(ROLES.FRIEND_MARKET) ? (
+                {hasRole(ROLES.WAGER_PARTICIPANT) ? (
                   <button
                     onClick={handleOpenFriendMarket}
                     className="action-button friend-market-btn"
@@ -448,7 +445,7 @@ function WalletButton({ className = '' }) {
                       role="menuitem"
                     >
                       <span aria-hidden="true">🔓</span>
-                      <span>Get Access - $50 USC per Month</span>
+                      <span>Get Access - from $2 USDC / month</span>
                     </button>
                   </div>
                 )}

@@ -20,7 +20,6 @@ import WalletPage from './pages/WalletPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
 
 //admin
-import RoleManagementAdmin from './components/RoleManagementAdmin'
 import AdminPanel from './components/AdminPanel'
 
 // dev
@@ -102,7 +101,6 @@ function AppContent() {
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/friend-market/accept" element={<MarketAcceptancePage />} />
           <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/admin/roles" element={<RoleManagementAdmin />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -49,6 +49,9 @@ interface IWagerRegistry {
         bool creatorIsYes
     );
 
+    event AccountFrozen(address indexed user, address indexed by, string reason);
+    event AccountUnfrozen(address indexed user, address indexed by);
+
     function createWager(
         address opponent,
         address arbitrator,
@@ -70,6 +73,10 @@ interface IWagerRegistry {
     function autoResolveFromOracle(uint256 wagerId) external;
     function claimPayout(uint256 wagerId) external;
     function claimRefund(uint256 wagerId) external;
+
+    function freezeAccount(address user, string calldata reason) external;
+    function unfreezeAccount(address user) external;
+    function isFrozen(address user) external view returns (bool);
 
     function getWager(uint256 wagerId) external view returns (Wager memory);
     function isAllowedToken(address token) external view returns (bool);

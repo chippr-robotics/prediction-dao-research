@@ -13,7 +13,7 @@ const Resolution = {
   Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4,
   ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7,
 };
-const FRIEND_MARKET_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE"));
+const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
 const usdc = (n) => ethers.parseUnits(String(n), 6);
 
 describe("WagerRegistry oracle registry", function () {
@@ -37,7 +37,7 @@ describe("WagerRegistry oracle registry", function () {
     const Membership = await ethers.getContractFactory("MembershipManager");
     const mgr = await Membership.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
     await mgr.connect(admin).setTier(
-      FRIEND_MARKET_ROLE, Tier.Bronze, usdc(50), 30,
+      WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30,
       { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 }, true
     );
 
@@ -52,18 +52,18 @@ describe("WagerRegistry oracle registry", function () {
       await usdcToken.mint(u.address, usdc(10_000));
       await usdcToken.connect(u).approve(await mgr.getAddress(), ethers.MaxUint256);
       await usdcToken.connect(u).approve(await reg.getAddress(), ethers.MaxUint256);
-      await mgr.connect(u).purchaseTier(FRIEND_MARKET_ROLE, Tier.Bronze);
+      await mgr.connect(u).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
     }
 
     return { reg, mgr, usdcToken, clAdapter, feed, pmAdapter, admin, alice, bob, charlie };
   }
 
   describe("setOracleAdapter", () => {
-    it("only the owner can call", async () => {
+    it("only an admin can call (caller without DEFAULT_ADMIN_ROLE reverts)", async () => {
       const fx = await loadFixture(deployFixture);
       await expect(
         fx.reg.connect(fx.alice).setOracleAdapter(Resolution.UMA, await fx.clAdapter.getAddress())
-      ).to.be.revertedWithCustomError(fx.reg, "OwnableUnauthorizedAccount");
+      ).to.be.revertedWithCustomError(fx.reg, "AccessControlUnauthorizedAccount");
     });
 
     it("rejects non-extensible enum values (Either/Creator/Opponent/ThirdParty/Polymarket)", async () => {

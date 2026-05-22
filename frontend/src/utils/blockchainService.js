@@ -576,22 +576,19 @@ export async function fetchFriendMarketsForUser(userAddress) {
   }
 }
 
-// Role name to on-chain role hash mapping
+// Role name to on-chain role hash mapping.
+// The protocol has a single paid role (WAGER_PARTICIPANT) plus four admin
+// roles enforced via OpenZeppelin AccessControl. DEFAULT_ADMIN_ROLE is the
+// zero hash by OpenZeppelin convention.
 const ROLE_NAME_TO_HASH = {
-  // Premium user roles
-  'MARKET_MAKER': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  'FRIEND_MARKET': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
+  // Paid user role
+  'WAGER_PARTICIPANT': ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE')),
+  'Wager Participant': ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE')),
   // Admin roles
   'ADMIN': '0x0000000000000000000000000000000000000000000000000000000000000000', // DEFAULT_ADMIN_ROLE
-  'OPERATIONS_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('OPERATIONS_ADMIN_ROLE')),
-  'EMERGENCY_GUARDIAN': ethers.keccak256(ethers.toUtf8Bytes('EMERGENCY_GUARDIAN_ROLE')),
-  'CORE_SYSTEM_ADMIN': ethers.keccak256(ethers.toUtf8Bytes('CORE_SYSTEM_ADMIN_ROLE')),
-  'OVERSIGHT_COMMITTEE': ethers.keccak256(ethers.toUtf8Bytes('OVERSIGHT_COMMITTEE_ROLE')),
-  // Display name aliases
-  'Market Maker': ethers.keccak256(ethers.toUtf8Bytes('MARKET_MAKER_ROLE')),
-  'Friend Market': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE')),
-  // Display names from ROLE_INFO (plural forms)
-  'Friend Markets': ethers.keccak256(ethers.toUtf8Bytes('FRIEND_MARKET_ROLE'))
+  'GUARDIAN': ethers.keccak256(ethers.toUtf8Bytes('GUARDIAN_ROLE')),
+  'ACCOUNT_MODERATOR': ethers.keccak256(ethers.toUtf8Bytes('ACCOUNT_MODERATOR_ROLE')),
+  'ROLE_MANAGER': ethers.keccak256(ethers.toUtf8Bytes('ROLE_MANAGER_ROLE')),
 }
 
 // Minimal ABI for role manager contract
@@ -903,69 +900,57 @@ export async function hasRoleOnChain(userAddress, roleName) {
     return false
   }
 
-  // v2 path: MembershipManager.hasActiveRole
-  const mmAddress = getContractAddress('membershipManager')
-  if (mmAddress) {
-    try {
-      const roleHash = getRoleHash(roleName)
-      if (!roleHash) return false
-      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider())
-      return await mm.hasActiveRole(userAddress, roleHash)
-    } catch (e) {
-      console.warn('[hasRoleOnChain v2] failed:', e.message)
-      return false
-    }
-  }
-
-  try {
-    const roleHash = getRoleHash(roleName)
-    if (!roleHash) {
-      console.warn(`Unknown role: ${roleName}`)
-      return false
-    }
-
-    const provider = getProvider()
-
-    // First check TierRegistry (modular RBAC system) - tier > 0 means user has the role
-    const tierRegistryAddress = getContractAddress('tierRegistry')
-    if (tierRegistryAddress) {
-      try {
-        const tierRegistry = new ethers.Contract(
-          tierRegistryAddress,
-          TIER_REGISTRY_ABI,
-          provider
-        )
-        const tier = await tierRegistry.getUserTier(userAddress, roleHash)
-        const tierNum = Number(tier)
-        if (tierNum > 0) {
-          console.log(`[hasRoleOnChain] ${roleName}: found in TierRegistry with tier ${tierNum}`)
-          return true
-        }
-      } catch (tierError) {
-        console.debug('[hasRoleOnChain] TierRegistry check failed:', tierError.message)
-      }
-    }
-
-    // Fall back to checking RoleManager (legacy/standalone system)
-    const roleManagerAddress = getContractAddress('roleManager')
-    if (!roleManagerAddress) {
-      console.warn('Role manager not deployed - cannot check on-chain role')
-      return false
-    }
-
-    const roleManagerContract = new ethers.Contract(
-      roleManagerAddress,
-      ROLE_MANAGER_ABI,
-      provider
-    )
-
-    const hasRole = await roleManagerContract.hasRole(roleHash, userAddress)
-    console.log(`[hasRoleOnChain] ${roleName}: RoleManager.hasRole = ${hasRole}`)
-    return hasRole
-  } catch (error) {
-    console.error('Error checking on-chain role:', error)
+  const roleHash = getRoleHash(roleName)
+  if (!roleHash) {
+    console.warn(`Unknown role: ${roleName}`)
     return false
   }
+
+  const provider = getProvider()
+
+  // Paid memberships (WAGER_PARTICIPANT) live in MembershipManager and are
+  // gated by a (Tier, expiry) pair — read via hasActiveRole.
+  if (roleName === 'WAGER_PARTICIPANT' || roleName === 'Wager Participant') {
+    const mmAddress = getContractAddress('membershipManager')
+    if (!mmAddress) return false
+    try {
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
+      return await mm.hasActiveRole(userAddress, roleHash)
+    } catch (e) {
+      console.warn('[hasRoleOnChain] membership read failed:', e.message)
+      return false
+    }
+  }
+
+  // Admin roles use OpenZeppelin AccessControl.hasRole. ADMIN /
+  // ACCOUNT_MODERATOR / GUARDIAN live on WagerRegistry; ROLE_MANAGER lives
+  // on MembershipManager. DEFAULT_ADMIN_ROLE (ADMIN) is set on both — we
+  // check WagerRegistry first because it's the canonical operator surface.
+  const accessControlAbi = [
+    'function hasRole(bytes32 role, address account) view returns (bool)'
+  ]
+  const candidates = []
+  if (roleName === 'ROLE_MANAGER') {
+    const addr = getContractAddress('membershipManager')
+    if (addr) candidates.push(addr)
+  } else {
+    const wager = getContractAddress('wagerRegistry')
+    if (wager) candidates.push(wager)
+    if (roleName === 'ADMIN') {
+      const mm = getContractAddress('membershipManager')
+      if (mm) candidates.push(mm)
+    }
+  }
+  for (const addr of candidates) {
+    try {
+      const c = new ethers.Contract(addr, accessControlAbi, provider)
+      const yes = await c.hasRole(roleHash, userAddress)
+      if (yes) return true
+    } catch (e) {
+      console.debug(`[hasRoleOnChain] AccessControl read failed on ${addr}:`, e.message)
+    }
+  }
+  return false
 }
 
 /**

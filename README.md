@@ -37,6 +37,35 @@ Private wagers between trusted groups with:
 - **30-day Oracle Timeout**: Stuck markets trigger mutual refund option
 - **Stake Escrow**: All funds locked in contract until resolution
 
+### Roles, tiers, and operator powers
+
+Wager creation requires a paid **Wager Participant** membership on
+`MembershipManager`. The four-tier ladder is anchored at **$2 Bronze** in
+USDC:
+
+| Tier | Price | Wagers / month | Open wagers at once |
+|------|-------|----------------|---------------------|
+| Bronze   | $2   | 15        | 5         |
+| Silver   | $8   | 30        | 10        |
+| Gold     | $25  | 100       | 30        |
+| Platinum | $100 | Unlimited | Unlimited |
+
+The operator team retains a narrow set of on-chain powers, each bound to a
+distinct OpenZeppelin AccessControl role:
+
+- `GUARDIAN_ROLE` — emergency pause of WagerRegistry (security incidents).
+- `ACCOUNT_MODERATOR_ROLE` — per-account freeze / unfreeze. A frozen account
+  cannot create, accept, settle, claim, or refund on the registry. See the
+  [Account Moderation Policy](docs/system-overview/account-moderation.md)
+  for full disclosure.
+- `ROLE_MANAGER_ROLE` — grant / revoke memberships outside the purchase
+  flow (support, gifts, dispute resolution).
+- `DEFAULT_ADMIN_ROLE` — tier config, treasury, and authority to grant the
+  three roles above.
+
+See [Roles and Tiers](docs/system-overview/roles-and-tiers.md) for the full
+privilege matrix.
+
 ## Architecture
 
 ```

@@ -26,10 +26,16 @@ interface IMembershipManager {
         uint64  monthAnchor;
     }
 
+    event MembershipRevoked(address indexed user, bytes32 indexed role, address indexed by);
+
     // Hooks (authorized callers only)
     function checkCanCreate(address user, bytes32 role) external view returns (bool);
     function recordCreate(address user, bytes32 role) external;
     function recordClose(address user, bytes32 role) external;
+
+    // Role-manager surface (out-of-band grants / revokes)
+    function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external;
+    function revokeMembership(address user, bytes32 role) external;
 
     // Views
     function hasActiveRole(address user, bytes32 role) external view returns (bool);

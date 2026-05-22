@@ -2,6 +2,60 @@
 
 Understanding how the Prediction DAO platform preserves trust, protects participants, and maintains system integrity.
 
+## Operator powers
+
+The protocol is permissionless at the wager level, but the operator team
+retains a narrow set of on-chain powers, each bound to a distinct
+OpenZeppelin AccessControl role. These exist so the team can respond to
+incidents and abuse without holding blanket authority over user funds.
+
+### Emergency pause (GUARDIAN_ROLE)
+
+A holder of `GUARDIAN_ROLE` on `WagerRegistry` can call `pause()`. While
+paused, **all** wager creation and acceptance reverts protocol-wide.
+Settlement paths (`declareWinner`, `autoResolveFromPolymarket`,
+`claimPayout`, `claimRefund`) are not gated by Pausable, so already-active
+wagers can continue to resolve and pay out.
+
+Pause is intended only for emergency response: a credible exploit report, a
+discovered vulnerability, an oracle compromise. The same role calls
+`unpause()` to restore creation/acceptance once the issue is resolved.
+
+A pause shows up in MetaMask as a revert with the OpenZeppelin custom error
+`EnforcedPause`.
+
+### Account moderation (ACCOUNT_MODERATOR_ROLE)
+
+A holder of `ACCOUNT_MODERATOR_ROLE` on `WagerRegistry` can freeze or
+unfreeze an individual account. A frozen account cannot create, accept,
+cancel, declare, claim, or refund on `WagerRegistry` — the contract reverts
+with the custom error `AccountFrozenError(address user)`.
+
+A freeze is per-account, not protocol-wide. It does not affect funds in the
+user's wallet outside `WagerRegistry`, does not seize escrowed stakes, and
+does not expire the user's tier early. Every freeze and unfreeze emits a
+public event (`AccountFrozen` / `AccountUnfrozen`) with the moderator's
+address and, for freezes, the reason text.
+
+See the dedicated [Account Moderation Policy](account-moderation.md) for the
+full disclosure, including illustrative grounds and the unfreeze path.
+
+### Membership management (ROLE_MANAGER_ROLE)
+
+A holder of `ROLE_MANAGER_ROLE` on `MembershipManager` can `grantMembership`
+or `revokeMembership` outside the purchase flow. This is the support /
+gift / dispute-resolution surface. It cannot grant or revoke admin roles.
+
+### Default admin (DEFAULT_ADMIN_ROLE)
+
+Configures tier prices, treasury, payment token, and authorised registry
+hooks. **Only** this role can grant or revoke the three roles above. Held by
+the project multisig.
+
+For the full role / privilege matrix, see [Roles and Tiers](roles-and-tiers.md).
+
+## Threat model
+
 ## Philosophy of Security
 
 Security in a decentralized governance system requires more than technical safeguards. It demands a thoughtful blend of cryptographic protection, economic incentives, and transparency. The Prediction DAO platform approaches security through layers that work together to create a resilient environment where honest participation becomes the rational choice.

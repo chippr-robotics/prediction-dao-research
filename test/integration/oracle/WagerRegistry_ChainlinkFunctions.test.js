@@ -8,7 +8,7 @@ const Resolution = {
   ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7,
 };
 const Status = { None: 0, Open: 1, Active: 2, Resolved: 3 };
-const FRIEND_MARKET_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE"));
+const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
 const usdc = (n) => ethers.parseUnits(String(n), 6);
 const DON_ID = "0x" + Buffer.from("fun-polygon-amoy-1").toString("hex").padEnd(64, "0");
 
@@ -33,7 +33,7 @@ describe("WagerRegistry + ChainlinkFunctionsOracleAdapter (integration)", functi
     const MembershipManager = await ethers.getContractFactory("MembershipManager");
     const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
     await mgr.connect(admin).setTier(
-      FRIEND_MARKET_ROLE, Tier.Bronze,
+      WAGER_PARTICIPANT_ROLE, Tier.Bronze,
       usdc(50), 30,
       { monthlyMarketCreation: 100, maxConcurrentMarkets: 10 },
       true
@@ -51,7 +51,7 @@ describe("WagerRegistry + ChainlinkFunctionsOracleAdapter (integration)", functi
       await usdcToken.mint(u.address, usdc(10_000));
       await usdcToken.connect(u).approve(await mgr.getAddress(), ethers.MaxUint256);
       await usdcToken.connect(u).approve(await reg.getAddress(), ethers.MaxUint256);
-      await mgr.connect(u).purchaseTier(FRIEND_MARKET_ROLE, Tier.Bronze);
+      await mgr.connect(u).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
     }
 
     return { reg, mgr, usdcToken, fnAdapter, router, admin, alice, bob, charlie };

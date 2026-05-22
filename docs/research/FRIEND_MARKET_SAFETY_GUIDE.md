@@ -1,5 +1,11 @@
 # Friend Group Market Safety Guide
 
+> **Historical — superseded by the v3 P2P refactor.** This document describes
+> the pre-refactor `FriendGroupMarketFactory` design. The current
+> architecture is `WagerRegistry` + `MembershipManager` with on-chain
+> account moderation. See [Roles and Tiers](../system-overview/roles-and-tiers.md)
+> and [Account Moderation Policy](../system-overview/account-moderation.md).
+
 ## ⚠️ IMPORTANT SAFETY WARNINGS
 
 ### Smart Contract Risks

@@ -1,19 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IMembershipManager.sol";
 
 /// @title MembershipManager
-/// @notice Tiered, time-bound memberships per role. USDC-denominated. Folds the
-///         old TieredRoleManager + TierRegistry + UsageTracker + MembershipPaymentManager
-///         into a single contract.
-contract MembershipManager is IMembershipManager, Ownable {
+/// @notice Tiered, time-bound memberships per role. USDC-denominated. The only
+///         paid role is `WAGER_PARTICIPANT_ROLE`; the surface is bytes32-keyed
+///         so future paid roles can be added without a redeploy.
+/// @dev    Role separation:
+///           DEFAULT_ADMIN_ROLE     — treasury, tier config, role administration
+///           ROLE_MANAGER_ROLE      — grant / revoke memberships out-of-band
+///           authorizedCallers map  — kept for the WagerRegistry hook surface
+contract MembershipManager is IMembershipManager, AccessControl {
     using SafeERC20 for IERC20;
 
     uint64 private constant ROLLING_WINDOW = 30 days;
+
+    bytes32 public constant ROLE_MANAGER_ROLE = keccak256("ROLE_MANAGER_ROLE");
 
     mapping(bytes32 => mapping(Tier => TierConfig)) private _tiers;
     mapping(address => mapping(bytes32 => Membership)) private _memberships;
@@ -52,10 +58,12 @@ contract MembershipManager is IMembershipManager, Ownable {
         _;
     }
 
-    constructor(address admin, address paymentToken_, address treasury_) Ownable(admin) {
+    constructor(address admin, address paymentToken_, address treasury_) {
         if (admin == address(0) || paymentToken_ == address(0) || treasury_ == address(0)) revert ZeroAddress();
         paymentToken = IERC20(paymentToken_);
         treasury = treasury_;
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(ROLE_MANAGER_ROLE, admin);
     }
 
     // ---------- Admin ----------
@@ -67,31 +75,31 @@ contract MembershipManager is IMembershipManager, Ownable {
         uint32 durationDays,
         Limits calldata limits,
         bool active
-    ) external onlyOwner {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (tier == Tier.None) revert TierNone();
         _tiers[role][tier] = TierConfig(priceUSDC, durationDays, active, limits);
         emit TierSet(role, tier, priceUSDC, durationDays, active);
     }
 
-    function setTreasury(address newTreasury) external onlyOwner {
+    function setTreasury(address newTreasury) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newTreasury == address(0)) revert ZeroAddress();
         treasury = newTreasury;
         emit TreasuryUpdated(newTreasury);
     }
 
-    function setPaymentToken(address token) external onlyOwner {
+    function setPaymentToken(address token) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (token == address(0)) revert ZeroAddress();
         paymentToken = IERC20(token);
         emit PaymentTokenUpdated(token);
     }
 
-    function setAuthorizedCaller(address caller, bool allowed) external onlyOwner {
+    function setAuthorizedCaller(address caller, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (caller == address(0)) revert ZeroAddress();
         authorizedCallers[caller] = allowed;
         emit AuthorizedCallerSet(caller, allowed);
     }
 
-    function grantTierAdmin(address user, bytes32 role, Tier tier, uint32 durationDays) external onlyOwner {
+    function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external onlyRole(ROLE_MANAGER_ROLE) {
         if (user == address(0)) revert ZeroAddress();
         if (tier == Tier.None) revert TierNone();
         Membership storage m = _memberships[user][role];
@@ -102,7 +110,17 @@ contract MembershipManager is IMembershipManager, Ownable {
         emit MembershipGranted(user, role, tier, m.expiresAt);
     }
 
-    function withdrawFees(uint128 amount, address to) external onlyOwner {
+    function revokeMembership(address user, bytes32 role) external onlyRole(ROLE_MANAGER_ROLE) {
+        if (user == address(0)) revert ZeroAddress();
+        Membership storage m = _memberships[user][role];
+        m.tier = Tier.None;
+        m.expiresAt = 0;
+        // monthCount / activeCount left intact: WagerRegistry still needs to call recordClose
+        // on any in-flight wagers, and resetting activeCount here would break that bookkeeping.
+        emit MembershipRevoked(user, role, msg.sender);
+    }
+
+    function withdrawFees(uint128 amount, address to) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (to == address(0)) revert ZeroAddress();
         if (amount > accruedFees) revert InsufficientFees();
         accruedFees -= amount;

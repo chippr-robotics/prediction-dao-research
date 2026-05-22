@@ -18,7 +18,7 @@ const path = require("path");
 const Tier = { None: 0, Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
 const Resolution = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4 };
 const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5 };
-const FRIEND_MARKET_ROLE = ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE"));
+const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
 
 function assert(cond, msg) { if (!cond) throw new Error("ASSERT: " + msg); }
 function log(...args) { console.log(...args); }
@@ -38,7 +38,7 @@ async function deployInProcess(admin) {
   await mgr.waitForDeployment();
   // Seed Bronze tier @ 50 USDC, 30 days, 15/month, 5 concurrent
   await mgr.connect(admin).setTier(
-    FRIEND_MARKET_ROLE, Tier.Bronze,
+    WAGER_PARTICIPANT_ROLE, Tier.Bronze,
     ethers.parseUnits("50", 6), 30,
     { monthlyMarketCreation: 15, maxConcurrentMarkets: 5 },
     true
@@ -82,14 +82,14 @@ async function main() {
   await usdc.connect(bob).approve(await mgr.getAddress(), usdc100);
   log("  ✓ Approved MembershipManager");
 
-  // Bronze costs 50 USDC (from FRIEND_MARKET_TIERS seed)
-  await mgr.connect(alice).purchaseTier(FRIEND_MARKET_ROLE, Tier.Bronze);
-  await mgr.connect(bob).purchaseTier(FRIEND_MARKET_ROLE, Tier.Bronze);
-  const am = await mgr.getMembership(alice.address, FRIEND_MARKET_ROLE);
-  const bm = await mgr.getMembership(bob.address, FRIEND_MARKET_ROLE);
+  // Bronze costs 50 USDC (test fixture; mainnet ladder is $2/$8/$25/$100)
+  await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+  await mgr.connect(bob).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+  const am = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+  const bm = await mgr.getMembership(bob.address, WAGER_PARTICIPANT_ROLE);
   assert(Number(am.tier) === Tier.Bronze, "Alice has Bronze");
   assert(Number(bm.tier) === Tier.Bronze, "Bob has Bronze");
-  log("  ✓ Both bought FRIEND_MARKET Bronze membership");
+  log("  ✓ Both bought WAGER_PARTICIPANT Bronze membership");
   log("    Alice expiresAt:", new Date(Number(am.expiresAt) * 1000).toISOString());
 
   // ========== 3. Either-resolution wager (USDC) ==========
@@ -241,8 +241,33 @@ async function main() {
   section("7. Membership monthly limit (Bronze = 15 wagers/month)");
   // Alice already created 3 wagers above. Try to fill up to the Bronze limit (15).
   // checkCanCreate should remain true through wager #15, then return false.
-  const aliceMembership = await mgr.getMembership(alice.address, FRIEND_MARKET_ROLE);
+  const aliceMembership = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
   log("  Alice's monthCount so far:", Number(aliceMembership.monthCount));
+
+  // ========== 8. Account freeze ==========
+  section("8. Account freeze (moderator power)");
+  await registry.connect(admin).freezeAccount(alice.address, "smoke test");
+  assert(await registry.isFrozen(alice.address), "Alice is frozen");
+  const accountFrozenSelector = ethers.id("AccountFrozenError(address)").slice(0, 10);
+  try {
+    await registry.connect(alice).createWager(
+      bob.address, ethers.ZeroAddress, usdcAddr,
+      stake, stake,
+      now + 7200, now + 90000,
+      Resolution.Either, ethers.ZeroHash, false,
+      ethers.id("Frozen test")
+    );
+    throw new Error("Frozen alice should not be able to create");
+  } catch (e) {
+    const matches =
+      e.message.includes("AccountFrozenError") ||
+      e.message.includes(accountFrozenSelector);
+    assert(matches, `Expected AccountFrozenError, got ${e.message}`);
+    log("  ✓ Frozen account blocked from createWager");
+  }
+  await registry.connect(admin).unfreezeAccount(alice.address);
+  assert(!(await registry.isFrozen(alice.address)), "Alice is unfrozen");
+  log("  ✓ Unfreeze restored access");
 
   log("\n" + "=".repeat(60));
   log("  ALL CHECKS PASSED ✓");

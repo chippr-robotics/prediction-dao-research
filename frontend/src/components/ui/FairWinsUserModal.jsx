@@ -90,7 +90,7 @@ function FairWinsUserModal() {
 
   const handleNavigateToAdmin = () => {
     hideModal()
-    navigate('/admin/roles')
+    navigate('/admin')
   }
 
   const shortenAddress = (addr) => {
@@ -499,10 +499,10 @@ function FairWinsUserModal() {
                   </ul>
                 </div>
 
-                {hasRole(ROLES.MARKET_MAKER) && (
+                {hasRole(ROLES.WAGER_PARTICIPANT) && (
                   <div className="fwum-market-maker-badge">
                     <span aria-hidden="true">⭐</span>
-                    You have Market Maker privileges
+                    You have an active Wager Participant membership
                   </div>
                 )}
               </div>

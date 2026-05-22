@@ -151,16 +151,15 @@ const UMA_OOV3 = {
 // =============================================================================
 
 /**
- * Pre-computed role hashes for access control
- * These match the keccak256 hashes used in the smart contracts
+ * Pre-computed role hashes for access control.
+ * `DEFAULT_ADMIN_ROLE` is bytes32(0) per OpenZeppelin AccessControl convention.
  */
 const ROLE_HASHES = {
-  ADMIN_ROLE: ethers.keccak256(ethers.toUtf8Bytes("ADMIN_ROLE")),
-  MARKET_MAKER_ROLE: ethers.keccak256(ethers.toUtf8Bytes("MARKET_MAKER_ROLE")),
-  FRIEND_MARKET_ROLE: ethers.keccak256(ethers.toUtf8Bytes("FRIEND_MARKET_ROLE")),
-  TOKENMINT_ROLE: ethers.keccak256(ethers.toUtf8Bytes("TOKENMINT_ROLE")),
-  CLEARPATH_USER_ROLE: ethers.keccak256(ethers.toUtf8Bytes("CLEARPATH_USER_ROLE")),
-  OPERATIONS_ADMIN_ROLE: ethers.keccak256(ethers.toUtf8Bytes("OPERATIONS_ADMIN_ROLE")),
+  DEFAULT_ADMIN_ROLE: ethers.ZeroHash,
+  WAGER_PARTICIPANT_ROLE: ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE")),
+  GUARDIAN_ROLE: ethers.keccak256(ethers.toUtf8Bytes("GUARDIAN_ROLE")),
+  ACCOUNT_MODERATOR_ROLE: ethers.keccak256(ethers.toUtf8Bytes("ACCOUNT_MODERATOR_ROLE")),
+  ROLE_MANAGER_ROLE: ethers.keccak256(ethers.toUtf8Bytes("ROLE_MANAGER_ROLE")),
 };
 
 // =============================================================================
@@ -179,19 +178,21 @@ const MembershipTier = {
 };
 
 /**
- * Friend Market tier configurations.
+ * Wager Participant tier configurations.
  *
- * NOTE: only `monthlyMarketCreation` and `maxConcurrentMarkets` are enforced
- * on-chain by MembershipManager. The other fields are unused but left in the
- * shape so v1 reporting/scripts don't break. `deploy.js` only reads the two
- * enforced limits.
+ * Anchored at $2 Bronze with a $2 / $8 / $25 / $100 ladder. Only the two
+ * MembershipManager `Limits` fields (`monthlyMarketCreation`,
+ * `maxConcurrentMarkets`) are enforced on-chain; the rest is presentation.
+ *
+ * Prices are stored as 18-decimal ethers for legacy script compatibility and
+ * converted to 6-decimal USDC by `deploy.js` via `toUSDC()`.
  */
-const FRIEND_MARKET_TIERS = [
+const WAGER_PARTICIPANT_TIERS = [
   {
     tier: MembershipTier.BRONZE,
-    name: "Friend Market Bronze",
-    description: "Entry-tier friend wagers — 15 markets/month, 5 concurrent",
-    price: ethers.parseEther("1"),
+    name: "Wager Participant Bronze",
+    description: "Entry tier — 15 wagers/month, 5 concurrent open wagers",
+    price: ethers.parseEther("2"),
     limits: {
       monthlyMarketCreation: 15,
       maxConcurrentMarkets: 5,
@@ -199,9 +200,9 @@ const FRIEND_MARKET_TIERS = [
   },
   {
     tier: MembershipTier.SILVER,
-    name: "Friend Market Silver",
-    description: "Casual usage — 30 markets/month, 10 concurrent",
-    price: ethers.parseEther("5"),
+    name: "Wager Participant Silver",
+    description: "Casual usage — 30 wagers/month, 10 concurrent",
+    price: ethers.parseEther("8"),
     limits: {
       monthlyMarketCreation: 30,
       maxConcurrentMarkets: 10,
@@ -209,8 +210,8 @@ const FRIEND_MARKET_TIERS = [
   },
   {
     tier: MembershipTier.GOLD,
-    name: "Friend Market Gold",
-    description: "Active wagering — 100 markets/month, 30 concurrent",
+    name: "Wager Participant Gold",
+    description: "Active wagering — 100 wagers/month, 30 concurrent",
     price: ethers.parseEther("25"),
     limits: {
       monthlyMarketCreation: 100,
@@ -219,86 +220,12 @@ const FRIEND_MARKET_TIERS = [
   },
   {
     tier: MembershipTier.PLATINUM,
-    name: "Friend Market Platinum",
-    description: "Unlimited friend wager creation",
+    name: "Wager Participant Platinum",
+    description: "Unlimited wager creation",
     price: ethers.parseEther("100"),
     limits: {
       monthlyMarketCreation: 0,    // 0 = unlimited
       maxConcurrentMarkets: 0,
-    }
-  }
-];
-
-/**
- * Market Maker tier configurations
- */
-const MARKET_MAKER_TIERS = [
-  {
-    tier: MembershipTier.BRONZE,
-    name: "Market Maker Bronze",
-    description: "Basic market creation capabilities",
-    price: ethers.parseEther("100"),
-    limits: {
-      dailyBetLimit: 10,
-      weeklyBetLimit: 50,
-      monthlyMarketCreation: 5,
-      maxPositionSize: ethers.parseEther("10"),
-      maxConcurrentMarkets: 3,
-      withdrawalLimit: ethers.parseEther("50"),
-      canCreatePrivateMarkets: false,
-      canUseAdvancedFeatures: false,
-      feeDiscount: 0
-    }
-  },
-  {
-    tier: MembershipTier.SILVER,
-    name: "Market Maker Silver",
-    description: "Enhanced market creation with more limits",
-    price: ethers.parseEther("150"),
-    limits: {
-      dailyBetLimit: 25,
-      weeklyBetLimit: 150,
-      monthlyMarketCreation: 15,
-      maxPositionSize: ethers.parseEther("50"),
-      maxConcurrentMarkets: 10,
-      withdrawalLimit: ethers.parseEther("200"),
-      canCreatePrivateMarkets: false,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 500  // 5% discount
-    }
-  },
-  {
-    tier: MembershipTier.GOLD,
-    name: "Market Maker Gold",
-    description: "Professional market creation capabilities",
-    price: ethers.parseEther("250"),
-    limits: {
-      dailyBetLimit: 100,
-      weeklyBetLimit: 500,
-      monthlyMarketCreation: 50,
-      maxPositionSize: ethers.parseEther("200"),
-      maxConcurrentMarkets: 30,
-      withdrawalLimit: ethers.parseEther("1000"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 1000  // 10% discount
-    }
-  },
-  {
-    tier: MembershipTier.PLATINUM,
-    name: "Market Maker Platinum",
-    description: "Unlimited market creation for institutions",
-    price: ethers.parseEther("500"),
-    limits: {
-      dailyBetLimit: ethers.MaxUint256,
-      weeklyBetLimit: ethers.MaxUint256,
-      monthlyMarketCreation: ethers.MaxUint256,
-      maxPositionSize: ethers.MaxUint256,
-      maxConcurrentMarkets: ethers.MaxUint256,
-      withdrawalLimit: ethers.MaxUint256,
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 2000  // 20% discount
     }
   }
 ];
@@ -398,8 +325,7 @@ module.exports = {
 
   // Tiers
   MembershipTier,
-  FRIEND_MARKET_TIERS,
-  MARKET_MAKER_TIERS,
+  WAGER_PARTICIPANT_TIERS,
 
   // Salts
   SALT_PREFIXES,

@@ -10,10 +10,9 @@ import {
   deriveKeyPairFromSignature,
   isXWingEnvelope,
 } from '../../utils/crypto/envelopeEncryption'
-import { ETCSWAP_ADDRESSES } from '../../constants/etcswap'
+import { DEX_ADDRESSES } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
-import { getContractAddress } from '../../config/contracts'
 import './MarketAcceptanceModal.css'
 
 // Helper to format stake amount as USD (rounded to nearest cent)
@@ -344,8 +343,8 @@ function MarketAcceptanceModal({
       const balance = await tokenContract.balanceOf(account)
       let tokenSymbol = marketData?.stakeTokenSymbol || 'tokens'
       let tokenDecimals = marketData?.stakeTokenDecimals || 18
-      try { tokenSymbol = await tokenContract.symbol() } catch {}
-      try { tokenDecimals = Number(await tokenContract.decimals()) } catch {}
+      try { tokenSymbol = await tokenContract.symbol() } catch { /* fall back to default */ }
+      try { tokenDecimals = Number(await tokenContract.decimals()) } catch { /* fall back to default */ }
 
       if (balance < stakeAmount) {
         throw new Error(
