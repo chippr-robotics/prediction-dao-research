@@ -24,6 +24,14 @@ contract UMAOptimisticOracleV3Adapter is
 
     uint64 public constant MIN_LIVENESS = 30;
 
+    /// @dev Sentinel written to `conditionToAssertion[id]` BEFORE calling
+    ///      `oo.assertTruth`. A reentrant call sees the slot as "already
+    ///      pending" and reverts. The real assertionId->conditionId mapping
+    ///      lives in `assertionToCondition`, written after the call;
+    ///      `conditionToAssertion` itself is never updated post-call so the
+    ///      mapping has no after-external-call writes (CEI-clean).
+    bytes32 internal constant _PENDING_SENTINEL = bytes32(uint256(1));
+
     struct AssertionConfig {
         bytes claim;
         address bondCurrency;
@@ -121,6 +129,12 @@ contract UMAOptimisticOracleV3Adapter is
         if (conditionToAssertion[conditionId] != bytes32(0)) revert AssertionAlreadyPending();
         if (asserter == address(0)) revert InvalidAddress();
 
+        // CEI: reserve the pending-assertion slot with a sentinel before the
+        // external call so a cross-function reentry can't see an empty mapping
+        // and start a second concurrent assertion for the same condition. The
+        // real assertionId is patched in after the call returns.
+        conditionToAssertion[conditionId] = _PENDING_SENTINEL;
+
         IERC20 currency = IERC20(cfg.bondCurrency);
         currency.safeTransferFrom(msg.sender, address(this), cfg.bondAmount);
         currency.forceApprove(address(oo), cfg.bondAmount);
@@ -138,7 +152,6 @@ contract UMAOptimisticOracleV3Adapter is
         );
 
         assertionToCondition[assertionId] = conditionId;
-        conditionToAssertion[conditionId] = assertionId;
 
         emit AssertionMade(conditionId, assertionId, asserter);
     }

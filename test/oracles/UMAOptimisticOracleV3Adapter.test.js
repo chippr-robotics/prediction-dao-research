@@ -73,9 +73,11 @@ describe("UMAOptimisticOracleV3Adapter", function () {
     expect(aliceBefore - await bond.balanceOf(alice.address)).to.equal(usdc(10));
     // Bond now sits at the OO
     expect(await bond.balanceOf(await oo.getAddress())).to.equal(usdc(10));
-    // Pending assertion recorded
-    const stored = await adapter.conditionToAssertion(conditionId);
-    expect(stored).to.equal(ev.args.assertionId);
+    // Forward mapping (assertionId -> conditionId) is the source of truth.
+    // `conditionToAssertion` holds a sentinel until any assertion is in flight
+    // (CEI: no post-external-call write to this slot — see contract for why).
+    expect(await adapter.assertionToCondition(ev.args.assertionId)).to.equal(conditionId);
+    expect(await adapter.conditionToAssertion(conditionId)).to.not.equal(ethers.ZeroHash);
   });
 
   it("rejects second assertResolution while one is pending", async () => {
