@@ -43,59 +43,14 @@ const MEMBERSHIP_TIERS = {
   PLATINUM: { id: 4, name: 'Platinum', color: '#e5e4e2' }
 }
 
-// Tier benefits matching TierLimits struct from TierRegistry contract:
-// - dailyBetLimit, weeklyBetLimit, monthlyMarketCreation, maxPositionSize
-// - maxConcurrentMarkets, withdrawalLimit, canCreatePrivateMarkets
-// - canUseAdvancedFeatures, feeDiscount (basis points)
+// Tier benefits — only the on-chain enforced limits (monthlyMarketCreation +
+// maxConcurrentMarkets). v1 had many more fields; they were never read by the
+// new MembershipManager so we drop them.
 const TIER_BENEFITS = {
-  BRONZE: {
-    dailyBetLimit: 10,
-    weeklyBetLimit: 50,
-    monthlyMarketCreation: 5,
-    maxPositionSize: '100 USC',
-    maxConcurrentMarkets: 3,
-    withdrawalLimit: '500 USC',
-    canCreatePrivateMarkets: false,
-    canUseAdvancedFeatures: false,
-    feeDiscount: 0,
-    duration: '30 days'
-  },
-  SILVER: {
-    dailyBetLimit: 25,
-    weeklyBetLimit: 125,
-    monthlyMarketCreation: 15,
-    maxPositionSize: '500 USC',
-    maxConcurrentMarkets: 10,
-    withdrawalLimit: '2,000 USC',
-    canCreatePrivateMarkets: false,
-    canUseAdvancedFeatures: true,
-    feeDiscount: 5,
-    duration: '30 days'
-  },
-  GOLD: {
-    dailyBetLimit: 50,
-    weeklyBetLimit: 250,
-    monthlyMarketCreation: 30,
-    maxPositionSize: '2,000 USC',
-    maxConcurrentMarkets: 25,
-    withdrawalLimit: '10,000 USC',
-    canCreatePrivateMarkets: true,
-    canUseAdvancedFeatures: true,
-    feeDiscount: 10,
-    duration: '30 days'
-  },
-  PLATINUM: {
-    dailyBetLimit: 'Unlimited',
-    weeklyBetLimit: 'Unlimited',
-    monthlyMarketCreation: 'Unlimited',
-    maxPositionSize: 'Unlimited',
-    maxConcurrentMarkets: 'Unlimited',
-    withdrawalLimit: 'Unlimited',
-    canCreatePrivateMarkets: true,
-    canUseAdvancedFeatures: true,
-    feeDiscount: 20,
-    duration: '30 days'
-  }
+  BRONZE:   { monthlyMarketCreation: 15,          maxConcurrentMarkets: 5,          duration: '30 days' },
+  SILVER:   { monthlyMarketCreation: 30,          maxConcurrentMarkets: 10,         duration: '30 days' },
+  GOLD:     { monthlyMarketCreation: 100,         maxConcurrentMarkets: 30,         duration: '30 days' },
+  PLATINUM: { monthlyMarketCreation: 'Unlimited', maxConcurrentMarkets: 'Unlimited', duration: '30 days' },
 }
 
 // Extended role information with features and fund destination
@@ -243,33 +198,19 @@ function RoleBenefitsDisplay({ roleKey, tierName, chainLimits }) {
     )
   }
 
-  // Betting roles (FRIEND_MARKET, MARKET_MAKER) - use legacy benefits or chain limits
+  // Betting roles (FRIEND_MARKET, MARKET_MAKER) — only the two on-chain limits.
   const benefits = chainLimits || TIER_BENEFITS[tierName]
+  // Normalize: contract uses 0 for "unlimited"; render as Unlimited.
+  const fmt = (v) => (v === 0 || v === '0') ? 'Unlimited' : v
   return (
     <div className="ppm-tier-limits">
       <div className="ppm-limit-item">
-        <span className="ppm-limit-label">Daily Bets:</span>
-        <span className="ppm-limit-value">{benefits.dailyBetLimit}</span>
+        <span className="ppm-limit-label">Markets / Month:</span>
+        <span className="ppm-limit-value">{fmt(benefits.monthlyMarketCreation)}</span>
       </div>
       <div className="ppm-limit-item">
-        <span className="ppm-limit-label">Weekly Bets:</span>
-        <span className="ppm-limit-value">{benefits.weeklyBetLimit}</span>
-      </div>
-      <div className="ppm-limit-item">
-        <span className="ppm-limit-label">Markets/Month:</span>
-        <span className="ppm-limit-value">{benefits.monthlyMarketCreation}</span>
-      </div>
-      <div className="ppm-limit-item">
-        <span className="ppm-limit-label">Max Position:</span>
-        <span className="ppm-limit-value">{benefits.maxPositionSize}</span>
-      </div>
-      <div className="ppm-limit-item">
-        <span className="ppm-limit-label">Active Markets:</span>
-        <span className="ppm-limit-value">{benefits.maxConcurrentMarkets}</span>
-      </div>
-      <div className="ppm-limit-item">
-        <span className="ppm-limit-label">Daily Withdrawals:</span>
-        <span className="ppm-limit-value">{benefits.withdrawalLimit}</span>
+        <span className="ppm-limit-label">Concurrent Wagers:</span>
+        <span className="ppm-limit-value">{fmt(benefits.maxConcurrentMarkets)}</span>
       </div>
     </div>
   )
@@ -341,28 +282,22 @@ function RoleBenefitFeatures({ roleKey, tierName, chainLimits }) {
     )
   }
 
-  // Betting features
-  const benefits = chainLimits || TIER_BENEFITS[tierName]
+  // Betting features — every paid tier gets the same set of capabilities in v2.
+  // Differentiation is only in monthly/concurrent caps (shown via TierBenefitLimits).
   return (
     <ul className="ppm-tier-features">
-      {benefits.canCreatePrivateMarkets && (
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          Private Markets
-        </li>
-      )}
-      {benefits.canUseAdvancedFeatures && (
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          Advanced Features
-        </li>
-      )}
-      {benefits.feeDiscount > 0 && (
-        <li>
-          <span className="ppm-feature-check" aria-hidden="true">✓</span>
-          {benefits.feeDiscount}% Fee Discount
-        </li>
-      )}
+      <li>
+        <span className="ppm-feature-check" aria-hidden="true">✓</span>
+        Create private 1v1 friend wagers
+      </li>
+      <li>
+        <span className="ppm-feature-check" aria-hidden="true">✓</span>
+        Encrypted metadata (off-chain envelope)
+      </li>
+      <li>
+        <span className="ppm-feature-check" aria-hidden="true">✓</span>
+        Polymarket-pegged outcomes
+      </li>
     </ul>
   )
 }

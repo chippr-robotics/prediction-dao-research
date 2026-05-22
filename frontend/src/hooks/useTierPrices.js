@@ -28,12 +28,14 @@ const TIER_IDS = {
   PLATINUM: 4
 }
 
-// Fallback prices in USDC (6-decimals) when MembershipManager is not yet deployed
+// Fallback prices in USDC when MembershipManager is not yet deployed.
+// Friend Market is the only role users are expected to hit in v2; others
+// preserved here only so the UI doesn't crash if a stale role is requested.
 const FALLBACK_PRICES = {
-  BRONZE:   { FRIEND_MARKET: 50,  MARKET_MAKER: 100, CLEARPATH_USER: 25,  TOKENMINT: 25  },
-  SILVER:   { FRIEND_MARKET: 100, MARKET_MAKER: 150, CLEARPATH_USER: 100, TOKENMINT: 100 },
-  GOLD:     { FRIEND_MARKET: 200, MARKET_MAKER: 250, CLEARPATH_USER: 250, TOKENMINT: 250 },
-  PLATINUM: { FRIEND_MARKET: 400, MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500 },
+  BRONZE:   { FRIEND_MARKET: 1,   MARKET_MAKER: 100, CLEARPATH_USER: 25,  TOKENMINT: 25  },
+  SILVER:   { FRIEND_MARKET: 5,   MARKET_MAKER: 150, CLEARPATH_USER: 100, TOKENMINT: 100 },
+  GOLD:     { FRIEND_MARKET: 25,  MARKET_MAKER: 250, CLEARPATH_USER: 250, TOKENMINT: 250 },
+  PLATINUM: { FRIEND_MARKET: 100, MARKET_MAKER: 500, CLEARPATH_USER: 500, TOKENMINT: 500 },
 }
 
 export function useTierPrices() {

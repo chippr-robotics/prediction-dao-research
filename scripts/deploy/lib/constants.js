@@ -109,75 +109,52 @@ const MembershipTier = {
 };
 
 /**
- * Friend Market tier configurations
+ * Friend Market tier configurations.
+ *
+ * NOTE: only `monthlyMarketCreation` and `maxConcurrentMarkets` are enforced
+ * on-chain by MembershipManager. The other fields are unused but left in the
+ * shape so v1 reporting/scripts don't break. `deploy.js` only reads the two
+ * enforced limits.
  */
 const FRIEND_MARKET_TIERS = [
   {
     tier: MembershipTier.BRONZE,
     name: "Friend Market Bronze",
-    description: "Basic friend market creation - 15 markets/month",
-    price: ethers.parseEther("50"),
+    description: "Entry-tier friend wagers — 15 markets/month, 5 concurrent",
+    price: ethers.parseEther("1"),
     limits: {
-      dailyBetLimit: 5,
-      weeklyBetLimit: 20,
       monthlyMarketCreation: 15,
-      maxPositionSize: ethers.parseEther("5"),
       maxConcurrentMarkets: 5,
-      withdrawalLimit: ethers.parseEther("25"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: false,
-      feeDiscount: 10000  // 100% discount (no fees for friend markets)
     }
   },
   {
     tier: MembershipTier.SILVER,
     name: "Friend Market Silver",
-    description: "Enhanced friend market creation - 30 markets/month",
-    price: ethers.parseEther("100"),
+    description: "Casual usage — 30 markets/month, 10 concurrent",
+    price: ethers.parseEther("5"),
     limits: {
-      dailyBetLimit: 10,
-      weeklyBetLimit: 50,
       monthlyMarketCreation: 30,
-      maxPositionSize: ethers.parseEther("15"),
       maxConcurrentMarkets: 10,
-      withdrawalLimit: ethers.parseEther("100"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 10000
     }
   },
   {
     tier: MembershipTier.GOLD,
     name: "Friend Market Gold",
-    description: "Advanced friend market creation - 100 markets/month",
-    price: ethers.parseEther("200"),
+    description: "Active wagering — 100 markets/month, 30 concurrent",
+    price: ethers.parseEther("25"),
     limits: {
-      dailyBetLimit: 35,
-      weeklyBetLimit: 200,
       monthlyMarketCreation: 100,
-      maxPositionSize: ethers.parseEther("50"),
       maxConcurrentMarkets: 30,
-      withdrawalLimit: ethers.parseEther("500"),
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 10000
     }
   },
   {
     tier: MembershipTier.PLATINUM,
     name: "Friend Market Platinum",
-    description: "Unlimited friend market creation",
-    price: ethers.parseEther("400"),
+    description: "Unlimited friend wager creation",
+    price: ethers.parseEther("100"),
     limits: {
-      dailyBetLimit: ethers.MaxUint256,
-      weeklyBetLimit: ethers.MaxUint256,
-      monthlyMarketCreation: ethers.MaxUint256,
-      maxPositionSize: ethers.MaxUint256,
-      maxConcurrentMarkets: ethers.MaxUint256,
-      withdrawalLimit: ethers.MaxUint256,
-      canCreatePrivateMarkets: true,
-      canUseAdvancedFeatures: true,
-      feeDiscount: 10000
+      monthlyMarketCreation: 0,    // 0 = unlimited
+      maxConcurrentMarkets: 0,
     }
   }
 ];
