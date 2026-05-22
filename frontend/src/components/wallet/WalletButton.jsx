@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
-import { ethers } from 'ethers'
 import { useDex } from '../../hooks/useDex'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { useWalletRoles, useWeb3 } from '../../hooks'
+import { useWalletRoles } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
-import { getContractAddress } from '../../config/contracts'
 import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { useFriendMarketCreation, loadPendingTransaction, clearPendingTransaction } from '../../hooks/useFriendMarketCreation'
@@ -41,7 +39,7 @@ function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
   const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
-  const { friendMarkets, addMarket: addFriendMarket } = useFriendMarkets()
+  const { friendMarkets } = useFriendMarkets()
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -56,7 +54,6 @@ function WalletButton({ className = '' }) {
     loading: roleDetailsLoading,
     refresh: refreshRoleDetails
   } = useRoleDetails()
-  const { signer } = useWeb3()
   const { toggleMode, isDark } = useTheme()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
