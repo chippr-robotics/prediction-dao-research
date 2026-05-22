@@ -1,0 +1,91 @@
+name: Oracle Fork Tests (Amoy)
+
+# Long-running fork tests for the Chainlink + UMA oracle adapters against live
+# Polygon Amoy state. Skipped in the default test pipeline (no AMOY_RPC_URL) and
+# run here on a schedule plus manual trigger. Requires AMOY_RPC_URL to be an
+# archive node (Alchemy, Infura, QuickNode) — the public free endpoint is pruned
+# and will fail with "historical state is not available".
+
+on:
+  schedule:
+    # Weekly Monday 04:00 UTC, offset from torture-test so they don't collide
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      block_number:
+        description: 'Optional Amoy block number to pin the fork at (uses latest if blank)'
+        required: false
+        type: string
+  pull_request:
+    # Auto-run on PRs that touch the oracle adapters or the fork test itself,
+    # so adapter changes get verified against live Amoy before merge.
+    paths:
+      - 'contracts/oracles/**'
+      - 'contracts/test/MockChainlinkAggregator.sol'
+      - 'contracts/test/MockFunctionsRouter.sol'
+      - 'contracts/test/MockOptimisticOracleV3.sol'
+      - 'test/fork/**'
+      - 'scripts/deploy/lib/constants.js'
+      - '.github/workflows/oracle-fork-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  fork-tests:
+    name: Amoy Fork Tests
+    runs-on: ubuntu-latest
+    # 30-minute cap so a misconfigured RPC can't hang CI
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      # Soft check: fork tests rely on an archive-mode Amoy RPC. Without the
+      # AMOY_RPC_URL secret the test file enters describe.skip and the job
+      # passes as a no-op (PRs from forks won't have the secret). Schedule and
+      # workflow_dispatch runs hard-fail to surface a misconfigured secret.
+      - name: Report secret availability
+        id: secret
+        env:
+          AMOY_RPC_URL: ${{ secrets.AMOY_RPC_URL }}
+        run: |
+          if [ -z "$AMOY_RPC_URL" ]; then
+            echo "::warning::AMOY_RPC_URL secret is not set; fork tests will be skipped. Configure an archive Amoy RPC (Alchemy/Infura/QuickNode) in repo secrets to enable them."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "::error::AMOY_RPC_URL secret is required for scheduled/manual runs."
+              exit 1
+            fi
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Amoy fork tests
+        env:
+          AMOY_RPC_URL: ${{ secrets.AMOY_RPC_URL }}
+          AMOY_FORK_BLOCK: ${{ github.event.inputs.block_number }}
+        run: npm run test:fork
+
+      - name: Upload Hardhat compiler cache (for debugging fork failures)
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hardhat-cache-${{ github.run_id }}
+          path: |
+            cache/
+            artifacts/build-info/
+          retention-days: 7

@@ -30,11 +30,17 @@ const {
   SALT_PREFIXES,
   TOKENS,
   POLYMARKET_CTF,
+  CHAINLINK_FUNCTIONS_ROUTER,
+  CHAINLINK_DATA_FEEDS,
+  UMA_OOV3,
   WAGER_PARTICIPANT_TIERS,
   MAINNET_CHAIN_IDS,
   ROLE_HASHES,
   SINGLETON_FACTORY_ADDRESS,
 } = require("./lib/constants");
+
+// ResolutionType enum ordinals (must match IWagerRegistry.sol)
+const RT = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4, ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7 };
 
 const {
   generateSalt,
@@ -215,6 +221,80 @@ async function main() {
     await tx.wait();
     console.log("  ✓ WagerRegistry can call recordCreate/recordClose");
   }
+  const wagerRegistry = regDeploy.contract;
+
+  // -------- Chainlink + UMA oracle adapters --------
+  // Each adapter is only deployed when its required network config resolves.
+  // Skipped adapters log a reason; the WagerRegistry just won't accept that
+  // ResolutionType on this network until the address gets filled in later.
+  const oracleDeployments = {};
+
+  // Chainlink Data Feeds
+  const feedMap = CHAINLINK_DATA_FEEDS[networkName] || {};
+  if (Object.keys(feedMap).length > 0) {
+    const cl = await deployDeterministic(
+      "ChainlinkDataFeedOracleAdapter",
+      [],
+      generateSalt(SALT_PREFIXES.V2 + "ChainlinkDataFeedOracleAdapter"),
+      deployer
+    );
+    oracleDeployments.chainlinkDataFeedAdapter = cl.address;
+    deployments.chainlinkDataFeedAdapter = cl.address;
+    if (!cl.alreadyDeployed) {
+      // Allowlist every feed configured for this network
+      for (const [pair, addr] of Object.entries(feedMap)) {
+        const tx = await cl.contract.connect(deployer).setFeedAllowed(addr, true);
+        await tx.wait();
+        console.log(`  ✓ allowlisted Chainlink ${pair}: ${addr}`);
+      }
+      const wireTx = await wagerRegistry.connect(deployer).setOracleAdapter(RT.ChainlinkDataFeed, cl.address);
+      await wireTx.wait();
+      console.log(`  ✓ ChainlinkDataFeedOracleAdapter wired into WagerRegistry`);
+    }
+  } else {
+    console.log(`Skipping ChainlinkDataFeedOracleAdapter on ${networkName}: no feeds configured`);
+  }
+
+  // Chainlink Functions
+  const fnRouter = CHAINLINK_FUNCTIONS_ROUTER[networkName];
+  if (fnRouter && ethers.isAddress(fnRouter)) {
+    const fn = await deployDeterministic(
+      "ChainlinkFunctionsOracleAdapter",
+      [fnRouter],
+      generateSalt(SALT_PREFIXES.V2 + "ChainlinkFunctionsOracleAdapter"),
+      deployer
+    );
+    oracleDeployments.chainlinkFunctionsAdapter = fn.address;
+    deployments.chainlinkFunctionsAdapter = fn.address;
+    if (!fn.alreadyDeployed) {
+      const wireTx = await wagerRegistry.connect(deployer).setOracleAdapter(RT.ChainlinkFunctions, fn.address);
+      await wireTx.wait();
+      console.log(`  ✓ ChainlinkFunctionsOracleAdapter wired into WagerRegistry`);
+      console.log(`  ⚠️  add ${fn.address} as a consumer on your LINK subscription before calling registerCondition`);
+    }
+  } else {
+    console.log(`Skipping ChainlinkFunctionsOracleAdapter on ${networkName}: no router configured`);
+  }
+
+  // UMA Optimistic Oracle V3
+  const ooAddr = UMA_OOV3[networkName];
+  if (ooAddr && ethers.isAddress(ooAddr)) {
+    const uma = await deployDeterministic(
+      "UMAOptimisticOracleV3Adapter",
+      [ooAddr],
+      generateSalt(SALT_PREFIXES.V2 + "UMAOptimisticOracleV3Adapter"),
+      deployer
+    );
+    oracleDeployments.umaAdapter = uma.address;
+    deployments.umaAdapter = uma.address;
+    if (!uma.alreadyDeployed) {
+      const wireTx = await wagerRegistry.connect(deployer).setOracleAdapter(RT.UMA, uma.address);
+      await wireTx.wait();
+      console.log(`  ✓ UMAOptimisticOracleV3Adapter wired into WagerRegistry`);
+    }
+  } else {
+    console.log(`Skipping UMAOptimisticOracleV3Adapter on ${networkName}: no OOv3 address configured`);
+  }
 
   // -------- KeyRegistry --------
   const keyDeploy = await deployDeterministic(
@@ -253,6 +333,7 @@ async function main() {
       membershipManager: mgrDeploy.address,
       wagerRegistry: regDeploy.address,
       keyRegistry: keyDeploy.address,
+      ...oracleDeployments,
     },
     mocks: deployments.mockUSDC || deployments.mockWMATIC || deployments.polymarketCTF
       ? {

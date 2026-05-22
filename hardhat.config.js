@@ -230,6 +230,11 @@ module.exports = {
         auto: true,
         interval: 0,
       },
+      // Fork mode for oracle fork tests. Activated by setting AMOY_RPC_URL.
+      forking: process.env.AMOY_RPC_URL ? {
+        url: process.env.AMOY_RPC_URL,
+        blockNumber: process.env.AMOY_FORK_BLOCK ? parseInt(process.env.AMOY_FORK_BLOCK, 10) : undefined,
+      } : undefined,
     },
     localhost: {
       url: "http://127.0.0.1:8545",

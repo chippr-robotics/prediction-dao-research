@@ -77,6 +77,76 @@ const POLYMARKET_CTF = {
 };
 
 // =============================================================================
+// CHAINLINK INTEGRATION ADDRESSES
+// =============================================================================
+
+/**
+ * Chainlink Functions Router addresses.
+ * Used by ChainlinkFunctionsOracleAdapter to send DON requests.
+ * The adapter must be added as a consumer on a LINK-funded subscription.
+ */
+const CHAINLINK_FUNCTIONS_ROUTER = {
+  polygon: process.env.CHAINLINK_FUNCTIONS_ROUTER_POLYGON || "0xdc2AAF042Aeff2E68B3e8E33F19e4B9fA7C73F10",
+  amoy: process.env.CHAINLINK_FUNCTIONS_ROUTER_AMOY || "0xC22a79eBA640940ABB6dF0f7982cc119578E11De",
+  mordor: null,
+  localhost: null,
+  hardhat: null,
+};
+
+/**
+ * Chainlink Functions DON identifiers (bytes32) per network.
+ * Passed to ChainlinkFunctionsOracleAdapter.registerCondition().
+ */
+const CHAINLINK_FUNCTIONS_DON_ID = {
+  polygon: "0x66756e2d706f6c79676f6e2d6d61696e6e65742d310000000000000000000000", // "fun-polygon-mainnet-1"
+  amoy:    "0x66756e2d706f6c79676f6e2d616d6f792d310000000000000000000000000000", // "fun-polygon-amoy-1"
+  mordor: null,
+  localhost: null,
+  hardhat: null,
+};
+
+/**
+ * Chainlink Data Feed (AggregatorV3) addresses by network.
+ * Each entry is the contract address for a specific price pair. Only the feeds
+ * we want exposed as wager-resolution sources need to be listed here; the
+ * adapter's allowlist gates which are usable on-chain.
+ *
+ * Re-verify additional pair addresses against the official Chainlink docs at
+ * deploy time. ETH/USD on Amoy is confirmed; others should be added cautiously.
+ */
+const CHAINLINK_DATA_FEEDS = {
+  polygon: {
+    "ETH/USD":   "0xF9680D99D6C9589e2a93a78A04A279e509205945",
+    "MATIC/USD": "0xAB594600376Ec9fD91F8e885dADF0CE036862dE0",
+  },
+  amoy: {
+    "ETH/USD": process.env.CHAINLINK_FEED_AMOY_ETH_USD || "0xF0d50568e3A7e8259E16663972b11910F89BD8e7",
+  },
+  mordor: {},
+  localhost: {},
+  hardhat: {},
+};
+
+// =============================================================================
+// UMA OPTIMISTIC ORACLE V3 ADDRESSES
+// =============================================================================
+
+/**
+ * UMA OptimisticOracleV3 addresses by network.
+ * Used by UMAOptimisticOracleV3Adapter to escrow bonds and receive callbacks.
+ *
+ * The Polygon mainnet address must be re-verified against UMA's official
+ * docs at deploy time (the deploy script tolerates null and skips the adapter).
+ */
+const UMA_OOV3 = {
+  polygon: process.env.UMA_OOV3_POLYGON || "0x5953f2538F613E05bAED8A5AeFa8e6622467AD3D",
+  amoy:    process.env.UMA_OOV3_AMOY    || "0xd8866E76441df243fc98B892362Fc6264dC3ca80",
+  mordor: null,
+  localhost: null,
+  hardhat: null,
+};
+
+// =============================================================================
 // ROLE HASHES
 // =============================================================================
 
@@ -243,6 +313,12 @@ module.exports = {
   // Tokens
   TOKENS,
   POLYMARKET_CTF,
+
+  // Chainlink + UMA oracle integration
+  CHAINLINK_FUNCTIONS_ROUTER,
+  CHAINLINK_FUNCTIONS_DON_ID,
+  CHAINLINK_DATA_FEEDS,
+  UMA_OOV3,
 
   // Roles
   ROLE_HASHES,

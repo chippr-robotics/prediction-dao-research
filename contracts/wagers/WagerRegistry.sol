@@ -34,6 +34,10 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     IMembershipManager public membershipManager;
     IOracleAdapter public polymarketAdapter;
 
+    /// @notice Generic registry for non-Polymarket oracle adapters keyed by ResolutionType.
+    ///         Polymarket retains its dedicated `polymarketAdapter` slot for ABI compatibility.
+    mapping(ResolutionType => IOracleAdapter) public oracleAdapters;
+
     mapping(address => bool) private _allowedTokens;
     mapping(uint256 => Wager) private _wagers;
     mapping(address => bool) private _frozen;
@@ -53,6 +57,9 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     error PolymarketRequired();
     error PolymarketDisallowed();
     error AdapterNotSet();
+    error OracleAdapterNotSet();
+    error OracleConditionRequired();
+    error UnsupportedOracleResolutionType();
     error ConditionNotResolved();
     error ConditionAlreadyResolved();
     error MembershipDenied();
@@ -106,6 +113,26 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     function setPolymarketAdapter(address adapter) external onlyRole(DEFAULT_ADMIN_ROLE) {
         polymarketAdapter = IOracleAdapter(adapter); // zero disables Polymarket type
         emit PolymarketAdapterUpdated(adapter);
+    }
+
+    /// @notice Set the adapter for one of the new (non-Polymarket) oracle resolution types.
+    ///         Pass `address(0)` to disable that resolution type.
+    /// @dev Rejects the legacy types — Either/Creator/Opponent/ThirdParty have no adapter,
+    ///      and Polymarket continues using `setPolymarketAdapter`.
+    function setOracleAdapter(ResolutionType rtype, address adapter) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (!_isExtensibleOracleType(rtype)) revert UnsupportedOracleResolutionType();
+        oracleAdapters[rtype] = IOracleAdapter(adapter);
+        emit OracleAdapterUpdated(rtype, adapter);
+    }
+
+    function _isExtensibleOracleType(ResolutionType rt) internal pure returns (bool) {
+        return rt == ResolutionType.ChainlinkDataFeed
+            || rt == ResolutionType.ChainlinkFunctions
+            || rt == ResolutionType.UMA;
+    }
+
+    function _isOracleResolvedType(ResolutionType rt) internal pure returns (bool) {
+        return rt == ResolutionType.Polymarket || _isExtensibleOracleType(rt);
     }
 
     function setTokenAllowed(address token, bool allowed) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -174,6 +201,12 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
             if (address(polymarketAdapter) == address(0)) revert AdapterNotSet();
             // Stale-condition attack mitigation
             if (polymarketAdapter.isConditionResolved(polymarketConditionId)) revert ConditionAlreadyResolved();
+        } else if (_isExtensibleOracleType(resolutionType)) {
+            if (polymarketConditionId == bytes32(0)) revert OracleConditionRequired();
+            IOracleAdapter adapter = oracleAdapters[resolutionType];
+            if (address(adapter) == address(0)) revert OracleAdapterNotSet();
+            // Stale-condition attack mitigation (parity with the Polymarket branch above)
+            if (adapter.isConditionResolved(polymarketConditionId)) revert ConditionAlreadyResolved();
         } else {
             if (polymarketConditionId != bytes32(0)) revert PolymarketDisallowed();
         }
@@ -206,6 +239,8 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         emit WagerCreated(wagerId, msg.sender, opponent, token, creatorStake, opponentStake, resolutionType, metadataHash);
         if (resolutionType == ResolutionType.Polymarket) {
             emit PolymarketLinked(wagerId, polymarketConditionId, creatorIsYes);
+        } else if (_isExtensibleOracleType(resolutionType)) {
+            emit OracleConditionLinked(wagerId, resolutionType, polymarketConditionId, creatorIsYes);
         }
     }
 
@@ -239,7 +274,7 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (w.status != Status.Active) revert NotActive();
         if (block.timestamp > w.resolveDeadline) revert ResolveExpired();
         if (winner != w.creator && winner != w.opponent) revert WinnerNotParticipant();
-        if (w.resolutionType == ResolutionType.Polymarket) revert NotAuthorized();
+        if (_isOracleResolvedType(w.resolutionType)) revert NotAuthorized();
 
         bool authorized;
         if (w.resolutionType == ResolutionType.Either) {
@@ -268,12 +303,30 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
 
         (bool outcome, , uint256 resolvedAt) = polymarketAdapter.getOutcome(w.polymarketConditionId);
         if (resolvedAt == 0) revert ConditionNotResolved();
+        _settleOracleWin(wagerId, w, outcome);
+    }
 
-        // creatorIsYes maps Polymarket outcome to winner:
-        //   creatorIsYes=true, outcome=true  → creator wins
-        //   creatorIsYes=true, outcome=false → opponent wins
-        //   creatorIsYes=false, outcome=true → opponent wins
-        //   creatorIsYes=false, outcome=false→ creator wins
+    /// @notice Generic resolve path for ChainlinkDataFeed / ChainlinkFunctions / UMA wagers.
+    ///         Reads the cached outcome from the wager's configured adapter and sets the winner.
+    function autoResolveFromOracle(uint256 wagerId) external nonReentrant {
+        Wager storage w = _wagers[wagerId];
+        if (w.status != Status.Active) revert NotActive();
+        if (!_isExtensibleOracleType(w.resolutionType)) revert NotAuthorized();
+
+        IOracleAdapter adapter = oracleAdapters[w.resolutionType];
+        if (address(adapter) == address(0)) revert OracleAdapterNotSet();
+
+        (bool outcome, , uint256 resolvedAt) = adapter.getOutcome(w.polymarketConditionId);
+        if (resolvedAt == 0) revert ConditionNotResolved();
+        _settleOracleWin(wagerId, w, outcome);
+    }
+
+    /// @dev Shared body for oracle-driven settlement. creatorIsYes maps outcome to winner:
+    ///      creatorIsYes=true,  outcome=true  -> creator wins
+    ///      creatorIsYes=true,  outcome=false -> opponent wins
+    ///      creatorIsYes=false, outcome=true  -> opponent wins
+    ///      creatorIsYes=false, outcome=false -> creator wins
+    function _settleOracleWin(uint256 wagerId, Wager storage w, bool outcome) internal {
         address winner = (outcome == w.creatorIsYes) ? w.creator : w.opponent;
         w.status = Status.Resolved;
         w.winner = winner;
