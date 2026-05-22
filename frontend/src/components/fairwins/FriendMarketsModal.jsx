@@ -12,7 +12,10 @@ import {
   getDefaultAcceptanceDeadline
 } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI, ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
+import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
+// Resolution enum kept here so existing UI dropdowns still resolve symbol names.
+// v2 contract enum: Either(0) | Creator(1) | Opponent(2) | ThirdParty(3) | Polymarket(4)
+const _ResolutionType = { Either: 0, Initiator: 1, Receiver: 2, ThirdParty: 3, AutoPegged: 4, PolymarketOracle: 4 }
 import QRScanner from '../ui/QRScanner'
 
 // Fallback so the UI renders even if the enum export is missing in some environments
@@ -507,11 +510,11 @@ function FriendMarketsModal({
 
     setCancellingMarketId(marketId)
     try {
-      const factoryAddress = getContractAddress('friendGroupMarketFactory')
-      const factory = new ethers.Contract(factoryAddress, FRIEND_GROUP_MARKET_FACTORY_ABI, signer)
+      const registryAddress = getContractAddress('wagerRegistry')
+      const registry = new ethers.Contract(registryAddress, WAGER_REGISTRY_ABI, signer)
 
-      console.log('Cancelling market:', marketId)
-      const tx = await factory.cancelPendingMarket(marketId)
+      console.log('Cancelling wager:', marketId)
+      const tx = await registry.cancelOpen(marketId)
       console.log('Cancel transaction sent:', tx.hash)
 
       await tx.wait()
@@ -963,20 +966,20 @@ function FriendMarketsModal({
     setResolveError(null)
 
     try {
-      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
-      const friendFactory = new ethers.Contract(
-        friendFactoryAddress,
-        FRIEND_GROUP_MARKET_FACTORY_ABI,
+      const registryAddress = getContractAddress('wagerRegistry')
+      const registry = new ethers.Contract(
+        registryAddress,
+        WAGER_REGISTRY_ABI,
         signer
       )
 
-      console.log('Resolving market on-chain:', { marketId: market.id, outcome: outcomeBool })
+      // v2: declareWinner takes (wagerId, winnerAddress). Map outcomeBool to creator/opponent.
+      // `outcomeBool=true` means creator wins (matches the v1 "true=creator" convention).
+      const w = await registry.getWager(market.id)
+      const winner = outcomeBool ? w.creator : w.opponent
+      console.log('Resolving wager on-chain:', { marketId: market.id, winner, outcomeBool })
 
-      const tx = await friendFactory.resolveFriendMarket(
-        market.id,
-        outcomeBool,
-        { gasLimit: 500000n }
-      )
+      const tx = await registry.declareWinner(market.id, winner)
       setResolveTxHash(tx.hash)
 
       const receipt = await tx.wait()
@@ -2280,8 +2283,8 @@ function FriendMarketsModal({
           marketId={marketToAccept.id}
           marketData={marketToAccept}
           onAccepted={handleMarketAccepted}
-          contractAddress={getContractAddress('friendGroupMarketFactory')}
-          contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
+          contractAddress={getContractAddress('wagerRegistry')}
+          contractABI={WAGER_REGISTRY_ABI}
         />
       )}
 

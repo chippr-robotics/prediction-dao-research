@@ -3,83 +3,56 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../hooks'
 import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
-import { getContractAddress } from '../config/contracts'
-import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
+import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
+import { getContractAddress, DEPLOYED_CONTRACTS } from '../config/contracts'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import { parseEncryptedIpfsReference } from '../utils/ipfsService'
 import './MarketAcceptancePage.css'
 
-/**
- * Determine token symbol based on token address
- */
-function getTokenSymbol(tokenAddress) {
-  if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
-    return 'ETC'
-  }
-  const addr = tokenAddress.toLowerCase()
-  if (addr === ETCSWAP_ADDRESSES.USC_STABLECOIN?.toLowerCase()) {
-    return 'USC'
-  }
-  if (addr === ETCSWAP_ADDRESSES.WETC?.toLowerCase()) {
-    return 'WETC'
-  }
-  return 'tokens'
+const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5 }
+const STATUS_NAMES = ['none', 'pending_acceptance', 'active', 'resolved', 'cancelled', 'refunded']
+
+// Map token address → friendly metadata (decimals, symbol). Anything else is
+// treated as a generic 18-decimal token.
+function tokenInfo(addr) {
+  if (!addr || addr === ethers.ZeroAddress) return { decimals: 18, symbol: 'tokens' }
+  const a = addr.toLowerCase()
+  const usdc = (DEPLOYED_CONTRACTS.paymentToken || '').toLowerCase()
+  const wmatic = (DEPLOYED_CONTRACTS.wmatic || '').toLowerCase()
+  if (a === usdc) return { decimals: 6, symbol: 'USDC' }
+  if (a === wmatic) return { decimals: 18, symbol: 'WMATIC' }
+  return { decimals: 18, symbol: 'tokens' }
 }
 
-/**
- * Get decimal places for a token
- */
-function getTokenDecimals(tokenAddress) {
-  if (!tokenAddress || tokenAddress === ethers.ZeroAddress) {
-    return 18
-  }
-  const addr = tokenAddress.toLowerCase()
-  if (addr === ETCSWAP_ADDRESSES.USC_STABLECOIN?.toLowerCase()) {
-    return 6 // USC has 6 decimals
-  }
-  return 18
-}
-
-/**
- * Check if a description is encrypted (inline JSON envelope or IPFS reference)
- */
-function isEncryptedDescription(description) {
-  if (!description || typeof description !== 'string') return false
-  // Check for IPFS reference: "encrypted:ipfs://..." or "ipfs://..." or raw CID
-  const ipfsRef = parseEncryptedIpfsReference(description)
+function isEncryptedDescription(desc) {
+  if (!desc || typeof desc !== 'string') return false
+  const ipfsRef = parseEncryptedIpfsReference(desc)
   if (ipfsRef.isIpfs) return true
-  // Check for inline JSON envelope
   try {
-    const parsed = JSON.parse(description)
+    const parsed = JSON.parse(desc)
     return parsed.version && parsed.algorithm && parsed.content
-  } catch {
-    return false
-  }
+  } catch { return false }
 }
 
-/**
- * Extract IPFS CID from an encrypted description, if present
- */
-function getIpfsCid(description) {
-  if (!description || typeof description !== 'string') return null
-  const ipfsRef = parseEncryptedIpfsReference(description)
+function getIpfsCid(desc) {
+  if (!desc || typeof desc !== 'string') return null
+  const ipfsRef = parseEncryptedIpfsReference(desc)
   return ipfsRef.isIpfs ? ipfsRef.cid : null
 }
 
 /**
- * MarketAcceptancePage
+ * MarketAcceptancePage — v2.
  *
- * Deep link handler for market acceptance QR codes.
- * Route: /friend-market/accept?marketId=X&...
+ * Reads from WagerRegistry.getWager(id) and synthesizes a `marketData` object
+ * with the same field names the legacy modal expects.
  *
- * Fetches market data from the contract and displays the acceptance modal.
+ * Route: /friend-market/accept?marketId=X (legacy URL kept for QR compatibility)
  */
 function MarketAcceptancePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { provider } = useWeb3()
-  useWallet() // For wallet state subscription
+  useWallet()
 
   const [marketData, setMarketData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -87,198 +60,21 @@ function MarketAcceptancePage() {
 
   const marketId = searchParams.get('marketId')
 
-  // Also get any data passed via URL params for offline preview
   const urlCreator = searchParams.get('creator')
   const urlStake = searchParams.get('stake')
   const urlToken = searchParams.get('token')
   const urlDeadline = searchParams.get('deadline')
-  // Legacy: old URLs may still include sig param for backward compat
   const urlSharedSignature = searchParams.get('sig') || null
 
   useEffect(() => {
-    const fetchMarketData = async () => {
+    const fetch = async () => {
       if (!marketId) {
         setError('No wager ID provided')
         setLoading(false)
         return
       }
-
-      // If we have a provider, try to fetch from contract
-      if (provider) {
-        try {
-          setLoading(true)
-          const contractAddress = getContractAddress('friendGroupMarketFactory')
-
-          if (!contractAddress) {
-            throw new Error('Contract address not configured')
-          }
-
-          const contract = new ethers.Contract(
-            contractAddress,
-            FRIEND_GROUP_MARKET_FACTORY_ABI,
-            provider
-          )
-
-          // Fetch market details with status
-          const marketResult = await contract.getFriendMarketWithStatus(marketId)
-          const acceptedCount = await contract.acceptedParticipantCount(marketId)
-          const acceptanceStatus = { accepted: acceptedCount }
-
-          // Also fetch full market details to get createdAt
-          const fullMarketResult = await contract.getFriendMarket(marketId)
-
-          // Try to get tradingPeriodSeconds from contract if available
-          // Note: This requires the getTradingPeriod getter to be added to the contract
-          let tradingPeriodSeconds = null
-          try {
-            tradingPeriodSeconds = await contract.getTradingPeriod(marketId)
-            tradingPeriodSeconds = Number(tradingPeriodSeconds)
-          } catch {
-            // Getter not available yet, will try to parse from metadata
-          }
-
-          // Fetch individual acceptances
-          const acceptances = {}
-          const members = marketResult.members || []
-
-          for (const member of members) {
-            try {
-              const record = await contract.getParticipantAcceptance(marketId, member)
-              acceptances[member.toLowerCase()] = {
-                hasAccepted: record.hasAccepted,
-                stakedAmount: ethers.formatEther(record.stakedAmount),
-                isArbitrator: record.isArbitrator
-              }
-            } catch {
-              // Member not found, skip
-            }
-          }
-
-          // Check arbitrator if exists
-          const arbitrator = marketResult.arbitrator
-          if (arbitrator && arbitrator !== ethers.ZeroAddress) {
-            try {
-              const arbRecord = await contract.getParticipantAcceptance(marketId, arbitrator)
-              acceptances[arbitrator.toLowerCase()] = {
-                hasAccepted: arbRecord.hasAccepted,
-                stakedAmount: '0',
-                isArbitrator: true
-              }
-            } catch {
-              // Arbitrator not found, skip
-            }
-          }
-
-          // Map market type enum to string
-          const marketTypes = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
-          const statusNames = ['pending_acceptance', 'active', 'pending_resolution', 'challenged', 'resolved', 'cancelled', 'refunded', 'oracle_timed_out']
-
-          // Determine token info
-          const stakeTokenAddr = marketResult.stakeToken
-          const tokenSymbol = getTokenSymbol(stakeTokenAddr)
-          const tokenDecimals = getTokenDecimals(stakeTokenAddr)
-
-          // Format stake amount with correct decimals
-          const stakeAmount = ethers.formatUnits(marketResult.stakePerParticipant, tokenDecimals)
-
-          // Get resolution type and odds from contract
-          const resolutionType = Number(marketResult.resolutionType)
-          const opponentOddsMultiplier = Number(marketResult.opponentOddsMultiplier)
-
-          // Handle encrypted descriptions - show placeholder instead of JSON
-          const rawDescription = marketResult.description
-          const displayDescription = isEncryptedDescription(rawDescription)
-            ? 'Encrypted Wager (details visible to participants)'
-            : rawDescription
-
-          // Get createdAt from full market result
-          const createdAt = Number(fullMarketResult.createdAt) * 1000
-          const acceptanceDeadlineMs = Number(marketResult.acceptanceDeadline) * 1000
-
-          // Try to extract market end date from encrypted metadata if available
-          let estimatedMarketEndDate = null
-          let tradingPeriodFromMetadata = null
-
-          if (isEncryptedDescription(rawDescription)) {
-            try {
-              const envelope = JSON.parse(rawDescription)
-              // The endDateTime might be in the encrypted content, which we can't read here
-              // But we store it in attributes for display purposes
-              if (envelope.attributes) {
-                const endDateAttr = envelope.attributes.find(a => a.trait_type === 'End Date')
-                if (endDateAttr) {
-                  estimatedMarketEndDate = new Date(endDateAttr.value).getTime()
-                }
-              }
-            } catch {
-              // Could not parse metadata
-            }
-          }
-
-          // If we got tradingPeriodSeconds from contract, use it
-          if (tradingPeriodSeconds) {
-            // For pending markets, estimate end date as when they might activate + trading period
-            // Best estimate: acceptance deadline + trading period
-            estimatedMarketEndDate = acceptanceDeadlineMs + (tradingPeriodSeconds * 1000)
-          } else if (!estimatedMarketEndDate) {
-            // Fallback: acceptance deadline + 7 days default
-            estimatedMarketEndDate = acceptanceDeadlineMs + (7 * 24 * 60 * 60 * 1000)
-          }
-
-          setMarketData({
-            id: marketId,
-            description: displayDescription,
-            rawDescription: rawDescription, // Keep original for decryption
-            isEncrypted: isEncryptedDescription(rawDescription),
-            ipfsCid: getIpfsCid(rawDescription),
-            sharedSignature: urlSharedSignature || null,
-            creator: marketResult.creator,
-            participants: members,
-            arbitrator: arbitrator !== ethers.ZeroAddress ? arbitrator : null,
-            marketType: marketTypes[Number(marketResult.marketType)] || 'unknown',
-            status: statusNames[Number(marketResult.status)] || 'unknown',
-            acceptanceDeadline: acceptanceDeadlineMs,
-            minAcceptanceThreshold: Number(marketResult.minThreshold),
-            stakePerParticipant: stakeAmount,
-            stakeToken: stakeTokenAddr,
-            stakeTokenSymbol: tokenSymbol,
-            acceptances,
-            acceptedCount: Number(acceptanceStatus.accepted),
-            opponentOddsMultiplier,
-            resolutionType,
-            // Add market end date info
-            createdAt,
-            tradingPeriodSeconds: tradingPeriodSeconds || tradingPeriodFromMetadata,
-            estimatedMarketEndDate
-          })
-
-        } catch (err) {
-          console.error('Error fetching market from contract:', err)
-
-          // Fall back to URL params if available
-          if (urlCreator && urlStake) {
-            setMarketData({
-              id: marketId,
-              description: 'Offer details will load when connected...',
-              creator: urlCreator,
-              participants: [],
-              arbitrator: null,
-              marketType: 'unknown',
-              status: 'pending_acceptance',
-              acceptanceDeadline: urlDeadline ? Number(urlDeadline) : Date.now() + 86400000,
-              minAcceptanceThreshold: WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD,
-              stakePerParticipant: urlStake,
-              stakeToken: null,
-              stakeTokenSymbol: urlToken || 'tokens',
-              acceptances: {},
-              acceptedCount: 0
-            })
-          } else {
-            setError('Failed to load offer data. Please ensure you are connected to the correct network.')
-          }
-        }
-      } else {
-        // No provider, use URL params if available
+      if (!provider) {
+        // Offline preview from URL params
         if (urlCreator && urlStake) {
           setMarketData({
             id: marketId,
@@ -286,36 +82,129 @@ function MarketAcceptancePage() {
             creator: urlCreator,
             participants: [],
             arbitrator: null,
-            marketType: 'unknown',
+            marketType: 'oneVsOne',
             status: 'pending_acceptance',
             acceptanceDeadline: urlDeadline ? Number(urlDeadline) : Date.now() + 86400000,
-            minAcceptanceThreshold: 2,
+            minAcceptanceThreshold: 1,
             stakePerParticipant: urlStake,
             stakeToken: null,
             stakeTokenSymbol: urlToken || 'tokens',
             acceptances: {},
-            acceptedCount: 0
+            acceptedCount: 0,
           })
         } else {
           setError('Please connect your wallet to view offer details')
         }
+        setLoading(false)
+        return
       }
 
-      setLoading(false)
-    }
+      try {
+        setLoading(true)
+        const registryAddress = getContractAddress('wagerRegistry')
+        if (!registryAddress) throw new Error('WagerRegistry not deployed on this network')
 
-    fetchMarketData()
+        const registry = new ethers.Contract(registryAddress, WAGER_REGISTRY_ABI, provider)
+        const w = await registry.getWager(marketId)
+
+        if (!w.creator || w.creator === ethers.ZeroAddress) {
+          throw new Error(`Wager #${marketId} not found`)
+        }
+
+        const { decimals, symbol } = tokenInfo(w.token)
+        const status = Number(w.status)
+        const statusName = STATUS_NAMES[status] || 'unknown'
+
+        // The opponent puts up opponentStake on acceptance; that's what the modal cares about.
+        const stakePerParticipant = ethers.formatUnits(w.opponentStake, decimals)
+
+        // Off-chain we may have the original description matching the on-chain metadataHash.
+        // For now we just show the metadataHash — the encrypted-envelope flow can resolve
+        // it via IPFS by hash lookup in a future enhancement.
+        const rawDescription = w.metadataHash
+        const displayDescription = `Wager #${marketId} — hash ${rawDescription.slice(0, 10)}…`
+
+        const opponentAddr = w.opponent
+        const acceptances = {}
+        if (opponentAddr && opponentAddr !== ethers.ZeroAddress) {
+          acceptances[opponentAddr.toLowerCase()] = {
+            hasAccepted: status >= Status.Active,
+            stakedAmount: stakePerParticipant,
+            isArbitrator: false,
+          }
+        }
+        // Creator implicitly accepts at creation
+        if (w.creator) {
+          acceptances[w.creator.toLowerCase()] = {
+            hasAccepted: true,
+            stakedAmount: ethers.formatUnits(w.creatorStake, decimals),
+            isArbitrator: false,
+          }
+        }
+
+        const acceptanceDeadlineMs = Number(w.acceptDeadline) * 1000
+        const resolveDeadlineMs = Number(w.resolveDeadline) * 1000
+
+        setMarketData({
+          id: marketId,
+          description: displayDescription,
+          rawDescription,
+          isEncrypted: isEncryptedDescription(rawDescription),
+          ipfsCid: getIpfsCid(rawDescription),
+          sharedSignature: urlSharedSignature,
+          creator: w.creator,
+          participants: opponentAddr && opponentAddr !== ethers.ZeroAddress ? [w.creator, opponentAddr] : [w.creator],
+          arbitrator: (w.arbitrator && w.arbitrator !== ethers.ZeroAddress) ? w.arbitrator : null,
+          marketType: 'oneVsOne',
+          status: statusName,
+          acceptanceDeadline: acceptanceDeadlineMs,
+          resolveDeadline: resolveDeadlineMs,
+          minAcceptanceThreshold: 1,
+          stakePerParticipant,
+          creatorStake: ethers.formatUnits(w.creatorStake, decimals),
+          opponentStake: ethers.formatUnits(w.opponentStake, decimals),
+          stakeToken: w.token,
+          stakeTokenSymbol: symbol,
+          stakeTokenDecimals: decimals,
+          resolutionType: Number(w.resolutionType),
+          polymarketConditionId: w.polymarketConditionId,
+          creatorIsYes: w.creatorIsYes,
+          acceptances,
+          acceptedCount: status >= Status.Active ? 2 : 1,
+          createdAt: 0,
+          estimatedMarketEndDate: resolveDeadlineMs,
+        })
+      } catch (err) {
+        console.error('Error fetching wager:', err)
+        if (urlCreator && urlStake) {
+          setMarketData({
+            id: marketId,
+            description: 'Offer details will load when connected...',
+            creator: urlCreator,
+            participants: [],
+            arbitrator: null,
+            marketType: 'oneVsOne',
+            status: 'pending_acceptance',
+            acceptanceDeadline: urlDeadline ? Number(urlDeadline) : Date.now() + 86400000,
+            minAcceptanceThreshold: 1,
+            stakePerParticipant: urlStake,
+            stakeToken: null,
+            stakeTokenSymbol: urlToken || 'tokens',
+            acceptances: {},
+            acceptedCount: 0,
+          })
+        } else {
+          setError(err.message || 'Failed to load wager data. Please ensure you are connected to the correct network.')
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetch()
   }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlSharedSignature])
 
-  const handleClose = () => {
-    navigate('/')
-  }
-
-  const handleAccepted = () => {
-    // Refresh market data after acceptance
-    setLoading(true)
-    window.location.reload()
-  }
+  const handleClose = () => navigate('/')
+  const handleAccepted = () => { setLoading(true); window.location.reload() }
 
   if (loading) {
     return (
@@ -332,9 +221,7 @@ function MarketAcceptancePage() {
         <div className="map-error-icon">&#9888;</div>
         <h2>Unable to Load Offer</h2>
         <p>{error}</p>
-        <button className="map-btn" onClick={handleClose}>
-          Go Back
-        </button>
+        <button className="map-btn" onClick={handleClose}>Go Back</button>
       </div>
     )
   }
@@ -347,8 +234,8 @@ function MarketAcceptancePage() {
         marketId={marketId}
         marketData={marketData}
         onAccepted={handleAccepted}
-        contractAddress={getContractAddress('friendGroupMarketFactory')}
-        contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
+        contractAddress={getContractAddress('wagerRegistry')}
+        contractABI={WAGER_REGISTRY_ABI}
       />
     </div>
   )

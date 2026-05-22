@@ -6,12 +6,15 @@
  */
 
 import { ethers } from 'ethers'
-import { getContractAddress, NETWORK_CONFIG, DEPLOYMENT_BLOCKS } from '../config/contracts'
+import { getContractAddress, NETWORK_CONFIG, DEPLOYMENT_BLOCKS, DEPLOYED_CONTRACTS } from '../config/contracts'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { ETCSWAP_ADDRESSES } from '../constants/etcswap'
 import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
+import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
+import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
+import { KEY_REGISTRY_ABI } from '../abis/KeyRegistry'
 import {
   parseEncryptedIpfsReference
 } from './ipfsService'
@@ -122,19 +125,29 @@ export function getProvider() {
 export function getContract(contractName, signerOrProvider = null) {
   const provider = signerOrProvider || getProvider()
   const address = getContractAddress(contractName)
-  
+
   let abi
   switch (contractName) {
-    case 'friendGroupMarketFactory':
-      abi = FRIEND_GROUP_MARKET_FACTORY_ABI
+    case 'wagerRegistry':
+      abi = WAGER_REGISTRY_ABI
+      break
+    case 'membershipManager':
+      abi = MEMBERSHIP_MANAGER_ABI
+      break
+    case 'keyRegistry':
+      abi = KEY_REGISTRY_ABI
       break
     case 'zkKeyManager':
       abi = ZK_KEY_MANAGER_ABI
       break
+    case 'friendGroupMarketFactory':
+      // Legacy Mordor only — v2 networks should use wagerRegistry instead.
+      abi = FRIEND_GROUP_MARKET_FACTORY_ABI
+      break
     default:
       throw new Error(`Unknown contract: ${contractName}`)
   }
-  
+
   return new ethers.Contract(address, abi, provider)
 }
 
@@ -379,6 +392,63 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
  * @param {string} userAddress - User's wallet address
  * @returns {Promise<Array>} Array of friend market objects
  */
+async function fetchWagersForUserV2(userAddress, provider, registryAddress) {
+  const registry = new ethers.Contract(registryAddress, WAGER_REGISTRY_ABI, provider)
+
+  // Filter WagerCreated events where the user is either creator or opponent.
+  const createdAsCreator = registry.filters.WagerCreated(null, userAddress, null)
+  const createdAsOpponent = registry.filters.WagerCreated(null, null, userAddress)
+  const fromBlock = (DEPLOYMENT_BLOCKS && DEPLOYMENT_BLOCKS.wagerRegistry) || 0
+
+  const [evA, evB] = await Promise.all([
+    registry.queryFilter(createdAsCreator, fromBlock, 'latest').catch(() => []),
+    registry.queryFilter(createdAsOpponent, fromBlock, 'latest').catch(() => []),
+  ])
+  const events = [...evA, ...evB]
+  const ids = Array.from(new Set(events.map(e => e.args.wagerId.toString())))
+
+  if (ids.length === 0) return []
+
+  const wagers = await Promise.all(ids.map(async (id) => {
+    try {
+      const w = await registry.getWager(id)
+      const tokenAddr = w.token
+      const usdc = (DEPLOYED_CONTRACTS?.paymentToken || '').toLowerCase()
+      const isUSDC = tokenAddr && tokenAddr.toLowerCase() === usdc
+      const decimals = isUSDC ? 6 : 18
+      const statusNames = ['none', 'pending', 'active', 'resolved', 'cancelled', 'refunded']
+      return {
+        id: String(id),
+        creator: w.creator,
+        opponent: w.opponent,
+        arbitrator: (w.arbitrator && w.arbitrator !== ethers.ZeroAddress) ? w.arbitrator : null,
+        participants: [w.creator, w.opponent].filter(a => a && a !== ethers.ZeroAddress),
+        creatorStake: ethers.formatUnits(w.creatorStake, decimals),
+        opponentStake: ethers.formatUnits(w.opponentStake, decimals),
+        stakeAmount: ethers.formatUnits(w.opponentStake, decimals),
+        stakeToken: tokenAddr,
+        stakeTokenAddress: tokenAddr,
+        stakeTokenSymbol: isUSDC ? 'USDC' : 'tokens',
+        resolutionType: Number(w.resolutionType),
+        status: statusNames[Number(w.status)] || 'unknown',
+        winner: (w.winner && w.winner !== ethers.ZeroAddress) ? w.winner : null,
+        paid: w.paid,
+        acceptanceDeadline: Number(w.acceptDeadline) * 1000,
+        endDate: new Date(Number(w.resolveDeadline) * 1000).toISOString(),
+        polymarketConditionId: w.polymarketConditionId,
+        creatorIsYes: w.creatorIsYes,
+        metadataHash: w.metadataHash,
+        description: `Wager #${id}`,
+      }
+    } catch (e) {
+      console.warn(`Failed to load wager ${id}:`, e.message)
+      return null
+    }
+  }))
+
+  return wagers.filter(Boolean)
+}
+
 export async function fetchFriendMarketsForUser(userAddress) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
@@ -391,6 +461,13 @@ export async function fetchFriendMarketsForUser(userAddress) {
     }
 
     const provider = getProvider()
+
+    // v2 path: WagerRegistry event scan
+    const registryAddress = getContractAddress('wagerRegistry')
+    if (registryAddress) {
+      return await fetchWagersForUserV2(userAddress, provider, registryAddress)
+    }
+
     const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
 
     if (!friendFactoryAddress) {
@@ -665,6 +742,11 @@ const TIERED_ROLE_MANAGER_ABI = [
  * @returns {Promise<{needsSync: boolean, tierRegistryTier: number, tieredRoleManagerTier: number, tierName: string}>}
  */
 export async function checkRoleSyncNeeded(userAddress, roleName) {
+  // v2: MembershipManager is the single source of truth — no sync ever needed.
+  if (getContractAddress('membershipManager')) {
+    return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
+  }
+
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return { needsSync: false, tierRegistryTier: 0, tieredRoleManagerTier: 0, tierName: 'None' }
@@ -756,6 +838,22 @@ export async function getUserTierOnChain(userAddress, roleName) {
     return { tier: 0, tierName: 'None' }
   }
 
+  // v2 path: MembershipManager.getActiveTier
+  const mmAddress = getContractAddress('membershipManager')
+  if (mmAddress) {
+    try {
+      const roleHash = getRoleHash(roleName)
+      if (!roleHash) return { tier: 0, tierName: 'None' }
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider())
+      const tier = Number(await mm.getActiveTier(userAddress, roleHash))
+      const tierName = tier === 0 ? 'None' : (TIER_NAMES[tier] || 'Unknown')
+      return { tier, tierName }
+    } catch (e) {
+      console.warn('[getUserTierOnChain v2] failed:', e.message)
+      return { tier: 0, tierName: 'None' }
+    }
+  }
+
   try {
     const tierRegistryAddress = getContractAddress('tierRegistry')
     if (!tierRegistryAddress) {
@@ -809,6 +907,20 @@ export async function hasRoleOnChain(userAddress, roleName) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return false
+  }
+
+  // v2 path: MembershipManager.hasActiveRole
+  const mmAddress = getContractAddress('membershipManager')
+  if (mmAddress) {
+    try {
+      const roleHash = getRoleHash(roleName)
+      if (!roleHash) return false
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider())
+      return await mm.hasActiveRole(userAddress, roleHash)
+    } catch (e) {
+      console.warn('[hasRoleOnChain v2] failed:', e.message)
+      return false
+    }
   }
 
   try {
@@ -949,6 +1061,52 @@ const PAYMENT_PROCESSOR_ABI = [
 export async function purchaseRoleWithUSC(signer, roleName, priceUSD, tier = MembershipTier.BRONZE) {
   if (!signer) {
     throw new Error('Wallet not connected')
+  }
+
+  // v2 path: MembershipManager.purchaseTier(role, tier). Price is fixed in the contract.
+  const mmAddress = getContractAddress('membershipManager')
+  if (mmAddress) {
+    const roleHash = getRoleHash(roleName)
+    if (!roleHash) throw new Error(`Unknown role: ${roleName}`)
+    const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+    const tierName = TIER_NAMES[validTier] || 'Bronze'
+
+    const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, signer)
+    const paymentTokenAddr = await mm.paymentToken()
+    const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, signer)
+
+    // Pull the configured price from the contract
+    const tierCfg = await mm.getTierConfig(roleHash, validTier)
+    const price = tierCfg.priceUSDC // 6-decimals
+
+    const userAddress = await signer.getAddress()
+    const balance = await paymentToken.balanceOf(userAddress)
+    if (balance < price) {
+      throw new Error(
+        `Insufficient USDC balance. Have ${ethers.formatUnits(balance, 6)}, need ${ethers.formatUnits(price, 6)}.`
+      )
+    }
+
+    const allowance = await paymentToken.allowance(userAddress, mmAddress)
+    if (allowance < price) {
+      const approveTx = await paymentToken.approve(mmAddress, price)
+      await approveTx.wait()
+    }
+
+    const tx = await mm.purchaseTier(roleHash, validTier)
+    const receipt = await tx.wait()
+    return {
+      hash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: receipt.status === 1 ? 'success' : 'failed',
+      gasUsed: receipt.gasUsed.toString(),
+      roleName,
+      tier: validTier,
+      tierName,
+      amount: parseFloat(ethers.formatUnits(price, 6)),
+      roleGrantedOnChain: receipt.status === 1,
+      roleGrantTxHash: receipt.hash,
+    }
   }
 
   try {
@@ -1116,21 +1274,24 @@ export async function registerZKKey(signer, publicKey) {
   }
 
   try {
-    // Get ZKKeyManager contract address (may not be deployed yet)
+    // v2 = KeyRegistry, legacy = ZKKeyManager
+    const keyRegistryAddress = getContractAddress('keyRegistry')
     const zkKeyManagerAddress = getContractAddress('zkKeyManager')
-    
-    if (!zkKeyManagerAddress) {
-      throw new Error('ZKKeyManager contract not deployed yet. Please register your key later.')
+    const address = keyRegistryAddress || zkKeyManagerAddress
+
+    if (!address) {
+      throw new Error('Key registry contract not deployed yet. Please register your key later.')
     }
 
-    const zkKeyManagerContract = new ethers.Contract(
-      zkKeyManagerAddress,
-      ZK_KEY_MANAGER_ABI,
-      signer
-    )
+    const abi = keyRegistryAddress ? KEY_REGISTRY_ABI : ZK_KEY_MANAGER_ABI
+    const contract = new ethers.Contract(address, abi, signer)
 
-    // Call registerKey function
-    const tx = await zkKeyManagerContract.registerKey(publicKey.trim())
+    // Both old (string) and new (bytes) registerKey accept a 0x-prefixed hex string.
+    const trimmed = publicKey.trim()
+    const arg = keyRegistryAddress
+      ? (trimmed.startsWith('0x') ? trimmed : '0x' + trimmed)
+      : trimmed
+    const tx = await contract.registerKey(arg)
     const receipt = await tx.wait()
 
     return {

@@ -3,7 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
-import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFactory'
+import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './MyMarketsModal.css'
 
@@ -743,8 +743,8 @@ function MyMarketsModal({
           marketId={acceptanceMarket.id}
           marketData={acceptanceMarket}
           onAccepted={handleMarketAccepted}
-          contractAddress={getContractAddress('friendGroupMarketFactory')}
-          contractABI={FRIEND_GROUP_MARKET_FACTORY_ABI}
+          contractAddress={getContractAddress('wagerRegistry')}
+          contractABI={WAGER_REGISTRY_ABI}
         />
       )}
     </div>
@@ -1316,28 +1316,27 @@ function ResolutionModal({
     setError(null)
 
     try {
-      const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
-      const friendFactory = new ethers.Contract(
-        friendFactoryAddress,
-        FRIEND_GROUP_MARKET_FACTORY_ABI,
+      const registryAddress = getContractAddress('wagerRegistry')
+      const registry = new ethers.Contract(
+        registryAddress,
+        WAGER_REGISTRY_ABI,
         signer
       )
 
-      // outcome: true = first option wins (Pass/Yes), false = second option wins (Fail/No)
+      // outcome: true = first option wins (Pass/Yes/creator), false = second option (Fail/No/opponent)
       const outcomeBool = selectedOutcome === outcomes[0]
 
-      console.log('Resolving market on-chain:', {
+      const w = await registry.getWager(market.id)
+      const winner = outcomeBool ? w.creator : w.opponent
+      console.log('Resolving wager on-chain:', {
         marketId: market.id,
+        winner,
         outcome: outcomeBool,
         selectedOutcome,
-        notes: resolutionNotes
+        notes: resolutionNotes,
       })
 
-      const tx = await friendFactory.resolveFriendMarket(
-        market.id,
-        outcomeBool,
-        { gasLimit: 500000n }
-      )
+      const tx = await registry.declareWinner(market.id, winner)
       setTxHash(tx.hash)
 
       const receipt = await tx.wait()
