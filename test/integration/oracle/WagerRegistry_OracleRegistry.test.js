@@ -31,7 +31,7 @@ describe("WagerRegistry oracle registry", function () {
     const Agg = await ethers.getContractFactory("MockChainlinkAggregator");
     const feed = await Agg.deploy(0n, 8, await time.latest());
     const ClAdapter = await ethers.getContractFactory("ChainlinkDataFeedOracleAdapter");
-    const clAdapter = await ClAdapter.deploy();
+    const clAdapter = await ClAdapter.deploy(admin.address);
     await clAdapter.setFeedAllowed(await feed.getAddress(), true);
 
     const Membership = await ethers.getContractFactory("MembershipManager");

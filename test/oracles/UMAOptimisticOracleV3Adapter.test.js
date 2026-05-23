@@ -12,7 +12,7 @@ describe("UMAOptimisticOracleV3Adapter", function () {
     const OO = await ethers.getContractFactory("MockOptimisticOracleV3");
     const oo = await OO.deploy();
     const Adapter = await ethers.getContractFactory("UMAOptimisticOracleV3Adapter");
-    const adapter = await Adapter.deploy(await oo.getAddress());
+    const adapter = await Adapter.deploy(admin.address, await oo.getAddress());
     // Fund alice and approve adapter
     await bond.mint(alice.address, usdc(1000));
     await bond.connect(alice).approve(await adapter.getAddress(), ethers.MaxUint256);
@@ -38,9 +38,9 @@ describe("UMAOptimisticOracleV3Adapter", function () {
   });
 
   it("isAvailable=false when OO addr has no code", async () => {
-    const [, , , eoa] = await ethers.getSigners();
+    const [admin, , , eoa] = await ethers.getSigners();
     const Adapter = await ethers.getContractFactory("UMAOptimisticOracleV3Adapter");
-    const adapter = await Adapter.deploy(eoa.address);
+    const adapter = await Adapter.deploy(admin.address, eoa.address);
     expect(await adapter.isAvailable()).to.equal(false);
   });
 

@@ -28,7 +28,7 @@ describe("WagerRegistry + ChainlinkFunctionsOracleAdapter (integration)", functi
     const Router = await ethers.getContractFactory("MockFunctionsRouter");
     const router = await Router.deploy();
     const FnAdapter = await ethers.getContractFactory("ChainlinkFunctionsOracleAdapter");
-    const fnAdapter = await FnAdapter.deploy(await router.getAddress());
+    const fnAdapter = await FnAdapter.deploy(admin.address, await router.getAddress());
 
     const MembershipManager = await ethers.getContractFactory("MembershipManager");
     const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);

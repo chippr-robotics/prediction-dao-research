@@ -75,7 +75,7 @@ contract UMAOptimisticOracleV3Adapter is
         _;
     }
 
-    constructor(address _oo) Ownable(msg.sender) {
+    constructor(address admin, address _oo) Ownable(admin) {
         if (_oo == address(0)) revert InvalidAddress();
         oo = OptimisticOracleV3Interface(_oo);
     }

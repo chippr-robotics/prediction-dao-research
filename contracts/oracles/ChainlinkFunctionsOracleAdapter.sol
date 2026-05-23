@@ -49,7 +49,7 @@ contract ChainlinkFunctionsOracleAdapter is IOracleAdapter, FunctionsClient, Con
     error AlreadyResolved();
     error MarketAlreadyLinked();
 
-    constructor(address _router) FunctionsClient(_router) ConfirmedOwner(msg.sender) {
+    constructor(address admin, address _router) FunctionsClient(_router) ConfirmedOwner(admin) {
         if (_router == address(0)) revert RouterHasNoCode();
         router = _router;
     }

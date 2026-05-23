@@ -73,27 +73,43 @@ export const DisputeStatus = {
 }
 
 // ── Resolution types (on-chain enum) ────────────────────────────────
-// Mirrors contracts/markets/FriendGroupMarketTypes.sol ResolutionType
+// Mirrors `enum ResolutionType` in contracts/interfaces/IWagerRegistry.sol.
+// Keep in lock-step with the contract — value ordering is wire-stable.
 export const ResolutionType = {
-  EITHER: 0,
-  INITIATOR: 1,
-  RECEIVER: 2,
-  THIRD_PARTY: 3,
-  AUTO_PEGGED: 4,
-  POLYMARKET_ORACLE: 5,
+  Either: 0,
+  Creator: 1,
+  Opponent: 2,
+  ThirdParty: 3,
+  Polymarket: 4,
+  ChainlinkDataFeed: 5,
+  ChainlinkFunctions: 6,
+  UMA: 7,
 }
+
+// Resolution types that require an `oracleConditionId` to be passed to
+// WagerRegistry.createWager (called `polymarketConditionId` on-chain for
+// legacy naming). Anything in this set needs a pre-registered conditionId
+// on the corresponding adapter.
+export const ORACLE_RESOLUTION_TYPES = new Set([
+  ResolutionType.Polymarket,
+  ResolutionType.ChainlinkDataFeed,
+  ResolutionType.ChainlinkFunctions,
+  ResolutionType.UMA,
+])
 
 export const ResolutionTypeNames = {
   0: 'Either',
-  1: 'Initiator',
-  2: 'Receiver',
+  1: 'Creator',
+  2: 'Opponent',
   3: 'Third Party',
-  4: 'Auto-Pegged',
-  5: 'Polymarket Oracle',
+  4: 'Polymarket',
+  5: 'Chainlink Data Feed',
+  6: 'Chainlink Functions',
+  7: 'UMA Optimistic Oracle',
 }
 
-// Sort order for "Resolution type" grouping in My Wagers
-export const ResolutionTypeOrder = [0, 1, 2, 3, 4, 5]
+// Sort order for "Resolution type" grouping in My Wagers. Mirrors enum order.
+export const ResolutionTypeOrder = [0, 1, 2, 3, 4, 5, 6, 7]
 
 // ── Sort keys for My Wagers list ────────────────────────────────────
 export const WagerSortKey = {

@@ -158,6 +158,9 @@ function main() {
         membershipManager: deployed.membershipManager,
         keyRegistry: deployed.keyRegistry,
         polymarketAdapter: deployed.polymarketAdapter,
+        chainlinkDataFeedAdapter: deployed.chainlinkDataFeedAdapter,
+        chainlinkFunctionsAdapter: deployed.chainlinkFunctionsAdapter,
+        umaAdapter: deployed.umaAdapter,
         paymentToken: deployment.paymentToken,
         wmatic: deployment.wmatic,
       }

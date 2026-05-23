@@ -34,8 +34,9 @@ describeFork("Amoy oracle adapters (fork)", function () {
   });
 
   it("ChainlinkDataFeedOracleAdapter is available and ETH/USD feed has fresh data", async () => {
+    const [admin] = await ethers.getSigners();
     const Adapter = await ethers.getContractFactory("ChainlinkDataFeedOracleAdapter");
-    const adapter = await Adapter.deploy();
+    const adapter = await Adapter.deploy(admin.address);
     expect(await adapter.isAvailable()).to.equal(true);
 
     // Verify the live feed returns a non-zero answer and a sane updatedAt.
@@ -49,15 +50,17 @@ describeFork("Amoy oracle adapters (fork)", function () {
   });
 
   it("ChainlinkFunctionsOracleAdapter is available against the real Functions router", async () => {
+    const [admin] = await ethers.getSigners();
     const Adapter = await ethers.getContractFactory("ChainlinkFunctionsOracleAdapter");
-    const adapter = await Adapter.deploy(AMOY.FUNCTIONS_ROUTER);
+    const adapter = await Adapter.deploy(admin.address, AMOY.FUNCTIONS_ROUTER);
     expect(await adapter.isAvailable()).to.equal(true);
     expect(await adapter.router()).to.equal(AMOY.FUNCTIONS_ROUTER);
   });
 
   it("UMAOptimisticOracleV3Adapter is available against the real OOv3 and reads defaultIdentifier", async () => {
+    const [admin] = await ethers.getSigners();
     const Adapter = await ethers.getContractFactory("UMAOptimisticOracleV3Adapter");
-    const adapter = await Adapter.deploy(AMOY.UMA_OOV3);
+    const adapter = await Adapter.deploy(admin.address, AMOY.UMA_OOV3);
     expect(await adapter.isAvailable()).to.equal(true);
     const oo = await ethers.getContractAt(
       "@uma/core/contracts/optimistic-oracle-v3/interfaces/OptimisticOracleV3Interface.sol:OptimisticOracleV3Interface",

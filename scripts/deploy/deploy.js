@@ -234,7 +234,7 @@ async function main() {
   if (Object.keys(feedMap).length > 0) {
     const cl = await deployDeterministic(
       "ChainlinkDataFeedOracleAdapter",
-      [],
+      [deployer.address],
       generateSalt(SALT_PREFIXES.V2 + "ChainlinkDataFeedOracleAdapter"),
       deployer
     );
@@ -260,7 +260,7 @@ async function main() {
   if (fnRouter && ethers.isAddress(fnRouter)) {
     const fn = await deployDeterministic(
       "ChainlinkFunctionsOracleAdapter",
-      [fnRouter],
+      [deployer.address, fnRouter],
       generateSalt(SALT_PREFIXES.V2 + "ChainlinkFunctionsOracleAdapter"),
       deployer
     );
@@ -281,7 +281,7 @@ async function main() {
   if (ooAddr && ethers.isAddress(ooAddr)) {
     const uma = await deployDeterministic(
       "UMAOptimisticOracleV3Adapter",
-      [ooAddr],
+      [deployer.address, ooAddr],
       generateSalt(SALT_PREFIXES.V2 + "UMAOptimisticOracleV3Adapter"),
       deployer
     );
