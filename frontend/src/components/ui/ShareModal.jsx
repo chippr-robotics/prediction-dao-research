@@ -110,7 +110,7 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
               />
             </div>
             <h2 className="brand-name">FairWins</h2>
-            <p className="brand-tagline">Prediction Markets for Friends.</p>
+            <p className="brand-tagline">Peer-to-Peer Wagers Between Friends.</p>
           </div>
 
           {/* QR Code Section */}

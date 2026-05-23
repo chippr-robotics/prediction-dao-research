@@ -17,7 +17,7 @@ const buildTutorialSteps = (stable) => [
   {
     id: 'welcome',
     title: 'Welcome to FairWins',
-    subtitle: 'Private wagers between friends',
+    subtitle: 'Peer-to-peer wagers between friends',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -28,16 +28,18 @@ const buildTutorialSteps = (stable) => [
     content: (
       <>
         <p>
-          FairWins lets you <strong>create private wagers with friends</strong> that automatically
-          resolve using built-in resolution methods with challenge periods.
+          FairWins lets you <strong>create private, peer-to-peer wagers with friends</strong> on any topic.
+          Stakes are locked in smart contract escrow and payouts are handled automatically
+          through built-in resolution methods with challenge periods.
         </p>
         <div className="tutorial-highlight-box">
-          <span className="highlight-icon">💡</span>
-          <span>Create a wager, share via <strong>QR code</strong>, and let the smart contract handle stakes and payouts.</span>
+          <span className="highlight-icon">&#128161;</span>
+          <span>Create a wager, share via <strong>QR code</strong>, and let the smart contract handle the rest. No trust required.</span>
         </div>
-        <p className="tutorial-note">
-          All stakes are held in escrow until the outcome is determined. No trust required.
-        </p>
+        <div className="tutorial-dev-notice">
+          <strong>Development Notice:</strong> This site is under active development.
+          Features and functionality may change. Contact: Howdy@FairWins.App
+        </div>
       </>
     )
   },
@@ -146,9 +148,11 @@ const buildTutorialSteps = (stable) => [
     content: (
       <>
         <p>
-          Choose how your wager gets resolved. All methods include a
-          <strong> 24-hour challenge period</strong> to prevent disputes.
+          Choose how your wager gets resolved — manually by participants,
+          or <strong>automatically via oracle</strong>. All methods include a
+          <strong> challenge period</strong> to prevent disputes.
         </p>
+        <p className="tutorial-resolution-group-label">Peer Resolution</p>
         <div className="tutorial-next-steps">
           <div className="next-step-item">
             <span className="next-icon">&#129309;</span>
@@ -160,15 +164,8 @@ const buildTutorialSteps = (stable) => [
           <div className="next-step-item">
             <span className="next-icon">&#128100;</span>
             <div className="next-content">
-              <strong>Initiator Resolves</strong>
-              <span>Wager creator reports the result</span>
-            </div>
-          </div>
-          <div className="next-step-item">
-            <span className="next-icon">&#128101;</span>
-            <div className="next-content">
-              <strong>Receiver Resolves</strong>
-              <span>Accepting party reports the result</span>
+              <strong>Creator / Opponent</strong>
+              <span>Designated party reports the result</span>
             </div>
           </div>
           <div className="next-step-item">
@@ -176,6 +173,30 @@ const buildTutorialSteps = (stable) => [
             <div className="next-content">
               <strong>Third Party</strong>
               <span>Trusted arbiter resolves the wager</span>
+            </div>
+          </div>
+        </div>
+        <p className="tutorial-resolution-group-label">Automated Oracle Resolution</p>
+        <div className="tutorial-next-steps">
+          <div className="next-step-item">
+            <span className="next-icon">&#128202;</span>
+            <div className="next-content">
+              <strong>Polymarket</strong>
+              <span>Links to a live Polymarket event for auto-resolution</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#128279;</span>
+            <div className="next-content">
+              <strong>Chainlink</strong>
+              <span>Resolves via data feeds or Chainlink Functions</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#9881;&#65039;</span>
+            <div className="next-content">
+              <strong>UMA Optimistic Oracle</strong>
+              <span>Decentralized dispute resolution with economic guarantees</span>
             </div>
           </div>
         </div>
@@ -428,7 +449,7 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
                 aria-hidden={index !== currentStep}
               >
                 <div className="step-icon">{s.icon}</div>
-                <h2 id={index === currentStep ? 'onboarding-title' : undefined} className="step-title">{s.title}</h2>
+                <h1 id={index === currentStep ? 'onboarding-title' : undefined} className="step-title">{s.title}</h1>
                 <p className="step-subtitle">{s.subtitle}</p>
                 <div className="step-content">{s.content}</div>
               </div>
