@@ -103,6 +103,23 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
+// Mock the contracts config so the modal sees the v2 Amoy adapter addresses
+// during tests (the real module reads VITE_NETWORK_ID at module-load time,
+// defaulting to 63 / Mordor which has no v2 contracts). The new oracle-type
+// dropdown options gate on these addresses being non-empty.
+vi.mock('../config/contracts', async (importOriginal) => {
+  const actual = await importOriginal()
+  const stubs = {
+    chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
+    chainlinkFunctionsAdapter: '0x074fC18C1E322a7537b53B8B2Bf0762629E3b532',
+    umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
+  }
+  return {
+    ...actual,
+    getContractAddress: (name) => stubs[name] ?? actual.getContractAddress(name),
+  }
+})
+
 // Stub PolymarketBrowser so the linked-market UI renders without making
 // real gamma-api calls. Exposes a button per (mocked) market that fires
 // the modal's onSelectMarket handler.
@@ -124,6 +141,24 @@ vi.mock('../components/fairwins/PolymarketBrowser', () => ({
       </div>
     )
   }
+}))
+
+// Stub OracleConditionPicker so the modal's new oracle-extensible flow can
+// be tested without going through useOracleConditions (which has its own
+// unit tests). The stub exposes a Pick button per kind that fires onChange
+// with a canonical conditionId so we can assert downstream wiring.
+const STUB_ORACLE_CONDITION_ID = '0x' + 'cd'.repeat(32)
+vi.mock('../components/fairwins/OracleConditionPicker', () => ({
+  default: ({ kind, adapterAddress, value, onChange, error }) => (
+    <div data-testid={`mock-oracle-picker-${kind}`} data-adapter={adapterAddress || ''} data-value={value || ''}>
+      <button
+        type="button"
+        data-testid={`mock-pick-${kind}`}
+        onClick={() => onChange?.(STUB_ORACLE_CONDITION_ID)}
+      >Pick a {kind} condition</button>
+      {error && <span data-testid={`mock-picker-error-${kind}`}>{error}</span>}
+    </div>
+  )
 }))
 
 const renderWithProviders = (ui, { isConnected = true, account = '0x1234567890123456789012345678901234567890', isCorrectNetwork = true, chainId = 61 } = {}) => {
@@ -636,6 +671,152 @@ describe('FriendMarketsModal', () => {
       await waitFor(() => {
         expect(screen.getByText(polymarketMarket.question)).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Oracle-extensible wagers (ChainlinkDataFeed / Functions / UMA)', () => {
+    // The picker hits ethers via the hook. We stub the picker itself at the
+    // top of this file so these tests focus on modal wiring — the hook +
+    // picker have their own unit tests.
+    const STUB_CONDITION_ID = STUB_ORACLE_CONDITION_ID
+
+    async function pickKindAndSide(kind, sideLabel) {
+      // Open the resolution-type dropdown and switch to the desired oracle.
+      const RT = { ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7 }[
+        kind === 'datafeed' ? 'ChainlinkDataFeed' : kind === 'functions' ? 'ChainlinkFunctions' : 'UMA'
+      ]
+      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), String(RT))
+      // Click the stub picker's "Pick" button → conditionId lands in formData.
+      await userEvent.click(await screen.findByTestId(`mock-pick-${kind}`))
+      // Side picker: generic YES/NO buttons.
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`i'm taking ${sideLabel}`, 'i') }))
+    }
+
+    it('renders the 3 new dropdown options on a Polygon-family chain', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />, { chainId: 80002 })
+      const dropdown = screen.getByLabelText(/who can resolve/i)
+      expect(dropdown).toContainHTML('Chainlink Data Feed')
+      expect(dropdown).toContainHTML('Chainlink Functions')
+      expect(dropdown).toContainHTML('UMA Optimistic Oracle')
+    })
+
+    it('renders the picker + generic side picker for ChainlinkDataFeed', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />, { chainId: 80002 })
+      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '5')
+      expect(await screen.findByTestId('mock-oracle-picker-datafeed')).toBeInTheDocument()
+      // Generic YES/NO buttons.
+      expect(screen.getByRole('button', { name: /I'm taking YES/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /I'm taking NO/i })).toBeInTheDocument()
+    })
+
+    it('forwards resolutionType=5 + oracleConditionId + creatorIsYes=true to onCreate (DataFeed YES)', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'wager-dfy' })
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} />,
+        { chainId: 80002 }
+      )
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'ETH closes above 3000 by year end — Chainlink Data Feed test'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await pickKindAndSide('datafeed', 'YES')
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await waitFor(() => expect(onCreate).toHaveBeenCalled())
+      expect(onCreate.mock.calls[0][0].data).toEqual(expect.objectContaining({
+        resolutionType: 5,
+        oracleConditionId: STUB_CONDITION_ID,
+        creatorIsYes: true,
+      }))
+    })
+
+    it('forwards resolutionType=7 + creatorIsYes=false for UMA NO', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'wager-umano' })
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} />,
+        { chainId: 80002 }
+      )
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'UMA assertion: Patriots win Super Bowl LX'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await pickKindAndSide('uma', 'NO')
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await waitFor(() => expect(onCreate).toHaveBeenCalled())
+      expect(onCreate.mock.calls[0][0].data).toEqual(expect.objectContaining({
+        resolutionType: 7,
+        oracleConditionId: STUB_CONDITION_ID,
+        creatorIsYes: false,
+      }))
+    })
+
+    it('rejects submit when no condition is picked', async () => {
+      const onCreate = vi.fn()
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} />,
+        { chainId: 80002 }
+      )
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'Chainlink Functions: some custom request'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '6')
+      // Don't pick a condition — go straight to submit. Side stays empty too.
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await waitFor(() => {
+        expect(screen.getByText(/Pick \(or paste\) a registered conditionId/i)).toBeInTheDocument()
+      })
+      expect(onCreate).not.toHaveBeenCalled()
+    })
+
+    it('rejects submit when a condition is picked but no side is chosen', async () => {
+      const onCreate = vi.fn()
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} />,
+        { chainId: 80002 }
+      )
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'Chainlink Data Feed test — no side picked'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '5')
+      await userEvent.click(await screen.findByTestId('mock-pick-datafeed'))
+      // Don't click YES/NO.
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+      await waitFor(() => {
+        expect(screen.getByText(/Pick which side of the bet you are taking/i)).toBeInTheDocument()
+      })
+      expect(onCreate).not.toHaveBeenCalled()
+    })
+
+    it('clears oracleConditionId when switching between oracle types', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'wager-switch' })
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} />,
+        { chainId: 80002 }
+      )
+      // Pick a DataFeed condition first.
+      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '5')
+      await userEvent.click(await screen.findByTestId('mock-pick-datafeed'))
+      // Switch to UMA → picker should reset (data-value attribute on the stub goes back to '').
+      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '7')
+      const umaPicker = await screen.findByTestId('mock-oracle-picker-uma')
+      expect(umaPicker).toHaveAttribute('data-value', '')
     })
   })
 
