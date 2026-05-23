@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useWalletClient } from 'wagmi'
 import { ethers } from 'ethers'
-import { isSupportedChainId, getNetwork, listSupportedChainIds, PRIMARY_CHAIN_ID } from '../config/networks'
+import { isSupportedChainId, getNetwork, PRIMARY_CHAIN_ID } from '../config/networks'
 import {
   getUserRoles,
   addUserRole,
@@ -108,23 +108,30 @@ export function WalletProvider({ children }) {
     return () => { cancelled = true }
   }, [isConnected, address, walletClient])
 
-  // Check network compatibility. Only emit a network error when the wallet
-  // is on a chain we don't recognize (anything other than Polygon Amoy or
-  // local Hardhat).
+  // Auto-switch to Amoy (PRIMARY_CHAIN_ID) when the wallet connects on an
+  // unsupported chain. If the switch fails, show a network error instead.
   useEffect(() => {
-    if (isConnected && !isSupportedChainId(chainId)) {
-      const supported = listSupportedChainIds()
-        .map((id) => getNetwork(id)?.name)
-        .filter(Boolean)
-        .join(' or ')
-      const primary = getNetwork(PRIMARY_CHAIN_ID)
-      setNetworkError(
-        `Wrong network. Please switch to ${supported || primary?.name || 'a supported network'}.`
-      )
-    } else {
+    if (!isConnected) {
       setNetworkError(null)
+      return
     }
-  }, [chainId, isConnected])
+    if (isSupportedChainId(chainId)) {
+      setNetworkError(null)
+      return
+    }
+    // Wallet is on an unsupported chain — try switching automatically
+    switchChain(
+      { chainId: PRIMARY_CHAIN_ID },
+      {
+        onError: () => {
+          const primary = getNetwork(PRIMARY_CHAIN_ID)
+          setNetworkError(
+            `Please switch to ${primary?.name || 'Polygon Amoy'} in your wallet.`
+          )
+        },
+      }
+    )
+  }, [chainId, isConnected, switchChain])
 
   // Clear stale WalletConnect data on mount if not connected
   // This prevents "failed to process inbound message" errors from stale sessions

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAccount, useConnect, useDisconnect, useChainId } from 'wagmi'
 import { useNavigate } from 'react-router-dom'
 import { useDex } from '../../hooks/useDex'
-import { useUserPreferences } from '../../hooks/useUserPreferences'
+import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { useWalletRoles } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
 import { useTheme } from '../../hooks/useTheme'
@@ -47,7 +47,7 @@ function WalletButton({ className = '' }) {
   const navigate = useNavigate()
   const { showModal } = useModal()
   const { balances, loading: balanceLoading } = useDex()
-  const { preferences, setDemoMode } = useUserPreferences()
+  const { isTestnet, network, switchMode: switchNetworkMode, isSwitching: isNetworkSwitching } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
@@ -198,10 +198,6 @@ function WalletButton({ className = '' }) {
   const handleDisconnect = () => {
     disconnect()
     setIsOpen(false)
-  }
-
-  const handleToggleDemoMode = () => {
-    setDemoMode(!preferences.demoMode)
   }
 
   const handleOpenPurchaseModal = (preselectedRole = null, action = 'purchase') => {
@@ -380,7 +376,7 @@ function WalletButton({ className = '' }) {
                     <span className="usc-balance">
                       {balanceLoading ? 'Loading...' : `${parseFloat(balances?.usc || 0).toFixed(2)} USC`}
                     </span>
-                    <span className="network-info">Chain ID: {chainId}</span>
+                    <span className="network-info">{network?.name || `Chain ${chainId}`}</span>
                   </div>
                 </div>
               </div>
@@ -432,18 +428,19 @@ function WalletButton({ className = '' }) {
                 </button>
               </div>
 
-              {/* Data Source Toggle */}
+              {/* Network Toggle */}
               <div className="dropdown-section">
                 <div className="toggle-row">
                   <span className="toggle-label">
-                    {preferences.demoMode ? '🎭 Demo Mode' : '🌐 Live Mode'}
+                    {isTestnet ? 'Amoy Testnet' : 'Polygon Mainnet'}
                   </span>
                   <button
-                    onClick={handleToggleDemoMode}
+                    onClick={() => switchNetworkMode('toggle')}
                     className="toggle-btn"
-                    aria-label={`Switch to ${preferences.demoMode ? 'Live' : 'Demo'} Mode`}
+                    disabled={isNetworkSwitching}
+                    aria-label={`Switch to ${isTestnet ? 'Polygon Mainnet' : 'Amoy Testnet'}`}
                   >
-                    {preferences.demoMode ? 'Go Live' : 'Use Demo'}
+                    {isNetworkSwitching ? 'Switching...' : isTestnet ? 'Mainnet' : 'Testnet'}
                   </button>
                 </div>
               </div>

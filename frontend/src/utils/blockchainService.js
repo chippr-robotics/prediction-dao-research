@@ -1043,46 +1043,59 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
   // v2 path: MembershipManager.purchaseTier(role, tier). Price is fixed in the contract.
   const mmAddress = getContractAddress('membershipManager')
   if (mmAddress) {
-    const roleHash = getRoleHash(roleName)
-    if (!roleHash) throw new Error(`Unknown role: ${roleName}`)
-    const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
-    const tierName = TIER_NAMES[validTier] || 'Bronze'
-
-    const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, signer)
-    const paymentTokenAddr = await mm.paymentToken()
-    const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, signer)
-
-    // Pull the configured price from the contract
-    const tierCfg = await mm.getTierConfig(roleHash, validTier)
-    const price = tierCfg.priceUSDC // 6-decimals
-
-    const userAddress = await signer.getAddress()
-    const balance = await paymentToken.balanceOf(userAddress)
-    if (balance < price) {
-      throw new Error(
-        `Insufficient USDC balance. Have ${ethers.formatUnits(balance, 6)}, need ${ethers.formatUnits(price, 6)}.`
+    // Verify the contract is actually deployed before calling into it.
+    // When the address has no code (wrong network, not yet deployed, etc.)
+    // ethers returns 0x from every call, producing a confusing BAD_DATA error.
+    const provider = signer.provider
+    const code = await provider.getCode(mmAddress)
+    if (!code || code === '0x') {
+      console.warn(
+        `[purchaseRole] MembershipManager has no code at ${mmAddress} — falling through to legacy path`
       )
-    }
+    } else {
+      const roleHash = getRoleHash(roleName)
+      if (!roleHash) throw new Error(`Unknown role: ${roleName}`)
+      const validTier = [1, 2, 3, 4].includes(tier) ? tier : MembershipTier.BRONZE
+      const tierName = TIER_NAMES[validTier] || 'Bronze'
 
-    const allowance = await paymentToken.allowance(userAddress, mmAddress)
-    if (allowance < price) {
-      const approveTx = await paymentToken.approve(mmAddress, price)
-      await approveTx.wait()
-    }
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, signer)
+      const paymentTokenAddr = await mm.paymentToken()
+      if (!paymentTokenAddr || paymentTokenAddr === ethers.ZeroAddress) {
+        throw new Error('MembershipManager has no payment token configured. Contact the DAO administrator.')
+      }
+      const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, signer)
 
-    const tx = await mm.purchaseTier(roleHash, validTier)
-    const receipt = await tx.wait()
-    return {
-      hash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      status: receipt.status === 1 ? 'success' : 'failed',
-      gasUsed: receipt.gasUsed.toString(),
-      roleName,
-      tier: validTier,
-      tierName,
-      amount: parseFloat(ethers.formatUnits(price, 6)),
-      roleGrantedOnChain: receipt.status === 1,
-      roleGrantTxHash: receipt.hash,
+      const tierCfg = await mm.getTierConfig(roleHash, validTier)
+      const price = tierCfg.priceUSDC // 6-decimals
+
+      const userAddress = await signer.getAddress()
+      const balance = await paymentToken.balanceOf(userAddress)
+      if (balance < price) {
+        throw new Error(
+          `Insufficient USDC balance. Have ${ethers.formatUnits(balance, 6)}, need ${ethers.formatUnits(price, 6)}.`
+        )
+      }
+
+      const allowance = await paymentToken.allowance(userAddress, mmAddress)
+      if (allowance < price) {
+        const approveTx = await paymentToken.approve(mmAddress, price)
+        await approveTx.wait()
+      }
+
+      const tx = await mm.purchaseTier(roleHash, validTier)
+      const receipt = await tx.wait()
+      return {
+        hash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: receipt.status === 1 ? 'success' : 'failed',
+        gasUsed: receipt.gasUsed.toString(),
+        roleName,
+        tier: validTier,
+        tierName,
+        amount: parseFloat(ethers.formatUnits(price, 6)),
+        roleGrantedOnChain: receipt.status === 1,
+        roleGrantTxHash: receipt.hash,
+      }
     }
   }
 
@@ -1091,7 +1104,9 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
     const paymentProcessorAddress = getContractAddress('paymentProcessor')
 
     if (!paymentProcessorAddress) {
-      throw new Error('PaymentProcessor not deployed on this network.')
+      throw new Error(
+        'No purchase contract found on this network. Please verify you are connected to the correct chain and that contracts are deployed.'
+      )
     }
 
     const stableContract = new ethers.Contract(stableAddress, ERC20_ABI, signer)
