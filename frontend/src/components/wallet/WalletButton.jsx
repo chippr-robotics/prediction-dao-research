@@ -482,14 +482,14 @@ function WalletButton({ className = '' }) {
                   </button>
                 )}
                 <a
-                  href="https://v3.etcswap.org/#/swap"
+                  href={isTestnet ? "https://faucet.circle.com/" : "https://app.uniswap.org/swap?chain=polygon"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="action-button get-usdc-btn"
                   role="menuitem"
                 >
                   <span aria-hidden="true">💰</span>
-                  <span>Get USC</span>
+                  <span>Get USDC</span>
                 </a>
                 <button
                   onClick={handleDisconnect}
