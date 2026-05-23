@@ -47,7 +47,7 @@ function WalletButton({ className = '' }) {
   const navigate = useNavigate()
   const { showModal } = useModal()
   const { balances, loading: balanceLoading } = useDex()
-  const { mode: networkMode, isTestnet, network, switchMode: switchNetworkMode, isSwitching: isNetworkSwitching } = useNetworkMode()
+  const { isTestnet, network, switchMode: switchNetworkMode, isSwitching: isNetworkSwitching } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
