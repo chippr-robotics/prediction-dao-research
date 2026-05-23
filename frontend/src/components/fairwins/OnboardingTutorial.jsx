@@ -449,7 +449,7 @@ function OnboardingTutorial({ isOpen, onDismiss, onComplete }) {
                 aria-hidden={index !== currentStep}
               >
                 <div className="step-icon">{s.icon}</div>
-                <h2 id={index === currentStep ? 'onboarding-title' : undefined} className="step-title">{s.title}</h2>
+                <h1 id={index === currentStep ? 'onboarding-title' : undefined} className="step-title">{s.title}</h1>
                 <p className="step-subtitle">{s.subtitle}</p>
                 <div className="step-content">{s.content}</div>
               </div>

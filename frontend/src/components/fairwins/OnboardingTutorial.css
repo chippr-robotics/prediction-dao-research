@@ -91,6 +91,8 @@
   font-size: 0.9rem;
   cursor: pointer;
   padding: 0.5rem 0.75rem;
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 6px;
   transition: all 0.2s ease;
   z-index: 10;
@@ -580,22 +582,26 @@
   border: none;
   background: var(--bg-tertiary);
   cursor: pointer;
-  padding: 0;
+  padding: 8px;
+  background-clip: content-box;
   transition: all 0.2s ease;
 }
 
 .dot:hover {
-  background: var(--text-tertiary);
+  background-color: var(--text-tertiary);
+  background-clip: content-box;
 }
 
 .dot.active {
   width: 24px;
   border-radius: 4px;
-  background: var(--primary-color);
+  background-color: var(--primary-color);
+  background-clip: content-box;
 }
 
 .dot.completed {
-  background: rgba(var(--primary-rgb), 0.5);
+  background-color: rgba(var(--primary-rgb), 0.5);
+  background-clip: content-box;
 }
 
 /* Footer */
@@ -621,8 +627,8 @@
 }
 
 .onboarding-checkbox input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   accent-color: var(--primary-color);
   cursor: pointer;
 }
