@@ -10,7 +10,7 @@ import {
   getDefaultAcceptanceDeadline,
   toDateTimeLocal
 } from '../../constants/wagerDefaults'
-import { ResolutionType as _ResolutionType } from '../../abis/FriendGroupMarketFactory'
+import { ResolutionType } from '../../constants/wagerDefaults'
 import QRScanner from '../ui/QRScanner'
 import AddressInput from '../ui/AddressInput'
 import { isEnsName } from '../../utils/validation'
@@ -20,16 +20,6 @@ import PolymarketBrowser from './PolymarketBrowser'
 import { formatUSD, getMarketUrl } from './marketHelpers'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
-
-// Fallback so the UI renders even if the enum export is missing in some environments
-const ResolutionType = _ResolutionType ?? {
-  Either: 0,
-  Initiator: 1,
-  Receiver: 2,
-  ThirdParty: 3,
-  AutoPegged: 4,
-  PolymarketOracle: 5,
-}
 
 // Stake token options derived from the active chain's tokens. The token
 // metadata is sourced from useDex() at render time so the Testnet/Mainnet
@@ -107,7 +97,7 @@ function FriendMarketsModal({
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
     arbitrator: '',
     arbitratorResolved: '',
-    peggedMarketId: '',
+    oracleConditionId: '',
     // Which outcome of a linked Polymarket the creator is taking. Stored as
     // the 0-based outcome index ('' = unset, '0' = YES/first, '1' = NO/second)
     // to match PolymarketOracleAdapter's payouts ordering (YES=0, NO=1).
@@ -138,7 +128,7 @@ function FriendMarketsModal({
 
   // Polymarket event selection — the PolymarketBrowser component below handles
   // browsing/searching internally. We only need to track the picked market so
-  // its conditionId can be committed to formData.peggedMarketId.
+  // its conditionId can be committed to formData.oracleConditionId.
   const [selectedPolymarketMarket, setSelectedPolymarketMarket] = useState(null)
   // Once a market is linked, the browse/search area collapses behind an
   // accordion so the form stays compact. Users can re-open it to swap markets
@@ -168,7 +158,7 @@ function FriendMarketsModal({
       customStakeTokenAddress: '',
       arbitrator: '',
       arbitratorResolved: '',
-      peggedMarketId: '',
+      oracleConditionId: '',
       creatorSide: '',
       acceptanceDeadline: getDefaultAcceptanceDeadline(),
       minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
@@ -207,8 +197,8 @@ function FriendMarketsModal({
           const linkedEnd = toDateTimeLocal(initialPolymarketMarket.endDate)
           return {
             ...prev,
-            resolutionType: ResolutionType.PolymarketOracle,
-            peggedMarketId: initialPolymarketMarket.conditionId,
+            resolutionType: ResolutionType.Polymarket,
+            oracleConditionId: initialPolymarketMarket.conditionId,
             description: seeded,
             ...(linkedEnd ? { endDateTime: linkedEnd } : {}),
           }
@@ -261,12 +251,12 @@ function FriendMarketsModal({
       // type that doesn't need it.
       if (field === 'resolutionType' &&
           value !== ResolutionType.ThirdParty &&
-          value !== ResolutionType.PolymarketOracle) {
+          value !== ResolutionType.Polymarket) {
         updated.arbitrator = ''
         updated.arbitratorResolved = ''
-        updated.peggedMarketId = ''
+        updated.oracleConditionId = ''
       }
-      if (field === 'resolutionType' && value !== ResolutionType.PolymarketOracle) {
+      if (field === 'resolutionType' && value !== ResolutionType.Polymarket) {
         updated.creatorSide = ''
       }
 
@@ -365,7 +355,7 @@ function FriendMarketsModal({
     setSelectedPolymarketMarket(market)
     setPolymarketBrowserOpen(false)
     setFormData(prev => {
-      const updated = { ...prev, peggedMarketId: market.conditionId }
+      const updated = { ...prev, oracleConditionId: market.conditionId }
       // Lock the wager's end time to the linked market so the side bet can't
       // resolve before (or long after) Polymarket does.
       const linkedEnd = toDateTimeLocal(market.endDate)
@@ -387,10 +377,10 @@ function FriendMarketsModal({
       }
       return updated
     })
-    if (errors.peggedMarketId) {
+    if (errors.oracleConditionId) {
       setErrors(prev => {
         const newErrors = { ...prev }
-        delete newErrors.peggedMarketId
+        delete newErrors.oracleConditionId
         return newErrors
       })
     }
@@ -410,7 +400,7 @@ function FriendMarketsModal({
     // so the user can pick their own again.
     setFormData(prev => ({
       ...prev,
-      peggedMarketId: '',
+      oracleConditionId: '',
       creatorSide: '',
       endDateTime: getDefaultEndDateTime(),
     }))
@@ -541,7 +531,7 @@ function FriendMarketsModal({
     const now = new Date()
     const minDate = new Date(now.getTime() + WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS * 1000)
     const maxDate = new Date(now.getTime() + WAGER_DEFAULTS.MAX_TRADING_PERIOD_SECONDS * 1000)
-    const isLinkedMarket = formData.resolutionType === ResolutionType.PolymarketOracle &&
+    const isLinkedMarket = formData.resolutionType === ResolutionType.Polymarket &&
       selectedPolymarketMarket?.endDate
 
     if (!formData.endDateTime || isNaN(endDate.getTime())) {
@@ -597,18 +587,35 @@ function FriendMarketsModal({
         } else if (resolvedArb.toLowerCase() === '0x0000000000000000000000000000000000000000') {
           newErrors.arbitrator = 'Cannot use the zero address'
         }
-      } else if (formData.resolutionType === ResolutionType.PolymarketOracle) {
+      } else if (formData.resolutionType === ResolutionType.Polymarket) {
         // Polymarket condition id (bytes32 hex) is required.
-        const cid = (formData.peggedMarketId || '').trim()
+        const cid = (formData.oracleConditionId || '').trim()
         if (!cid) {
-          newErrors.peggedMarketId = 'Pick a Polymarket event to link this wager to'
+          newErrors.oracleConditionId = 'Pick a Polymarket event to link this wager to'
         } else if (!/^0x[a-fA-F0-9]{64}$/.test(cid)) {
-          newErrors.peggedMarketId = 'Invalid Polymarket condition id (expected 0x + 64 hex chars)'
+          newErrors.oracleConditionId = 'Invalid Polymarket condition id (expected 0x + 64 hex chars)'
         }
         // Creator must declare which side of the linked market they're taking
         // so the bet description unambiguously identifies who is on which side.
         if (formData.creatorSide !== '0' && formData.creatorSide !== '1') {
           newErrors.creatorSide = 'Pick which side of the linked market you are taking'
+        }
+        // Linked-market deadline guards: the standard MIN/MAX deadline checks
+        // are skipped for linked markets (we lock endDateTime to the Polymarket
+        // end date). Re-validate against the linked market's own clock so we
+        // don't submit a wager whose accept window outlives the Polymarket.
+        if (selectedPolymarketMarket?.endDate) {
+          const linkedEnd = new Date(selectedPolymarketMarket.endDate)
+          if (!Number.isNaN(linkedEnd.getTime())) {
+            if (linkedEnd.getTime() <= Date.now()) {
+              newErrors.oracleConditionId = 'This Polymarket has already ended. Pick an active market.'
+            } else if (formData.acceptanceDeadline) {
+              const acceptEnd = new Date(formData.acceptanceDeadline)
+              if (!Number.isNaN(acceptEnd.getTime()) && acceptEnd.getTime() >= linkedEnd.getTime()) {
+                newErrors.acceptanceDeadline = 'Acceptance deadline must be before the linked market ends.'
+              }
+            }
+          }
         }
       }
     }
@@ -723,6 +730,17 @@ function FriendMarketsModal({
       const tradingPeriodSeconds = Math.max(rawSeconds, WAGER_DEFAULTS.MIN_TRADING_PERIOD_SECONDS)
       const tradingPeriodDays = Math.max(1, Math.ceil(tradingPeriodSeconds / (60 * 60 * 24)))
 
+      // Translate UI-side semantics into contract-facing semantics:
+      //  - creatorSide ('0' = first Polymarket outcome, '1' = second) → creatorIsYes (bool).
+      //    PolymarketOracleAdapter.getOutcome returns `payouts[0] > payouts[1]`, so picking
+      //    outcome index 0 means the creator wins iff that outcome wins ⇒ creatorIsYes = true.
+      //  - oracleConditionId (form field) → passed straight to the hook; the hook forwards it
+      //    to the contract's still-named `polymarketConditionId` arg.
+      // creatorIsYes only matters for oracle-resolved wagers; default true for the others.
+      const creatorIsYes = formData.creatorSide === '0' || formData.creatorSide === ''
+        ? true
+        : false
+
       // Build submit data with token address for WalletButton
       const submitData = {
         type: 'friend',
@@ -735,6 +753,8 @@ function FriendMarketsModal({
           // address.
           opponent: formData.opponentResolved || formData.opponent,
           arbitrator: formData.arbitratorResolved || formData.arbitrator,
+          // Translated UI → contract semantics (see comment above).
+          creatorIsYes,
           // Pass calculated trading period so downstream uses the user's selected end date.
           // `tradingPeriodSeconds` is the source of truth; `tradingPeriod` (days)
           // is kept for any legacy consumers that still parse it.
@@ -1057,19 +1077,19 @@ function FriendMarketsModal({
                           className="fm-select"
                         >
                           <option value={ResolutionType.Either}>Either Party</option>
-                          <option value={ResolutionType.Initiator}>Creator Only</option>
-                          <option value={ResolutionType.Receiver}>Opponent Only</option>
+                          <option value={ResolutionType.Creator}>Creator Only</option>
+                          <option value={ResolutionType.Opponent}>Opponent Only</option>
                           <option value={ResolutionType.ThirdParty}>Third Party Arbitrator</option>
                           {polymarketSidebetsEnabled && (
-                            <option value={ResolutionType.PolymarketOracle}>Linked Market (Polymarket)</option>
+                            <option value={ResolutionType.Polymarket}>Linked Market (Polymarket)</option>
                           )}
                         </select>
                         <span className="fm-hint">
                           {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the wager'}
-                          {formData.resolutionType === ResolutionType.Initiator && 'Only you (the creator) can resolve the wager'}
-                          {formData.resolutionType === ResolutionType.Receiver && 'Only your opponent can resolve the wager'}
+                          {formData.resolutionType === ResolutionType.Creator && 'Only you (the creator) can resolve the wager'}
+                          {formData.resolutionType === ResolutionType.Opponent && 'Only your opponent can resolve the wager'}
                           {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
-                          {formData.resolutionType === ResolutionType.PolymarketOracle && 'Settles automatically when the linked Polymarket market resolves'}
+                          {formData.resolutionType === ResolutionType.Polymarket && 'Settles automatically when the linked Polymarket market resolves'}
                           {!polymarketSidebetsEnabled && (
                             <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
                               Linked Market settlement requires a chain with the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.
@@ -1144,7 +1164,7 @@ function FriendMarketsModal({
                       own end time so the side bet can't settle before (or
                       long after) the linked event.
                     */}
-                    {!(formData.resolutionType === ResolutionType.PolymarketOracle && selectedPolymarketMarket) && (
+                    {!(formData.resolutionType === ResolutionType.Polymarket && selectedPolymarketMarket) && (
                       <div className="fm-form-group">
                         <label htmlFor="fm-end-date">
                           End Date &amp; Time <span className="fm-required">*</span>
@@ -1242,7 +1262,7 @@ function FriendMarketsModal({
 
                     {/* Linked Market — Polymarket event lookup */}
                     {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
-                     formData.resolutionType === ResolutionType.PolymarketOracle && (
+                     formData.resolutionType === ResolutionType.Polymarket && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-polymarket-search">
                           Linked Polymarket Event <span className="fm-required">*</span>
@@ -1334,15 +1354,15 @@ function FriendMarketsModal({
                           </>
                         )}
 
-                        {errors.peggedMarketId && (
-                          <span className="fm-error">{errors.peggedMarketId}</span>
+                        {errors.oracleConditionId && (
+                          <span className="fm-error">{errors.oracleConditionId}</span>
                         )}
                       </div>
                     )}
 
                     {/* Creator side — which outcome of the linked Polymarket are you taking? */}
                     {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
-                     formData.resolutionType === ResolutionType.PolymarketOracle &&
+                     formData.resolutionType === ResolutionType.Polymarket &&
                      selectedPolymarketMarket && (
                       <div className="fm-form-group fm-form-full">
                         <label>

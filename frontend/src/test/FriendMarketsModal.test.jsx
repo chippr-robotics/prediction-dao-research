@@ -103,7 +103,30 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
-const renderWithProviders = (ui, { isConnected = true, account = '0x1234567890123456789012345678901234567890', isCorrectNetwork = true } = {}) => {
+// Stub PolymarketBrowser so the linked-market UI renders without making
+// real gamma-api calls. Exposes a button per (mocked) market that fires
+// the modal's onSelectMarket handler.
+vi.mock('../components/fairwins/PolymarketBrowser', () => ({
+  default: ({ onSelectMarket, selectedConditionId }) => {
+    const mockMarkets = (globalThis.__mockPolymarketBrowserMarkets__ || [])
+    return (
+      <div data-testid="mock-polymarket-browser" data-selected={selectedConditionId || ''}>
+        {mockMarkets.map((m) => (
+          <button
+            key={m.conditionId}
+            type="button"
+            onClick={() => onSelectMarket?.(m)}
+            data-testid={`pmb-pick-${m.conditionId}`}
+          >
+            {m.question}
+          </button>
+        ))}
+      </div>
+    )
+  }
+}))
+
+const renderWithProviders = (ui, { isConnected = true, account = '0x1234567890123456789012345678901234567890', isCorrectNetwork = true, chainId = 61 } = {}) => {
   mockWalletState.isConnected = isConnected
   mockWalletState.account = isConnected ? account : null
   mockWeb3State.isCorrectNetwork = isCorrectNetwork
@@ -119,7 +142,7 @@ const renderWithProviders = (ui, { isConnected = true, account = '0x123456789012
   mockUseDisconnect.mockReturnValue({
     disconnect: vi.fn()
   })
-  mockUseChainId.mockReturnValue(61)
+  mockUseChainId.mockReturnValue(chainId)
   mockUseSwitchChain.mockReturnValue({
     switchChain: vi.fn()
   })
@@ -454,6 +477,165 @@ describe('FriendMarketsModal', () => {
       fireEvent.keyDown(document, { key: 'Escape', code: 'Escape' })
 
       expect(onClose).toHaveBeenCalled()
+    })
+  })
+
+  describe('Polymarket-pegged wagers', () => {
+    const polymarketMarket = {
+      conditionId: '0x' + 'a'.repeat(64),
+      question: 'Will the Patriots win the Super Bowl?',
+      endDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      outcomes: [
+        { name: 'Yes', price: 0.42 },
+        { name: 'No', price: 0.58 },
+      ],
+    }
+
+    beforeEach(() => {
+      globalThis.__mockPolymarketBrowserMarkets__ = [polymarketMarket]
+    })
+
+    it('seeds the form when initialPolymarketMarket is provided', () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialPolymarketMarket={polymarketMarket} />,
+        { chainId: 80002 }
+      )
+      // The seeded market card is visible in the "selected market" panel.
+      expect(screen.getByText(polymarketMarket.question)).toBeInTheDocument()
+    })
+
+    it('forwards oracleConditionId + creatorIsYes + resolutionType=4 to onCreate', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'wager-1' })
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} initialPolymarketMarket={polymarketMarket} />,
+        { chainId: 80002 }
+      )
+
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'Patriots win the Super Bowl - pegged to Polymarket'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+
+      // Pick "I'm taking Yes" (first outcome — creatorSide '0' → creatorIsYes true).
+      // The side picker buttons are rendered from selectedPolymarketMarket.outcomes.
+      await userEvent.click(screen.getByRole('button', { name: /i'm taking yes/i }))
+
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+
+      await waitFor(() => {
+        expect(onCreate).toHaveBeenCalled()
+      })
+      const callArg = onCreate.mock.calls[0][0]
+      expect(callArg.data).toEqual(expect.objectContaining({
+        oracleConditionId: polymarketMarket.conditionId,
+        creatorIsYes: true,
+        resolutionType: 4,  // canonical enum: Polymarket = 4
+      }))
+    })
+
+    it('forwards creatorIsYes=false when the creator picks outcome index 1', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'wager-2' })
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} initialPolymarketMarket={polymarketMarket} />,
+        { chainId: 80002 }
+      )
+
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'Patriots win the Super Bowl - pegged to Polymarket'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: /i'm taking no/i }))
+
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+
+      await waitFor(() => {
+        expect(onCreate).toHaveBeenCalled()
+      })
+      const callArg = onCreate.mock.calls[0][0]
+      expect(callArg.data.creatorIsYes).toBe(false)
+    })
+
+    it('rejects submit when no side is chosen', async () => {
+      const onCreate = vi.fn()
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} initialPolymarketMarket={polymarketMarket} />,
+        { chainId: 80002 }
+      )
+
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'Patriots win the Super Bowl - pegged to Polymarket'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/pick which side/i)).toBeInTheDocument()
+      })
+      expect(onCreate).not.toHaveBeenCalled()
+    })
+
+    it('rejects submit when the linked Polymarket has already ended', async () => {
+      const stale = {
+        ...polymarketMarket,
+        endDate: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      }
+      const onCreate = vi.fn()
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} onCreate={onCreate} initialPolymarketMarket={stale} />,
+        { chainId: 80002 }
+      )
+
+      await userEvent.type(
+        screen.getByLabelText(/what's the bet/i),
+        'Patriots win the Super Bowl - pegged to Polymarket'
+      )
+      await userEvent.type(
+        screen.getByLabelText(/opponent address/i),
+        '0xabcdef1234567890123456789012345678901234'
+      )
+      await userEvent.click(screen.getByRole('button', { name: /i'm taking yes/i }))
+
+      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText(/already ended/i)).toBeInTheDocument()
+      })
+      expect(onCreate).not.toHaveBeenCalled()
+    })
+
+    it('picking a market via the inline PolymarketBrowser surfaces it as the selected market', async () => {
+      // No initialPolymarketMarket — user picks via the (mocked) browser instead.
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} />,
+        { chainId: 80002 }
+      )
+
+      // Switch resolution type to Polymarket so the inline browser renders.
+      const dropdown = screen.getByLabelText(/who can resolve/i)
+      await userEvent.selectOptions(dropdown, '4')  // ResolutionType.Polymarket = 4
+
+      // Pick the (single) mocked market.
+      await userEvent.click(screen.getByTestId(`pmb-pick-${polymarketMarket.conditionId}`))
+
+      // After pick the modal collapses the browser and shows the picked market.
+      // The selected-market panel renders the question text (same as in the seed test).
+      await waitFor(() => {
+        expect(screen.getByText(polymarketMarket.question)).toBeInTheDocument()
+      })
     })
   })
 
