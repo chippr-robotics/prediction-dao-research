@@ -1,148 +1,204 @@
 /**
  * estimate-amoy-deployment.js — Estimate Amoy deployment cost in POL
  *
- * Deploys every contract from scripts/deploy/01..04 to an in-process Hardhat
- * network, captures real gas used, then multiplies by the live Amoy gas price.
+ * Deploys the current v2 contract set to an in-process Hardhat network,
+ * captures real gas used for each contract and each post-deploy
+ * configuration tx, then multiplies by the live Amoy gas price.
+ *
+ * Mirrors scripts/deploy/deploy.js, so the number reflects what
+ *   npx hardhat run scripts/deploy/deploy.js --network amoy
+ * actually spends.
  *
  * Usage:
  *   npx hardhat run scripts/estimate-amoy-deployment.js
- *   DEPLOY_PERPETUALS=true npx hardhat run scripts/estimate-amoy-deployment.js
  */
 
-const hre = require("hardhat");
 const { ethers } = require("hardhat");
+
+const {
+  WAGER_PARTICIPANT_TIERS,
+  ROLE_HASHES,
+  CHAINLINK_DATA_FEEDS,
+  CHAINLINK_FUNCTIONS_ROUTER,
+  UMA_OOV3,
+} = require("./deploy/lib/constants");
 
 const AMOY_RPC = process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology";
 
 // Singleton-factory CALL adds a constant overhead per deterministic deploy
 // (CALL + memory expansion + the factory's CREATE2). Empirically ~55k on top
-// of the raw CREATE cost. We add it per contract below.
+// of the raw CREATE cost.
 const SINGLETON_FACTORY_OVERHEAD = 55_000n;
 
-async function deploy(name, args = [], libraries = {}) {
-  const factory = await ethers.getContractFactory(name, { libraries });
+// ResolutionType enum ordinals (must match IWagerRegistry.sol)
+const RT = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4, ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7 };
+
+const USDC_DECIMALS = 6;
+function toUSDC(price18) { return price18 / (10n ** 12n); }
+
+async function deploy(name, args = []) {
+  const factory = await ethers.getContractFactory(name);
   const contract = await factory.deploy(...args);
-  const tx = contract.deploymentTransaction();
-  const receipt = await tx.wait();
+  const receipt = await contract.deploymentTransaction().wait();
   return { name, gasUsed: receipt.gasUsed, address: await contract.getAddress(), contract };
 }
 
-async function tryInit(c, ...args) {
-  try {
-    if (typeof c.initialize === "function") {
-      const tx = await c.initialize(...args);
-      await tx.wait();
-    }
-  } catch {}
+async function sendTx(label, txPromise) {
+  const tx = await txPromise;
+  const receipt = await tx.wait();
+  return { name: label, gasUsed: receipt.gasUsed };
 }
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const includePerpetuals = (process.env.DEPLOY_PERPETUALS ?? "false").toLowerCase() === "true";
-  const PLACEHOLDER = "0xec6Ed68627749b9C244a25A6d0bAC8962043fdcB";
-  const TREASURY = "0x93F7ee39C02d99289E3c29696f1F3a70656d0772";
+  const treasury = deployer.address;
+  const NETWORK = "amoy";
 
-  console.log("Deploying contracts to in-process Hardhat to measure gas...\n");
-  const results = [];
+  console.log("Deploying current v2 contracts to in-process Hardhat to measure gas...\n");
+  const deploys = [];
+  const txs = [];
 
-  // 01-core
-  const rmc = await deploy("RoleManagerCore"); results.push(rmc);
-  const welfare = await deploy("WelfareMetricRegistry"); results.push(welfare);
-  const proposals = await deploy("ProposalRegistry"); results.push(proposals);
-  const cmf = await deploy("ConditionalMarketFactory"); results.push(cmf);
-  const privacy = await deploy("PrivacyCoordinator"); results.push(privacy);
-  const oracle = await deploy("OracleResolver"); results.push(oracle);
-  const ragequit = await deploy("RagequitModule"); results.push(ragequit);
-  await tryInit(ragequit.contract, deployer.address, PLACEHOLDER, TREASURY);
-  const futarchy = await deploy("FutarchyGovernor"); results.push(futarchy);
-  const tmf = await deploy("TokenMintFactory", [rmc.address]); results.push(tmf);
-  const daoFactory = await deploy(
-    "DAOFactory",
-    [welfare.address, proposals.address, cmf.address, privacy.address, oracle.address, ragequit.address, futarchy.address]
-  );
-  results.push(daoFactory);
+  // Amoy has no canonical Polymarket CTF — deploy a mock per deploy.js.
+  const mockCTF = await deploy("MockPolymarketCTF"); deploys.push(mockCTF);
 
-  // 02-rbac
-  const trm = await deploy("TieredRoleManager"); results.push(trm);
-  const tierRegistry = await deploy("TierRegistry"); results.push(tierRegistry);
-  const usage = await deploy("UsageTracker"); results.push(usage);
-  const membership = await deploy("MembershipManager"); results.push(membership);
-  const payment = await deploy("PaymentProcessor"); results.push(payment);
-  const mpm = await deploy("MembershipPaymentManager", [TREASURY]); results.push(mpm);
+  // PolymarketOracleAdapter
+  const adapter = await deploy("PolymarketOracleAdapter", [mockCTF.address]);
+  deploys.push(adapter);
 
-  // 03-markets (libraries first)
-  const ctf = await deploy("CTF1155"); results.push(ctf);
-  const fgrLib = await deploy("FriendGroupResolutionLib"); results.push(fgrLib);
-  const fgcLib = await deploy("FriendGroupClaimsLib"); results.push(fgcLib);
-  const fgcrLib = await deploy("FriendGroupCreationLib"); results.push(fgcrLib);
-  const fgmf = await deploy(
-    "FriendGroupMarketFactory",
-    [cmf.address, ragequit.address, trm.address, mpm.address, deployer.address],
-    {
-      FriendGroupResolutionLib: fgrLib.address,
-      FriendGroupClaimsLib: fgcLib.address,
-      FriendGroupCreationLib: fgcrLib.address,
-    }
-  );
-  results.push(fgmf);
+  // Configured Amoy tokens (used in ctors only; no transfers happen here)
+  const AMOY_USDC = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582";
+  const AMOY_WMATIC = "0x0ae690AAD8663aaB12a671A6A0d74242332de85f";
 
-  // 04-registries
-  const correlation = await deploy("MarketCorrelationRegistry"); results.push(correlation);
-  const nullifier = await deploy("NullifierRegistry"); results.push(nullifier);
+  // MembershipManager (now AccessControl-based — "role manager" refactor lives here)
+  const mgr = await deploy("MembershipManager", [deployer.address, AMOY_USDC, treasury]);
+  deploys.push(mgr);
 
-  // Optional perpetuals
-  if (includePerpetuals) {
-    const fre = await deploy("FundingRateEngine"); results.push(fre);
-    const perp = await deploy(
-      "PerpetualFuturesFactory",
-      [fre.address, deployer.address, deployer.address]
-    );
-    results.push(perp);
+  // Seed WAGER_PARTICIPANT tiers (4 transactions — replaces the old 8 from
+  // FRIEND_MARKET + MARKET_MAKER).
+  for (const cfg of WAGER_PARTICIPANT_TIERS) {
+    const limits = {
+      monthlyMarketCreation: cfg.limits.monthlyMarketCreation > 2n ** 32n - 1n ? 0 : Number(cfg.limits.monthlyMarketCreation),
+      maxConcurrentMarkets:  cfg.limits.maxConcurrentMarkets  > 2n ** 32n - 1n ? 0 : Number(cfg.limits.maxConcurrentMarkets),
+    };
+    txs.push(await sendTx(
+      `setTier WAGER_PARTICIPANT tier=${cfg.tier}`,
+      mgr.contract.setTier(ROLE_HASHES.WAGER_PARTICIPANT_ROLE, cfg.tier, toUSDC(cfg.price), 30, limits, true),
+    ));
   }
 
-  // Fetch live Amoy gas price
+  // WagerRegistry (AccessControl + GUARDIAN + ACCOUNT_MODERATOR roles)
+  const reg = await deploy("WagerRegistry", [deployer.address, mgr.address, adapter.address, [AMOY_USDC, AMOY_WMATIC]]);
+  deploys.push(reg);
+
+  txs.push(await sendTx(
+    "setAuthorizedCaller(WagerRegistry)",
+    mgr.contract.setAuthorizedCaller(reg.address, true),
+  ));
+
+  // --- Chainlink Data Feed adapter (Amoy has ETH/USD configured) ---
+  const cl = await deploy("ChainlinkDataFeedOracleAdapter"); deploys.push(cl);
+  const feedMap = CHAINLINK_DATA_FEEDS[NETWORK] || {};
+  for (const [pair, addr] of Object.entries(feedMap)) {
+    txs.push(await sendTx(`setFeedAllowed Chainlink ${pair}`, cl.contract.setFeedAllowed(addr, true)));
+  }
+  txs.push(await sendTx(
+    "setOracleAdapter(ChainlinkDataFeed)",
+    reg.contract.setOracleAdapter(RT.ChainlinkDataFeed, cl.address),
+  ));
+
+  // --- Chainlink Functions adapter ---
+  const fnRouter = CHAINLINK_FUNCTIONS_ROUTER[NETWORK];
+  // deploy.js requires a real router; on Amoy this is the canonical address.
+  // To measure deploy gas on in-process Hardhat where that router doesn't
+  // exist, deploy MockFunctionsRouter and use its address.
+  const mockRouter = await deploy("MockFunctionsRouter"); deploys.push(mockRouter);
+  const fn = await deploy("ChainlinkFunctionsOracleAdapter", [mockRouter.address]); deploys.push(fn);
+  txs.push(await sendTx(
+    "setOracleAdapter(ChainlinkFunctions)",
+    reg.contract.setOracleAdapter(RT.ChainlinkFunctions, fn.address),
+  ));
+
+  // --- UMA Optimistic Oracle V3 adapter ---
+  // Same mock-routing trick — UMA OOv3 on Amoy is real, but here we use a mock
+  // to satisfy the constructor and measure deploy gas faithfully.
+  const mockOO = await deploy("MockOptimisticOracleV3"); deploys.push(mockOO);
+  const uma = await deploy("UMAOptimisticOracleV3Adapter", [mockOO.address]); deploys.push(uma);
+  txs.push(await sendTx(
+    "setOracleAdapter(UMA)",
+    reg.contract.setOracleAdapter(RT.UMA, uma.address),
+  ));
+
+  // KeyRegistry
+  const key = await deploy("KeyRegistry"); deploys.push(key);
+
+  // One-time Safe Singleton Factory bootstrap on a clean network (~60k @ 100 gwei).
+  const SINGLETON_FACTORY_DEPLOY_GAS = 60_000n;
+
+  // --- Live Amoy gas price ---
   console.log("\nFetching Amoy gas price from", AMOY_RPC);
   const amoy = new ethers.JsonRpcProvider(AMOY_RPC);
   const fee = await amoy.getFeeData();
-  // Use maxFeePerGas (EIP-1559 ceiling) if available, else gasPrice
   const gasPriceWei = fee.maxFeePerGas ?? fee.gasPrice;
   console.log("Amoy maxFeePerGas:", ethers.formatUnits(gasPriceWei, "gwei"), "gwei");
   console.log("Amoy gasPrice:    ", ethers.formatUnits(fee.gasPrice, "gwei"), "gwei");
 
-  // Report
-  let totalGas = 0n;
-  console.log("\n%s  %s  %s", "Contract".padEnd(34), "Gas (raw)".padStart(12), "Gas +factory".padStart(14));
-  console.log("─".repeat(66));
-  for (const r of results) {
+  // --- Drop mock-only rows from the cost roll-up but show them in the table ---
+  // On real Amoy, MockFunctionsRouter and MockOptimisticOracleV3 are NOT
+  // deployed (the real router/OO already exist). We exclude them from the
+  // total but list them for transparency.
+  const MOCKS_NOT_ON_AMOY = new Set(["MockFunctionsRouter", "MockOptimisticOracleV3"]);
+
+  console.log("\nContract deploys (gas, including singleton-factory CALL overhead):");
+  console.log("─".repeat(82));
+  console.log("%s  %s  %s  %s", "Contract".padEnd(40), "Gas (raw)".padStart(12), "Gas +fac".padStart(12), "On Amoy?".padStart(10));
+  console.log("─".repeat(82));
+  let deployGas = 0n;
+  for (const r of deploys) {
     const adjusted = r.gasUsed + SINGLETON_FACTORY_OVERHEAD;
-    totalGas += adjusted;
+    const includeOnAmoy = !MOCKS_NOT_ON_AMOY.has(r.name);
+    if (includeOnAmoy) deployGas += adjusted;
     console.log(
-      "%s  %s  %s",
-      r.name.padEnd(34),
+      "%s  %s  %s  %s",
+      r.name.padEnd(40),
       r.gasUsed.toString().padStart(12),
-      adjusted.toString().padStart(14)
+      adjusted.toString().padStart(12),
+      (includeOnAmoy ? "yes" : "skip").padStart(10),
     );
   }
-  console.log("─".repeat(66));
-  console.log("%s  %s  %s", "TOTAL".padEnd(34), "".padStart(12), totalGas.toString().padStart(14));
 
-  // Cost in POL using two gas-price scenarios
-  const lowGwei = 30n;       // typical Amoy floor
-  const midPriceWei = gasPriceWei;
-  const highGwei = 100n;     // congested
+  console.log("\nPost-deploy configuration txs:");
+  console.log("─".repeat(82));
+  let txGas = 0n;
+  for (const t of txs) {
+    txGas += t.gasUsed;
+    console.log("%s  %s", t.name.padEnd(50), t.gasUsed.toString().padStart(12));
+  }
+
+  const totalGas = deployGas + txGas + SINGLETON_FACTORY_DEPLOY_GAS;
+  console.log("\n" + "─".repeat(82));
+  console.log("%s  %s", "Contract-deploy gas subtotal (Amoy)".padEnd(50), deployGas.toString().padStart(12));
+  console.log("%s  %s", "Post-deploy tx gas subtotal".padEnd(50), txGas.toString().padStart(12));
+  console.log("%s  %s", "Safe Singleton Factory bootstrap (one-time)".padEnd(50), SINGLETON_FACTORY_DEPLOY_GAS.toString().padStart(12));
+  console.log("%s  %s", "TOTAL".padEnd(50), totalGas.toString().padStart(12));
+
+  // --- Cost in POL ---
+  const lowGwei = 30n;
+  const highGwei = 100n;
 
   const costLow  = totalGas * lowGwei * 10n**9n;
-  const costMid  = totalGas * midPriceWei;
+  const costMid  = totalGas * gasPriceWei;
   const costHigh = totalGas * highGwei * 10n**9n;
 
   console.log("\nDeployment cost estimates (total gas =", totalGas.toString(), ")");
-  console.log("─".repeat(66));
-  console.log(`  @  30 gwei (low):     ${ethers.formatEther(costLow)} POL`);
-  console.log(`  @ ~${ethers.formatUnits(midPriceWei, "gwei")} gwei (live): ${ethers.formatEther(costMid)} POL`);
-  console.log(`  @ 100 gwei (high):    ${ethers.formatEther(costHigh)} POL`);
+  console.log("─".repeat(82));
+  console.log(`  @  30 gwei (low):      ${ethers.formatEther(costLow)} POL`);
+  console.log(`  @ ~${ethers.formatUnits(gasPriceWei, "gwei")} gwei (live):  ${ethers.formatEther(costMid)} POL`);
+  console.log(`  @ 100 gwei (high):     ${ethers.formatEther(costHigh)} POL`);
 
-  console.log("\nNote: gas figures include constructor execution but exclude post-deploy");
-  console.log("configuration txs (setCTF1155, setDefaultCollateralToken, role grants, etc).");
+  console.log("\nNotes:");
+  console.log("  • Excludes MockFunctionsRouter + MockOptimisticOracleV3 (real ones exist on Amoy).");
+  console.log("  • Assumes Amoy USDC + WMATIC are used (no MockERC20 deploys).");
+  console.log("  • Re-running on already-deployed CREATE2 addresses is free (SingletonFactory short-circuits).");
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

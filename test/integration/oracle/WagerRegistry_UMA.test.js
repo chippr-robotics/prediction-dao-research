@@ -27,7 +27,7 @@ describe("WagerRegistry + UMAOptimisticOracleV3Adapter (integration)", function 
     const OO = await ethers.getContractFactory("MockOptimisticOracleV3");
     const oo = await OO.deploy();
     const UmaAdapter = await ethers.getContractFactory("UMAOptimisticOracleV3Adapter");
-    const umaAdapter = await UmaAdapter.deploy(await oo.getAddress());
+    const umaAdapter = await UmaAdapter.deploy(admin.address, await oo.getAddress());
 
     const MembershipManager = await ethers.getContractFactory("MembershipManager");
     const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);

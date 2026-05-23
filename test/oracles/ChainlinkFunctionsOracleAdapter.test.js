@@ -8,7 +8,7 @@ describe("ChainlinkFunctionsOracleAdapter", function () {
     const Router = await ethers.getContractFactory("MockFunctionsRouter");
     const router = await Router.deploy();
     const Adapter = await ethers.getContractFactory("ChainlinkFunctionsOracleAdapter");
-    const adapter = await Adapter.deploy(await router.getAddress());
+    const adapter = await Adapter.deploy(admin.address, await router.getAddress());
     return { adapter, router, admin, alice };
   }
 
@@ -30,9 +30,9 @@ describe("ChainlinkFunctionsOracleAdapter", function () {
   });
 
   it("isAvailable=false when router has no code (constructed against EOA)", async () => {
-    const [, , , eoa] = await ethers.getSigners();
+    const [admin, , , eoa] = await ethers.getSigners();
     const Adapter = await ethers.getContractFactory("ChainlinkFunctionsOracleAdapter");
-    const adapter = await Adapter.deploy(eoa.address);
+    const adapter = await Adapter.deploy(admin.address, eoa.address);
     expect(await adapter.isAvailable()).to.equal(false);
   });
 

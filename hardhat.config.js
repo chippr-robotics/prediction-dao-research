@@ -250,6 +250,7 @@ module.exports = {
       url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
       chainId: 80002,
       accounts: floppyKeys,
+      ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
     },
     // Example: Mainnet with floppy keystore (uncomment when ready to use)
     // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)

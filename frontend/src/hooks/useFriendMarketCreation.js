@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { getContractAddress } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
+import { ResolutionType, ORACLE_RESOLUTION_TYPES } from '../constants/wagerDefaults'
 import {
   uploadEncryptedEnvelope,
   buildEncryptedIpfsReference
@@ -16,14 +17,7 @@ const ERC20_ABI = [
   'function symbol() view returns (string)',
 ]
 
-// New ResolutionType enum — matches WagerRegistry contract
-export const ResolutionType = {
-  Either: 0,
-  Creator: 1,
-  Opponent: 2,
-  ThirdParty: 3,
-  Polymarket: 4,
-}
+export { ResolutionType, ORACLE_RESOLUTION_TYPES }
 
 // localStorage helpers — preserved for backward-compat with FriendMarketsModal callers
 const PENDING_TX_KEY = 'pendingFriendMarketTx'

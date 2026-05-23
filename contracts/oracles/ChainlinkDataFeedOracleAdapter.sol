@@ -47,7 +47,7 @@ contract ChainlinkDataFeedOracleAdapter is IOracleAdapter, Ownable, ReentrancyGu
     error InvalidDeadline();
     error MarketAlreadyLinked();
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address admin) Ownable(admin) {}
 
     // ========== Admin ==========
 

@@ -10,7 +10,7 @@ describe("ChainlinkDataFeedOracleAdapter", function () {
     const Agg = await ethers.getContractFactory("MockChainlinkAggregator");
     const feed = await Agg.deploy(3000_00000000n, 8, await time.latest());
     const Adapter = await ethers.getContractFactory("ChainlinkDataFeedOracleAdapter");
-    const adapter = await Adapter.deploy();
+    const adapter = await Adapter.deploy(admin.address);
     await adapter.connect(admin).setFeedAllowed(await feed.getAddress(), true);
     return { adapter, feed, admin, alice };
   }
