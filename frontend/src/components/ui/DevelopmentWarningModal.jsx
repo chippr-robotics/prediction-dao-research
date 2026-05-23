@@ -2,12 +2,8 @@ import { useEffect, useRef } from 'react'
 import { useModal } from '../../hooks/useUI'
 import './DevelopmentWarningModal.css'
 
-const DEV_WARNING_SEEN_KEY = 'dev_warning_modal_seen'
+const DEV_WARNING_SEEN_KEY = 'dev_warning_modal_seen_v2'
 
-/**
- * Modal that displays on first visit to warn users
- * that the site is under active development
- */
 function DevelopmentWarningModal() {
   const { showModal, hideModal } = useModal()
   const hasShownRef = useRef(false)
@@ -24,9 +20,9 @@ function DevelopmentWarningModal() {
         showModal(
           <div className="dev-warning-modal-content">
             <div className="dev-warning-modal-header">
-              <img 
-                src="/assets/fairwins_no-text_logo.svg" 
-                alt="FairWins" 
+              <img
+                src="/assets/fairwins_no-text_logo.svg"
+                alt="FairWins"
                 className="dev-warning-modal-logo"
                 width="64"
                 height="64"
@@ -36,34 +32,43 @@ function DevelopmentWarningModal() {
                 Welcome to FairWins
               </h2>
               <p className="dev-warning-modal-subtitle">
-                Prediction Markets for Friends
+                Peer-to-Peer Wagers Between Friends
               </p>
             </div>
-            
+
             <div className="dev-warning-modal-body">
               <p className="dev-warning-modal-message">
-                <strong>FairWins</strong> is the core platform for creating and trading on prediction markets 
-                about any topic. Open to everyone, with transparent market-driven outcomes. For information contact: Howdy@FairWins.App
+                <strong>FairWins</strong> lets you create private, peer-to-peer wagers with friends on any topic.
+                Stakes are locked in smart contract escrow and payouts are handled automatically
+                through built-in resolution methods with challenge periods — no trust required.
               </p>
-              
+
+              <div className="dev-warning-modal-highlights">
+                <p className="dev-warning-modal-message">
+                  <strong>How it works:</strong> Create a wager, share it via QR code or link,
+                  and let the smart contract handle the rest. Choose who resolves the outcome — either
+                  party, the initiator, the receiver, or a trusted third party.
+                </p>
+              </div>
+
               <div className="dev-warning-notice">
                 <p className="dev-warning-modal-message">
-                  ⚠️ <strong>Development Notice:</strong> This site is under active development. 
-                  Features and functionality may change. 
+                  <strong>Development Notice:</strong> This site is under active development.
+                  Features and functionality may change. For information contact: Howdy@FairWins.App
                 </p>
               </div>
             </div>
-            
+
             <div className="dev-warning-modal-footer">
-              <a 
-                href="https://docs.fairwins.app" 
-                target="_blank" 
+              <a
+                href="https://docs.fairwins.app"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="dev-warning-modal-link"
               >
-                📚 Visit docs.fairwins.app for more information
+                Visit docs.fairwins.app for more information
               </a>
-              <button 
+              <button
                 className="dev-warning-modal-button"
                 onClick={() => {
                   sessionStorage.setItem(DEV_WARNING_SEEN_KEY, 'true')

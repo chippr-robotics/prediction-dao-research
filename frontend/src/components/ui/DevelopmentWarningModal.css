@@ -103,6 +103,13 @@
   flex: 1;
 }
 
+.dev-warning-modal-highlights {
+  background: var(--bg-secondary, #f8f9fa);
+  padding: 1rem;
+  border-radius: var(--radius-md, 8px);
+  border-left: 4px solid var(--brand-primary, #4caf50);
+}
+
 .dev-warning-notice {
   background: rgba(255, 152, 0, 0.1);
   padding: 1rem;

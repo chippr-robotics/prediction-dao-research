@@ -51,7 +51,7 @@ describe('ShareModal Component', () => {
         <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
       )
       expect(screen.getByText('FairWins')).toBeInTheDocument()
-      expect(screen.getByText('Prediction Markets for Friends.')).toBeInTheDocument()
+      expect(screen.getByText('Peer-to-Peer Wagers Between Friends.')).toBeInTheDocument()
     })
 
     it('renders QR code', () => {
