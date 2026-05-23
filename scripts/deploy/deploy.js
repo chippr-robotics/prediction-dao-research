@@ -207,10 +207,12 @@ async function main() {
   }
 
   // -------- WagerRegistry --------
+  // Salt suffix bumped (`-userindex`) when the per-user EnumerableSet index was added
+  // to force a fresh deterministic address; old wagers stay on the prior registry.
   const regDeploy = await deployDeterministic(
     "WagerRegistry",
     [deployer.address, mgrDeploy.address, adapter.address, [usdc, wmatic]],
-    generateSalt(SALT_PREFIXES.V2 + "WagerRegistry"),
+    generateSalt(SALT_PREFIXES.V2 + "WagerRegistry-userindex"),
     deployer
   );
   deployments.wagerRegistry = regDeploy.address;
@@ -247,6 +249,8 @@ async function main() {
         await tx.wait();
         console.log(`  ✓ allowlisted Chainlink ${pair}: ${addr}`);
       }
+    }
+    if (!cl.alreadyDeployed || !regDeploy.alreadyDeployed) {
       const wireTx = await wagerRegistry.connect(deployer).setOracleAdapter(RT.ChainlinkDataFeed, cl.address);
       await wireTx.wait();
       console.log(`  ✓ ChainlinkDataFeedOracleAdapter wired into WagerRegistry`);
@@ -266,11 +270,13 @@ async function main() {
     );
     oracleDeployments.chainlinkFunctionsAdapter = fn.address;
     deployments.chainlinkFunctionsAdapter = fn.address;
-    if (!fn.alreadyDeployed) {
+    if (!fn.alreadyDeployed || !regDeploy.alreadyDeployed) {
       const wireTx = await wagerRegistry.connect(deployer).setOracleAdapter(RT.ChainlinkFunctions, fn.address);
       await wireTx.wait();
       console.log(`  ✓ ChainlinkFunctionsOracleAdapter wired into WagerRegistry`);
-      console.log(`  ⚠️  add ${fn.address} as a consumer on your LINK subscription before calling registerCondition`);
+      if (!fn.alreadyDeployed) {
+        console.log(`  ⚠️  add ${fn.address} as a consumer on your LINK subscription before calling registerCondition`);
+      }
     }
   } else {
     console.log(`Skipping ChainlinkFunctionsOracleAdapter on ${networkName}: no router configured`);
@@ -287,7 +293,7 @@ async function main() {
     );
     oracleDeployments.umaAdapter = uma.address;
     deployments.umaAdapter = uma.address;
-    if (!uma.alreadyDeployed) {
+    if (!uma.alreadyDeployed || !regDeploy.alreadyDeployed) {
       const wireTx = await wagerRegistry.connect(deployer).setOracleAdapter(RT.UMA, uma.address);
       await wireTx.wait();
       console.log(`  ✓ UMAOptimisticOracleV3Adapter wired into WagerRegistry`);

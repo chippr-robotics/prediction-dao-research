@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -23,6 +24,7 @@ import "../oracles/IOracleAdapter.sol";
 ///         on this contract. See docs/system-overview/account-moderation.md.
 contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     bytes32 public constant WAGER_PARTICIPANT_ROLE = keccak256("WAGER_PARTICIPANT_ROLE");
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
@@ -42,6 +44,11 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     mapping(uint256 => Wager) private _wagers;
     mapping(address => bool) private _frozen;
     uint256 private _nextWagerId = 1;
+
+    /// @notice Append-only per-user index of every wager a participant has been part of.
+    ///         Populated in `createWager` for both creator and opponent; never removed.
+    ///         Enables O(N_user) lookup without log scans (avoids `eth_getLogs` block-range limits).
+    mapping(address => EnumerableSet.UintSet) private _userWagerIds;
 
     event MembershipManagerUpdated(address indexed manager);
     event PolymarketAdapterUpdated(address indexed adapter);
@@ -236,6 +243,9 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         w.metadataHash = metadataHash;
         w.polymarketConditionId = polymarketConditionId;
 
+        _userWagerIds[msg.sender].add(wagerId);
+        _userWagerIds[opponent].add(wagerId);
+
         emit WagerCreated(wagerId, msg.sender, opponent, token, creatorStake, opponentStake, resolutionType, metadataHash);
         if (resolutionType == ResolutionType.Polymarket) {
             emit PolymarketLinked(wagerId, polymarketConditionId, creatorIsYes);
@@ -390,5 +400,42 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
 
     function nextWagerId() external view returns (uint256) {
         return _nextWagerId;
+    }
+
+    function getUserWagerCount(address user) external view returns (uint256) {
+        return _userWagerIds[user].length();
+    }
+
+    /// @notice Paginated slice of a user's wager IDs. `offset` and `limit` are clamped
+    ///         to the available range so callers can safely page past the end.
+    function getUserWagerIds(address user, uint256 offset, uint256 limit)
+        public
+        view
+        returns (uint256[] memory ids)
+    {
+        EnumerableSet.UintSet storage set = _userWagerIds[user];
+        uint256 total = set.length();
+        if (offset >= total || limit == 0) return new uint256[](0);
+        uint256 end = offset + limit;
+        if (end > total) end = total;
+        uint256 n = end - offset;
+        ids = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
+            ids[i] = set.at(offset + i);
+        }
+    }
+
+    /// @notice Paginated slice of a user's wagers as full structs. Order matches
+    ///         `getUserWagerIds(user, offset, limit)`.
+    function getUserWagers(address user, uint256 offset, uint256 limit)
+        external
+        view
+        returns (Wager[] memory wagers)
+    {
+        uint256[] memory ids = getUserWagerIds(user, offset, limit);
+        wagers = new Wager[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            wagers[i] = _wagers[ids[i]];
+        }
     }
 }

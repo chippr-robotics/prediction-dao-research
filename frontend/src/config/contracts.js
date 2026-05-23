@@ -48,7 +48,7 @@ const AMOY_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   // v2 core (populated by `npm run sync:frontend-contracts -- --network amoy --chainId 80002`)
-  wagerRegistry: '0x39f1CbC680cDc9831b6dF4D9e4719D3748720aBA',
+  wagerRegistry: '0x61B0c8eb77266b401d0b7de8ac0e82548D1E4e0B',
   membershipManager: '0xFaEbF662aa591fF95e97306b413522efC958540f',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
   polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',

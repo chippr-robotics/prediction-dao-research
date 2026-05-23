@@ -81,4 +81,8 @@ interface IWagerRegistry {
     function getWager(uint256 wagerId) external view returns (Wager memory);
     function isAllowedToken(address token) external view returns (bool);
     function nextWagerId() external view returns (uint256);
+
+    function getUserWagerCount(address user) external view returns (uint256);
+    function getUserWagerIds(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory);
+    function getUserWagers(address user, uint256 offset, uint256 limit) external view returns (Wager[] memory);
 }
