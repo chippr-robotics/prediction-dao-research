@@ -373,8 +373,8 @@ function WalletButton({ className = '' }) {
                   <BlockiesAvatar address={address} size={40} />
                   <div className="account-details">
                     <span className="account-address-full">{shortenAddress(address)}</span>
-                    <span className="usc-balance">
-                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.usc || 0).toFixed(2)} USC`}
+                    <span className="usdc-balance">
+                      {balanceLoading ? 'Loading...' : `${parseFloat(balances?.stable || 0).toFixed(2)} USDC`}
                     </span>
                     <span className="network-info">{network?.name || `Chain ${chainId}`}</span>
                   </div>
