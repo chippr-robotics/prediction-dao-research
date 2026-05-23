@@ -3,8 +3,10 @@ import { useRoles } from '../../hooks/useRoles'
 import { useWeb3 } from '../../hooks/useWeb3'
 import { useNotification } from '../../hooks/useUI'
 import { useTierPrices } from '../../hooks/useTierPrices'
+import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../../utils/blockchainService'
+import { ensureKeyRegistered } from '../../utils/keyRegistryService'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -85,6 +87,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const { account, isConnected, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
   const { showNotification } = useNotification()
   const { getPrice, getLimits } = useTierPrices()
+  const { ensureInitialized } = useEncryption()
 
   const isUpgradeFlow = action === 'upgrade'
   const isExtendFlow = action === 'extend'
@@ -95,6 +98,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   const [isPurchasing, setIsPurchasing] = useState(false)
   const [purchaseResult, setPurchaseResult] = useState(null)
   const [errors, setErrors] = useState({})
+  const [keyRegStatus, setKeyRegStatus] = useState(null) // null | 'registering' | 'success' | 'skipped' | 'failed'
+  const [keyRegError, setKeyRegError] = useState(null)
 
   const [userCurrentTier, setUserCurrentTier] = useState(0)
   const [isLoadingTier, setIsLoadingTier] = useState(false)
@@ -194,6 +199,24 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       setPurchaseResult({ success: true, tier: tierName, txHash: receipt.hash })
       try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
       showNotification(`${tierName} membership activated.`, 'success', 7000)
+
+      // Auto-register encryption key after successful payment
+      setKeyRegStatus('registering')
+      try {
+        const keys = await ensureInitialized()
+        if (keys?.publicKey) {
+          const wasNew = await ensureKeyRegistered(signer, account, keys.publicKey)
+          setKeyRegStatus(wasNew ? 'success' : 'skipped')
+        } else {
+          setKeyRegStatus('failed')
+          setKeyRegError('Could not derive encryption keys')
+        }
+      } catch (keyErr) {
+        console.warn('[PremiumPurchaseModal] key registration failed (non-fatal):', keyErr.message)
+        setKeyRegStatus('failed')
+        setKeyRegError(keyErr.message)
+      }
+
       setCurrentStep(2)
     } catch (err) {
       console.error('[PremiumPurchaseModal] purchase failed:', err)
@@ -211,6 +234,8 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
     setPurchaseResult(null)
     setErrors({})
     setIsPurchasing(false)
+    setKeyRegStatus(null)
+    setKeyRegError(null)
   }, [])
 
   const handleClose = useCallback(() => {
@@ -501,6 +526,37 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                   >
                     View transaction
                   </a>
+                )}
+                {purchaseResult?.success && (
+                  <div className="ppm-key-reg-status">
+                    {keyRegStatus === 'registering' && (
+                      <div className="ppm-info-card">
+                        <span className="ppm-spinner" aria-hidden="true" />
+                        <span>Registering your encryption key...</span>
+                      </div>
+                    )}
+                    {keyRegStatus === 'success' && (
+                      <div className="ppm-info-card ppm-key-reg-success">
+                        <span aria-hidden="true">&#x1F512;</span>
+                        <span>Encryption key registered &mdash; you can send and receive private wagers.</span>
+                      </div>
+                    )}
+                    {keyRegStatus === 'skipped' && (
+                      <div className="ppm-info-card ppm-key-reg-success">
+                        <span aria-hidden="true">&#x1F512;</span>
+                        <span>Encryption key already registered.</span>
+                      </div>
+                    )}
+                    {keyRegStatus === 'failed' && (
+                      <div className="ppm-info-card ppm-key-reg-warn">
+                        <span aria-hidden="true">&#x26A0;&#xFE0F;</span>
+                        <span>
+                          Key registration was not completed{keyRegError ? `: ${keyRegError}` : ''}.
+                          You can register later from <strong>Security</strong> settings.
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <div className="ppm-tier-summary">
                   <h4>Your {selectedTierInfo?.name} limits</h4>
