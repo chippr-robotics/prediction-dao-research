@@ -1466,3 +1466,118 @@
   justify-content: center;
   z-index: 1000;
 }
+
+/* ── Oracle adapter admin tab ─────────────────────────────────────────── */
+.oracle-adapters-subtabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+  flex-wrap: wrap;
+}
+
+.oracle-adapter-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.04));
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.admin-form-section {
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.admin-form-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.admin-form-section h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.admin-hint {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.66));
+  line-height: 1.4;
+}
+
+.admin-hint code {
+  background: var(--bg-tertiary, rgba(255, 255, 255, 0.08));
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.admin-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.admin-form-row > label {
+  flex: 1 1 14rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+}
+
+.admin-form-row > label.admin-form-full {
+  flex-basis: 100%;
+}
+
+.admin-form-row input,
+.admin-form-row select,
+.admin-form-row textarea {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  background: var(--bg-secondary, rgba(0, 0, 0, 0.3));
+  color: var(--text-primary, #fff);
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.admin-form-row textarea {
+  font-family: monospace;
+  font-size: 0.8125rem;
+  resize: vertical;
+}
+
+.admin-btn {
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-btn.primary {
+  background: var(--accent-color, #00b76f);
+  color: #fff;
+}
+
+.admin-btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover, #00a060);
+}
