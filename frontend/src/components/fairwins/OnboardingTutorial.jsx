@@ -17,7 +17,7 @@ const buildTutorialSteps = (stable) => [
   {
     id: 'welcome',
     title: 'Welcome to FairWins',
-    subtitle: 'Private wagers between friends',
+    subtitle: 'Peer-to-peer wagers between friends',
     icon: (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M12 2L2 7l10 5 10-5-10-5z"/>
@@ -28,16 +28,18 @@ const buildTutorialSteps = (stable) => [
     content: (
       <>
         <p>
-          FairWins lets you <strong>create private wagers with friends</strong> that automatically
-          resolve using built-in resolution methods with challenge periods.
+          FairWins lets you <strong>create private, peer-to-peer wagers with friends</strong> on any topic.
+          Stakes are locked in smart contract escrow and payouts are handled automatically
+          through built-in resolution methods with challenge periods.
         </p>
         <div className="tutorial-highlight-box">
-          <span className="highlight-icon">💡</span>
-          <span>Create a wager, share via <strong>QR code</strong>, and let the smart contract handle stakes and payouts.</span>
+          <span className="highlight-icon">&#128161;</span>
+          <span>Create a wager, share via <strong>QR code</strong>, and let the smart contract handle the rest. No trust required.</span>
         </div>
-        <p className="tutorial-note">
-          All stakes are held in escrow until the outcome is determined. No trust required.
-        </p>
+        <div className="tutorial-dev-notice">
+          <strong>Development Notice:</strong> This site is under active development.
+          Features and functionality may change. Contact: Howdy@FairWins.App
+        </div>
       </>
     )
   },

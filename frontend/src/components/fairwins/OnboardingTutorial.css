@@ -205,6 +205,18 @@
   line-height: 1.5;
 }
 
+/* Dev notice banner inside tutorial */
+.tutorial-dev-notice {
+  background: rgba(255, 152, 0, 0.1);
+  border-left: 4px solid rgba(255, 152, 0, 0.8);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 0.5rem;
+}
+
 /* Example market */
 .tutorial-example {
   background: var(--bg-primary);
