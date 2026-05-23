@@ -390,61 +390,60 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
  * @param {string} userAddress - User's wallet address
  * @returns {Promise<Array>} Array of friend market objects
  */
+const WAGER_STATUS_NAMES = ['none', 'pending', 'active', 'resolved', 'cancelled', 'refunded']
+
+function toWagerShape(id, w) {
+  const tokenAddr = w.token
+  const paymentToken = (DEPLOYED_CONTRACTS?.paymentToken || '').toLowerCase()
+  const isUSDC = tokenAddr && tokenAddr.toLowerCase() === paymentToken
+  const decimals = isUSDC ? 6 : 18
+  return {
+    id: String(id),
+    creator: w.creator,
+    opponent: w.opponent,
+    arbitrator: (w.arbitrator && w.arbitrator !== ethers.ZeroAddress) ? w.arbitrator : null,
+    participants: [w.creator, w.opponent].filter(a => a && a !== ethers.ZeroAddress),
+    creatorStake: ethers.formatUnits(w.creatorStake, decimals),
+    opponentStake: ethers.formatUnits(w.opponentStake, decimals),
+    stakeAmount: ethers.formatUnits(w.opponentStake, decimals),
+    stakeToken: tokenAddr,
+    stakeTokenAddress: tokenAddr,
+    stakeTokenSymbol: isUSDC ? 'USDC' : 'tokens',
+    resolutionType: Number(w.resolutionType),
+    status: WAGER_STATUS_NAMES[Number(w.status)] || 'unknown',
+    winner: (w.winner && w.winner !== ethers.ZeroAddress) ? w.winner : null,
+    paid: w.paid,
+    acceptanceDeadline: Number(w.acceptDeadline) * 1000,
+    endDate: new Date(Number(w.resolveDeadline) * 1000).toISOString(),
+    polymarketConditionId: w.polymarketConditionId,
+    creatorIsYes: w.creatorIsYes,
+    metadataHash: w.metadataHash,
+    description: `Wager #${id}`,
+  }
+}
+
 async function fetchWagersForUserV2(userAddress, provider, registryAddress) {
   const registry = new ethers.Contract(registryAddress, WAGER_REGISTRY_ABI, provider)
 
-  // Filter WagerCreated events where the user is either creator or opponent.
-  const createdAsCreator = registry.filters.WagerCreated(null, userAddress, null)
-  const createdAsOpponent = registry.filters.WagerCreated(null, null, userAddress)
-  const fromBlock = (DEPLOYMENT_BLOCKS && DEPLOYMENT_BLOCKS.wagerRegistry) || 0
+  // O(N_user) read via the contract's per-user EnumerableSet.UintSet index.
+  // Avoids `eth_getLogs` — public RPCs (e.g. Polygon Amoy) reject `toBlock: 'latest'`
+  // on the full deploy-to-tip range.
+  const count = Number(await registry.getUserWagerCount(userAddress))
+  if (count === 0) return []
 
-  const [evA, evB] = await Promise.all([
-    registry.queryFilter(createdAsCreator, fromBlock, 'latest').catch(() => []),
-    registry.queryFilter(createdAsOpponent, fromBlock, 'latest').catch(() => []),
-  ])
-  const events = [...evA, ...evB]
-  const ids = Array.from(new Set(events.map(e => e.args.wagerId.toString())))
-
-  if (ids.length === 0) return []
-
-  const wagers = await Promise.all(ids.map(async (id) => {
-    try {
-      const w = await registry.getWager(id)
-      const tokenAddr = w.token
-      const usdc = (DEPLOYED_CONTRACTS?.paymentToken || '').toLowerCase()
-      const isUSDC = tokenAddr && tokenAddr.toLowerCase() === usdc
-      const decimals = isUSDC ? 6 : 18
-      const statusNames = ['none', 'pending', 'active', 'resolved', 'cancelled', 'refunded']
-      return {
-        id: String(id),
-        creator: w.creator,
-        opponent: w.opponent,
-        arbitrator: (w.arbitrator && w.arbitrator !== ethers.ZeroAddress) ? w.arbitrator : null,
-        participants: [w.creator, w.opponent].filter(a => a && a !== ethers.ZeroAddress),
-        creatorStake: ethers.formatUnits(w.creatorStake, decimals),
-        opponentStake: ethers.formatUnits(w.opponentStake, decimals),
-        stakeAmount: ethers.formatUnits(w.opponentStake, decimals),
-        stakeToken: tokenAddr,
-        stakeTokenAddress: tokenAddr,
-        stakeTokenSymbol: isUSDC ? 'USDC' : 'tokens',
-        resolutionType: Number(w.resolutionType),
-        status: statusNames[Number(w.status)] || 'unknown',
-        winner: (w.winner && w.winner !== ethers.ZeroAddress) ? w.winner : null,
-        paid: w.paid,
-        acceptanceDeadline: Number(w.acceptDeadline) * 1000,
-        endDate: new Date(Number(w.resolveDeadline) * 1000).toISOString(),
-        polymarketConditionId: w.polymarketConditionId,
-        creatorIsYes: w.creatorIsYes,
-        metadataHash: w.metadataHash,
-        description: `Wager #${id}`,
-      }
-    } catch (e) {
-      console.warn(`Failed to load wager ${id}:`, e.message)
-      return null
+  const PAGE = 100
+  const wagers = []
+  for (let offset = 0; offset < count; offset += PAGE) {
+    const limit = Math.min(PAGE, count - offset)
+    const [ids, structs] = await Promise.all([
+      registry.getUserWagerIds(userAddress, offset, limit),
+      registry.getUserWagers(userAddress, offset, limit),
+    ])
+    for (let i = 0; i < ids.length; i++) {
+      wagers.push(toWagerShape(String(ids[i]), structs[i]))
     }
-  }))
-
-  return wagers.filter(Boolean)
+  }
+  return wagers
 }
 
 export async function fetchFriendMarketsForUser(userAddress) {

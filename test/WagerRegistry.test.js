@@ -637,4 +637,117 @@ describe("WagerRegistry", function () {
       expect(await reg.isFrozen(bob.address)).to.be.true;
     });
   });
+
+  describe("per-user wager index", () => {
+    it("appends new wager IDs for both creator and opponent", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice, bob } = fx;
+      const id = await createDefault(reg, fx);
+      expect(await reg.getUserWagerCount(alice.address)).to.equal(1);
+      expect(await reg.getUserWagerCount(bob.address)).to.equal(1);
+      const aliceIds = await reg.getUserWagerIds(alice.address, 0, 10);
+      const bobIds = await reg.getUserWagerIds(bob.address, 0, 10);
+      expect(aliceIds.map(Number)).to.deep.equal([id]);
+      expect(bobIds.map(Number)).to.deep.equal([id]);
+    });
+
+    it("accumulates IDs across multiple wagers per user", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice, bob, charlie } = fx;
+      const id1 = await createDefault(reg, fx); // alice vs bob
+      const id2 = await createDefault(reg, fx, { opponent: charlie.address }); // alice vs charlie
+      const id3 = await createDefault(reg, fx, { _signer: bob, opponent: charlie.address }); // bob vs charlie
+
+      expect(await reg.getUserWagerCount(alice.address)).to.equal(2);
+      expect(await reg.getUserWagerCount(bob.address)).to.equal(2);
+      expect(await reg.getUserWagerCount(charlie.address)).to.equal(2);
+
+      const aliceIds = (await reg.getUserWagerIds(alice.address, 0, 10)).map(Number);
+      const bobIds = (await reg.getUserWagerIds(bob.address, 0, 10)).map(Number);
+      const charlieIds = (await reg.getUserWagerIds(charlie.address, 0, 10)).map(Number);
+      expect(aliceIds).to.deep.equal([id1, id2]);
+      expect(bobIds).to.deep.equal([id1, id3]);
+      expect(charlieIds).to.deep.equal([id2, id3]);
+    });
+
+    it("paginates with clamped offset and limit", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice } = fx;
+      const ids = [];
+      for (let i = 0; i < 5; i++) ids.push(await createDefault(reg, fx));
+
+      // full page
+      const full = (await reg.getUserWagerIds(alice.address, 0, 5)).map(Number);
+      expect(full).to.deep.equal(ids);
+
+      // limit larger than remaining clamps to end
+      const overshoot = (await reg.getUserWagerIds(alice.address, 3, 100)).map(Number);
+      expect(overshoot).to.deep.equal(ids.slice(3));
+
+      // offset past end returns empty
+      const past = await reg.getUserWagerIds(alice.address, 5, 10);
+      expect(past.length).to.equal(0);
+
+      // zero limit returns empty
+      const zero = await reg.getUserWagerIds(alice.address, 0, 0);
+      expect(zero.length).to.equal(0);
+
+      // mid-range slice
+      const mid = (await reg.getUserWagerIds(alice.address, 1, 2)).map(Number);
+      expect(mid).to.deep.equal(ids.slice(1, 3));
+    });
+
+    it("getUserWagers returns full structs in the same order as getUserWagerIds", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice, bob } = fx;
+      const id1 = await createDefault(reg, fx);
+      const id2 = await createDefault(reg, fx);
+      const ids = (await reg.getUserWagerIds(alice.address, 0, 10)).map(Number);
+      const wagers = await reg.getUserWagers(alice.address, 0, 10);
+      expect(ids).to.deep.equal([id1, id2]);
+      expect(wagers.length).to.equal(2);
+      expect(wagers[0].creator).to.equal(alice.address);
+      expect(wagers[0].opponent).to.equal(bob.address);
+      expect(wagers[0].status).to.equal(Status.Open);
+      expect(wagers[1].creator).to.equal(alice.address);
+    });
+
+    it("index is append-only across the full lifecycle (accept / cancel / declare / refund)", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice, bob } = fx;
+
+      // 1) accepted
+      const accepted = await createDefault(reg, fx);
+      await reg.connect(bob).acceptWager(accepted);
+      await reg.connect(alice).declareWinner(accepted, alice.address);
+
+      // 2) cancelled
+      const cancelled = await createDefault(reg, fx);
+      await reg.connect(alice).cancelOpen(cancelled);
+
+      // 3) refunded (Open → past acceptDeadline)
+      const refunded = await createDefault(reg, fx);
+      await time.increase(3700);
+      await reg.connect(alice).claimRefund(refunded);
+
+      // All three IDs still present, in creation order
+      const aliceIds = (await reg.getUserWagerIds(alice.address, 0, 10)).map(Number);
+      const bobIds = (await reg.getUserWagerIds(bob.address, 0, 10)).map(Number);
+      expect(aliceIds).to.deep.equal([accepted, cancelled, refunded]);
+      expect(bobIds).to.deep.equal([accepted, cancelled, refunded]);
+      expect(await reg.getUserWagerCount(alice.address)).to.equal(3);
+      expect(await reg.getUserWagerCount(bob.address)).to.equal(3);
+    });
+
+    it("returns zero count and empty page for a user not party to any wager", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg } = fx;
+      const stranger = ethers.Wallet.createRandom().address;
+      expect(await reg.getUserWagerCount(stranger)).to.equal(0);
+      const ids = await reg.getUserWagerIds(stranger, 0, 50);
+      expect(ids.length).to.equal(0);
+      const wagers = await reg.getUserWagers(stranger, 0, 50);
+      expect(wagers.length).to.equal(0);
+    });
+  });
 });

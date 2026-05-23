@@ -32,6 +32,38 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "AccessControlBadConfirmation",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "neededRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AccessControlUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "AccountFrozenError",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "AdapterNotSet",
     "type": "error"
   },
@@ -126,25 +158,13 @@ export const WAGER_REGISTRY_ABI = [
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnableInvalidOwner",
+    "inputs": [],
+    "name": "OracleAdapterNotSet",
     "type": "error"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "OwnableUnauthorizedAccount",
+    "inputs": [],
+    "name": "OracleConditionRequired",
     "type": "error"
   },
   {
@@ -185,6 +205,11 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "UnsupportedOracleResolutionType",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "WinnerNotParticipant",
     "type": "error"
   },
@@ -204,6 +229,50 @@ export const WAGER_REGISTRY_ABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "AccountFrozen",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      }
+    ],
+    "name": "AccountUnfrozen",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "manager",
         "type": "address"
       }
@@ -216,18 +285,49 @@ export const WAGER_REGISTRY_ABI = [
     "inputs": [
       {
         "indexed": true,
-        "internalType": "address",
-        "name": "previousOwner",
-        "type": "address"
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
       },
       {
         "indexed": true,
         "internalType": "address",
-        "name": "newOwner",
+        "name": "adapter",
         "type": "address"
       }
     ],
-    "name": "OwnershipTransferred",
+    "name": "OracleAdapterUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "conditionId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "creatorIsYes",
+        "type": "bool"
+      }
+    ],
+    "name": "OracleConditionLinked",
     "type": "event"
   },
   {
@@ -304,6 +404,81 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "PolymarketLinked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "previousAdminRole",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newAdminRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RoleAdminChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleRevoked",
     "type": "event"
   },
   {
@@ -477,7 +652,33 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
-    "name": "FRIEND_MARKET_ROLE",
+    "name": "ACCOUNT_MODERATOR_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DEFAULT_ADMIN_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "GUARDIAN_ROLE",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -515,6 +716,19 @@ export const WAGER_REGISTRY_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "WAGER_PARTICIPANT_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -523,6 +737,19 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "acceptWager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "autoResolveFromOracle",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -669,6 +896,197 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "reason",
+        "type": "string"
+      }
+    ],
+    "name": "freezeAccount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRoleAdmin",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "getUserWagerCount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "offset",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
+    "name": "getUserWagerIds",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "ids",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "offset",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "limit",
+        "type": "uint256"
+      }
+    ],
+    "name": "getUserWagers",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "creator",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "opponent",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "arbitrator",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "token",
+            "type": "address"
+          },
+          {
+            "internalType": "uint128",
+            "name": "creatorStake",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "opponentStake",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint64",
+            "name": "acceptDeadline",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "resolveDeadline",
+            "type": "uint64"
+          },
+          {
+            "internalType": "enum IWagerRegistry.ResolutionType",
+            "name": "resolutionType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "enum IWagerRegistry.Status",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "paid",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "creatorIsYes",
+            "type": "bool"
+          },
+          {
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "metadataHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "polymarketConditionId",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct IWagerRegistry.Wager[]",
+        "name": "wagers",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "wagerId",
         "type": "uint256"
@@ -765,12 +1183,73 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "grantRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "hasRole",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "token",
         "type": "address"
       }
     ],
     "name": "isAllowedToken",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      }
+    ],
+    "name": "isFrozen",
     "outputs": [
       {
         "internalType": "bool",
@@ -808,11 +1287,17 @@ export const WAGER_REGISTRY_ABI = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "owner",
+    "inputs": [
+      {
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "name": "oracleAdapters",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "contract IOracleAdapter",
         "name": "",
         "type": "address"
       }
@@ -854,8 +1339,37 @@ export const WAGER_REGISTRY_ABI = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "renounceOwnership",
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "callerConfirmation",
+        "type": "address"
+      }
+    ],
+    "name": "renounceRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "revokeRole",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -869,6 +1383,24 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "setMembershipManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "rtype",
+        "type": "uint8"
+      },
+      {
+        "internalType": "address",
+        "name": "adapter",
+        "type": "address"
+      }
+    ],
+    "name": "setOracleAdapter",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -907,12 +1439,31 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
+    ],
+    "name": "supportsInterface",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
-        "name": "newOwner",
+        "name": "user",
         "type": "address"
       }
     ],
-    "name": "transferOwnership",
+    "name": "unfreezeAccount",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -924,4 +1475,4 @@ export const WAGER_REGISTRY_ABI = [
     "stateMutability": "nonpayable",
     "type": "function"
   }
-];
+]
