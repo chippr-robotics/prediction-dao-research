@@ -148,9 +148,11 @@ const buildTutorialSteps = (stable) => [
     content: (
       <>
         <p>
-          Choose how your wager gets resolved. All methods include a
-          <strong> 24-hour challenge period</strong> to prevent disputes.
+          Choose how your wager gets resolved — manually by participants,
+          or <strong>automatically via oracle</strong>. All methods include a
+          <strong> challenge period</strong> to prevent disputes.
         </p>
+        <p className="tutorial-resolution-group-label">Peer Resolution</p>
         <div className="tutorial-next-steps">
           <div className="next-step-item">
             <span className="next-icon">&#129309;</span>
@@ -162,15 +164,8 @@ const buildTutorialSteps = (stable) => [
           <div className="next-step-item">
             <span className="next-icon">&#128100;</span>
             <div className="next-content">
-              <strong>Initiator Resolves</strong>
-              <span>Wager creator reports the result</span>
-            </div>
-          </div>
-          <div className="next-step-item">
-            <span className="next-icon">&#128101;</span>
-            <div className="next-content">
-              <strong>Receiver Resolves</strong>
-              <span>Accepting party reports the result</span>
+              <strong>Creator / Opponent</strong>
+              <span>Designated party reports the result</span>
             </div>
           </div>
           <div className="next-step-item">
@@ -178,6 +173,30 @@ const buildTutorialSteps = (stable) => [
             <div className="next-content">
               <strong>Third Party</strong>
               <span>Trusted arbiter resolves the wager</span>
+            </div>
+          </div>
+        </div>
+        <p className="tutorial-resolution-group-label">Automated Oracle Resolution</p>
+        <div className="tutorial-next-steps">
+          <div className="next-step-item">
+            <span className="next-icon">&#128202;</span>
+            <div className="next-content">
+              <strong>Polymarket</strong>
+              <span>Links to a live Polymarket event for auto-resolution</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#128279;</span>
+            <div className="next-content">
+              <strong>Chainlink</strong>
+              <span>Resolves via data feeds or Chainlink Functions</span>
+            </div>
+          </div>
+          <div className="next-step-item">
+            <span className="next-icon">&#9881;&#65039;</span>
+            <div className="next-content">
+              <strong>UMA Optimistic Oracle</strong>
+              <span>Decentralized dispute resolution with economic guarantees</span>
             </div>
           </div>
         </div>
