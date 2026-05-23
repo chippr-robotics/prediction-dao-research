@@ -3558,12 +3558,6 @@ export const FriendGroupMarketFactoryABI = [
 // Back-compat alias used by most importers
 export const FRIEND_GROUP_MARKET_FACTORY_ABI = FriendGroupMarketFactoryABI;
 
-// Enum mirrors for Solidity's ResolutionType
-export const ResolutionType = {
-  Either: 0,
-  Initiator: 1,
-  Receiver: 2,
-  ThirdParty: 3,
-  AutoPegged: 4,
-  PolymarketOracle: 5,
-};
+// Note: a stale v1 ResolutionType enum used to live here. It was deleted in the
+// admin/oracle PR — the canonical enum is `frontend/src/constants/wagerDefaults.js`
+// (8-value, mirrors `contracts/interfaces/IWagerRegistry.sol`).
