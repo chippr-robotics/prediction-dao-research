@@ -1614,6 +1614,31 @@
    Print Styles
    =========================== */
 
+/* ===========================
+   Key Registration Status
+   =========================== */
+
+.ppm-key-reg-status {
+  margin-top: 1rem;
+}
+
+.ppm-key-reg-status .ppm-info-card {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+}
+
+.ppm-key-reg-success {
+  background: rgba(72, 187, 120, 0.08);
+  border-left-color: var(--success-color, #48bb78);
+}
+
+.ppm-key-reg-warn {
+  background: rgba(245, 158, 11, 0.08);
+  border-left-color: var(--warning-color, #f59e0b);
+}
+
 @media print {
   .ppm-overlay {
     display: none;
