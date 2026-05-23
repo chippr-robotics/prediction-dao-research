@@ -17,6 +17,8 @@ import { isEnsName } from '../../utils/validation'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 import PolymarketBrowser from './PolymarketBrowser'
+import OracleConditionPicker from './OracleConditionPicker'
+import { getContractAddress } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -51,6 +53,24 @@ function FriendMarketsModal({
   // Polymarket CTF is reachable (Polygon Amoy and Mainnet).
   const { capabilities } = useChainTokens()
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
+
+  // Adapter addresses for the extensible oracle resolution types. Each option
+  // in the resolution-type dropdown self-gates on the adapter being deployed
+  // on the active chain — synced into frontend/src/config/contracts.js by
+  // `npm run sync:frontend-contracts`.
+  const chainlinkDataFeedAdapter  = getContractAddress('chainlinkDataFeedAdapter')
+  const chainlinkFunctionsAdapter = getContractAddress('chainlinkFunctionsAdapter')
+  const umaAdapter                = getContractAddress('umaAdapter')
+  const hasOracleAdapter = {
+    [ResolutionType.ChainlinkDataFeed]:  Boolean(chainlinkDataFeedAdapter),
+    [ResolutionType.ChainlinkFunctions]: Boolean(chainlinkFunctionsAdapter),
+    [ResolutionType.UMA]:                Boolean(umaAdapter),
+  }
+  const isExtensibleOracleType = (t) => (
+    t === ResolutionType.ChainlinkDataFeed ||
+    t === ResolutionType.ChainlinkFunctions ||
+    t === ResolutionType.UMA
+  )
 
   // Chain-aware token metadata for the Stake Token dropdown. Recomputed
   // whenever the user switches Testnet/Mainnet so the right addresses are
@@ -227,6 +247,17 @@ function FriendMarketsModal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, handleClose])
 
+  // Whenever the user switches AWAY from Polymarket resolution, drop the
+  // selected Polymarket market so the linked-market UI doesn't bleed into
+  // the new oracle-condition flow. We can't do this inside handleFormChange's
+  // setFormData callback because selectedPolymarketMarket is separate state.
+  useEffect(() => {
+    if (formData.resolutionType !== ResolutionType.Polymarket && selectedPolymarketMarket) {
+      setSelectedPolymarketMarket(null)
+      setPolymarketBrowserOpen(false)
+    }
+  }, [formData.resolutionType, selectedPolymarketMarket])
+
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       handleClose()
@@ -249,15 +280,26 @@ function FriendMarketsModal({
 
       // Clear arbitrator/linked-market state when switching to a resolution
       // type that doesn't need it.
+      const valueIsOracleResolved = value === ResolutionType.Polymarket ||
+        value === ResolutionType.ChainlinkDataFeed ||
+        value === ResolutionType.ChainlinkFunctions ||
+        value === ResolutionType.UMA
       if (field === 'resolutionType' &&
           value !== ResolutionType.ThirdParty &&
-          value !== ResolutionType.Polymarket) {
+          !valueIsOracleResolved) {
         updated.arbitrator = ''
         updated.arbitratorResolved = ''
-        updated.oracleConditionId = ''
       }
-      if (field === 'resolutionType' && value !== ResolutionType.Polymarket) {
+      if (field === 'resolutionType' && !valueIsOracleResolved) {
+        // Leaving the oracle family entirely → clear conditionId + side.
+        updated.oracleConditionId = ''
         updated.creatorSide = ''
+      }
+      if (field === 'resolutionType' && valueIsOracleResolved && prev.resolutionType !== value) {
+        // Switching among oracle types resets the conditionId — different
+        // adapters register different ids, so carrying state across is wrong.
+        // (Side preference IS preserved: YES/NO maps the same way for all.)
+        updated.oracleConditionId = ''
       }
 
       return updated
@@ -617,6 +659,22 @@ function FriendMarketsModal({
             }
           }
         }
+      } else if (isExtensibleOracleType(formData.resolutionType)) {
+        // The same oracle conditionId field, validated the same way as the
+        // Polymarket branch above but with messaging that reflects the
+        // generic picker UX.
+        const cid = (formData.oracleConditionId || '').trim()
+        if (!cid) {
+          newErrors.oracleConditionId = 'Pick (or paste) a registered conditionId for the chosen oracle'
+        } else if (!/^0x[a-fA-F0-9]{64}$/.test(cid)) {
+          newErrors.oracleConditionId = 'Invalid conditionId (expected 0x + 64 hex chars)'
+        }
+        if (formData.creatorSide !== '0' && formData.creatorSide !== '1') {
+          newErrors.creatorSide = 'Pick which side of the bet you are taking (YES or NO)'
+        }
+        // We don't have an off-chain "linked market end date" for these, so
+        // the standard MIN/MAX deadline checks (run earlier in this function)
+        // already cover the deadline path.
       }
     }
 
@@ -1083,6 +1141,15 @@ function FriendMarketsModal({
                           {polymarketSidebetsEnabled && (
                             <option value={ResolutionType.Polymarket}>Linked Market (Polymarket)</option>
                           )}
+                          {hasOracleAdapter[ResolutionType.ChainlinkDataFeed] && (
+                            <option value={ResolutionType.ChainlinkDataFeed}>Chainlink Data Feed (price condition)</option>
+                          )}
+                          {hasOracleAdapter[ResolutionType.ChainlinkFunctions] && (
+                            <option value={ResolutionType.ChainlinkFunctions}>Chainlink Functions (custom request)</option>
+                          )}
+                          {hasOracleAdapter[ResolutionType.UMA] && (
+                            <option value={ResolutionType.UMA}>UMA Optimistic Oracle (claim assertion)</option>
+                          )}
                         </select>
                         <span className="fm-hint">
                           {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the wager'}
@@ -1090,6 +1157,9 @@ function FriendMarketsModal({
                           {formData.resolutionType === ResolutionType.Opponent && 'Only your opponent can resolve the wager'}
                           {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
                           {formData.resolutionType === ResolutionType.Polymarket && 'Settles automatically when the linked Polymarket market resolves'}
+                          {formData.resolutionType === ResolutionType.ChainlinkDataFeed && 'Settles automatically once the price feed reading at the deadline passes the threshold'}
+                          {formData.resolutionType === ResolutionType.ChainlinkFunctions && 'Settles when the Chainlink Functions DON returns a result (admin-registered request)'}
+                          {formData.resolutionType === ResolutionType.UMA && 'Settles via UMA Optimistic Oracle — someone posts the bond and the assertion stands after the liveness window'}
                           {!polymarketSidebetsEnabled && (
                             <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
                               Linked Market settlement requires a chain with the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.
@@ -1356,6 +1426,71 @@ function FriendMarketsModal({
 
                         {errors.oracleConditionId && (
                           <span className="fm-error">{errors.oracleConditionId}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Oracle condition picker — Chainlink Data Feed / Chainlink Functions / UMA */}
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                     isExtensibleOracleType(formData.resolutionType) && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-oracle-condition-picker">
+                          Oracle condition <span className="fm-required">*</span>
+                        </label>
+                        <OracleConditionPicker
+                          kind={
+                            formData.resolutionType === ResolutionType.ChainlinkDataFeed ? 'datafeed' :
+                            formData.resolutionType === ResolutionType.ChainlinkFunctions ? 'functions' :
+                            'uma'
+                          }
+                          adapterAddress={
+                            formData.resolutionType === ResolutionType.ChainlinkDataFeed ? chainlinkDataFeedAdapter :
+                            formData.resolutionType === ResolutionType.ChainlinkFunctions ? chainlinkFunctionsAdapter :
+                            umaAdapter
+                          }
+                          value={formData.oracleConditionId}
+                          onChange={(id) => handleFormChange('oracleConditionId', id || '')}
+                          error={errors.oracleConditionId}
+                          disabled={submitting}
+                        />
+                      </div>
+                    )}
+
+                    {/* Generic YES/NO side picker for the non-Polymarket oracle types.
+                        Polymarket has its own outcome-named side picker below — we
+                        skip it for the new types and use a binary YES/NO labelling
+                        that maps to the contract's creatorIsYes bool. */}
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                     isExtensibleOracleType(formData.resolutionType) && (
+                      <div className="fm-form-group fm-form-full">
+                        <label>
+                          Your side of the bet <span className="fm-required">*</span>
+                        </label>
+                        <span className="fm-hint">
+                          The oracle will return a YES or NO outcome. Pick which side you&apos;re taking — your opponent gets the other.
+                        </span>
+                        <div className="fm-side-picker">
+                          {[
+                            { idx: '0', label: 'YES' },
+                            { idx: '1', label: 'NO' },
+                          ].map(({ idx, label }) => {
+                            const active = formData.creatorSide === idx
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                className={`fm-side-btn ${active ? 'active' : ''}`}
+                                onClick={() => handleFormChange('creatorSide', idx)}
+                                disabled={submitting}
+                                aria-pressed={active}
+                              >
+                                <span className="fm-side-btn-label">I&apos;m taking {label}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {errors.creatorSide && (
+                          <span className="fm-error">{errors.creatorSide}</span>
                         )}
                       </div>
                     )}
