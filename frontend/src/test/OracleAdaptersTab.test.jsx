@@ -8,10 +8,9 @@ import OracleAdaptersTab from '../components/admin/OracleAdaptersTab'
 // `new ethers.Contract(addr, abi, signerOrProvider).<fn>(...)` by returning
 // stub instances with the methods the tab calls.
 
-const { dataFeedStub, functionsStub, umaStub, txReceipt } = vi.hoisted(() => {
+const { dataFeedStub, functionsStub, umaStub } = vi.hoisted(() => {
   const txReceipt = { wait: vi.fn().mockResolvedValue({ status: 1 }) }
   return {
-    txReceipt,
     dataFeedStub: {
       owner: vi.fn().mockResolvedValue('0x52502d049571C7893447b86c4d8B38e6184bF6e1'),
       setFeedAllowed: vi.fn().mockResolvedValue(txReceipt),
