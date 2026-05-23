@@ -126,11 +126,29 @@
   cursor: not-allowed;
 }
 
+/* Scrollable content region (between header and bottom of modal) */
+.fm-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.25rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Step panel — fills the content area so .fm-form-actions can stick to the bottom */
+.fm-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
 /* Form */
 .fm-form {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .fm-form-grid {
