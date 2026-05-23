@@ -155,11 +155,35 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
       // Resolution
       const resolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Either
-      const polymarketConditionId = data.data.polymarketConditionId || ethers.ZeroHash
+      // The form field is `oracleConditionId` (future-proof: same slot serves Polymarket
+      // and the upcoming ChainlinkDataFeed / ChainlinkFunctions / UMA adapters). The
+      // contract param is still named `polymarketConditionId` for legacy reasons; we
+      // rebind here so the contract call is unambiguous.
+      // Fall back to the legacy key for any external callers that still set it.
+      const oracleConditionId = data.data.oracleConditionId ?? data.data.polymarketConditionId ?? ''
+      const polymarketConditionId = oracleConditionId || ethers.ZeroHash
       const creatorIsYes = Boolean(data.data.creatorIsYes ?? true)
       const arbitrator = (resolutionType === ResolutionType.ThirdParty)
         ? (data.data.arbitrator || ethers.ZeroAddress)
         : ethers.ZeroAddress
+
+      // Defense-in-depth: the modal's validateForm should have caught these
+      // mismatches before submit. If something slipped through (e.g. a future
+      // caller invokes the hook directly), surface a clear error rather than
+      // let the contract revert with a cryptic custom error.
+      const oracleResolved = ORACLE_RESOLUTION_TYPES.has(resolutionType)
+      if (oracleResolved && polymarketConditionId === ethers.ZeroHash) {
+        throw new Error(
+          'Oracle-resolved wagers require a conditionId. ' +
+          'Pick a Polymarket market (or other oracle condition) before submitting.'
+        )
+      }
+      if (!oracleResolved && polymarketConditionId !== ethers.ZeroHash) {
+        throw new Error(
+          'A conditionId was supplied for a non-oracle resolution type. ' +
+          'Either change the resolution type or clear the conditionId.'
+        )
+      }
 
       // Metadata (encrypted envelope → IPFS, or plaintext)
       let metadataReference
@@ -284,7 +308,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
   return { createFriendMarket, loadPendingTransaction, clearPendingTransaction }
 }
 
-function translateRevert(reason) {
+export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
   if (reason.includes('MembershipDenied')) return 'Your Friend Market membership is inactive or you have reached the monthly/concurrent wager limit. Purchase or upgrade your tier to continue.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
@@ -294,6 +318,12 @@ function translateRevert(reason) {
   if (reason.includes('ConditionAlreadyResolved')) return 'That Polymarket condition is already resolved. Pick an unresolved one.'
   if (reason.includes('PolymarketRequired')) return 'Polymarket resolution requires a non-zero conditionId.'
   if (reason.includes('PolymarketDisallowed')) return 'Polymarket conditionId must be zero unless resolutionType=Polymarket.'
+  // Order: the new oracle-extensible reverts must check BEFORE the legacy
+  // `AdapterNotSet`, since substring matching would otherwise route
+  // `OracleAdapterNotSet` to the legacy "Polymarket adapter" message.
+  if (reason.includes('OracleConditionRequired')) return 'Oracle-resolved wagers require a non-zero conditionId.'
+  if (reason.includes('OracleAdapterNotSet')) return 'No oracle adapter is configured on-chain for this resolution type.'
+  if (reason.includes('UnsupportedOracleResolutionType')) return 'This resolution type is not supported by the registry.'
   if (reason.includes('AdapterNotSet')) return 'Polymarket adapter not configured on-chain.'
   if (reason.includes('ArbitratorRequired')) return 'ThirdParty resolution requires an arbitrator.'
   if (reason.includes('ArbitratorDisallowed')) return 'Only ThirdParty resolution allows an arbitrator.'
