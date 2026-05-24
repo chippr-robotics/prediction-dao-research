@@ -676,7 +676,7 @@ function MyMarketsModal({
                       isCorrectNetwork={isCorrectNetwork}
                       switchNetwork={switchNetwork}
                       onWithdraw={() => {
-                        setSelectedMarket(null)
+                        setSelectedMarketId(null)
                         fetchMarketsData?.()
                       }}
                     />
