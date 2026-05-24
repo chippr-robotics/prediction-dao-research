@@ -594,17 +594,15 @@ function FriendMarketsModal({
       newErrors.endDateTime = 'End date must be within 21 days'
     }
 
-    // Validate acceptance deadline
-    const acceptanceDeadline = new Date(formData.acceptanceDeadline)
-    const minAcceptanceDate = new Date(now.getTime() + 5 * 60 * 1000) // At least 5 minutes from now
-    const maxAcceptanceDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // Max 30 days from now
-
-    if (!formData.acceptanceDeadline || isNaN(acceptanceDeadline.getTime())) {
-      newErrors.acceptanceDeadline = 'Please select a valid acceptance deadline'
-    } else if (acceptanceDeadline < minAcceptanceDate) {
-      newErrors.acceptanceDeadline = 'Acceptance deadline must be at least 5 minutes from now'
-    } else if (acceptanceDeadline > maxAcceptanceDate) {
-      newErrors.acceptanceDeadline = 'Acceptance deadline must be within 30 days'
+    // Acceptance deadline is deterministic (midpoint of now → end), so
+    // recalculate it fresh and update formData to keep the display in sync.
+    const freshDeadline = getMidpointAcceptanceDeadline(formData.endDateTime)
+    if (freshDeadline !== formData.acceptanceDeadline) {
+      setFormData(prev => ({ ...prev, acceptanceDeadline: freshDeadline }))
+    }
+    const acceptanceDeadline = new Date(freshDeadline)
+    if (isNaN(acceptanceDeadline.getTime())) {
+      newErrors.acceptanceDeadline = 'Could not calculate acceptance deadline — check the end date'
     } else if (acceptanceDeadline >= endDate) {
       newErrors.acceptanceDeadline = 'Acceptance deadline must be before market end date'
     }
@@ -657,8 +655,8 @@ function FriendMarketsModal({
           if (!Number.isNaN(linkedEnd.getTime())) {
             if (linkedEnd.getTime() <= Date.now()) {
               newErrors.oracleConditionId = 'This Polymarket has already ended. Pick an active market.'
-            } else if (formData.acceptanceDeadline) {
-              const acceptEnd = new Date(formData.acceptanceDeadline)
+            } else if (freshDeadline) {
+              const acceptEnd = new Date(freshDeadline)
               if (!Number.isNaN(acceptEnd.getTime()) && acceptEnd.getTime() >= linkedEnd.getTime()) {
                 newErrors.acceptanceDeadline = 'Acceptance deadline must be before the linked market ends.'
               }
@@ -808,12 +806,17 @@ function FriendMarketsModal({
         ? true
         : false
 
+      // Recalculate acceptance deadline fresh so the midpoint reflects the
+      // current wall-clock time, not the time the user last changed endDateTime.
+      const freshAcceptanceDeadline = getMidpointAcceptanceDeadline(formData.endDateTime)
+
       // Build submit data with token address for WalletButton
       const submitData = {
         type: 'friend',
         marketType: friendMarketType,
         data: {
           ...formData,
+          acceptanceDeadline: freshAcceptanceDeadline,
           // Downstream hooks (useFriendMarketCreation) read `opponent` and
           // `arbitrator` as 0x addresses. Substitute the ENS-resolved values
           // so a user can enter `name.eth` and the contract still gets a hex
@@ -841,7 +844,7 @@ function FriendMarketsModal({
       const result = await handleCreate(submitData, signer)
 
       // Calculate acceptance deadline info
-      const acceptanceDeadline = new Date(formData.acceptanceDeadline)
+      const acceptanceDeadline = new Date(freshAcceptanceDeadline)
       const minThreshold = friendMarketType === 'oneVsOne'
         ? WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
         : parseInt(formData.minAcceptanceThreshold, 10) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
@@ -1265,22 +1268,15 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    {/* Acceptance Deadline - for multi-party acceptance flow */}
+                    {/* Acceptance Deadline - deterministic, not user-editable */}
                     <div className="fm-form-group">
-                      <label htmlFor="fm-acceptance-deadline">
-                        Acceptance Deadline <span className="fm-required">*</span>
-                      </label>
-                      <input
-                        id="fm-acceptance-deadline"
-                        type="datetime-local"
-                        value={formData.acceptanceDeadline}
-                        onChange={(e) => handleFormChange('acceptanceDeadline', e.target.value)}
-                        min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
-                        max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
-                        disabled={submitting}
-                        className={`fm-datetime-input ${errors.acceptanceDeadline ? 'error' : ''}`}
-                      />
-                      <span className="fm-hint">Auto-set to halfway between now and end time (min: 5 min)</span>
+                      <label>Acceptance Deadline</label>
+                      <div className="fm-readonly-value">
+                        {formData.acceptanceDeadline
+                          ? new Date(formData.acceptanceDeadline).toLocaleString()
+                          : '—'}
+                      </div>
+                      <span className="fm-hint">Automatically set to halfway between now and end time</span>
                       {errors.acceptanceDeadline && <span className="fm-error">{errors.acceptanceDeadline}</span>}
                     </div>
 
