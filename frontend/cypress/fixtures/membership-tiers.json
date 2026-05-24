@@ -1,0 +1,34 @@
+{
+  "bronze": {
+    "id": 1,
+    "name": "Bronze",
+    "priceUSDC": 2,
+    "monthlyLimit": 15,
+    "concurrentMax": 5,
+    "durationDays": 30
+  },
+  "silver": {
+    "id": 2,
+    "name": "Silver",
+    "priceUSDC": 8,
+    "monthlyLimit": 30,
+    "concurrentMax": 10,
+    "durationDays": 30
+  },
+  "gold": {
+    "id": 3,
+    "name": "Gold",
+    "priceUSDC": 25,
+    "monthlyLimit": 100,
+    "concurrentMax": 30,
+    "durationDays": 30
+  },
+  "platinum": {
+    "id": 4,
+    "name": "Platinum",
+    "priceUSDC": 100,
+    "monthlyLimit": 0,
+    "concurrentMax": 0,
+    "durationDays": 30
+  }
+}

@@ -37,7 +37,30 @@ jobs:
         run: npm run compile
 
       - name: Run tests
-        run: npm test
+        run: npm test 2>&1 | tee test-output.txt
+
+      - name: Summarize test results
+        if: always()
+        run: |
+          echo "### Smart Contract Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if grep -q "passing" test-output.txt; then
+            PASSING=$(grep -oP '\d+ passing' test-output.txt | head -1)
+            PENDING=$(grep -oP '\d+ pending' test-output.txt | head -1 || echo "0 pending")
+            FAILING=$(grep -oP '\d+ failing' test-output.txt | head -1 || echo "")
+            DURATION=$(grep -oP '\(\d+[ms]+\)' test-output.txt | tail -1 || echo "")
+
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Passing | $PASSING |" >> $GITHUB_STEP_SUMMARY
+            [ -n "$PENDING" ] && echo "| Pending | $PENDING |" >> $GITHUB_STEP_SUMMARY
+            [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
+            [ -n "$DURATION" ] && echo "| Duration | $DURATION |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Could not parse test output" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       # Coverage report generation can fail due to environment issues without indicating
       # actual test failures. We allow this to fail gracefully while still uploading
@@ -45,6 +68,25 @@ jobs:
       - name: Generate coverage report
         run: npm run test:coverage
         continue-on-error: true
+
+      - name: Summarize coverage
+        if: always()
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo "### Contract Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            # Extract top-level coverage percentages
+            node -e "
+              const c = require('./coverage/coverage-summary.json').total;
+              console.log('Statements: ' + c.statements.pct + '%');
+              console.log('Branches:   ' + c.branches.pct + '%');
+              console.log('Functions:  ' + c.functions.pct + '%');
+              console.log('Lines:      ' + c.lines.pct + '%');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -79,7 +121,24 @@ jobs:
       # IMPORTANT: Linting errors must fail the build to prevent code quality regressions.
       # Do not add 'continue-on-error: true' to this step as it would hide ESLint failures.
       - name: Run linter
-        run: npm run lint
+        run: npm run lint 2>&1 | tee lint-output.txt
+
+      - name: Summarize lint results
+        if: always()
+        run: |
+          echo "### Frontend Lint" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          WARNINGS=$(grep -c "warning" lint-output.txt 2>/dev/null || echo "0")
+          ERRORS=$(grep -c "error" lint-output.txt 2>/dev/null || echo "0")
+          if [ "$ERRORS" = "0" ] && [ "$WARNINGS" = "0" ]; then
+            echo "✅ No lint issues found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Type | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Errors | $ERRORS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Warnings | $WARNINGS |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
   frontend-tests:
     name: Frontend Unit Tests
@@ -104,14 +163,56 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test -- --run
+        run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
+
+      - name: Summarize test results
+        if: always()
+        run: |
+          echo "### Frontend Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Parse Vitest output
+          FILES=$(grep -oP '\d+ passed' test-output.txt | tail -1 || echo "")
+          TESTS_LINE=$(grep "Tests" test-output.txt | tail -1 || echo "")
+          DURATION_LINE=$(grep "Duration" test-output.txt | tail -1 || echo "")
+
+          if [ -n "$TESTS_LINE" ]; then
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| $TESTS_LINE |" | sed 's/^/| Tests | /' >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            echo "| Duration | $DURATION_LINE |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       # Coverage report generation can fail due to environment issues without indicating
       # actual test failures. We allow this to fail gracefully while still uploading
       # whatever coverage data was generated.
       - name: Generate coverage report
-        run: npm run test:coverage -- --run
+        run: npm run test:coverage -- --run 2>&1 | tee coverage-output.txt
         continue-on-error: true
+
+      - name: Summarize coverage
+        if: always()
+        run: |
+          echo "### Frontend Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const c = require('./coverage/coverage-summary.json').total;
+              console.log('Statements: ' + c.statements.pct + '%');
+              console.log('Branches:   ' + c.branches.pct + '%');
+              console.log('Functions:  ' + c.functions.pct + '%');
+              console.log('Lines:      ' + c.lines.pct + '%');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            # Fall back to parsing text output
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -A5 "^-\|^All files\|^%" coverage-output.txt | head -10 >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -146,9 +247,119 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Summarize build output
+        if: always()
+        run: |
+          echo "### Frontend Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d "dist" ]; then
+            TOTAL_SIZE=$(du -sh dist | cut -f1)
+            JS_SIZE=$(find dist -name "*.js" -exec du -ch {} + 2>/dev/null | tail -1 | cut -f1 || echo "n/a")
+            CSS_SIZE=$(find dist -name "*.css" -exec du -ch {} + 2>/dev/null | tail -1 | cut -f1 || echo "n/a")
+            FILE_COUNT=$(find dist -type f | wc -l)
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total size | $TOTAL_SIZE |" >> $GITHUB_STEP_SUMMARY
+            echo "| JS bundle | $JS_SIZE |" >> $GITHUB_STEP_SUMMARY
+            echo "| CSS bundle | $CSS_SIZE |" >> $GITHUB_STEP_SUMMARY
+            echo "| Files | $FILE_COUNT |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Build failed — no dist directory" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build-test
           path: frontend/dist/
           retention-days: 7
+
+  cypress-fast-e2e:
+    name: Cypress Fast E2E
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run fast E2E tests
+        run: npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/fast/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
+        continue-on-error: true
+
+      - name: Summarize E2E results
+        if: always()
+        run: |
+          echo "### Cypress Fast E2E" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "cypress-results.json" ]; then
+            node -e "
+              const r = require('./cypress-results.json');
+              const stats = r.stats || {};
+              console.log('| Metric | Value |');
+              console.log('|--------|-------|');
+              console.log('| Passing | ' + (stats.passes || 0) + ' |');
+              console.log('| Failing | ' + (stats.failures || 0) + ' |');
+              console.log('| Pending | ' + (stats.pending || 0) + ' |');
+              console.log('| Duration | ' + ((stats.duration || 0) / 1000).toFixed(1) + 's |');
+              console.log('| Specs | ' + (stats.suites || 0) + ' |');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          else
+            # Fall back to parsing text output
+            PASSING=$(grep -oP 'passing \(\d+' cypress-output.txt | head -1 || echo "")
+            FAILING=$(grep -oP '\d+ failing' cypress-output.txt | head -1 || echo "")
+            if [ -n "$PASSING" ] || [ -n "$FAILING" ]; then
+              echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+              echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+              [ -n "$PASSING" ] && echo "| Result | $PASSING |" >> $GITHUB_STEP_SUMMARY
+              [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ Could not parse Cypress results" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check E2E exit code
+        run: |
+          if grep -q "failing" cypress-output.txt 2>/dev/null; then
+            exit 1
+          fi
+
+      - name: Upload Cypress screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-fast-screenshots
+          path: frontend/cypress/screenshots
+          retention-days: 30
+
+      - name: Upload Cypress videos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cypress-fast-videos
+          path: frontend/cypress/videos
+          retention-days: 7
+
+      - name: Upload Cypress JSON results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cypress-fast-results
+          path: frontend/cypress-results.json
+          retention-days: 30

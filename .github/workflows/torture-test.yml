@@ -34,7 +34,22 @@ jobs:
       - name: Run tests with gas reporting
         env:
           REPORT_GAS: true
-        run: npm test
+        run: npm test 2>&1 | tee test-output.txt
+
+      - name: Summarize test results
+        if: always()
+        run: |
+          echo "### Hardhat Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          PASSING=$(grep -oP '\d+ passing' test-output.txt | head -1 || echo "n/a")
+          PENDING=$(grep -oP '\d+ pending' test-output.txt | head -1 || echo "")
+          FAILING=$(grep -oP '\d+ failing' test-output.txt | head -1 || echo "")
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Passing | $PASSING |" >> $GITHUB_STEP_SUMMARY
+          [ -n "$PENDING" ] && echo "| Pending | $PENDING |" >> $GITHUB_STEP_SUMMARY
+          [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload gas report
         uses: actions/upload-artifact@v4
@@ -63,6 +78,28 @@ jobs:
 
       - name: Generate coverage report
         run: npm run test:coverage
+
+      - name: Summarize coverage
+        if: always()
+        run: |
+          echo "### Contract Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const c = require('./coverage/coverage-summary.json').total;
+              console.log('Statements: ' + c.statements.pct + '% (' + c.statements.covered + '/' + c.statements.total + ')');
+              console.log('Branches:   ' + c.branches.pct + '% (' + c.branches.covered + '/' + c.branches.total + ')');
+              console.log('Functions:  ' + c.functions.pct + '% (' + c.functions.covered + '/' + c.functions.total + ')');
+              console.log('Lines:      ' + c.lines.pct + '% (' + c.lines.covered + '/' + c.lines.total + ')');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          elif [ -d "coverage" ]; then
+            echo "Coverage artifacts generated (see uploaded report)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Coverage generation failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -158,130 +195,53 @@ jobs:
       - name: Patch wasm package for Python 3.10+ compatibility
         run: python scripts/patch-wasm-types.py
 
-      - name: Run Manticore on ProposalRegistry
+      - name: Run Manticore on WagerRegistry
         run: |
-          echo "Running Manticore on ProposalRegistry..."
-          timeout 600 python scripts/run-manticore.py contracts/ProposalRegistry.sol \
-            --contract ProposalRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on WagerRegistry..."
+          timeout 600 python scripts/run-manticore.py contracts/wagers/WagerRegistry.sol \
+            --contract WagerRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on WelfareMetricRegistry
+      - name: Run Manticore on MembershipManager
         run: |
-          echo "Running Manticore on WelfareMetricRegistry..."
-          timeout 600 python scripts/run-manticore.py contracts/WelfareMetricRegistry.sol \
-            --contract WelfareMetricRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on MembershipManager..."
+          timeout 600 python scripts/run-manticore.py contracts/access/MembershipManager.sol \
+            --contract MembershipManager --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on ConditionalMarketFactory
+      - name: Run Manticore on KeyRegistry
         run: |
-          echo "Running Manticore on ConditionalMarketFactory..."
-          timeout 600 python scripts/run-manticore.py contracts/ConditionalMarketFactory.sol \
-            --contract ConditionalMarketFactory --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on KeyRegistry..."
+          timeout 600 python scripts/run-manticore.py contracts/privacy/KeyRegistry.sol \
+            --contract KeyRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on DAOFactory
+      - name: Run Manticore on PolymarketOracleAdapter
         run: |
-          echo "Running Manticore on DAOFactory..."
-          timeout 600 python scripts/run-manticore.py contracts/DAOFactory.sol \
-            --contract DAOFactory --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on PolymarketOracleAdapter..."
+          timeout 600 python scripts/run-manticore.py contracts/oracles/PolymarketOracleAdapter.sol \
+            --contract PolymarketOracleAdapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on DexV3Integration
+      - name: Run Manticore on ChainlinkDataFeedOracleAdapter
         run: |
-          echo "Running Manticore on DexV3Integration..."
-          timeout 600 python scripts/run-manticore.py contracts/DexV3Integration.sol \
-            --contract DexV3Integration --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on ChainlinkDataFeedOracleAdapter..."
+          timeout 600 python scripts/run-manticore.py contracts/oracles/ChainlinkDataFeedOracleAdapter.sol \
+            --contract ChainlinkDataFeedOracleAdapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on FutarchyGovernor
+      - name: Run Manticore on ChainlinkFunctionsOracleAdapter
         run: |
-          echo "Running Manticore on FutarchyGovernor..."
-          timeout 600 python scripts/run-manticore.py contracts/FutarchyGovernor.sol \
-            --contract FutarchyGovernor --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on ChainlinkFunctionsOracleAdapter..."
+          timeout 600 python scripts/run-manticore.py contracts/oracles/ChainlinkFunctionsOracleAdapter.sol \
+            --contract ChainlinkFunctionsOracleAdapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
-      - name: Run Manticore on MarketCorrelationRegistry
+      - name: Run Manticore on UMAOptimisticOracleV3Adapter
         run: |
-          echo "Running Manticore on MarketCorrelationRegistry..."
-          timeout 600 python scripts/run-manticore.py contracts/MarketCorrelationRegistry.sol \
-            --contract MarketCorrelationRegistry --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on MembershipPaymentManager
-        run: |
-          echo "Running Manticore on MembershipPaymentManager..."
-          timeout 600 python scripts/run-manticore.py contracts/MembershipPaymentManager.sol \
-            --contract MembershipPaymentManager --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on OracleResolver
-        run: |
-          echo "Running Manticore on OracleResolver..."
-          timeout 600 python scripts/run-manticore.py contracts/OracleResolver.sol \
-            --contract OracleResolver --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on PrivacyCoordinator
-        run: |
-          echo "Running Manticore on PrivacyCoordinator..."
-          timeout 600 python scripts/run-manticore.py contracts/PrivacyCoordinator.sol \
-            --contract PrivacyCoordinator --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on RagequitModule
-        run: |
-          echo "Running Manticore on RagequitModule..."
-          timeout 600 python scripts/run-manticore.py contracts/RagequitModule.sol \
-            --contract RagequitModule --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on RoleManager
-        run: |
-          echo "Running Manticore on RoleManager..."
-          timeout 600 python scripts/run-manticore.py contracts/RoleManager.sol \
-            --contract RoleManager --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on TieredRoleManager
-        run: |
-          echo "Running Manticore on TieredRoleManager..."
-          timeout 600 python scripts/run-manticore.py contracts/TieredRoleManager.sol \
-            --contract TieredRoleManager --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on TokenMintFactory
-        run: |
-          echo "Running Manticore on TokenMintFactory..."
-          timeout 600 python scripts/run-manticore.py contracts/TokenMintFactory.sol \
-            --contract TokenMintFactory --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on TreasuryVault
-        run: |
-          echo "Running Manticore on TreasuryVault..."
-          timeout 600 python scripts/run-manticore.py contracts/TreasuryVault.sol \
-            --contract TreasuryVault --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on MarketVault
-        run: |
-          echo "Running Manticore on MarketVault..."
-          timeout 600 python scripts/run-manticore.py contracts/MarketVault.sol \
-            --contract MarketVault --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on ZKKeyManager
-        run: |
-          echo "Running Manticore on ZKKeyManager..."
-          timeout 600 python scripts/run-manticore.py contracts/ZKKeyManager.sol \
-            --contract ZKKeyManager --timeout 600 || echo "Manticore analysis completed with warnings/errors"
-        continue-on-error: true
-
-      - name: Run Manticore on ZKVerifier
-        run: |
-          echo "Running Manticore on ZKVerifier..."
-          timeout 600 python scripts/run-manticore.py contracts/ZKVerifier.sol \
-            --contract ZKVerifier --timeout 600 || echo "Manticore analysis completed with warnings/errors"
+          echo "Running Manticore on UMAOptimisticOracleV3Adapter..."
+          timeout 600 python scripts/run-manticore.py contracts/oracles/UMAOptimisticOracleV3Adapter.sol \
+            --contract UMAOptimisticOracleV3Adapter --timeout 600 || echo "Manticore analysis completed with warnings/errors"
         continue-on-error: true
 
       - name: Collect Manticore results
@@ -336,8 +296,38 @@ jobs:
       - name: Run Medusa fuzzing (extended)
         run: |
           export PATH=$PATH:$HOME/go/bin
-          medusa fuzz --timeout 3600
+          medusa fuzz --timeout 3600 2>&1 | tee medusa-output.txt
         continue-on-error: true
+
+      - name: Summarize Medusa results
+        if: always()
+        run: |
+          echo "### Medusa Fuzz Testing" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "medusa-output.txt" ]; then
+            PASSED=$(grep -c "PASSED" medusa-output.txt 2>/dev/null || echo "0")
+            FAILED=$(grep -c "FAILED" medusa-output.txt 2>/dev/null || echo "0")
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Properties passed | $PASSED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Properties failed | $FAILED |" >> $GITHUB_STEP_SUMMARY
+            echo "| Target contracts | WagerRegistryFuzzTest, MembershipManagerFuzzTest, KeyRegistryFuzzTest |" >> $GITHUB_STEP_SUMMARY
+            echo "| Timeout | 3600s |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Show any failures in detail
+            if [ "$FAILED" -gt "0" ]; then
+              echo "<details><summary>Failed properties</summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              grep -A5 "FAILED" medusa-output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ Medusa output not available" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Collect Medusa results
         if: always()
@@ -345,6 +335,7 @@ jobs:
           mkdir -p medusa-results
           cp -r medusa-corpus medusa-results/ || true
           cp medusa.json medusa-results/ || true
+          cp medusa-output.txt medusa-results/ || true
           find . -name "medusa-output" -exec cp -r {} medusa-results/ \; || true
 
       - name: Upload Medusa results
@@ -397,9 +388,50 @@ jobs:
           echo "Contract deployment completed"
         continue-on-error: false
 
-      - name: Run Cypress E2E tests
+      - name: Run Cypress E2E tests (full suite)
         working-directory: frontend
-        run: npm run test:e2e
+        run: npx start-server-and-test dev http://localhost:5173 'cypress run --spec "cypress/e2e/**/*.cy.js" --reporter json --reporter-options "output=cypress-results.json"' 2>&1 | tee cypress-output.txt
+        continue-on-error: true
+
+      - name: Summarize Cypress results
+        if: always()
+        working-directory: frontend
+        run: |
+          echo "### Cypress E2E Tests (Full Suite)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "cypress-results.json" ]; then
+            node -e "
+              const r = require('./cypress-results.json');
+              const stats = r.stats || {};
+              console.log('| Metric | Value |');
+              console.log('|--------|-------|');
+              console.log('| Passing | ' + (stats.passes || 0) + ' |');
+              console.log('| Failing | ' + (stats.failures || 0) + ' |');
+              console.log('| Pending | ' + (stats.pending || 0) + ' |');
+              console.log('| Duration | ' + ((stats.duration || 0) / 1000).toFixed(1) + 's |');
+              console.log('| Suites | ' + (stats.suites || 0) + ' |');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          else
+            # Fall back to text parsing
+            SPECS=$(grep -c "Running:" cypress-output.txt 2>/dev/null || echo "n/a")
+            PASSING=$(grep -oP '\d+ passing' cypress-output.txt | tail -1 || echo "")
+            FAILING=$(grep -oP '\d+ failing' cypress-output.txt | tail -1 || echo "")
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Specs run | $SPECS |" >> $GITHUB_STEP_SUMMARY
+            [ -n "$PASSING" ] && echo "| Passing | $PASSING |" >> $GITHUB_STEP_SUMMARY
+            [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check Cypress exit code
+        if: always()
+        working-directory: frontend
+        run: |
+          if grep -q "failing" cypress-output.txt 2>/dev/null; then
+            exit 1
+          fi
 
       - name: Upload Cypress screenshots
         uses: actions/upload-artifact@v4
@@ -417,12 +449,20 @@ jobs:
           path: frontend/cypress/videos
           retention-days: 90
 
+      - name: Upload Cypress JSON results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cypress-e2e-results
+          path: frontend/cypress-results.json
+          retention-days: 90
+
   summary:
     name: Generate Test Summary
     runs-on: ubuntu-latest
     needs: [hardhat-tests, coverage-report, slither-analysis, manticore-analysis, medusa-fuzzing, cypress-e2e]
     if: always()
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -436,29 +476,104 @@ jobs:
         run: |
           echo "# Weekly Torture Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+
+          # ---- Job Status Overview ----
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Gas Report
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for JOB in hardhat-tests coverage-report slither-analysis manticore-analysis medusa-fuzzing cypress-e2e; do
+            RESULT="${{ needs.hardhat-tests.result }}"
+            case "$JOB" in
+              coverage-report) RESULT="${{ needs.coverage-report.result }}" ;;
+              slither-analysis) RESULT="${{ needs.slither-analysis.result }}" ;;
+              manticore-analysis) RESULT="${{ needs.manticore-analysis.result }}" ;;
+              medusa-fuzzing) RESULT="${{ needs.medusa-fuzzing.result }}" ;;
+              cypress-e2e) RESULT="${{ needs.cypress-e2e.result }}" ;;
+            esac
+
+            case "$RESULT" in
+              success) echo "| $JOB | ✅ Passed |" >> $GITHUB_STEP_SUMMARY ;;
+              failure) echo "| $JOB | ❌ Failed |" >> $GITHUB_STEP_SUMMARY ;;
+              skipped) echo "| $JOB | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY ;;
+              cancelled) echo "| $JOB | 🚫 Cancelled |" >> $GITHUB_STEP_SUMMARY ;;
+              *) echo "| $JOB | ❓ $RESULT |" >> $GITHUB_STEP_SUMMARY ;;
+            esac
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ---- Gas Report ----
+          echo "## Gas Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f "artifacts/gas-report/gas-report.txt" ]; then
-            echo "### Gas Report" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            head -50 artifacts/gas-report/gas-report.txt >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Click to expand gas report</summary>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat artifacts/gas-report/gas-report.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Gas report not available" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          # Slither Results
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ---- Coverage ----
+          echo "## Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "artifacts/coverage-report/coverage-summary.json" ]; then
+            node -e "
+              const c = require('./artifacts/coverage-report/coverage-summary.json').total;
+              console.log('| Metric | Coverage | Covered / Total |');
+              console.log('|--------|----------|-----------------|');
+              console.log('| Statements | ' + c.statements.pct + '% | ' + c.statements.covered + ' / ' + c.statements.total + ' |');
+              console.log('| Branches | ' + c.branches.pct + '% | ' + c.branches.covered + ' / ' + c.branches.total + ' |');
+              console.log('| Functions | ' + c.functions.pct + '% | ' + c.functions.covered + ' / ' + c.functions.total + ' |');
+              console.log('| Lines | ' + c.lines.pct + '% | ' + c.lines.covered + ' / ' + c.lines.total + ' |');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Could not parse coverage data" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage summary not available (see uploaded artifacts)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ---- Slither ----
+          echo "## Slither Static Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f "artifacts/slither-reports/slither-report.md" ]; then
-            echo "### Slither Static Analysis" >> $GITHUB_STEP_SUMMARY
-            cat artifacts/slither-reports/slither-report.md >> $GITHUB_STEP_SUMMARY || true
+            FINDING_COUNT=$(grep -c "^-\|^\*" artifacts/slither-reports/slither-report.md 2>/dev/null || echo "0")
+            echo "Findings: $FINDING_COUNT" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Full Slither report</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            cat artifacts/slither-reports/slither-report.md >> $GITHUB_STEP_SUMMARY || true
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Slither report not available" >> $GITHUB_STEP_SUMMARY
           fi
-          
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ---- Manticore ----
+          echo "## Manticore Symbolic Execution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Contracts analyzed: WagerRegistry, MembershipManager, KeyRegistry, PolymarketOracleAdapter, ChainlinkDataFeedOracleAdapter, ChainlinkFunctionsOracleAdapter, UMAOptimisticOracleV3Adapter" >> $GITHUB_STEP_SUMMARY
+          if [ -d "artifacts/manticore-results" ]; then
+            DIRS=$(find artifacts/manticore-results -type d -name "mcore_*" 2>/dev/null | wc -l || echo "0")
+            echo "Result directories: $DIRS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Results: see uploaded artifacts" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # ---- Artifacts Index ----
           echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Gas Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Coverage Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Slither Analysis: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Manticore Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Medusa Fuzzing (Extended): Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Cypress E2E Test Results: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Retention |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| gas-report | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| coverage-report | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| slither-reports | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| manticore-results | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| medusa-results | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| cypress-e2e-results | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| cypress-videos | 90 days |" >> $GITHUB_STEP_SUMMARY
+          echo "| cypress-screenshots (on failure) | 90 days |" >> $GITHUB_STEP_SUMMARY

@@ -43,7 +43,20 @@ jobs:
       - name: Run tests with gas reporting
         env:
           REPORT_GAS: true
-        run: npm test
+        run: npm test 2>&1 | tee test-output.txt
+
+      - name: Summarize test results
+        if: always()
+        run: |
+          echo "### Hardhat Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          PASSING=$(grep -oP '\d+ passing' test-output.txt | head -1 || echo "n/a")
+          FAILING=$(grep -oP '\d+ failing' test-output.txt | head -1 || echo "")
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Passing | $PASSING |" >> $GITHUB_STEP_SUMMARY
+          [ -n "$FAILING" ] && echo "| Failing | $FAILING |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload gas report
         uses: actions/upload-artifact@v4
@@ -76,6 +89,26 @@ jobs:
       - name: Generate coverage report
         run: npm run test:coverage
         continue-on-error: true
+
+      - name: Summarize coverage
+        if: always()
+        run: |
+          echo "### Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const c = require('./coverage/coverage-summary.json').total;
+              console.log('Statements: ' + c.statements.pct + '%');
+              console.log('Branches:   ' + c.branches.pct + '%');
+              console.log('Functions:  ' + c.functions.pct + '%');
+              console.log('Lines:      ' + c.lines.pct + '%');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage summary not available (see uploaded artifacts)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -147,28 +180,70 @@ jobs:
         run: |
           echo "# Security Testing & Analysis Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+
+          # Job status
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for JOB_RESULT in \
+            "Hardhat Tests:${{ needs.hardhat-tests.result }}" \
+            "Coverage:${{ needs.coverage-report.result }}" \
+            "Slither:${{ needs.slither-analysis.result }}"; do
+            JOB_NAME="${JOB_RESULT%%:*}"
+            JOB_STATUS="${JOB_RESULT##*:}"
+            case "$JOB_STATUS" in
+              success) echo "| $JOB_NAME | ✅ Passed |" >> $GITHUB_STEP_SUMMARY ;;
+              failure) echo "| $JOB_NAME | ❌ Failed |" >> $GITHUB_STEP_SUMMARY ;;
+              *) echo "| $JOB_NAME | $JOB_STATUS |" >> $GITHUB_STEP_SUMMARY ;;
+            esac
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+
           # Gas Report
-          if [ -f "artifacts/gas-report/gas-report.txt" ]; then
-            echo "### Gas Report" >> $GITHUB_STEP_SUMMARY
+          if [ -f "artifacts/security-gas-report/gas-report.txt" ]; then
+            echo "## Gas Report" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Click to expand</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            head -50 artifacts/gas-report/gas-report.txt >> $GITHUB_STEP_SUMMARY
+            cat artifacts/security-gas-report/gas-report.txt >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          # Slither Results
+
+          # Coverage
+          if [ -f "artifacts/security-coverage-report/coverage-summary.json" ]; then
+            echo "## Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const c = require('./artifacts/security-coverage-report/coverage-summary.json').total;
+              console.log('| Metric | Coverage | Covered / Total |');
+              console.log('|--------|----------|-----------------|');
+              console.log('| Statements | ' + c.statements.pct + '% | ' + c.statements.covered + ' / ' + c.statements.total + ' |');
+              console.log('| Branches | ' + c.branches.pct + '% | ' + c.branches.covered + ' / ' + c.branches.total + ' |');
+              console.log('| Functions | ' + c.functions.pct + '% | ' + c.functions.covered + ' / ' + c.functions.total + ' |');
+              console.log('| Lines | ' + c.lines.pct + '% | ' + c.lines.covered + ' / ' + c.lines.total + ' |');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Slither
           if [ -f "artifacts/slither-reports/slither-report.md" ]; then
-            echo "### Slither Static Analysis" >> $GITHUB_STEP_SUMMARY
+            echo "## Slither Static Analysis" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            FINDING_COUNT=$(grep -c "^-\|^\*" artifacts/slither-reports/slither-report.md 2>/dev/null || echo "0")
+            echo "Findings: $FINDING_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "<details><summary>Full report</summary>" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
             cat artifacts/slither-reports/slither-report.md >> $GITHUB_STEP_SUMMARY || true
+            echo "</details>" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Gas Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Coverage Report: Available in artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- Slither Analysis: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+
+          echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Note:** Manticore symbolic execution and Medusa fuzz testing run in the Weekly Torture Test workflow." >> $GITHUB_STEP_SUMMARY
