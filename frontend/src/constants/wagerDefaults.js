@@ -128,38 +128,10 @@ export const TERMINAL_STATUSES = new Set([
 ])
 
 // ── Date helpers ────────────────────────────────────────────────────
-/** Returns an ISO datetime-local string N days from now */
-export const getDefaultEndDateTime = (days = WAGER_DEFAULTS.WAGER_END_DAYS) => {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 16)
-}
-
-/** Returns an ISO datetime-local string N hours from now */
-export const getDefaultAcceptanceDeadline = (hours = WAGER_DEFAULTS.ACCEPTANCE_DEADLINE_HOURS) => {
-  const date = new Date()
-  date.setHours(date.getHours() + hours)
-  return date.toISOString().slice(0, 16)
-}
-
-/**
- * Returns an ISO datetime-local string set to the midpoint between
- * the current wall-clock time and the given end time.
- * Falls back to the fixed-hour default when endDateTime is missing or invalid.
- */
-export const getMidpointAcceptanceDeadline = (endDateTime) => {
-  if (!endDateTime) return getDefaultAcceptanceDeadline()
-  const now = Date.now()
-  const end = new Date(endDateTime).getTime()
-  if (Number.isNaN(end) || end <= now) return getDefaultAcceptanceDeadline()
-  const midpoint = now + (end - now) / 2
-  return new Date(midpoint).toISOString().slice(0, 16)
-}
 
 /**
  * Convert any datetime-like value into the `<input type="datetime-local">`
  * string format (`YYYY-MM-DDTHH:mm`) in the user's local timezone.
- * Used when seeding the end-date field from a linked Polymarket's endDate.
  */
 export const toDateTimeLocal = (value) => {
   if (!value) return ''
@@ -170,4 +142,32 @@ export const toDateTimeLocal = (value) => {
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`
   )
+}
+
+/** Returns a datetime-local string N days from now in the user's local timezone */
+export const getDefaultEndDateTime = (days = WAGER_DEFAULTS.WAGER_END_DAYS) => {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return toDateTimeLocal(date)
+}
+
+/** Returns a datetime-local string N hours from now in the user's local timezone */
+export const getDefaultAcceptanceDeadline = (hours = WAGER_DEFAULTS.ACCEPTANCE_DEADLINE_HOURS) => {
+  const date = new Date()
+  date.setHours(date.getHours() + hours)
+  return toDateTimeLocal(date)
+}
+
+/**
+ * Returns a datetime-local string set to the midpoint between
+ * the current wall-clock time and the given end time.
+ * Falls back to the fixed-hour default when endDateTime is missing or invalid.
+ */
+export const getMidpointAcceptanceDeadline = (endDateTime) => {
+  if (!endDateTime) return getDefaultAcceptanceDeadline()
+  const now = Date.now()
+  const end = new Date(endDateTime).getTime()
+  if (Number.isNaN(end) || end <= now) return getDefaultAcceptanceDeadline()
+  const midpoint = now + (end - now) / 2
+  return toDateTimeLocal(new Date(midpoint))
 }
