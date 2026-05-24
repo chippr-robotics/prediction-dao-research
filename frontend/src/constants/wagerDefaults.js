@@ -60,6 +60,7 @@ export const WagerStatus = {
   RESOLVED: 'resolved',
   EXPIRED: 'expired',
   CANCELLED: 'cancelled',
+  DECLINED: 'declined',
   REFUNDED: 'refunded',
   ORACLE_TIMED_OUT: 'oracle_timed_out',
 }
@@ -123,6 +124,7 @@ export const WagerSortKey = {
 export const TERMINAL_STATUSES = new Set([
   'resolved',
   'cancelled',
+  'declined',
   'refunded',
   'oracle_timed_out',
 ])

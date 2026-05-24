@@ -86,7 +86,7 @@ function MarketAcceptanceModal({
     initializeKeys
   } = useEncryption()
 
-  const [step, setStep] = useState('review') // 'review', 'confirm', 'processing', 'success', 'error'
+  const [step, setStep] = useState('review') // 'review', 'confirm', 'confirmDecline', 'processing', 'success', 'declined', 'error'
   const [error, setError] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [timeRemaining, setTimeRemaining] = useState(0)
@@ -427,9 +427,49 @@ function MarketAcceptanceModal({
     }
   }
 
-  const handleDecline = () => {
-    // Just close - no on-chain action needed
-    onClose()
+  const handleDecline = async () => {
+    if (!signer) {
+      setError('Please connect your wallet')
+      return
+    }
+
+    if (!isCorrectNetwork) {
+      try {
+        await switchNetwork()
+      } catch {
+        setError('Please switch to the correct network')
+        return
+      }
+    }
+
+    setStep('processing')
+    setError(null)
+
+    try {
+      const contract = new ethers.Contract(
+        contractAddress,
+        contractABI,
+        signer
+      )
+      const tx = await contract.declineWager(marketId)
+      setTxHash(tx.hash)
+      await tx.wait()
+      setStep('declined')
+    } catch (err) {
+      let errorMessage = 'Failed to decline the offer.'
+      const reason = err?.reason || err?.data?.message || err?.message || ''
+      if (reason.includes('NotOpen')) {
+        errorMessage = 'This wager is no longer open. It may have been cancelled or already accepted.'
+      } else if (reason.includes('NotOpponent')) {
+        errorMessage = 'Only the invited participant can decline this offer.'
+      } else if (reason.includes('AccountFrozenError')) {
+        errorMessage = 'Your account is currently frozen. Please contact support.'
+      } else if (reason.includes('user rejected') || reason.includes('ACTION_REJECTED')) {
+        errorMessage = 'Transaction was cancelled in your wallet.'
+      }
+      setError(errorMessage)
+      setStep('error')
+    }
   }
 
   const handleRetry = () => {
@@ -691,7 +731,7 @@ function MarketAcceptanceModal({
               {/* Action buttons */}
               {canAccept && (
                 <div className="ma-actions">
-                  <button className="ma-btn-secondary" onClick={handleDecline}>
+                  <button className="ma-btn-secondary" onClick={() => setStep('confirmDecline')}>
                     Decline Offer
                   </button>
                   <button
@@ -808,6 +848,58 @@ function MarketAcceptanceModal({
                   I Understand, Accept Offer
                 </button>
               </div>
+            </div>
+          )}
+
+          {step === 'confirmDecline' && (
+            <div className="ma-confirmation">
+              <h3>Decline This Offer?</h3>
+              <p className="ma-stake-notice">
+                This will permanently decline the wager and return the creator&apos;s stake.
+                This action cannot be undone.
+              </p>
+              <div className="ma-confirm-details">
+                <div className="ma-confirm-row">
+                  <span>Wager:</span>
+                  <span>
+                    {(decryptedDescription || marketData?.description)?.slice(0, 50)}
+                    {(decryptedDescription || marketData?.description)?.length > 50 ? '...' : ''}
+                  </span>
+                </div>
+                <div className="ma-confirm-row">
+                  <span>Created By:</span>
+                  <span className="ma-address">{formatAddress(marketData?.creator)}</span>
+                </div>
+              </div>
+              <div className="ma-actions">
+                <button className="ma-btn-secondary" onClick={() => setStep('review')}>
+                  Back
+                </button>
+                <button className="ma-btn-danger" onClick={handleDecline}>
+                  Confirm Decline
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'declined' && (
+            <div className="ma-success">
+              <div className="ma-success-icon" style={{ background: 'var(--color-warning, #f59e0b)' }}>&#10003;</div>
+              <h3>Offer Declined</h3>
+              <p>The creator&apos;s funds have been returned. This wager has been removed.</p>
+              {txHash && (
+                <a
+                  href={getTransactionUrl(chainId, txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ma-tx-link"
+                >
+                  View Transaction
+                </a>
+              )}
+              <button className="ma-btn-primary" onClick={onClose}>
+                Done
+              </button>
             </div>
           )}
 

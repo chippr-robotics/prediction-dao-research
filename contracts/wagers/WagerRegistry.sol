@@ -273,12 +273,31 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (w.status != Status.Open) revert NotOpen();
         if (msg.sender != w.creator) revert NotCreator();
 
-        w.status = Status.Cancelled;
-        // Close membership counter
-        membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+        IERC20 token = IERC20(w.token);
+        uint128 refund = w.creatorStake;
+        address creator = w.creator;
 
-        IERC20(w.token).safeTransfer(w.creator, w.creatorStake);
+        membershipManager.recordClose(creator, WAGER_PARTICIPANT_ROLE);
+        delete _wagers[wagerId];
+
+        token.safeTransfer(creator, refund);
         emit WagerCancelled(wagerId);
+    }
+
+    function declineWager(uint256 wagerId) external nonReentrant notFrozen(msg.sender) {
+        Wager storage w = _wagers[wagerId];
+        if (w.status != Status.Open) revert NotOpen();
+        if (msg.sender != w.opponent) revert NotOpponent();
+
+        IERC20 token = IERC20(w.token);
+        uint128 refund = w.creatorStake;
+        address creator = w.creator;
+
+        membershipManager.recordClose(creator, WAGER_PARTICIPANT_ROLE);
+        delete _wagers[wagerId];
+
+        token.safeTransfer(creator, refund);
+        emit WagerDeclined(wagerId, msg.sender);
     }
 
     function declareWinner(uint256 wagerId, address winner) external nonReentrant notFrozen(msg.sender) {

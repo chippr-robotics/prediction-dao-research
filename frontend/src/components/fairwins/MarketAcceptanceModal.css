@@ -561,6 +561,21 @@
   border-color: var(--text-secondary);
 }
 
+.ma-btn-danger {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: #dc2626;
+  color: #fff;
+}
+
+.ma-btn-danger:hover {
+  background: #b91c1c;
+}
+
 /* Confirmation Step */
 .ma-confirmation {
   text-align: left;

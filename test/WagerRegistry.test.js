@@ -254,7 +254,7 @@ describe("WagerRegistry", function () {
   });
 
   describe("cancelOpen", () => {
-    it("refunds creator and closes membership slot", async () => {
+    it("refunds creator, closes membership slot, and zeroes storage", async () => {
       const fx = await loadFixture(deployFixture);
       const { reg, alice, usdcToken, mgr } = fx;
       const id = await createDefault(reg, fx);
@@ -263,6 +263,10 @@ describe("WagerRegistry", function () {
       expect(await usdcToken.balanceOf(alice.address) - balBefore).to.equal(usdc(10));
       const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
       expect(m.activeCount).to.equal(0);
+      // Wager struct should be zeroed
+      const w = await reg.getWager(id);
+      expect(w.status).to.equal(Status.None);
+      expect(w.creator).to.equal(ethers.ZeroAddress);
     });
 
     it("rejects non-creator", async () => {
@@ -278,6 +282,61 @@ describe("WagerRegistry", function () {
       await fx.reg.connect(fx.bob).acceptWager(id);
       await expect(fx.reg.connect(fx.alice).cancelOpen(id))
         .to.be.revertedWithCustomError(fx.reg, "NotOpen");
+    });
+  });
+
+  describe("declineWager", () => {
+    it("opponent can decline and creator gets refund", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice, bob, usdcToken, mgr } = fx;
+      const id = await createDefault(reg, fx);
+      const balBefore = await usdcToken.balanceOf(alice.address);
+      await reg.connect(bob).declineWager(id);
+      expect(await usdcToken.balanceOf(alice.address) - balBefore).to.equal(usdc(10));
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m.activeCount).to.equal(0);
+    });
+
+    it("zeroes wager storage after decline", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, bob } = fx;
+      const id = await createDefault(reg, fx);
+      await reg.connect(bob).declineWager(id);
+      const w = await reg.getWager(id);
+      expect(w.status).to.equal(Status.None);
+      expect(w.creator).to.equal(ethers.ZeroAddress);
+    });
+
+    it("emits WagerDeclined event", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, bob } = fx;
+      const id = await createDefault(reg, fx);
+      await expect(reg.connect(bob).declineWager(id))
+        .to.emit(reg, "WagerDeclined")
+        .withArgs(id, bob.address);
+    });
+
+    it("rejects non-opponent", async () => {
+      const fx = await loadFixture(deployFixture);
+      const id = await createDefault(fx.reg, fx);
+      await expect(fx.reg.connect(fx.alice).declineWager(id))
+        .to.be.revertedWithCustomError(fx.reg, "NotOpponent");
+    });
+
+    it("rejects if not Open (already accepted)", async () => {
+      const fx = await loadFixture(deployFixture);
+      const id = await createDefault(fx.reg, fx);
+      await fx.reg.connect(fx.bob).acceptWager(id);
+      await expect(fx.reg.connect(fx.bob).declineWager(id))
+        .to.be.revertedWithCustomError(fx.reg, "NotOpen");
+    });
+
+    it("frozen opponent cannot decline", async () => {
+      const fx = await loadFixture(deployFixture);
+      const id = await createDefault(fx.reg, fx);
+      await fx.reg.connect(fx.admin).freezeAccount(fx.bob.address, "test");
+      await expect(fx.reg.connect(fx.bob).declineWager(id))
+        .to.be.revertedWithCustomError(fx.reg, "AccountFrozenError");
     });
   });
 
