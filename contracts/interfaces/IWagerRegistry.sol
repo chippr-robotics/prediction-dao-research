@@ -78,6 +78,7 @@ interface IWagerRegistry {
     function autoResolveFromOracle(uint256 wagerId) external;
     function claimPayout(uint256 wagerId) external;
     function claimRefund(uint256 wagerId) external;
+    function batchExpireOpen(uint256[] calldata wagerIds) external;
 
     function freezeAccount(address user, string calldata reason) external;
     function unfreezeAccount(address user) external;

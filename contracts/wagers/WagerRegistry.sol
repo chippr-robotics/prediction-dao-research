@@ -409,6 +409,26 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         }
     }
 
+    // ---------- Batch expire ----------
+
+    /// @notice Expire Open wagers whose accept deadline has passed, refund the
+    ///         creator's stake, and release the concurrent-limit slot on
+    ///         MembershipManager. Any address may call this (the refund always
+    ///         goes to the original creator). Silently skips wager IDs that are
+    ///         not eligible (wrong status, deadline not yet reached, etc.).
+    function batchExpireOpen(uint256[] calldata wagerIds) external nonReentrant whenNotPaused {
+        for (uint256 i = 0; i < wagerIds.length; i++) {
+            Wager storage w = _wagers[wagerIds[i]];
+            if (w.status != Status.Open) continue;
+            if (block.timestamp <= w.acceptDeadline) continue;
+
+            w.status = Status.Refunded;
+            membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+            IERC20(w.token).safeTransfer(w.creator, w.creatorStake);
+            emit WagerRefunded(wagerIds[i], w.creator, address(0));
+        }
+    }
+
     // ---------- Views ----------
 
     function getWager(uint256 wagerId) external view returns (Wager memory) {

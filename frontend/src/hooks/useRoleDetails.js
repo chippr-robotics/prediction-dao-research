@@ -84,12 +84,15 @@ export function useRoleDetails() {
       details.tier = Number(m.tier)
       details.tierName = TIER_NAMES[details.tier] || 'Unknown'
       details.tierColor = TIER_COLORS[details.tier] || '#666'
-      details.wagersCreated = Number(m.monthCount)
       details.activeWagers = Number(m.activeCount)
+
+      const now = Math.floor(Date.now() / 1000)
+      const ROLLING_WINDOW = 30 * 24 * 3600
+      const monthAnchor = Number(m.monthAnchor)
+      details.wagersCreated = (now >= monthAnchor + ROLLING_WINDOW) ? 0 : Number(m.monthCount)
 
       const expiresAt = Number(m.expiresAt)
       if (expiresAt > 0) {
-        const now = Math.floor(Date.now() / 1000)
         details.expiration = expiresAt
         details.expirationDate = new Date(expiresAt * 1000)
         details.isExpired = expiresAt <= now
@@ -103,7 +106,6 @@ export function useRoleDetails() {
           const cfg = await mgr.getTierConfig(roleBytes, details.tier)
           details.wagerLimit = Number(cfg.limits.monthlyMarketCreation)
           details.concurrentLimit = Number(cfg.limits.maxConcurrentMarkets)
-          // 0 = unlimited
           const monthlyOk = details.wagerLimit === 0 || details.wagersCreated < details.wagerLimit
           const concurrentOk = details.concurrentLimit === 0 || details.activeWagers < details.concurrentLimit
           details.canCreateWager = details.isActive && monthlyOk && concurrentOk
