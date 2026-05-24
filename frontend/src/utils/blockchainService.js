@@ -1042,27 +1042,23 @@ const PAYMENT_PROCESSOR_ABI = [
 ]
 
 /**
- * Purchase a role using the active chain's stablecoin (USDC on Polygon Amoy)
- * with tiered membership. Calls PaymentProcessor.purchaseTierWithToken,
- * which handles both the payment and role granting atomically.
+ * Purchase, upgrade, or extend a membership using the active chain's stablecoin.
  *
  * @param {ethers.Signer} signer - Connected wallet signer
  * @param {string} roleName - Name of the role being purchased
  * @param {number} priceUSD - Price in USD (converted to stablecoin units, 6 decimals)
  * @param {number} tier - Membership tier (1=Bronze, 2=Silver, 3=Gold, 4=Platinum), defaults to Bronze
+ * @param {string} action - 'purchase' (default), 'upgrade', or 'extend'
  * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
-export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE) {
+export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase') {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
 
-  // v2 path: MembershipManager.purchaseTier(role, tier). Price is fixed in the contract.
+  // v2 path: MembershipManager.purchaseTier / upgradeTier / extendMembership.
   const mmAddress = getContractAddress('membershipManager')
   if (mmAddress) {
-    // Verify the contract is actually deployed before calling into it.
-    // When the address has no code (wrong network, not yet deployed, etc.)
-    // ethers returns 0x from every call, producing a confusing BAD_DATA error.
     const provider = signer.provider
     const code = await provider.getCode(mmAddress)
     if (!code || code === '0x') {
@@ -1081,11 +1077,20 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
         throw new Error('MembershipManager has no payment token configured. Contact the DAO administrator.')
       }
       const paymentToken = new ethers.Contract(paymentTokenAddr, ERC20_ABI, signer)
-
-      const tierCfg = await mm.getTierConfig(roleHash, validTier)
-      const price = tierCfg.priceUSDC // 6-decimals
-
       const userAddress = await signer.getAddress()
+
+      // Determine the price the contract will charge
+      let price
+      if (action === 'upgrade') {
+        const membership = await mm.getMembership(userAddress, roleHash)
+        const currentCfg = await mm.getTierConfig(roleHash, membership.tier)
+        const newCfg = await mm.getTierConfig(roleHash, validTier)
+        price = newCfg.priceUSDC - currentCfg.priceUSDC
+      } else {
+        const tierCfg = await mm.getTierConfig(roleHash, validTier)
+        price = tierCfg.priceUSDC
+      }
+
       const balance = await paymentToken.balanceOf(userAddress)
       if (balance < price) {
         throw new Error(
@@ -1099,7 +1104,14 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
         await approveTx.wait()
       }
 
-      const tx = await mm.purchaseTier(roleHash, validTier)
+      let tx
+      if (action === 'upgrade') {
+        tx = await mm.upgradeTier(roleHash, validTier)
+      } else if (action === 'extend') {
+        tx = await mm.extendMembership(roleHash)
+      } else {
+        tx = await mm.purchaseTier(roleHash, validTier)
+      }
       const receipt = await tx.wait()
       return {
         hash: receipt.hash,

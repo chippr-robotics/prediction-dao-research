@@ -186,7 +186,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       const provider = new ethers.BrowserProvider(window.ethereum)
       const signer = await provider.getSigner()
 
-      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue)
+      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue, action)
       grantRole(ROLE_KEY)
       recordRolePurchase(account, ROLE_KEY, {
         price: selectedPrice,
