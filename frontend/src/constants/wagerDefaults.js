@@ -143,6 +143,20 @@ export const getDefaultAcceptanceDeadline = (hours = WAGER_DEFAULTS.ACCEPTANCE_D
 }
 
 /**
+ * Returns an ISO datetime-local string set to the midpoint between
+ * the current wall-clock time and the given end time.
+ * Falls back to the fixed-hour default when endDateTime is missing or invalid.
+ */
+export const getMidpointAcceptanceDeadline = (endDateTime) => {
+  if (!endDateTime) return getDefaultAcceptanceDeadline()
+  const now = Date.now()
+  const end = new Date(endDateTime).getTime()
+  if (Number.isNaN(end) || end <= now) return getDefaultAcceptanceDeadline()
+  const midpoint = now + (end - now) / 2
+  return new Date(midpoint).toISOString().slice(0, 16)
+}
+
+/**
  * Convert any datetime-like value into the `<input type="datetime-local">`
  * string format (`YYYY-MM-DDTHH:mm`) in the user's local timezone.
  * Used when seeding the end-date field from a linked Polymarket's endDate.
