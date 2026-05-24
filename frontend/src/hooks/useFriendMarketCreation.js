@@ -221,7 +221,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
           creatorStakeWei, opponentStakeWei,
           acceptDeadline, resolveDeadline,
           resolutionType, polymarketConditionId, creatorIsYes,
-          metadataHash
+          metadataHash, metadataReference
         )
       } catch (simError) {
         const reason = simError.reason || simError.shortMessage || simError.message || ''
@@ -234,7 +234,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         creatorStakeWei, opponentStakeWei,
         acceptDeadline, resolveDeadline,
         resolutionType, polymarketConditionId, creatorIsYes,
-        metadataHash
+        metadataHash, metadataReference
       )
       onProgress({ step: 'create', message: 'Waiting for confirmation...', txHash: tx.hash })
       savePendingTransaction({ step: 'create', txHash: tx.hash, data: data.data })
@@ -292,7 +292,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
       if (onMarketCreated) onMarketCreated(newMarket)
 
-      return { id: wagerId, txHash: receipt.hash, status: 'pending' }
+      return { id: wagerId, txHash: receipt.hash, status: 'pending', ipfsCid, metadataHash }
     } catch (error) {
       console.error('Error creating wager:', error)
       if (error.code === 'ACTION_REJECTED' || error.code === 4001) {

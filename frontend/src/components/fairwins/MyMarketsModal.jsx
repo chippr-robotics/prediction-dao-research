@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
+import { useLazyMarketDecryption } from '../../hooks/useEncryption'
+import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
@@ -27,6 +29,9 @@ function MyMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+
+  const { markets: marketsWithEnvelopes, fetchEnvelope } = useLazyIpfsEnvelope(friendMarkets)
+  const { markets: decryptableMarkets, decryptMarket, isMarketDecrypting } = useLazyMarketDecryption(marketsWithEnvelopes)
 
   // Tab state
   const [activeTab, setActiveTab] = useState('participating')
@@ -56,6 +61,15 @@ function MyMarketsModal({
   // Filter state
   const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
   const [statusFilter, setStatusFilter] = useState('all')
+
+  const handleDecryptMarket = useCallback(async (marketId) => {
+    try {
+      await fetchEnvelope(marketId)
+      await decryptMarket(marketId)
+    } catch (err) {
+      console.error('[MyMarketsModal] Decryption failed:', err)
+    }
+  }, [fetchEnvelope, decryptMarket])
 
   // Fetch markets data (friend markets are passed via props)
   const fetchMarketsData = useCallback(async () => {
@@ -130,7 +144,7 @@ function MyMarketsModal({
     // Combine fetched and friend markets
     const allMarkets = [
       ...markets.map(m => ({ ...m, marketType: 'friend' })),
-      ...friendMarkets.map(m => ({ ...m, marketType: 'friend' }))
+      ...decryptableMarkets.map(m => ({ ...m, marketType: 'friend' }))
     ]
 
     // Remove duplicates by id
@@ -223,7 +237,7 @@ function MyMarketsModal({
     })
 
     return { participating, created, history }
-  }, [markets, friendMarkets, userPositions, account, marketTypeFilter, statusFilter])
+  }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter])
 
   // Format helpers
   const formatDate = (dateValue) => {
@@ -589,6 +603,8 @@ function MyMarketsModal({
                       userPositions={userPositions}
                       canOpenDispute={canOpenDispute}
                       onOpenDispute={handleOpenDispute}
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting(selectedMarket?.id)}
                     />
                   ) : categorizedMarkets.participating.length === 0 ? (
                     <div className="mm-empty-state">
@@ -634,6 +650,8 @@ function MyMarketsModal({
                       onOpenResolution={handleOpenResolution}
                       onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
                       isCreatorView
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting(selectedMarket?.id)}
                     />
                   ) : categorizedMarkets.created.length === 0 ? (
                     <div className="mm-empty-state">
@@ -678,6 +696,8 @@ function MyMarketsModal({
                       account={account}
                       userPositions={userPositions}
                       isHistoryView
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting(selectedMarket?.id)}
                     />
                   ) : categorizedMarkets.history.length === 0 ? (
                     <div className="mm-empty-state">
@@ -758,7 +778,12 @@ function MyMarketsModal({
  * Get display title for a market, handling encrypted markets
  */
 function getMarketDisplayTitle(market) {
-  // First check decrypted metadata (from useDecryptedMarkets hook)
+  // Check decrypted metadata (from useLazyMarketDecryption hook)
+  if (market.decryptedMetadata) {
+    const title = market.decryptedMetadata.name || market.decryptedMetadata.description || market.decryptedMetadata.question
+    if (title) return title
+  }
+
   if (market.metadata && market.canView !== false) {
     const title = market.metadata.name || market.metadata.description || market.metadata.question
     if (title && title !== 'Private Market' && title !== 'Private Wager' && title !== 'Encrypted Market' && title !== 'Encrypted Wager') {
@@ -1062,6 +1087,8 @@ function MarketDetailView({
   getStatusLabel,
   getTimeRemaining,
   account,
+  onDecrypt,
+  isDecrypting,
   userPositions,
   canResolve: _canResolve,
   canOpenDispute,
@@ -1118,13 +1145,31 @@ function MarketDetailView({
         </div>
       </div>
 
-      {/* Show description if it's different from the title and not a placeholder */}
+      {/* Encrypted wager: show decrypt prompt or decrypted content */}
+      {market.isEncrypted && !market.decryptedMetadata && (
+        <div className="mm-detail-description">
+          {isDecrypting ? (
+            <p style={{ opacity: 0.7 }}>Decrypting...</p>
+          ) : (
+            <button
+              type="button"
+              className="mm-btn-primary"
+              onClick={() => onDecrypt?.(market.id)}
+              style={{ marginTop: '8px' }}
+            >
+              Decrypt Wager Details
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Show description if available and not a placeholder */}
       {market.description &&
-       market.proposalTitle &&
        market.description !== 'Encrypted Market' &&
        market.description !== 'Encrypted Wager' &&
        market.description !== 'Private Market' &&
-       market.description !== 'Private Wager' && (
+       market.description !== 'Private Wager' &&
+       !market.isEncrypted && (
         <div className="mm-detail-description">
           <p>{market.description}</p>
         </div>

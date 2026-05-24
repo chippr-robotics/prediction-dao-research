@@ -185,7 +185,8 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         ResolutionType resolutionType,
         bytes32 polymarketConditionId,
         bool creatorIsYes,
-        bytes32 metadataHash
+        bytes32 metadataHash,
+        string calldata metadataUri
     ) external nonReentrant whenNotPaused notFrozen(msg.sender) returns (uint256 wagerId) {
         if (opponent == address(0)) revert ZeroAddress();
         if (opponent == msg.sender) revert SelfWager();
@@ -242,11 +243,12 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         w.creatorIsYes = creatorIsYes;
         w.metadataHash = metadataHash;
         w.polymarketConditionId = polymarketConditionId;
+        w.metadataUri = metadataUri;
 
         _userWagerIds[msg.sender].add(wagerId);
         _userWagerIds[opponent].add(wagerId);
 
-        emit WagerCreated(wagerId, msg.sender, opponent, token, creatorStake, opponentStake, resolutionType, metadataHash);
+        emit WagerCreated(wagerId, msg.sender, opponent, token, creatorStake, opponentStake, resolutionType, metadataHash, metadataUri);
         if (resolutionType == ResolutionType.Polymarket) {
             emit PolymarketLinked(wagerId, polymarketConditionId, creatorIsYes);
         } else if (_isExtensibleOracleType(resolutionType)) {

@@ -65,6 +65,7 @@ function MarketAcceptancePage() {
   const urlToken = searchParams.get('token')
   const urlDeadline = searchParams.get('deadline')
   const urlSharedSignature = searchParams.get('sig') || null
+  const urlCid = searchParams.get('cid') || null
 
   useEffect(() => {
     const fetch = async () => {
@@ -118,11 +119,13 @@ function MarketAcceptancePage() {
         // The opponent puts up opponentStake on acceptance; that's what the modal cares about.
         const stakePerParticipant = ethers.formatUnits(w.opponentStake, decimals)
 
-        // Off-chain we may have the original description matching the on-chain metadataHash.
-        // For now we just show the metadataHash — the encrypted-envelope flow can resolve
-        // it via IPFS by hash lookup in a future enhancement.
-        const rawDescription = w.metadataHash
-        const displayDescription = `Wager #${marketId} — hash ${rawDescription.slice(0, 10)}…`
+        const rawDescription = w.metadataUri || ''
+        const ipfsRef = parseEncryptedIpfsReference(rawDescription)
+        const ipfsCid = ipfsRef.cid || getIpfsCid(rawDescription) || urlCid || null
+        const encrypted = ipfsRef.isIpfs || isEncryptedDescription(rawDescription) || Boolean(urlCid)
+        const displayDescription = encrypted
+          ? 'Encrypted Wager'
+          : (rawDescription || `Wager #${marketId}`)
 
         const opponentAddr = w.opponent
         const acceptances = {}
@@ -149,8 +152,8 @@ function MarketAcceptancePage() {
           id: marketId,
           description: displayDescription,
           rawDescription,
-          isEncrypted: isEncryptedDescription(rawDescription),
-          ipfsCid: getIpfsCid(rawDescription),
+          isEncrypted: encrypted,
+          ipfsCid,
           sharedSignature: urlSharedSignature,
           creator: w.creator,
           participants: opponentAddr && opponentAddr !== ethers.ZeroAddress ? [w.creator, opponentAddr] : [w.creator],
@@ -201,7 +204,7 @@ function MarketAcceptancePage() {
       }
     }
     fetch()
-  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlSharedSignature])
+  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlSharedSignature, urlCid])
 
   const handleClose = () => navigate('/')
   const handleAccepted = () => { setLoading(true); window.location.reload() }

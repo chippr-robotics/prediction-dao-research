@@ -23,6 +23,7 @@ interface IWagerRegistry {
         address winner;
         bytes32 metadataHash;
         bytes32 polymarketConditionId;
+        string  metadataUri;
     }
 
     event WagerCreated(
@@ -33,7 +34,8 @@ interface IWagerRegistry {
         uint128 creatorStake,
         uint128 opponentStake,
         ResolutionType resolutionType,
-        bytes32 metadataHash
+        bytes32 metadataHash,
+        string  metadataUri
     );
     event WagerAccepted(uint256 indexed wagerId, address indexed opponent);
     event WagerCancelled(uint256 indexed wagerId);
@@ -63,7 +65,8 @@ interface IWagerRegistry {
         ResolutionType resolutionType,
         bytes32 polymarketConditionId,
         bool creatorIsYes,
-        bytes32 metadataHash
+        bytes32 metadataHash,
+        string calldata metadataUri
     ) external returns (uint256 wagerId);
 
     function acceptWager(uint256 wagerId) external;
