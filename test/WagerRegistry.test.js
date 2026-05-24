@@ -79,6 +79,7 @@ describe("WagerRegistry", function () {
       polymarketConditionId: ethers.ZeroHash,
       creatorIsYes: false,
       metadataHash: ethers.id("test"),
+      metadataUri: "ipfs://bafyTestCid123",
       ...overrides,
     };
     const signer = overrides._signer || alice;
@@ -87,7 +88,8 @@ describe("WagerRegistry", function () {
       params.creatorStake, params.opponentStake,
       params.acceptDeadline, params.resolveDeadline,
       params.resolutionType, params.polymarketConditionId,
-      params.creatorIsYes, params.metadataHash
+      params.creatorIsYes, params.metadataHash,
+      params.metadataUri
     );
     const receipt = await tx.wait();
     // Find WagerCreated event and extract wagerId
@@ -111,6 +113,41 @@ describe("WagerRegistry", function () {
       const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
       expect(m.activeCount).to.equal(1);
       expect(m.monthCount).to.equal(1);
+    });
+
+    it("stores and returns metadataUri", async () => {
+      const fx = await loadFixture(deployFixture);
+      const uri = "ipfs://bafybeicCustomCid";
+      const wagerId = await createDefault(fx.reg, fx, { metadataUri: uri });
+      const w = await fx.reg.getWager(wagerId);
+      expect(w.metadataUri).to.equal(uri);
+    });
+
+    it("emits metadataUri in WagerCreated event", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, alice, bob, usdcToken } = fx;
+      const now = await time.latest();
+      const uri = "ipfs://bafybeicEventTest";
+      const hash = ethers.id("event-test");
+      await expect(
+        reg.connect(alice).createWager(
+          bob.address, ethers.ZeroAddress, await usdcToken.getAddress(),
+          usdc(10), usdc(10),
+          now + 3600, now + 86400,
+          Resolution.Either, ethers.ZeroHash, false,
+          hash, uri
+        )
+      ).to.emit(reg, "WagerCreated").withArgs(
+        1, alice.address, bob.address, await usdcToken.getAddress(),
+        usdc(10), usdc(10), Resolution.Either, hash, uri
+      );
+    });
+
+    it("supports empty metadataUri for plaintext wagers", async () => {
+      const fx = await loadFixture(deployFixture);
+      const wagerId = await createDefault(fx.reg, fx, { metadataUri: "" });
+      const w = await fx.reg.getWager(wagerId);
+      expect(w.metadataUri).to.equal("");
     });
 
     it("rejects SelfWager", async () => {

@@ -595,6 +595,12 @@ export const WAGER_REGISTRY_ABI = [
         "internalType": "bytes32",
         "name": "metadataHash",
         "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
       }
     ],
     "name": "WagerCreated",
@@ -862,6 +868,11 @@ export const WAGER_REGISTRY_ABI = [
         "internalType": "bytes32",
         "name": "metadataHash",
         "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
       }
     ],
     "name": "createWager",
@@ -1074,6 +1085,11 @@ export const WAGER_REGISTRY_ABI = [
             "internalType": "bytes32",
             "name": "polymarketConditionId",
             "type": "bytes32"
+          },
+          {
+            "internalType": "string",
+            "name": "metadataUri",
+            "type": "string"
           }
         ],
         "internalType": "struct IWagerRegistry.Wager[]",
@@ -1170,6 +1186,11 @@ export const WAGER_REGISTRY_ABI = [
             "internalType": "bytes32",
             "name": "polymarketConditionId",
             "type": "bytes32"
+          },
+          {
+            "internalType": "string",
+            "name": "metadataUri",
+            "type": "string"
           }
         ],
         "internalType": "struct IWagerRegistry.Wager",

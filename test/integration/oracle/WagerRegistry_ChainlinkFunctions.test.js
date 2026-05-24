@@ -70,7 +70,8 @@ describe("WagerRegistry + ChainlinkFunctionsOracleAdapter (integration)", functi
       Resolution.ChainlinkFunctions,
       conditionId,
       opts.creatorIsYes ?? true,
-      ethers.id("meta")
+      ethers.id("meta"),
+      ""
     );
     const rcpt = await tx.wait();
     const ev = rcpt.logs.map(l => { try { return reg.interface.parseLog(l); } catch { return null; } })
@@ -123,7 +124,7 @@ describe("WagerRegistry + ChainlinkFunctionsOracleAdapter (integration)", functi
     await expect(fx.reg.connect(fx.alice).createWager(
       fx.bob.address, ethers.ZeroAddress, await fx.usdcToken.getAddress(),
       usdc(10), usdc(10), now + 1800, now + 7200,
-      Resolution.ChainlinkFunctions, ethers.id("c"), true, ethers.id("meta")
+      Resolution.ChainlinkFunctions, ethers.id("c"), true, ethers.id("meta"), ""
     )).to.be.revertedWithCustomError(fx.reg, "OracleAdapterNotSet");
   });
 });

@@ -100,7 +100,7 @@ describe("WagerRegistry oracle registry", function () {
       return fx.reg.connect(fx.alice).createWager(
         fx.bob.address, ethers.ZeroAddress, await fx.usdcToken.getAddress(),
         usdc(10), usdc(10), now + 1800, now + 7200,
-        resolutionType, conditionId, true, ethers.id("meta")
+        resolutionType, conditionId, true, ethers.id("meta"), ""
       );
     }
 
@@ -131,7 +131,7 @@ describe("WagerRegistry oracle registry", function () {
       const tx = await fx.reg.connect(fx.alice).createWager(
         fx.bob.address, ethers.ZeroAddress, await fx.usdcToken.getAddress(),
         usdc(10), usdc(10), now + 1800, now + 7200,
-        Resolution.Either, ethers.ZeroHash, true, ethers.id("meta")
+        Resolution.Either, ethers.ZeroHash, true, ethers.id("meta"), ""
       );
       const rcpt = await tx.wait();
       const ev = rcpt.logs.map(l => { try { return fx.reg.interface.parseLog(l); } catch { return null; } })
@@ -155,7 +155,7 @@ describe("WagerRegistry oracle registry", function () {
       const tx = await fx.reg.connect(fx.alice).createWager(
         fx.bob.address, ethers.ZeroAddress, await fx.usdcToken.getAddress(),
         usdc(10), usdc(10), now + 1800, now + 7200,
-        Resolution.Polymarket, cid, true, ethers.id("meta")
+        Resolution.Polymarket, cid, true, ethers.id("meta"), ""
       );
       const rcpt = await tx.wait();
       const ev = rcpt.logs.map(l => { try { return fx.reg.interface.parseLog(l); } catch { return null; } })

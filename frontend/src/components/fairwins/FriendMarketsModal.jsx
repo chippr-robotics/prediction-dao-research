@@ -879,7 +879,9 @@ function FriendMarketsModal({
           }
         },
         // Encryption fields
-        isEncrypted: enableEncryption
+        isEncrypted: enableEncryption,
+        ipfsCid: result?.ipfsCid || null,
+        metadataHash: result?.metadataHash || null,
       }
 
       setCreatedMarket(newMarket)

@@ -56,5 +56,9 @@ export const getMarketUrl = (market, fallbackCreator = '') => {
       : ''
   })
 
+  if (market.ipfsCid) {
+    params.set('cid', market.ipfsCid)
+  }
+
   return `${window.location.origin}/friend-market/accept?${params.toString()}`
 }

@@ -72,7 +72,8 @@ describe("WagerRegistry + ChainlinkDataFeedOracleAdapter (integration)", functio
       Resolution.ChainlinkDataFeed,
       conditionId,
       opts.creatorIsYes ?? true,
-      ethers.id("meta")
+      ethers.id("meta"),
+      ""
     );
     const rcpt = await tx.wait();
     const ev = rcpt.logs.map(l => { try { return reg.interface.parseLog(l); } catch { return null; } })
@@ -122,7 +123,7 @@ describe("WagerRegistry + ChainlinkDataFeedOracleAdapter (integration)", functio
     await expect(fx.reg.connect(fx.alice).createWager(
       fx.bob.address, ethers.ZeroAddress, await fx.usdcToken.getAddress(),
       usdc(10), usdc(10), now + 1800, now + 7200,
-      Resolution.ChainlinkDataFeed, conditionId, true, ethers.id("meta")
+      Resolution.ChainlinkDataFeed, conditionId, true, ethers.id("meta"), ""
     )).to.be.revertedWithCustomError(fx.reg, "OracleAdapterNotSet");
   });
 
@@ -138,7 +139,7 @@ describe("WagerRegistry + ChainlinkDataFeedOracleAdapter (integration)", functio
     await expect(fx.reg.connect(fx.alice).createWager(
       fx.bob.address, ethers.ZeroAddress, await fx.usdcToken.getAddress(),
       usdc(10), usdc(10), now + 1800, now + 7200,
-      Resolution.ChainlinkDataFeed, conditionId, true, ethers.id("meta")
+      Resolution.ChainlinkDataFeed, conditionId, true, ethers.id("meta"), ""
     )).to.be.revertedWithCustomError(fx.reg, "ConditionAlreadyResolved");
   });
 

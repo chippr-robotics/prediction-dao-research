@@ -397,6 +397,21 @@ function toWagerShape(id, w) {
   const paymentToken = (DEPLOYED_CONTRACTS?.paymentToken || '').toLowerCase()
   const isUSDC = tokenAddr && tokenAddr.toLowerCase() === paymentToken
   const decimals = isUSDC ? 6 : 18
+
+  const metadataUri = w.metadataUri || ''
+  const ipfsRef = parseEncryptedIpfsReference(metadataUri)
+  const isEncrypted = ipfsRef.isIpfs
+  const ipfsCid = ipfsRef.cid || null
+
+  let description
+  if (isEncrypted) {
+    description = 'Encrypted Wager'
+  } else if (metadataUri) {
+    description = metadataUri
+  } else {
+    description = `Wager #${id}`
+  }
+
   return {
     id: String(id),
     creator: w.creator,
@@ -418,7 +433,10 @@ function toWagerShape(id, w) {
     polymarketConditionId: w.polymarketConditionId,
     creatorIsYes: w.creatorIsYes,
     metadataHash: w.metadataHash,
-    description: `Wager #${id}`,
+    ipfsCid,
+    isEncrypted,
+    needsIpfsFetch: isEncrypted,
+    description,
   }
 }
 
