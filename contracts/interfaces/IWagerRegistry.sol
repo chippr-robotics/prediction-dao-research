@@ -39,6 +39,7 @@ interface IWagerRegistry {
     );
     event WagerAccepted(uint256 indexed wagerId, address indexed opponent);
     event WagerCancelled(uint256 indexed wagerId);
+    event WagerDeclined(uint256 indexed wagerId, address indexed opponent);
     event WagerResolved(uint256 indexed wagerId, address indexed winner, address indexed by);
     event WagerRefunded(uint256 indexed wagerId, address indexed creator, address indexed opponent);
     event PayoutClaimed(uint256 indexed wagerId, address indexed winner, uint256 amount);
@@ -71,6 +72,7 @@ interface IWagerRegistry {
 
     function acceptWager(uint256 wagerId) external;
     function cancelOpen(uint256 wagerId) external;
+    function declineWager(uint256 wagerId) external;
     function declareWinner(uint256 wagerId, address winner) external;
     function autoResolveFromPolymarket(uint256 wagerId) external;
     function autoResolveFromOracle(uint256 wagerId) external;

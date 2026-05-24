@@ -1048,6 +1048,72 @@
   cursor: not-allowed;
 }
 
+.mm-withdraw-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mm-withdraw-error {
+  color: #DC3545;
+  font-size: 0.813rem;
+  margin: 0;
+}
+
+.mm-withdraw-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+}
+
+.mm-withdraw-success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-size: 1.125rem;
+}
+
+.mm-withdraw-success p {
+  margin: 0;
+  color: #10b981;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.mm-tx-link {
+  color: var(--text-accent, #6366f1);
+  font-size: 0.813rem;
+  text-decoration: none;
+}
+
+.mm-tx-link:hover {
+  text-decoration: underline;
+}
+
+.mm-spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: mm-spin 0.6s linear infinite;
+}
+
+@keyframes mm-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Encrypted-data section in the detail view */
 .mm-encrypted-section {
   background: rgba(108, 92, 231, 0.06);

@@ -292,6 +292,7 @@ function MyMarketsModal({
       case MarketStatus.DISPUTED: return 'status-disputed'
       case MarketStatus.RESOLVED: return 'status-resolved'
       case MarketStatus.CANCELLED: return 'status-cancelled'
+      case MarketStatus.DECLINED: return 'status-cancelled'
       case MarketStatus.REFUNDED: return 'status-cancelled'
       case MarketStatus.ORACLE_TIMED_OUT: return 'status-cancelled'
       default: return 'status-default'
@@ -307,6 +308,7 @@ function MyMarketsModal({
       case MarketStatus.DISPUTED: return 'Disputed'
       case MarketStatus.RESOLVED: return 'Resolved'
       case MarketStatus.CANCELLED: return 'Cancelled'
+      case MarketStatus.DECLINED: return 'Declined'
       case MarketStatus.REFUNDED: return 'Refunded'
       case MarketStatus.ORACLE_TIMED_OUT: return 'Timed Out'
       default: return status
@@ -670,6 +672,13 @@ function MyMarketsModal({
                       isCreatorView
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting(selectedMarket?.id)}
+                      signer={signer}
+                      isCorrectNetwork={isCorrectNetwork}
+                      switchNetwork={switchNetwork}
+                      onWithdraw={() => {
+                        setSelectedMarketId(null)
+                        fetchMarketsData?.()
+                      }}
                     />
                   ) : categorizedMarkets.created.length === 0 ? (
                     <div className="mm-empty-state">
@@ -1115,11 +1124,62 @@ function MarketDetailView({
   onOpenDispute,
   onRespondToDispute,
   isCreatorView = false,
-  isHistoryView = false
+  isHistoryView = false,
+  signer,
+  isCorrectNetwork,
+  switchNetwork,
+  onWithdraw
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
   const endTime = market.tradingEndTime || market.endDate
+
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [withdrawError, setWithdrawError] = useState(null)
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false)
+  const [withdrawTxHash, setWithdrawTxHash] = useState(null)
+
+  const handleWithdraw = async () => {
+    if (!signer) return
+
+    if (!isCorrectNetwork) {
+      try {
+        await switchNetwork()
+      } catch {
+        setWithdrawError('Please switch to the correct network')
+        return
+      }
+    }
+
+    setWithdrawing(true)
+    setWithdrawError(null)
+
+    try {
+      const contract = new ethers.Contract(
+        getContractAddress('wagerRegistry'),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await contract.cancelOpen(market.wagerId ?? market.id)
+      setWithdrawTxHash(tx.hash)
+      await tx.wait()
+      setWithdrawSuccess(true)
+      onWithdraw?.(market)
+    } catch (err) {
+      const reason = err?.reason || err?.data?.message || err?.message || ''
+      if (reason.includes('user rejected') || reason.includes('ACTION_REJECTED')) {
+        setWithdrawError('Transaction was cancelled in your wallet.')
+      } else if (reason.includes('NotOpen')) {
+        setWithdrawError('This wager is no longer open.')
+      } else if (reason.includes('NotCreator')) {
+        setWithdrawError('Only the creator can withdraw this offer.')
+      } else {
+        setWithdrawError('Failed to withdraw the offer. Please try again.')
+      }
+    } finally {
+      setWithdrawing(false)
+    }
+  }
 
   return (
     <div className="mm-detail">
@@ -1298,6 +1358,50 @@ function MarketDetailView({
 
       {/* Actions */}
       <div className="mm-detail-actions">
+        {isCreatorView && isCreator && (market.computedStatus || market.status) === MarketStatus.PENDING_ACCEPTANCE && !withdrawSuccess && (
+          <div className="mm-withdraw-section">
+            <button
+              type="button"
+              className="mm-btn-danger"
+              onClick={handleWithdraw}
+              disabled={withdrawing}
+            >
+              {withdrawing ? (
+                <>
+                  <span className="mm-spinner-small"></span>
+                  Withdrawing...
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="1 4 1 10 7 10"/>
+                    <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                  </svg>
+                  Withdraw Offer
+                </>
+              )}
+            </button>
+            {withdrawError && (
+              <p className="mm-withdraw-error">{withdrawError}</p>
+            )}
+          </div>
+        )}
+        {withdrawSuccess && (
+          <div className="mm-withdraw-success">
+            <span className="mm-withdraw-success-icon">&#10003;</span>
+            <p>Offer withdrawn. Your funds have been returned.</p>
+            {withdrawTxHash && (
+              <a
+                href={`https://amoy.polygonscan.com/tx/${withdrawTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mm-tx-link"
+              >
+                View Transaction
+              </a>
+            )}
+          </div>
+        )}
         {isCreatorView && (
           <ResolveButtonWithCountdown
             market={market}

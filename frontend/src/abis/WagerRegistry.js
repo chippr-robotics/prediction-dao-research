@@ -557,6 +557,25 @@ export const WAGER_REGISTRY_ABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "opponent",
+        "type": "address"
+      }
+    ],
+    "name": "WagerDeclined",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "creator",
         "type": "address"
       },
@@ -782,6 +801,19 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "cancelOpen",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "declineWager",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

@@ -346,13 +346,24 @@ describe('MarketAcceptanceModal', () => {
       expect(screen.getByText(/Only accept offers from people you know/)).toBeInTheDocument()
     })
 
-    it('should call onClose when Decline Offer is clicked', async () => {
-      const onClose = vi.fn()
-      render(<MarketAcceptanceModal {...defaultProps} onClose={onClose} />)
+    it('should show confirmation step when Decline Offer is clicked', async () => {
+      render(<MarketAcceptanceModal {...defaultProps} />)
 
       await userEvent.click(screen.getByText('Decline Offer'))
 
-      expect(onClose).toHaveBeenCalledTimes(1)
+      expect(screen.getByText('Decline This Offer?')).toBeInTheDocument()
+      expect(screen.getByText('Back')).toBeInTheDocument()
+      expect(screen.getByText('Confirm Decline')).toBeInTheDocument()
+    })
+
+    it('should return to review step when Back is clicked from decline confirmation', async () => {
+      render(<MarketAcceptanceModal {...defaultProps} />)
+
+      await userEvent.click(screen.getByText('Decline Offer'))
+      expect(screen.getByText('Decline This Offer?')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByText('Back'))
+      expect(screen.getByText('Review Offer')).toBeInTheDocument()
     })
   })
 
