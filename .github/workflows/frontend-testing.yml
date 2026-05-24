@@ -44,9 +44,26 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: npm test -- --run
+        run: npm test -- --run --reporter=verbose 2>&1 | tee test-output.txt
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Summarize test results
+        if: always()
+        run: |
+          echo "### Frontend Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          TESTS_LINE=$(grep "Tests" test-output.txt | tail -1 || echo "")
+          FILES_LINE=$(grep "Test Files" test-output.txt | tail -1 || echo "")
+          DURATION_LINE=$(grep "Duration" test-output.txt | tail -1 || echo "")
+          if [ -n "$FILES_LINE" ]; then
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| $FILES_LINE |" | sed 's/^.*Test Files/| Test Files |/' >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            echo "| $TESTS_LINE |" | sed 's/^.*Tests/| Tests |/' >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+            echo "| $DURATION_LINE |" | sed 's/^.*Duration/| Duration |/' >> $GITHUB_STEP_SUMMARY 2>/dev/null || true
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       # Coverage report generation can fail due to environment issues without indicating
       # actual test failures. We allow this to fail gracefully while still uploading
@@ -56,6 +73,26 @@ jobs:
         continue-on-error: true
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Summarize coverage
+        if: always()
+        run: |
+          echo "### Frontend Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "coverage/coverage-summary.json" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            node -e "
+              const c = require('./coverage/coverage-summary.json').total;
+              console.log('Statements: ' + c.statements.pct + '%');
+              console.log('Branches:   ' + c.branches.pct + '%');
+              console.log('Functions:  ' + c.functions.pct + '%');
+              console.log('Lines:      ' + c.lines.pct + '%');
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Coverage data not available" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -117,6 +154,30 @@ jobs:
           LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
           LHCI_BUILD_CONTEXT__COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
 
+      - name: Summarize Lighthouse results
+        if: always()
+        run: |
+          echo "### Lighthouse Scores" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # Parse the latest Lighthouse JSON report
+          REPORT=$(find .lighthouseci -name "lhr-*.json" -type f | head -1 2>/dev/null || echo "")
+          if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
+            node -e "
+              const lhr = require('./$REPORT');
+              const cats = lhr.categories || {};
+              console.log('| Category | Score |');
+              console.log('|----------|-------|');
+              for (const [key, cat] of Object.entries(cats)) {
+                const score = Math.round((cat.score || 0) * 100);
+                const icon = score >= 90 ? '🟢' : score >= 50 ? '🟠' : '🔴';
+                console.log('| ' + cat.title + ' | ' + icon + ' ' + score + ' |');
+              }
+            " >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "Could not parse Lighthouse report" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Lighthouse report not available" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload Lighthouse results
         uses: actions/upload-artifact@v4
         if: always()
@@ -176,7 +237,11 @@ jobs:
 
       - name: Deployment summary
         run: |
-          echo "✅ Unit and integration tests passed"
-          echo "✅ Lighthouse accessibility audit completed"
-          echo "✅ axe accessibility audit passed"
-          echo "🚀 Application is ready for deployment"
+          echo "### Deployment Readiness" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lighthouse audit | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
+          echo "| axe a11y audit | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
