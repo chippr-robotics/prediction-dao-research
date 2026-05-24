@@ -457,7 +457,15 @@ export function useEncryption() {
     if (!account || !keyPairs.x25519?.privateKey) {
       throw new Error('Encryption keys not initialized')
     }
-    // Use the low-level addRecipient which accepts {address, publicKey} directly
+    if (isXWingEnvelope(envelope)) {
+      // The on-chain KeyRegistry only stores 32-byte X25519 keys, so we have
+      // no X-Wing key to encrypt for. Callers should create X25519 envelopes
+      // when they intend to add a recipient via on-chain lookup.
+      throw new Error(
+        'addRecipientByPublicKey: cannot add an X-Wing recipient using an X25519 key. ' +
+        'Create the envelope with { algorithm: "x25519" } when the recipient comes from KeyRegistry.'
+      )
+    }
     return addRecipient(envelope, account, keyPairs.x25519.privateKey, {
       address: recipientAddress,
       publicKey: recipientPublicKey
