@@ -7,7 +7,7 @@ import { useDex } from '../../hooks/useDex'
 import {
   WAGER_DEFAULTS,
   getDefaultEndDateTime,
-  getDefaultAcceptanceDeadline,
+  getMidpointAcceptanceDeadline,
   toDateTimeLocal
 } from '../../constants/wagerDefaults'
 import { ResolutionType } from '../../constants/wagerDefaults'
@@ -123,7 +123,7 @@ function FriendMarketsModal({
     // to match PolymarketOracleAdapter's payouts ordering (YES=0, NO=1).
     creatorSide: '',
     // Multi-party acceptance fields
-    acceptanceDeadline: getDefaultAcceptanceDeadline(),
+    acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
     minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
     // Leverage/odds for Bookmaker markets (200 = 2x equal stakes, 10000 = 100x)
     oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER,
@@ -180,7 +180,7 @@ function FriendMarketsModal({
       arbitratorResolved: '',
       oracleConditionId: '',
       creatorSide: '',
-      acceptanceDeadline: getDefaultAcceptanceDeadline(),
+      acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
       minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
       oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER
     })
@@ -220,7 +220,7 @@ function FriendMarketsModal({
             resolutionType: ResolutionType.Polymarket,
             oracleConditionId: initialPolymarketMarket.conditionId,
             description: seeded,
-            ...(linkedEnd ? { endDateTime: linkedEnd } : {}),
+            ...(linkedEnd ? { endDateTime: linkedEnd, acceptanceDeadline: getMidpointAcceptanceDeadline(linkedEnd) } : {}),
           }
         })
       }
@@ -300,6 +300,12 @@ function FriendMarketsModal({
         // adapters register different ids, so carrying state across is wrong.
         // (Side preference IS preserved: YES/NO maps the same way for all.)
         updated.oracleConditionId = ''
+      }
+
+      // Auto-set acceptance deadline to the midpoint between now and the end
+      // time whenever the end time changes.
+      if (field === 'endDateTime') {
+        updated.acceptanceDeadline = getMidpointAcceptanceDeadline(value)
       }
 
       return updated
@@ -590,13 +596,13 @@ function FriendMarketsModal({
 
     // Validate acceptance deadline
     const acceptanceDeadline = new Date(formData.acceptanceDeadline)
-    const minAcceptanceDate = new Date(now.getTime() + 60 * 60 * 1000) // At least 1 hour from now
+    const minAcceptanceDate = new Date(now.getTime() + 5 * 60 * 1000) // At least 5 minutes from now
     const maxAcceptanceDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // Max 30 days from now
 
     if (!formData.acceptanceDeadline || isNaN(acceptanceDeadline.getTime())) {
       newErrors.acceptanceDeadline = 'Please select a valid acceptance deadline'
     } else if (acceptanceDeadline < minAcceptanceDate) {
-      newErrors.acceptanceDeadline = 'Acceptance deadline must be at least 1 hour from now'
+      newErrors.acceptanceDeadline = 'Acceptance deadline must be at least 5 minutes from now'
     } else if (acceptanceDeadline > maxAcceptanceDate) {
       newErrors.acceptanceDeadline = 'Acceptance deadline must be within 30 days'
     } else if (acceptanceDeadline >= endDate) {
@@ -1264,12 +1270,12 @@ function FriendMarketsModal({
                         type="datetime-local"
                         value={formData.acceptanceDeadline}
                         onChange={(e) => handleFormChange('acceptanceDeadline', e.target.value)}
-                        min={new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)}
+                        min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
                         max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
                         disabled={submitting}
                         className={`fm-datetime-input ${errors.acceptanceDeadline ? 'error' : ''}`}
                       />
-                      <span className="fm-hint">How long do participants have to accept? (min: 1 hour, max: 30 days)</span>
+                      <span className="fm-hint">Auto-set to halfway between now and end time (min: 5 min)</span>
                       {errors.acceptanceDeadline && <span className="fm-error">{errors.acceptanceDeadline}</span>}
                     </div>
 
