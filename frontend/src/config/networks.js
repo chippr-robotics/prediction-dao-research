@@ -33,11 +33,11 @@ const NETWORKS = {
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Polygonscan', baseUrl: 'https://amoy.polygonscan.com' },
-    // Polymarket testnet USDC on Amoy. The exact address must be set per
-    // deployment via VITE_AMOY_USDC — there is no committed default because
-    // Polymarket's testnet configuration changes from time to time.
+    // USDC on Amoy. Defaults to the Circle faucet USDC deployed alongside
+    // our contracts (same as paymentToken in contracts.js). Override via
+    // VITE_AMOY_USDC if a different token is needed.
     stablecoin: {
-      address: import.meta.env?.VITE_AMOY_USDC || null,
+      address: import.meta.env?.VITE_AMOY_USDC || '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
       symbol: 'USDC',
       name: 'USD Coin',
       decimals: 6,

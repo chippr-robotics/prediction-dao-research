@@ -84,6 +84,12 @@ export function DexProvider({ children }) {
   const [quotingPrice, setQuotingPrice] = useState(false)
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE)
 
+  // Stablecoin contract for balance reads — available even when DEX is not.
+  const stableContract = useMemo(() => {
+    if (!provider || !stableConfig?.address) return null
+    return new ethers.Contract(stableConfig.address, ERC20_ABI, provider)
+  }, [provider, stableConfig])
+
   const contracts = useMemo(() => {
     if (!provider || !isDexAvailable) return null
 
@@ -100,14 +106,26 @@ export function DexProvider({ children }) {
       return
     }
 
-    if (!provider || !address || !contracts) return
+    if (!provider || !address) return
+    // Need at least stableContract or full DEX contracts to fetch anything useful
+    if (!stableContract && !contracts) return
 
     try {
       setLoading(true)
 
       const nativeBalance = await provider.getBalance(address)
-      const wnativeBalance = await contracts.wnative.balanceOf(address)
-      const stableBalance = await contracts.stable.balanceOf(address)
+
+      // Fetch wnative only when DEX contracts are available
+      const wnativeBalance = contracts
+        ? await contracts.wnative.balanceOf(address)
+        : 0n
+
+      // Fetch stable balance from DEX contracts if available, otherwise
+      // fall back to the standalone stableContract
+      const stableReader = contracts?.stable || stableContract
+      const stableBalance = stableReader
+        ? await stableReader.balanceOf(address)
+        : 0n
 
       const newBalances = {
         native: ethers.formatEther(nativeBalance),
@@ -129,7 +147,7 @@ export function DexProvider({ children }) {
     } finally {
       setLoading(false)
     }
-  }, [provider, address, contracts, tokens.STABLE.decimals])
+  }, [provider, address, contracts, stableContract, tokens.STABLE.decimals])
 
   // Reset balances when chain changes so the user doesn't see stale numbers.
   useEffect(() => {
