@@ -770,9 +770,12 @@ function FriendMarketsModal({
             )
           }
 
-          // Create encrypted envelope for creator
-          const { envelope } = await createEncrypted(marketMetadata)
-          // Add opponent as recipient using their on-chain public key (no shared secret)
+          // 1v1 encrypted: force X25519 so we can add the opponent using the
+          // X25519 public key returned by the on-chain KeyRegistry. The X-Wing
+          // (v2.0) path can't be used here because the registry only stores
+          // 32-byte X25519 keys; addRecipientByPublicKey would then read an
+          // undefined `ephemeralPublicKey` off an X-Wing wrapped-key entry.
+          const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519' })
           finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
         } else {
           // Group markets: start with creator as only recipient
