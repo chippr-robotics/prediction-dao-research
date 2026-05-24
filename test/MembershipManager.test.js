@@ -118,6 +118,22 @@ describe("MembershipManager", function () {
       await expect(mgr.connect(alice).upgradeTier(WAGER_PARTICIPANT_ROLE, Tier.Gold))
         .to.be.revertedWithCustomError(mgr, "NoActiveMembership");
     });
+
+    it("reverts with TierInactive when target tier is inactive", async () => {
+      const { mgr, admin, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      // Deactivate Gold tier
+      await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Gold, usdc(200), 30, { monthlyMarketCreation: 100, maxConcurrentMarkets: 30 }, false);
+      await expect(mgr.connect(alice).upgradeTier(WAGER_PARTICIPANT_ROLE, Tier.Gold))
+        .to.be.revertedWithCustomError(mgr, "TierInactive");
+    });
+
+    it("reverts with NotUpgrade when new tier price <= current price (same tier)", async () => {
+      const { mgr, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      await expect(mgr.connect(alice).upgradeTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze))
+        .to.be.revertedWithCustomError(mgr, "NotUpgrade");
+    });
   });
 
   describe("extendMembership", () => {
@@ -141,6 +157,45 @@ describe("MembershipManager", function () {
       const balBefore = await token.balanceOf(alice.address);
       await mgr.connect(alice).extendMembership(WAGER_PARTICIPANT_ROLE);
       expect(balBefore - await token.balanceOf(alice.address)).to.equal(usdc(100));
+    });
+
+    it("extends from current time when membership is already expired (base = now, not expiresAt)", async () => {
+      const { mgr, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      // Let membership expire
+      await time.increase(31 * 24 * 3600);
+      const nowBefore = await time.latest();
+      await mgr.connect(alice).extendMembership(WAGER_PARTICIPANT_ROLE);
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      // Base should be ~now, not the old expiresAt
+      const nowAfter = await time.latest();
+      expect(m.expiresAt).to.be.gte(BigInt(nowAfter) + BigInt(30 * 24 * 3600));
+      expect(m.expiresAt).to.be.lte(BigInt(nowAfter) + BigInt(30 * 24 * 3600) + 2n);
+    });
+
+    it("reverts with NoActiveMembership when tier is None", async () => {
+      const { mgr, alice } = await loadFixture(deployFixture);
+      // alice never purchased — tier is None
+      await expect(mgr.connect(alice).extendMembership(WAGER_PARTICIPANT_ROLE))
+        .to.be.revertedWithCustomError(mgr, "NoActiveMembership");
+    });
+
+    it("reverts with TierInactive when tier config was deactivated", async () => {
+      const { mgr, admin, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      // Deactivate Bronze
+      await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze, usdc(50), 30, { monthlyMarketCreation: 15, maxConcurrentMarkets: 5 }, false);
+      await expect(mgr.connect(alice).extendMembership(WAGER_PARTICIPANT_ROLE))
+        .to.be.revertedWithCustomError(mgr, "TierInactive");
+    });
+
+    it("reverts with PriceZero when tier price is zero", async () => {
+      const { mgr, admin, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      // Set price to zero (but active)
+      await mgr.connect(admin).setTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze, 0, 30, { monthlyMarketCreation: 15, maxConcurrentMarkets: 5 }, true);
+      await expect(mgr.connect(alice).extendMembership(WAGER_PARTICIPANT_ROLE))
+        .to.be.revertedWithCustomError(mgr, "PriceZero");
     });
   });
 
@@ -284,6 +339,87 @@ describe("MembershipManager", function () {
       await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
       await time.increase(31 * 24 * 3600);
       expect(await mgr.checkCanCreate(alice.address, WAGER_PARTICIPANT_ROLE)).to.be.false;
+    });
+
+    it("checkCanCreate returns false when monthly limit reached", async () => {
+      const { mgr, alice, caller } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze); // monthly=15
+      for (let i = 0; i < 15; i++) {
+        await mgr.connect(caller).recordCreate(alice.address, WAGER_PARTICIPANT_ROLE);
+        await mgr.connect(caller).recordClose(alice.address, WAGER_PARTICIPANT_ROLE);
+      }
+      expect(await mgr.checkCanCreate(alice.address, WAGER_PARTICIPANT_ROLE)).to.be.false;
+    });
+
+    it("checkCanCreate returns false when concurrent limit reached", async () => {
+      const { mgr, alice, caller } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze); // concurrent=5
+      for (let i = 0; i < 5; i++) {
+        await mgr.connect(caller).recordCreate(alice.address, WAGER_PARTICIPANT_ROLE);
+      }
+      expect(await mgr.checkCanCreate(alice.address, WAGER_PARTICIPANT_ROLE)).to.be.false;
+    });
+
+    it("checkCanCreate resets month count after rolling window passes (30 days)", async () => {
+      const { mgr, alice, caller } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze); // monthly=15
+      for (let i = 0; i < 15; i++) {
+        await mgr.connect(caller).recordCreate(alice.address, WAGER_PARTICIPANT_ROLE);
+        await mgr.connect(caller).recordClose(alice.address, WAGER_PARTICIPANT_ROLE);
+      }
+      expect(await mgr.checkCanCreate(alice.address, WAGER_PARTICIPANT_ROLE)).to.be.false;
+      // Advance past rolling window but within membership expiry (membership is 30 days,
+      // rolling window is 30 days; re-purchase to reset membership)
+      await time.increase(31 * 24 * 3600);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      // After rolling window passes, checkCanCreate should treat monthCount as 0
+      expect(await mgr.checkCanCreate(alice.address, WAGER_PARTICIPANT_ROLE)).to.be.true;
+    });
+
+    it("recordCreate resets monthAnchor when rolling window passes", async () => {
+      const { mgr, alice, caller } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      await mgr.connect(caller).recordCreate(alice.address, WAGER_PARTICIPANT_ROLE);
+      const m1 = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      const anchorBefore = m1.monthAnchor;
+      await mgr.connect(caller).recordClose(alice.address, WAGER_PARTICIPANT_ROLE);
+      // Advance past rolling window, re-purchase to keep membership active
+      await time.increase(31 * 24 * 3600);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      await mgr.connect(caller).recordCreate(alice.address, WAGER_PARTICIPANT_ROLE);
+      const m2 = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m2.monthAnchor).to.be.gt(anchorBefore);
+      expect(m2.monthCount).to.equal(1); // reset from prior count
+    });
+  });
+
+  describe("view functions", () => {
+    it("getActiveTier returns None when membership is expired", async () => {
+      const { mgr, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      await time.increase(31 * 24 * 3600);
+      expect(await mgr.getActiveTier(alice.address, WAGER_PARTICIPANT_ROLE)).to.equal(Tier.None);
+    });
+
+    it("getMembership returns full membership struct", async () => {
+      const { mgr, alice } = await loadFixture(deployFixture);
+      await mgr.connect(alice).purchaseTier(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m.tier).to.equal(Tier.Bronze);
+      expect(m.expiresAt).to.be.gt(0);
+      expect(m.monthCount).to.equal(0);
+      expect(m.activeCount).to.equal(0);
+      expect(m.monthAnchor).to.be.gt(0);
+    });
+
+    it("getTierConfig returns tier config", async () => {
+      const { mgr } = await loadFixture(deployFixture);
+      const cfg = await mgr.getTierConfig(WAGER_PARTICIPANT_ROLE, Tier.Bronze);
+      expect(cfg.priceUSDC).to.equal(usdc(50));
+      expect(cfg.durationDays).to.equal(30);
+      expect(cfg.active).to.be.true;
+      expect(cfg.limits.monthlyMarketCreation).to.equal(15);
+      expect(cfg.limits.maxConcurrentMarkets).to.equal(5);
     });
   });
 });

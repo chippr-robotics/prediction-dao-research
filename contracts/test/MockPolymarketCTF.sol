@@ -137,3 +137,63 @@ contract MockPolymarketCTF is IPolymarketOracle {
         return keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount));
     }
 }
+
+/**
+ * @title RevertingPolymarketCTF
+ * @notice A mock that always reverts, used to test try/catch error paths
+ */
+contract RevertingPolymarketCTF is IPolymarketOracle {
+    function getCondition(bytes32) external pure override returns (address, bytes32, uint256, bool) {
+        revert("RevertingCTF: always reverts");
+    }
+    function isResolved(bytes32) external pure override returns (bool) {
+        revert("RevertingCTF: always reverts");
+    }
+    function getPayoutNumerators(bytes32) external pure override returns (uint256[] memory) {
+        revert("RevertingCTF: always reverts");
+    }
+    function getPayoutDenominator(bytes32) external pure override returns (uint256) {
+        revert("RevertingCTF: always reverts");
+    }
+    function getConditionId(address, bytes32, uint256) external pure override returns (bytes32) {
+        revert("RevertingCTF: always reverts");
+    }
+}
+
+/**
+ * @title SelectiveRevertCTF
+ * @notice A mock CTF where isResolved returns true but getPayoutNumerators/getPayoutDenominator revert.
+ *         Used to test FetchFailed catch paths on payout fetching.
+ */
+contract SelectiveRevertCTF is IPolymarketOracle {
+    bool public revertOnPayoutNumerators;
+    bool public revertOnPayoutDenominator;
+
+    function setRevertOnPayoutNumerators(bool _revert) external {
+        revertOnPayoutNumerators = _revert;
+    }
+    function setRevertOnPayoutDenominator(bool _revert) external {
+        revertOnPayoutDenominator = _revert;
+    }
+
+    function getCondition(bytes32) external pure override returns (address, bytes32, uint256, bool) {
+        return (address(1), bytes32(0), 2, true);
+    }
+    function isResolved(bytes32) external pure override returns (bool) {
+        return true;
+    }
+    function getPayoutNumerators(bytes32) external view override returns (uint256[] memory) {
+        if (revertOnPayoutNumerators) revert("SelectiveRevertCTF: payout numerators reverted");
+        uint256[] memory payouts = new uint256[](2);
+        payouts[0] = 1;
+        payouts[1] = 0;
+        return payouts;
+    }
+    function getPayoutDenominator(bytes32) external view override returns (uint256) {
+        if (revertOnPayoutDenominator) revert("SelectiveRevertCTF: payout denominator reverted");
+        return 1;
+    }
+    function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount) external pure override returns (bytes32) {
+        return keccak256(abi.encodePacked(oracle, questionId, outcomeSlotCount));
+    }
+}

@@ -610,6 +610,14 @@ describe("WagerRegistry", function () {
       await expect(createDefault(reg, fx, { resolutionType: Resolution.Polymarket, polymarketConditionId: cid }))
         .to.be.revertedWithCustomError(reg, "AdapterNotSet");
     });
+
+    it("setPolymarketAdapter with zero address succeeds (disables Polymarket)", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, admin } = fx;
+      await expect(reg.connect(admin).setPolymarketAdapter(ethers.ZeroAddress))
+        .to.emit(reg, "PolymarketAdapterUpdated")
+        .withArgs(ethers.ZeroAddress);
+    });
   });
 
   describe("account moderation (freeze / unfreeze)", () => {

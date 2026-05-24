@@ -116,4 +116,124 @@ describe("ChainlinkFunctionsOracleAdapter", function () {
     await expect(adapter.handleOracleFulfillment(ethers.ZeroHash, "0x01", "0x"))
       .to.be.revertedWithCustomError(adapter, "OnlyRouterCanFulfill");
   });
+
+  it("linkMarket stores mapping and emits MarketLinked", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    await expect(adapter.linkMarket(42, conditionId))
+      .to.emit(adapter, "MarketLinked").withArgs(42, conditionId);
+    expect(await adapter.marketToCondition(42)).to.equal(conditionId);
+  });
+
+  it("linkMarket reverts ConditionNotRegistered for unknown condition", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    await expect(adapter.linkMarket(1, ethers.id("unknown")))
+      .to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("linkMarket reverts MarketAlreadyLinked for duplicate", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    await adapter.linkMarket(99, conditionId);
+    const conditionId2 = await register(adapter);
+    await expect(adapter.linkMarket(99, conditionId2))
+      .to.be.revertedWithCustomError(adapter, "MarketAlreadyLinked");
+  });
+
+  it("registerCondition reverts for zero conditionId", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const encodedReq = ethers.toUtf8Bytes(SOURCE);
+    const sourceHash = ethers.keccak256(encodedReq);
+    await expect(adapter.registerCondition(ethers.ZeroHash, encodedReq, sourceHash, 42, 300_000, DON_ID))
+      .to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("requestResolution reverts AlreadyResolved after fulfillment", async () => {
+    const { adapter, router } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    const tx = await adapter.requestResolution(conditionId);
+    const rcpt = await tx.wait();
+    const ev = rcpt.logs.map(l => { try { return adapter.interface.parseLog(l); } catch { return null; } })
+      .find(p => p && p.name === "ResolutionRequested");
+    await router.fulfill(ev.args.requestId, "0x01", "0x");
+    await expect(adapter.requestResolution(conditionId))
+      .to.be.revertedWithCustomError(adapter, "AlreadyResolved");
+  });
+
+  it("requestResolution reverts ConditionNotRegistered for unknown condition", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    await expect(adapter.requestResolution(ethers.id("unknown")))
+      .to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("fulfill with empty response reverts InvalidResponseLength", async () => {
+    const { adapter, router } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    const tx = await adapter.requestResolution(conditionId);
+    const rcpt = await tx.wait();
+    const ev = rcpt.logs.map(l => { try { return adapter.interface.parseLog(l); } catch { return null; } })
+      .find(p => p && p.name === "ResolutionRequested");
+    await expect(router.fulfill(ev.args.requestId, "0x", "0x"))
+      .to.be.reverted;
+  });
+
+  it("getConfiguredChainId returns block.chainid", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const chainId = await adapter.getConfiguredChainId();
+    expect(chainId).to.be.gt(0n);
+  });
+
+  it("getConditionMetadata returns empty description and zero time", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    const [desc, time] = await adapter.getConditionMetadata(conditionId);
+    expect(desc).to.equal("");
+    expect(time).to.equal(0n);
+  });
+
+  it("getOutcome returns zeros before resolution", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    const [outcome, confidence, resolvedAt] = await adapter.getOutcome(conditionId);
+    expect(outcome).to.equal(false);
+    expect(confidence).to.equal(0n);
+    expect(resolvedAt).to.equal(0n);
+  });
+
+  it("isConditionResolved returns false before resolution", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    expect(await adapter.isConditionResolved(conditionId)).to.equal(false);
+  });
+
+  it("isConditionResolved returns true after fulfillment", async () => {
+    const { adapter, router } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    const tx = await adapter.requestResolution(conditionId);
+    const rcpt = await tx.wait();
+    const ev = rcpt.logs.map(l => { try { return adapter.interface.parseLog(l); } catch { return null; } })
+      .find(p => p && p.name === "ResolutionRequested");
+    await router.fulfill(ev.args.requestId, "0x01", "0x");
+    expect(await adapter.isConditionResolved(conditionId)).to.equal(true);
+  });
+
+  it("isConditionSupported returns false for unregistered condition", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    expect(await adapter.isConditionSupported(ethers.id("nope"))).to.equal(false);
+  });
+
+  it("non-owner cannot registerCondition", async () => {
+    const { adapter, alice } = await loadFixture(deployFixture);
+    const encodedReq = ethers.toUtf8Bytes(SOURCE);
+    const sourceHash = ethers.keccak256(encodedReq);
+    await expect(adapter.connect(alice).registerCondition(ethers.id("x"), encodedReq, sourceHash, 42, 300_000, DON_ID))
+      .to.be.reverted;
+  });
+
+  it("non-owner cannot linkMarket", async () => {
+    const { adapter, alice } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter);
+    await expect(adapter.connect(alice).linkMarket(1, conditionId))
+      .to.be.reverted;
+  });
 });

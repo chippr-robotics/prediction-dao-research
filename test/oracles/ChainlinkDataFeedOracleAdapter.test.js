@@ -126,6 +126,67 @@ describe("ChainlinkDataFeedOracleAdapter", function () {
     await adapter.evaluate(conditionId);
     expect(await adapter.isConditionResolved(conditionId)).to.equal(true);
   });
+
+  it("getConfiguredChainId returns a number (block.chainid)", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const chainId = await adapter.getConfiguredChainId();
+    expect(chainId).to.be.a("bigint");
+    expect(chainId).to.be.gt(0n);
+  });
+
+  it("getConditionMetadata returns empty description and the deadline", async () => {
+    const { adapter, feed } = await loadFixture(deployFixture);
+    const { conditionId, deadline } = await register(adapter, feed, 2500_00000000n, Op.GT);
+    const [description, expectedResolutionTime] = await adapter.getConditionMetadata(conditionId);
+    expect(description).to.equal("");
+    expect(expectedResolutionTime).to.equal(BigInt(deadline));
+  });
+
+  it("linkMarket success case (links and emits MarketLinked)", async () => {
+    const { adapter, feed } = await loadFixture(deployFixture);
+    const { conditionId } = await register(adapter, feed, 2500_00000000n, Op.GT);
+    const marketId = 42;
+    await expect(adapter.linkMarket(marketId, conditionId))
+      .to.emit(adapter, "MarketLinked")
+      .withArgs(marketId, conditionId);
+    expect(await adapter.marketToCondition(marketId)).to.equal(conditionId);
+  });
+
+  it("linkMarket reverts ConditionNotRegistered for unregistered condition", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const unregistered = ethers.id("unregistered");
+    await expect(adapter.linkMarket(1, unregistered))
+      .to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("linkMarket reverts MarketAlreadyLinked for duplicate link", async () => {
+    const { adapter, feed } = await loadFixture(deployFixture);
+    const { conditionId } = await register(adapter, feed, 2500_00000000n, Op.GT);
+    await adapter.linkMarket(1, conditionId);
+    // Register a second condition to try to link to the same marketId
+    const { conditionId: conditionId2 } = await register(adapter, feed, 3000_00000000n, Op.LT);
+    await expect(adapter.linkMarket(1, conditionId2))
+      .to.be.revertedWithCustomError(adapter, "MarketAlreadyLinked");
+  });
+
+  it("registerCondition reverts ConditionNotRegistered for zero conditionId (bytes32(0))", async () => {
+    const { adapter, feed } = await loadFixture(deployFixture);
+    const deadline = (await time.latest()) + 3600;
+    await expect(adapter.registerCondition(ethers.ZeroHash, await feed.getAddress(), 0, Op.GT, deadline))
+      .to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("setFeedAllowed reverts InvalidAddress for zero address", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    await expect(adapter.setFeedAllowed(ethers.ZeroAddress, true))
+      .to.be.revertedWithCustomError(adapter, "InvalidAddress");
+  });
+
+  it("isConditionSupported returns false for unregistered condition", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const fakeId = ethers.id("nonexistent");
+    expect(await adapter.isConditionSupported(fakeId)).to.equal(false);
+  });
 });
 
 function anyUint() {

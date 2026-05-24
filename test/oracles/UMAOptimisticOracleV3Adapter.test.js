@@ -135,4 +135,101 @@ describe("UMAOptimisticOracleV3Adapter", function () {
       .to.emit(adapter, "AssertionDisputed").withArgs(conditionId, ev.args.assertionId);
     expect(await adapter.isConditionResolved(conditionId)).to.equal(false);
   });
+
+  it("getConfiguredChainId returns block.chainid", async () => {
+    const { adapter } = await loadFixture(deployFixture);
+    const chainId = await adapter.getConfiguredChainId();
+    expect(chainId).to.be.gt(0n);
+  });
+
+  it("isConditionSupported returns true for registered and false for unknown", async () => {
+    const { adapter, bond } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter, await bond.getAddress());
+    expect(await adapter.isConditionSupported(conditionId)).to.equal(true);
+    expect(await adapter.isConditionSupported(ethers.id("nope"))).to.equal(false);
+  });
+
+  it("isConditionResolved returns false before and true after resolution", async () => {
+    const { adapter, oo, bond, alice } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter, await bond.getAddress());
+    expect(await adapter.isConditionResolved(conditionId)).to.equal(false);
+    const tx = await adapter.connect(alice).assertResolution(conditionId, alice.address);
+    const rcpt = await tx.wait();
+    const ev = rcpt.logs.map(l => { try { return adapter.interface.parseLog(l); } catch { return null; } })
+      .find(p => p && p.name === "AssertionMade");
+    await oo.mockResolve(ev.args.assertionId, true);
+    expect(await adapter.isConditionResolved(conditionId)).to.equal(true);
+  });
+
+  it("getOutcome returns zeros before resolution", async () => {
+    const { adapter, bond } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter, await bond.getAddress());
+    const [outcome, confidence, resolvedAt] = await adapter.getOutcome(conditionId);
+    expect(outcome).to.equal(false);
+    expect(confidence).to.equal(0n);
+    expect(resolvedAt).to.equal(0n);
+  });
+
+  it("getConditionMetadata returns claim and liveness", async () => {
+    const { adapter, bond } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter, await bond.getAddress(), {
+      claim: "Did ETH reach $5k?",
+      liveness: 7200
+    });
+    const [desc, resTime] = await adapter.getConditionMetadata(conditionId);
+    expect(desc).to.equal("Did ETH reach $5k?");
+    expect(resTime).to.equal(7200n);
+  });
+
+  it("rejects duplicate condition registration", async () => {
+    const { adapter, bond } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter, await bond.getAddress());
+    await expect(adapter.registerCondition(
+      conditionId,
+      ethers.toUtf8Bytes("claim"),
+      await bond.getAddress(),
+      usdc(10),
+      7200
+    )).to.be.revertedWithCustomError(adapter, "ConditionAlreadyRegistered");
+  });
+
+  it("rejects zero conditionId registration", async () => {
+    const { adapter, bond } = await loadFixture(deployFixture);
+    await expect(adapter.registerCondition(
+      ethers.ZeroHash,
+      ethers.toUtf8Bytes("claim"),
+      await bond.getAddress(),
+      usdc(10),
+      7200
+    )).to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("assertResolution reverts for unregistered condition", async () => {
+    const { adapter, alice } = await loadFixture(deployFixture);
+    await expect(adapter.connect(alice).assertResolution(ethers.id("nope"), alice.address))
+      .to.be.revertedWithCustomError(adapter, "ConditionNotRegistered");
+  });
+
+  it("assertResolution reverts AlreadyResolved after resolution", async () => {
+    const { adapter, oo, bond, alice } = await loadFixture(deployFixture);
+    const conditionId = await register(adapter, await bond.getAddress());
+    const tx = await adapter.connect(alice).assertResolution(conditionId, alice.address);
+    const rcpt = await tx.wait();
+    const ev = rcpt.logs.map(l => { try { return adapter.interface.parseLog(l); } catch { return null; } })
+      .find(p => p && p.name === "AssertionMade");
+    await oo.mockResolve(ev.args.assertionId, true);
+    await expect(adapter.connect(alice).assertResolution(conditionId, alice.address))
+      .to.be.revertedWithCustomError(adapter, "AlreadyResolved");
+  });
+
+  it("non-owner cannot registerCondition", async () => {
+    const { adapter, bond, alice } = await loadFixture(deployFixture);
+    await expect(adapter.connect(alice).registerCondition(
+      ethers.id("x"),
+      ethers.toUtf8Bytes("claim"),
+      await bond.getAddress(),
+      usdc(10),
+      7200
+    )).to.be.reverted;
+  });
 });
