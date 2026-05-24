@@ -165,27 +165,6 @@ function createAcceptAndResolve(config = {}) {
   })
 }
 
-/**
- * Look for a claim button in the wager detail view.
- */
-function findClaimButton() {
-  cy.openMyWagers('history')
-
-  return cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const rows = $panel.find('.mm-table-row, tr[role="button"]')
-    if (rows.length > 0) {
-      cy.wrap(rows.first()).click()
-      cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
-
-      return cy.get('.mm-detail').then(($detail) => {
-        const claimBtn = $detail.find('button:contains("Claim"), button:contains("Payout")')
-        return claimBtn
-      })
-    }
-    return cy.wrap(null)
-  })
-}
-
 describe('Claim Payouts', () => {
   beforeEach(() => {
     cy.clearLocalStorage()

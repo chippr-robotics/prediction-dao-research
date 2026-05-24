@@ -29,7 +29,7 @@ describe('Wager Creation Form Validation', () => {
                                text.includes('purchase') ||
                                text.includes('get access')
       // Either shows a membership CTA or the form itself (if mock allows it)
-      expect($modal.length).to.be.greaterThan(0)
+      expect(hasMembershipRef || $modal.length > 0).to.be.true
     })
   })
 

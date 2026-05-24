@@ -66,7 +66,6 @@ describe('Encryption & Key Registration (UI)', () => {
       // Override the mock provider to reject personal_sign
       cy.mockWeb3Provider()
       cy.on('window:before:load', (win) => {
-        const original = win.ethereum?.request
         if (win.ethereum) {
           const origRequest = win.ethereum.request.bind(win.ethereum)
           win.ethereum.request = ({ method, params }) => {

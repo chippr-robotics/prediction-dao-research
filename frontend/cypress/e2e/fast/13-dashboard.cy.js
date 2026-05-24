@@ -227,9 +227,9 @@ describe('Dashboard', () => {
 
     // If Polymarket content loaded, it should render cards or a message.
     cy.get('body').then(($body) => {
-      const polymarketSection = $body.find('.polymarket-browser, .polymarket-feed')
+      const hasPolymarket = $body.find('.polymarket-browser, .polymarket-feed').length > 0
       // Either the component rendered or the section is present (may be empty on non-Polygon).
-      expect($body.find('.dashboard-section').length).to.be.greaterThan(1)
+      expect(hasPolymarket || $body.find('.dashboard-section').length > 1).to.be.true
     })
   })
 

@@ -93,26 +93,6 @@ function createSimpleWager(config = {}) {
   })
 }
 
-/**
- * Navigate to My Wagers and find a pending wager to accept.
- * Returns by clicking the View Offer or Accept button.
- */
-function openPendingWagerForAcceptance() {
-  cy.openMyWagers('participating')
-
-  // Look for a pending wager with "View Offer" action
-  cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).then(($panel) => {
-    const acceptBtn = $panel.find('button:contains("View Offer"), button:contains("Accept")')
-    if (acceptBtn.length > 0) {
-      cy.wrap(acceptBtn.first()).click({ force: true })
-    } else {
-      // Try the created tab
-      cy.contains('[role="tab"]', 'Created').click()
-      cy.get('.mm-table-row, tr[role="button"]').first().click()
-    }
-  })
-}
-
 describe('Wager Acceptance', () => {
   beforeEach(() => {
     cy.clearLocalStorage()
