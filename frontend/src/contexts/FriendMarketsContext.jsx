@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAccount } from 'wagmi'
 import { fetchFriendMarketsForUser } from '../utils/blockchainService'
 import { FriendMarketsContext } from './FriendMarketsContext'
 
 const STORAGE_KEY = 'friendMarkets'
+const DISMISSED_STORAGE_PREFIX = 'mywagers_dismissed:'
 
 function loadFromStorage() {
   try {
@@ -22,10 +23,34 @@ function saveToStorage(markets) {
   }
 }
 
+function dismissedKey(address) {
+  return `${DISMISSED_STORAGE_PREFIX}${(address || '').toLowerCase()}`
+}
+
+function loadDismissed(address) {
+  if (!address) return []
+  try {
+    const stored = localStorage.getItem(dismissedKey(address))
+    return stored ? JSON.parse(stored) : []
+  } catch {
+    return []
+  }
+}
+
+function saveDismissed(address, ids) {
+  if (!address) return
+  try {
+    localStorage.setItem(dismissedKey(address), JSON.stringify(ids))
+  } catch {
+    // non-fatal
+  }
+}
+
 export function FriendMarketsProvider({ children }) {
   const { address, isConnected } = useAccount()
   const [friendMarkets, setFriendMarkets] = useState(() => loadFromStorage())
   const [loading, setLoading] = useState(false)
+  const [dismissedIdsArr, setDismissedIdsArr] = useState(() => loadDismissed(address))
 
   // Fetch friend markets from blockchain when wallet connects
   useEffect(() => {
@@ -89,8 +114,67 @@ export function FriendMarketsProvider({ children }) {
     })
   }, [])
 
+  // Reload the dismissed set when the active account changes so we don't
+  // leak one wallet's dismissed list into another.
+  useEffect(() => {
+    setDismissedIdsArr(loadDismissed(address))
+  }, [address])
+
+  const dismissedIds = useMemo(() => new Set(dismissedIdsArr.map(String)), [dismissedIdsArr])
+
+  const dismissMarket = useCallback((marketId) => {
+    if (marketId == null) return
+    const id = String(marketId)
+    setDismissedIdsArr(prev => {
+      if (prev.includes(id)) return prev
+      const next = [...prev, id]
+      saveDismissed(address, next)
+      return next
+    })
+  }, [address])
+
+  const dismissMarkets = useCallback((marketIds) => {
+    const incoming = (marketIds || []).filter(v => v != null).map(String)
+    if (incoming.length === 0) return
+    setDismissedIdsArr(prev => {
+      const merged = Array.from(new Set([...prev, ...incoming]))
+      if (merged.length === prev.length) return prev
+      saveDismissed(address, merged)
+      return merged
+    })
+  }, [address])
+
+  const restoreMarket = useCallback((marketId) => {
+    if (marketId == null) return
+    const id = String(marketId)
+    setDismissedIdsArr(prev => {
+      if (!prev.includes(id)) return prev
+      const next = prev.filter(x => x !== id)
+      saveDismissed(address, next)
+      return next
+    })
+  }, [address])
+
+  const isDismissed = useCallback(
+    (marketId) => dismissedIds.has(String(marketId)),
+    [dismissedIds]
+  )
+
   return (
-    <FriendMarketsContext.Provider value={{ friendMarkets, loading, refresh, addMarket, setFriendMarkets }}>
+    <FriendMarketsContext.Provider
+      value={{
+        friendMarkets,
+        loading,
+        refresh,
+        addMarket,
+        setFriendMarkets,
+        dismissedIds,
+        dismissMarket,
+        dismissMarkets,
+        restoreMarket,
+        isDismissed,
+      }}
+    >
       {children}
     </FriendMarketsContext.Provider>
   )

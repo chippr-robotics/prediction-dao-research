@@ -614,6 +614,42 @@
   background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
 }
 
+.mm-action-btn.mm-action-clear {
+  background: rgba(229, 83, 61, 0.12);
+  color: #E5533D;
+  border: 1px solid rgba(229, 83, 61, 0.35);
+}
+
+.mm-action-btn.mm-action-clear:hover {
+  background: rgba(229, 83, 61, 0.22);
+}
+
+/* Expired offer treatment */
+.mm-status-badge.status-expired {
+  background: rgba(229, 83, 61, 0.15);
+  color: #E5533D;
+}
+
+.mm-table-row-expired {
+  opacity: 0.7;
+}
+
+.mm-time-expired {
+  color: #E5533D;
+  font-weight: 600;
+}
+
+.mm-table-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0.75rem 0.25rem;
+}
+
+.mm-btn-small {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.75rem;
+}
+
 /* Load More */
 .mm-load-more-row {
   display: flex;

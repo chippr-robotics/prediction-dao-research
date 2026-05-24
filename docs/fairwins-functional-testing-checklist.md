@@ -405,6 +405,9 @@ A manual testing checklist for validating all functional flows of the FairWins p
 | [ ] | DSH-11 | Empty state - no wagers | 1. Connect wallet that has never created or participated in wagers 2. Open My Wagers | Empty state message displayed; no errors |  |
 | [ ] | DSH-12 | Loading state | 1. Navigate to My Wagers with slow connection | Loading spinner/skeleton shown while data fetches |  |
 | [ ] | DSH-13 | Decrypt encrypted wager in list | 1. Open My Wagers with encrypted wagers 2. Wager should auto-decrypt | Encrypted wagers show decrypted description (lazy-loaded); non-participants see "Encrypted Market" |  |
+| [ ] | DSH-14 | Expired pending offers hidden by default | 1. Have a pending offer whose acceptance deadline has passed 2. Open My Wagers (default "All Status") | Expired offer does not appear in Participating/Created list; empty state shown if it was the only entry |  |
+| [ ] | DSH-15 | Expired filter surfaces expired offers | 1. With expired offers present 2. Set Status filter to "Expired" | Expired rows appear; Time Left reads "Expired" (not the resolve-deadline countdown); row carries a Clear action |  |
+| [ ] | DSH-16 | Clear expired offer (local dismiss) | 1. View an expired offer 2. Click "Clear" (or "Reclaim & Clear" as creator) | Row disappears; dismissed id persisted under `mywagers_dismissed:<account>` so it stays hidden across reloads; creator variant also calls claimRefund on-chain |  |
 
 ---
 
