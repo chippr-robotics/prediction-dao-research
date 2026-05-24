@@ -42,8 +42,12 @@ function MyMarketsModal({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Selected market for detail view
-  const [selectedMarket, setSelectedMarket] = useState(null)
+  // Selected market for detail view. Stored as an ID (not the object) so the
+  // detail view always renders against the latest market data — important
+  // because decryptableMarkets updates the underlying object with
+  // decryptedMetadata after the user clicks "Decrypt Wager Details", and a
+  // snapshot would freeze the pre-decryption state.
+  const [selectedMarketId, setSelectedMarketId] = useState(null)
 
   // Resolution modal state
   const [showResolutionModal, setShowResolutionModal] = useState(false)
@@ -100,7 +104,7 @@ function MyMarketsModal({
   useEffect(() => {
     if (isOpen) {
       setActiveTab('participating')
-      setSelectedMarket(null)
+      setSelectedMarketId(null)
       setShowResolutionModal(false)
       setShowDisputeModal(false)
       setMarketTypeFilter('all')
@@ -118,8 +122,8 @@ function MyMarketsModal({
           setShowResolutionModal(false)
         } else if (showDisputeModal) {
           setShowDisputeModal(false)
-        } else if (selectedMarket) {
-          setSelectedMarket(null)
+        } else if (selectedMarketId) {
+          setSelectedMarketId(null)
         } else {
           onClose()
         }
@@ -128,7 +132,7 @@ function MyMarketsModal({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose, selectedMarket, showResolutionModal, showDisputeModal])
+  }, [isOpen, onClose, selectedMarketId, showResolutionModal, showDisputeModal])
 
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget && !showResolutionModal && !showDisputeModal) {
@@ -239,6 +243,20 @@ function MyMarketsModal({
     return { participating, created, history }
   }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter])
 
+  // Derive the selected market from the live categorized lists so the detail
+  // view reflects fresh data (e.g., decryptedMetadata) after decryption
+  // completes. categorizedMarkets is preferred over decryptableMarkets because
+  // it carries the computedStatus field the detail view depends on.
+  const selectedMarket = useMemo(() => {
+    if (!selectedMarketId) return null
+    const all = [
+      ...categorizedMarkets.participating,
+      ...categorizedMarkets.created,
+      ...categorizedMarkets.history,
+    ]
+    return all.find(m => String(m.id) === String(selectedMarketId)) || null
+  }, [selectedMarketId, categorizedMarkets])
+
   // Format helpers
   const formatDate = (dateValue) => {
     if (!dateValue) return 'N/A'
@@ -332,11 +350,11 @@ function MyMarketsModal({
   }
 
   const handleMarketSelect = (market) => {
-    setSelectedMarket(market)
+    setSelectedMarketId(market.id)
   }
 
   const handleBackToList = () => {
-    setSelectedMarket(null)
+    setSelectedMarketId(null)
   }
 
   // Check if market can be resolved (contract requires market.active == true, i.e. ACTIVE status)
@@ -477,7 +495,7 @@ function MyMarketsModal({
         <nav className="mm-tabs" role="tablist">
           <button
             className={`mm-tab ${activeTab === 'participating' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('participating'); setSelectedMarket(null) }}
+            onClick={() => { setActiveTab('participating'); setSelectedMarketId(null) }}
             role="tab"
             aria-selected={activeTab === 'participating'}
           >
@@ -491,7 +509,7 @@ function MyMarketsModal({
           </button>
           <button
             className={`mm-tab ${activeTab === 'created' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('created'); setSelectedMarket(null) }}
+            onClick={() => { setActiveTab('created'); setSelectedMarketId(null) }}
             role="tab"
             aria-selected={activeTab === 'created'}
           >
@@ -507,7 +525,7 @@ function MyMarketsModal({
           </button>
           <button
             className={`mm-tab ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('history'); setSelectedMarket(null) }}
+            onClick={() => { setActiveTab('history'); setSelectedMarketId(null) }}
             role="tab"
             aria-selected={activeTab === 'history'}
           >
