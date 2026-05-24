@@ -1,9 +1,10 @@
 module.exports = {
   skipFiles: [
     'mocks/',
+    'test/',
     'ProposalRegistryFuzzTest.sol',
     'WelfareMetricRegistryFuzzTest.sol',
-    'DAOFactory.sol', // Skip due to constructor gas limits under coverage instrumentation
+    'DAOFactory.sol',
   ],
   mocha: {
     timeout: 180000, // 3 minutes for coverage (instrumented code is slower)
