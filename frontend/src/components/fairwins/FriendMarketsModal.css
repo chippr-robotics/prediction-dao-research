@@ -247,6 +247,15 @@
   cursor: not-allowed;
 }
 
+.fm-readonly-value {
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 8px;
+  color: var(--text-muted, #7A8590);
+  font-size: 0.875rem;
+}
+
 .fm-hint {
   font-size: 0.75rem;
   color: var(--text-muted, #7A8590);
