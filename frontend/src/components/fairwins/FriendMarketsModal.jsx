@@ -7,7 +7,6 @@ import { useDex } from '../../hooks/useDex'
 import {
   WAGER_DEFAULTS,
   getDefaultEndDateTime,
-  getDefaultAcceptanceDeadline,
   getMidpointAcceptanceDeadline,
   toDateTimeLocal
 } from '../../constants/wagerDefaults'
