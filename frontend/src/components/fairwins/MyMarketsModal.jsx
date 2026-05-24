@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
+import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
@@ -29,6 +30,7 @@ function MyMarketsModal({
 }) {
   const { isConnected, account } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { dismissedIds, dismissMarket, dismissMarkets } = useFriendMarkets()
 
   const { markets: marketsWithEnvelopes, fetchEnvelope } = useLazyIpfsEnvelope(friendMarkets)
   const { markets: decryptableMarkets, decryptMarket, isMarketDecrypting } = useLazyMarketDecryption(marketsWithEnvelopes)
@@ -168,19 +170,31 @@ function MyMarketsModal({
           ? Number(market.tradingEndTime) * 1000
           : new Date(market.tradingEndTime).getTime())
         : (market.endDate ? new Date(market.endDate).getTime() : 0)
+      const acceptanceDeadlineMs = market.acceptanceDeadline
+        ? (typeof market.acceptanceDeadline === 'bigint'
+          ? Number(market.acceptanceDeadline) * 1000
+          : Number(market.acceptanceDeadline))
+        : 0
 
       // Check for terminal statuses first
       const statusLower = market.status?.toLowerCase()
       if (statusLower === 'cancelled' || statusLower === 'canceled') {
         return MarketStatus.CANCELLED
       }
+      if (statusLower === 'declined') return MarketStatus.DECLINED
       if (statusLower === 'resolved') return MarketStatus.RESOLVED
       if (statusLower === 'refunded') return MarketStatus.REFUNDED
       if (statusLower === 'oracle_timed_out') return MarketStatus.ORACLE_TIMED_OUT
       if (statusLower === 'challenged') return MarketStatus.CHALLENGED
 
-      // Check for pending_acceptance status (friend markets awaiting participant stakes)
+      // Pending acceptance: surface as EXPIRED once the accept window has
+      // closed without acceptance, so the row shows the right time-left and
+      // can be cleared by the user. The on-chain status is still Open until
+      // someone calls claimRefund/cancelOpen.
       if (statusLower === 'pending_acceptance' || statusLower === 'pending') {
+        if (acceptanceDeadlineMs > 0 && now > acceptanceDeadlineMs) {
+          return MarketStatus.EXPIRED
+        }
         return MarketStatus.PENDING_ACCEPTANCE
       }
       if (statusLower === 'disputed' || market.disputeStatus === DisputeStatus.OPENED) {
@@ -212,6 +226,9 @@ function MyMarketsModal({
     const history = []
 
     marketsList.forEach(market => {
+      // Always drop dismissed wagers from view (per-account localStorage)
+      if (dismissedIds?.has(String(market.id))) return
+
       const status = getMarketStatus(market)
       const marketWithStatus = { ...market, computedStatus: status }
 
@@ -220,13 +237,23 @@ function MyMarketsModal({
         return
       }
 
-      // Apply status filter
-      if (statusFilter !== 'all' && status !== statusFilter) {
+      // Apply status filter. The default ("all") view also hides expired
+      // offers so they don't clutter the list — pick "Expired" explicitly
+      // to see them.
+      if (statusFilter === 'all') {
+        if (status === MarketStatus.EXPIRED) return
+      } else if (status !== statusFilter) {
         return
       }
 
       // Terminal markets go to history
-      if (status === MarketStatus.RESOLVED || status === MarketStatus.CANCELLED || status === MarketStatus.REFUNDED || status === MarketStatus.ORACLE_TIMED_OUT) {
+      if (
+        status === MarketStatus.RESOLVED ||
+        status === MarketStatus.CANCELLED ||
+        status === MarketStatus.DECLINED ||
+        status === MarketStatus.REFUNDED ||
+        status === MarketStatus.ORACLE_TIMED_OUT
+      ) {
         if (isCreator(market) || isParticipant(market)) {
           history.push(marketWithStatus)
         }
@@ -241,7 +268,7 @@ function MyMarketsModal({
     })
 
     return { participating, created, history }
-  }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter])
+  }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter, dismissedIds])
 
   // Derive the selected market from the live categorized lists so the detail
   // view reflects fresh data (e.g., decryptedMetadata) after decryption
@@ -293,6 +320,7 @@ function MyMarketsModal({
       case MarketStatus.RESOLVED: return 'status-resolved'
       case MarketStatus.CANCELLED: return 'status-cancelled'
       case MarketStatus.DECLINED: return 'status-cancelled'
+      case MarketStatus.EXPIRED: return 'status-expired'
       case MarketStatus.REFUNDED: return 'status-cancelled'
       case MarketStatus.ORACLE_TIMED_OUT: return 'status-cancelled'
       default: return 'status-default'
@@ -309,6 +337,7 @@ function MyMarketsModal({
       case MarketStatus.RESOLVED: return 'Resolved'
       case MarketStatus.CANCELLED: return 'Cancelled'
       case MarketStatus.DECLINED: return 'Declined'
+      case MarketStatus.EXPIRED: return 'Expired'
       case MarketStatus.REFUNDED: return 'Refunded'
       case MarketStatus.ORACLE_TIMED_OUT: return 'Timed Out'
       default: return status
@@ -462,6 +491,44 @@ function MyMarketsModal({
     fetchMarketsData()
   }
 
+  // Clear an expired offer from the user's view. For the creator this also
+  // calls claimRefund on-chain so the stake comes back; for an invited
+  // opponent (no stake at risk) we just hide locally and let the creator
+  // reclaim on their own.
+  const handleClearExpired = useCallback(async (market) => {
+    const userAddr = account?.toLowerCase()
+    const isCreator = userAddr && market.creator?.toLowerCase() === userAddr
+
+    if (isCreator && signer) {
+      try {
+        if (!isCorrectNetwork) {
+          try { await switchNetwork() } catch { /* user declined */ }
+        }
+        const registry = new ethers.Contract(
+          getContractAddress('wagerRegistry'),
+          WAGER_REGISTRY_ABI,
+          signer
+        )
+        const tx = await registry.claimRefund(market.wagerId ?? market.id)
+        await tx.wait()
+      } catch (err) {
+        const reason = err?.reason || err?.shortMessage || err?.message || ''
+        const userRejected = err?.code === 'ACTION_REJECTED' ||
+          err?.code === 4001 || reason.toLowerCase().includes('user rejected')
+        if (userRejected) return // leave row visible so they can retry
+        // Anything else (e.g. NotRefundable because the chain advanced state)
+        // we still dismiss locally — the user's intent is clear.
+        console.warn('[MyMarkets] claimRefund failed, dismissing locally:', err)
+      }
+    }
+
+    dismissMarket(market.id)
+  }, [account, signer, isCorrectNetwork, switchNetwork, dismissMarket])
+
+  const handleClearAllExpired = useCallback((markets) => {
+    dismissMarkets(markets.map(m => m.id))
+  }, [dismissMarkets])
+
   if (!isOpen) return null
 
   return (
@@ -568,6 +635,7 @@ function MyMarketsModal({
               <option value={MarketStatus.PENDING_RESOLUTION}>Pending Resolution</option>
               <option value={MarketStatus.DISPUTED}>Disputed</option>
               <option value={MarketStatus.RESOLVED}>Resolved</option>
+              <option value={MarketStatus.EXPIRED}>Expired</option>
             </select>
           </div>
           <button
@@ -646,6 +714,9 @@ function MyMarketsModal({
                       isCreatorOfPending={isCreatorOfPendingMarket}
                       onAccept={handleOpenAcceptance}
                       account={account}
+                      onClearExpired={handleClearExpired}
+                      onClearAllExpired={handleClearAllExpired}
+                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
@@ -703,6 +774,9 @@ function MyMarketsModal({
                       showActions
                       account={account}
                       showResolveCountdown
+                      onClearExpired={handleClearExpired}
+                      onClearAllExpired={handleClearAllExpired}
+                      statusFilter={statusFilter}
                     />
                   )}
                 </div>
@@ -849,9 +923,40 @@ function MarketsTable({
   onResolve,
   onRespondToDispute,
   onAccept,
+  onClearExpired,
+  onClearAllExpired,
+  statusFilter,
   account,
   showResolveCountdown = false
 }) {
+  const expiredMarkets = useMemo(
+    () => markets.filter(m => m.computedStatus === MarketStatus.EXPIRED),
+    [markets]
+  )
+  const showClearAll =
+    statusFilter === MarketStatus.EXPIRED &&
+    expiredMarkets.length > 0 &&
+    typeof onClearAllExpired === 'function'
+
+  // Pick the appropriate countdown source for each row. Pending offers use
+  // the *acceptance* deadline, not the trading/resolve deadline — those are
+  // unrelated for an un-accepted wager, and using endDate is what made
+  // expired offers report "tomorrow" instead of "Expired".
+  const rowTimeLeft = (market) => {
+    const isPending =
+      market.computedStatus === MarketStatus.PENDING_ACCEPTANCE ||
+      market.computedStatus === MarketStatus.EXPIRED
+    const endTime = isPending && market.acceptanceDeadline
+      ? market.acceptanceDeadline
+      : (market.tradingEndTime || market.endDate)
+    if (market.computedStatus === MarketStatus.EXPIRED) return 'Expired'
+    return getTimeRemaining(endTime)
+  }
+
+  const tableHasActionsColumn =
+    showActions || canAccept || showResolveCountdown ||
+    (typeof onClearExpired === 'function' && expiredMarkets.length > 0)
+
   return (
     <div className="mm-table-container">
       <table className="mm-table" role="table">
@@ -861,24 +966,26 @@ function MarketsTable({
             <th>Type</th>
             <th>{showOutcome ? 'Outcome' : 'Time Left'}</th>
             <th>Status</th>
-            {(showActions || canAccept || showResolveCountdown) && <th>Actions</th>}
+            {tableHasActionsColumn && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>
           {markets.map((market) => {
-            const endTime = market.tradingEndTime || market.endDate
-            const timeLeft = getTimeRemaining(endTime)
+            const timeLeft = rowTimeLeft(market)
+            const isExpired = market.computedStatus === MarketStatus.EXPIRED
             const showResolveBtn = showActions && canResolve?.(market)
             const showDisputeBtn = showActions && canRespondToDispute?.(market)
-            const showAcceptBtn = canAccept?.(market)
-            const showUnderConsideration = isCreatorOfPending?.(market)
+            const showAcceptBtn = !isExpired && canAccept?.(market)
+            const showUnderConsideration = !isExpired && isCreatorOfPending?.(market)
+            const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
+            const showClearBtn = isExpired && typeof onClearExpired === 'function'
             const displayTitle = getMarketDisplayTitle(market)
 
             return (
               <tr
                 key={`${market.marketType}-${market.id}`}
                 onClick={() => onSelect(market)}
-                className="mm-table-row"
+                className={`mm-table-row${isExpired ? ' mm-table-row-expired' : ''}`}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter') onSelect(market) }}
@@ -917,6 +1024,8 @@ function MarketsTable({
                     <span className={`mm-outcome ${market.outcome === 'Pass' || market.outcome === 'Yes' ? 'positive' : 'negative'}`}>
                       {market.outcome || 'N/A'}
                     </span>
+                  ) : isExpired ? (
+                    <span className="mm-time-expired">Expired</span>
                   ) : (
                     timeLeft
                   )}
@@ -926,7 +1035,7 @@ function MarketsTable({
                     {showUnderConsideration ? 'Under Consideration' : getStatusLabel(market.computedStatus)}
                   </span>
                 </td>
-                {(showActions || showAcceptBtn || showUnderConsideration || showResolveCountdown) && (
+                {tableHasActionsColumn && (
                   <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>
                     {showAcceptBtn && (
                       <button
@@ -937,7 +1046,7 @@ function MarketsTable({
                         View Offer
                       </button>
                     )}
-                    {showResolveCountdown && (
+                    {showResolveCountdown && !isExpired && (
                       <ResolveButtonWithCountdown
                         market={market}
                         onResolve={onResolve}
@@ -962,6 +1071,15 @@ function MarketsTable({
                         Respond
                       </button>
                     )}
+                    {showClearBtn && (
+                      <button
+                        className="mm-action-btn mm-action-clear"
+                        onClick={(e) => { e.stopPropagation(); onClearExpired(market) }}
+                        title={isCreator ? 'Reclaim stake and clear' : 'Clear from list'}
+                      >
+                        {isCreator ? 'Reclaim & Clear' : 'Clear'}
+                      </button>
+                    )}
                   </td>
                 )}
               </tr>
@@ -969,6 +1087,18 @@ function MarketsTable({
           })}
         </tbody>
       </table>
+      {showClearAll && (
+        <div className="mm-table-footer">
+          <button
+            type="button"
+            className="mm-btn-secondary mm-btn-small"
+            onClick={() => onClearAllExpired(expiredMarkets)}
+            title="Hide all expired offers from this list"
+          >
+            Clear all expired ({expiredMarkets.length})
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1132,7 +1262,22 @@ function MarketDetailView({
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
-  const endTime = market.tradingEndTime || market.endDate
+  // For un-accepted offers, the relevant deadline is the *acceptance*
+  // deadline, not the trading/resolve window — the latter is what made
+  // expired offers show "tomorrow" in the list/detail view.
+  const isPendingLike =
+    market.computedStatus === MarketStatus.PENDING_ACCEPTANCE ||
+    market.computedStatus === MarketStatus.EXPIRED
+  const endTime = isPendingLike && market.acceptanceDeadline
+    ? market.acceptanceDeadline
+    : (market.tradingEndTime || market.endDate)
+  const isExpired = market.computedStatus === MarketStatus.EXPIRED
+  const endLabel = isHistoryView
+    ? 'Ended'
+    : isPendingLike
+      ? 'Accept by'
+      : 'Ends'
+  const remainingDisplay = isExpired ? 'Expired' : getTimeRemaining(endTime)
 
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawError, setWithdrawError] = useState(null)
@@ -1266,13 +1411,13 @@ function MarketDetailView({
           </span>
         </div>
         <div className="mm-detail-item">
-          <span className="mm-detail-label">{isHistoryView ? 'Ended' : 'Ends'}</span>
+          <span className="mm-detail-label">{endLabel}</span>
           <span className="mm-detail-value">{formatDate(endTime)}</span>
         </div>
         {!isHistoryView && (
           <div className="mm-detail-item">
-            <span className="mm-detail-label">Time Remaining</span>
-            <span className="mm-detail-value mm-time-remaining">{getTimeRemaining(endTime)}</span>
+            <span className="mm-detail-label">{isExpired ? 'Status' : 'Time Remaining'}</span>
+            <span className={`mm-detail-value mm-time-remaining${isExpired ? ' mm-time-expired' : ''}`}>{remainingDisplay}</span>
           </div>
         )}
         {market.totalLiquidity && (

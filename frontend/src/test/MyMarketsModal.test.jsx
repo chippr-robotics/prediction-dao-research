@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
-import { WalletContext, ThemeContext, UIContext } from '../contexts'
+import { WalletContext, ThemeContext, UIContext, FriendMarketsContext } from '../contexts'
 import { BrowserRouter } from 'react-router-dom'
 
 // Mock hooks
@@ -93,20 +93,36 @@ describe('MyMarketsModal', () => {
     modal: null
   }
 
+  const defaultFriendMarketsContext = {
+    friendMarkets: [],
+    loading: false,
+    refresh: vi.fn(),
+    addMarket: vi.fn(),
+    setFriendMarkets: vi.fn(),
+    dismissedIds: new Set(),
+    dismissMarket: vi.fn(),
+    dismissMarkets: vi.fn(),
+    restoreMarket: vi.fn(),
+    isDismissed: vi.fn(() => false),
+  }
+
   const renderWithProviders = (component, options = {}) => {
     const {
       walletContext = defaultWalletContext,
       themeContext = defaultThemeContext,
-      uiContext = defaultUIContext
+      uiContext = defaultUIContext,
+      friendMarketsContext = defaultFriendMarketsContext
     } = options
 
     return render(
       <BrowserRouter>
         <ThemeContext.Provider value={themeContext}>
           <WalletContext.Provider value={walletContext}>
-            <UIContext.Provider value={uiContext}>
-              {component}
-            </UIContext.Provider>
+            <FriendMarketsContext.Provider value={friendMarketsContext}>
+              <UIContext.Provider value={uiContext}>
+                {component}
+              </UIContext.Provider>
+            </FriendMarketsContext.Provider>
           </WalletContext.Provider>
         </ThemeContext.Provider>
       </BrowserRouter>
@@ -425,6 +441,71 @@ describe('MyMarketsModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Test Wager 2')).toBeInTheDocument()
       })
+    })
+
+    it('should hide expired pending offers from the default list', async () => {
+      const expiredMarket = {
+        id: '99',
+        description: 'Expired Offer',
+        creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+        participants: ['0x1234567890123456789012345678901234567890'],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[expiredMarket]} />
+        )
+      })
+
+      // Default Participating tab + 'all' status filter → expired offer hidden
+      expect(screen.queryByText('Expired Offer')).not.toBeInTheDocument()
+      expect(screen.getByText(/No Active Positions/i)).toBeInTheDocument()
+    })
+
+    it('shows expired offers with "Expired" time-left and Clear button when filter is Expired', async () => {
+      const user = userEvent.setup()
+      const dismissMarket = vi.fn()
+      const expiredMarket = {
+        id: '99',
+        description: 'Expired Offer',
+        creator: '0xABCDEF1234567890ABCDEF1234567890ABCDEF12',
+        participants: ['0x1234567890123456789012345678901234567890'],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[expiredMarket]} />,
+          {
+            friendMarketsContext: {
+              ...defaultFriendMarketsContext,
+              dismissMarket,
+            }
+          }
+        )
+      })
+
+      const statusSelect = screen.getAllByRole('combobox')[1]
+      await user.selectOptions(statusSelect, 'expired')
+
+      await waitFor(() => {
+        expect(screen.getByText('Expired Offer')).toBeInTheDocument()
+      })
+
+      // Time-left cell reads "Expired", not "tomorrow"
+      expect(screen.getAllByText('Expired').length).toBeGreaterThan(0)
+
+      // Invitee (not creator) → button label is just "Clear"
+      const clearBtn = screen.getByRole('button', { name: /^clear$/i })
+      await user.click(clearBtn)
+      expect(dismissMarket).toHaveBeenCalledWith('99')
     })
 
     it('should show tab badges only for unread wagers (count circuit breaker)', async () => {

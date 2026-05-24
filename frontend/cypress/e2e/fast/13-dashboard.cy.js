@@ -338,4 +338,105 @@ describe('Dashboard', () => {
       }
     })
   })
+
+  // ---------------------------------------------------------------------------
+  // DSH-14..DSH-16: Expired pending offers (My Wagers cleanup)
+  //
+  // These cover the UI-only contract: an offer whose acceptanceDeadline has
+  // passed must be hidden by default, must surface under the Expired filter
+  // with "Expired" in the Time Left column (not e.g. "23h 6m" from the
+  // resolve deadline), and must be clearable from the user's local view.
+  // The on-chain refund path is exercised by REF-01 in the full tier; here
+  // we only assert what the user sees and what localStorage records.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Connect, then seed localStorage with the supplied friend-market list and
+   * reload so FriendMarketsContext picks them up from cache. The on-chain
+   * fetch fails (no Hardhat) and the catch path preserves localStorage,
+   * matching the wallet-disconnected-from-node scenario in production caches.
+   */
+  function seedFriendMarketsAndOpen(markets) {
+    connectAndVisitDashboard()
+    cy.window().then((win) => {
+      win.localStorage.setItem('friendMarkets', JSON.stringify(markets))
+    })
+    cy.reload()
+    cy.get('body', { timeout: 10000 }).should('be.visible')
+    // Re-connect via UI after reload (wagmi auto-reconnect may not fire).
+    cy.get('body').then(($body) => {
+      if ($body.find('.wallet-connect-button, button[aria-label="Connect Wallet"]').length > 0) {
+        cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 })
+          .click()
+        cy.get('.connector-option:not(.unavailable)', { timeout: 5000 })
+          .first()
+          .click()
+      }
+    })
+    cy.get('.quick-action-card').contains('My Wagers').click()
+    cy.get('[role="dialog"], .my-markets-modal', { timeout: 5000 }).should('be.visible')
+  }
+
+  /** Build a synthetic friend-market record for an opponent-side expired offer. */
+  function expiredOfferAsOpponent(id = 'exp-1') {
+    return {
+      id,
+      uniqueId: `0xMOCK-${id}`,
+      contractAddress: '0xMOCK',
+      creator: '0x00000000000000000000000000000000000000aa', // not the test account
+      opponent: TEST_ACCOUNT,
+      participants: ['0x00000000000000000000000000000000000000aa', TEST_ACCOUNT],
+      description: 'DSH-14 Expired Friend Offer',
+      status: 'pending_acceptance',
+      acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+      endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      stakeAmount: '1',
+      stakeTokenSymbol: 'USDC',
+      acceptedCount: 0,
+    }
+  }
+
+  it('[DSH-14] Expired pending offers hidden from default Participating view', () => {
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-14')])
+
+    // Default Participating tab + "All Status" filter → expired offer hidden.
+    cy.get('.mm-empty-state', { timeout: 5000 }).should('be.visible')
+    cy.contains('.mm-table-row', 'DSH-14 Expired Friend Offer').should('not.exist')
+  })
+
+  it('[DSH-15] Expired filter surfaces expired offers with "Expired" time-left and a Clear button', () => {
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-15')])
+
+    cy.get('.mm-filter-bar .mm-filter-select').last().select('expired')
+    cy.get('.mm-filter-bar .mm-filter-select').last().should('have.value', 'expired')
+
+    cy.contains('.mm-table-row', 'DSH-15', { timeout: 5000 }).should('be.visible')
+      .within(() => {
+        // Time-left column reads "Expired" (not e.g. "23h 6m" from endDate).
+        cy.get('.mm-time-expired').should('have.text', 'Expired')
+        // Opponent-side action is just "Clear" (creator's variant adds "Reclaim").
+        cy.contains('button', /^Clear$/).should('be.visible')
+      })
+  })
+
+  it('[DSH-16] Clear button dismisses an expired offer and persists to localStorage', () => {
+    seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-16')])
+
+    cy.get('.mm-filter-bar .mm-filter-select').last().select('expired')
+    cy.contains('.mm-table-row', 'DSH-16').should('be.visible')
+
+    cy.contains('button', /^Clear$/).click({ force: true })
+
+    // Row gone from the list and the dismissed set recorded under the
+    // wallet's per-account key.
+    cy.contains('.mm-table-row', 'DSH-16').should('not.exist')
+    cy.window().then((win) => {
+      const raw = win.localStorage.getItem(
+        `mywagers_dismissed:${TEST_ACCOUNT.toLowerCase()}`
+      )
+      expect(raw).to.exist
+      const ids = JSON.parse(raw)
+      expect(ids).to.include('exp-16')
+    })
+  })
 })
