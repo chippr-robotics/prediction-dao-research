@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
 import { getContractAddress } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
+import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import { ResolutionType, ORACLE_RESOLUTION_TYPES } from '../constants/wagerDefaults'
 import {
   uploadEncryptedEnvelope,
@@ -18,6 +19,47 @@ const ERC20_ABI = [
 ]
 
 export { ResolutionType, ORACLE_RESOLUTION_TYPES }
+
+const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTICIPANT_ROLE'))
+
+async function expireStaleWagers(registry, userAddress, onProgress) {
+  try {
+    const membershipManagerAddr = getContractAddress('membershipManager')
+    if (!membershipManagerAddr) return
+
+    const provider = registry.runner?.provider || registry.provider
+    const mgr = new ethers.Contract(membershipManagerAddr, MEMBERSHIP_MANAGER_ABI, provider)
+    const membership = await mgr.getMembership(userAddress, WAGER_PARTICIPANT_ROLE)
+    const tierNum = Number(membership.tier)
+    if (tierNum === 0) return
+
+    const cfg = await mgr.getTierConfig(WAGER_PARTICIPANT_ROLE, tierNum)
+    const concurrentLimit = Number(cfg.limits.maxConcurrentMarkets)
+    const activeCount = Number(membership.activeCount)
+    if (concurrentLimit === 0 || activeCount < concurrentLimit) return
+
+    const count = await registry.getUserWagerCount(userAddress)
+    if (count === 0n) return
+
+    const wagers = await registry.getUserWagers(userAddress, 0, count)
+    const ids = await registry.getUserWagerIds(userAddress, 0, count)
+    const now = Math.floor(Date.now() / 1000)
+    const expiredIds = []
+
+    for (let i = 0; i < wagers.length; i++) {
+      if (Number(wagers[i].status) === 1 && Number(wagers[i].acceptDeadline) < now) {
+        expiredIds.push(ids[i])
+      }
+    }
+    if (expiredIds.length === 0) return
+
+    onProgress({ step: 'cleanup', message: `Cleaning up ${expiredIds.length} expired wager(s)...` })
+    const tx = await registry.batchExpireOpen(expiredIds)
+    await tx.wait()
+  } catch (e) {
+    console.debug('[expireStaleWagers] cleanup skipped:', e.message)
+  }
+}
 
 // localStorage helpers — preserved for backward-compat with FriendMarketsModal callers
 const PENDING_TX_KEY = 'pendingFriendMarketTx'
@@ -213,6 +255,12 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         await approveTx.wait()
       }
 
+      // Auto-cleanup expired Open wagers that still count toward the
+      // concurrent limit. Without this, acceptDeadline-expired wagers
+      // inflate activeCount and block new creation even when the user
+      // has fewer truly-active wagers than their tier allows.
+      await expireStaleWagers(registry, userAddress, onProgress)
+
       // Simulate to catch reverts pre-wallet-prompt
       try {
         onProgress({ step: 'create', message: 'Validating transaction...' })
@@ -310,7 +358,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
 export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
-  if (reason.includes('MembershipDenied')) return 'Your Friend Market membership is inactive or you have reached the monthly/concurrent wager limit. Purchase or upgrade your tier to continue.'
+  if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'
   if (reason.includes('BadDeadlines')) return 'Invalid deadlines. Accept window must be within 30 days; resolve window within 180 days.'

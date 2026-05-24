@@ -846,4 +846,89 @@ describe("WagerRegistry", function () {
       expect(wagers.length).to.equal(0);
     });
   });
+
+  describe("batchExpireOpen", () => {
+    it("refunds expired Open wagers and decrements activeCount", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, mgr, usdcToken, alice, bob, charlie } = fx;
+
+      const id1 = await createDefault(reg, fx);
+      const id2 = await createDefault(reg, fx);
+
+      const m1 = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m1.activeCount).to.equal(2);
+
+      const balBefore = await usdcToken.balanceOf(alice.address);
+      await time.increase(3601);
+      await reg.connect(charlie).batchExpireOpen([id1, id2]);
+      const balAfter = await usdcToken.balanceOf(alice.address);
+
+      expect(balAfter - balBefore).to.equal(usdc(20));
+
+      const m2 = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m2.activeCount).to.equal(0);
+
+      expect((await reg.getWager(id1)).status).to.equal(Status.Refunded);
+      expect((await reg.getWager(id2)).status).to.equal(Status.Refunded);
+    });
+
+    it("skips non-expired and non-Open wagers silently", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, mgr, alice, bob } = fx;
+
+      const id1 = await createDefault(reg, fx);
+      const id2 = await createDefault(reg, fx);
+      await reg.connect(bob).acceptWager(id2);
+
+      await time.increase(3601);
+      await reg.connect(alice).batchExpireOpen([id1, id2, 9999]);
+
+      expect((await reg.getWager(id1)).status).to.equal(Status.Refunded);
+      expect((await reg.getWager(id2)).status).to.equal(Status.Active);
+
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m.activeCount).to.equal(1);
+    });
+
+    it("frees concurrent slots so new wagers can be created", async () => {
+      const fx = await loadFixture(deployFixture);
+      const { reg, mgr, admin, alice, bob, usdcToken } = fx;
+
+      await mgr.connect(admin).setTier(
+        WAGER_PARTICIPANT_ROLE, Tier.Bronze,
+        usdc(50), 30,
+        { monthlyMarketCreation: 100, maxConcurrentMarkets: 3 },
+        true
+      );
+
+      await createDefault(reg, fx);
+      await createDefault(reg, fx);
+      await createDefault(reg, fx);
+
+      const now = await time.latest();
+      await expect(
+        reg.connect(alice).createWager(
+          bob.address, ethers.ZeroAddress, await usdcToken.getAddress(),
+          usdc(10), usdc(10), now + 7200, now + 86400,
+          Resolution.Either, ethers.ZeroHash, false, ethers.id("test"), ""
+        )
+      ).to.be.revertedWithCustomError(reg, "MembershipDenied");
+
+      await time.increase(3601);
+
+      const ids = await reg.getUserWagerIds(alice.address, 0, 10);
+      await reg.batchExpireOpen(Array.from(ids));
+
+      const m = await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE);
+      expect(m.activeCount).to.equal(0);
+
+      const now2 = await time.latest();
+      await reg.connect(alice).createWager(
+        bob.address, ethers.ZeroAddress, await usdcToken.getAddress(),
+        usdc(10), usdc(10), now2 + 7200, now2 + 86400,
+        Resolution.Either, ethers.ZeroHash, false, ethers.id("test"), ""
+      );
+      expect((await mgr.getMembership(alice.address, WAGER_PARTICIPANT_ROLE)).activeCount).to.equal(1);
+    });
+  });
 });

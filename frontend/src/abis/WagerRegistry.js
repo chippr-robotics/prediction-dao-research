@@ -834,6 +834,19 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256[]",
+        "name": "wagerIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "batchExpireOpen",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "wagerId",
         "type": "uint256"

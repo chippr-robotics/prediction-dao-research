@@ -41,13 +41,17 @@ export function RoleDetailsCard({ role, onUpgrade, onExtend, compact = false, is
     expirationDate,
     wagersCreated,
     wagerLimit,
-    canCreateWager
+    canCreateWager,
+    activeWagers = 0,
+    concurrentLimit = 0,
   } = role
 
   const displayName = ROLE_DISPLAY_NAMES[roleName] || roleName
   const description = ROLE_DESCRIPTIONS[roleName] || ''
 
-  const isAtLimit = wagerLimit > 0 && !canCreateWager
+  const isMonthlyLimit = wagerLimit > 0 && wagersCreated >= wagerLimit
+  const isConcurrentLimit = concurrentLimit > 0 && activeWagers >= concurrentLimit
+  const isAtLimit = (wagerLimit > 0 || concurrentLimit > 0) && !canCreateWager
   const isExpiringSoon = daysRemaining !== null && daysRemaining <= 7 && daysRemaining > 0
   const needsAttention = isFrozen || isExpired || isAtLimit || isExpiringSoon
 
@@ -85,8 +89,16 @@ export function RoleDetailsCard({ role, onUpgrade, onExtend, compact = false, is
             {wagerLimit > 0 && (
               <div className="detail-row">
                 <span className="detail-label">Wagers:</span>
-                <span className={`detail-value ${isAtLimit ? 'at-limit' : ''}`}>
+                <span className={`detail-value ${isMonthlyLimit ? 'at-limit' : ''}`}>
                   {wagersCreated} / {wagerLimit} this month
+                </span>
+              </div>
+            )}
+            {concurrentLimit > 0 && (
+              <div className="detail-row">
+                <span className="detail-label">Active:</span>
+                <span className={`detail-value ${isConcurrentLimit ? 'at-limit' : ''}`}>
+                  {activeWagers} / {concurrentLimit} concurrent
                 </span>
               </div>
             )}
@@ -162,18 +174,28 @@ export function RoleDetailsCard({ role, onUpgrade, onExtend, compact = false, is
             <span className="stat-label">Wagers This Month</span>
             <div className="usage-bar-container">
               <div
-                className={`usage-bar ${isAtLimit ? 'at-limit' : ''}`}
+                className={`usage-bar ${isMonthlyLimit ? 'at-limit' : ''}`}
                 style={{ width: `${Math.min(100, (wagersCreated / wagerLimit) * 100)}%` }}
               />
             </div>
-            <span className={`stat-value ${isAtLimit ? 'at-limit' : ''}`}>
+            <span className={`stat-value ${isMonthlyLimit ? 'at-limit' : ''}`}>
               {wagersCreated} / {wagerLimit}
             </span>
-            {isAtLimit && (
-              <span className="stat-sublabel warning">
-                Limit reached — upgrade for more
-              </span>
-            )}
+          </div>
+        )}
+
+        {concurrentLimit > 0 && (
+          <div className="role-stat">
+            <span className="stat-label">Active Wagers</span>
+            <div className="usage-bar-container">
+              <div
+                className={`usage-bar ${isConcurrentLimit ? 'at-limit' : ''}`}
+                style={{ width: `${Math.min(100, (activeWagers / concurrentLimit) * 100)}%` }}
+              />
+            </div>
+            <span className={`stat-value ${isConcurrentLimit ? 'at-limit' : ''}`}>
+              {activeWagers} / {concurrentLimit}
+            </span>
           </div>
         )}
 
@@ -182,9 +204,14 @@ export function RoleDetailsCard({ role, onUpgrade, onExtend, compact = false, is
             Your {displayName} access has expired. Renew to continue creating wagers.
           </div>
         )}
-        {isAtLimit && !isExpired && !isFrozen && (
+        {isConcurrentLimit && !isMonthlyLimit && !isExpired && !isFrozen && (
           <div className="role-alert at-limit">
-            You've reached your monthly limit. Upgrade your tier for higher limits.
+            Concurrent wager limit reached. Close or refund expired wagers to free up slots, or upgrade your tier.
+          </div>
+        )}
+        {isMonthlyLimit && !isExpired && !isFrozen && (
+          <div className="role-alert at-limit">
+            Monthly wager limit reached. Upgrade your tier for higher limits.
           </div>
         )}
         {isExpiringSoon && !isExpired && !isAtLimit && !isFrozen && (
