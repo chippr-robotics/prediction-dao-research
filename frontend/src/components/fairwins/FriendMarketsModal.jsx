@@ -600,12 +600,6 @@ function FriendMarketsModal({
     if (freshDeadline !== formData.acceptanceDeadline) {
       setFormData(prev => ({ ...prev, acceptanceDeadline: freshDeadline }))
     }
-    const acceptanceDeadline = new Date(freshDeadline)
-    if (isNaN(acceptanceDeadline.getTime())) {
-      newErrors.acceptanceDeadline = 'Could not calculate acceptance deadline — check the end date'
-    } else if (acceptanceDeadline >= endDate) {
-      newErrors.acceptanceDeadline = 'Acceptance deadline must be before market end date'
-    }
 
     // Validate minimum threshold for group markets
     if (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') {
@@ -1277,7 +1271,6 @@ function FriendMarketsModal({
                           : '—'}
                       </div>
                       <span className="fm-hint">Automatically set to halfway between now and end time</span>
-                      {errors.acceptanceDeadline && <span className="fm-error">{errors.acceptanceDeadline}</span>}
                     </div>
 
                     {/* Minimum Threshold - only for group markets */}
