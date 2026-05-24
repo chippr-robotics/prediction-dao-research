@@ -53,7 +53,15 @@ export default defineConfig({
         '*.config.js',
         'dist/',
         'cypress/',
-        'cypress.config.js'
+        'cypress.config.js',
+        'src/**/index.js',
+        'src/legacy/**',
+        'src/assets/**',
+        'src/main.jsx',
+        'src/App.jsx',
+        'src/wagmi.js',
+        'src/thirdweb.js',
+        'src/ipfs.js'
       ]
     }
   }
