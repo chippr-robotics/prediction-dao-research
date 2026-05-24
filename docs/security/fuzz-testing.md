@@ -41,9 +41,19 @@ Medusa uses intelligent fuzzing techniques:
 ### Example
 
 ```solidity
-// Invariant: Total supply should never exceed initial supply
-function property_total_supply_bounded() public view returns (bool) {
-    return registry.totalSupply() <= INITIAL_SUPPLY;
+// Invariant: Escrow balance always covers active wager stakes
+function property_escrow_covers_active_stakes() public view returns (bool) {
+    uint256 totalLocked = 0;
+    uint256 count = registry.nextWagerId();
+    for (uint256 i = 1; i < count; i++) {
+        IWagerRegistry.Wager memory w = registry.getWager(i);
+        if (w.status == IWagerRegistry.Status.Open) {
+            totalLocked += w.creatorStake;
+        } else if (w.status == IWagerRegistry.Status.Active && !w.paid) {
+            totalLocked += uint256(w.creatorStake) + uint256(w.opponentStake);
+        }
+    }
+    return token.balanceOf(address(registry)) >= totalLocked;
 }
 ```
 
@@ -99,8 +109,9 @@ Medusa is configured via `medusa.json`:
     "corpusDirectory": "medusa-corpus",
     "coverageEnabled": true,
     "targetContracts": [
-      "ProposalRegistryFuzzTest",
-      "WelfareMetricRegistryFuzzTest"
+      "WagerRegistryFuzzTest",
+      "MembershipManagerFuzzTest",
+      "KeyRegistryFuzzTest"
     ],
     "testing": {
       "stopOnFailedTest": true,
@@ -134,27 +145,39 @@ Medusa is configured via `medusa.json`:
 ### Test Contract Structure
 
 ```solidity
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "../../contracts/ProposalRegistry.sol";
+import "../wagers/WagerRegistry.sol";
+import "../access/MembershipManager.sol";
+import "../mocks/MockERC20.sol";
 
-contract ProposalRegistryFuzzTest {
-    ProposalRegistry public registry;
-    
+contract WagerRegistryFuzzTest {
+    WagerRegistry public registry;
+    MembershipManager public membership;
+    MockERC20 public token;
+
     constructor() {
-        registry = new ProposalRegistry();
+        // Deploy full stack: token, membership, registry
+        token = new MockERC20("FuzzCoin", "FUZZ", 1e30);
+        membership = new MembershipManager(address(this), address(token), address(0x40000));
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(token);
+        registry = new WagerRegistry(address(this), address(membership), address(0), tokens);
+        membership.setAuthorizedCaller(address(registry), true);
+        // ... tier setup, membership purchase, approvals
     }
-    
+
     // Property test: must start with "property_"
-    function property_proposal_count_never_decreases() public view returns (bool) {
-        uint256 count = registry.proposalCount();
-        return count >= 0; // Always true, but validates access
+    function property_wager_count_never_decreases() public returns (bool) {
+        uint256 current = registry.nextWagerId();
+        return current >= _previousWagerCount;
     }
-    
-    // Property test with parameters
-    function property_bond_sufficient(uint256 amount) public view returns (bool) {
-        return amount >= registry.bondAmount();
+
+    // Property test: escrow solvency
+    function property_escrow_covers_active_stakes() public view returns (bool) {
+        // ... iterate wagers, sum locked stakes, compare to balance
+        return token.balanceOf(address(registry)) >= totalLocked;
     }
 }
 ```
@@ -221,7 +244,7 @@ medusa fuzz --timeout 300
 ### Specific Test
 
 ```bash
-medusa fuzz --target-contracts ProposalRegistryFuzzTest
+medusa fuzz --target-contracts WagerRegistryFuzzTest
 ```
 
 ### With Coverage
@@ -254,17 +277,17 @@ Medusa runs automatically in the GitHub Actions workflow:
 ```
 [Medusa] Starting fuzzing campaign
 [Medusa] Workers: 10, Timeout: 300s
-[Medusa] Target contracts: ProposalRegistryFuzzTest, WelfareMetricRegistryFuzzTest
+[Medusa] Target contracts: WagerRegistryFuzzTest, MembershipManagerFuzzTest, KeyRegistryFuzzTest
 
-[Worker 1] Fuzzing ProposalRegistryFuzzTest
+[Worker 1] Fuzzing WagerRegistryFuzzTest
 [Worker 1] Corpus size: 42 | Coverage: 87% | Executions: 1,524
 
-✓ property_proposal_count_never_decreases: PASSED
-✓ property_bond_amount_positive: PASSED
-✓ property_total_weight_bounded: PASSED
+✓ property_wager_count_never_decreases: PASSED
+✓ property_escrow_covers_active_stakes: PASSED
+✓ property_winner_is_participant: PASSED
 
 [Medusa] Fuzzing completed
-[Medusa] Total tests: 3 | Passed: 3 | Failed: 0
+[Medusa] Total tests: 26 | Passed: 26 | Failed: 0
 [Medusa] Coverage: 87% | Time: 178s
 ```
 
@@ -273,16 +296,17 @@ Medusa runs automatically in the GitHub Actions workflow:
 When a property fails:
 
 ```
-✗ property_total_supply_bounded: FAILED
+✗ property_escrow_covers_active_stakes: FAILED
 
 Failing sequence:
 1. constructor()
-2. mint(0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2, 1000000000)
-3. mint(0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2, MAX_UINT256)
+2. createWager(0x20000, 0x0, 0xToken, 1000000, 1000000, ...)
+3. acceptWager(1)
+4. claimPayout(1)
 
 Property returned false at:
-  File: ProposalRegistryFuzzTest.sol
-  Function: property_total_supply_bounded
+  File: WagerRegistryFuzzTest.sol
+  Function: property_escrow_covers_active_stakes
   
 Transaction trace saved to: medusa-corpus/failed_001.json
 ```
@@ -325,72 +349,49 @@ Coverage: 87%
 
 Higher coverage means more thorough testing.
 
-## Fuzz Test Examples
+## Fuzz Test Contracts
 
-### ProposalRegistry
+The fuzz test harnesses live in `contracts/test/` and target the active FairWins contracts:
 
-```solidity
-contract ProposalRegistryFuzzTest {
-    ProposalRegistry public registry;
-    
-    constructor() {
-        registry = new ProposalRegistry();
-    }
-    
-    // Invariant: Count never decreases
-    function property_proposal_count_never_decreases() public view returns (bool) {
-        uint256 count = registry.proposalCount();
-        return count >= 0;
-    }
-    
-    // Invariant: Bond amount is positive
-    function property_bond_amount_positive() public view returns (bool) {
-        return registry.bondAmount() > 0;
-    }
-    
-    // Property: Submission requires correct bond
-    function property_submission_requires_bond(
-        string memory title,
-        uint256 fundingAmount
-    ) public payable returns (bool) {
-        // Test various conditions
-        if (msg.value < registry.bondAmount()) {
-            return true; // Should revert
-        }
-        if (bytes(title).length == 0) {
-            return true; // Should revert
-        }
-        return true;
-    }
-}
-```
+### WagerRegistryFuzzTest
 
-### WelfareMetricRegistry
+Tests invariants for the peer-to-peer wager escrow system:
 
-```solidity
-contract WelfareMetricRegistryFuzzTest {
-    WelfareMetricRegistry public registry;
-    
-    constructor() {
-        registry = new WelfareMetricRegistry();
-    }
-    
-    // Invariant: Total weight bounded
-    function property_total_weight_bounded() public view returns (bool) {
-        return registry.totalActiveWeight() <= 10000;
-    }
-    
-    // Invariant: Metric count never decreases
-    function property_metric_count_never_decreases() public view returns (bool) {
-        return registry.metricCount() >= 0;
-    }
-    
-    // Property: Weight values are valid
-    function property_weight_bounded(uint256 weight) public pure returns (bool) {
-        return weight <= 10000;
-    }
-}
-```
+- **Wager count monotonicity** -- `nextWagerId` never decreases
+- **Escrow solvency** -- token balance always covers locked stakes
+- **Winner integrity** -- resolved winner is always creator or opponent
+- **No double-claim** -- the `paid` flag is irreversible
+- **Forward-only state** -- status transitions never go backward
+- **Payout correctness** -- payout equals `creatorStake + opponentStake`
+- **Freeze enforcement** -- frozen accounts cannot mutate state
+- **Pause enforcement** -- paused contract blocks creation
+- **Refund completeness** -- refunded wagers preserve stake values
+- **ID base** -- `nextWagerId` is always >= 1
+
+### MembershipManagerFuzzTest
+
+Tests invariants for the tiered membership system:
+
+- **Tier ID bounds** -- tier values are always in [0..4]
+- **Expiry correctness** -- active memberships have future expiry
+- **Upgrade monotonicity** -- downgrade attempts always revert
+- **Limit consistency** -- tier limits match configured values
+- **Fee solvency** -- accrued fees never exceed token balance
+- **Access control** -- non-admins cannot configure or withdraw
+- **Price ordering** -- tier prices are monotonically increasing
+- **Grant correctness** -- admin grants produce active memberships
+- **Limit ordering** -- higher tiers have >= limits
+
+### KeyRegistryFuzzTest
+
+Tests invariants for the encryption key registry:
+
+- **Key length bounds** -- stored keys satisfy `MIN_KEY_LENGTH..MAX_KEY_LENGTH`
+- **Overwrite support** -- re-registering replaces the previous key
+- **Empty for unregistered** -- `getPublicKey` returns empty bytes for unknown addresses
+- **hasKey consistency** -- `hasKey` and `getPublicKey` agree
+- **Short key rejection** -- keys below `MIN_KEY_LENGTH` are rejected
+- **Long key rejection** -- keys above `MAX_KEY_LENGTH` are rejected
 
 ## Best Practices
 

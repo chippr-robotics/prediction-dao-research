@@ -19,6 +19,8 @@
     "cypress:headless": "cypress run",
     "cypress:run": "cypress run",
     "test:e2e": "start-server-and-test dev http://localhost:5173 cypress:headless",
+    "test:e2e:fast": "start-server-and-test dev http://localhost:5173 'cypress run --spec cypress/e2e/fast/**/*.cy.js'",
+    "test:e2e:full": "start-server-and-test dev http://localhost:5173 'cypress run --spec cypress/e2e/full/**/*.cy.js'",
     "test:e2e:open": "start-server-and-test dev http://localhost:5173 cypress"
   },
   "dependencies": {

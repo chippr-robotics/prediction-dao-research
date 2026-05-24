@@ -1,0 +1,34 @@
+{
+  "polymarket": {
+    "conditionId": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "questionTitle": "Will BTC exceed $100k by end of 2025?",
+    "outcome": "YES",
+    "resolved": false
+  },
+  "polymarketResolved": {
+    "conditionId": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    "questionTitle": "Did the Chiefs win Super Bowl 2025?",
+    "outcome": "YES",
+    "resolved": true,
+    "payoutNumerators": [1, 0]
+  },
+  "chainlinkDataFeed": {
+    "feedAddress": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+    "description": "ETH / USD",
+    "threshold": 4000,
+    "operator": "GreaterThan",
+    "operatorCode": 0
+  },
+  "chainlinkFunctions": {
+    "donId": "0x66756e2d706f6c79676f6e2d616d6f792d310000000000000000000000000000",
+    "subscriptionId": 1,
+    "source": "return Functions.encodeUint256(1)",
+    "description": "Custom Chainlink Functions condition"
+  },
+  "uma": {
+    "claim": "The price of ETH exceeded $4000 on 2025-12-31",
+    "bond": "1000000",
+    "liveness": 7200,
+    "currency": "USDC"
+  }
+}

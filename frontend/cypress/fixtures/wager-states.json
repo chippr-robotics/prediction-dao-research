@@ -1,0 +1,71 @@
+{
+  "pendingAcceptance": {
+    "status": "Open",
+    "statusCode": 0,
+    "description": "Test wager pending acceptance",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC",
+    "resolutionType": "Either",
+    "resolutionTypeCode": 0,
+    "acceptDeadlineOffset": 172800,
+    "resolveDeadlineOffset": 604800
+  },
+  "active": {
+    "status": "Active",
+    "statusCode": 1,
+    "description": "Test active wager",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC",
+    "resolutionType": "Either",
+    "resolutionTypeCode": 0
+  },
+  "pendingResolution": {
+    "status": "Active",
+    "statusCode": 1,
+    "description": "Test wager past end date awaiting resolution",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC",
+    "resolutionType": "Either",
+    "resolutionTypeCode": 0
+  },
+  "resolved": {
+    "status": "Resolved",
+    "statusCode": 3,
+    "description": "Test resolved wager",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC",
+    "resolutionType": "Either",
+    "resolutionTypeCode": 0
+  },
+  "cancelled": {
+    "status": "Cancelled",
+    "statusCode": 4,
+    "description": "Test cancelled wager",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC"
+  },
+  "refunded": {
+    "status": "Refunded",
+    "statusCode": 5,
+    "description": "Test refunded wager",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC"
+  },
+  "bookmaker": {
+    "status": "Open",
+    "statusCode": 0,
+    "description": "Test bookmaker wager with asymmetric odds",
+    "creatorStake": "100000000",
+    "opponentStake": "50000000",
+    "stakeToken": "USDC",
+    "oddsMultiplier": 300
+  },
+  "encrypted": {
+    "status": "Open",
+    "statusCode": 0,
+    "description": "encrypted:ipfs://QmTestEncryptedCID",
+    "stakeAmount": "10000000",
+    "stakeToken": "USDC",
+    "isEncrypted": true
+  }
+}
