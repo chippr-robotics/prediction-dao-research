@@ -689,10 +689,15 @@ function MyMarketsModal({
                       getTimeRemaining={getTimeRemaining}
                       account={account}
                       userPositions={userPositions}
+                      canResolve={canResolve}
                       canOpenDispute={canOpenDispute}
+                      onOpenResolution={handleOpenResolution}
                       onOpenDispute={handleOpenDispute}
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting(selectedMarket?.id)}
+                      signer={signer}
+                      isCorrectNetwork={isCorrectNetwork}
+                      switchNetwork={switchNetwork}
                     />
                   ) : categorizedMarkets.participating.length === 0 ? (
                     <div className="mm-empty-state">
@@ -717,6 +722,8 @@ function MyMarketsModal({
                       onClearExpired={handleClearExpired}
                       onClearAllExpired={handleClearAllExpired}
                       statusFilter={statusFilter}
+                      showResolveCountdown
+                      onResolve={handleOpenResolution}
                     />
                   )}
                 </div>
@@ -1112,8 +1119,22 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
   const [timeRemaining, setTimeRemaining] = useState(null)
   const [canResolveNow, setCanResolveNow] = useState(false)
 
-  // Check if user is creator
-  const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
+  const userAddr = account?.toLowerCase()
+  const isCreator = market.creator?.toLowerCase() === userAddr
+  const isOpponent = market.participants?.length > 1 &&
+    market.participants[1]?.toLowerCase() === userAddr
+  const isArbitrator = market.arbitrator &&
+    market.arbitrator !== ethers.ZeroAddress &&
+    market.arbitrator.toLowerCase() === userAddr
+
+  const resType = market.resolutionType ?? 0
+  const isAuthorized = (() => {
+    if (resType === 0) return isCreator || isOpponent || isArbitrator
+    if (resType === 1) return isCreator
+    if (resType === 2) return isOpponent
+    if (resType === 3) return isArbitrator
+    return false
+  })()
 
   // Get end time
   const endTime = useMemo(() => {
@@ -1129,7 +1150,7 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
 
   // Update countdown every second
   useEffect(() => {
-    if (!endTime || !isCreator) return
+    if (!endTime || !isAuthorized) return
 
     const updateCountdown = () => {
       const now = Date.now()
@@ -1148,10 +1169,9 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
     const interval = setInterval(updateCountdown, 1000)
 
     return () => clearInterval(interval)
-  }, [endTime, isCreator])
+  }, [endTime, isAuthorized])
 
-  // Don't show if not creator
-  if (!isCreator) return null
+  if (!isAuthorized) return null
 
   // If already resolved, disputed, or cancelled, don't show
   const status = market.computedStatus || market.status
@@ -1547,7 +1567,7 @@ function MarketDetailView({
             )}
           </div>
         )}
-        {isCreatorView && (
+        {onOpenResolution && (
           <ResolveButtonWithCountdown
             market={market}
             onResolve={onOpenResolution}
@@ -1555,7 +1575,7 @@ function MarketDetailView({
             variant="full"
           />
         )}
-        {isCreatorView && canRespondToDispute?.(market) && (
+        {canRespondToDispute?.(market) && (
           <button
             type="button"
             className="mm-btn-warning"
@@ -1567,7 +1587,7 @@ function MarketDetailView({
             Respond to Dispute
           </button>
         )}
-        {!isCreatorView && canOpenDispute?.(market) && (
+        {canOpenDispute?.(market) && (
           <button
             type="button"
             className="mm-btn-secondary"
@@ -1670,6 +1690,8 @@ function ResolutionModal({
         setError('This wager is not active. It may have already been resolved or is still pending acceptance.')
       } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
         setError('You are not authorized to resolve this wager based on its resolution type.')
+      } else if (err.reason?.includes('ResolveExpired') || err.message?.includes('ResolveExpired')) {
+        setError('The resolution deadline has passed. This wager can no longer be resolved and may be eligible for a refund.')
       } else {
         setError(err.reason || err.shortMessage || err.message || 'Failed to resolve wager. Please try again.')
       }

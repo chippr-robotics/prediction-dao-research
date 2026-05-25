@@ -4,7 +4,7 @@ import { useWeb3 } from './useWeb3'
 import { getContractAddress } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
-import { ResolutionType, ORACLE_RESOLUTION_TYPES } from '../constants/wagerDefaults'
+import { ResolutionType, ORACLE_RESOLUTION_TYPES, WAGER_DEFAULTS } from '../constants/wagerDefaults'
 import {
   uploadEncryptedEnvelope,
   buildEncryptedIpfsReference
@@ -184,7 +184,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         const hours = parseInt(raw, 10) || 48
         acceptDeadline = Math.floor(Date.now() / 1000) + hours * 3600
       }
-      const resolveDeadline = acceptDeadline + tradingPeriodSeconds
+      const resolveDeadline = acceptDeadline + tradingPeriodSeconds + (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600)
 
       // Participants
       const opponent = data.data.opponent || data.data.participants?.[0]
@@ -331,7 +331,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         arbitrator,
         creator: userAddress,
         acceptanceDeadline: new Date(acceptDeadline * 1000).toISOString(),
-        endDate: new Date(resolveDeadline * 1000).toISOString(),
+        endDate: new Date((acceptDeadline + tradingPeriodSeconds) * 1000).toISOString(),
         tradingPeriod: Math.max(1, Math.ceil(tradingPeriodSeconds / 86400)).toString(),
         createdAt: new Date().toISOString(),
         status: 'pending',
