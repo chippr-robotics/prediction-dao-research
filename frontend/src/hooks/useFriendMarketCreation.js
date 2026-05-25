@@ -168,7 +168,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
 
       // Deadlines
-      const tradingPeriodDays = parseInt(data.data.tradingPeriod, 10) || 7
+      const tradingPeriodSeconds = parseInt(data.data.tradingPeriodSeconds, 10) || (parseInt(data.data.tradingPeriod, 10) || 7) * 86400
       const raw = data.data.acceptanceDeadline
       let acceptDeadline
       if (typeof raw === 'string' && raw.includes('-')) {
@@ -184,7 +184,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         const hours = parseInt(raw, 10) || 48
         acceptDeadline = Math.floor(Date.now() / 1000) + hours * 3600
       }
-      const resolveDeadline = acceptDeadline + tradingPeriodDays * 86400
+      const resolveDeadline = acceptDeadline + tradingPeriodSeconds
 
       // Participants
       const opponent = data.data.opponent || data.data.participants?.[0]
@@ -332,7 +332,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         creator: userAddress,
         acceptanceDeadline: new Date(acceptDeadline * 1000).toISOString(),
         endDate: new Date(resolveDeadline * 1000).toISOString(),
-        tradingPeriod: tradingPeriodDays.toString(),
+        tradingPeriod: Math.max(1, Math.ceil(tradingPeriodSeconds / 86400)).toString(),
         createdAt: new Date().toISOString(),
         status: 'pending',
         txHash: receipt.hash,
