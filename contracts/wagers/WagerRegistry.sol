@@ -222,12 +222,7 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         // Membership gate
         if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
 
-        // Pull creator stake first (CEI: external call before state change)
-        IERC20(token).safeTransferFrom(msg.sender, address(this), creatorStake);
-
-        // Record creation in membership AFTER the transferFrom succeeds (avoids counter-revert race)
-        membershipManager.recordCreate(msg.sender, WAGER_PARTICIPANT_ROLE);
-
+        // Effects
         wagerId = _nextWagerId++;
         Wager storage w = _wagers[wagerId];
         w.creator = msg.sender;
@@ -248,6 +243,10 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         _userWagerIds[msg.sender].add(wagerId);
         _userWagerIds[opponent].add(wagerId);
 
+        // Interactions
+        IERC20(token).safeTransferFrom(msg.sender, address(this), creatorStake);
+        membershipManager.recordCreate(msg.sender, WAGER_PARTICIPANT_ROLE);
+
         emit WagerCreated(wagerId, msg.sender, opponent, token, creatorStake, opponentStake, resolutionType, metadataHash, metadataUri);
         if (resolutionType == ResolutionType.Polymarket) {
             emit PolymarketLinked(wagerId, polymarketConditionId, creatorIsYes);
@@ -261,9 +260,11 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (w.status != Status.Open) revert NotOpen();
         if (msg.sender != w.opponent) revert NotOpponent();
         if (block.timestamp > w.acceptDeadline) revert AcceptExpired();
+        if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
 
         w.status = Status.Active;
         IERC20(w.token).safeTransferFrom(msg.sender, address(this), w.opponentStake);
+        membershipManager.recordCreate(msg.sender, WAGER_PARTICIPANT_ROLE);
 
         emit WagerAccepted(wagerId, msg.sender);
     }
@@ -322,6 +323,7 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         w.status = Status.Resolved;
         w.winner = winner;
         membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+        membershipManager.recordClose(w.opponent, WAGER_PARTICIPANT_ROLE);
 
         emit WagerResolved(wagerId, winner, msg.sender);
     }
@@ -362,6 +364,7 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         w.status = Status.Resolved;
         w.winner = winner;
         membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+        membershipManager.recordClose(w.opponent, WAGER_PARTICIPANT_ROLE);
 
         emit WagerResolved(wagerId, winner, msg.sender);
     }
@@ -400,6 +403,7 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
             if (block.timestamp <= w.resolveDeadline) revert NotRefundable();
             w.status = Status.Refunded;
             membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+            membershipManager.recordClose(w.opponent, WAGER_PARTICIPANT_ROLE);
             IERC20 token = IERC20(w.token);
             token.safeTransfer(w.creator, w.creatorStake);
             token.safeTransfer(w.opponent, w.opponentStake);

@@ -137,7 +137,7 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
     function linkMarketToPolymarket(
         uint256 friendMarketId,
         bytes32 conditionId
-    ) external {
+    ) external onlyOwner {
         linkMarketToPolymarketWithCTF(friendMarketId, conditionId, polymarketCTF);
     }
 
@@ -151,7 +151,7 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
         uint256 friendMarketId,
         bytes32 conditionId,
         address ctfContract
-    ) public {
+    ) public onlyOwner {
         if (!supportedCTFContracts[ctfContract]) revert CTFNotSupported();
         if (linkedMarkets[friendMarketId].linked) revert MarketAlreadyLinked();
         if (conditionId == bytes32(0)) revert InvalidConditionId();

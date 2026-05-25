@@ -36,9 +36,11 @@ jobs:
             -t us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }} .
           docker push us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }}
       - name: Debug secrets
+        env:
+          PINATA_JWT_SET: ${{ secrets.VITE_PINATA_JWT != '' }}
         run: |
-          if [ -n "${{ secrets.VITE_PINATA_JWT }}" ]; then
-            echo "✅ VITE_PINATA_JWT is set (length: ${#VITE_PINATA_JWT})"
+          if [ "$PINATA_JWT_SET" = "true" ]; then
+            echo "✅ VITE_PINATA_JWT is set"
           else
             echo "❌ VITE_PINATA_JWT is empty or not set"
           fi

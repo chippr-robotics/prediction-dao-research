@@ -17,6 +17,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const readline = require('readline');
 const { execSync } = require('child_process');
 const { encryptMnemonic, decryptMnemonic, decryptXprv, getKeystoreType } = require('./keystore');
@@ -1451,8 +1452,10 @@ async function forkClone(options) {
     console.log(`  Mother Address: ${forkData.motherAddress}`);
     console.log(`  Isolation: xprv (no mnemonic shared)`);
 
-    // Save fork data to temp file
-    const tempPath = '/tmp/fork-data.json';
+    // Save fork data to secure staging directory (owner-only permissions)
+    const secureDir = path.join(os.homedir(), '.floppy-staging');
+    if (!fs.existsSync(secureDir)) fs.mkdirSync(secureDir, { mode: 0o700 });
+    const tempPath = path.join(secureDir, 'fork-data.json');
     const exportData = {
       ...forkData,
       // Store xprv data for write step (will be encrypted with clone password)
@@ -1460,7 +1463,7 @@ async function forkClone(options) {
         Object.entries(forkData.files).map(([k, v]) => [k, v.toString('base64')])
       )
     };
-    fs.writeFileSync(tempPath, JSON.stringify(exportData));
+    fs.writeFileSync(tempPath, JSON.stringify(exportData), { mode: 0o600 });
     console.log(`\nFork data saved to: ${tempPath}`);
 
     console.log('\n--- Next Steps ---');
@@ -1485,7 +1488,8 @@ async function forkWrite() {
     process.exit(1);
   }
 
-  const tempPath = '/tmp/fork-data.json';
+  const secureDir = path.join(os.homedir(), '.floppy-staging');
+  const tempPath = path.join(secureDir, 'fork-data.json');
   if (!fs.existsSync(tempPath)) {
     console.error('Error: No fork data found. Run "fork" command first on mother disk.');
     process.exit(1);
@@ -1714,9 +1718,11 @@ function pushChanges() {
       return;
     }
 
-    // Save push data
-    const tempPath = '/tmp/push-data.json';
-    fs.writeFileSync(tempPath, JSON.stringify(pushData, null, 2));
+    // Save push data to secure staging directory
+    const secureDir = path.join(os.homedir(), '.floppy-staging');
+    if (!fs.existsSync(secureDir)) fs.mkdirSync(secureDir, { mode: 0o700 });
+    const tempPath = path.join(secureDir, 'push-data.json');
+    fs.writeFileSync(tempPath, JSON.stringify(pushData, null, 2), { mode: 0o600 });
     console.log(`\nPush data saved to: ${tempPath}`);
 
     console.log('\n--- Next Steps ---');
@@ -1739,7 +1745,8 @@ function pushImport(options) {
     process.exit(1);
   }
 
-  const tempPath = '/tmp/push-data.json';
+  const secureDir = path.join(os.homedir(), '.floppy-staging');
+  const tempPath = path.join(secureDir, 'push-data.json');
   if (!fs.existsSync(tempPath)) {
     console.error('Error: No push data found. Run "push" command first on clone disk.');
     process.exit(1);
@@ -1780,7 +1787,8 @@ function pullChanges() {
     process.exit(1);
   }
 
-  const tempPath = '/tmp/clone-manifest.json';
+  const secureDir = path.join(os.homedir(), '.floppy-staging');
+  const tempPath = path.join(secureDir, 'clone-manifest.json');
   if (!fs.existsSync(tempPath)) {
     console.error('Error: No clone manifest found.');
     console.error('First, on the clone disk, run: node cli.js pull-request');
@@ -1800,9 +1808,11 @@ function pullChanges() {
       return;
     }
 
-    // Save pull data
-    const pullPath = '/tmp/pull-data.json';
-    fs.writeFileSync(pullPath, JSON.stringify(pullData, null, 2));
+    // Save pull data to secure staging directory
+    const pullDir = path.join(os.homedir(), '.floppy-staging');
+    if (!fs.existsSync(pullDir)) fs.mkdirSync(pullDir, { mode: 0o700 });
+    const pullPath = path.join(pullDir, 'pull-data.json');
+    fs.writeFileSync(pullPath, JSON.stringify(pullData, null, 2), { mode: 0o600 });
     console.log(`\nPull data saved to: ${pullPath}`);
 
     console.log('\n--- Next Steps ---');
@@ -1831,8 +1841,10 @@ function pullRequest() {
     process.exit(1);
   }
 
-  const tempPath = '/tmp/clone-manifest.json';
-  fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2));
+  const secureDir = path.join(os.homedir(), '.floppy-staging');
+  if (!fs.existsSync(secureDir)) fs.mkdirSync(secureDir, { mode: 0o700 });
+  const tempPath = path.join(secureDir, 'clone-manifest.json');
+  fs.writeFileSync(tempPath, JSON.stringify(manifest, null, 2), { mode: 0o600 });
 
   console.log('\n=== Pull Request ===\n');
   console.log(`Clone ID: ${manifest.diskId}`);
@@ -1854,7 +1866,8 @@ function pullImport() {
     process.exit(1);
   }
 
-  const tempPath = '/tmp/pull-data.json';
+  const secureDir = path.join(os.homedir(), '.floppy-staging');
+  const tempPath = path.join(secureDir, 'pull-data.json');
   if (!fs.existsSync(tempPath)) {
     console.error('Error: No pull data found. Run "pull" command first on mother disk.');
     process.exit(1);
