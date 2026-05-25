@@ -1672,14 +1672,14 @@ function ResolutionModal({
     setSubmitting(true)
     setError(null)
 
-    try {
-      const registryAddress = getContractAddress('wagerRegistry')
-      const registry = new ethers.Contract(
-        registryAddress,
-        WAGER_REGISTRY_ABI,
-        signer
-      )
+    const registryAddress = getContractAddress('wagerRegistry')
+    const registry = new ethers.Contract(
+      registryAddress,
+      WAGER_REGISTRY_ABI,
+      signer
+    )
 
+    try {
       // outcome: true = first option wins (Pass/Yes/creator), false = second option (Fail/No/opponent)
       const outcomeBool = selectedOutcome === outcomes[0]
 
