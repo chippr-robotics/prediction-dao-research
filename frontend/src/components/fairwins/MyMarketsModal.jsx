@@ -698,6 +698,10 @@ function MyMarketsModal({
                       signer={signer}
                       isCorrectNetwork={isCorrectNetwork}
                       switchNetwork={switchNetwork}
+                      onRefunded={() => {
+                        setSelectedMarketId(null)
+                        fetchMarketsData?.()
+                      }}
                     />
                   ) : categorizedMarkets.participating.length === 0 ? (
                     <div className="mm-empty-state">
@@ -754,6 +758,10 @@ function MyMarketsModal({
                       isCorrectNetwork={isCorrectNetwork}
                       switchNetwork={switchNetwork}
                       onWithdraw={() => {
+                        setSelectedMarketId(null)
+                        fetchMarketsData?.()
+                      }}
+                      onRefunded={() => {
                         setSelectedMarketId(null)
                         fetchMarketsData?.()
                       }}
@@ -1278,7 +1286,8 @@ function MarketDetailView({
   signer,
   isCorrectNetwork,
   switchNetwork,
-  onWithdraw
+  onWithdraw,
+  onRefunded
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
@@ -1343,6 +1352,59 @@ function MarketDetailView({
       }
     } finally {
       setWithdrawing(false)
+    }
+  }
+
+  const [refunding, setRefunding] = useState(false)
+  const [refundError, setRefundError] = useState(null)
+  const [refundSuccess, setRefundSuccess] = useState(false)
+  const [refundTxHash, setRefundTxHash] = useState(null)
+
+  const status = market.computedStatus || market.status
+  const isParticipant = market.participants?.some(
+    p => p.toLowerCase() === account?.toLowerCase()
+  )
+  const showRefundButton = isParticipant && signer &&
+    status === MarketStatus.PENDING_RESOLUTION && !refundSuccess
+
+  const handleClaimRefund = async () => {
+    if (!signer) return
+
+    if (!isCorrectNetwork) {
+      try {
+        await switchNetwork()
+      } catch {
+        setRefundError('Please switch to the correct network')
+        return
+      }
+    }
+
+    setRefunding(true)
+    setRefundError(null)
+
+    try {
+      const registry = new ethers.Contract(
+        getContractAddress('wagerRegistry'),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await registry.claimRefund(market.wagerId ?? market.id)
+      setRefundTxHash(tx.hash)
+      await tx.wait()
+      setRefundSuccess(true)
+      onRefunded?.(market)
+    } catch (err) {
+      const reason = err?.reason || err?.shortMessage || err?.message || ''
+      if (err?.code === 'ACTION_REJECTED' || err?.code === 4001 ||
+          reason.toLowerCase().includes('user rejected')) {
+        setRefundError('Transaction was cancelled in your wallet.')
+      } else if (reason.includes('NotRefundable')) {
+        setRefundError('This wager is not yet refundable. The resolution window may still be open — try resolving instead.')
+      } else {
+        setRefundError(reason || 'Failed to claim refund. Please try again.')
+      }
+    } finally {
+      setRefunding(false)
     }
   }
 
@@ -1600,6 +1662,53 @@ function MarketDetailView({
             </svg>
             Open Dispute
           </button>
+        )}
+        {refundSuccess && (
+          <div className="mm-withdraw-success">
+            <span className="mm-withdraw-success-icon">&#10003;</span>
+            <p>Refund claimed successfully. Stakes have been returned to both participants.</p>
+            {refundTxHash && (
+              <a
+                href={`https://amoy.polygonscan.com/tx/${refundTxHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mm-tx-link"
+              >
+                View Transaction
+              </a>
+            )}
+          </div>
+        )}
+        {showRefundButton && (
+          <div className="mm-refund-section">
+            <button
+              type="button"
+              className="mm-btn-secondary"
+              onClick={handleClaimRefund}
+              disabled={refunding}
+            >
+              {refunding ? (
+                <>
+                  <span className="mm-spinner-small"></span>
+                  Claiming Refund...
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="1 4 1 10 7 10"/>
+                    <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                  </svg>
+                  Claim Refund
+                </>
+              )}
+            </button>
+            <p className="mm-refund-hint">
+              If the resolution window has expired without a winner declared, both participants can reclaim their stakes.
+            </p>
+            {refundError && (
+              <p className="mm-withdraw-error">{refundError}</p>
+            )}
+          </div>
         )}
       </div>
     </div>
