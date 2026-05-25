@@ -1119,14 +1119,12 @@ function MarketsTable({
 }
 
 /**
- * Resolve Button with Countdown Component
- * Shows countdown timer until resolution time, then becomes active
+ * Resolve Button Component
+ * Shows resolve button when the user is authorized and the wager is active.
+ * The contract allows resolution any time while status=Active and before resolveDeadline.
  * @param {string} variant - 'compact' (table) or 'full' (detail view)
  */
 function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'compact' }) {
-  const [timeRemaining, setTimeRemaining] = useState(null)
-  const [canResolveNow, setCanResolveNow] = useState(false)
-
   const userAddr = account?.toLowerCase()
   const isCreator = market.creator?.toLowerCase() === userAddr
   const isOpponent = market.participants?.length > 1 &&
@@ -1144,120 +1142,38 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
     return false
   })()
 
-  // Get end time
-  const endTime = useMemo(() => {
-    const rawEndTime = market.tradingEndTime || market.endDate
-    if (!rawEndTime) return null
-    if (typeof rawEndTime === 'bigint') {
-      return Number(rawEndTime) * 1000
-    } else if (typeof rawEndTime === 'number') {
-      return rawEndTime > 1e12 ? rawEndTime : rawEndTime * 1000
-    }
-    return new Date(rawEndTime).getTime()
-  }, [market.tradingEndTime, market.endDate])
-
-  // Update countdown every second
-  useEffect(() => {
-    if (!endTime || !isAuthorized) return
-
-    const updateCountdown = () => {
-      const now = Date.now()
-      const remaining = endTime - now
-
-      if (remaining <= 0) {
-        setCanResolveNow(true)
-        setTimeRemaining(null)
-      } else {
-        setCanResolveNow(false)
-        setTimeRemaining(remaining)
-      }
-    }
-
-    updateCountdown()
-    const interval = setInterval(updateCountdown, 1000)
-
-    return () => clearInterval(interval)
-  }, [endTime, isAuthorized])
-
   if (!isAuthorized) return null
 
-  // If already resolved, disputed, or cancelled, don't show
   const status = market.computedStatus || market.status
-  if (status === 'resolved' || status === 'disputed' || status === 'cancelled' || status === 'canceled') {
+  if (status === 'resolved' || status === 'disputed' || status === 'cancelled' ||
+      status === 'canceled' || status === 'refunded' || status === 'expired' ||
+      status === 'declined' || status === 'pending_acceptance') {
     return null
   }
 
-  // Format remaining time
-  const formatCountdown = (ms) => {
-    if (!ms || ms <= 0) return null
-
-    const days = Math.floor(ms / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))
-    const seconds = Math.floor((ms % (1000 * 60)) / 1000)
-
-    if (days > 0) return `${days}d ${hours}h`
-    if (hours > 0) return `${hours}h ${minutes}m`
-    if (minutes > 0) return `${minutes}m ${seconds}s`
-    return `${seconds}s`
-  }
-
-  // Show resolve button if can resolve now
-  if (canResolveNow) {
-    if (variant === 'full') {
-      return (
-        <button
-          type="button"
-          className="mm-btn-primary"
-          onClick={() => onResolve(market)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Resolve Market
-        </button>
-      )
-    }
+  if (variant === 'full') {
     return (
       <button
-        className="mm-action-btn mm-action-resolve"
-        onClick={(e) => { e.stopPropagation(); onResolve(market) }}
-        title="Resolve wager"
+        type="button"
+        className="mm-btn-primary"
+        onClick={() => onResolve(market)}
       >
-        Resolve
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Resolve Market
       </button>
     )
   }
-
-  // Show countdown
-  if (timeRemaining) {
-    const countdownText = formatCountdown(timeRemaining)
-    if (variant === 'full') {
-      return (
-        <div className="mm-resolve-countdown-full">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <span>Resolution available in <strong>{countdownText}</strong></span>
-        </div>
-      )
-    }
-    return (
-      <span
-        className="mm-resolve-countdown"
-        title={`Resolution available in ${countdownText}`}
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
-        {countdownText}
-      </span>
-    )
-  }
-
-  return null
+  return (
+    <button
+      className="mm-action-btn mm-action-resolve"
+      onClick={(e) => { e.stopPropagation(); onResolve(market) }}
+      title="Resolve wager"
+    >
+      Resolve
+    </button>
+  )
 }
 
 /**
@@ -1793,14 +1709,39 @@ function ResolutionModal({
       setStep('success')
     } catch (err) {
       console.error('Error resolving market:', err)
+
+      const errStr = [err.reason, err.shortMessage, err.message, err.data?.message].filter(Boolean).join(' ')
+      let errorData = err.data
+      if (!errorData && err.error?.data) errorData = err.error.data
+      if (typeof errorData === 'string' && errorData.length >= 10) {
+        try {
+          const decoded = registry.interface.parseError(errorData)
+          if (decoded?.name) {
+            const decodedName = decoded.name
+            if (decodedName === 'ResolveExpired') {
+              setError('The resolution deadline has passed. This wager can no longer be resolved and may be eligible for a refund.')
+            } else if (decodedName === 'NotActive') {
+              setError('This wager is not active. It may have already been resolved or is still pending acceptance.')
+            } else if (decodedName === 'NotAuthorized') {
+              setError('You are not authorized to resolve this wager based on its resolution type.')
+            } else {
+              setError(`Contract rejected the transaction: ${decodedName}`)
+            }
+            return
+          }
+        } catch { /* couldn't decode, fall through */ }
+      }
+
       if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
         setError('Transaction was rejected in your wallet.')
-      } else if (err.reason?.includes('NotActive') || err.message?.includes('NotActive')) {
+      } else if (errStr.includes('NotActive')) {
         setError('This wager is not active. It may have already been resolved or is still pending acceptance.')
-      } else if (err.reason?.includes('NotAuthorized') || err.message?.includes('NotAuthorized')) {
+      } else if (errStr.includes('NotAuthorized')) {
         setError('You are not authorized to resolve this wager based on its resolution type.')
-      } else if (err.reason?.includes('ResolveExpired') || err.message?.includes('ResolveExpired')) {
+      } else if (errStr.includes('ResolveExpired')) {
         setError('The resolution deadline has passed. This wager can no longer be resolved and may be eligible for a refund.')
+      } else if (errStr.includes('unknown custom error') || errStr.includes('execution reverted')) {
+        setError('Transaction failed. The resolution deadline may have passed, or the wager is no longer active. Check the wager status and try claiming a refund instead.')
       } else {
         setError(err.reason || err.shortMessage || err.message || 'Failed to resolve wager. Please try again.')
       }
