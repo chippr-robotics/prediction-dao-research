@@ -48,6 +48,11 @@ export const WAGER_DEFAULTS = {
 
   /** Maximum trading period in seconds (mirrors contract MAX_TRADING_PERIOD). */
   MAX_TRADING_PERIOD_SECONDS: 21 * 24 * 60 * 60,
+
+  /** Extra window (seconds) added to resolveDeadline beyond the trading end
+   *  so that participants have time to declare a winner after the event ends.
+   *  48 hours keeps the UX generous without approaching MAX_RESOLVE_WINDOW. */
+  RESOLUTION_WINDOW_SECONDS: 48 * 60 * 60,
 }
 
 // ── Wager status strings (friend / P2P markets) ────────────────────
