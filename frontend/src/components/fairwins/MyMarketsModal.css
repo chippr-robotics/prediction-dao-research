@@ -1132,6 +1132,19 @@
   text-decoration: none;
 }
 
+.mm-refund-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mm-refund-hint {
+  margin: 0;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .mm-tx-link:hover {
   text-decoration: underline;
 }
