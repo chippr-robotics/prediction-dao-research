@@ -34,7 +34,12 @@ const PARTICIPANT_RESOLUTION_TYPES = [
   ResolutionType.Either,
   ResolutionType.Creator,
   ResolutionType.Opponent,
-  ResolutionType.ThirdParty,
+  // ResolutionType.ThirdParty intentionally omitted: a designated arbiter has
+  // no way to discover the wagers they oversee (the WagerRegistry per-user
+  // index and the subgraph/event queries surface only the creator and
+  // opponent, never the arbiter), so they could never resolve them. The
+  // on-chain enum value and resolution branch remain for any pre-existing
+  // wagers; we just stop offering it as a create-time choice.
 ]
 
 // Dropdown labels + helper text for every resolution type. Kept here so the
@@ -44,7 +49,6 @@ const RESOLUTION_TYPE_LABELS = {
   [ResolutionType.Either]: 'Either Party',
   [ResolutionType.Creator]: 'Creator Only',
   [ResolutionType.Opponent]: 'Opponent Only',
-  [ResolutionType.ThirdParty]: 'Third Party Arbitrator',
   [ResolutionType.Polymarket]: 'Linked Market (Polymarket)',
   [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed (price condition)',
   [ResolutionType.ChainlinkFunctions]: 'Chainlink Functions (custom request)',
@@ -54,7 +58,6 @@ const RESOLUTION_TYPE_HINTS = {
   [ResolutionType.Either]: 'Either you or your opponent can resolve the wager',
   [ResolutionType.Creator]: 'Only you (the creator) can resolve the wager',
   [ResolutionType.Opponent]: 'Only your opponent can resolve the wager',
-  [ResolutionType.ThirdParty]: 'A designated arbitrator will resolve disputes',
   [ResolutionType.Polymarket]: 'Settles automatically when the linked Polymarket market resolves',
   [ResolutionType.ChainlinkDataFeed]: 'Settles automatically once the price feed reading at the deadline passes the threshold',
   [ResolutionType.ChainlinkFunctions]: 'Settles when the Chainlink Functions DON returns a result (admin-registered request)',
@@ -105,7 +108,7 @@ function FriendMarketsModal({
   )
 
   // Resolution choices are split into two flows, driven by `resolutionCategory`:
-  //   - 'participant' → people settle it (Either / Creator / Opponent / ThirdParty)
+  //   - 'participant' → people settle it (Either / Creator / Opponent)
   //   - 'oracle'      → an oracle settles it (Polymarket / Chainlink / UMA), each
   //                     self-gated on being reachable/deployed on the active chain
   //   - 'all'         → both (used by the Bookmaker card)
@@ -173,8 +176,6 @@ function FriendMarketsModal({
     stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
     stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
     customStakeTokenAddress: '', // Used when stakeTokenId is 'CUSTOM'
-    arbitrator: '',
-    arbitratorResolved: '',
     oracleConditionId: '',
     // Which outcome of a linked Polymarket the creator is taking. Stored as
     // the 0-based outcome index ('' = unset, '0' = YES/first, '1' = NO/second)
@@ -184,7 +185,7 @@ function FriendMarketsModal({
     acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
     // Leverage/odds for Bookmaker markets (200 = 2x equal stakes, 10000 = 100x)
     oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER,
-    // Resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged
+    // Resolution type: 0=Either, 1=Creator, 2=Opponent, 4=Polymarket, 5/6/7=oracle adapters
     resolutionType: WAGER_DEFAULTS.RESOLUTION_TYPE
   })
 
@@ -201,7 +202,7 @@ function FriendMarketsModal({
 
   // QR Scanner state
   const [qrScannerOpen, setQrScannerOpen] = useState(false)
-  const [qrScanTarget, setQrScanTarget] = useState(null) // 'opponent' or 'arbitrator'
+  const [qrScanTarget, setQrScanTarget] = useState(null) // 'opponent'
 
   // Polymarket event selection — the PolymarketBrowser component below handles
   // browsing/searching internally. We only need to track the picked market so
@@ -231,8 +232,6 @@ function FriendMarketsModal({
       stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
       stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
       customStakeTokenAddress: '',
-      arbitrator: '',
-      arbitratorResolved: '',
       oracleConditionId: '',
       creatorSide: '',
       acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
@@ -333,18 +332,12 @@ function FriendMarketsModal({
 
       const updated = { ...prev, [field]: value }
 
-      // Clear arbitrator/linked-market state when switching to a resolution
-      // type that doesn't need it.
+      // Clear linked-market state when switching to a resolution type that
+      // doesn't need it.
       const valueIsOracleResolved = value === ResolutionType.Polymarket ||
         value === ResolutionType.ChainlinkDataFeed ||
         value === ResolutionType.ChainlinkFunctions ||
         value === ResolutionType.UMA
-      if (field === 'resolutionType' &&
-          value !== ResolutionType.ThirdParty &&
-          !valueIsOracleResolved) {
-        updated.arbitrator = ''
-        updated.arbitratorResolved = ''
-      }
       if (field === 'resolutionType' && !valueIsOracleResolved) {
         // Leaving the oracle family entirely → clear conditionId + side.
         updated.oracleConditionId = ''
@@ -617,22 +610,9 @@ function FriendMarketsModal({
       setFormData(prev => ({ ...prev, acceptanceDeadline: freshDeadline }))
     }
 
-    // Validate arbitrator/market ID based on resolution type
+    // Validate linked-market ID based on resolution type
     {
-      if (formData.resolutionType === ResolutionType.ThirdParty) {
-        // Arbitrator address is required for ThirdParty resolution
-        const rawArb = (formData.arbitrator || '').trim()
-        const resolvedArb = (formData.arbitratorResolved || '').trim()
-        if (!rawArb) {
-          newErrors.arbitrator = 'Arbitrator address is required for third party resolution'
-        } else if (!resolvedArb) {
-          newErrors.arbitrator = isEnsName(rawArb)
-            ? 'Could not resolve ENS name — check the name and try again'
-            : 'Enter a valid Ethereum address or ENS name'
-        } else if (resolvedArb.toLowerCase() === '0x0000000000000000000000000000000000000000') {
-          newErrors.arbitrator = 'Cannot use the zero address'
-        }
-      } else if (formData.resolutionType === ResolutionType.Polymarket) {
+      if (formData.resolutionType === ResolutionType.Polymarket) {
         // Polymarket condition id (bytes32 hex) is required.
         const cid = (formData.oracleConditionId || '').trim()
         if (!cid) {
@@ -746,7 +726,6 @@ function FriendMarketsModal({
         stakeAmount: formData.stakeAmount,
         stakeToken: stakeToken.symbol,
         endDateTime: formData.endDateTime,
-        arbitrator: formData.arbitratorResolved || null,
         createdAt: new Date().toISOString(),
         attributes: [
           { trait_type: 'Market Source', value: 'friend' },
@@ -823,12 +802,10 @@ function FriendMarketsModal({
         data: {
           ...formData,
           acceptanceDeadline: freshAcceptanceDeadline,
-          // Downstream hooks (useFriendMarketCreation) read `opponent` and
-          // `arbitrator` as 0x addresses. Substitute the ENS-resolved values
-          // so a user can enter `name.eth` and the contract still gets a hex
-          // address.
+          // Downstream hooks (useFriendMarketCreation) read `opponent` as a 0x
+          // address. Substitute the ENS-resolved value so a user can enter
+          // `name.eth` and the contract still gets a hex address.
           opponent: formData.opponentResolved || formData.opponent,
-          arbitrator: formData.arbitratorResolved || formData.arbitrator,
           // Translated UI → contract semantics (see comment above).
           creatorIsYes,
           // Pass calculated trading period so downstream uses the user's selected end date.
@@ -870,7 +847,6 @@ function FriendMarketsModal({
         tradingPeriod: tradingPeriodDays,
         participants: [account, formData.opponentResolved],
         creator: account,
-        arbitrator: formData.arbitratorResolved || null,
         createdAt: new Date().toISOString(),
         status: 'pending_acceptance',
         // Acceptance flow fields
@@ -929,11 +905,6 @@ function FriendMarketsModal({
     const date = new Date(dateString)
     if (Number.isNaN(date.getTime())) return 'N/A'
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const formatAddress = (address) => {
-    if (!address) return 'N/A'
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
   // Get selected stake token info for display
@@ -1278,42 +1249,6 @@ function FriendMarketsModal({
                         </div>
                       )
                     })()}
-
-                    {/* Arbitrator address field — for Third Party resolution */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
-                     formData.resolutionType === ResolutionType.ThirdParty && (
-                      <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-arbitrator">
-                          Arbitrator Address <span className="fm-required">*</span>
-                        </label>
-                        <div className="fm-input-with-action">
-                          <div className="fm-address-input-wrap">
-                            <AddressInput
-                              id="fm-arbitrator"
-                              value={formData.arbitrator}
-                              onChange={(e) => handleFormChange('arbitrator', e.target.value)}
-                              onResolvedChange={(addr) => handleFormChange('arbitratorResolved', addr || '')}
-                              placeholder="0x... or ENS name (trusted third party)"
-                              disabled={submitting}
-                              error={!!errors.arbitrator}
-                              errorMessage={errors.arbitrator}
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            className="fm-scan-btn"
-                            onClick={() => openQrScanner('arbitrator')}
-                            disabled={submitting}
-                            title="Scan QR code"
-                            aria-label="Scan QR code"
-                          >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v2h-2v-2zm0 4h2v2h-2v-2z"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Linked Market — Polymarket event lookup */}
                     {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
@@ -1800,12 +1735,6 @@ function FriendMarketsModal({
                       <span>Wager Ends</span>
                       <span>{createdMarket.endDateTime ? new Date(createdMarket.endDateTime).toLocaleString() : `${createdMarket.tradingPeriod} days`}</span>
                     </div>
-                    {createdMarket.arbitrator && (
-                      <div className="fm-detail-row">
-                        <span>Arbitrator</span>
-                        <span>{formatAddress(createdMarket.arbitrator)}</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="fm-success-actions">
@@ -1854,7 +1783,7 @@ function FriendMarketsModal({
         </div>
       </div>
 
-      {/* QR Scanner Modal — opens for opponent/arbitrator address fields */}
+      {/* QR Scanner Modal — opens for the opponent address field */}
       <QRScanner
         isOpen={qrScannerOpen}
         onClose={handleQrScannerClose}
