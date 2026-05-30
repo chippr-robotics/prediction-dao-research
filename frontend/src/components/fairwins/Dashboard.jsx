@@ -28,7 +28,7 @@ const formatAddress = (addr) => {
 function QuickActions({ onAction }) {
   const actions = [
     {
-      id: 'create-1v1',
+      id: 'create-1v1-friends',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -37,21 +37,31 @@ function QuickActions({ onAction }) {
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       ),
-      title: 'New 1v1 Wager',
-      description: 'Challenge a friend to a direct bet'
+      title: 'Friends Decide (1v1)',
+      description: 'You and a friend settle the outcome'
     },
     {
-      id: 'create-group',
+      id: 'create-1v1-oracle',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <line x1="23" y1="11" x2="17" y2="11" />
-          <line x1="20" y1="8" x2="20" y2="14" />
+          <circle cx="12" cy="12" r="10" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
         </svg>
       ),
-      title: 'Group Wager',
-      description: 'Create a pool for 3-10 friends'
+      title: 'Oracle Settles (1v1)',
+      description: 'Auto-settles from Polymarket, Chainlink or UMA'
+    },
+    {
+      id: 'create-bookmaker',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="12" y1="1" x2="12" y2="23" />
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+      ),
+      title: 'Bookmaker',
+      description: 'Offer odds and let a friend take the other side'
     },
     {
       id: 'scan-qr',
@@ -324,7 +334,10 @@ function Dashboard() {
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
-  const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'smallGroup'
+  const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'bookmaker'
+  // Narrows the modal's resolution choices: 'participant' (people settle),
+  // 'oracle' (oracle settles), or 'all' (both — used by the Bookmaker card).
+  const [createResolutionCategory, setCreateResolutionCategory] = useState('all')
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
@@ -337,12 +350,19 @@ function Dashboard() {
 
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
-      case 'create-1v1':
+      case 'create-1v1-friends':
         setCreateWagerType('oneVsOne')
+        setCreateResolutionCategory('participant')
         setShowCreateWager(true)
         break
-      case 'create-group':
-        setCreateWagerType('smallGroup')
+      case 'create-1v1-oracle':
+        setCreateWagerType('oneVsOne')
+        setCreateResolutionCategory('oracle')
+        setShowCreateWager(true)
+        break
+      case 'create-bookmaker':
+        setCreateWagerType('bookmaker')
+        setCreateResolutionCategory('all')
         setShowCreateWager(true)
         break
       case 'my-wagers':
@@ -359,6 +379,9 @@ function Dashboard() {
   const handlePolymarketCardClick = useCallback((market) => {
     setInitialPolymarketMarket(market)
     setCreateWagerType('oneVsOne')
+    // A Polymarket card pre-selects an oracle (Polymarket) condition, so open
+    // straight into the oracle-resolved flow.
+    setCreateResolutionCategory('oracle')
     setShowCreateWager(true)
   }, [])
 
@@ -471,9 +494,11 @@ function Dashboard() {
         onClose={() => {
           setShowCreateWager(false)
           setCreateWagerType(null)
+          setCreateResolutionCategory('all')
           setInitialPolymarketMarket(null)
         }}
         initialType={createWagerType}
+        resolutionCategory={createResolutionCategory}
         initialPolymarketMarket={initialPolymarketMarket}
       />
 

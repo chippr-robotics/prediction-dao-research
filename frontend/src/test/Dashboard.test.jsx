@@ -148,16 +148,18 @@ describe('Dashboard Component', () => {
   describe('Quick Actions', () => {
     it('should render all quick action cards', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('New 1v1 Wager')).toBeInTheDocument()
-      expect(screen.getByText('Group Wager')).toBeInTheDocument()
+      expect(screen.getByText('Friends Decide (1v1)')).toBeInTheDocument()
+      expect(screen.getByText('Oracle Settles (1v1)')).toBeInTheDocument()
+      expect(screen.getByText('Bookmaker')).toBeInTheDocument()
       expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
     })
 
     it('should have quick action descriptions', () => {
       renderWithProviders(<Dashboard />)
-      expect(screen.getByText('Challenge a friend to a direct bet')).toBeInTheDocument()
-      expect(screen.getByText('Create a pool for 3-10 friends')).toBeInTheDocument()
+      expect(screen.getByText('You and a friend settle the outcome')).toBeInTheDocument()
+      expect(screen.getByText('Auto-settles from Polymarket, Chainlink or UMA')).toBeInTheDocument()
+      expect(screen.getByText('Offer odds and let a friend take the other side')).toBeInTheDocument()
     })
   })
 

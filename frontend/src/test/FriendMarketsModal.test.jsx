@@ -289,14 +289,44 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
     })
 
-    it('opens into the Small Group form when initialType="smallGroup"', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="smallGroup" />)
-      expect(screen.getByLabelText(/member addresses/i)).toBeInTheDocument()
+    it('opens into the Bookmaker form (with opponent + odds) when initialType="bookmaker"', () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="bookmaker" resolutionCategory="all" />
+      )
+      expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/opponent.*odds/i)).toBeInTheDocument()
     })
 
-    it('opens into the Event Tracking form when initialType="eventTracking"', () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="eventTracking" />)
-      expect(screen.getByLabelText(/member addresses/i)).toBeInTheDocument()
+    it('no longer offers group / member-address inputs', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      expect(screen.queryByLabelText(/member addresses/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/minimum participants/i)).not.toBeInTheDocument()
+    })
+
+    it('participant category shows only people-settled resolution options', () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} resolutionCategory="participant" />
+      )
+      const select = screen.getByLabelText(/who can resolve/i)
+      const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
+      expect(labels).toEqual([
+        'Either Party',
+        'Creator Only',
+        'Opponent Only',
+        'Third Party Arbitrator',
+      ])
+    })
+
+    it('oracle category shows only oracle resolution options', () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} resolutionCategory="oracle" />
+      )
+      // The oracle flow relabels the selector and excludes participant options.
+      const select = screen.getByLabelText(/which oracle settles this/i)
+      const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
+      expect(labels).not.toContain('Either Party')
+      expect(labels.length).toBeGreaterThan(0)
+      labels.forEach(l => expect(l).toMatch(/Polymarket|Chainlink|UMA/))
     })
 
     it('no longer renders a type-selector or Back link', () => {
@@ -370,30 +400,16 @@ describe('FriendMarketsModal', () => {
       expect(stakeInput).toHaveAttribute('min', '0.1')
     })
 
-    it('should validate member addresses for group markets', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="smallGroup" />)
-
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'BTC will reach $100k by end of year')
-      await userEvent.type(screen.getByLabelText(/member addresses/i), '0xinvalid, 0xalsobad')
-      await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
-
-      await waitFor(() => {
-        expect(screen.getByText(/Invalid address:/i)).toBeInTheDocument()
-      })
-    })
-
-    it('should validate minimum members for event tracking', async () => {
-      renderWithProviders(<FriendMarketsModal {...defaultProps} initialType="eventTracking" />)
-
-      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Who will win the tournament')
-      await userEvent.type(
-        screen.getByLabelText(/member addresses/i),
-        '0xabcdef1234567890123456789012345678901234, 0x9876543210987654321098765432109876543210'
+    it('should require an opponent address for a Bookmaker wager', async () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="bookmaker" resolutionCategory="all" />
       )
+
+      await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
 
       await waitFor(() => {
-        expect(screen.getByText(/at least 3 members required/i)).toBeInTheDocument()
+        expect(screen.getByText(/opponent address is required/i)).toBeInTheDocument()
       })
     })
 

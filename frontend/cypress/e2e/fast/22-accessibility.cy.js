@@ -140,7 +140,7 @@ describe('Accessibility', () => {
     connectAndVisit()
 
     // Open the create wager modal via quick action.
-    cy.get('.quick-action-card').contains('New 1v1 Wager').click()
+    cy.get('.quick-action-card').contains('Friends Decide (1v1)').click()
 
     // The modal should open with dialog role and aria-modal.
     cy.get('[role="dialog"]', { timeout: 5000 }).should('be.visible')
@@ -159,7 +159,7 @@ describe('Accessibility', () => {
       .should('not.exist')
 
     // Re-open and test backdrop click.
-    cy.get('.quick-action-card').contains('New 1v1 Wager').click()
+    cy.get('.quick-action-card').contains('Friends Decide (1v1)').click()
     cy.get('[role="dialog"]', { timeout: 5000 }).should('be.visible')
 
     // Click the backdrop (outside the modal content).
@@ -210,7 +210,7 @@ describe('Accessibility', () => {
     connectAndVisit()
 
     // Open create wager modal.
-    cy.get('.quick-action-card').contains('New 1v1 Wager').click()
+    cy.get('.quick-action-card').contains('Friends Decide (1v1)').click()
     cy.get('[role="dialog"]', { timeout: 5000 }).should('be.visible')
 
     // Try to submit with empty fields — this should trigger validation errors.
@@ -307,7 +307,7 @@ describe('Accessibility', () => {
     connectAndVisit()
 
     // Open create wager modal to test the datetime input.
-    cy.get('.quick-action-card').contains('New 1v1 Wager').click()
+    cy.get('.quick-action-card').contains('Friends Decide (1v1)').click()
     cy.get('[role="dialog"]', { timeout: 5000 }).should('be.visible')
 
     // The datetime-local input should have a min and max constraint.

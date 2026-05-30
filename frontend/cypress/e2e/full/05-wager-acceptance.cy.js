@@ -295,50 +295,11 @@ describe('Wager Acceptance', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // ACC-05: Group wager — threshold met
+  // ACC-06: Unaccepted wager stays pending
   // ---------------------------------------------------------------------------
-  it('[ACC-05] Group wager threshold met activates market', () => {
-    connectAndVisit(0)
-
-    // Create group wager
-    cy.openCreateWagerModal('smallGroup')
-    cy.get('#fm-description, [role="dialog"] input[type="text"]')
-      .first()
-      .clear()
-      .type('ACC-05: Group wager threshold test')
-    cy.get('#fm-members, [role="dialog"] input[placeholder*="0x1"]')
-      .first()
-      .clear()
-      .type(`${TEST_ACCOUNTS[1]}, ${TEST_ACCOUNTS[2]}`)
-    cy.get('#fm-stake, [role="dialog"] input[type="number"]')
-      .first()
-      .clear()
-      .type('5')
-
-    cy.get('[role="dialog"]').then(($modal) => {
-      const encToggle = $modal.find('input[type="checkbox"]')
-      if (encToggle.length > 0 && encToggle.is(':checked')) {
-        cy.wrap(encToggle.first()).uncheck({ force: true })
-      }
-    })
-
-    cy.get('[role="dialog"], .modal')
-      .find('button[type="submit"], button')
-      .filter(':contains("Create")')
-      .click({ force: true })
-
-    cy.get('[role="dialog"], .modal', { timeout: 45000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      expect(lower.includes('created') || lower.includes('success') || lower.includes('share') || lower.includes('error')).to.be.true
-    })
-  })
-
-  // ---------------------------------------------------------------------------
-  // ACC-06: Group wager — threshold not met
-  // ---------------------------------------------------------------------------
-  it('[ACC-06] Group wager threshold not met stays pending', () => {
-    // This test verifies that a group wager stays in pending state
-    // when not enough participants have accepted
+  it('[ACC-06] Unaccepted wager stays pending acceptance', () => {
+    // A 1v1 wager that the opponent hasn't accepted yet stays in the
+    // pending-acceptance state.
     connectAndVisit(0)
 
     cy.openMyWagers('created')

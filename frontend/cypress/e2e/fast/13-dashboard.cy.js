@@ -38,18 +38,19 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-01: Quick action cards visible
   // ---------------------------------------------------------------------------
-  it('[DSH-01] Quick action cards visible (Create 1v1, Group, Scan QR, My Wagers)', () => {
+  it('[DSH-01] Quick action cards visible (1v1 Friends, 1v1 Oracle, Bookmaker, Scan QR, My Wagers)', () => {
     connectAndVisitDashboard()
 
-    // The quick-actions-grid should contain exactly 4 action cards.
+    // The quick-actions-grid should contain exactly 5 action cards.
     cy.get('.quick-actions-grid', { timeout: 10000 }).should('be.visible')
-    cy.get('.quick-action-card').should('have.length', 4)
+    cy.get('.quick-action-card').should('have.length', 5)
 
     // Verify each action card title.
-    cy.get('.quick-action-card').eq(0).should('contain.text', 'New 1v1 Wager')
-    cy.get('.quick-action-card').eq(1).should('contain.text', 'Group Wager')
-    cy.get('.quick-action-card').eq(2).should('contain.text', 'Scan QR Code')
-    cy.get('.quick-action-card').eq(3).should('contain.text', 'My Wagers')
+    cy.get('.quick-action-card').eq(0).should('contain.text', 'Friends Decide (1v1)')
+    cy.get('.quick-action-card').eq(1).should('contain.text', 'Oracle Settles (1v1)')
+    cy.get('.quick-action-card').eq(2).should('contain.text', 'Bookmaker')
+    cy.get('.quick-action-card').eq(3).should('contain.text', 'Scan QR Code')
+    cy.get('.quick-action-card').eq(4).should('contain.text', 'My Wagers')
   })
 
   // ---------------------------------------------------------------------------
