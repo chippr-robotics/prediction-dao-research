@@ -10,7 +10,7 @@ import { getContractAddress, NETWORK_CONFIG, DEPLOYMENT_BLOCKS, DEPLOYED_CONTRAC
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { DEX_ADDRESSES } from '../constants/dex'
-import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
+import { WAGER_DEFAULTS, deriveWagerType } from '../constants/wagerDefaults'
 import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../abis/FriendGroupMarketFactory'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
@@ -412,12 +412,22 @@ function toWagerShape(id, w) {
     description = `Wager #${id}`
   }
 
+  // v2 WagerRegistry has no marketType field — a bookmaker wager is encoded as
+  // asymmetric stakes (creatorStake !== opponentStake). Derive the subtype and
+  // the opponent's odds from the raw on-chain stakes so the table badge and the
+  // acceptance modal reflect bookmaker terms instead of collapsing to even-money
+  // 1v1. Derivation uses raw wei (ratio is decimals-independent).
+  const { type: wagerType, oddsMultiplier } = deriveWagerType(w.creatorStake, w.opponentStake)
+
   return {
     id: String(id),
     creator: w.creator,
     opponent: w.opponent,
     arbitrator: (w.arbitrator && w.arbitrator !== ethers.ZeroAddress) ? w.arbitrator : null,
     participants: [w.creator, w.opponent].filter(a => a && a !== ethers.ZeroAddress),
+    type: wagerType,
+    oddsMultiplier,
+    opponentOddsMultiplier: oddsMultiplier,
     creatorStake: ethers.formatUnits(w.creatorStake, decimals),
     opponentStake: ethers.formatUnits(w.opponentStake, decimals),
     stakeAmount: ethers.formatUnits(w.opponentStake, decimals),

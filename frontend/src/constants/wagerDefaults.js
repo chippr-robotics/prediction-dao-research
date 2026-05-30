@@ -62,6 +62,40 @@ export const WAGER_DEFAULTS = {
   MAX_RESOLVE_WINDOW_SECONDS: 180 * 24 * 60 * 60,
 }
 
+/**
+ * Derive a wager's subtype and the opponent's odds multiplier from the
+ * asymmetric on-chain stakes.
+ *
+ * v2 WagerRegistry has no `marketType` field — a bookmaker wager is encoded
+ * purely as `creatorStake !== opponentStake`, where the opponent risks
+ * `opponentStake` to win the whole pot (`creatorStake + opponentStake`). The
+ * creation path mirrors this: `creatorStake = opponentStake * (odds - 100) / 100`.
+ * Inverting that, the opponent's payout multiplier in basis points is
+ * `(creatorStake + opponentStake) / opponentStake * 100` (200 = 2× = even money).
+ *
+ * Accepts raw stakes as BigInt | string | number (wei or unit — only the ratio
+ * matters). Returns `{ type, oddsMultiplier }`.
+ */
+export function deriveWagerType(creatorStake, opponentStake) {
+  let creator
+  let opponent
+  try {
+    creator = BigInt(creatorStake ?? 0)
+    opponent = BigInt(opponentStake ?? 0)
+  } catch {
+    creator = 0n
+    opponent = 0n
+  }
+  // Equal (or unknown) stakes are an even-money 1v1; no odds to surface.
+  if (opponent <= 0n || creator === opponent) {
+    return { type: 'oneVsOne', oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER }
+  }
+  return {
+    type: 'bookmaker',
+    oddsMultiplier: Number(((creator + opponent) * 100n) / opponent),
+  }
+}
+
 // ── Wager status strings (friend / P2P markets) ────────────────────
 export const WagerStatus = {
   PENDING_ACCEPTANCE: 'pending_acceptance',
