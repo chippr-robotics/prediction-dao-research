@@ -309,12 +309,14 @@ describe('FriendMarketsModal', () => {
       )
       const select = screen.getByLabelText(/who can resolve/i)
       const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
+      // Third Party Arbitrator was removed: a designated arbiter can't discover
+      // the wagers they oversee, so they could never resolve them.
       expect(labels).toEqual([
         'Either Party',
         'Creator Only',
         'Opponent Only',
-        'Third Party Arbitrator',
       ])
+      expect(labels).not.toContain('Third Party Arbitrator')
     })
 
     it('oracle category shows only oracle resolution options', () => {

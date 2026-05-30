@@ -127,7 +127,7 @@ A manual testing checklist for validating all functional flows of the FairWins p
 | [ ] | CRE-03 | Create 1v1 wager with WMATIC | 1. Same as CRE-01 but select WMATIC | WMATIC approval + creation; wager created |  |
 | [ ] | CRE-04 | Create wager with Creator Only resolution | 1. Create 1v1 2. Set resolution type to "Creator Only" | Wager created; only creator can propose resolution after end date |  |
 | [ ] | CRE-05 | Create wager with Opponent Only resolution | 1. Create 1v1 2. Set resolution type to "Opponent Only" | Wager created; only opponent can propose resolution |  |
-| [ ] | CRE-06 | Create wager with Third Party resolution | 1. Create 1v1 2. Set resolution type to "Third Party" 3. Enter arbitrator address | Wager created with designated arbitrator; arbitrator address stored on-chain |  |
+| ~~[ ]~~ | ~~CRE-06~~ | ~~Create wager with Third Party resolution~~ | **REMOVED** — Third Party (arbiter) resolution is no longer offered in the create UI. A designated arbiter cannot discover the wagers they oversee (the WagerRegistry per-user index and the subgraph/event queries surface only creator and opponent), so they could never resolve them. The "Third Party Arbitrator" option and arbitrator address input have been removed from the create form. | n/a |  |
 | [ ] | CRE-07 | Create private (encrypted) wager | 1. Create 1v1 2. Toggle "Private Wager" ON 3. Ensure opponent has registered key 4. Complete creation | Wager created; metadata encrypted and stored on IPFS; on-chain metadataUri = `encrypted:ipfs://<CID>` |  |
 | [ ] | CRE-08 | Create wager with custom acceptance deadline | 1. Create 1v1 2. Set acceptance deadline to 24 hours | Wager created with specified deadline; deadline enforced on-chain |  |
 | [ ] | CRE-09 | Create wager with custom end date | 1. Create 1v1 2. Set end date to 14 days | Wager created; resolveDeadline reflects chosen end date |  |
@@ -165,7 +165,7 @@ A manual testing checklist for validating all functional flows of the FairWins p
 | [ ] | CRE-21 | Create wager with zero stake | 1. Set stake amount to 0 | Form validation prevents submission; or contract reverts "ZeroStake" |  |
 | [ ] | CRE-22 | Create wager exceeding max stake (1,000) | 1. Set stake amount to 1,001 | Form validation prevents submission; or contract reverts |  |
 | [ ] | CRE-23 | Create wager with insufficient balance | 1. Set stake to 500 USDC with only 100 USDC in wallet | Error: "Insufficient balance"; transaction not submitted |  |
-| [ ] | CRE-24 | Create Third Party wager without arbitrator | 1. Select "Third Party" resolution 2. Leave arbitrator field empty | Validation error: arbitrator required; creation blocked |  |
+| ~~[ ]~~ | ~~CRE-24~~ | ~~Create Third Party wager without arbitrator~~ | **REMOVED** — Third Party resolution is no longer selectable in the create UI (see CRE-06). The "Third Party" option no longer appears in the resolution-type dropdown, so there is no arbitrator field to leave empty. | n/a |  |
 | [ ] | CRE-25 | Create wager with invalid opponent address | 1. Enter malformed address as opponent | Form validation catches invalid address; creation blocked |  |
 | [ ] | CRE-26 | Create Polymarket wager with already-resolved condition | 1. Select a Polymarket market that has already resolved | Error: "ConditionAlreadyResolved"; creation blocked |  |
 | [ ] | CRE-27 | Create wager with non-allowlisted token | 1. Attempt to use a token not in the allowlist | Error: "NotAllowedToken"; creation blocked |  |
@@ -228,7 +228,7 @@ A manual testing checklist for validating all functional flows of the FairWins p
 
 ## 7. Manual Resolution
 
-**Preconditions:** Active wager exists. Trading period (end date) has passed. Wager uses manual resolution type (Either Party, Creator Only, Opponent Only, or Third Party).
+**Preconditions:** Active wager exists. Trading period (end date) has passed. Wager uses manual resolution type (Either Party, Creator Only, or Opponent Only). Third Party (arbiter) resolution is no longer offered when creating wagers — see CRE-06.
 
 ### Happy Path
 
@@ -238,7 +238,7 @@ A manual testing checklist for validating all functional flows of the FairWins p
 | [ ] | RES-02 | Resolve (Either Party) - opponent proposes | 1. As opponent on Either Party wager 2. Propose resolution (False = opponent wins) | Resolution proposed; same flow as RES-01 but initiated by opponent |  |
 | [ ] | RES-03 | Resolve (Creator Only) | 1. As creator on Creator Only wager 2. Propose resolution | Resolution accepted; only creator can propose |  |
 | [ ] | RES-04 | Resolve (Opponent Only) | 1. As opponent on Opponent Only wager 2. Propose resolution | Resolution accepted; only opponent can propose |  |
-| [ ] | RES-05 | Resolve (Third Party) - arbitrator resolves | 1. As designated arbitrator 2. Call resolution with outcome 3. Confirm transaction | Wager resolved immediately (no challenge period for Third Party); winner recorded |  |
+| ~~[ ]~~ | ~~RES-05~~ | ~~Resolve (Third Party) - arbitrator resolves~~ | **REMOVED** — Third Party wagers can no longer be created (see CRE-06). The on-chain `declareWinner` arbiter branch is retained for any pre-existing wagers, but the flow is no longer exercised via the UI. | n/a |  |
 | [ ] | RES-06 | Finalize resolution after challenge period (no challenge) | 1. Resolution proposed 24+ hours ago 2. No challenge filed 3. Click "Finalize" | Wager status transitions to Resolved; winner can now claim |  |
 
 ### Non-Happy Path
@@ -248,7 +248,7 @@ A manual testing checklist for validating all functional flows of the FairWins p
 | [ ] | RES-07 | Propose resolution before end date | 1. Active wager still within trading period 2. Attempt to propose resolution | Error: "NotPendingResolution"; resolution blocked until end date passes |  |
 | [ ] | RES-08 | Opponent proposes on Creator Only wager | 1. Creator Only resolution type 2. Opponent attempts to propose | Error: "NotAuthorized"; only creator allowed |  |
 | [ ] | RES-09 | Creator proposes on Opponent Only wager | 1. Opponent Only type 2. Creator attempts to propose | Error: "NotAuthorized"; only opponent allowed |  |
-| [ ] | RES-10 | Non-arbitrator proposes on Third Party wager | 1. Third Party type 2. Creator or opponent attempts to propose | Error: "NotAuthorized"; only designated arbitrator allowed |  |
+| ~~[ ]~~ | ~~RES-10~~ | ~~Non-arbitrator proposes on Third Party wager~~ | **REMOVED** — Third Party wagers can no longer be created (see CRE-06). | n/a |  |
 | [ ] | RES-11 | Propose resolution after resolve deadline | 1. Active wager past resolveDeadline 2. Attempt to propose | Error: "ResolveExpired"; refund path available instead |  |
 | [ ] | RES-12 | Manual resolution on oracle-type wager | 1. Polymarket/Chainlink/UMA wager 2. Attempt declareWinner | Error: oracle-resolved types cannot use manual resolution |  |
 | [ ] | RES-13 | Propose with winner not a participant | 1. Attempt to declare a third-party address as winner | Error: "WinnerNotParticipant"; winner must be creator or opponent |  |
@@ -637,17 +637,12 @@ These scenarios combine multiple sections above into full lifecycle tests. They 
 | 4 | Creator (or anyone) calls claimRefund | REF-01 |
 | 5 | Creator receives stake back | REF-01 |
 
-### E2E-04: Unhappy Path - Challenged Resolution
+### ~~E2E-04: Unhappy Path - Challenged Resolution~~
 
-| Step | Action | Reference Tests |
-|------|--------|-----------------|
-| 1 | Creator creates 1v1 wager with Third Party arbitrator | CRE-06 |
-| 2 | Opponent accepts | ACC-01 |
-| 3 | Wager end date passes | - |
-| 4 | Arbitrator declares creator as winner | RES-05 |
-| 5 | (If challenge period applies) Opponent challenges | CHL-01 |
-| 6 | Arbitrator re-resolves dispute | CHL-02 |
-| 7 | Final winner claims | CLM-01 |
+**REMOVED** — this end-to-end flow depended on the Third Party arbitrator option, which is no
+longer offered when creating wagers (a designated arbiter cannot discover the wagers they
+oversee; see CRE-06). The on-chain arbiter resolution branch is retained for any pre-existing
+wagers but is no longer reachable through the create UI.
 
 ### E2E-05: Unhappy Path - Oracle Timeout
 
