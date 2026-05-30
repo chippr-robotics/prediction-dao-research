@@ -764,6 +764,25 @@
   gap: 0.75rem;
 }
 
+/* Explicit exit from the share screen (Minor bug #3) */
+.fm-success-done {
+  display: block;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.625rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #AAB6C2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.fm-success-done:hover {
+  color: var(--text-primary, #E6EDF3);
+}
+
 /* Responsive Styles */
 @media (max-width: 640px) {
   .friend-markets-modal-backdrop {
