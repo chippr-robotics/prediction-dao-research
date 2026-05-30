@@ -28,13 +28,49 @@ import './FriendMarketsModal.css'
 // toggle picks up the right addresses without a reload.
 const CUSTOM_TOKEN_OPTION = { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Token', address: '', icon: '🔧' }
 
+// Participant-resolved (people settle it) resolution types, in enum order.
+// Oracle-resolved types are computed per-chain at render time (adapter-gated).
+const PARTICIPANT_RESOLUTION_TYPES = [
+  ResolutionType.Either,
+  ResolutionType.Creator,
+  ResolutionType.Opponent,
+  ResolutionType.ThirdParty,
+]
+
+// Dropdown labels + helper text for every resolution type. Kept here so the
+// participant/oracle flows render from a single mapped source instead of a
+// hand-maintained option list.
+const RESOLUTION_TYPE_LABELS = {
+  [ResolutionType.Either]: 'Either Party',
+  [ResolutionType.Creator]: 'Creator Only',
+  [ResolutionType.Opponent]: 'Opponent Only',
+  [ResolutionType.ThirdParty]: 'Third Party Arbitrator',
+  [ResolutionType.Polymarket]: 'Linked Market (Polymarket)',
+  [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed (price condition)',
+  [ResolutionType.ChainlinkFunctions]: 'Chainlink Functions (custom request)',
+  [ResolutionType.UMA]: 'UMA Optimistic Oracle (claim assertion)',
+}
+const RESOLUTION_TYPE_HINTS = {
+  [ResolutionType.Either]: 'Either you or your opponent can resolve the wager',
+  [ResolutionType.Creator]: 'Only you (the creator) can resolve the wager',
+  [ResolutionType.Opponent]: 'Only your opponent can resolve the wager',
+  [ResolutionType.ThirdParty]: 'A designated arbitrator will resolve disputes',
+  [ResolutionType.Polymarket]: 'Settles automatically when the linked Polymarket market resolves',
+  [ResolutionType.ChainlinkDataFeed]: 'Settles automatically once the price feed reading at the deadline passes the threshold',
+  [ResolutionType.ChainlinkFunctions]: 'Settles when the Chainlink Functions DON returns a result (admin-registered request)',
+  [ResolutionType.UMA]: 'Settles via UMA Optimistic Oracle — someone posts the bond and the assertion stands after the liveness window',
+}
+
 /**
  * FriendMarketsModal
  *
- * Focused modal for creating a new friend market (1v1, Small Group,
- * Event Tracking, or Bookmaker). Opens directly into the form for the
- * provided initialType, defaulting to 1v1. Viewing/managing existing
- * wagers lives in MyMarketsModal.
+ * Focused modal for creating a new 1v1 friend market (either a standard
+ * even-stakes wager or a Bookmaker odds wager). Opens directly into the form
+ * for the provided initialType, defaulting to 1v1. The `resolutionCategory`
+ * prop narrows the resolution choices to participant-resolved or
+ * oracle-resolved so each flow can present the right configuration. Group/event
+ * wagers are not supported — the v2 WagerRegistry contract is 1v1 only.
+ * Viewing/managing existing wagers lives in MyMarketsModal.
  */
 function FriendMarketsModal({
   isOpen,
@@ -43,6 +79,7 @@ function FriendMarketsModal({
   pendingTransaction = null,
   onClearPendingTransaction = () => {},
   initialType = null,
+  resolutionCategory = 'all',
   initialPolymarketMarket = null
 }) {
   const { isConnected, account } = useWallet()
@@ -61,16 +98,39 @@ function FriendMarketsModal({
   const chainlinkDataFeedAdapter  = getContractAddress('chainlinkDataFeedAdapter')
   const chainlinkFunctionsAdapter = getContractAddress('chainlinkFunctionsAdapter')
   const umaAdapter                = getContractAddress('umaAdapter')
-  const hasOracleAdapter = {
-    [ResolutionType.ChainlinkDataFeed]:  Boolean(chainlinkDataFeedAdapter),
-    [ResolutionType.ChainlinkFunctions]: Boolean(chainlinkFunctionsAdapter),
-    [ResolutionType.UMA]:                Boolean(umaAdapter),
-  }
   const isExtensibleOracleType = (t) => (
     t === ResolutionType.ChainlinkDataFeed ||
     t === ResolutionType.ChainlinkFunctions ||
     t === ResolutionType.UMA
   )
+
+  // Resolution choices are split into two flows, driven by `resolutionCategory`:
+  //   - 'participant' → people settle it (Either / Creator / Opponent / ThirdParty)
+  //   - 'oracle'      → an oracle settles it (Polymarket / Chainlink / UMA), each
+  //                     self-gated on being reachable/deployed on the active chain
+  //   - 'all'         → both (used by the Bookmaker card)
+  // The Set/order mirrors `enum ResolutionType` in IWagerRegistry.sol.
+  const availableOracleResolutionTypes = useMemo(() => [
+    ...(polymarketSidebetsEnabled ? [ResolutionType.Polymarket] : []),
+    ...(chainlinkDataFeedAdapter ? [ResolutionType.ChainlinkDataFeed] : []),
+    ...(chainlinkFunctionsAdapter ? [ResolutionType.ChainlinkFunctions] : []),
+    ...(umaAdapter ? [ResolutionType.UMA] : []),
+  ], [polymarketSidebetsEnabled, chainlinkDataFeedAdapter, chainlinkFunctionsAdapter, umaAdapter])
+
+  const resolutionOptionTypes = useMemo(() => {
+    if (resolutionCategory === 'participant') return PARTICIPANT_RESOLUTION_TYPES
+    if (resolutionCategory === 'oracle') return availableOracleResolutionTypes
+    return [...PARTICIPANT_RESOLUTION_TYPES, ...availableOracleResolutionTypes]
+  }, [resolutionCategory, availableOracleResolutionTypes])
+
+  // Default resolution to pre-select when the modal opens, per category.
+  const defaultResolutionType = useMemo(() => {
+    if (resolutionCategory === 'participant') return ResolutionType.Either
+    if (resolutionCategory === 'oracle') {
+      return availableOracleResolutionTypes[0] ?? ResolutionType.Polymarket
+    }
+    return WAGER_DEFAULTS.RESOLUTION_TYPE
+  }, [resolutionCategory, availableOracleResolutionTypes])
 
   // Chain-aware token metadata for the Stake Token dropdown. Recomputed
   // whenever the user switches Testnet/Mainnet so the right addresses are
@@ -109,8 +169,6 @@ function FriendMarketsModal({
     // an ENS name); `opponentResolved` is the 0x address used for validation
     // and contract submission.
     opponentResolved: '',
-    members: '',
-    memberLimit: WAGER_DEFAULTS.MEMBER_LIMIT,
     endDateTime: getDefaultEndDateTime(),
     stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
     stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
@@ -122,9 +180,8 @@ function FriendMarketsModal({
     // the 0-based outcome index ('' = unset, '0' = YES/first, '1' = NO/second)
     // to match PolymarketOracleAdapter's payouts ordering (YES=0, NO=1).
     creatorSide: '',
-    // Multi-party acceptance fields
+    // Deterministic accept-by time (midpoint of now → end).
     acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
-    minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
     // Leverage/odds for Bookmaker markets (200 = 2x equal stakes, 10000 = 100x)
     oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER,
     // Resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 4=AutoPegged
@@ -170,8 +227,6 @@ function FriendMarketsModal({
       description: '',
       opponent: '',
       opponentResolved: '',
-      members: '',
-      memberLimit: WAGER_DEFAULTS.MEMBER_LIMIT,
       endDateTime: getDefaultEndDateTime(),
       stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
       stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
@@ -181,8 +236,8 @@ function FriendMarketsModal({
       oracleConditionId: '',
       creatorSide: '',
       acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
-      minAcceptanceThreshold: String(WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD),
-      oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER
+      oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER,
+      resolutionType: defaultResolutionType
     })
     setErrors({})
     setSelectedPolymarketMarket(null)
@@ -190,7 +245,7 @@ function FriendMarketsModal({
     clearPolymarket()
     lastAutoDescriptionRef.current = ''
     setEnableEncryption(true)
-  }, [clearPolymarket])
+  }, [clearPolymarket, defaultResolutionType])
 
   // Reset modal state when opened. Always lands on the form for the
   // provided initialType (1v1 by default), since this modal is now
@@ -497,7 +552,9 @@ function FriendMarketsModal({
       newErrors.description = 'Description must be at least 10 characters'
     }
 
-    if (friendMarketType === 'oneVsOne') {
+    // Every supported wager type (1v1 and Bookmaker) is a head-to-head bet with
+    // a single opponent — the v2 contract has no group mode.
+    {
       const rawOpponent = formData.opponent.trim()
       const resolvedOpponent = (formData.opponentResolved || '').trim()
       if (!rawOpponent) {
@@ -510,47 +567,6 @@ function FriendMarketsModal({
         newErrors.opponent = 'Cannot use the zero address'
       } else if (resolvedOpponent.toLowerCase() === account?.toLowerCase()) {
         newErrors.opponent = 'Cannot bet against yourself'
-      }
-    }
-
-    if (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') {
-      if (!formData.members.trim()) {
-        newErrors.members = 'Member addresses are required'
-      } else {
-        const addresses = formData.members.split(',').map(a => a.trim()).filter(a => a)
-        const minMembers = friendMarketType === 'eventTracking' ? 3 : 2
-        const maxMembers = 10
-
-        if (addresses.length < minMembers) {
-          newErrors.members = `At least ${minMembers} members required`
-        } else if (addresses.length > maxMembers) {
-          newErrors.members = `Maximum ${maxMembers} members allowed`
-        } else {
-          // Check for invalid addresses
-          for (const addr of addresses) {
-            if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-              newErrors.members = `Invalid address: "${addr}"`
-              break
-            }
-            if (addr.toLowerCase() === '0x0000000000000000000000000000000000000000') {
-              newErrors.members = 'Cannot use the zero address'
-              break
-            }
-          }
-          
-          // Check for duplicates
-          if (!newErrors.members) {
-            const lowerAddresses = addresses.map(a => a.toLowerCase())
-            const uniqueAddresses = new Set(lowerAddresses)
-            if (uniqueAddresses.size !== addresses.length) {
-              newErrors.members = 'Duplicate addresses are not allowed'
-            }
-            // Check if creator is in the list
-            if (account && lowerAddresses.includes(account.toLowerCase())) {
-              newErrors.members = 'Cannot include your own address in member list'
-            }
-          }
-        }
       }
     }
 
@@ -601,19 +617,8 @@ function FriendMarketsModal({
       setFormData(prev => ({ ...prev, acceptanceDeadline: freshDeadline }))
     }
 
-    // Validate minimum threshold for group markets
-    if (friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') {
-      const threshold = parseInt(formData.minAcceptanceThreshold, 10)
-      const memberCount = formData.members.split(',').filter(m => m.trim()).length + 1 // +1 for creator
-      if (isNaN(threshold) || threshold < 2) {
-        newErrors.minAcceptanceThreshold = 'Minimum threshold must be at least 2'
-      } else if (threshold > memberCount) {
-        newErrors.minAcceptanceThreshold = `Threshold cannot exceed total participants (${memberCount})`
-      }
-    }
-
     // Validate arbitrator/market ID based on resolution type
-    if ((friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker')) {
+    {
       if (formData.resolutionType === ResolutionType.ThirdParty) {
         // Arbitrator address is required for ThirdParty resolution
         const rawArb = (formData.arbitrator || '').trim()
@@ -686,7 +691,7 @@ function FriendMarketsModal({
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
-  }, [formData, friendMarketType, account, STAKE_TOKEN_OPTIONS, selectedPolymarketMarket?.endDate])
+  }, [formData, account, STAKE_TOKEN_OPTIONS, selectedPolymarketMarket?.endDate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -753,14 +758,13 @@ function FriendMarketsModal({
       let finalMetadata = marketMetadata
 
       if (enableEncryption) {
-        // Look up opponent's on-chain encryption key before creating envelope.
-        // Use the ENS-resolved address (falls back to raw input when the user
-        // typed a hex address, since onResolvedChange mirrors that value).
-        const opponentAddress = friendMarketType === 'oneVsOne'
-          ? formData.opponentResolved
-          : null // For group markets, encrypt for creator only initially
+        // Every wager type (1v1 + Bookmaker) is head-to-head, so we always
+        // encrypt to the single opponent. Use the ENS-resolved address (falls
+        // back to raw input when the user typed a hex address, since
+        // onResolvedChange mirrors that value).
+        const opponentAddress = formData.opponentResolved
 
-        if (friendMarketType === 'oneVsOne' && opponentAddress) {
+        if (opponentAddress) {
           const opponentKey = await lookupOpponentKey(opponentAddress)
           if (!opponentKey) {
             throw new Error(
@@ -778,8 +782,8 @@ function FriendMarketsModal({
           const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519' })
           finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
         } else {
-          // Group markets: start with creator as only recipient
-          // Other participants will be added as they accept
+          // Defensive fallback: validation guarantees an opponent, but if one
+          // is somehow missing, encrypt to the creator only rather than crash.
           const { envelope } = await createEncrypted(marketMetadata)
           finalMetadata = envelope
         }
@@ -847,9 +851,9 @@ function FriendMarketsModal({
 
       // Calculate acceptance deadline info
       const acceptanceDeadline = new Date(freshAcceptanceDeadline)
-      const minThreshold = friendMarketType === 'oneVsOne'
-        ? WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
-        : parseInt(formData.minAcceptanceThreshold, 10) || WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
+      // 1v1 head-to-head: both sides (creator + opponent) must be in for the
+      // wager to activate.
+      const minThreshold = WAGER_DEFAULTS.MIN_ACCEPTANCE_THRESHOLD
 
       // Created market with acceptance flow fields
       const newMarket = {
@@ -864,9 +868,7 @@ function FriendMarketsModal({
         endDateTime: formData.endDateTime,
         endDate: endDate.toISOString(),
         tradingPeriod: tradingPeriodDays,
-        participants: friendMarketType === 'oneVsOne'
-          ? [account, formData.opponentResolved]
-          : [account, ...formData.members.split(',').map(a => a.trim())],
+        participants: [account, formData.opponentResolved],
         creator: account,
         arbitrator: formData.arbitratorResolved || null,
         createdAt: new Date().toISOString(),
@@ -917,8 +919,7 @@ function FriendMarketsModal({
   const getTypeLabel = (type) => {
     switch (type) {
       case 'oneVsOne': return '1v1'
-      case 'smallGroup': return 'Group'
-      case 'eventTracking': return 'Event'
+      case 'bookmaker': return 'Bookmaker'
       default: return type
     }
   }
@@ -1006,7 +1007,7 @@ function FriendMarketsModal({
                       {errors.description && <span className="fm-error">{errors.description}</span>}
                     </div>
 
-                    {friendMarketType === 'oneVsOne' && (
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-opponent">
                           Opponent Address <span className="fm-required">*</span>
@@ -1040,26 +1041,6 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    {(friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') && (
-                      <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-members">
-                          Member Addresses <span className="fm-required">*</span>
-                        </label>
-                        <input
-                          id="fm-members"
-                          type="text"
-                          value={formData.members}
-                          onChange={(e) => handleFormChange('members', e.target.value)}
-                          placeholder="0x123..., 0x456..., 0x789..."
-                          disabled={submitting}
-                          className={errors.members ? 'error' : ''}
-                        />
-                        <span className="fm-hint">
-                          Comma-separated ({friendMarketType === 'eventTracking' ? '3-10' : '2-10'} members)
-                        </span>
-                        {errors.members && <span className="fm-error">{errors.members}</span>}
-                      </div>
-                    )}
 
                     <div className="fm-form-group">
                       <label htmlFor="fm-stake">
@@ -1139,10 +1120,14 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    {/* Resolution Type selector - for 1v1 and Bookmaker markets */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                    {/* Resolution Type selector. The options are pre-filtered by
+                        `resolutionCategory` (participant vs oracle) so each flow
+                        only surfaces the relevant settlement choices. */}
+                    {resolutionOptionTypes.length > 0 ? (
                       <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-resolution-type">Who Can Resolve?</label>
+                        <label htmlFor="fm-resolution-type">
+                          {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'Who Can Resolve?'}
+                        </label>
                         <select
                           id="fm-resolution-type"
                           value={formData.resolutionType}
@@ -1150,37 +1135,29 @@ function FriendMarketsModal({
                           disabled={submitting}
                           className="fm-select"
                         >
-                          <option value={ResolutionType.Either}>Either Party</option>
-                          <option value={ResolutionType.Creator}>Creator Only</option>
-                          <option value={ResolutionType.Opponent}>Opponent Only</option>
-                          <option value={ResolutionType.ThirdParty}>Third Party Arbitrator</option>
-                          {polymarketSidebetsEnabled && (
-                            <option value={ResolutionType.Polymarket}>Linked Market (Polymarket)</option>
-                          )}
-                          {hasOracleAdapter[ResolutionType.ChainlinkDataFeed] && (
-                            <option value={ResolutionType.ChainlinkDataFeed}>Chainlink Data Feed (price condition)</option>
-                          )}
-                          {hasOracleAdapter[ResolutionType.ChainlinkFunctions] && (
-                            <option value={ResolutionType.ChainlinkFunctions}>Chainlink Functions (custom request)</option>
-                          )}
-                          {hasOracleAdapter[ResolutionType.UMA] && (
-                            <option value={ResolutionType.UMA}>UMA Optimistic Oracle (claim assertion)</option>
-                          )}
+                          {resolutionOptionTypes.map((t) => (
+                            <option key={t} value={t}>{RESOLUTION_TYPE_LABELS[t]}</option>
+                          ))}
                         </select>
                         <span className="fm-hint">
-                          {formData.resolutionType === ResolutionType.Either && 'Either you or your opponent can resolve the wager'}
-                          {formData.resolutionType === ResolutionType.Creator && 'Only you (the creator) can resolve the wager'}
-                          {formData.resolutionType === ResolutionType.Opponent && 'Only your opponent can resolve the wager'}
-                          {formData.resolutionType === ResolutionType.ThirdParty && 'A designated arbitrator will resolve disputes'}
-                          {formData.resolutionType === ResolutionType.Polymarket && 'Settles automatically when the linked Polymarket market resolves'}
-                          {formData.resolutionType === ResolutionType.ChainlinkDataFeed && 'Settles automatically once the price feed reading at the deadline passes the threshold'}
-                          {formData.resolutionType === ResolutionType.ChainlinkFunctions && 'Settles when the Chainlink Functions DON returns a result (admin-registered request)'}
-                          {formData.resolutionType === ResolutionType.UMA && 'Settles via UMA Optimistic Oracle — someone posts the bond and the assertion stands after the liveness window'}
-                          {!polymarketSidebetsEnabled && (
+                          {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
+                          {resolutionCategory === 'oracle' && !polymarketSidebetsEnabled && (
                             <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
-                              Linked Market settlement requires a chain with the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.
+                              Linked Market (Polymarket) settlement requires a chain with the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.
                             </em>
                           )}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="fm-form-group fm-form-full">
+                        <label>Oracle Settlement</label>
+                        <div className="fm-readonly-value">
+                          No oracle is available on this network.
+                        </div>
+                        <span className="fm-hint">
+                          Switch to a chain with the Polymarket CTF (Polygon Amoy or Mainnet) or a
+                          deployed Chainlink/UMA adapter, or create a wager that your friends settle
+                          instead.
                         </span>
                       </div>
                     )}
@@ -1302,27 +1279,6 @@ function FriendMarketsModal({
                       )
                     })()}
 
-                    {/* Minimum Threshold - only for group markets */}
-                    {(friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') && (
-                      <div className="fm-form-group">
-                        <label htmlFor="fm-min-threshold">
-                          Minimum Participants to Activate
-                        </label>
-                        <input
-                          id="fm-min-threshold"
-                          type="number"
-                          value={formData.minAcceptanceThreshold}
-                          onChange={(e) => handleFormChange('minAcceptanceThreshold', e.target.value)}
-                          min="2"
-                          max={Math.max(2, formData.members.split(',').filter(m => m.trim()).length + 1)}
-                          disabled={submitting}
-                          className={errors.minAcceptanceThreshold ? 'error' : ''}
-                        />
-                        <span className="fm-hint">Wager activates when this many participants accept (including you)</span>
-                        {errors.minAcceptanceThreshold && <span className="fm-error">{errors.minAcceptanceThreshold}</span>}
-                      </div>
-                    )}
-
                     {/* Arbitrator address field — for Third Party resolution */}
                     {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
                      formData.resolutionType === ResolutionType.ThirdParty && (
@@ -1360,7 +1316,7 @@ function FriendMarketsModal({
                     )}
 
                     {/* Linked Market — Polymarket event lookup */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
                      formData.resolutionType === ResolutionType.Polymarket && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-polymarket-search">
@@ -1460,7 +1416,7 @@ function FriendMarketsModal({
                     )}
 
                     {/* Oracle condition picker — Chainlink Data Feed / Chainlink Functions / UMA */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
                      isExtensibleOracleType(formData.resolutionType) && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-oracle-condition-picker">
@@ -1489,7 +1445,7 @@ function FriendMarketsModal({
                         Polymarket has its own outcome-named side picker below — we
                         skip it for the new types and use a binary YES/NO labelling
                         that maps to the contract's creatorIsYes bool. */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
                      isExtensibleOracleType(formData.resolutionType) && (
                       <div className="fm-form-group fm-form-full">
                         <label>
@@ -1525,7 +1481,7 @@ function FriendMarketsModal({
                     )}
 
                     {/* Creator side — which outcome of the linked Polymarket are you taking? */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker' || friendMarketType === 'smallGroup') &&
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
                      formData.resolutionType === ResolutionType.Polymarket &&
                      selectedPolymarketMarket && (
                       <div className="fm-form-group fm-form-full">
@@ -1648,7 +1604,7 @@ function FriendMarketsModal({
                             <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
                           </div>
                         )}
-                        {enableEncryption && friendMarketType === 'oneVsOne' && (
+                        {enableEncryption && (friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
                           <div className="fm-encryption-info" style={{ marginTop: '0.5rem' }}>
                             <div className="fm-encryption-info-header">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

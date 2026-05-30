@@ -60,14 +60,6 @@ function openAndFillWagerForm(config = {}) {
     cy.wait(500)
   }
 
-  // Fill members (group)
-  if (config.members) {
-    cy.get('#fm-members, [role="dialog"] input[placeholder*="0x1"]')
-      .first()
-      .clear()
-      .type(config.members)
-  }
-
   // Set stake amount
   if (config.stake) {
     cy.get('#fm-stake, [role="dialog"] input[type="number"]')
@@ -396,30 +388,19 @@ describe('Wager Creation with Real Transactions', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // CRE-10: Small group wager
+  // CRE-10: Group wagers are not offered (v2 contract is 1v1 only)
   // ---------------------------------------------------------------------------
-  it('[CRE-10] Create small group wager', () => {
+  it('[CRE-10] Group wager creation is not available', () => {
     connectWalletAndVisit(0)
 
-    openAndFillWagerForm({
-      type: 'smallGroup',
-      description: 'CRE-10: Group wager for the squad',
-      members: `${TEST_ACCOUNTS[1]}, ${TEST_ACCOUNTS[2]}, ${TEST_ACCOUNTS[3]}`,
-      stake: 10,
-      encrypted: false,
-    })
+    // No "Group Wager" entry card on the dashboard.
+    cy.contains('.quick-action-card', /group wager/i).should('not.exist')
 
-    submitWagerForm()
-
-    // Group wagers follow the same creation flow
-    cy.get('[role="dialog"], .modal', { timeout: 30000 }).invoke('text').then((text) => {
-      const lower = text.toLowerCase()
-      const validOutcome = lower.includes('created') ||
-                          lower.includes('success') ||
-                          lower.includes('share') ||
-                          lower.includes('error') ||
-                          lower.includes('failed')
-      expect(validOutcome).to.be.true
+    // And the 1v1 creation form exposes no member-address / group inputs.
+    cy.openCreateWagerModal('oneVsOne')
+    cy.get('[role="dialog"]').within(() => {
+      cy.get('#fm-members').should('not.exist')
+      cy.get('#fm-min-threshold').should('not.exist')
     })
   })
 

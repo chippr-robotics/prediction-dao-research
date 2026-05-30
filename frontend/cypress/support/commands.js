@@ -188,12 +188,15 @@ Cypress.Commands.add('disableDemoMode', () => {
 
 /**
  * Open the wager creation modal for a specific type.
- * @param {'oneVsOne'|'smallGroup'|'bookmaker'} type
+ * Group wagers are no longer supported — the v2 contract is 1v1 only. The
+ * 1v1 flow is split into participant-resolved ("Friends Decide") and
+ * oracle-resolved ("Oracle Settles") cards.
+ * @param {'oneVsOne'|'oracle'|'bookmaker'} type
  */
 Cypress.Commands.add('openCreateWagerModal', (type = 'oneVsOne') => {
   const buttonMap = {
-    oneVsOne: /create 1v1|1v1 wager|create wager/i,
-    smallGroup: /create group|group wager/i,
+    oneVsOne: /friends decide|1v1|create wager/i,
+    oracle: /oracle settles/i,
     bookmaker: /bookmaker/i,
   }
 

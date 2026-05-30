@@ -273,8 +273,8 @@ const buildTutorialSteps = (stable) => [
           <div className="next-step-item">
             <span className="next-icon">&#127942;</span>
             <div className="next-content">
-              <strong>Create a Group Wager</strong>
-              <span>Set up a pool for 3-10 friends</span>
+              <strong>Let an Oracle Settle It</strong>
+              <span>Auto-settle a 1v1 from Polymarket, Chainlink or UMA</span>
             </div>
           </div>
           <div className="next-step-item">
