@@ -5,7 +5,7 @@ import { useWallet, useWeb3 } from '../hooks'
 import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { getContractAddress, DEPLOYED_CONTRACTS } from '../config/contracts'
-import { WAGER_DEFAULTS } from '../constants/wagerDefaults'
+import { WAGER_DEFAULTS, deriveWagerType } from '../constants/wagerDefaults'
 import { parseEncryptedIpfsReference } from '../utils/ipfsService'
 import './MarketAcceptancePage.css'
 
@@ -119,6 +119,12 @@ function MarketAcceptancePage() {
         // The opponent puts up opponentStake on acceptance; that's what the modal cares about.
         const stakePerParticipant = ethers.formatUnits(w.opponentStake, decimals)
 
+        // v2 WagerRegistry has no marketType field — a bookmaker wager is encoded
+        // as asymmetric stakes (creatorStake !== opponentStake). Derive the subtype
+        // and the opponent's odds from raw stakes so the offer shows real bookmaker
+        // terms instead of collapsing to even-money 1v1.
+        const { type: wagerType, oddsMultiplier } = deriveWagerType(w.creatorStake, w.opponentStake)
+
         const rawDescription = w.metadataUri || ''
         const ipfsRef = parseEncryptedIpfsReference(rawDescription)
         const ipfsCid = ipfsRef.cid || getIpfsCid(rawDescription) || urlCid || null
@@ -158,7 +164,8 @@ function MarketAcceptancePage() {
           creator: w.creator,
           participants: opponentAddr && opponentAddr !== ethers.ZeroAddress ? [w.creator, opponentAddr] : [w.creator],
           arbitrator: (w.arbitrator && w.arbitrator !== ethers.ZeroAddress) ? w.arbitrator : null,
-          marketType: 'oneVsOne',
+          marketType: wagerType,
+          opponentOddsMultiplier: oddsMultiplier,
           status: statusName,
           acceptanceDeadline: acceptanceDeadlineMs,
           resolveDeadline: resolveDeadlineMs,

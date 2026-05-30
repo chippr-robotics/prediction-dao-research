@@ -508,6 +508,12 @@
   color: #36B37E;
 }
 
+/* Bookmaker (odds) wagers — distinct from even-money friend wagers */
+.mm-type-badge.mm-type-bookmaker {
+  background: rgba(255, 171, 0, 0.15);
+  color: #FFAB00;
+}
+
 /* Status Badge */
 .mm-status-badge {
   display: inline-block;
