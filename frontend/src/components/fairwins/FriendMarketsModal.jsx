@@ -647,8 +647,16 @@ function FriendMarketsModal({
         if (selectedPolymarketMarket?.endDate) {
           const linkedEnd = new Date(selectedPolymarketMarket.endDate)
           if (!Number.isNaN(linkedEnd.getTime())) {
+            // The on-chain resolveDeadline (linkedEnd + 48h) must fall within the
+            // contract's MAX_RESOLVE_WINDOW (180d). Markets ending beyond that
+            // can't be wagered on yet — block with a clear message instead of
+            // letting createWager revert with BadDeadlines.
+            const maxLinkedEnd = Date.now() +
+              (WAGER_DEFAULTS.MAX_RESOLVE_WINDOW_SECONDS - WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS) * 1000
             if (linkedEnd.getTime() <= Date.now()) {
               newErrors.oracleConditionId = 'This Polymarket has already ended. Pick an active market.'
+            } else if (linkedEnd.getTime() > maxLinkedEnd) {
+              newErrors.oracleConditionId = 'This market ends too far in the future to wager on (it must resolve within ~180 days). Pick a sooner-resolving market.'
             } else if (freshDeadline) {
               const acceptEnd = new Date(freshDeadline)
               if (!Number.isNaN(acceptEnd.getTime()) && acceptEnd.getTime() >= linkedEnd.getTime()) {

@@ -298,7 +298,6 @@ function PolymarketBrowser({
             <ul className={`pmb__grid pmb__grid--${variant}`} role="list">
               {rankedResults.map((m) => {
                 const isSelected = selectedConditionId && m.conditionId === selectedConditionId
-                const topOutcome = m.outcomes?.[0]
                 const vol = formatVolume(m.volume)
                 return (
                   <li key={m.conditionId} className="pmb__card-wrapper">
@@ -314,14 +313,6 @@ function PolymarketBrowser({
                         )}
                         {vol && <span className="pmb__card-volume">{vol} vol</span>}
                       </div>
-                      {topOutcome && topOutcome.price != null && (
-                        <div className="pmb__card-outcome">
-                          <span className="pmb__card-outcome-name">{topOutcome.name}</span>
-                          <span className="pmb__card-outcome-price">
-                            {Math.round(topOutcome.price * 100)}¢
-                          </span>
-                        </div>
-                      )}
                       {isSelected && <span className="pmb__card-selected-badge">Selected</span>}
                     </button>
                   </li>

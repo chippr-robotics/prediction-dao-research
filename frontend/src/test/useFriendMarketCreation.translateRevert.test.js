@@ -41,6 +41,18 @@ describe('useFriendMarketCreation: translateRevert', () => {
       .toMatch(/already resolved/i)
   })
 
+  it('maps ERC20 allowance/balance reverts to actionable guidance', () => {
+    // createWager pulls the stake via transferFrom; an unconfirmed approval
+    // surfaces as an allowance revert (sometimes stripped to "missing revert
+    // data" by wallet RPCs). Guide the user to wait for the approval instead.
+    expect(translateRevert('execution reverted: ERC20: transfer amount exceeds allowance'))
+      .toMatch(/approval has not been confirmed/i)
+    expect(translateRevert('ERC20: insufficient allowance'))
+      .toMatch(/approval has not been confirmed/i)
+    expect(translateRevert('execution reverted: ERC20: transfer amount exceeds balance'))
+      .toMatch(/insufficient token balance/i)
+  })
+
   it('falls back to a generic message for unknown reasons', () => {
     expect(translateRevert('out of gas: 0x1234'))
       .toMatch(/transaction will fail/i)

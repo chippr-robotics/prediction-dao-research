@@ -19,7 +19,7 @@ import { FRIEND_GROUP_MARKET_FACTORY_ABI } from '../../abis/FriendGroupMarketFac
 import { parseEncryptedIpfsReference } from '../../utils/ipfsService'
 import { loadIndex, saveIndex, loadCache, upsertCache } from './cacheStore'
 import { applyFilters, paginate } from './sortFilter'
-import { WagerSortKey } from '../../constants/wagerDefaults'
+import { WagerSortKey, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 
 const MARKET_TYPES = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet']
 const STATUS_NAMES = [
@@ -128,6 +128,14 @@ function toWager(marketId, withStatus, full) {
     acceptanceDeadline: acceptanceDeadlineMs,
     endTime,
     endDate: endTime > 0 ? new Date(endTime).toISOString() : null,
+    // Canonical timing pair (mirrors blockchainService.toWagerShape) so the
+    // detail/list views show a consistent end across data sources. `endTime`
+    // here is the resolution-open time E (createdAt + tradingPeriodSeconds);
+    // resolution closes 48h later.
+    tradingEndTime: endTime > 0 ? endTime : undefined,
+    resolveDeadlineTime: endTime > 0
+      ? endTime + (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
+      : undefined,
     acceptedCount: Number(withStatus.acceptedCount || 0),
     minAcceptanceThreshold: Number(withStatus.minThreshold || 0),
     ipfsCid: enc.ipfsCid,
