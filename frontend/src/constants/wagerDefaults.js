@@ -53,6 +53,13 @@ export const WAGER_DEFAULTS = {
    *  so that participants have time to declare a winner after the event ends.
    *  48 hours keeps the UX generous without approaching MAX_RESOLVE_WINDOW. */
   RESOLUTION_WINDOW_SECONDS: 48 * 60 * 60,
+
+  /** Hard caps enforced on-chain by WagerRegistry. acceptDeadline must be
+   *  within MAX_ACCEPT_WINDOW of now and resolveDeadline within
+   *  MAX_RESOLVE_WINDOW; exceeding either reverts with BadDeadlines. Mirrored
+   *  here so the client can clamp/validate before submitting. */
+  MAX_ACCEPT_WINDOW_SECONDS: 30 * 24 * 60 * 60,
+  MAX_RESOLVE_WINDOW_SECONDS: 180 * 24 * 60 * 60,
 }
 
 // ── Wager status strings (friend / P2P markets) ────────────────────

@@ -747,6 +747,30 @@
   .onboarding-carousel {
     min-height: 350px;
   }
+
+  /* Compact the progress header + step dots so they don't dominate
+     the small-screen layout (mobile "breadcrumbs" were oversized). */
+  .onboarding-progress {
+    padding: 0.75rem 1rem 0;
+    gap: 0.75rem;
+  }
+
+  .progress-text {
+    font-size: 0.7rem;
+  }
+
+  .onboarding-dots {
+    gap: 0.375rem;
+    padding: 0.625rem 0;
+  }
+
+  .dot {
+    padding: 5px;
+  }
+
+  .dot.active {
+    width: 16px;
+  }
 }
 
 @media (max-width: 400px) {

@@ -197,7 +197,21 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const tradingEnd = (parsedEnd && !Number.isNaN(parsedEnd.getTime()))
         ? Math.floor(parsedEnd.getTime() / 1000)
         : acceptDeadline + tradingPeriodSeconds // fallback when no explicit end time
-      const resolveDeadline = tradingEnd + RESOLUTION_WINDOW
+      let resolveDeadline = tradingEnd + RESOLUTION_WINDOW
+
+      // Clamp deadlines to the contract's accept/resolve windows so a far-future
+      // end (e.g. a Polymarket-linked market whose own end is months out, which
+      // bypasses the modal's 21-day bound) can't push past the on-chain caps and
+      // revert with BadDeadlines. We keep now < acceptDeadline < resolveDeadline.
+      const nowSec = Math.floor(Date.now() / 1000)
+      const SAFETY_BUFFER = 5 * 60 // 5 min, to absorb block-time skew
+      const maxAccept = nowSec + (WAGER_DEFAULTS.MAX_ACCEPT_WINDOW_SECONDS || 30 * 86400) - SAFETY_BUFFER
+      const maxResolve = nowSec + (WAGER_DEFAULTS.MAX_RESOLVE_WINDOW_SECONDS || 180 * 86400) - SAFETY_BUFFER
+      if (acceptDeadline > maxAccept) acceptDeadline = maxAccept
+      if (resolveDeadline > maxResolve) resolveDeadline = maxResolve
+      // Guarantee strict ordering even after clamping.
+      if (acceptDeadline <= nowSec) acceptDeadline = nowSec + 60
+      if (resolveDeadline <= acceptDeadline) resolveDeadline = acceptDeadline + RESOLUTION_WINDOW
 
       // Participants
       const opponent = data.data.opponent || data.data.participants?.[0]
@@ -259,13 +273,36 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
       const metadataHash = ethers.keccak256(ethers.toUtf8Bytes(metadataReference))
 
-      // Approve stake token if needed
-      const currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
+      // Approve stake token if needed. We approve the full uint256 max rather
+      // than the exact stake so (a) subsequent wagers don't need a fresh
+      // approval each time (the exact-stake approval left allowance at 0 after
+      // every wager) and (b) a stale read on a load-balanced RPC node can't
+      // under-approve. After approving we poll the allowance until the freshly
+      // mined approval is actually visible to the RPC — otherwise createWager's
+      // gas estimation can land on a node that still sees allowance 0, and the
+      // transferFrom reverts ("transfer amount exceeds allowance", surfaced as
+      // an opaque "missing revert data" by some wallet RPCs).
+      let currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
       if (currentAllowance < creatorStakeWei) {
         onProgress({ step: 'approve', message: 'Approving token spend...' })
-        const approveTx = await stakeToken.approve(wagerRegistryAddress, creatorStakeWei)
+        const approveTx = await stakeToken.approve(wagerRegistryAddress, ethers.MaxUint256)
         onProgress({ step: 'approve', message: 'Waiting for approval confirmation...', txHash: approveTx.hash })
         await approveTx.wait()
+
+        // Wait until the approval is observable before continuing. Public RPCs
+        // are often load-balanced, so the node answering the next read/estimate
+        // may briefly lag the node that mined the approval.
+        for (let attempt = 0; attempt < 6; attempt++) {
+          currentAllowance = await stakeToken.allowance(userAddress, wagerRegistryAddress)
+          if (currentAllowance >= creatorStakeWei) break
+          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+        }
+        if (currentAllowance < creatorStakeWei) {
+          throw new Error(
+            'Your token approval has not been confirmed yet. Please wait a few ' +
+            'seconds for it to finalize, then try creating the wager again.'
+          )
+        }
       }
 
       // Auto-cleanup expired Open wagers that still count toward the
@@ -291,13 +328,37 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
       onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
       const feeOverrides = await getFeeOverrides(activeSigner.provider)
-      const tx = await registry.createWager(
+      const createArgs = [
         opponent, arbitrator, stakeTokenAddress,
         creatorStakeWei, opponentStakeWei,
         acceptDeadline, resolveDeadline,
         resolutionType, polymarketConditionId, creatorIsYes,
         metadataHash, metadataReference,
-        feeOverrides
+      ]
+
+      // Estimate gas explicitly with a short retry so a transient stale read on
+      // a load-balanced RPC doesn't surface a raw "missing revert data" error.
+      // The staticCall above already validated the args, so a failure here is
+      // almost always RPC lag rather than a genuine revert; fall back to a fixed
+      // limit after exhausting retries.
+      let gasLimit
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const estimate = await registry.createWager.estimateGas(...createArgs)
+          gasLimit = (estimate * 120n) / 100n // +20% headroom
+          break
+        } catch {
+          if (attempt === 2) {
+            gasLimit = 800000n // generous fallback; the staticCall already passed
+            break
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+        }
+      }
+
+      const tx = await registry.createWager(
+        ...createArgs,
+        { ...feeOverrides, gasLimit }
       )
       onProgress({ step: 'create', message: 'Waiting for confirmation...', txHash: tx.hash })
       savePendingTransaction({ step: 'create', txHash: tx.hash, data: data.data })
@@ -373,6 +434,12 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
 export function translateRevert(reason) {
   if (!reason) return 'Unknown contract error.'
+  if (reason.includes('insufficient allowance') || reason.includes('exceeds allowance')) {
+    return 'Your USDC approval has not been confirmed yet. Wait a few seconds for the approval to finalize, then try creating the wager again.'
+  }
+  if (reason.includes('insufficient balance') || reason.includes('exceeds balance')) {
+    return 'Insufficient token balance to cover your stake.'
+  }
   if (reason.includes('MembershipDenied')) return 'Your membership is inactive or you have reached your wager limit. If you have expired wagers, try again — they will be cleaned up automatically. Otherwise, upgrade your tier for higher limits.'
   if (reason.includes('SelfWager')) return 'Cannot wager against yourself.'
   if (reason.includes('NotAllowedToken')) return 'Stake token is not on the allowlist. Use USDC or WMATIC.'

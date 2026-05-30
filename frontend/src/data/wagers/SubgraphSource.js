@@ -10,7 +10,7 @@
  * Falls back to EventsSource if the subgraph endpoint is unreachable.
  */
 
-import { WagerSortKey, TERMINAL_STATUSES } from '../../constants/wagerDefaults'
+import { WagerSortKey, TERMINAL_STATUSES, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { upsertCache } from './cacheStore'
 import * as EventsSource from './EventsSource'
 
@@ -102,6 +102,14 @@ function toWager(raw) {
     acceptanceDeadline: Number(raw.acceptanceDeadline || 0) * 1000,
     endTime: Number(raw.endTime || 0) * 1000,
     endDate: raw.endTime ? new Date(Number(raw.endTime) * 1000).toISOString() : null,
+    // Canonical timing pair so the detail/list show a consistent end across
+    // sources. The subgraph's `endTime` is the resolution-open time E
+    // (createdAt + tradingPeriodSeconds, per schema.graphql); resolution
+    // closes 48h later.
+    tradingEndTime: raw.endTime ? Number(raw.endTime) * 1000 : undefined,
+    resolveDeadlineTime: raw.endTime
+      ? Number(raw.endTime) * 1000 + (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
+      : undefined,
     acceptedCount: Number(raw.acceptedCount || 0),
     ipfsCid: raw.ipfsCid || null,
     isEncrypted: Boolean(raw.isEncrypted),

@@ -268,6 +268,15 @@ function MyMarketsModal({
       }
     })
 
+    // Sort each list newest-first. Wager `id` is sequential on-chain (higher =
+    // newer) and always present; createdAt is preferred when available.
+    const byNewest = (a, b) =>
+      (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0) ||
+      (Number(b.id) || 0) - (Number(a.id) || 0)
+    participating.sort(byNewest)
+    created.sort(byNewest)
+    history.sort(byNewest)
+
     return { participating, created, history }
   }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter, dismissedIds])
 
@@ -987,7 +996,6 @@ function MarketsTable({
         <thead>
           <tr>
             <th>Wager</th>
-            <th>Type</th>
             <th>{showOutcome ? 'Outcome' : 'Time Left'}</th>
             <th>Status</th>
             {tableHasActionsColumn && <th>Actions</th>}
@@ -1037,11 +1045,6 @@ function MarketsTable({
                   {market.category && (
                     <span className="mm-table-category">{market.category}</span>
                   )}
-                </td>
-                <td>
-                  <span className={`mm-type-badge mm-type-${market.marketType}`}>
-                    {market.marketType === 'friend' ? 'Friend' : 'Wager'}
-                  </span>
                 </td>
                 <td className="mm-table-time">
                   {showOutcome ? (
