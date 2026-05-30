@@ -9,6 +9,7 @@ import {
   uploadEncryptedEnvelope,
   buildEncryptedIpfsReference
 } from '../utils/ipfsService'
+import { getFeeOverrides } from '../utils/feeOverrides'
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -184,7 +185,19 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         const hours = parseInt(raw, 10) || 48
         acceptDeadline = Math.floor(Date.now() / 1000) + hours * 3600
       }
-      const resolveDeadline = acceptDeadline + tradingPeriodSeconds + (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600)
+      // Timing model: a single user-chosen end time `E` (tradingEnd) drives everything.
+      //   - acceptDeadline  = midpoint(now, E)            (set upstream by the form)
+      //   - tradingEnd      = E   → resolution opens here
+      //   - resolveDeadline = E + 48h → resolution closes; after this stakes are refundable
+      // Anchor resolveDeadline to E directly. The previous formula
+      // (acceptDeadline + tradingPeriodSeconds + 48h) overshot to ~1.5*E + 48h because
+      // acceptDeadline is the midpoint, which broke the resolve-window gate downstream.
+      const RESOLUTION_WINDOW = WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600
+      const parsedEnd = data.data.endDateTime ? new Date(data.data.endDateTime) : null
+      const tradingEnd = (parsedEnd && !Number.isNaN(parsedEnd.getTime()))
+        ? Math.floor(parsedEnd.getTime() / 1000)
+        : acceptDeadline + tradingPeriodSeconds // fallback when no explicit end time
+      const resolveDeadline = tradingEnd + RESOLUTION_WINDOW
 
       // Participants
       const opponent = data.data.opponent || data.data.participants?.[0]
@@ -277,12 +290,14 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
 
       onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
+      const feeOverrides = await getFeeOverrides(activeSigner.provider)
       const tx = await registry.createWager(
         opponent, arbitrator, stakeTokenAddress,
         creatorStakeWei, opponentStakeWei,
         acceptDeadline, resolveDeadline,
         resolutionType, polymarketConditionId, creatorIsYes,
-        metadataHash, metadataReference
+        metadataHash, metadataReference,
+        feeOverrides
       )
       onProgress({ step: 'create', message: 'Waiting for confirmation...', txHash: tx.hash })
       savePendingTransaction({ step: 'create', txHash: tx.hash, data: data.data })
@@ -331,7 +346,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         arbitrator,
         creator: userAddress,
         acceptanceDeadline: new Date(acceptDeadline * 1000).toISOString(),
-        endDate: new Date((acceptDeadline + tradingPeriodSeconds) * 1000).toISOString(),
+        endDate: new Date(tradingEnd * 1000).toISOString(),
         tradingPeriod: Math.max(1, Math.ceil(tradingPeriodSeconds / 86400)).toString(),
         createdAt: new Date().toISOString(),
         status: 'pending',

@@ -13,6 +13,7 @@ import {
 import { DEX_ADDRESSES } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getTransactionUrl } from '../../config/blockExplorer'
+import { getFeeOverrides } from '../../utils/feeOverrides'
 import './MarketAcceptanceModal.css'
 
 // Helper to format stake amount as USD (rounded to nearest cent)
@@ -363,7 +364,8 @@ function MarketAcceptanceModal({
 
       let tx
       console.log('Sending acceptWager transaction...')
-      tx = await contract.acceptWager(marketId)
+      const feeOverrides = await getFeeOverrides(signer.provider)
+      tx = await contract.acceptWager(marketId, feeOverrides)
 
       setTxHash(tx.hash)
       await tx.wait()

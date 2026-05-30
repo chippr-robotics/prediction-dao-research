@@ -1352,6 +1352,10 @@
 
 .mm-outcome-btn {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
   padding: 1rem;
   background: var(--bg-primary, #0E141B);
   border: 2px solid var(--border-color, #23303D);
@@ -1361,6 +1365,18 @@
   color: var(--text-primary, #E6EDF3);
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.mm-outcome-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.mm-outcome-addr {
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  opacity: 0.75;
 }
 
 .mm-outcome-btn:hover:not(:disabled) {

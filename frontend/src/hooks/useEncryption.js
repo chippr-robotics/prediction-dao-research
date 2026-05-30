@@ -172,6 +172,34 @@ export function useEncryption() {
     // Create and store the promise to prevent concurrent requests
     initializationPromise = (async () => {
       try {
+        // Reuse a cached session signature if one exists, deriving keypairs WITHOUT a
+        // wallet popup. This makes initialization idempotent across hook instances and
+        // rapid sequential calls, so the encryption-terms message is only ever signed
+        // once per session (Minor bug #1 — repeated signature prompts on wager creation).
+        const cached = getCachedSignatureData(account)
+        if (cached?.signature) {
+          const x25519Keys = deriveKeyPairFromSignature(cached.signature)
+          const xwingKeys = deriveXWingKeyPairFromSignature(cached.signature)
+          setSignature(cached.signature)
+          setCachedVersion(cached.version)
+          setKeyPairs({
+            x25519: {
+              publicKey: x25519Keys.publicKey,
+              privateKey: x25519Keys.privateKey
+            },
+            xwing: {
+              publicKey: xwingKeys.publicKey,
+              secretKey: xwingKeys.secretKey
+            }
+          })
+          console.log('[useEncryption] Reused cached session signature (no wallet popup)')
+          return {
+            signature: cached.signature,
+            publicKey: x25519Keys.publicKey,
+            xwingPublicKey: xwingKeys.publicKey
+          }
+        }
+
         // Derive X25519 keypair (also gets the signature and version)
         const x25519Result = await deriveKeyPair(signer)
         const signingVersion = x25519Result.version || 2 // Default to current version

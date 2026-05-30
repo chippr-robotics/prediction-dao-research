@@ -7,6 +7,7 @@ import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
+import { getFeeOverrides } from '../../utils/feeOverrides'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './MyMarketsModal.css'
 
@@ -411,9 +412,16 @@ function MyMarketsModal({
     return false
   }
 
+  // Disputes are intentionally disabled (Bug #3 — honest UX).
+  // The WagerRegistry contract resolves immediately and finally via declareWinner();
+  // there is no on-chain challenge/dispute function, so we must not surface a dispute
+  // affordance (the DisputeModal is a non-functional placeholder). These checks return
+  // false so the wiring stays intact for a future on-chain dispute feature.
+  const DISPUTES_ENABLED = false
+
   // Check if user can open dispute
   const canOpenDispute = (market) => {
-    if (!account) return false
+    if (!DISPUTES_ENABLED || !account) return false
     const status = market.computedStatus || MarketStatus.ACTIVE
     const hasPos = userPositions.some(p => String(p.marketId) === String(market.id))
     const isParticipant = market.participants?.some(p => p.toLowerCase() === account.toLowerCase()) || hasPos
@@ -422,7 +430,7 @@ function MyMarketsModal({
 
   // Check if user can respond to dispute (as market maker)
   const canRespondToDispute = (market) => {
-    if (!account) return false
+    if (!DISPUTES_ENABLED || !account) return false
     const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
     const status = market.computedStatus || MarketStatus.ACTIVE
     return isCreator && status === MarketStatus.DISPUTED
@@ -843,6 +851,7 @@ function MyMarketsModal({
       {showResolutionModal && resolutionMarket && (
         <ResolutionModal
           market={resolutionMarket}
+          account={account}
           onClose={() => setShowResolutionModal(false)}
           onResolved={() => {
             setShowResolutionModal(false)
@@ -1125,6 +1134,13 @@ function MarketsTable({
  * @param {string} variant - 'compact' (table) or 'full' (detail view)
  */
 function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'compact' }) {
+  // Tick every second so the resolve window opens automatically without a reload.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
+
   const userAddr = account?.toLowerCase()
   const isCreator = market.creator?.toLowerCase() === userAddr
   const isOpponent = market.participants?.length > 1 &&
@@ -1149,6 +1165,43 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
       status === 'canceled' || status === 'refunded' || status === 'expired' ||
       status === 'declined' || status === 'pending_acceptance') {
     return null
+  }
+
+  // Resolve-window gate (Bug #1). Resolution is only allowed in
+  // [tradingEndTime, resolveDeadlineTime]:
+  //   - before tradingEndTime  → show a countdown, no resolve button
+  //   - after resolveDeadlineTime → nothing (the Claim Refund flow takes over)
+  // tradingEndTime is the user's chosen end time `E`; resolveDeadlineTime = E + 48h.
+  // Fall back to "resolvable" when the timestamps are missing (e.g. legacy wagers).
+  const tradingEndTime = market.tradingEndTime
+  const resolveDeadlineTime = market.resolveDeadlineTime
+  if (typeof resolveDeadlineTime === 'number' && now > resolveDeadlineTime) {
+    return null
+  }
+  if (typeof tradingEndTime === 'number' && now < tradingEndTime) {
+    const diff = tradingEndTime - now
+    const days = Math.floor(diff / 86400000)
+    const hours = Math.floor((diff % 86400000) / 3600000)
+    const minutes = Math.floor((diff % 3600000) / 60000)
+    const label = days > 0 ? `${days}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
+    if (variant === 'full') {
+      return (
+        <div className="mm-resolve-countdown-full" title="Resolution opens after the wager's end time">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Resolution opens in <strong>{label}</strong>
+        </div>
+      )
+    }
+    return (
+      <span className="mm-resolve-countdown" title="Resolution opens after the wager's end time">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        {label}
+      </span>
+    )
   }
 
   if (variant === 'full') {
@@ -1636,6 +1689,7 @@ function MarketDetailView({
  */
 function ResolutionModal({
   market,
+  account,
   onClose,
   onResolved,
   signer,
@@ -1649,9 +1703,28 @@ function ResolutionModal({
   const [txHash, setTxHash] = useState(null)
   const [step, setStep] = useState('select') // 'select', 'confirm', 'success'
 
+  // Canonical outcome keys preserve the on-chain mapping:
+  //   outcomes[0] => creator wins, outcomes[1] => opponent wins.
   const outcomes = market.marketType === 'friend'
     ? ['Pass', 'Fail']
     : ['Yes', 'No']
+
+  // Participant-anchored display labels so the resolver clearly sees which party each
+  // choice pays out, instead of an ambiguous "Pass/Fail" (Bug #2).
+  const fmtParty = (addr) => {
+    if (!addr) return 'Unknown'
+    const short = `${addr.slice(0, 6)}…${addr.slice(-4)}`
+    const isYou = account && addr.toLowerCase() === account.toLowerCase()
+    return isYou ? `${short} (You)` : short
+  }
+  const outcomeLabels = {
+    [outcomes[0]]: { title: 'Creator wins', who: fmtParty(market.creator) },
+    [outcomes[1]]: { title: 'Opponent wins', who: fmtParty(market.opponent) },
+  }
+  const labelFor = (outcome) => {
+    const meta = outcomeLabels[outcome]
+    return meta ? `${meta.title} — ${meta.who}` : outcome
+  }
 
   const handleSubmit = async () => {
     if (!selectedOutcome) {
@@ -1666,6 +1739,12 @@ function ResolutionModal({
 
     if (!signer) {
       setError('Please connect your wallet to resolve this wager.')
+      return
+    }
+
+    // Resolve-window guard (Bug #1): block resolution before the wager's end time `E`.
+    if (typeof market.tradingEndTime === 'number' && Date.now() < market.tradingEndTime) {
+      setError('This wager cannot be resolved yet. Resolution opens after the wager’s end time.')
       return
     }
 
@@ -1693,7 +1772,8 @@ function ResolutionModal({
         notes: resolutionNotes,
       })
 
-      const tx = await registry.declareWinner(market.id, winner)
+      const feeOverrides = await getFeeOverrides(signer.provider)
+      const tx = await registry.declareWinner(market.id, winner, feeOverrides)
       setTxHash(tx.hash)
 
       const receipt = await tx.wait()
@@ -1784,13 +1864,13 @@ function ResolutionModal({
               <div className="mm-resolution-market-info">
                 <h4>{getMarketDisplayTitle(market)}</h4>
                 <p className="mm-resolution-hint">
-                  Select the winning outcome for this wager. This action will distribute
-                  winnings to participants who chose correctly.
+                  Select the winning party for this wager. This pays out the entire pot to
+                  the chosen participant and is final once confirmed on-chain.
                 </p>
               </div>
 
               <div className="mm-resolution-outcomes">
-                <label className="mm-outcome-label">Select Outcome</label>
+                <label className="mm-outcome-label">Who won?</label>
                 <div className="mm-outcome-options">
                   {outcomes.map(outcome => (
                     <button
@@ -1800,7 +1880,8 @@ function ResolutionModal({
                       onClick={() => setSelectedOutcome(outcome)}
                       disabled={submitting}
                     >
-                      {outcome}
+                      <span className="mm-outcome-title">{outcomeLabels[outcome]?.title || outcome}</span>
+                      <span className="mm-outcome-addr">{outcomeLabels[outcome]?.who}</span>
                     </button>
                   ))}
                 </div>
@@ -1861,11 +1942,11 @@ function ResolutionModal({
                 <div className="mm-confirmation-icon">&#9888;</div>
                 <h4>Confirm Resolution</h4>
                 <p>
-                  You are about to resolve this wager with outcome: <strong>{selectedOutcome}</strong>
+                  You are about to resolve this wager in favour of: <strong>{labelFor(selectedOutcome)}</strong>
                 </p>
                 <p className="mm-confirmation-warning">
-                  This action cannot be undone. Participants will have a window to dispute
-                  the resolution if they disagree.
+                  This action cannot be undone. The full pot is paid to the winner immediately
+                  and the result is final.
                 </p>
               </div>
 
@@ -1902,13 +1983,12 @@ function ResolutionModal({
           {step === 'success' && (
             <div className="mm-success-state">
               <div className="mm-success-icon">&#9989;</div>
-              <h4>Resolution Proposed!</h4>
+              <h4>Wager Resolved</h4>
               <p>
-                Resolution proposed with outcome: <strong>{selectedOutcome}</strong>
+                Winnings sent to: <strong>{labelFor(selectedOutcome)}</strong>
               </p>
               <p className="mm-success-hint">
-                The other party has a 24-hour challenge window to dispute this resolution.
-                If unchallenged, the resolution will be finalized automatically.
+                The full pot has been paid out on-chain. This result is final.
               </p>
               {txHash && (
                 <p className="mm-success-hint">

@@ -1257,7 +1257,7 @@ function FriendMarketsModal({
                           disabled={submitting}
                           className={`fm-datetime-input ${errors.endDateTime ? 'error' : ''}`}
                         />
-                        <span className="fm-hint">When does this wager end? (min: 1 hour, max: 21 days)</span>
+                        <span className="fm-hint">When does this wager end? You can resolve it once this time passes. (min: 1 hour, max: 21 days)</span>
                         {errors.endDateTime && <span className="fm-error">{errors.endDateTime}</span>}
                       </div>
                     )}
@@ -1270,8 +1270,29 @@ function FriendMarketsModal({
                           ? new Date(formData.acceptanceDeadline).toLocaleString()
                           : '—'}
                       </div>
-                      <span className="fm-hint">Automatically set to halfway between now and end time</span>
+                      <span className="fm-hint">Halfway between now and the end time — your opponent must accept before this.</span>
                     </div>
+
+                    {/* Resolution window — derived from the end time so the full timeline is
+                        clear before the user commits (Bug #1). Resolve allowed in
+                        [end time, end time + 48h]; refundable after that. */}
+                    {formData.endDateTime && !Number.isNaN(new Date(formData.endDateTime).getTime()) && (() => {
+                      const end = new Date(formData.endDateTime)
+                      const windowMs = (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000
+                      const resolveClose = new Date(end.getTime() + windowMs)
+                      return (
+                        <div className="fm-form-group">
+                          <label>Resolution Window</label>
+                          <div className="fm-readonly-value">
+                            {end.toLocaleString()} → {resolveClose.toLocaleString()}
+                          </div>
+                          <span className="fm-hint">
+                            You have 48 hours after the end time to resolve. If unresolved by{' '}
+                            {resolveClose.toLocaleString()}, both stakes can be refunded.
+                          </span>
+                        </div>
+                      )
+                    })()}
 
                     {/* Minimum Threshold - only for group markets */}
                     {(friendMarketType === 'smallGroup' || friendMarketType === 'eventTracking') && (
@@ -1856,6 +1877,13 @@ function FriendMarketsModal({
                       Copy Link
                     </button>
                   </div>
+                  <button
+                    type="button"
+                    className="fm-success-done"
+                    onClick={handleClose}
+                  >
+                    Done — back to My Wagers
+                  </button>
                 </div>
               )}
             </div>

@@ -430,6 +430,14 @@ function toWagerShape(id, w) {
     paid: w.paid,
     acceptanceDeadline: Number(w.acceptDeadline) * 1000,
     endDate: new Date(Number(w.resolveDeadline) * 1000).toISOString(),
+    // Explicit ms timestamps for the resolve-window gate (Bug #1):
+    //   resolveDeadlineTime = on-chain resolveDeadline (resolution closes / refund opens)
+    //   tradingEndTime      = resolveDeadline - 48h = the user's chosen end time `E`
+    //                         (resolution opens). Resolution is only allowed in
+    //                         [tradingEndTime, resolveDeadlineTime].
+    resolveDeadlineTime: Number(w.resolveDeadline) * 1000,
+    tradingEndTime: Number(w.resolveDeadline) * 1000 -
+      (WAGER_DEFAULTS.RESOLUTION_WINDOW_SECONDS || 48 * 3600) * 1000,
     polymarketConditionId: w.polymarketConditionId,
     creatorIsYes: w.creatorIsYes,
     metadataHash: w.metadataHash,
