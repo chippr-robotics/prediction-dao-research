@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
+import LiveStats from './fairwins/LiveStats'
 import { useChainTokens } from '../hooks/useChainTokens'
 import './LandingPage.css'
 
@@ -140,30 +141,8 @@ function LandingPage() {
         </div>
       </section>
 
-      {/* Social Proof Strip */}
-      <section className="proof-strip">
-        <div className="proof-strip-inner">
-          <div className="proof-item">
-            <span className="proof-number">5</span>
-            <span className="proof-label">Resolution Types</span>
-          </div>
-          <div className="proof-divider" />
-          <div className="proof-item">
-            <span className="proof-number">24hr</span>
-            <span className="proof-label">Dispute Window</span>
-          </div>
-          <div className="proof-divider" />
-          <div className="proof-item">
-            <span className="proof-number">100%</span>
-            <span className="proof-label">Non-Custodial</span>
-          </div>
-          <div className="proof-divider" />
-          <div className="proof-item">
-            <span className="proof-number">0</span>
-            <span className="proof-label">Middlemen</span>
-          </div>
-        </div>
-      </section>
+      {/* Live on-chain stats band */}
+      <LiveStats />
 
       {/* Why FairWins - Value Props */}
       <section className={`value-section ${isVisible('value-props') ? 'visible' : ''}`} id="features">
