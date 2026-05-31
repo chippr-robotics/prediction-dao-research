@@ -367,13 +367,10 @@
   height: 8px;
   border-radius: 50%;
   background: #36B37E;
-  animation: livestatsPulse 2s ease-in-out infinite;
-}
-
-@keyframes livestatsPulse {
-  0% { box-shadow: 0 0 0 0 rgba(54, 179, 126, 0.5); }
-  70% { box-shadow: 0 0 0 10px rgba(54, 179, 126, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(54, 179, 126, 0); }
+  /* Reuse the hero's pulse (transform + opacity) so the animation stays
+     GPU-composited — animating box-shadow here trips Lighthouse's
+     non-composited-animations audit. */
+  animation: pulse 2s ease-in-out infinite;
 }
 
 .livestats-grid {
