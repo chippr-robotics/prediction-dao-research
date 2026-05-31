@@ -6,8 +6,10 @@
  *      sums staked value, counts unique users.
  *   2. RPC fallback — reads WagerRegistry.nextWagerId() for the total wager
  *      count when the subgraph is unavailable.
- *   3. Baseline floor — every metric is displayed as max(live, baseline) so
- *      a fresh testnet still looks alive (see constants/siteStats.js).
+ *
+ * Metrics are reported exactly as they come back on-chain — there is no
+ * baseline floor or padding. When neither source resolves, the band renders
+ * zeros and a neutral "Platform activity" label.
  *
  * Results are cached at module scope for STATS_TTL_MS so the band doesn't
  * refetch on every mount/navigation.
@@ -18,7 +20,6 @@ import { Contract, formatUnits } from 'ethers'
 import { getProvider } from '../utils/blockchainService'
 import { getContractAddress } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
-import { STATS_BASELINE } from '../constants/siteStats'
 
 const SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
 // Stake token is assumed to be a 6-decimal stable (USDC) for the headline
@@ -115,10 +116,11 @@ async function loadStats() {
     }
   }
 
-  // Floor each metric at its baseline so the band always looks alive.
-  const stats = {}
-  for (const key of Object.keys(STATS_BASELINE)) {
-    stats[key] = Math.max(Number(live[key]) || 0, STATS_BASELINE[key])
+  // Report metrics exactly as fetched — no baseline floor. Normalise each
+  // key to a non-negative number so the formatter never sees undefined/NaN.
+  const stats = emptyStats()
+  for (const key of Object.keys(stats)) {
+    stats[key] = Math.max(0, Number(live[key]) || 0)
   }
 
   const value = { stats, isLive }
@@ -127,9 +129,9 @@ async function loadStats() {
 }
 
 export function useSiteStats() {
-  // Render the baseline immediately so the band never flashes empty, then
+  // Start from zeros so the band never flashes fabricated figures, then
   // refine with live data once it resolves.
-  const [stats, setStats] = useState(() => ({ ...STATS_BASELINE }))
+  const [stats, setStats] = useState(emptyStats)
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(true)
 

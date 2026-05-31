@@ -150,6 +150,18 @@ async function main() {
   let wmatic = TOKENS[networkName]?.WMATIC;
   const deployments = {};
 
+  // Never let a mainnet deployment fall back to a worthless MockERC20 as the
+  // stake token. On a recognised mainnet (see MAINNET_CHAIN_IDS) a real token
+  // address is mandatory — configure TOKENS[network] in lib/constants.js.
+  const isMainnet = MAINNET_CHAIN_IDS.includes(chainId);
+  if (isMainnet && (!usdc || !wmatic)) {
+    throw new Error(
+      `Real token addresses are required on mainnet '${networkName}' (chainId ${chainId}). ` +
+        `Missing: ${[!usdc && "USDC", !wmatic && "WMATIC"].filter(Boolean).join(", ")}. ` +
+        `Set TOKENS["${networkName}"] in scripts/deploy/lib/constants.js.`
+    );
+  }
+
   if (!usdc) {
     console.log(`\nNo USDC configured for ${networkName}; deploying MockERC20...`);
     const mock = await deployDeterministic(

@@ -8,6 +8,7 @@ import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../.
 import { getContractAddress } from '../../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
+import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
 import './MyMarketsModal.css'
 
@@ -56,10 +57,12 @@ function MyMarketsModal({
   const [showResolutionModal, setShowResolutionModal] = useState(false)
   const [resolutionMarket, setResolutionMarket] = useState(null)
 
-  // Dispute modal state
-  const [showDisputeModal, setShowDisputeModal] = useState(false)
-  const [disputeMarket, setDisputeMarket] = useState(null)
-  const [disputeMode, setDisputeMode] = useState(null) // 'open', 'respond', 'escalate'
+  // Disputes are intentionally not surfaced as an interactive flow.
+  // WagerRegistry.declareWinner() resolves a wager finally on-chain with no
+  // challenge/dispute function, so there is no contract call to back a dispute
+  // UI. Any active dispute carried in market data is shown read-only below;
+  // re-introduce an interactive flow here only once an on-chain dispute
+  // mechanism exists.
 
   // Acceptance modal state (for friend markets)
   const [showAcceptanceModal, setShowAcceptanceModal] = useState(false)
@@ -109,7 +112,6 @@ function MyMarketsModal({
       setActiveTab('participating')
       setSelectedMarketId(null)
       setShowResolutionModal(false)
-      setShowDisputeModal(false)
       setMarketTypeFilter('all')
       setStatusFilter('all')
     }
@@ -123,8 +125,6 @@ function MyMarketsModal({
       if (e.key === 'Escape') {
         if (showResolutionModal) {
           setShowResolutionModal(false)
-        } else if (showDisputeModal) {
-          setShowDisputeModal(false)
         } else if (selectedMarketId) {
           setSelectedMarketId(null)
         } else {
@@ -135,10 +135,10 @@ function MyMarketsModal({
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose, selectedMarketId, showResolutionModal, showDisputeModal])
+  }, [isOpen, onClose, selectedMarketId, showResolutionModal])
 
   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget && !showResolutionModal && !showDisputeModal) {
+    if (e.target === e.currentTarget && !showResolutionModal) {
       onClose()
     }
   }
@@ -384,12 +384,6 @@ function MyMarketsModal({
     setShowResolutionModal(true)
   }
 
-  const handleOpenDispute = (market, mode = 'open') => {
-    setDisputeMarket(market)
-    setDisputeMode(mode)
-    setShowDisputeModal(true)
-  }
-
   const handleMarketSelect = (market) => {
     setSelectedMarketId(market.id)
   }
@@ -419,30 +413,6 @@ function MyMarketsModal({
     if (resType === 2) return isOpponent // Receiver
     if (resType === 3) return isArbitrator // ThirdParty
     return false
-  }
-
-  // Disputes are intentionally disabled (Bug #3 — honest UX).
-  // The WagerRegistry contract resolves immediately and finally via declareWinner();
-  // there is no on-chain challenge/dispute function, so we must not surface a dispute
-  // affordance (the DisputeModal is a non-functional placeholder). These checks return
-  // false so the wiring stays intact for a future on-chain dispute feature.
-  const DISPUTES_ENABLED = false
-
-  // Check if user can open dispute
-  const canOpenDispute = (market) => {
-    if (!DISPUTES_ENABLED || !account) return false
-    const status = market.computedStatus || MarketStatus.ACTIVE
-    const hasPos = userPositions.some(p => String(p.marketId) === String(market.id))
-    const isParticipant = market.participants?.some(p => p.toLowerCase() === account.toLowerCase()) || hasPos
-    return isParticipant && (status === MarketStatus.PENDING_RESOLUTION || status === MarketStatus.RESOLVED)
-  }
-
-  // Check if user can respond to dispute (as market maker)
-  const canRespondToDispute = (market) => {
-    if (!DISPUTES_ENABLED || !account) return false
-    const isCreator = market.creator?.toLowerCase() === account.toLowerCase()
-    const status = market.computedStatus || MarketStatus.ACTIVE
-    return isCreator && status === MarketStatus.DISPUTED
   }
 
   // Check if user can accept a pending friend market (is invited participant, not creator)
@@ -710,9 +680,7 @@ function MyMarketsModal({
                       account={account}
                       userPositions={userPositions}
                       canResolve={canResolve}
-                      canOpenDispute={canOpenDispute}
                       onOpenResolution={handleOpenResolution}
-                      onOpenDispute={handleOpenDispute}
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting(selectedMarket?.id)}
                       signer={signer}
@@ -768,9 +736,7 @@ function MyMarketsModal({
                       account={account}
                       userPositions={userPositions}
                       canResolve={canResolve}
-                      canRespondToDispute={canRespondToDispute}
                       onOpenResolution={handleOpenResolution}
-                      onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
                       isCreatorView
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting(selectedMarket?.id)}
@@ -802,10 +768,8 @@ function MyMarketsModal({
                       getStatusLabel={getStatusLabel}
                       getTimeRemaining={getTimeRemaining}
                       canResolve={canResolve}
-                      canRespondToDispute={canRespondToDispute}
                       isCreatorOfPending={isCreatorOfPendingMarket}
                       onResolve={handleOpenResolution}
-                      onRespondToDispute={(m) => handleOpenDispute(m, 'respond')}
                       showActions
                       account={account}
                       showResolveCountdown
@@ -875,23 +839,6 @@ function MyMarketsModal({
         />
       )}
 
-      {/* Dispute Modal */}
-      {showDisputeModal && disputeMarket && (
-        <DisputeModal
-          market={disputeMarket}
-          mode={disputeMode}
-          onClose={() => setShowDisputeModal(false)}
-          onSubmitted={() => {
-            setShowDisputeModal(false)
-            fetchMarketsData()
-          }}
-          signer={signer}
-          isCorrectNetwork={isCorrectNetwork}
-          switchNetwork={switchNetwork}
-          account={account}
-        />
-      )}
-
       {/* Market Acceptance Modal (for friend markets) */}
       {showAcceptanceModal && acceptanceMarket && (
         <MarketAcceptanceModal
@@ -953,11 +900,9 @@ function MarketsTable({
   showActions = false,
   showOutcome = false,
   canResolve,
-  canRespondToDispute,
   canAccept,
   isCreatorOfPending,
   onResolve,
-  onRespondToDispute,
   onAccept,
   onClearExpired,
   onClearAllExpired,
@@ -1009,7 +954,6 @@ function MarketsTable({
             const timeLeft = rowTimeLeft(market)
             const isExpired = market.computedStatus === MarketStatus.EXPIRED
             const showResolveBtn = showActions && canResolve?.(market)
-            const showDisputeBtn = showActions && canRespondToDispute?.(market)
             const showAcceptBtn = !isExpired && canAccept?.(market)
             const showUnderConsideration = !isExpired && isCreatorOfPending?.(market)
             const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
@@ -1090,15 +1034,6 @@ function MarketsTable({
                         title="Resolve wager"
                       >
                         Resolve
-                      </button>
-                    )}
-                    {showDisputeBtn && (
-                      <button
-                        className="mm-action-btn mm-action-dispute"
-                        onClick={(e) => { e.stopPropagation(); onRespondToDispute(market) }}
-                        title="Respond to dispute"
-                      >
-                        Respond
                       </button>
                     )}
                     {showClearBtn && (
@@ -1251,11 +1186,7 @@ function MarketDetailView({
   isDecrypting,
   userPositions,
   canResolve: _canResolve,
-  canOpenDispute,
-  canRespondToDispute,
   onOpenResolution,
-  onOpenDispute,
-  onRespondToDispute,
   isCreatorView = false,
   isHistoryView = false,
   signer,
@@ -1282,6 +1213,10 @@ function MarketDetailView({
       ? 'Accept by'
       : 'Ends'
   const remainingDisplay = isExpired ? 'Expired' : getTimeRemaining(endTime)
+
+  // Active chain id so explorer links resolve to the right network
+  // (Polygon mainnet vs Amoy testnet) instead of a hardcoded testnet URL.
+  const { chainId } = useWeb3()
 
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawError, setWithdrawError] = useState(null)
@@ -1596,7 +1531,7 @@ function MarketDetailView({
             <p>Offer withdrawn. Your funds have been returned.</p>
             {withdrawTxHash && (
               <a
-                href={`https://amoy.polygonscan.com/tx/${withdrawTxHash}`}
+                href={getTransactionUrl(chainId, withdrawTxHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mm-tx-link"
@@ -1614,39 +1549,13 @@ function MarketDetailView({
             variant="full"
           />
         )}
-        {canRespondToDispute?.(market) && (
-          <button
-            type="button"
-            className="mm-btn-warning"
-            onClick={() => onRespondToDispute(market)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-            </svg>
-            Respond to Dispute
-          </button>
-        )}
-        {canOpenDispute?.(market) && (
-          <button
-            type="button"
-            className="mm-btn-secondary"
-            onClick={() => onOpenDispute(market)}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-            Open Dispute
-          </button>
-        )}
         {refundSuccess && (
           <div className="mm-withdraw-success">
             <span className="mm-withdraw-success-icon">&#10003;</span>
             <p>Refund claimed successfully. Stakes have been returned to both participants.</p>
             {refundTxHash && (
               <a
-                href={`https://amoy.polygonscan.com/tx/${refundTxHash}`}
+                href={getTransactionUrl(chainId, refundTxHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mm-tx-link"
@@ -2009,364 +1918,6 @@ function ResolutionModal({
                 type="button"
                 className="mm-btn-primary"
                 onClick={onResolved}
-              >
-                Done
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * Dispute Modal Component
- */
-function DisputeModal({
-  market,
-  mode, // 'open', 'respond', 'escalate'
-  onClose,
-  onSubmitted,
-  isCorrectNetwork,
-  switchNetwork
-}) {
-  const [disputeReason, setDisputeReason] = useState('')
-  const [evidenceUrl, setEvidenceUrl] = useState('')
-  const [responseText, setResponseText] = useState('')
-  const [selectedResolution, setSelectedResolution] = useState(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-  const [step, setStep] = useState('form') // 'form', 'confirm', 'success'
-
-  const isOpenMode = mode === 'open'
-  const isRespondMode = mode === 'respond'
-
-  const outcomes = market.marketType === 'friend'
-    ? ['Pass', 'Fail']
-    : ['Yes', 'No']
-
-  const handleSubmit = async () => {
-    if (isOpenMode && !disputeReason.trim()) {
-      setError('Please provide a reason for the dispute')
-      return
-    }
-
-    if (isRespondMode && !responseText.trim()) {
-      setError('Please provide a response')
-      return
-    }
-
-    if (!isCorrectNetwork) {
-      setError('Please switch to the correct network')
-      return
-    }
-
-    setSubmitting(true)
-    setError(null)
-
-    try {
-      // TODO: Implement actual contract call for dispute
-      console.log('Dispute action:', {
-        mode,
-        marketId: market.id,
-        reason: disputeReason,
-        evidence: evidenceUrl,
-        response: responseText,
-        suggestedResolution: selectedResolution
-      })
-
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      setStep('success')
-    } catch (err) {
-      console.error('Error processing dispute:', err)
-      setError(err.message || 'Failed to process dispute. Please try again.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget && !submitting) {
-      onClose()
-    }
-  }
-
-  const getTitle = () => {
-    if (isOpenMode) return 'Open Dispute'
-    if (isRespondMode) return 'Respond to Dispute'
-    return 'Escalate Dispute'
-  }
-
-  const getIcon = () => {
-    if (isRespondMode) return '&#128172;' // Speech bubble
-    return '&#9888;' // Warning
-  }
-
-  return (
-    <div className="mm-sub-modal-backdrop" onClick={handleBackdropClick}>
-      <div className="mm-sub-modal mm-dispute-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="mm-sub-modal-header">
-          <h3>
-            <span dangerouslySetInnerHTML={{ __html: getIcon() }} />
-            {getTitle()}
-          </h3>
-          <button
-            className="mm-close-btn"
-            onClick={onClose}
-            disabled={submitting}
-            aria-label="Close"
-          >
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </header>
-
-        <div className="mm-sub-modal-content">
-          {step === 'form' && (
-            <>
-              <div className="mm-dispute-market-info">
-                <h4>{getMarketDisplayTitle(market)}</h4>
-                {market.outcome && (
-                  <p className="mm-dispute-current-outcome">
-                    Current resolution: <strong>{market.outcome}</strong>
-                  </p>
-                )}
-              </div>
-
-              {isOpenMode && (
-                <>
-                  <div className="mm-form-group">
-                    <label htmlFor="dispute-reason">
-                      Reason for Dispute <span className="mm-required">*</span>
-                    </label>
-                    <textarea
-                      id="dispute-reason"
-                      value={disputeReason}
-                      onChange={(e) => setDisputeReason(e.target.value)}
-                      placeholder="Explain why you believe the wager resolution is incorrect..."
-                      rows={4}
-                      disabled={submitting}
-                      className={error && !disputeReason.trim() ? 'error' : ''}
-                    />
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label htmlFor="evidence-url">Evidence URL (Optional)</label>
-                    <input
-                      id="evidence-url"
-                      type="url"
-                      value={evidenceUrl}
-                      onChange={(e) => setEvidenceUrl(e.target.value)}
-                      placeholder="https://..."
-                      disabled={submitting}
-                    />
-                    <span className="mm-hint">Link to evidence supporting your dispute</span>
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label>Correct Outcome (Your View)</label>
-                    <div className="mm-outcome-options">
-                      {outcomes.map(outcome => (
-                        <button
-                          key={outcome}
-                          type="button"
-                          className={`mm-outcome-btn ${selectedResolution === outcome ? 'selected' : ''} ${outcome === outcomes[0] ? 'positive' : 'negative'}`}
-                          onClick={() => setSelectedResolution(outcome)}
-                          disabled={submitting}
-                        >
-                          {outcome}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mm-dispute-info-box">
-                    <h5>What happens next?</h5>
-                    <ul>
-                      <li>The wager creator will be notified and can respond</li>
-                      <li>A dispute bond may be required (refunded if you win)</li>
-                      <li>If unresolved, the dispute can be escalated to arbitration</li>
-                    </ul>
-                  </div>
-                </>
-              )}
-
-              {isRespondMode && (
-                <>
-                  {market.dispute && (
-                    <div className="mm-dispute-details">
-                      <h5>Dispute Details</h5>
-                      <div className="mm-dispute-detail-item">
-                        <span className="mm-label">Disputed by:</span>
-                        <span>{market.dispute.disputedBy?.slice(0, 6)}...{market.dispute.disputedBy?.slice(-4)}</span>
-                      </div>
-                      <div className="mm-dispute-detail-item">
-                        <span className="mm-label">Reason:</span>
-                        <span>{market.dispute.reason}</span>
-                      </div>
-                      <div className="mm-dispute-detail-item">
-                        <span className="mm-label">Suggested outcome:</span>
-                        <span>{market.dispute.suggestedOutcome}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mm-form-group">
-                    <label htmlFor="response-text">
-                      Your Response <span className="mm-required">*</span>
-                    </label>
-                    <textarea
-                      id="response-text"
-                      value={responseText}
-                      onChange={(e) => setResponseText(e.target.value)}
-                      placeholder="Provide your response to this dispute..."
-                      rows={4}
-                      disabled={submitting}
-                      className={error && !responseText.trim() ? 'error' : ''}
-                    />
-                  </div>
-
-                  <div className="mm-form-group">
-                    <label>Resolution Decision</label>
-                    <div className="mm-resolution-options">
-                      <button
-                        type="button"
-                        className={`mm-resolution-btn ${selectedResolution === 'accept' ? 'selected accept' : ''}`}
-                        onClick={() => setSelectedResolution('accept')}
-                        disabled={submitting}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Accept Dispute
-                      </button>
-                      <button
-                        type="button"
-                        className={`mm-resolution-btn ${selectedResolution === 'reject' ? 'selected reject' : ''}`}
-                        onClick={() => setSelectedResolution('reject')}
-                        disabled={submitting}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M18 6L6 18M6 6l12 12"/>
-                        </svg>
-                        Reject Dispute
-                      </button>
-                    </div>
-                    <span className="mm-hint">
-                      {selectedResolution === 'accept'
-                        ? 'The wager resolution will be changed to the disputant\'s suggested outcome'
-                        : selectedResolution === 'reject'
-                        ? 'The original resolution will be maintained. The disputant can escalate.'
-                        : 'Select your decision'}
-                    </span>
-                  </div>
-                </>
-              )}
-
-              {!isCorrectNetwork && (
-                <div className="mm-warning-banner">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/>
-                    <line x1="12" y1="17" x2="12.01" y2="17"/>
-                  </svg>
-                  <div>
-                    <strong>Wrong Network</strong>
-                    <button type="button" onClick={switchNetwork}>Switch Network</button>
-                  </div>
-                </div>
-              )}
-
-              {error && <div className="mm-error-banner">{error}</div>}
-
-              <div className="mm-sub-modal-actions">
-                <button
-                  type="button"
-                  className="mm-btn-secondary"
-                  onClick={onClose}
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="mm-btn-primary"
-                  onClick={() => setStep('confirm')}
-                  disabled={submitting || !isCorrectNetwork || (isRespondMode && !selectedResolution)}
-                >
-                  Continue
-                </button>
-              </div>
-            </>
-          )}
-
-          {step === 'confirm' && (
-            <>
-              <div className="mm-confirmation">
-                <div className="mm-confirmation-icon">&#9888;</div>
-                <h4>Confirm {isOpenMode ? 'Dispute' : 'Response'}</h4>
-                {isOpenMode ? (
-                  <p>
-                    You are about to open a dispute for this wager.
-                    {selectedResolution && ` You believe the correct outcome should be: ${selectedResolution}`}
-                  </p>
-                ) : (
-                  <p>
-                    You are about to {selectedResolution === 'accept' ? 'accept' : 'reject'} this dispute.
-                    {selectedResolution === 'accept'
-                      ? ' The wager resolution will be changed.'
-                      : ' The original resolution will be maintained.'}
-                  </p>
-                )}
-              </div>
-
-              {error && <div className="mm-error-banner">{error}</div>}
-
-              <div className="mm-sub-modal-actions">
-                <button
-                  type="button"
-                  className="mm-btn-secondary"
-                  onClick={() => setStep('form')}
-                  disabled={submitting}
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  className={`mm-btn-primary ${isOpenMode ? 'warning' : ''}`}
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <>
-                      <span className="mm-spinner-small"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    isOpenMode ? 'Submit Dispute' : 'Submit Response'
-                  )}
-                </button>
-              </div>
-            </>
-          )}
-
-          {step === 'success' && (
-            <div className="mm-success-state">
-              <div className="mm-success-icon">&#9989;</div>
-              <h4>{isOpenMode ? 'Dispute Submitted!' : 'Response Submitted!'}</h4>
-              <p>
-                {isOpenMode
-                  ? 'Your dispute has been recorded. The wager creator will be notified and can respond.'
-                  : selectedResolution === 'accept'
-                  ? 'The dispute has been accepted. The wager resolution will be updated.'
-                  : 'The dispute has been rejected. The disputant can escalate if they disagree.'}
-              </p>
-              <button
-                type="button"
-                className="mm-btn-primary"
-                onClick={onSubmitted}
               >
                 Done
               </button>
