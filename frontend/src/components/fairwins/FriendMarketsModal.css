@@ -1532,6 +1532,53 @@
   font-size: 0.9rem;
 }
 
+/* ── Resolution-type tabs (oracle / Bookmaker flows) ─────────────────── */
+.fm-resolution-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.fm-resolution-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--bg-primary, #0E141B);
+  border: 1px solid var(--border-color, #23303D);
+  border-radius: 999px;
+  color: var(--text-primary, #1F2933);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.fm-resolution-tab:hover:not(:disabled) {
+  border-color: var(--brand-primary, #36B37E);
+}
+
+.fm-resolution-tab.active {
+  border-color: var(--brand-primary, #36B37E);
+  background: rgba(54, 179, 126, 0.12);
+  color: var(--brand-primary, #36B37E);
+}
+
+.fm-resolution-tab.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fm-resolution-tab:disabled:not(.locked) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fm-resolution-tab-lock {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
 /* ── Oracle condition picker ─────────────────────────────────────────── */
 .fm-oracle-picker {
   display: flex;

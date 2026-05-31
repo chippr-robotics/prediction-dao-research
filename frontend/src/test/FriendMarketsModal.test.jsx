@@ -319,16 +319,28 @@ describe('FriendMarketsModal', () => {
       expect(labels).not.toContain('Third Party Arbitrator')
     })
 
-    it('oracle category shows only oracle resolution options', () => {
+    it('oracle category shows oracle resolution tabs (not a dropdown)', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} resolutionCategory="oracle" />
       )
-      // The oracle flow relabels the selector and excludes participant options.
-      const select = screen.getByLabelText(/which oracle settles this/i)
-      const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
-      expect(labels).not.toContain('Either Party')
-      expect(labels.length).toBeGreaterThan(0)
-      labels.forEach(l => expect(l).toMatch(/Polymarket|Chainlink|UMA/))
+      // The oracle flow renders settlement sources as tabs at the top of the
+      // form (no <select> dropdown), and excludes the participant-settled options.
+      expect(screen.queryByRole('combobox', { name: /which oracle settles this/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /polymarket/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /chainlink data feed/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /chainlink functions/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^uma$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /either party/i })).not.toBeInTheDocument()
+    })
+
+    it('locks oracle tabs whose source is unavailable on the active chain', () => {
+      // On Hardhat (1337) the Polymarket CTF is unreachable, so the Polymarket
+      // tab is shown locked/disabled rather than hidden.
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} resolutionCategory="oracle" />,
+        { chainId: 1337 }
+      )
+      expect(screen.getByRole('tab', { name: /polymarket/i })).toBeDisabled()
     })
 
     it('no longer renders a type-selector or Back link', () => {
@@ -338,8 +350,11 @@ describe('FriendMarketsModal', () => {
     })
 
     it('no longer renders the Active/Past tab strip', () => {
+      // The modal's only tablist is now the resolution-source strip; the old
+      // Active/Past navigation tabs are gone.
       renderWithProviders(<FriendMarketsModal {...defaultProps} />)
-      expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /^active$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /^past$/i })).not.toBeInTheDocument()
     })
   })
 
@@ -677,9 +692,9 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
 
-      // Switch resolution type to Polymarket so the inline browser renders.
-      const dropdown = screen.getByLabelText(/who can resolve/i)
-      await userEvent.selectOptions(dropdown, '4')  // ResolutionType.Polymarket = 4
+      // Switch resolution type to Polymarket (via the tab strip) so the inline
+      // browser renders.
+      await userEvent.click(screen.getByRole('tab', { name: /polymarket/i }))
 
       // Pick the (single) mocked market.
       await userEvent.click(screen.getByTestId(`pmb-pick-${polymarketMarket.conditionId}`))
@@ -698,29 +713,32 @@ describe('FriendMarketsModal', () => {
     // picker have their own unit tests.
     const STUB_CONDITION_ID = STUB_ORACLE_CONDITION_ID
 
+    // Tab names in the resolution strip, keyed by oracle picker `kind`.
+    const TAB_NAME = {
+      datafeed: /chainlink data feed/i,
+      functions: /chainlink functions/i,
+      uma: /^uma$/i,
+    }
+
     async function pickKindAndSide(kind, sideLabel) {
-      // Open the resolution-type dropdown and switch to the desired oracle.
-      const RT = { ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7 }[
-        kind === 'datafeed' ? 'ChainlinkDataFeed' : kind === 'functions' ? 'ChainlinkFunctions' : 'UMA'
-      ]
-      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), String(RT))
+      // Switch to the desired oracle via the resolution-type tab strip.
+      await userEvent.click(screen.getByRole('tab', { name: TAB_NAME[kind] }))
       // Click the stub picker's "Pick" button → conditionId lands in formData.
       await userEvent.click(await screen.findByTestId(`mock-pick-${kind}`))
       // Side picker: generic YES/NO buttons.
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`i'm taking ${sideLabel}`, 'i') }))
     }
 
-    it('renders the 3 new dropdown options on a Polygon-family chain', async () => {
+    it('renders the 3 new oracle tabs on a Polygon-family chain', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />, { chainId: 80002 })
-      const dropdown = screen.getByLabelText(/who can resolve/i)
-      expect(dropdown).toContainHTML('Chainlink Data Feed')
-      expect(dropdown).toContainHTML('Chainlink Functions')
-      expect(dropdown).toContainHTML('UMA Optimistic Oracle')
+      expect(screen.getByRole('tab', { name: /chainlink data feed/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /chainlink functions/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^uma$/i })).toBeInTheDocument()
     })
 
     it('renders the picker + generic side picker for ChainlinkDataFeed', async () => {
       renderWithProviders(<FriendMarketsModal {...defaultProps} />, { chainId: 80002 })
-      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '5')
+      await userEvent.click(screen.getByRole('tab', { name: /chainlink data feed/i }))
       expect(await screen.findByTestId('mock-oracle-picker-datafeed')).toBeInTheDocument()
       // Generic YES/NO buttons.
       expect(screen.getByRole('button', { name: /I'm taking YES/i })).toBeInTheDocument()
@@ -789,7 +807,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '6')
+      await userEvent.click(screen.getByRole('tab', { name: /chainlink functions/i }))
       // Don't pick a condition — go straight to submit. Side stays empty too.
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
       await waitFor(() => {
@@ -812,7 +830,7 @@ describe('FriendMarketsModal', () => {
         screen.getByLabelText(/opponent address/i),
         '0xabcdef1234567890123456789012345678901234'
       )
-      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '5')
+      await userEvent.click(screen.getByRole('tab', { name: /chainlink data feed/i }))
       await userEvent.click(await screen.findByTestId('mock-pick-datafeed'))
       // Don't click YES/NO.
       await userEvent.click(screen.getByRole('button', { name: /create wager/i }))
@@ -829,10 +847,10 @@ describe('FriendMarketsModal', () => {
         { chainId: 80002 }
       )
       // Pick a DataFeed condition first.
-      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '5')
+      await userEvent.click(screen.getByRole('tab', { name: /chainlink data feed/i }))
       await userEvent.click(await screen.findByTestId('mock-pick-datafeed'))
       // Switch to UMA → picker should reset (data-value attribute on the stub goes back to '').
-      await userEvent.selectOptions(screen.getByLabelText(/who can resolve/i), '7')
+      await userEvent.click(screen.getByRole('tab', { name: /^uma$/i }))
       const umaPicker = await screen.findByTestId('mock-oracle-picker-uma')
       expect(umaPicker).toHaveAttribute('data-value', '')
     })
