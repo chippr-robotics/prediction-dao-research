@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSiteStats } from '../../hooks/useSiteStats'
 import { STAT_CARDS } from '../../constants/siteStats'
-import { formatCompact } from '../../utils/currency'
+
+/** Compact number formatting: 1500 → "1.5K", 1_200_000 → "1.2M". */
+function formatCompact(n) {
+  const num = Number(n) || 0
+  if (num >= 1_000_000) return `${trim(num / 1_000_000)}M`
+  if (num >= 1_000) return `${trim(num / 1_000)}K`
+  return String(Math.round(num))
+}
+
+/** One decimal place, dropping a trailing ".0". */
+function trim(n) {
+  return n.toFixed(1).replace(/\.0$/, '')
+}
 
 function formatStat(n, format) {
   if (format === 'usd') return `$${formatCompact(n)}`
@@ -14,14 +26,10 @@ function formatStat(n, format) {
  * supported (no IntersectionObserver / reduced motion / test env).
  */
 function StatValue({ value, format, animatable, visible }) {
-  const [display, setDisplay] = useState(animatable ? 0 : value)
+  const [animated, setAnimated] = useState(0)
 
   useEffect(() => {
-    if (!animatable) {
-      setDisplay(value)
-      return
-    }
-    if (!visible) return
+    if (!animatable || !visible) return
 
     let raf
     const duration = 1200
@@ -29,14 +37,16 @@ function StatValue({ value, format, animatable, visible }) {
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration)
       const eased = 1 - Math.pow(1 - t, 3) // ease-out cubic
-      setDisplay(value * eased)
+      setAnimated(value * eased)
       if (t < 1) raf = requestAnimationFrame(tick)
-      else setDisplay(value)
+      else setAnimated(value)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [value, animatable, visible])
 
+  // Render the final value directly unless we're mid count-up animation.
+  const display = animatable && visible ? animated : value
   return <span className="livestat-number">{formatStat(display, format)}</span>
 }
 

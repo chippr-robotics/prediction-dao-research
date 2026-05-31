@@ -16,8 +16,8 @@
 import { useEffect, useState } from 'react'
 import { Contract, formatUnits } from 'ethers'
 import { getProvider } from '../utils/blockchainService'
-import { CONTRACT_ADDRESSES } from '../config/contracts'
-import { WagerRegistryABI } from '../abis/WagerRegistry'
+import { getContractAddress } from '../config/contracts'
+import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { STATS_BASELINE } from '../constants/siteStats'
 
 const SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
@@ -89,9 +89,9 @@ async function fetchFromSubgraph() {
 
 async function fetchFromRpc() {
   const stats = emptyStats()
-  const address = CONTRACT_ADDRESSES.WagerRegistry
+  const address = getContractAddress('wagerRegistry')
   if (!address) return stats
-  const registry = new Contract(address, WagerRegistryABI, getProvider())
+  const registry = new Contract(address, WAGER_REGISTRY_ABI, getProvider())
   const nextId = await registry.nextWagerId()
   // ids start at 1, so total created = nextWagerId - 1
   stats.totalWagers = Math.max(0, Number(nextId) - 1)
