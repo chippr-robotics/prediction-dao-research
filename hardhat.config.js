@@ -252,6 +252,16 @@ module.exports = {
       accounts: floppyKeys,
       ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
     },
+    // Polygon mainnet (production). Deployer key comes from the floppy keystore
+    // only — no PRIVATE_KEY fallback. Prefer a paid POLYGON_RPC_URL over the
+    // public endpoint for deploys. deploy.js additionally requires
+    // CONFIRM_MAINNET=true to run against this network (chainId 137).
+    polygon: {
+      url: process.env.POLYGON_RPC_URL || "https://polygon-rpc.com",
+      chainId: 137,
+      accounts: floppyKeys,
+      ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
+    },
     // Example: Mainnet with floppy keystore (uncomment when ready to use)
     // Requires: npm run floppy:mount && npm run floppy:create (one-time setup)
     // "mainnet-floppy": {
@@ -292,9 +302,18 @@ module.exports = {
   etherscan: {
     apiKey: {
       'mordor': 'empty',
-      'amoy': process.env.POLYGONSCAN_API_KEY || 'empty'
+      'amoy': process.env.POLYGONSCAN_API_KEY || 'empty',
+      'polygon': process.env.POLYGONSCAN_API_KEY || 'empty'
    },
     customChains: [
+      {
+        network: "polygon",
+        chainId: 137,
+        urls: {
+          apiURL: "https://api.polygonscan.com/api",
+          browserURL: "https://polygonscan.com"
+        }
+      },
       {
         network: "mordor",
         chainId: 63,
