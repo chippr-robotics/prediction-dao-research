@@ -64,6 +64,28 @@ const RESOLUTION_TYPE_HINTS = {
   [ResolutionType.UMA]: 'Settles via UMA Optimistic Oracle — someone posts the bond and the assertion stands after the liveness window',
 }
 
+// Oracle resolution types in enum order. Rendered as tabs (always shown; locked
+// when the adapter/CTF isn't reachable on the active chain) so users can see
+// every settlement source at a glance instead of a filtered dropdown.
+const ORACLE_TAB_TYPES = [
+  ResolutionType.Polymarket,
+  ResolutionType.ChainlinkDataFeed,
+  ResolutionType.ChainlinkFunctions,
+  ResolutionType.UMA,
+]
+
+// Short labels for the resolution tab strip — the full RESOLUTION_TYPE_LABELS
+// are too long to read comfortably as tabs.
+const RESOLUTION_TAB_LABELS = {
+  [ResolutionType.Either]: 'Either Party',
+  [ResolutionType.Creator]: 'Creator',
+  [ResolutionType.Opponent]: 'Opponent',
+  [ResolutionType.Polymarket]: 'Polymarket',
+  [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed',
+  [ResolutionType.ChainlinkFunctions]: 'Chainlink Functions',
+  [ResolutionType.UMA]: 'UMA',
+}
+
 /**
  * FriendMarketsModal
  *
@@ -134,6 +156,49 @@ function FriendMarketsModal({
     }
     return WAGER_DEFAULTS.RESOLUTION_TYPE
   }, [resolutionCategory, availableOracleResolutionTypes])
+
+  // The oracle ('oracle') and Bookmaker ('all') flows present the settlement
+  // source as a tab strip at the top of the form (with the market/condition
+  // picker right under it) instead of a dropdown buried below the stake fields.
+  // The participant-only flow keeps its simple "Who Can Resolve?" dropdown.
+  const useResolutionTabs = resolutionCategory === 'oracle' || resolutionCategory === 'all'
+
+  // Availability + locked-reason per oracle resolution type, reusing the same
+  // gates as `availableOracleResolutionTypes`. Unavailable oracles render as
+  // locked tabs rather than being hidden.
+  const oracleAvailability = useMemo(() => ({
+    [ResolutionType.Polymarket]: {
+      enabled: polymarketSidebetsEnabled,
+      lockedReason: 'Requires the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.',
+    },
+    [ResolutionType.ChainlinkDataFeed]: {
+      enabled: Boolean(chainlinkDataFeedAdapter),
+      lockedReason: "Chainlink Data Feed adapter isn't deployed on this network yet.",
+    },
+    [ResolutionType.ChainlinkFunctions]: {
+      enabled: Boolean(chainlinkFunctionsAdapter),
+      lockedReason: "Chainlink Functions adapter isn't deployed on this network yet.",
+    },
+    [ResolutionType.UMA]: {
+      enabled: Boolean(umaAdapter),
+      lockedReason: "UMA Optimistic Oracle adapter isn't deployed on this network yet.",
+    },
+  }), [polymarketSidebetsEnabled, chainlinkDataFeedAdapter, chainlinkFunctionsAdapter, umaAdapter])
+
+  // Resolution types rendered as tabs. Oracle types are always shown (locked
+  // when unavailable). The Bookmaker ('all') flow also lists the participant
+  // settlement choices first.
+  const resolutionTabTypes = useMemo(() => {
+    if (resolutionCategory === 'oracle') return ORACLE_TAB_TYPES
+    return [...PARTICIPANT_RESOLUTION_TYPES, ...ORACLE_TAB_TYPES]
+  }, [resolutionCategory])
+
+  // A tab is locked only for oracle types whose adapter/CTF isn't reachable.
+  const isTabLocked = useCallback(
+    (t) => Boolean(oracleAvailability[t]) && !oracleAvailability[t].enabled,
+    [oracleAvailability]
+  )
+  const anyOracleEnabled = ORACLE_TAB_TYPES.some((t) => oracleAvailability[t]?.enabled)
 
   // Chain-aware token metadata for the Stake Token dropdown. Recomputed
   // whenever the user switches Testnet/Mainnet so the right addresses are
@@ -958,6 +1023,276 @@ function FriendMarketsModal({
               {creationStep === 'form' && (
                 <form className="fm-form" onSubmit={handleSubmit}>
                   <div className="fm-form-grid">
+                    {/* Settlement source + market selection — surfaced at the very
+                        top of the oracle / Bookmaker flows so users pick the
+                        resource they're betting on (Polymarket event / oracle
+                        condition) first. The source is chosen via tabs; oracle
+                        sources that aren't reachable on the active chain render as
+                        locked tabs. */}
+                    {useResolutionTabs && (
+                      <>
+                        <div className="fm-form-group fm-form-full">
+                          <label id="fm-resolution-tabs-label">
+                            {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'How does this settle?'}
+                          </label>
+                          <div
+                            className="fm-resolution-tabs"
+                            role="tablist"
+                            aria-labelledby="fm-resolution-tabs-label"
+                          >
+                            {resolutionTabTypes.map((t) => {
+                              const locked = isTabLocked(t)
+                              const active = formData.resolutionType === t
+                              return (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  role="tab"
+                                  aria-selected={active}
+                                  aria-disabled={locked}
+                                  disabled={submitting || locked}
+                                  title={locked ? oracleAvailability[t]?.lockedReason : undefined}
+                                  className={`fm-resolution-tab ${active ? 'active' : ''} ${locked ? 'locked' : ''}`}
+                                  onClick={() => { if (!locked) handleFormChange('resolutionType', t) }}
+                                >
+                                  <span className="fm-resolution-tab-label">{RESOLUTION_TAB_LABELS[t]}</span>
+                                  {locked && (
+                                    <svg className="fm-resolution-tab-lock" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </svg>
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <span className="fm-hint">
+                            {isTabLocked(formData.resolutionType)
+                              ? oracleAvailability[formData.resolutionType]?.lockedReason
+                              : RESOLUTION_TYPE_HINTS[formData.resolutionType]}
+                            {resolutionCategory === 'oracle' && !anyOracleEnabled && (
+                              <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
+                                No oracle is available on this network. Switch to a chain with the
+                                Polymarket CTF (Polygon Amoy or Mainnet) or a deployed Chainlink/UMA
+                                adapter, or create a wager that your friends settle instead.
+                              </em>
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Linked Market — Polymarket event lookup */}
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                         formData.resolutionType === ResolutionType.Polymarket && (
+                          <div className="fm-form-group fm-form-full">
+                            <label htmlFor="fm-polymarket-search">
+                              Linked Polymarket Event <span className="fm-required">*</span>
+                            </label>
+
+                            {selectedPolymarketMarket && (
+                              <div className="fm-polymarket-selected">
+                                <div className="fm-polymarket-selected-body">
+                                  <strong>{selectedPolymarketMarket.question}</strong>
+                                  <div className="fm-polymarket-meta">
+                                    {selectedPolymarketMarket.endDate && (
+                                      <span>Wager ends {formatDate(selectedPolymarketMarket.endDate)} (locked to linked market)</span>
+                                    )}
+                                    {selectedPolymarketMarket.outcomes?.length > 0 && (
+                                      <span>
+                                        {selectedPolymarketMarket.outcomes
+                                          .map((o) => `${o.name}${o.price != null ? ` ${Math.round(o.price * 100)}¢` : ''}`)
+                                          .join(' · ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <code className="fm-polymarket-cid">{selectedPolymarketMarket.conditionId}</code>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="fm-link-btn"
+                                  onClick={clearPolymarketSelection}
+                                  disabled={submitting}
+                                >
+                                  Change
+                                </button>
+                              </div>
+                            )}
+
+                            {selectedPolymarketMarket ? (
+                              <div className={`fm-polymarket-browse-accordion ${polymarketBrowserOpen ? 'open' : ''}`}>
+                                <button
+                                  type="button"
+                                  className="fm-polymarket-browse-toggle"
+                                  onClick={() => setPolymarketBrowserOpen(o => !o)}
+                                  aria-expanded={polymarketBrowserOpen}
+                                  aria-controls="fm-polymarket-browse-panel"
+                                  disabled={submitting}
+                                >
+                                  <span>Browse other Polymarket events</span>
+                                  <svg
+                                    className="fm-polymarket-browse-chevron"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <polyline points="6 9 12 15 18 9" />
+                                  </svg>
+                                </button>
+                                {polymarketBrowserOpen && (
+                                  <div id="fm-polymarket-browse-panel" className="fm-polymarket-browse-panel">
+                                    <span className="fm-hint">
+                                      Browse top markets by category, or search for a specific event. Picking a different one will replace your current selection.
+                                    </span>
+                                    <PolymarketBrowser
+                                      variant="inline"
+                                      showFilters
+                                      limit={20}
+                                      selectedConditionId={selectedPolymarketMarket?.conditionId}
+                                      onSelectMarket={handleSelectPolymarketMarket}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <span className="fm-hint">
+                                  Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.
+                                </span>
+
+                                <PolymarketBrowser
+                                  variant="inline"
+                                  showFilters
+                                  limit={20}
+                                  selectedConditionId={selectedPolymarketMarket?.conditionId}
+                                  onSelectMarket={handleSelectPolymarketMarket}
+                                />
+                              </>
+                            )}
+
+                            {errors.oracleConditionId && (
+                              <span className="fm-error">{errors.oracleConditionId}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Oracle condition picker — Chainlink Data Feed / Chainlink Functions / UMA */}
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                         isExtensibleOracleType(formData.resolutionType) && (
+                          <div className="fm-form-group fm-form-full">
+                            <label htmlFor="fm-oracle-condition-picker">
+                              Oracle condition <span className="fm-required">*</span>
+                            </label>
+                            <OracleConditionPicker
+                              kind={
+                                formData.resolutionType === ResolutionType.ChainlinkDataFeed ? 'datafeed' :
+                                formData.resolutionType === ResolutionType.ChainlinkFunctions ? 'functions' :
+                                'uma'
+                              }
+                              adapterAddress={
+                                formData.resolutionType === ResolutionType.ChainlinkDataFeed ? chainlinkDataFeedAdapter :
+                                formData.resolutionType === ResolutionType.ChainlinkFunctions ? chainlinkFunctionsAdapter :
+                                umaAdapter
+                              }
+                              value={formData.oracleConditionId}
+                              onChange={(id) => handleFormChange('oracleConditionId', id || '')}
+                              error={errors.oracleConditionId}
+                              disabled={submitting}
+                            />
+                          </div>
+                        )}
+
+                        {/* Generic YES/NO side picker for the non-Polymarket oracle types.
+                            Polymarket has its own outcome-named side picker below — we
+                            skip it for the new types and use a binary YES/NO labelling
+                            that maps to the contract's creatorIsYes bool. */}
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                         isExtensibleOracleType(formData.resolutionType) && (
+                          <div className="fm-form-group fm-form-full">
+                            <label>
+                              Your side of the bet <span className="fm-required">*</span>
+                            </label>
+                            <span className="fm-hint">
+                              The oracle will return a YES or NO outcome. Pick which side you&apos;re taking — your opponent gets the other.
+                            </span>
+                            <div className="fm-side-picker">
+                              {[
+                                { idx: '0', label: 'YES' },
+                                { idx: '1', label: 'NO' },
+                              ].map(({ idx, label }) => {
+                                const active = formData.creatorSide === idx
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    className={`fm-side-btn ${active ? 'active' : ''}`}
+                                    onClick={() => handleFormChange('creatorSide', idx)}
+                                    disabled={submitting}
+                                    aria-pressed={active}
+                                  >
+                                    <span className="fm-side-btn-label">I&apos;m taking {label}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {errors.creatorSide && (
+                              <span className="fm-error">{errors.creatorSide}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Creator side — which outcome of the linked Polymarket are you taking? */}
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                         formData.resolutionType === ResolutionType.Polymarket &&
+                         selectedPolymarketMarket && (
+                          <div className="fm-form-group fm-form-full">
+                            <label>
+                              Your side of the bet <span className="fm-required">*</span>
+                            </label>
+                            <span className="fm-hint">
+                              Pick which outcome you&apos;re taking. Your opponent will be on the other side, and the bet description will say so explicitly.
+                            </span>
+                            <div className="fm-side-picker">
+                              {['0', '1'].map((idx) => {
+                                const outcome = selectedPolymarketMarket.outcomes?.[Number(idx)]
+                                const fallback = idx === '0' ? 'YES' : 'NO'
+                                const name = outcome?.name || fallback
+                                const active = formData.creatorSide === idx
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    className={`fm-side-btn ${active ? 'active' : ''}`}
+                                    onClick={() => handleSelectCreatorSide(idx)}
+                                    disabled={submitting}
+                                    aria-pressed={active}
+                                  >
+                                    <span className="fm-side-btn-label">I&apos;m taking {name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {formData.creatorSide !== '' && (
+                              <span className="fm-hint">
+                                Your opponent will be taking{' '}
+                                <strong>
+                                  {selectedPolymarketMarket.outcomes?.[formData.creatorSide === '0' ? 1 : 0]?.name
+                                    || (formData.creatorSide === '0' ? 'NO' : 'YES')}
+                                </strong>.
+                              </span>
+                            )}
+                            {errors.creatorSide && (
+                              <span className="fm-error">{errors.creatorSide}</span>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
                     <div className="fm-form-group fm-form-full">
                       <label htmlFor="fm-description">
                         What&apos;s the bet? <span className="fm-required">*</span>
@@ -1091,14 +1426,12 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    {/* Resolution Type selector. The options are pre-filtered by
-                        `resolutionCategory` (participant vs oracle) so each flow
-                        only surfaces the relevant settlement choices. */}
-                    {resolutionOptionTypes.length > 0 ? (
+                    {/* Resolution Type selector (participant flow only). The
+                        oracle / Bookmaker flows render a tab strip at the top of
+                        the form instead — see the settlement section above. */}
+                    {!useResolutionTabs && resolutionOptionTypes.length > 0 && (
                       <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-resolution-type">
-                          {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'Who Can Resolve?'}
-                        </label>
+                        <label htmlFor="fm-resolution-type">Who Can Resolve?</label>
                         <select
                           id="fm-resolution-type"
                           value={formData.resolutionType}
@@ -1112,23 +1445,6 @@ function FriendMarketsModal({
                         </select>
                         <span className="fm-hint">
                           {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
-                          {resolutionCategory === 'oracle' && !polymarketSidebetsEnabled && (
-                            <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
-                              Linked Market (Polymarket) settlement requires a chain with the Polymarket CTF. Switch to Polygon (Amoy or Mainnet) to use it.
-                            </em>
-                          )}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="fm-form-group fm-form-full">
-                        <label>Oracle Settlement</label>
-                        <div className="fm-readonly-value">
-                          No oracle is available on this network.
-                        </div>
-                        <span className="fm-hint">
-                          Switch to a chain with the Polymarket CTF (Polygon Amoy or Mainnet) or a
-                          deployed Chainlink/UMA adapter, or create a wager that your friends settle
-                          instead.
                         </span>
                       </div>
                     )}
@@ -1249,217 +1565,6 @@ function FriendMarketsModal({
                         </div>
                       )
                     })()}
-
-                    {/* Linked Market — Polymarket event lookup */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
-                     formData.resolutionType === ResolutionType.Polymarket && (
-                      <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-polymarket-search">
-                          Linked Polymarket Event <span className="fm-required">*</span>
-                        </label>
-
-                        {selectedPolymarketMarket && (
-                          <div className="fm-polymarket-selected">
-                            <div className="fm-polymarket-selected-body">
-                              <strong>{selectedPolymarketMarket.question}</strong>
-                              <div className="fm-polymarket-meta">
-                                {selectedPolymarketMarket.endDate && (
-                                  <span>Wager ends {formatDate(selectedPolymarketMarket.endDate)} (locked to linked market)</span>
-                                )}
-                                {selectedPolymarketMarket.outcomes?.length > 0 && (
-                                  <span>
-                                    {selectedPolymarketMarket.outcomes
-                                      .map((o) => `${o.name}${o.price != null ? ` ${Math.round(o.price * 100)}¢` : ''}`)
-                                      .join(' · ')}
-                                  </span>
-                                )}
-                              </div>
-                              <code className="fm-polymarket-cid">{selectedPolymarketMarket.conditionId}</code>
-                            </div>
-                            <button
-                              type="button"
-                              className="fm-link-btn"
-                              onClick={clearPolymarketSelection}
-                              disabled={submitting}
-                            >
-                              Change
-                            </button>
-                          </div>
-                        )}
-
-                        {selectedPolymarketMarket ? (
-                          <div className={`fm-polymarket-browse-accordion ${polymarketBrowserOpen ? 'open' : ''}`}>
-                            <button
-                              type="button"
-                              className="fm-polymarket-browse-toggle"
-                              onClick={() => setPolymarketBrowserOpen(o => !o)}
-                              aria-expanded={polymarketBrowserOpen}
-                              aria-controls="fm-polymarket-browse-panel"
-                              disabled={submitting}
-                            >
-                              <span>Browse other Polymarket events</span>
-                              <svg
-                                className="fm-polymarket-browse-chevron"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                              >
-                                <polyline points="6 9 12 15 18 9" />
-                              </svg>
-                            </button>
-                            {polymarketBrowserOpen && (
-                              <div id="fm-polymarket-browse-panel" className="fm-polymarket-browse-panel">
-                                <span className="fm-hint">
-                                  Browse top markets by category, or search for a specific event. Picking a different one will replace your current selection.
-                                </span>
-                                <PolymarketBrowser
-                                  variant="inline"
-                                  showFilters
-                                  limit={20}
-                                  selectedConditionId={selectedPolymarketMarket?.conditionId}
-                                  onSelectMarket={handleSelectPolymarketMarket}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <>
-                            <span className="fm-hint">
-                              Browse top markets by category, or search for a specific event. Pick one and the wager will settle automatically when that Polymarket market resolves.
-                            </span>
-
-                            <PolymarketBrowser
-                              variant="inline"
-                              showFilters
-                              limit={20}
-                              selectedConditionId={selectedPolymarketMarket?.conditionId}
-                              onSelectMarket={handleSelectPolymarketMarket}
-                            />
-                          </>
-                        )}
-
-                        {errors.oracleConditionId && (
-                          <span className="fm-error">{errors.oracleConditionId}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Oracle condition picker — Chainlink Data Feed / Chainlink Functions / UMA */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
-                     isExtensibleOracleType(formData.resolutionType) && (
-                      <div className="fm-form-group fm-form-full">
-                        <label htmlFor="fm-oracle-condition-picker">
-                          Oracle condition <span className="fm-required">*</span>
-                        </label>
-                        <OracleConditionPicker
-                          kind={
-                            formData.resolutionType === ResolutionType.ChainlinkDataFeed ? 'datafeed' :
-                            formData.resolutionType === ResolutionType.ChainlinkFunctions ? 'functions' :
-                            'uma'
-                          }
-                          adapterAddress={
-                            formData.resolutionType === ResolutionType.ChainlinkDataFeed ? chainlinkDataFeedAdapter :
-                            formData.resolutionType === ResolutionType.ChainlinkFunctions ? chainlinkFunctionsAdapter :
-                            umaAdapter
-                          }
-                          value={formData.oracleConditionId}
-                          onChange={(id) => handleFormChange('oracleConditionId', id || '')}
-                          error={errors.oracleConditionId}
-                          disabled={submitting}
-                        />
-                      </div>
-                    )}
-
-                    {/* Generic YES/NO side picker for the non-Polymarket oracle types.
-                        Polymarket has its own outcome-named side picker below — we
-                        skip it for the new types and use a binary YES/NO labelling
-                        that maps to the contract's creatorIsYes bool. */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
-                     isExtensibleOracleType(formData.resolutionType) && (
-                      <div className="fm-form-group fm-form-full">
-                        <label>
-                          Your side of the bet <span className="fm-required">*</span>
-                        </label>
-                        <span className="fm-hint">
-                          The oracle will return a YES or NO outcome. Pick which side you&apos;re taking — your opponent gets the other.
-                        </span>
-                        <div className="fm-side-picker">
-                          {[
-                            { idx: '0', label: 'YES' },
-                            { idx: '1', label: 'NO' },
-                          ].map(({ idx, label }) => {
-                            const active = formData.creatorSide === idx
-                            return (
-                              <button
-                                key={idx}
-                                type="button"
-                                className={`fm-side-btn ${active ? 'active' : ''}`}
-                                onClick={() => handleFormChange('creatorSide', idx)}
-                                disabled={submitting}
-                                aria-pressed={active}
-                              >
-                                <span className="fm-side-btn-label">I&apos;m taking {label}</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                        {errors.creatorSide && (
-                          <span className="fm-error">{errors.creatorSide}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Creator side — which outcome of the linked Polymarket are you taking? */}
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
-                     formData.resolutionType === ResolutionType.Polymarket &&
-                     selectedPolymarketMarket && (
-                      <div className="fm-form-group fm-form-full">
-                        <label>
-                          Your side of the bet <span className="fm-required">*</span>
-                        </label>
-                        <span className="fm-hint">
-                          Pick which outcome you&apos;re taking. Your opponent will be on the other side, and the bet description will say so explicitly.
-                        </span>
-                        <div className="fm-side-picker">
-                          {['0', '1'].map((idx) => {
-                            const outcome = selectedPolymarketMarket.outcomes?.[Number(idx)]
-                            const fallback = idx === '0' ? 'YES' : 'NO'
-                            const name = outcome?.name || fallback
-                            const active = formData.creatorSide === idx
-                            return (
-                              <button
-                                key={idx}
-                                type="button"
-                                className={`fm-side-btn ${active ? 'active' : ''}`}
-                                onClick={() => handleSelectCreatorSide(idx)}
-                                disabled={submitting}
-                                aria-pressed={active}
-                              >
-                                <span className="fm-side-btn-label">I&apos;m taking {name}</span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                        {formData.creatorSide !== '' && (
-                          <span className="fm-hint">
-                            Your opponent will be taking{' '}
-                            <strong>
-                              {selectedPolymarketMarket.outcomes?.[formData.creatorSide === '0' ? 1 : 0]?.name
-                                || (formData.creatorSide === '0' ? 'NO' : 'YES')}
-                            </strong>.
-                          </span>
-                        )}
-                        {errors.creatorSide && (
-                          <span className="fm-error">{errors.creatorSide}</span>
-                        )}
-                      </div>
-                    )}
 
                     {/* Privacy / Encryption Toggle */}
                     <div className="fm-form-group fm-form-full">
