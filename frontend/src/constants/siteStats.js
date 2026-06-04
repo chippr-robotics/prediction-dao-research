@@ -1,21 +1,13 @@
 /**
- * Live site stats — baseline figures and display metadata for the landing
- * page stats band.
+ * Live site stats — display metadata for the landing page stats band.
  *
- * The landing page surfaces real on-chain metrics when they're available,
- * but on a fresh testnet deployment the numbers are trivially small. To keep
- * the band feeling alive we floor each metric at a tasteful baseline — see
- * `useSiteStats`, where the displayed value is `max(live, baseline)`. Bump
- * these as the platform grows so the floor never trails reality.
+ * The band surfaces real on-chain metrics only (see `useSiteStats`). There is
+ * intentionally no baseline floor: on a fresh deployment the numbers are
+ * trivially small (or zero), and showing fabricated figures to users of a
+ * real-money product would be misleading.
+ *
+ * The canonical list of metric keys lives in `useSiteStats.emptyStats()`.
  */
-
-export const STATS_BASELINE = {
-  activeAccounts: 1280,
-  valueWageredUsd: 248_000,
-  wagersResolved: 940,
-  totalWagers: 1620,
-  activeWagers: 210,
-}
 
 /**
  * The featured metrics, in display order. `format` selects the formatter in
