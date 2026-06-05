@@ -25,6 +25,7 @@ const REGISTRY_ABI = [
   'function acceptWager(uint256 wagerId)',
   'function declareWinner(uint256 wagerId, address winner)',
   'function claimRefund(uint256 wagerId)',
+  'function claimPayout(uint256 wagerId)',
   'function autoResolveFromPolymarket(uint256 wagerId)',
   'function getWager(uint256 wagerId) view returns (tuple(address creator,address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,uint8 status,bool paid,bool creatorIsYes,address winner,bytes32 metadataHash,bytes32 polymarketConditionId,string metadataUri))',
 ]
@@ -48,6 +49,10 @@ const TOKEN_ABI = [
   'function mint(address to, uint256 amount)',
   'function balanceOf(address) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
+]
+const KEYREG_ABI = [
+  'function hasKey(address user) view returns (bool)',
+  'function getPublicKey(address user) view returns (bytes)',
 ]
 
 /**
@@ -155,6 +160,16 @@ export default defineConfig({
                 .claimRefund(args.wagerId)
               break
             }
+            case 'claimPayout': {
+              const pw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, pw)
+                .claimPayout(args.wagerId)
+              break
+            }
+            case 'hasKey': {
+              const kr = new ethers.Contract(d.contracts.keyRegistry, KEYREG_ABI, provider)
+              return { ok: true, registered: await kr.hasKey(args.address) }
+            }
             case 'autoResolve':
               tx = await registry.autoResolveFromPolymarket(args.wagerId); break
             case 'prepareCondition': {
@@ -172,7 +187,7 @@ export default defineConfig({
             case 'wagerInfo': {
               const reg2 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
               const w = await reg2.getWager(args.wagerId)
-              return { ok: true, status: Number(w.status), winner: w.winner }
+              return { ok: true, status: Number(w.status), winner: w.winner, paid: w.paid }
             }
             case 'pause':
               if (await registry.paused()) return { ok: true, noop: true }

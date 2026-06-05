@@ -35,7 +35,7 @@ description: "Task list — complete the remaining E2E stubs (encryption, privac
 
 **Purpose**: a small read action the encryption specs assert against.
 
-- [ ] T001 Add a `hasKey` read action to the `chainTx` task in `frontend/cypress.config.js` returning `{ ok, registered }` for `args.address` from the KeyRegistry (address via the deployment record's `keyRegistry`/`zkKeyManager`; ABI from the app's KeyRegistry read used in `frontend/src/utils/keyRegistryService.js`).
+- [X] T001 Add a `hasKey` read action to the `chainTx` task in `frontend/cypress.config.js` returning `{ ok, registered }` for `args.address` from the KeyRegistry (address via the deployment record's `keyRegistry`/`zkKeyManager`; ABI from the app's KeyRegistry read used in `frontend/src/utils/keyRegistryService.js`).
 
 **Checkpoint**: `cy.task('chainTx', {action:'hasKey', args:{address}})` returns a boolean.
 
@@ -47,7 +47,7 @@ description: "Task list — complete the remaining E2E stubs (encryption, privac
 encryption keys account-distinct. **US2 and US3 cannot start until this is done.**
 (US1 does NOT depend on it.)
 
-- [ ] T002 In `frontend/cypress/support/commands.js`, change `mockWeb3Provider`'s `request` handler so `personal_sign` / `eth_sign` / `eth_signTypedData*` return a **deterministic per-account** value (a pure function of the connected account, e.g. a keccak of the account expanded to a 65-byte hex). Rationale: `encryption.js` derives keys via `keccak256(toUtf8Bytes(signature))` without verifying the signature, so per-account bytes yield per-account keys; the current same-for-all value would let a non-participant decrypt.
+- [X] T002 In `frontend/cypress/support/commands.js`, change `mockWeb3Provider`'s `request` handler so `personal_sign` / `eth_sign` / `eth_signTypedData*` return a **deterministic per-account** value (a pure function of the connected account, e.g. a keccak of the account expanded to a 65-byte hex). Rationale: `encryption.js` derives keys via `keccak256(toUtf8Bytes(signature))` without verifying the signature, so per-account bytes yield per-account keys; the current same-for-all value would let a non-participant decrypt.
 
 **Checkpoint**: two different mocked accounts derive two different encryption keys (a private wager encrypted to #1 cannot be decrypted as #4).
 
@@ -58,7 +58,7 @@ encryption keys account-distinct. **US2 and US3 cannot start until this is done.
 **Goal**: prove the connected journeys end-to-end.
 **Independent test**: `23-lifecycle-e2e.cy.js` passes on a fresh node. **Independent of Phase 2** — needs only the 001 foundation, so it can proceed in parallel.
 
-- [ ] T003 [US1] Rewrite `frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js` with five journeys, each asserting terminal `wagerInfo` (status/winner) + a user-visible signal: E2E-01 1v1 manual (createAndAcceptWager → `declareWinner` → winner claims → Resolved/paid), E2E-02 Polymarket auto (prepareCondition → create+accept type 4 → resolve [1,0] → autoResolve → correct winner), E2E-03 accept-timeout refund, E2E-04 oracle resolve-timeout refund, E2E-05 frozen-winner-cannot-claim then unfreeze. **Delete the obsolete "Challenged Resolution with Arbitrator" journey** (removed feature — FR-002). For the winner-claims step, drive the MyMarkets claim button; if brittle, fall back to a `chainTx` claim + assert the UI shows paid (document, don't silently skip).
+- [X] T003 [US1] Rewrite `frontend/cypress/e2e/full/23-lifecycle-e2e.cy.js` with five journeys, each asserting terminal `wagerInfo` (status/winner) + a user-visible signal: E2E-01 1v1 manual (createAndAcceptWager → `declareWinner` → winner claims → Resolved/paid), E2E-02 Polymarket auto (prepareCondition → create+accept type 4 → resolve [1,0] → autoResolve → correct winner), E2E-03 accept-timeout refund, E2E-04 oracle resolve-timeout refund, E2E-05 frozen-winner-cannot-claim then unfreeze. **Delete the obsolete "Challenged Resolution with Arbitrator" journey** (removed feature — FR-002). For the winner-claims step, drive the MyMarkets claim button; if brittle, fall back to a `chainTx` claim + assert the UI shows paid (document, don't silently skip).
 
 **Checkpoint**: `cypress run --spec '**/23-lifecycle-e2e.cy.js'` is green; no arbitrator/challenge references.
 

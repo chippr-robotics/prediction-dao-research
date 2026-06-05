@@ -59,8 +59,13 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               resolve('0x56bc75e2d63100000') // 100 ETH
               break
             case 'personal_sign':
-              // Return a deterministic mock signature for key derivation
-              resolve('0x' + 'ab'.repeat(65))
+            case 'eth_sign':
+              // Deterministic PER-ACCOUNT signature. encryption.js derives keys via
+              // keccak256(toUtf8Bytes(signature)) and never verifies the signature,
+              // so any account-distinct deterministic value yields per-account keys
+              // (a same-for-all value would let a non-participant decrypt). Expand
+              // the 40-hex-char account to a 65-byte (130-hex) value.
+              resolve('0x' + account.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
             default:
               fetch(rpcUrl, {
