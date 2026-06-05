@@ -135,6 +135,29 @@ export function getContractAddress(contractName) {
 }
 
 /**
+ * Get a contract address for a specific chain id.
+ *
+ * Unlike `getContractAddress`, which is bound to the build-time
+ * VITE_NETWORK_ID, this resolves against the per-chain deployment record so
+ * runtime network switches (testnet ↔ mainnet) read the right deployment.
+ * Returns undefined when the chain has no deployment for that contract — which
+ * is the correct signal for "not available on this network" (e.g. a testnet
+ * membership must not appear active on mainnet).
+ *
+ * Falls back to `getContractAddress` (env overrides + active chain) when no
+ * chainId is supplied so existing callers keep their current behavior.
+ *
+ * @param {string} contractName - Name of the contract
+ * @param {number} [chainId] - Target chain id
+ * @returns {string|undefined} Contract address
+ */
+export function getContractAddressForChain(contractName, chainId) {
+  if (chainId == null) return getContractAddress(contractName)
+  const chainContracts = NETWORK_CONTRACTS[chainId]
+  return chainContracts ? chainContracts[contractName] : undefined
+}
+
+/**
  * Network configuration, derived from VITE_NETWORK_ID
  */
 const NETWORK_INFO_BY_CHAIN = {

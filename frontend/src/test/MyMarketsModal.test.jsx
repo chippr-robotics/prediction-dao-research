@@ -194,7 +194,7 @@ describe('MyMarketsModal', () => {
         )
       })
 
-      expect(screen.getByText('Manage your wagers and positions')).toBeInTheDocument()
+      expect(screen.getByText(/Manage your wagers and positions/)).toBeInTheDocument()
     })
 
     it('should have close button', async () => {

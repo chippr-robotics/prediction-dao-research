@@ -1,26 +1,45 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useAccount } from 'wagmi'
+import { useAccount, useChainId } from 'wagmi'
 import { fetchFriendMarketsForUser } from '../utils/blockchainService'
 import { FriendMarketsContext } from './FriendMarketsContext'
 
 const STORAGE_KEY = 'friendMarkets'
 const DISMISSED_STORAGE_PREFIX = 'mywagers_dismissed:'
 
-function loadFromStorage() {
+// The wager cache is scoped per chain so that wagers fetched on the testnet
+// don't leak into the mainnet view (and vice versa) after a network switch.
+// Each entry is also tagged with the `chainId` it was read from, which lets
+// the UI filter/label wagers defensively even if a legacy (unscoped) cache is
+// still present.
+function storageKey(chainId) {
+  return chainId ? `${STORAGE_KEY}:${chainId}` : STORAGE_KEY
+}
+
+function loadFromStorage(chainId) {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(storageKey(chainId))
     return stored ? JSON.parse(stored) : []
   } catch {
     return []
   }
 }
 
-function saveToStorage(markets) {
+function saveToStorage(chainId, markets) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(markets))
+    localStorage.setItem(storageKey(chainId), JSON.stringify(markets))
   } catch {
     // localStorage may be full or unavailable — non-fatal
   }
+}
+
+// Stamp each market with the chain it belongs to and a chain-qualified
+// uniqueId so identical market ids on different chains never collide.
+function tagMarkets(markets, chainId) {
+  return markets.map(m => ({
+    ...m,
+    chainId,
+    uniqueId: `${chainId || 'unknown'}-${m.contractAddress || 'unknown'}-${m.id}`,
+  }))
 }
 
 function dismissedKey(address) {
@@ -48,12 +67,20 @@ function saveDismissed(address, ids) {
 
 export function FriendMarketsProvider({ children }) {
   const { address, isConnected } = useAccount()
-  const [friendMarkets, setFriendMarkets] = useState(() => loadFromStorage())
+  const chainId = useChainId()
+  const [friendMarkets, setFriendMarkets] = useState(() => loadFromStorage(chainId))
   const [loading, setLoading] = useState(false)
   const [dismissedIdsArr, setDismissedIdsArr] = useState(() => loadDismissed(address))
 
-  // Fetch friend markets from blockchain when wallet connects
+  // Fetch friend markets from blockchain when the wallet connects or the
+  // active network changes. The chainId dependency is essential: when the
+  // user toggles testnet ↔ mainnet we must re-query the chain rather than
+  // keep showing wagers that only exist on the previous network.
   useEffect(() => {
+    // Immediately swap to the selected network's cached wagers (or nothing)
+    // so stale wagers from the previous network don't linger during the fetch.
+    setFriendMarkets(loadFromStorage(chainId))
+
     if (!address || !isConnected) return
 
     let cancelled = false
@@ -64,13 +91,10 @@ export function FriendMarketsProvider({ children }) {
         const blockchainMarkets = await fetchFriendMarketsForUser(address)
         if (cancelled) return
 
-        const marketsWithUniqueIds = blockchainMarkets.map(m => ({
-          ...m,
-          uniqueId: `${m.contractAddress || 'unknown'}-${m.id}`
-        }))
+        const marketsWithUniqueIds = tagMarkets(blockchainMarkets, chainId)
 
         setFriendMarkets(marketsWithUniqueIds)
-        saveToStorage(marketsWithUniqueIds)
+        saveToStorage(chainId, marketsWithUniqueIds)
       } catch (error) {
         console.error('[FriendMarketsContext] Error fetching friend markets:', error)
         if (!cancelled && attempt < 2) {
@@ -85,7 +109,7 @@ export function FriendMarketsProvider({ children }) {
 
     fetchMarkets()
     return () => { cancelled = true }
-  }, [address, isConnected])
+  }, [address, isConnected, chainId])
 
   // Manual refresh
   const refresh = useCallback(async () => {
@@ -93,26 +117,23 @@ export function FriendMarketsProvider({ children }) {
     setLoading(true)
     try {
       const blockchainMarkets = await fetchFriendMarketsForUser(address)
-      const marketsWithUniqueIds = blockchainMarkets.map(m => ({
-        ...m,
-        uniqueId: `${m.contractAddress || 'unknown'}-${m.id}`
-      }))
+      const marketsWithUniqueIds = tagMarkets(blockchainMarkets, chainId)
       setFriendMarkets(marketsWithUniqueIds)
-      saveToStorage(marketsWithUniqueIds)
+      saveToStorage(chainId, marketsWithUniqueIds)
     } catch (error) {
       console.error('[FriendMarketsContext] Error refreshing friend markets:', error)
     }
     setLoading(false)
-  }, [address, isConnected])
+  }, [address, isConnected, chainId])
 
   // Optimistic add after creation (before next blockchain fetch)
   const addMarket = useCallback((market) => {
     setFriendMarkets(prev => {
-      const updated = [...prev, market]
-      saveToStorage(updated)
+      const updated = [...prev, { ...market, chainId }]
+      saveToStorage(chainId, updated)
       return updated
     })
-  }, [])
+  }, [chainId])
 
   // Reload the dismissed set when the active account changes so we don't
   // leak one wallet's dismissed list into another.
