@@ -15,7 +15,7 @@
     "test:fork": "hardhat test test/fork/*.test.js",
     "test:all": "hardhat test test/**/*.test.js",
     "test:gas": "REPORT_GAS=true hardhat test",
-    "test:coverage": "hardhat coverage --testfiles '{test/!(BatchOperations|DAOFactory).test.js,test/integration/!(factory)/**/*.test.js}'",
+    "test:coverage": "hardhat coverage --testfiles '{test/!(BatchOperations|DAOFactory).test.js,test/oracles/*.test.js,test/integration/!(factory)/**/*.test.js}'",
     "deploy:local": "hardhat run scripts/deploy/deploy.js --network localhost",
     "deploy:mordor": "hardhat run scripts/deploy/deploy-deterministic.js --network mordor",
     "deploy:deterministic": "hardhat run scripts/deploy/deploy-deterministic.js",
