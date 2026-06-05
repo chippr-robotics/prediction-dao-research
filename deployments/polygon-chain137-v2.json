@@ -7,7 +7,7 @@
   "wmatic": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
   "polymarketCTF": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
   "contracts": {
-    "polymarketAdapter": "0x5B75a926662b27Fb917cf50b3DD1073EEa82D702",
+    "polymarketAdapter": "0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4",
     "membershipManager": "0x7441700979e37a9a1F17093a4859c8f261780c95",
     "wagerRegistry": "0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4",
     "keyRegistry": "0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb",

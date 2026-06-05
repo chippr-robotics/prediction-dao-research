@@ -68,4 +68,18 @@ describe("Adapter deterministic-deploy ownership", function () {
     expect(await adapter.owner()).to.equal(deployer.address);
     expect(await adapter.owner()).to.not.equal(SINGLETON_FACTORY_ADDRESS);
   });
+
+  it("PolymarketOracleAdapter: owner is admin arg, not the factory", async () => {
+    const [deployer] = await ethers.getSigners();
+    const Ctf = await ethers.getContractFactory("MockPolymarketCTF");
+    const ctf = await Ctf.deploy();
+    const F = await ethers.getContractFactory("PolymarketOracleAdapter");
+    const addr = await deployViaFactory(deployer, F, [deployer.address, await ctf.getAddress()], "pm-ownership-regression");
+    const adapter = F.attach(addr);
+    expect(await adapter.owner()).to.equal(deployer.address);
+    expect(await adapter.owner()).to.not.equal(SINGLETON_FACTORY_ADDRESS);
+    // An onlyOwner function must now be callable by the deployer/admin.
+    await expect(adapter.connect(deployer).addCTFContract("0x000000000000000000000000000000000000bEEF"))
+      .to.not.be.reverted;
+  });
 });

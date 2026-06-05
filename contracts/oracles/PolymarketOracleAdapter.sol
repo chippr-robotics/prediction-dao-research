@@ -87,8 +87,12 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
     error InvalidConditionId();
     error FetchFailed();
 
-    constructor(address _polymarketCTF) Ownable(msg.sender) {
-        if (_polymarketCTF == address(0)) revert InvalidAddress();
+    // `admin` (not msg.sender) becomes the owner so deterministic CREATE2-via-
+    // factory deploys are owned by the intended admin EOA rather than the
+    // singleton factory — matching the other oracle adapters. See
+    // test/oracles/AdapterDeterministicOwnership.test.js.
+    constructor(address admin, address _polymarketCTF) Ownable(admin) {
+        if (admin == address(0) || _polymarketCTF == address(0)) revert InvalidAddress();
         polymarketCTF = _polymarketCTF;
         supportedCTFContracts[_polymarketCTF] = true;
         emit CTFContractAdded(_polymarketCTF);

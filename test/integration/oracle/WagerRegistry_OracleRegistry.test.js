@@ -26,7 +26,7 @@ describe("WagerRegistry oracle registry", function () {
     const Ctf = await ethers.getContractFactory("MockPolymarketCTF");
     const ctf = await Ctf.deploy();
     const PolymarketAdapter = await ethers.getContractFactory("PolymarketOracleAdapter");
-    const pmAdapter = await PolymarketAdapter.deploy(await ctf.getAddress());
+    const pmAdapter = await PolymarketAdapter.deploy(admin.address, await ctf.getAddress());
 
     const Agg = await ethers.getContractFactory("MockChainlinkAggregator");
     const feed = await Agg.deploy(0n, 8, await time.latest());

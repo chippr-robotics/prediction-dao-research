@@ -19,7 +19,7 @@ contract PolymarketOracleAdapterFuzzTest {
 
     constructor() {
         ctf = new MockPolymarketCTF();
-        adapter = new PolymarketOracleAdapter(address(ctf));
+        adapter = new PolymarketOracleAdapter(address(this), address(ctf));
     }
 
     /// @dev Fuzzed over (a, b). Prepares + resolves a fresh binary condition with

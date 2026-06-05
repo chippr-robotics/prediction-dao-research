@@ -26,7 +26,7 @@ describe("WagerRegistry + PolymarketOracleAdapter — tie handling (integration)
     const Ctf = await ethers.getContractFactory("MockPolymarketCTF");
     const ctf = await Ctf.deploy();
     const PolymarketAdapter = await ethers.getContractFactory("PolymarketOracleAdapter");
-    const pmAdapter = await PolymarketAdapter.deploy(await ctf.getAddress());
+    const pmAdapter = await PolymarketAdapter.deploy(admin.address, await ctf.getAddress());
 
     const MembershipManager = await ethers.getContractFactory("MembershipManager");
     const mgr = await MembershipManager.deploy(admin.address, await usdcToken.getAddress(), treasury.address);
