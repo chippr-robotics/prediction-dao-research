@@ -540,6 +540,61 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
 })
 
 /**
+ * Mock the IPFS (Pinata) boundary: store uploaded JSON in-memory and serve it back
+ * on fetch, so the app's real encrypt → store → retrieve → decrypt round-trip runs
+ * without a network. Call BEFORE cy.visit. `{ failFetch:true }` makes gateway reads
+ * return 500 (to drive the graceful-error path). CIDs are valid CIDv0 strings.
+ */
+// Module-level IPFS store: persists across tests in a spec so a private wager can
+// be created once (uploads stored here) and decrypted in a later test (fetched here).
+const __ipfsStore = {}
+let __ipfsCounter = 0
+Cypress.Commands.add('interceptIpfs', (opts = {}) => {
+  const mkCid = () => 'Qm' + String(1000 + __ipfsCounter++).split('').map((c) => 'abcdefghij'[+c]).join('') + 'a'.repeat(40)
+  cy.intercept('POST', '**/pinJSONToIPFS', (req) => {
+    const cid = mkCid()
+    const content = (req.body && req.body.pinataContent) || req.body
+    __ipfsStore[cid] = content
+    req.reply({ statusCode: 200, body: { IpfsHash: cid, PinSize: 1, Timestamp: '2026-01-01T00:00:00Z' } })
+  }).as('ipfsUpload')
+  cy.intercept('GET', '**/ipfs/*', (req) => {
+    if (opts.failFetch) { req.reply({ statusCode: 500, body: 'mock IPFS unreachable' }); return }
+    const cid = req.url.split('/ipfs/')[1].split(/[?#/]/)[0]
+    if (__ipfsStore[cid]) req.reply({ statusCode: 200, body: __ipfsStore[cid] })
+    else req.reply({ statusCode: 404, body: 'not found' })
+  }).as('ipfsFetch')
+})
+
+/**
+ * Create a 1v1 PRIVATE (encrypted) wager through the UI — leaves the "Private
+ * Wager" toggle ON. Requires `interceptIpfs()` active and BOTH parties to have a
+ * registered encryption key (creator and `opponent`). Confirms the wager landed
+ * and its metadataUri is an `encrypted:ipfs` reference. Yields the wagerId.
+ */
+Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
+  const o = { description: 'E2E private encrypted wager', opponent: TEST_ACCOUNTS[1], stake: 2, ...cfg }
+  cy.lastWagerId().then((before) => {
+    cy.openCreateWagerModal('oneVsOne')
+    cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+    cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+    cy.wait(300)
+    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    const p2 = (n) => String(n).padStart(2, '0')
+    const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
+    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
+    // Leave the encryption toggle ON (do NOT uncheck).
+    cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+    cy.waitForWagerId(before + 1).then((id) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.metadataUri, 'encrypted metadata reference').to.match(/^encrypted:ipfs/)
+      })
+      return cy.wrap(id)
+    })
+  })
+})
+
+/**
  * Set up a wager directly on-chain (reliable) so specs can assert UI behavior on
  * it. Funds + approves + grants membership for both parties, then createWager and
  * (unless {accept:false}) acceptWager via the chainTx task. Yields the wagerId.

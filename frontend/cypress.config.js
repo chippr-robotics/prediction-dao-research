@@ -187,7 +187,7 @@ export default defineConfig({
             case 'wagerInfo': {
               const reg2 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
               const w = await reg2.getWager(args.wagerId)
-              return { ok: true, status: Number(w.status), winner: w.winner, paid: w.paid }
+              return { ok: true, status: Number(w.status), winner: w.winner, paid: w.paid, metadataUri: w.metadataUri }
             }
             case 'pause':
               if (await registry.paused()) return { ok: true, noop: true }
