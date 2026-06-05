@@ -65,7 +65,8 @@ const AMOY_CONTRACTS = {
 //      npm run sync:frontend-contracts -- --network polygon --chainId 137
 const POLYGON_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-  treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  // Treasury / membership-sales recipient = chipprbots.eth (hardware wallet).
+  treasury: '0x1215185387E70a48b07D73AcB67002A073F18575',
   // v2 core (populated by `npm run sync:frontend-contracts -- --network polygon --chainId 137`)
   wagerRegistry: '0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4',
   membershipManager: '0x7441700979e37a9a1F17093a4859c8f261780c95',
