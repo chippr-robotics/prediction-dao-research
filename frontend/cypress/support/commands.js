@@ -442,6 +442,24 @@ Cypress.Commands.add('connectAs', (account) => {
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
 })
 
+/**
+ * Open the create modal, fill it, disable privacy, and submit — WITHOUT asserting
+ * success. Use for "blocked" cases (paused / frozen / expired membership) where
+ * the create should NOT produce a wager; assert lastWagerId is unchanged after.
+ */
+Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
+  const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, ...cfg }
+  cy.openCreateWagerModal('oneVsOne')
+  cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+  cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+  cy.wait(300)
+  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+  cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
+    if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
+  })
+  cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+})
+
 /** Poll lastWagerId until it reaches `target` (default ~40s). Yields the id. */
 Cypress.Commands.add('waitForWagerId', (target, tries = 40) => {
   const check = (remaining) => cy.task('lastWagerId').then((id) => {
@@ -472,6 +490,14 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
     if (o.resolutionType !== undefined) {
       cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
     }
+    // Set a far-future end date (~20 days, within the 21-day max) so acceptDeadline
+    // (the midpoint) stays well ahead of the chain clock even after a spec advances
+    // time — otherwise the UI computes deadlines from browser time and the create
+    // reverts with BadDeadlines once the chain is ahead.
+    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    const p2 = (n) => String(n).padStart(2, '0')
+    const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
+    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
     cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
       if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
     })
