@@ -93,13 +93,15 @@ const hardhat = {
   testnet: true,
 }
 
-// Get network ID from environment or default to Polygon Amoy testnet
+// Get network ID from environment or default to Polygon mainnet (primary)
 const networkId = import.meta.env.VITE_NETWORK_ID
   ? parseInt(import.meta.env.VITE_NETWORK_ID, 10)
-  : 80002
+  : 137
 
-// Get RPC URL from environment
-const rpcUrl = import.meta.env.VITE_RPC_URL || 'https://rpc-amoy.polygon.technology'
+// Optional global RPC override. Left undefined when VITE_RPC_URL is unset so
+// each chain's transport falls back to its own default rpcUrls (a hardcoded
+// Amoy default here would otherwise leak into the Polygon transport).
+const rpcUrl = import.meta.env.VITE_RPC_URL || undefined
 
 // Get WalletConnect project ID from environment
 // Using a fallback demo project ID if none is provided to ensure WalletConnect option is always available
@@ -138,8 +140,10 @@ const resolveAppUrl = () => {
 
 const appUrl = resolveAppUrl()
 
-// Define supported chains
-const chains = [amoy, polygon, ethereumClassic, mordor, hardhat]
+// Define supported chains. Polygon mainnet is first so it is wagmi's default
+// chain (used by useChainId when no wallet is connected), matching the primary
+// network. The Testnet/Mainnet toggle still switches to Amoy on demand.
+const chains = [polygon, amoy, ethereumClassic, mordor, hardhat]
 
 // Create wagmi config
 export const config = createConfig({

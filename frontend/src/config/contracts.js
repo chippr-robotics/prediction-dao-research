@@ -86,12 +86,13 @@ const NETWORK_CONTRACTS = {
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
 }
 
-// Default to Mordor (63) when VITE_NETWORK_ID isn't set so existing tests pass.
-// The .env / .env.example files set VITE_NETWORK_ID=80002 for the live frontend.
-const ACTIVE_CHAIN_ID = parseInt(import.meta.env.VITE_NETWORK_ID || '63', 10)
+// Default to Polygon mainnet (137) — the primary network — when VITE_NETWORK_ID
+// isn't set. Test runs pin VITE_NETWORK_ID=63 (frontend/vite.config.js) so this
+// default doesn't affect them; the live frontend reads VITE_NETWORK_ID from .env.
+const ACTIVE_CHAIN_ID = parseInt(import.meta.env.VITE_NETWORK_ID || '137', 10)
 
 export const DEPLOYED_CONTRACTS =
-  NETWORK_CONTRACTS[ACTIVE_CHAIN_ID] || MORDOR_CONTRACTS
+  NETWORK_CONTRACTS[ACTIVE_CHAIN_ID] || POLYGON_CONTRACTS
 
 /**
  * Deployment block numbers for event scanning.
@@ -155,7 +156,7 @@ const NETWORK_INFO_BY_CHAIN = {
   },
 }
 
-const _activeNetwork = NETWORK_INFO_BY_CHAIN[ACTIVE_CHAIN_ID] || NETWORK_INFO_BY_CHAIN[63]
+const _activeNetwork = NETWORK_INFO_BY_CHAIN[ACTIVE_CHAIN_ID] || NETWORK_INFO_BY_CHAIN[137]
 
 export const NETWORK_CONFIG = {
   chainId: ACTIVE_CHAIN_ID,

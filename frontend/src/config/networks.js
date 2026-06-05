@@ -7,29 +7,36 @@
  * this map.
  *
  * Supported chains:
- *   - Polygon Amoy (80002) — default testnet. Co-locates with Polymarket's
- *     CTF for settle-by-reference; community Uniswap V3 contracts may be
- *     plugged in via VITE_AMOY_UNISWAP_* env vars.
- *   - Polygon Mainnet (137) — production. Canonical Uniswap V3 deployment.
+ *   - Polygon Mainnet (137) — PRIMARY / production default. Canonical Uniswap
+ *     V3 deployment; live v2 wager contracts.
+ *   - Polygon Amoy (80002) — testnet. Co-locates with Polymarket's CTF for
+ *     settle-by-reference; community Uniswap V3 contracts may be plugged in via
+ *     VITE_AMOY_UNISWAP_* env vars.
  *   - Hardhat (1337) — local dev.
  *
- * The user-facing Testnet/Mainnet toggle switches between 80002 and 137 via
- * wagmi.switchChain.
+ * The user-facing Testnet/Mainnet toggle switches between 80002 (testnet) and
+ * 137 (mainnet) via wagmi.switchChain.
  */
 
 // Note: We intentionally do NOT import from ./contracts here — contracts.js
 // imports from this file (indirectly, via NETWORK_CONFIG-style lookups) and a
 // hard import would create a cycle.
 
-const PRIMARY_CHAIN_ID = 80002
+// PRIMARY_CHAIN_ID is the app's home/default network (used as the default chain
+// when VITE_NETWORK_ID is unset and as the wallet auto-switch target for
+// unsupported chains). TESTNET_CHAIN_ID is the testnet side of the user-facing
+// Testnet/Mainnet toggle — kept separate so "primary" can be mainnet without
+// collapsing the toggle pair.
+const PRIMARY_CHAIN_ID = 137
 const MAINNET_CHAIN_ID = 137
+const TESTNET_CHAIN_ID = 80002
 
 const NETWORKS = {
   80002: {
     chainId: 80002,
     name: 'Polygon Amoy',
     isTestnet: true,
-    isPrimary: true,
+    isPrimary: false,
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Polygonscan', baseUrl: 'https://amoy.polygonscan.com' },
@@ -80,7 +87,7 @@ const NETWORKS = {
     chainId: 137,
     name: 'Polygon',
     isTestnet: false,
-    isPrimary: false,
+    isPrimary: true,
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
@@ -130,7 +137,7 @@ const NETWORKS = {
   },
 }
 
-export { NETWORKS, PRIMARY_CHAIN_ID, MAINNET_CHAIN_ID }
+export { NETWORKS, PRIMARY_CHAIN_ID, MAINNET_CHAIN_ID, TESTNET_CHAIN_ID }
 
 export function getCurrentChainId() {
   const env = import.meta.env?.VITE_NETWORK_ID
@@ -161,6 +168,6 @@ export function listSupportedChainIds() {
  * Surfaced as a helper so UI code doesn't have to know the numeric values.
  */
 export const TESTNET_MAINNET_PAIR = {
-  testnet: PRIMARY_CHAIN_ID,
+  testnet: TESTNET_CHAIN_ID,
   mainnet: MAINNET_CHAIN_ID,
 }
