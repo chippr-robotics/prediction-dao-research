@@ -158,9 +158,13 @@ export default defineConfig({
             case 'autoResolve':
               tx = await registry.autoResolveFromPolymarket(args.wagerId); break
             case 'prepareCondition': {
-              // Prepare a fresh Polymarket condition owned by #0; return its id.
+              // Prepare a FRESH Polymarket condition owned by #0; return its id.
+              // The questionId is salted so reusing the node across runs can't
+              // collide with an already-prepared/resolved condition (createWager
+              // reverts ConditionAlreadyResolved on a resolved id).
               const oracle = wallet.address
-              const qid = ethers.id(args.question || 'e2e-question')
+              const salt = `${args.question || 'q'}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`
+              const qid = ethers.id(salt)
               const cid = await ctf.getConditionId(oracle, qid, 2)
               await (await ctf.prepareCondition(oracle, qid, 2)).wait(1)
               return { ok: true, conditionId: cid }
