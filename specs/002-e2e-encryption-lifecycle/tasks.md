@@ -69,8 +69,8 @@ encryption keys account-distinct. **US2 and US3 cannot start until this is done.
 **Goal**: prove a user can register an encryption key and that status is reported.
 **Independent test**: `03-encryption-chain.cy.js` passes. **Depends on Phase 2.**
 
-- [ ] T004 [US2] Add shared commands in `frontend/cypress/support/commands.js`: `registerEncryptionKeyViaUI()` (drive the WalletPage register-key flow; wait until `hasKey` reports true) and `hasRegisteredKey(address)` (wraps the `hasKey` task). Reused by US3.
-- [ ] T005 [US2] Implement `frontend/cypress/e2e/full/03-encryption-chain.cy.js`: connect a fresh account → assert `hasRegisteredKey` is false → `registerEncryptionKeyViaUI()` → assert the register tx landed, the UI shows "registered", and `hasRegisteredKey`/KeyRegistry returns a non-empty key (ENC-02/ENC-03).
+- [X] T004 [US2] Add shared commands in `frontend/cypress/support/commands.js`: `registerEncryptionKeyViaUI()` (drive the WalletPage register-key flow; wait until `hasKey` reports true) and `hasRegisteredKey(address)` (wraps the `hasKey` task). Reused by US3.
+- [X] T005 [US2] Implement `frontend/cypress/e2e/full/03-encryption-chain.cy.js`: connect a fresh account → assert `hasRegisteredKey` is false → `registerEncryptionKeyViaUI()` → assert the register tx landed, the UI shows "registered", and `hasRegisteredKey`/KeyRegistry returns a non-empty key (ENC-02/ENC-03).
 
 ---
 

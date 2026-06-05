@@ -429,6 +429,34 @@ Cypress.Commands.add('restoreGlobalState', (accounts = TEST_ACCOUNTS) => {
   accounts.forEach((address) => cy.task('chainTx', { action: 'unfreeze', args: { address } }))
 })
 
+/** Read KeyRegistry: has this account registered an encryption key? */
+Cypress.Commands.add('hasRegisteredKey', (address) => {
+  return cy.task('chainTx', { action: 'hasKey', args: { address } }).then((r) => r.registered)
+})
+
+/**
+ * Register the connected account's encryption key via the WalletPage Security tab.
+ * Idempotent — if already registered, it just confirms. Polls KeyRegistry until
+ * the key is on-chain. The connected account must already be connected (the mock
+ * provides per-account signatures so the registered key is account-specific).
+ */
+Cypress.Commands.add('registerEncryptionKeyViaUI', (address) => {
+  cy.visit('/wallet')
+  cy.contains('button', /security/i, { timeout: 10000 }).click()
+  cy.get('body', { timeout: 10000 }).then(($b) => {
+    if (/register encryption key/i.test($b.text())) {
+      cy.contains('button', /register encryption key/i).click()
+    }
+  })
+  const poll = (n) => cy.task('chainTx', { action: 'hasKey', args: { address } }).then((r) => {
+    if (r.registered) return cy.wrap(true)
+    if (n <= 0) throw new Error(`encryption key not registered for ${address}`)
+    cy.wait(1000)
+    return poll(n - 1)
+  })
+  return poll(30)
+})
+
 /** Mint a large stake-token balance to an account (so create/accept never reverts). */
 Cypress.Commands.add('fundAccount', (address) => {
   return cy.task('chainTx', { action: 'fund', args: { address } }).then((r) => {
