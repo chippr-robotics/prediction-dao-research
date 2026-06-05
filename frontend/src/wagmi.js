@@ -68,8 +68,8 @@ const polygon = {
     symbol: 'POL',
   },
   rpcUrls: {
-    default: { http: ['https://polygon-rpc.com'] },
-    public: { http: ['https://polygon-rpc.com'] },
+    default: { http: ['https://polygon-bor-rpc.publicnode.com'] },
+    public: { http: ['https://polygon-bor-rpc.publicnode.com'] },
   },
   blockExplorers: {
     default: { name: 'PolygonScan', url: 'https://polygonscan.com' },
@@ -163,7 +163,7 @@ export const config = createConfig({
   ],
   transports: {
     [amoy.id]: http(networkId === 80002 ? rpcUrl : 'https://rpc-amoy.polygon.technology'),
-    [polygon.id]: http(),
+    [polygon.id]: http(networkId === 137 ? rpcUrl : 'https://polygon-bor-rpc.publicnode.com'),
     [ethereumClassic.id]: http(),
     [mordor.id]: http(networkId === 63 ? rpcUrl : 'https://rpc.mordor.etccooperative.org'),
     [hardhat.id]: http('http://localhost:8545'),

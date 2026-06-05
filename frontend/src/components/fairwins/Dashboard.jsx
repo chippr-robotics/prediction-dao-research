@@ -10,6 +10,7 @@ import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
+import { NETWORK_CONFIG } from '../../config/contracts'
 import './Dashboard.css'
 
 // ============================================================================
@@ -177,7 +178,7 @@ function WelcomeView({ onConnect }) {
       <section className="welcome-hero">
         <div className="welcome-hero-badge">
           <span className="welcome-hero-badge-dot" />
-          Polygon Amoy
+          {NETWORK_CONFIG.name}
         </div>
         <h1 className="welcome-hero-title">
           Create a wager<br />with a friend

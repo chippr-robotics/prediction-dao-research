@@ -1,0 +1,21 @@
+{
+  "network": "polygon",
+  "chainId": 137,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "treasury": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "paymentToken": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+  "wmatic": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+  "polymarketCTF": "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045",
+  "contracts": {
+    "polymarketAdapter": "0xF941Ddc0062A2a57fFe4E17ed299FdBC17bF885E",
+    "membershipManager": "0x7441700979e37a9a1F17093a4859c8f261780c95",
+    "wagerRegistry": "0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4",
+    "keyRegistry": "0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb",
+    "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
+    "chainlinkFunctionsAdapter": "0x148C2E347a601AC1a680b17321529b0Ffc31AeFc",
+    "umaAdapter": "0x8224433d099Af6cd30540A78421aBFd6e044E949"
+  },
+  "mocks": null,
+  "saltPrefix": "FairWins-P2P-v2.0-",
+  "timestamp": "2026-06-04T22:06:18.741Z"
+}

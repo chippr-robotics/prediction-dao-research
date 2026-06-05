@@ -48,7 +48,7 @@ const AMOY_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   // v2 core (populated by `npm run sync:frontend-contracts -- --network amoy --chainId 80002`)
-  wagerRegistry: '0x66c7fa8cB1642Fc5e94Fa92928f1d6333c8d657f',
+  wagerRegistry: '0x95cC567EF97f21bdd135844652aD8792fa8ba266',
   membershipManager: '0xFaEbF662aa591fF95e97306b413522efC958540f',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
   polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',
@@ -60,9 +60,29 @@ const AMOY_CONTRACTS = {
   umaAdapter: '0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88',
 }
 
+// Polygon mainnet deployment (v2 — P2P betting architecture) — LIVE
+// Run: npx hardhat run scripts/deploy/deploy.js --network polygon
+//      npm run sync:frontend-contracts -- --network polygon --chainId 137
+const POLYGON_CONTRACTS = {
+  deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
+  // v2 core (populated by `npm run sync:frontend-contracts -- --network polygon --chainId 137`)
+  wagerRegistry: '0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4',
+  membershipManager: '0x7441700979e37a9a1F17093a4859c8f261780c95',
+  keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
+  polymarketAdapter: '0xF941Ddc0062A2a57fFe4E17ed299FdBC17bF885E',
+  // Stake / payment tokens (Circle USDC + Wrapped MATIC on Polygon)
+  paymentToken: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+  wmatic: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+  chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
+  chainlinkFunctionsAdapter: '0x148C2E347a601AC1a680b17321529b0Ffc31AeFc',
+  umaAdapter: '0x8224433d099Af6cd30540A78421aBFd6e044E949',
+}
+
 const NETWORK_CONTRACTS = {
   63: MORDOR_CONTRACTS,     // Mordor (legacy v1)
   80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
+  137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox
 }
 
@@ -83,6 +103,7 @@ export const DEPLOYED_CONTRACTS =
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0 },
+  137: { friendGroupMarketFactory: 0, wagerRegistry: 87937155 },
 }
 
 export const DEPLOYMENT_BLOCKS =
@@ -127,7 +148,9 @@ const NETWORK_INFO_BY_CHAIN = {
   },
   137: {
     name: 'Polygon',
-    rpcUrl: 'https://polygon-rpc.com',
+    // Public keyless endpoint; override per-deploy with VITE_RPC_URL. The
+    // legacy https://polygon-rpc.com endpoint now rejects unauthenticated reads.
+    rpcUrl: 'https://polygon-bor-rpc.publicnode.com',
     blockExplorer: 'https://polygonscan.com',
   },
 }

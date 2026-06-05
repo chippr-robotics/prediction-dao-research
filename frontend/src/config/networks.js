@@ -82,7 +82,7 @@ const NETWORKS = {
     isTestnet: false,
     isPrimary: false,
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
-    rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-rpc.com',
+    rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
     // Native USDC on Polygon (Circle-issued, USDC.e is the bridged variant
     // and is not used here). Decimals=6.
