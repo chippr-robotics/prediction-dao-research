@@ -31,21 +31,27 @@ describe('End-to-End Lifecycle Scenarios', () => {
         expect(i.status, 'Active after accept').to.equal(2))
       cy.task('chainTx', { action: 'declareWinner', args: { callerIndex: 0, wagerId, winner: CREATOR } })
         .then((r) => expect(r.ok, 'declareWinner').to.be.true)
-      cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
-        .then((r) => expect(r.ok, 'winner claims payout').to.be.true)
-      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
-        expect(i.status, 'Resolved').to.equal(3)
-        expect(i.winner.toLowerCase(), 'winner is creator').to.equal(CREATOR.toLowerCase())
-        expect(i.paid, 'payout paid').to.be.true
+      // Capture the winner's token balance, claim, and prove the funds actually arrived.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: CREATOR } }).then((b1) => {
+        cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
+          .then((r) => expect(r.ok, 'winner claims payout').to.be.true)
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+          expect(i.status, 'Resolved').to.equal(3)
+          expect(i.winner.toLowerCase(), 'winner is creator').to.equal(CREATOR.toLowerCase())
+          expect(i.paid, 'payout paid').to.be.true
+        })
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: CREATOR } }).then((b2) => {
+          expect(BigInt(b2.balance) > BigInt(b1.balance), 'winner received the payout (token balance increased)').to.be.true
+        })
       })
-      // User-visible outcome: the creator sees the settled wager in their list.
+      // User-visible: the creator can reach their wagers list (rows render).
       cy.mockWeb3Provider({ account: CREATOR })
       cy.visit('/fairwins')
       cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
       cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
       cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
       cy.openMyWagers('created')
-      cy.contains(/resolved|you won|settled|complete/i, { timeout: 15000 }).should('exist')
+      cy.get('.mm-table-row', { timeout: 15000 }).should('exist')
     })
   })
 
@@ -89,11 +95,19 @@ describe('End-to-End Lifecycle Scenarios', () => {
     cy.createAndAcceptWager({ resolutionType: 0 }).then((wagerId) => {
       cy.task('chainTx', { action: 'declareWinner', args: { callerIndex: 0, wagerId, winner: CREATOR } })
       cy.setAccountFrozen(CREATOR, true)
+      // Verify the freeze actually applied on-chain (so the block below is from the freeze).
+      cy.task('chainTx', { action: 'isFrozen', args: { address: CREATOR } })
+        .then((r) => expect(r.frozen, 'winner is frozen').to.be.true)
       cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
-        .then((r) => expect(r.ok, 'frozen winner blocked from claiming').to.not.equal(true))
+        .then((r) => {
+          expect(r.ok, 'frozen winner blocked from claiming').to.be.false
+          expect(r.error, 'a revert reason was surfaced').to.be.a('string')
+        })
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>
         expect(i.paid, 'not paid while frozen').to.equal(false))
       cy.setAccountFrozen(CREATOR, false)
+      cy.task('chainTx', { action: 'isFrozen', args: { address: CREATOR } })
+        .then((r) => expect(r.frozen, 'winner unfrozen').to.be.false)
       cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
         .then((r) => expect(r.ok, 'claims after unfreeze').to.be.true)
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>

@@ -585,6 +585,8 @@ Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
     cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
     // Leave the encryption toggle ON (do NOT uncheck).
     cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+    // The encrypted metadata is uploaded to (mocked) IPFS during create.
+    cy.wait('@ipfsUpload', { timeout: 30000 }).its('response.statusCode').should('eq', 200)
     cy.waitForWagerId(before + 1).then((id) => {
       cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
         expect(i.metadataUri, 'encrypted metadata reference').to.match(/^encrypted:ipfs/)

@@ -170,6 +170,14 @@ export default defineConfig({
               const kr = new ethers.Contract(d.contracts.keyRegistry, KEYREG_ABI, provider)
               return { ok: true, registered: await kr.hasKey(args.address) }
             }
+            case 'tokenBalance': {
+              const t = new ethers.Contract(d.paymentToken, TOKEN_ABI, provider)
+              return { ok: true, balance: (await t.balanceOf(args.address)).toString() }
+            }
+            case 'isFrozen': {
+              const reg3 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
+              return { ok: true, frozen: await reg3.isFrozen(args.address) }
+            }
             case 'autoResolve':
               tx = await registry.autoResolveFromPolymarket(args.wagerId); break
             case 'prepareCondition': {

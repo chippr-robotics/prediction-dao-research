@@ -28,6 +28,10 @@ describe('Encryption Key Registration (On-Chain)', () => {
     connectAs(USER)
     cy.registerEncryptionKeyViaUI(USER)
     cy.hasRegisteredKey(USER).should('eq', true) // key is now on-chain
+    // The UI reflects the registered status: the "Register" CTA is gone and the
+    // Security tab reports "Registered".
+    cy.contains('button', /register encryption key/i).should('not.exist')
+    cy.contains(/^\s*registered\s*$/i, { timeout: 10000 }).should('exist')
   })
 
   it('[ENC-03] registration status is reported correctly', () => {
