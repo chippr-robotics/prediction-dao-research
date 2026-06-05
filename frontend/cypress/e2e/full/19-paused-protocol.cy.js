@@ -38,7 +38,9 @@ function attemptCreate() {
 
 describe('Paused Protocol', () => {
   before(() => {
-    // Ensure the creator can create when unpaused (membership gate).
+    // Ensure the creator can create when unpaused: funded + approved + member.
+    cy.fundAccount(ADMIN)
+    cy.task('chainTx', { action: 'approve', args: { index: 0 } })
     cy.grantMembershipFor(ADMIN, { tier: 4, durationDays: 365 })
   })
 
@@ -58,18 +60,11 @@ describe('Paused Protocol', () => {
     })
   })
 
-  // TODO(US1): the create happy-path is a multi-step wizard (verify role →
-  // approve token → create wager → complete) that `attemptCreate` does not yet
-  // fully drive — it stalls at "creating...". This is the same create-completion
-  // flow that the existing 07-manual-resolution specs exercise; once that shared
-  // create/accept helper is stabilized (T004's createAndAcceptWager), unskip this
-  // and assert lastWagerId == before + 1 after unpause. Skipped (not deleted) so
-  // the gap is explicit, not silent.
-  it.skip('[PAU-02] creation succeeds again after unpause', () => {
+  it('[PAU-02] creation succeeds again after unpause', () => {
     cy.setProtocolPaused(false)
     connectAsAdmin()
     cy.lastWagerId().then((before) => {
-      attemptCreate()
+      cy.createWagerViaUI({ opponent: OPPONENT, stake: 2 })
       cy.lastWagerId().then((after) => {
         expect(after, 'a new wager after unpause').to.equal(before + 1)
       })

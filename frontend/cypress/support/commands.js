@@ -74,7 +74,21 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
                 })
               })
               .then(r => r.json())
-              .then(data => resolve(data.result))
+              .then(data => {
+                // Propagate JSON-RPC errors as a real rejection (EIP-1193 shape)
+                // so viem/ethers can handle reverts/estimateGas failures instead
+                // of receiving `undefined`. This is what makes write txs work:
+                // a reverting eth_estimateGas now rejects (ethers retries/falls
+                // back) and eth_sendTransaction surfaces real errors.
+                if (data && data.error) {
+                  const e = new Error(data.error.message || 'RPC error')
+                  e.code = data.error.code
+                  e.data = data.error.data
+                  reject(e)
+                } else {
+                  resolve(data.result)
+                }
+              })
               .catch(err => reject(err))
           }
         })
@@ -428,32 +442,42 @@ Cypress.Commands.add('connectAs', (account) => {
   cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
 })
 
+/** Poll lastWagerId until it reaches `target` (default ~40s). Yields the id. */
+Cypress.Commands.add('waitForWagerId', (target, tries = 40) => {
+  const check = (remaining) => cy.task('lastWagerId').then((id) => {
+    if (id >= target) return cy.wrap(id)
+    if (remaining <= 0) throw new Error(`wager ${target} not created (last=${id})`)
+    cy.wait(1000)
+    return check(remaining - 1)
+  })
+  return check(tries)
+})
+
 /**
- * Create a 1v1 wager through the UI as the connected account. Drives the
- * multi-step create wizard (verify role → approve token → create) and waits for
- * completion. The creator must already have a membership + token balance.
+ * Create a 1v1 wager through the real UI as the connected account, and confirm
+ * it landed on-chain (polls the wager count — robust to success-copy wording).
+ * The creator must already be funded + approved + a member (e.g. via the same
+ * fund/approve/grant the spec does for createAndAcceptWager). "Private Wager" is
+ * turned off so the create flow doesn't block on an IPFS upload (no IPFS in tests).
  */
 Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
   // description must be >= 10 chars (form validation)
   const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, resolutionType: 0, ...cfg }
-  cy.openCreateWagerModal('oneVsOne')
-  cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
-  cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
-  cy.wait(300)
-  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
-  if (o.resolutionType !== undefined) {
-    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
-  }
-  cy.get('[role="dialog"]').then(($m) => {
-    const e = $m.find('input[type="checkbox"]')
-    if (e.length && e.is(':checked')) cy.wrap(e.first()).uncheck({ force: true })
+  cy.lastWagerId().then((before) => {
+    cy.openCreateWagerModal('oneVsOne')
+    cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+    cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+    cy.wait(300)
+    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    if (o.resolutionType !== undefined) {
+      cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
+    }
+    cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
+      if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
+    })
+    cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+    cy.waitForWagerId(before + 1)
   })
-  cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
-  // Multi-step wizard completes -> success copy appears.
-  cy.get('[role="dialog"], .modal', { timeout: 60000 }).invoke('text').then((t) => {
-    expect(t.toLowerCase(), 'create wizard reached success').to.match(/created|success|share|invite/)
-  })
-  cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn').click({ force: true })
 })
 
 /**
