@@ -21,12 +21,28 @@ const REGISTRY_ABI = [
   'function unfreezeAccount(address user)',
   'function isFrozen(address) view returns (bool)',
   'function nextWagerId() view returns (uint256)',
+  'function createWager(address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 polymarketConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
+  'function acceptWager(uint256 wagerId)',
+  'function declareWinner(uint256 wagerId, address winner)',
 ]
 const MEMBERSHIP_ABI = [
   'function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)',
 ]
+// Hardhat default account private keys (#0–#4) — public test keys, test-only.
+const ACCOUNT_KEYS = [
+  '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+  '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
+  '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
+  '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6',
+  '0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a',
+]
 const CTF_ABI = [
   'function resolveCondition(bytes32 conditionId, uint256[] payouts)',
+]
+const TOKEN_ABI = [
+  'function mint(address to, uint256 amount)',
+  'function balanceOf(address) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
 ]
 
 /**
@@ -82,9 +98,51 @@ export default defineConfig({
           const membership = new ethers.Contract(d.contracts.membershipManager, MEMBERSHIP_ABI, wallet)
           const ctfAddr = (d.mocks && d.mocks.mockPolymarketCTF) || d.polymarketCTF
           const ctf = new ethers.Contract(ctfAddr, CTF_ABI, wallet)
+          const token = new ethers.Contract(d.paymentToken, TOKEN_ABI, wallet)
 
           let tx
           switch (action) {
+            case 'fund':
+              // Mint a large stake-token balance so create/accept never reverts on
+              // transferFrom (the mock is 18-dec; this covers any stake amount).
+              tx = await token.mint(args.address, args.amount || (10n ** 24n)); break
+            case 'approve': {
+              // Approve the registry as account #idx (uses that account's key).
+              const aw = new ethers.Wallet(ACCOUNT_KEYS[args.index ?? 0], provider)
+              tx = await new ethers.Contract(d.paymentToken, TOKEN_ABI, aw)
+                .approve(d.contracts.wagerRegistry, ethers.MaxUint256)
+              break
+            }
+            case 'createWager': {
+              // Reliable on-chain wager creation as account #creatorIndex (bypasses
+              // the UI create wizard, which doesn't send txs under the mock wallet).
+              const cw = new ethers.Wallet(ACCOUNT_KEYS[args.creatorIndex ?? 0], provider)
+              const creg = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, cw)
+              const now = (await provider.getBlock('latest')).timestamp
+              const stake = BigInt(args.stake ?? (10n ** 18n))
+              const sent = await creg.createWager(
+                args.opponent, args.arbitrator || ethers.ZeroAddress, d.paymentToken,
+                stake, stake,
+                now + (args.acceptIn ?? 3600), now + (args.resolveIn ?? 7200),
+                args.resolutionType ?? 0, args.conditionId ?? ethers.ZeroHash,
+                args.creatorIsYes ?? false, ethers.id('e2e-meta'), ''
+              )
+              const rc = await sent.wait(1)
+              const reg = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
+              return { ok: rc.status === 1, wagerId: Number(await reg.nextWagerId()) - 1 }
+            }
+            case 'acceptWager': {
+              const ow = new ethers.Wallet(ACCOUNT_KEYS[args.opponentIndex ?? 1], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, ow)
+                .acceptWager(args.wagerId)
+              break
+            }
+            case 'declareWinner': {
+              const rw = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, rw)
+                .declareWinner(args.wagerId, args.winner)
+              break
+            }
             case 'pause':
               if (await registry.paused()) return { ok: true, noop: true }
               tx = await registry.pause(); break

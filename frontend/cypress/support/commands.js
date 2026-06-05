@@ -409,3 +409,78 @@ Cypress.Commands.add('restoreGlobalState', (accounts = TEST_ACCOUNTS) => {
   cy.task('chainTx', { action: 'unpause' })
   accounts.forEach((address) => cy.task('chainTx', { action: 'unfreeze', args: { address } }))
 })
+
+/** Mint a large stake-token balance to an account (so create/accept never reverts). */
+Cypress.Commands.add('fundAccount', (address) => {
+  return cy.task('chainTx', { action: 'fund', args: { address } }).then((r) => {
+    expect(r.ok, 'fundAccount tx ok').to.be.true
+    return r
+  })
+})
+
+/** Connect the mocked wallet as `account` and reach the app. */
+Cypress.Commands.add('connectAs', (account) => {
+  cy.mockWeb3Provider({ account })
+  cy.visit('/fairwins')
+  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
+  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+})
+
+/**
+ * Create a 1v1 wager through the UI as the connected account. Drives the
+ * multi-step create wizard (verify role → approve token → create) and waits for
+ * completion. The creator must already have a membership + token balance.
+ */
+Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
+  // description must be >= 10 chars (form validation)
+  const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, resolutionType: 0, ...cfg }
+  cy.openCreateWagerModal('oneVsOne')
+  cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+  cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+  cy.wait(300)
+  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+  if (o.resolutionType !== undefined) {
+    cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
+  }
+  cy.get('[role="dialog"]').then(($m) => {
+    const e = $m.find('input[type="checkbox"]')
+    if (e.length && e.is(':checked')) cy.wrap(e.first()).uncheck({ force: true })
+  })
+  cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+  // Multi-step wizard completes -> success copy appears.
+  cy.get('[role="dialog"], .modal', { timeout: 60000 }).invoke('text').then((t) => {
+    expect(t.toLowerCase(), 'create wizard reached success').to.match(/created|success|share|invite/)
+  })
+  cy.get('[role="dialog"] button[aria-label="Close modal"], [role="dialog"] .fm-close-btn').click({ force: true })
+})
+
+/**
+ * Set up a wager directly on-chain (reliable) so specs can assert UI behavior on
+ * it. Funds + approves + grants membership for both parties, then createWager and
+ * (unless {accept:false}) acceptWager via the chainTx task. Yields the wagerId.
+ *
+ * cfg: { creatorIndex=0, opponentIndex=1, resolutionType=0, creatorIsYes,
+ *        conditionId, acceptIn, resolveIn, stake, accept }
+ */
+Cypress.Commands.add('createAndAcceptWager', (cfg = {}) => {
+  const creatorIndex = cfg.creatorIndex ?? 0
+  const opponentIndex = cfg.opponentIndex ?? 1
+  const creator = TEST_ACCOUNTS[creatorIndex]
+  const opponent = TEST_ACCOUNTS[opponentIndex]
+  cy.task('chainTx', { action: 'fund', args: { address: creator } })
+  cy.task('chainTx', { action: 'fund', args: { address: opponent } })
+  cy.task('chainTx', { action: 'approve', args: { index: creatorIndex } })
+  cy.task('chainTx', { action: 'approve', args: { index: opponentIndex } })
+  cy.task('chainTx', { action: 'grantMembership', args: { address: creator, tier: 4, durationDays: 365 } })
+  cy.task('chainTx', { action: 'grantMembership', args: { address: opponent, tier: 4, durationDays: 365 } })
+  return cy.task('chainTx', { action: 'createWager', args: { ...cfg, creatorIndex, opponent } }).then((r) => {
+    expect(r.ok, 'createWager ok').to.be.true
+    if (cfg.accept === false) return cy.wrap(r.wagerId)
+    return cy.task('chainTx', { action: 'acceptWager', args: { opponentIndex, wagerId: r.wagerId } }).then((a) => {
+      expect(a.ok, 'acceptWager ok').to.be.true
+      return cy.wrap(r.wagerId)
+    })
+  })
+})
