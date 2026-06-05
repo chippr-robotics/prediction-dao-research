@@ -164,7 +164,7 @@ export function WalletProvider({ children }) {
    * If a role exists on-chain but not locally, add it
    * If a role exists locally but not on-chain, remove it (expired)
    */
-  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
+  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles, activeChainId) => {
     const premiumRoles = ['WAGER_PARTICIPANT']
     const adminRoles = ['ADMIN', 'GUARDIAN', 'ACCOUNT_MODERATOR', 'ROLE_MANAGER']
     const allSyncedRoles = [...premiumRoles, ...adminRoles]
@@ -178,7 +178,7 @@ export function WalletProvider({ children }) {
     // Check each role on-chain (both premium and admin roles)
     for (const roleName of allSyncedRoles) {
       try {
-        const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
+        const hasOnChain = await hasRoleOnChain(walletAddress, roleName, activeChainId)
         const hasLocally = localRoles.includes(roleName)
 
         console.log(`[RoleSync] ${roleName}: onChain=${hasOnChain}, local=${hasLocally}`)
@@ -228,7 +228,7 @@ export function WalletProvider({ children }) {
    * Load roles from both localStorage and blockchain
    * Blockchain is the source of truth for premium roles
    */
-  const loadRoles = useCallback(async (walletAddress) => {
+  const loadRoles = useCallback(async (walletAddress, activeChainId) => {
     setRolesLoading(true)
     setBlockchainSynced(false)
     try {
@@ -236,8 +236,8 @@ export function WalletProvider({ children }) {
       const localRoles = getUserRoles(walletAddress)
       setRoles(localRoles)
 
-      // Then sync with blockchain (authoritative source)
-      const { roles: syncedRoles } = await syncRolesWithBlockchain(walletAddress, localRoles)
+      // Then sync with blockchain (authoritative source) for the active chain
+      const { roles: syncedRoles } = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
       setRoles(syncedRoles)
       setBlockchainSynced(true)
     } catch (error) {
@@ -254,8 +254,8 @@ export function WalletProvider({ children }) {
    */
   const refreshRoles = useCallback(async () => {
     if (!address) return
-    await loadRoles(address)
-  }, [address, loadRoles])
+    await loadRoles(address, chainId)
+  }, [address, chainId, loadRoles])
 
   // Fetch wallet balances
   const fetchBalances = useCallback(async (walletAddress) => {
@@ -277,17 +277,21 @@ export function WalletProvider({ children }) {
     }
   }, [provider])
 
-  // Load RVAC roles when wallet connects
+  // Load RVAC roles when the wallet connects or the active network changes.
+  // Membership (the paid WAGER_PARTICIPANT role) lives in a per-chain
+  // MembershipManager, so a testnet ↔ mainnet switch must re-query the chain
+  // — otherwise a testnet membership would appear active on mainnet where it
+  // doesn't exist. chainId is included in the deps to force that re-query.
   useEffect(() => {
     if (isConnected && address) {
-      loadRoles(address)
+      loadRoles(address, chainId)
       fetchBalances(address)
     } else {
       setRoles([])
       setBalances({ native: '0', wnative: '0', tokens: {} })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, isConnected])
+  }, [address, isConnected, chainId])
 
   // Refresh balances manually
   const refreshBalances = useCallback(() => {

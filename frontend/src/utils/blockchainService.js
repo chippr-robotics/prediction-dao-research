@@ -6,7 +6,8 @@
  */
 
 import { ethers } from 'ethers'
-import { getContractAddress, NETWORK_CONFIG, DEPLOYMENT_BLOCKS, DEPLOYED_CONTRACTS } from '../config/contracts'
+import { getContractAddress, getContractAddressForChain, NETWORK_CONFIG, DEPLOYMENT_BLOCKS, DEPLOYED_CONTRACTS } from '../config/contracts'
+import { getNetwork } from '../config/networks'
 import { ERC20_ABI } from '../abis/ERC20'
 import { ZK_KEY_MANAGER_ABI } from '../abis/ZKKeyManager'
 import { DEX_ADDRESSES } from '../constants/dex'
@@ -110,9 +111,16 @@ export function canUserViewMarket(market, userAddress) {
 
 /**
  * Get a provider for reading from the blockchain
+ * @param {number} [chainId] - Optional chain id. When supplied, returns a
+ *   provider pointed at that chain's RPC (from networks.js) so reads target
+ *   the user's selected network rather than the build-time default.
  * @returns {ethers.JsonRpcProvider}
  */
-export function getProvider() {
+export function getProvider(chainId) {
+  if (chainId != null) {
+    const net = getNetwork(chainId)
+    if (net?.rpcUrl) return new ethers.JsonRpcProvider(net.rpcUrl)
+  }
   return new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
 }
 
@@ -929,7 +937,7 @@ export function getRoleHash(roleName) {
  * @param {string} roleName - Role name or constant
  * @returns {Promise<boolean>} True if user has the role on-chain
  */
-export async function hasRoleOnChain(userAddress, roleName) {
+export async function hasRoleOnChain(userAddress, roleName, chainId) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return false
@@ -941,12 +949,17 @@ export async function hasRoleOnChain(userAddress, roleName) {
     return false
   }
 
-  const provider = getProvider()
+  const provider = getProvider(chainId)
+  // Resolve addresses against the selected chain when one is given so a
+  // membership on testnet is not read as active on mainnet (where the
+  // MembershipManager isn't deployed) and vice versa.
+  const resolveAddress = (name) =>
+    chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
 
   // Paid memberships (WAGER_PARTICIPANT) live in MembershipManager and are
   // gated by a (Tier, expiry) pair — read via hasActiveRole.
   if (roleName === 'WAGER_PARTICIPANT' || roleName === 'Wager Participant') {
-    const mmAddress = getContractAddress('membershipManager')
+    const mmAddress = resolveAddress('membershipManager')
     if (!mmAddress) return false
     try {
       const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
@@ -966,13 +979,13 @@ export async function hasRoleOnChain(userAddress, roleName) {
   ]
   const candidates = []
   if (roleName === 'ROLE_MANAGER') {
-    const addr = getContractAddress('membershipManager')
+    const addr = resolveAddress('membershipManager')
     if (addr) candidates.push(addr)
   } else {
-    const wager = getContractAddress('wagerRegistry')
+    const wager = resolveAddress('wagerRegistry')
     if (wager) candidates.push(wager)
     if (roleName === 'ADMIN') {
-      const mm = getContractAddress('membershipManager')
+      const mm = resolveAddress('membershipManager')
       if (mm) candidates.push(mm)
     }
   }

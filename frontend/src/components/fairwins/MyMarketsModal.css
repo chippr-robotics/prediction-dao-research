@@ -94,6 +94,27 @@
   margin: 0.25rem 0 0 0;
 }
 
+/* Network tag — signals which network's wagers are being shown so testnet
+   wagers are never mistaken for mainnet ones (and vice versa). */
+.mm-network-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-primary, #E6EDF3);
+  background: rgba(76, 154, 255, 0.15);
+  border: 1px solid rgba(76, 154, 255, 0.45);
+}
+
+.mm-network-tag-testnet {
+  color: #F5C451;
+  background: rgba(245, 196, 81, 0.12);
+  border-color: rgba(245, 196, 81, 0.45);
+}
+
 .mm-close-btn {
   background: var(--bg-primary, #0E141B);
   border: 2px solid var(--text-secondary, #AAB6C2);
