@@ -49,5 +49,6 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/001-cypress-e2e-flows/plan.md` (Cypress E2E flow coverage).
+`specs/002-e2e-encryption-lifecycle/plan.md` (complete the remaining E2E stubs —
+encryption key registration, encrypted privacy round-trip, lifecycle journeys).
 <!-- SPECKIT END -->
