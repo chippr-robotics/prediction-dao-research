@@ -24,6 +24,9 @@ const REGISTRY_ABI = [
   'function createWager(address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,bytes32 polymarketConditionId,bool creatorIsYes,bytes32 metadataHash,string metadataUri) returns (uint256)',
   'function acceptWager(uint256 wagerId)',
   'function declareWinner(uint256 wagerId, address winner)',
+  'function claimRefund(uint256 wagerId)',
+  'function autoResolveFromPolymarket(uint256 wagerId)',
+  'function getWager(uint256 wagerId) view returns (tuple(address creator,address opponent,address arbitrator,address token,uint128 creatorStake,uint128 opponentStake,uint64 acceptDeadline,uint64 resolveDeadline,uint8 resolutionType,uint8 status,bool paid,bool creatorIsYes,address winner,bytes32 metadataHash,bytes32 polymarketConditionId,string metadataUri))',
 ]
 const MEMBERSHIP_ABI = [
   'function grantMembership(address user, bytes32 role, uint8 tier, uint32 durationDays)',
@@ -38,6 +41,8 @@ const ACCOUNT_KEYS = [
 ]
 const CTF_ABI = [
   'function resolveCondition(bytes32 conditionId, uint256[] payouts)',
+  'function prepareCondition(address oracle, bytes32 questionId, uint256 outcomeSlotCount)',
+  'function getConditionId(address oracle, bytes32 questionId, uint256 outcomeSlotCount) pure returns (bytes32)',
 ]
 const TOKEN_ABI = [
   'function mint(address to, uint256 amount)',
@@ -100,6 +105,7 @@ export default defineConfig({
           const ctf = new ethers.Contract(ctfAddr, CTF_ABI, wallet)
           const token = new ethers.Contract(d.paymentToken, TOKEN_ABI, wallet)
 
+          try {
           let tx
           switch (action) {
             case 'fund':
@@ -143,6 +149,27 @@ export default defineConfig({
                 .declareWinner(args.wagerId, args.winner)
               break
             }
+            case 'claimRefund': {
+              const cw2 = new ethers.Wallet(ACCOUNT_KEYS[args.callerIndex ?? 0], provider)
+              tx = await new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, cw2)
+                .claimRefund(args.wagerId)
+              break
+            }
+            case 'autoResolve':
+              tx = await registry.autoResolveFromPolymarket(args.wagerId); break
+            case 'prepareCondition': {
+              // Prepare a fresh Polymarket condition owned by #0; return its id.
+              const oracle = wallet.address
+              const qid = ethers.id(args.question || 'e2e-question')
+              const cid = await ctf.getConditionId(oracle, qid, 2)
+              await (await ctf.prepareCondition(oracle, qid, 2)).wait(1)
+              return { ok: true, conditionId: cid }
+            }
+            case 'wagerInfo': {
+              const reg2 = new ethers.Contract(d.contracts.wagerRegistry, REGISTRY_ABI, provider)
+              const w = await reg2.getWager(args.wagerId)
+              return { ok: true, status: Number(w.status), winner: w.winner }
+            }
             case 'pause':
               if (await registry.paused()) return { ok: true, noop: true }
               tx = await registry.pause(); break
@@ -165,6 +192,11 @@ export default defineConfig({
           }
           const receipt = await tx.wait(1)
           return { ok: receipt.status === 1, hash: receipt.hash }
+          } catch (e) {
+            // Return a soft failure so specs can assert "blocked" cases (e.g. a
+            // premature claimRefund) instead of the task rejecting the test.
+            return { ok: false, error: e.shortMessage || e.reason || e.message }
+          }
         },
 
         /** Read the latest wager id (nextWagerId - 1) for status/winner assertions. */
