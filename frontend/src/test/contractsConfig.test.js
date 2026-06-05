@@ -91,12 +91,19 @@ describe('contracts config', () => {
       )
     })
 
-    it('returns undefined on a chain with no deployment (e.g. Polygon mainnet)', () => {
-      // Polygon mainnet (137) has no contracts deployed yet — membership and
-      // wager reads must resolve to undefined so a testnet membership is never
-      // surfaced as active on mainnet.
-      expect(getContractAddressForChain('membershipManager', 137)).toBeUndefined()
-      expect(getContractAddressForChain('wagerRegistry', 137)).toBeUndefined()
+    it('resolves Polygon mainnet (137) now that it has a v2 deployment', () => {
+      // The v2 contracts are live on Polygon mainnet, so 137 resolves to real
+      // addresses (previously this returned undefined when 137 was undeployed).
+      expect(getContractAddressForChain('membershipManager', 137)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+      expect(getContractAddressForChain('wagerRegistry', 137)).toMatch(/^0x[0-9a-fA-F]{40}$/)
+    })
+
+    it('returns undefined on a chain with no deployment', () => {
+      // An unconfigured chain (e.g. Ethereum mainnet, 1) has no NETWORK_CONTRACTS
+      // entry — membership and wager reads must resolve to undefined so a testnet
+      // membership is never surfaced as active there.
+      expect(getContractAddressForChain('membershipManager', 1)).toBeUndefined()
+      expect(getContractAddressForChain('wagerRegistry', 1)).toBeUndefined()
     })
 
     it('falls back to the active-chain lookup when no chainId is given', () => {
