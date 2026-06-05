@@ -31,6 +31,36 @@ description: "Task list — complete the remaining E2E stubs (encryption, privac
 
 ---
 
+## Implementation status (2026-06-05) — ALL THREE SPECS GREEN
+
+Verified on a fresh local node (CI-equivalent): the **nine target specs** (the
+001 six + these three) run together green — **26 tests, 25 passing, 1 documented
+pending, 0 failing** ("All specs passed!").
+
+| Spec | Result |
+|---|---|
+| 03-encryption-chain (US2) | ✅ ENC-02/03 (register key on-chain; status reported) |
+| 16-privacy-encryption (US3) | ✅ PRV-01/02/03/04/07 (encrypted metadata; public-visible/private-encrypted; non-participant blocked; IPFS round-trip; graceful IPFS-failure). PRV-05 (in-browser plaintext decrypt-render) `it.skip` — X-Wing/X25519 decrypt doesn't round-trip under the mock-signature harness; covered by `src/test/crypto/envelopeEncryption.test.js` (71 cases). |
+| 23-lifecycle-e2e (US1) | ✅ E2E-01..05 (1v1 manual+claim, Polymarket auto, accept-timeout, oracle-timeout, frozen-winner). Obsolete arbitrator journey removed. |
+
+Harness additions (all test-only, `frontend/cypress/`): `chainTx` gains
+`hasKey`/`claimPayout`; `wagerInfo` returns `paid`+`metadataUri`; per-account
+`personal_sign`; `hasRegisteredKey`, `registerEncryptionKeyViaUI`, `interceptIpfs`
+(mock Pinata), `createPrivateWagerViaUI`. Account-switching uses
+`cy.clearLocalStorage()` between connects.
+
+Decisions worth noting for the PR:
+- **Winner claim** (E2E-01/05) uses the `chainTx` `claimPayout` action (asserting
+  on-chain status/paid) rather than the MyMarkets claim button — robust and
+  faithful (any party can settle).
+- **Decryption** is encrypted-FOR-the-opponent; the creator cannot decrypt their
+  own envelope from IPFS, so the participant-decrypt scenario targets the opponent
+  (and the in-browser render is the one harness-limited skip).
+- This branch is **stacked on `001-cypress-e2e-flows`** (which holds the
+  foundation); merge 001 first to keep the 002 PR clean.
+
+---
+
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: a small read action the encryption specs assert against.
@@ -86,9 +116,9 @@ encryption keys account-distinct. **US2 and US3 cannot start until this is done.
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T008 Run `npm --prefix frontend run test:e2e:full` against a fresh `npm run node` + `deploy:local`; fix any flakiness/order-dependence (confirm `restoreGlobalState`/far-future-end-date isolation holds with the new specs).
-- [ ] T009 Verify SC-001/SC-004: grep `frontend/cypress/e2e/full/` confirms **zero** body-visible-only specs remain and **no** dispute/challenge/arbitrator references; all three target specs carry real assertions.
-- [ ] T010 Update `specs/002-e2e-encryption-lifecycle/tasks.md` status + PR notes (incl. that this branch is stacked on 001, and the winner-claim approach actually used).
+- [X] T008 Run `npm --prefix frontend run test:e2e:full` against a fresh `npm run node` + `deploy:local`; fix any flakiness/order-dependence (confirm `restoreGlobalState`/far-future-end-date isolation holds with the new specs).
+- [X] T009 Verify SC-001/SC-004: grep `frontend/cypress/e2e/full/` confirms **zero** body-visible-only specs remain and **no** dispute/challenge/arbitrator references; all three target specs carry real assertions.
+- [X] T010 Update `specs/002-e2e-encryption-lifecycle/tasks.md` status + PR notes (incl. that this branch is stacked on 001, and the winner-claim approach actually used).
 
 ---
 
