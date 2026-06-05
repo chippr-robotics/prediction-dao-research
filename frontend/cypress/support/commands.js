@@ -338,3 +338,67 @@ Cypress.Commands.add('checkA11y', () => {
     }
   })
 })
+
+// ***********************************************
+// Precondition helpers (chain 1337 setup) — see
+// specs/001-cypress-e2e-flows/contracts/test-helpers.md.
+// These send admin transactions to the local Hardhat node via the `chainTx`
+// task (cypress.config.js) to arrange on-chain state the UI can't set, or that
+// is faster to set directly. Account #0 holds all admin roles locally.
+// ***********************************************
+
+/** Pause / unpause the WagerRegistry (Guardian = #0). Idempotent. */
+Cypress.Commands.add('setProtocolPaused', (paused) => {
+  return cy.task('chainTx', { action: paused ? 'pause' : 'unpause' }).then((r) => {
+    expect(r.ok, 'setProtocolPaused tx ok').to.be.true
+    return r
+  })
+})
+
+/** Freeze / unfreeze an account (Moderator = #0). */
+Cypress.Commands.add('setAccountFrozen', (address, frozen) => {
+  return cy.task('chainTx', {
+    action: frozen ? 'freeze' : 'unfreeze',
+    args: { address },
+  }).then((r) => {
+    expect(r.ok, 'setAccountFrozen tx ok').to.be.true
+    return r
+  })
+})
+
+/** Grant a WAGER_PARTICIPANT membership (ROLE_MANAGER = #0). */
+Cypress.Commands.add('grantMembershipFor', (address, { tier = 1, durationDays = 30 } = {}) => {
+  return cy.task('chainTx', {
+    action: 'grantMembership',
+    args: { address, tier, durationDays },
+  }).then((r) => {
+    expect(r.ok, 'grantMembershipFor tx ok').to.be.true
+    return r
+  })
+})
+
+/** Resolve a MockPolymarketCTF condition. payouts: [1,0]=YES, [0,1]=NO, [1,1]=tie. */
+Cypress.Commands.add('resolveMockCondition', (conditionId, payouts) => {
+  return cy.task('chainTx', {
+    action: 'resolveCondition',
+    args: { conditionId, payouts },
+  }).then((r) => {
+    expect(r.ok, 'resolveMockCondition tx ok').to.be.true
+    return r
+  })
+})
+
+/** Latest wager id (nextWagerId - 1) for status/winner assertions. */
+Cypress.Commands.add('lastWagerId', () => {
+  return cy.task('lastWagerId')
+})
+
+/**
+ * Restore global state a spec may have changed so the shared node is clean for
+ * later specs. Call in afterEach. Unpauses the protocol and unfreezes the given
+ * accounts (defaults to all five test accounts).
+ */
+Cypress.Commands.add('restoreGlobalState', (accounts = TEST_ACCOUNTS) => {
+  cy.task('chainTx', { action: 'unpause' })
+  accounts.forEach((address) => cy.task('chainTx', { action: 'unfreeze', args: { address } }))
+})
