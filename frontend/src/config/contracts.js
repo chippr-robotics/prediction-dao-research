@@ -71,7 +71,7 @@ const POLYGON_CONTRACTS = {
   wagerRegistry: '0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4',
   membershipManager: '0x7441700979e37a9a1F17093a4859c8f261780c95',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
-  polymarketAdapter: '0xF941Ddc0062A2a57fFe4E17ed299FdBC17bF885E',
+  polymarketAdapter: '0x5B75a926662b27Fb917cf50b3DD1073EEa82D702', // tie-fix redeploy
   // Stake / payment tokens (Circle USDC + Wrapped MATIC on Polygon)
   paymentToken: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
   wmatic: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
