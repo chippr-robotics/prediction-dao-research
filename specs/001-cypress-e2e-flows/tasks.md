@@ -20,6 +20,7 @@ description: "Task list — Cypress E2E flow coverage"
 
 - The suite is mock-wallet + a **real local Hardhat node (chain 1337)** — arrange on-chain preconditions; do not stub `eth_call` (research.md R1).
 - Every acceptance scenario in spec.md gets ≥1 assertion that fails on a wrong outcome; a `cy.get('body').should('be.visible')`-only assertion does NOT satisfy the task (FR-008, contracts/test-helpers.md).
+- Assertions MUST target real UI: derive concrete selectors/text by reading the actual components (`frontend/src/components/AdminPanel.jsx`, the create-wager modal, `frontend/src/components/fairwins/MyMarketsModal.jsx`) and assert specific state/text or `assertToast`, not generic visibility.
 - Any spec that sets **global** state (pause/freeze) MUST revert it in `afterEach` (research.md R4, cleanup contract).
 
 ---
@@ -28,7 +29,7 @@ description: "Task list — Cypress E2E flow coverage"
 
 **Purpose**: the precondition plumbing every flow depends on.
 
-- [ ] T001 Add a Node-side admin-signer task `chainTx` in `frontend/cypress.config.js` using ethers v6 + a public Hardhat test private key (test-only), reading contract addresses from `deployments/hardhat-chain1337-v2.json` (and `MockPolymarketCTF` address), able to send `pause/unpause`, `freezeAccount/unfreezeAccount`, `grantMembership`, and `MockPolymarketCTF.resolveCondition`.
+- [ ] T001 Add a Node-side admin-signer task `chainTx` in `frontend/cypress.config.js` using ethers v6 + a public Hardhat test private key (test-only). Read all contract addresses from the deployment record `deployments/localhost-chain1337-v2.json` (what `deploy:local`/`--network localhost` actually writes, and what `sync:frontend-contracts` mirrors into the UI's `HARDHAT_CONTRACTS` — so addresses match the UI); the `MockPolymarketCTF` address is the record's `mocks.mockPolymarketCTF`/`polymarketCTF`. The task must send `pause/unpause`, `freezeAccount/unfreezeAccount`, `grantMembership`, and `MockPolymarketCTF.resolveCondition`. (Do NOT use `deployments/hardhat-chain1337-v2.json` — that is the in-process `--network hardhat` record, not the local node the suite runs against.)
 - [ ] T002 Document/verify the local-chain prerequisite in `specs/001-cypress-e2e-flows/quickstart.md` matches reality: `npm run node` + `npm run deploy:local` produce the chain-1337 deployment + synced `HARDHAT_CONTRACTS` the suite reads.
 
 **Checkpoint**: a `cy.task('chainTx', …)` round-trips a tx against the local node.
@@ -80,7 +81,7 @@ description: "Task list — Cypress E2E flow coverage"
 **Goal**: prove correct settlement per outcome and tie→refund (the fixed bug).
 **Independent test**: resolve the mock condition to YES/NO/tie and assert winner/refund + claim.
 
-- [ ] T008 [US4] Implement `frontend/cypress/e2e/full/08-oracle-resolution.cy.js`: Polymarket wager (creator YES) + `resolveMockCondition(id,[1,0])` → trigger resolve via UI → creator wins + claims; `resolveMockCondition(id,[1,1])` (tie) → assert no winner settled, then `advanceTime(>resolveDeadline)` → both refunded; Chainlink/UMA paths asserted if locally wired, else `.skip` with a stated reason (no silent gap).
+- [ ] T008 [US4] Implement `frontend/cypress/e2e/full/08-oracle-resolution.cy.js`, **scoped to the Polymarket path** — the only oracle adapter `deploy:local` wires on chain 1337 (Chainlink/UMA/Functions constants are `null`/`{}` for localhost in `scripts/deploy/lib/constants.js`, so those adapters are not deployed locally): Polymarket wager (creator YES) + `resolveMockCondition(id,[1,0])` → trigger resolve via UI → creator wins + claims; `resolveMockCondition(id,[0,1])` → opponent wins; `resolveMockCondition(id,[1,1])` (tie) → assert no winner settled, then `cy.advanceTime(>resolveDeadline)` → both refunded. Add a top-of-file comment stating Chainlink/UMA auto-resolution is intentionally NOT covered by this E2E harness (adapters absent on the local chain) and is instead covered by the hardhat integration tests `test/integration/oracle/WagerRegistry_ChainlinkDataFeed|UMA|ChainlinkFunctions.test.js` — explicit, not a silent gap.
 
 ---
 
@@ -89,7 +90,7 @@ description: "Task list — Cypress E2E flow coverage"
 **Goal**: prove an expired membership blocks creation until renewal.
 **Independent test**: place #1 in expired-membership state, assert create blocked w/ renewal prompt; renew, assert success.
 
-- [ ] T009 [US5] Implement `frontend/cypress/e2e/full/20-expired-membership.cy.js`: `grantMembershipFor(#1,{durationDays:30})` then `advanceTime(31 days)` (or grant near-zero duration) → as #1 assert create blocked + renewal prompt; renew (purchase/grant) → assert create succeeds.
+- [ ] T009 [US5] Implement `frontend/cypress/e2e/full/20-expired-membership.cy.js`: `grantMembershipFor(#1,{durationDays:30})` then `cy.advanceTime(31 days)` so the membership lapses (the realistic path) → as #1 assert create blocked + renewal prompt; renew via `grantMembershipFor`/purchase → assert create succeeds.
 
 ---
 
@@ -106,7 +107,7 @@ description: "Task list — Cypress E2E flow coverage"
 
 - [ ] T011 Run `npm --prefix frontend run test:e2e:full` against a fresh `node`+`deploy:local`; fix flakiness/order-dependence (confirm `afterEach` cleanups hold). 
 - [ ] T012 Verify SC-002/SC-004: grep `frontend/cypress/e2e/full/` for `cy.get('body').should('be.visible')`-only specs and for any lingering dispute/challenge references; confirm `09-challenge-dispute.cy.js` is gone and the Cypress job still exits non-zero on a failing assertion (Constitution IV).
-- [ ] T013 [P] (follow-up, optional) Note in the PR whether to add `test:e2e:full` to per-PR CI (currently weekly torture-test only) so it gates merges.
+- [ ] T013 Add the implemented `test:e2e:full` (or the implemented-spec subset) to per-PR CI so it gates merges — the suite runs only on the weekly torture-test today, leaving a window where a regression isn't caught at merge (Constitution IV: CI is the enforcement layer). If weekly-only is intentionally retained, document the rationale in the PR.
 
 ---
 
