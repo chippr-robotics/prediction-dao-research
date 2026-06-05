@@ -6,6 +6,7 @@ import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddress } from '../../config/contracts'
+import { getNetwork } from '../../config/networks'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
@@ -30,8 +31,12 @@ function MyMarketsModal({
   onClose,
   friendMarkets = []
 }) {
-  const { isConnected, account } = useWallet()
+  const { isConnected, account, chainId } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+
+  // Active network metadata, used to scope/label the wagers shown so it's
+  // clear they belong to the selected network (testnet vs mainnet).
+  const activeNetwork = useMemo(() => (chainId ? getNetwork(chainId) : null), [chainId])
   const { dismissedIds, dismissMarket, dismissMarkets } = useFriendMarkets()
 
   const { markets: marketsWithEnvelopes, fetchEnvelope } = useLazyIpfsEnvelope(friendMarkets)
@@ -154,8 +159,18 @@ function MyMarketsModal({
       ...decryptableMarkets.map(m => ({ ...m, marketType: 'friend' }))
     ]
 
+    // Only show wagers that belong to the active network. Wagers are tagged
+    // with the chainId they were read from (see FriendMarketsContext); after a
+    // testnet ↔ mainnet switch this drops wagers that only exist on the other
+    // network instead of displaying them as if they were available here.
+    // Legacy/untagged wagers (no chainId) fall through so we never hide data
+    // written before this tagging existed.
+    const onActiveChain = allMarkets.filter(
+      m => m.chainId == null || !chainId || m.chainId === chainId
+    )
+
     // Remove duplicates by id
-    const uniqueMarkets = allMarkets.reduce((acc, market) => {
+    const uniqueMarkets = onActiveChain.reduce((acc, market) => {
       const key = `${market.marketType}-${market.id}`
       if (!acc[key]) acc[key] = market
       return acc
@@ -278,7 +293,7 @@ function MyMarketsModal({
     history.sort(byNewest)
 
     return { participating, created, history }
-  }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter, dismissedIds])
+  }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter, dismissedIds, chainId])
 
   // Derive the selected market from the live categorized lists so the detail
   // view reflects fresh data (e.g., decryptedMetadata) after decryption
@@ -536,8 +551,18 @@ function MyMarketsModal({
             <div className="mm-brand">
               <span className="mm-brand-icon">&#128202;</span>
               <h2 id="my-markets-modal-title">My Wagers</h2>
+              {activeNetwork && (
+                <span
+                  className={`mm-network-tag${activeNetwork.isTestnet ? ' mm-network-tag-testnet' : ''}`}
+                  title={`Showing wagers on ${activeNetwork.name}`}
+                >
+                  {activeNetwork.name}
+                </span>
+              )}
             </div>
-            <p className="mm-subtitle">Manage your wagers and positions</p>
+            <p className="mm-subtitle">
+              Manage your wagers and positions on {activeNetwork?.name || 'the current network'}
+            </p>
           </div>
           <button
             className="mm-close-btn"

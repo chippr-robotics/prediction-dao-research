@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { DEPLOYED_CONTRACTS, getContractAddress } from '../config/contracts'
+import { DEPLOYED_CONTRACTS, getContractAddress, getContractAddressForChain } from '../config/contracts'
 
 // Each contract slot is either an empty placeholder (pre-deploy state) or a
 // 0x-prefixed 40-character hex address (post-sync:frontend-contracts state).
@@ -81,5 +81,28 @@ describe('contracts config', () => {
     // - VITE_FRIENDGROUPMARKETFACTORY_ADDRESS (uppercase name)
     // - VITE_FRIEND_GROUP_MARKET_FACTORY_ADDRESS (snake_case conversion)
     // These are verified through manual testing and integration tests.
+  })
+
+  describe('getContractAddressForChain', () => {
+    it('resolves the membership manager for the Amoy testnet', () => {
+      // Amoy (80002) has a v2 deployment with a real MembershipManager.
+      expect(getContractAddressForChain('membershipManager', 80002)).toMatch(
+        /^0x[0-9a-fA-F]{40}$/
+      )
+    })
+
+    it('returns undefined on a chain with no deployment (e.g. Polygon mainnet)', () => {
+      // Polygon mainnet (137) has no contracts deployed yet — membership and
+      // wager reads must resolve to undefined so a testnet membership is never
+      // surfaced as active on mainnet.
+      expect(getContractAddressForChain('membershipManager', 137)).toBeUndefined()
+      expect(getContractAddressForChain('wagerRegistry', 137)).toBeUndefined()
+    })
+
+    it('falls back to the active-chain lookup when no chainId is given', () => {
+      expect(getContractAddressForChain('roleManager')).toEqual(
+        getContractAddress('roleManager')
+      )
+    })
   })
 })
