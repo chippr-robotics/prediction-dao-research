@@ -19,7 +19,10 @@ ARG VITE_APP_URL
 ARG VITE_NETWORK_ID
 ARG VITE_RPC_URL
 ARG VITE_IPFS_GATEWAY
-ARG VITE_PINATA_JWT
+# SECURITY: VITE_PINATA_JWT is intentionally NOT a build arg. As a VITE_*-prefixed var it
+# would be inlined into the client bundle in cleartext. The Pinata JWT is server-side only
+# and is injected at runtime via the nginx proxy (see the production ../Dockerfile and
+# docker-entrypoint.sh). The production build also fails if it is set (vite.config.js).
 
 # Set environment variables from build args
 ENV VITE_WALLETCONNECT_PROJECT_ID=${VITE_WALLETCONNECT_PROJECT_ID}
@@ -27,7 +30,6 @@ ENV VITE_APP_URL=${VITE_APP_URL}
 ENV VITE_NETWORK_ID=${VITE_NETWORK_ID}
 ENV VITE_RPC_URL=${VITE_RPC_URL}
 ENV VITE_IPFS_GATEWAY=${VITE_IPFS_GATEWAY}
-ENV VITE_PINATA_JWT=${VITE_PINATA_JWT}
 
 # Build the application
 RUN npm run build

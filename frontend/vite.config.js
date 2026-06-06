@@ -1,9 +1,36 @@
-import { defineConfig } from 'vite'
+import process from 'node:process'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+
+// Fails a production build if Pinata write credentials are present in the build
+// environment. Any VITE_*-prefixed value is inlined into the client bundle in
+// cleartext, so a set VITE_PINATA_* would publish the Pinata secret to every visitor.
+// Production IPFS uploads use the server-side /api/pinata proxy (nginx.conf.template),
+// which injects the JWT at container runtime — it must never reach the browser build.
+// See the SECURITY note in frontend/.env.example.
+function pinataSecretGuard() {
+  return {
+    name: 'pinata-secret-guard',
+    config(_config, { command, mode }) {
+      if (command !== 'build' || mode !== 'production') return
+      const env = loadEnv(mode, process.cwd(), '')
+      const leaked = ['VITE_PINATA_JWT', 'VITE_PINATA_API_KEY', 'VITE_PINATA_API_SECRET']
+        .filter((key) => (env[key] || '').trim() !== '')
+      if (leaked.length > 0) {
+        throw new Error(
+          `[security] Refusing to build: ${leaked.join(', ')} set in build env. ` +
+          'These VITE_* vars are inlined into the client bundle in cleartext. ' +
+          'Remove them — production uploads use the server-side /api/pinata proxy ' +
+          '(JWT injected at container runtime, never at build time).'
+        )
+      }
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pinataSecretGuard()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,

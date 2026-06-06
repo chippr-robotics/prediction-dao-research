@@ -2,6 +2,9 @@ node_modules
 dist
 dist-ssr
 *.local
+# Never copy env secrets into the image — Vite inlines VITE_* values into the bundle.
+.env
+.env.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
