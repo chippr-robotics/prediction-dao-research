@@ -768,6 +768,49 @@ describe('MyMarketsModal', () => {
     })
   })
 
+  describe('Arbitrating tab (005)', () => {
+    const me = '0x1234567890123456789012345678901234567890'
+    const creator = '0xAAaAAAAaaAAaaAaAAaaaAaAaAAAAaAAaAaaaAAaA'
+    const opponent = '0xBBbBBBBbbBBbbBbBBbbbBbBbBBBBbBBbBbbbBBbB'
+
+    it('shows an "Arbitrating" tab listing wagers where the wallet is the arbitrator', async () => {
+      const user = userEvent.setup()
+      const arbWager = {
+        id: '77', description: 'Arbitrated Wager', creator, participants: [creator, opponent],
+        arbitrator: me, status: 'active', marketType: 'friend',
+        tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+      }
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[arbWager]} />
+        )
+      })
+
+      const arbTab = await screen.findByRole('tab', { name: /arbitrating/i })
+      await user.click(arbTab)
+      await waitFor(() => {
+        expect(screen.getByText('Arbitrated Wager')).toBeInTheDocument()
+      })
+    })
+
+    it('does not show the Arbitrating tab when the wallet arbitrates nothing', async () => {
+      const ownWager = {
+        id: '78', description: 'My Own Wager', creator: me, participants: [me, opponent],
+        status: 'active', marketType: 'friend',
+        tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+      }
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[ownWager]} />
+        )
+      })
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: /created/i })).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('tab', { name: /arbitrating/i })).not.toBeInTheDocument()
+    })
+  })
+
   describe('Accessibility', () => {
     it('should have proper tab roles', async () => {
       await act(async () => {
