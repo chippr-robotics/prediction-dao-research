@@ -29,7 +29,7 @@ description: "Task list — Polymarket-only oracle selection (frontend)"
 
 **Purpose**: surface the new flag where operators expect it.
 
-- [ ] T001 Add `VITE_ORACLE_MODELS` to `frontend/.env.example` with a comment: values `polymarket-only` (default, hides Chainlink/UMA in the user creation flow) | `all` (restore every oracle model). Do NOT set a real value in committed env files.
+- [X] T001 Add `VITE_ORACLE_MODELS` to `frontend/.env.example` with a comment: values `polymarket-only` (default, hides Chainlink/UMA in the user creation flow) | `all` (restore every oracle model). Do NOT set a real value in committed env files.
 
 ---
 
@@ -37,7 +37,7 @@ description: "Task list — Polymarket-only oracle selection (frontend)"
 
 **Purpose**: the single source of truth every selection/copy surface reads. **US1 and US2 cannot start until this exists.**
 
-- [ ] T002 In `frontend/src/constants/wagerDefaults.js`, add `EXPOSED_ORACLE_RESOLUTION_TYPES` (a `ResolutionType[]`) and an `isOracleModelExposed(rt)` helper, derived from `import.meta.env.VITE_ORACLE_MODELS`: default/unset/unknown → `[ResolutionType.Polymarket]`; `'all'` → `[Polymarket, ChainlinkDataFeed, ChainlinkFunctions, UMA]`. Polymarket is always included. Export both. Leave `ORACLE_RESOLUTION_TYPES`, `RESOLUTION_TYPE_LABELS` unchanged (display).
+- [X] T002 In `frontend/src/constants/wagerDefaults.js`, add `EXPOSED_ORACLE_RESOLUTION_TYPES` (a `ResolutionType[]`) and an `isOracleModelExposed(rt)` helper, derived from `import.meta.env.VITE_ORACLE_MODELS`: default/unset/unknown → `[ResolutionType.Polymarket]`; `'all'` → `[Polymarket, ChainlinkDataFeed, ChainlinkFunctions, UMA]`. Polymarket is always included. Export both. Leave `ORACLE_RESOLUTION_TYPES`, `RESOLUTION_TYPE_LABELS` unchanged (display).
 
 **Checkpoint**: importing `EXPOSED_ORACLE_RESOLUTION_TYPES` yields `[Polymarket]` by default.
 
@@ -48,8 +48,8 @@ description: "Task list — Polymarket-only oracle selection (frontend)"
 **Goal**: a user creating an oracle wager (1v1 **and Bookmaker**) sees and can select only Polymarket.
 **Independent test**: open the oracle create flow in both the 1v1 and Bookmaker paths → Polymarket is the only model offered; no Chainlink/UMA by any path; Polymarket create still works.
 
-- [ ] T003 [US1] In `frontend/src/components/fairwins/FriendMarketsModal.jsx`, derive the oracle tab list (`ORACLE_TAB_TYPES`, ~L70–75; consumed at `availableResolutionTypes` ~L192 and the tab render ~L1045) from `EXPOSED_ORACLE_RESOLUTION_TYPES`. This covers **both the 1v1 and the Bookmaker** flows (the Bookmaker uses `resolutionCategory='all'` → participant + the same `ORACLE_TAB_TYPES`). When only one oracle model is exposed: default `formData.resolutionType` to Polymarket for the oracle category and **suppress the multi-tab oracle chooser** (no dead single-tab/empty selector — FR-002). If an initial/pre-selected `resolutionType` is a now-hidden model, fall back to Polymarket. Do not change the Chainlink/UMA branches (`OracleConditionPicker`) — they become unreachable.
-- [ ] T004 [US1] Add `frontend/src/test/oracleExposure.test.jsx`: (a) default flag → the oracle selector offers exactly one model (Polymarket) and no Chainlink/UMA option is selectable, **in both the 1v1 and the Bookmaker (`resolutionCategory='all'`) flows** (SC-001/SC-002); (b) `VITE_ORACLE_MODELS='all'` → the selector offers all four models (SC-004 — also serves US3); (c) a wager whose model is Chainlink or UMA still renders its label (SC-005/FR-006).
+- [X] T003 [US1] In `frontend/src/components/fairwins/FriendMarketsModal.jsx`, derive the oracle tab list (`ORACLE_TAB_TYPES`, ~L70–75; consumed at `availableResolutionTypes` ~L192 and the tab render ~L1045) from `EXPOSED_ORACLE_RESOLUTION_TYPES`. This covers **both the 1v1 and the Bookmaker** flows (the Bookmaker uses `resolutionCategory='all'` → participant + the same `ORACLE_TAB_TYPES`). When only one oracle model is exposed: default `formData.resolutionType` to Polymarket for the oracle category and **suppress the multi-tab oracle chooser** (no dead single-tab/empty selector — FR-002). If an initial/pre-selected `resolutionType` is a now-hidden model, fall back to Polymarket. Do not change the Chainlink/UMA branches (`OracleConditionPicker`) — they become unreachable.
+- [X] T004 [US1] Add `frontend/src/test/oracleExposure.test.jsx`: (a) default flag → the oracle selector offers exactly one model (Polymarket) and no Chainlink/UMA option is selectable, **in both the 1v1 and the Bookmaker (`resolutionCategory='all'`) flows** (SC-001/SC-002); (b) `VITE_ORACLE_MODELS='all'` → the selector offers all four models (SC-004 — also serves US3); (c) a wager whose model is Chainlink or UMA still renders its label (SC-005/FR-006).
 
 **Checkpoint**: `npm --prefix frontend run test -- oracleExposure` passes; the Polymarket create path is unchanged.
 
@@ -60,8 +60,8 @@ description: "Task list — Polymarket-only oracle selection (frontend)"
 **Goal**: explanatory/onboarding copy AND landing/marketing pages don't advertise or link Chainlink/UMA.
 **Independent test**: dashboard + onboarding + every landing/marketing page name only Polymarket (zero "Chainlink"/"UMA" text or links) under the default flag.
 
-- [ ] T005 [US2] Condition the oracle copy on the exposure setting: `frontend/src/components/fairwins/Dashboard.jsx` (L54 "Auto-settles from Polymarket, Chainlink or UMA") and `frontend/src/components/fairwins/OnboardingTutorial.jsx` (the Chainlink/UMA explainer cards + "Polymarket, Chainlink or UMA", ~L191–198/L277) render Polymarket-only wording when the flag is default, and the full wording when `all` (FR-004).
-- [ ] T005b [US2] In `frontend/src/components/LandingPage.jsx`, gate the footer "Oracles" list (~L420–423) on the exposure setting: render only the Polymarket link by default; restore the Chainlink (`chain.link`) and "UMA Protocol" (`uma.xyz`) links when `all`. Confirm no other landing/marketing copy contains "Chainlink"/"UMA" (folded from 004; FR-004/SC-003).
+- [X] T005 [US2] Condition the oracle copy on the exposure setting: `frontend/src/components/fairwins/Dashboard.jsx` (L54 "Auto-settles from Polymarket, Chainlink or UMA") and `frontend/src/components/fairwins/OnboardingTutorial.jsx` (the Chainlink/UMA explainer cards + "Polymarket, Chainlink or UMA", ~L191–198/L277) render Polymarket-only wording when the flag is default, and the full wording when `all` (FR-004).
+- [X] T005b [US2] In `frontend/src/components/LandingPage.jsx`, gate the footer "Oracles" list (~L420–423) on the exposure setting: render only the Polymarket link by default; restore the Chainlink (`chain.link`) and "UMA Protocol" (`uma.xyz`) links when `all`. Confirm no other landing/marketing copy contains "Chainlink"/"UMA" (folded from 004; FR-004/SC-003).
 
 ---
 
@@ -70,14 +70,14 @@ description: "Task list — Polymarket-only oracle selection (frontend)"
 **Goal**: flipping `VITE_ORACLE_MODELS=all` restores all four models everywhere, with no other change.
 **Independent test**: with `all`, the selector and copy show all four again.
 
-- [ ] T006 [US3] Verify reversibility end-to-end and document it: confirm no other user-facing oracle-selection/copy surface bypasses `EXPOSED_ORACLE_RESOLUTION_TYPES` (grep for `ResolutionType.ChainlinkDataFeed|ChainlinkFunctions|UMA` and `Chainlink|UMA` strings across `frontend/src/components`/`pages`, excluding the admin tab + display labels); add a short note documenting `VITE_ORACLE_MODELS` (e.g., in `frontend/README` or the env section). The `all` assertion is covered by T004(b).
+- [X] T006 [US3] Verify reversibility end-to-end and document it: confirm no other user-facing oracle-selection/copy surface bypasses `EXPOSED_ORACLE_RESOLUTION_TYPES` (grep for `ResolutionType.ChainlinkDataFeed|ChainlinkFunctions|UMA` and `Chainlink|UMA` strings across `frontend/src/components`/`pages`, excluding the admin tab + display labels); add a short note documenting `VITE_ORACLE_MODELS` (e.g., in `frontend/README` or the env section). The `all` assertion is covered by T004(b).
 
 ---
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T007 Run `npm --prefix frontend run test` and `npm --prefix frontend run lint`; manually validate `quickstart.md` in both flag states (default → only Polymarket; `VITE_ORACLE_MODELS=all` → all four restored) and that a hidden-model wager still displays.
-- [ ] T008 Confirm SC-006: `git diff --stat` touches only `frontend/src/**`, `frontend/.env.example`, and `specs/**` — **zero** changes under `contracts/`, ABIs, `deployments/`, or `subgraph/`.
+- [X] T007 Run `npm --prefix frontend run test` and `npm --prefix frontend run lint`; manually validate `quickstart.md` in both flag states (default → only Polymarket; `VITE_ORACLE_MODELS=all` → all four restored) and that a hidden-model wager still displays.
+- [X] T008 Confirm SC-006: `git diff --stat` touches only `frontend/src/**`, `frontend/.env.example`, and `specs/**` — **zero** changes under `contracts/`, ABIs, `deployments/`, or `subgraph/`.
 
 ---
 

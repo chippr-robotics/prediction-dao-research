@@ -4,6 +4,7 @@ import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
 import { ROLES } from '../../contexts/RoleContext'
+import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
@@ -51,7 +52,9 @@ function QuickActions({ onAction }) {
         </svg>
       ),
       title: 'Oracle Settles (1v1)',
-      description: 'Auto-settles from Polymarket, Chainlink or UMA'
+      description: SHOW_ALL_ORACLE_MODELS
+        ? 'Auto-settles from Polymarket, Chainlink or UMA'
+        : 'Auto-settles from a linked Polymarket market'
     },
     {
       id: 'create-bookmaker',

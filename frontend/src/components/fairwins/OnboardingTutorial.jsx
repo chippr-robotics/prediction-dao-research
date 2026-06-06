@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useChainTokens } from '../../hooks/useChainTokens'
+import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import './OnboardingTutorial.css'
 
 /**
@@ -185,20 +186,24 @@ const buildTutorialSteps = (stable) => [
               <span>Links to a live Polymarket event for auto-resolution</span>
             </div>
           </div>
-          <div className="next-step-item">
-            <span className="next-icon">&#128279;</span>
-            <div className="next-content">
-              <strong>Chainlink</strong>
-              <span>Resolves via data feeds or Chainlink Functions</span>
-            </div>
-          </div>
-          <div className="next-step-item">
-            <span className="next-icon">&#9881;&#65039;</span>
-            <div className="next-content">
-              <strong>UMA Optimistic Oracle</strong>
-              <span>Decentralized dispute resolution with economic guarantees</span>
-            </div>
-          </div>
+          {SHOW_ALL_ORACLE_MODELS && (
+            <>
+              <div className="next-step-item">
+                <span className="next-icon">&#128279;</span>
+                <div className="next-content">
+                  <strong>Chainlink</strong>
+                  <span>Resolves via data feeds or Chainlink Functions</span>
+                </div>
+              </div>
+              <div className="next-step-item">
+                <span className="next-icon">&#9881;&#65039;</span>
+                <div className="next-content">
+                  <strong>UMA Optimistic Oracle</strong>
+                  <span>Decentralized dispute resolution with economic guarantees</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </>
     )
@@ -274,7 +279,7 @@ const buildTutorialSteps = (stable) => [
             <span className="next-icon">&#127942;</span>
             <div className="next-content">
               <strong>Let an Oracle Settle It</strong>
-              <span>Auto-settle a 1v1 from Polymarket, Chainlink or UMA</span>
+              <span>{SHOW_ALL_ORACLE_MODELS ? 'Auto-settle a 1v1 from Polymarket, Chainlink or UMA' : 'Auto-settle a 1v1 from a linked Polymarket market'}</span>
             </div>
           </div>
           <div className="next-step-item">

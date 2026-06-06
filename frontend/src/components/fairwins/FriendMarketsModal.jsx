@@ -10,7 +10,7 @@ import {
   getMidpointAcceptanceDeadline,
   toDateTimeLocal
 } from '../../constants/wagerDefaults'
-import { ResolutionType } from '../../constants/wagerDefaults'
+import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefaults'
 import QRScanner from '../ui/QRScanner'
 import AddressInput from '../ui/AddressInput'
 import { isEnsName } from '../../utils/validation'
@@ -67,12 +67,15 @@ const RESOLUTION_TYPE_HINTS = {
 // Oracle resolution types in enum order. Rendered as tabs (always shown; locked
 // when the adapter/CTF isn't reachable on the active chain) so users can see
 // every settlement source at a glance instead of a filtered dropdown.
+// Only the oracle models EXPOSED by the current VITE_ORACLE_MODELS setting are
+// offered as tabs (default: Polymarket only). Hidden models are not selectable by
+// any path; flip the flag to 'all' to restore them.
 const ORACLE_TAB_TYPES = [
   ResolutionType.Polymarket,
   ResolutionType.ChainlinkDataFeed,
   ResolutionType.ChainlinkFunctions,
   ResolutionType.UMA,
-]
+].filter(isOracleModelExposed)
 
 // Short labels for the resolution tab strip — the full RESOLUTION_TYPE_LABELS
 // are too long to read comfortably as tabs.
@@ -135,11 +138,14 @@ function FriendMarketsModal({
   //                     self-gated on being reachable/deployed on the active chain
   //   - 'all'         → both (used by the Bookmaker card)
   // The Set/order mirrors `enum ResolutionType` in IWagerRegistry.sol.
+  // Only adapters that are reachable AND exposed by the current VITE_ORACLE_MODELS
+  // setting are offered (default: Polymarket only). This drives the selectable
+  // options and the auto-selected default in both the 1v1 and Bookmaker flows.
   const availableOracleResolutionTypes = useMemo(() => [
-    ...(polymarketSidebetsEnabled ? [ResolutionType.Polymarket] : []),
-    ...(chainlinkDataFeedAdapter ? [ResolutionType.ChainlinkDataFeed] : []),
-    ...(chainlinkFunctionsAdapter ? [ResolutionType.ChainlinkFunctions] : []),
-    ...(umaAdapter ? [ResolutionType.UMA] : []),
+    ...(polymarketSidebetsEnabled && isOracleModelExposed(ResolutionType.Polymarket) ? [ResolutionType.Polymarket] : []),
+    ...(chainlinkDataFeedAdapter && isOracleModelExposed(ResolutionType.ChainlinkDataFeed) ? [ResolutionType.ChainlinkDataFeed] : []),
+    ...(chainlinkFunctionsAdapter && isOracleModelExposed(ResolutionType.ChainlinkFunctions) ? [ResolutionType.ChainlinkFunctions] : []),
+    ...(umaAdapter && isOracleModelExposed(ResolutionType.UMA) ? [ResolutionType.UMA] : []),
   ], [polymarketSidebetsEnabled, chainlinkDataFeedAdapter, chainlinkFunctionsAdapter, umaAdapter])
 
   const resolutionOptionTypes = useMemo(() => {
@@ -1029,7 +1035,7 @@ function FriendMarketsModal({
                         condition) first. The source is chosen via tabs; oracle
                         sources that aren't reachable on the active chain render as
                         locked tabs. */}
-                    {useResolutionTabs && (
+                    {useResolutionTabs && !(resolutionCategory === 'oracle' && resolutionTabTypes.length <= 1) && (
                       <>
                         <div className="fm-form-group fm-form-full">
                           <label id="fm-resolution-tabs-label">

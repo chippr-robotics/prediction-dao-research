@@ -158,7 +158,9 @@ describe('Dashboard Component', () => {
     it('should have quick action descriptions', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.getByText('You and a friend settle the outcome')).toBeInTheDocument()
-      expect(screen.getByText('Auto-settles from Polymarket, Chainlink or UMA')).toBeInTheDocument()
+      // Default (VITE_ORACLE_MODELS=polymarket-only) hides Chainlink/UMA copy.
+      expect(screen.getByText('Auto-settles from a linked Polymarket market')).toBeInTheDocument()
+      expect(screen.queryByText(/Chainlink or UMA/)).not.toBeInTheDocument()
       expect(screen.getByText('Offer odds and let a friend take the other side')).toBeInTheDocument()
     })
   })
