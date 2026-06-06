@@ -1038,8 +1038,14 @@ function FriendMarketsModal({
                         condition) first. The source is chosen via tabs; oracle
                         sources that aren't reachable on the active chain render as
                         locked tabs. */}
-                    {useResolutionTabs && !(resolutionCategory === 'oracle' && resolutionTabTypes.length <= 1) && (
+                    {useResolutionTabs && (
                       <>
+                        {/* Tab strip: hidden when there's only one settlement type to
+                            pick (e.g. the oracle flow with Polymarket-only exposure).
+                            The type-specific inputs below (Polymarket search, oracle
+                            condition pickers) still render, so the Polymarket search is
+                            always visible in the oracle flow. */}
+                        {!(resolutionCategory === 'oracle' && resolutionTabTypes.length <= 1) && (
                         <div className="fm-form-group fm-form-full">
                           <label id="fm-resolution-tabs-label">
                             {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'How does this settle?'}
@@ -1088,6 +1094,7 @@ function FriendMarketsModal({
                             )}
                           </span>
                         </div>
+                        )}
 
                         {/* Linked Market — Polymarket event lookup */}
                         {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
