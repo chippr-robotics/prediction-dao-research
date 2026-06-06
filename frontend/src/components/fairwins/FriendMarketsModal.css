@@ -1149,6 +1149,55 @@
   color: var(--text-muted, #7A8590);
 }
 
+/* Collapsible "How encryption works" disclosure — the header acts as the toggle. */
+.fm-encryption-info-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 0; /* spacing comes from the details block only when expanded */
+  cursor: pointer;
+  text-align: left;
+}
+
+.fm-encryption-info-toggle:hover {
+  color: var(--text-primary, #E6EDF3);
+}
+
+.fm-encryption-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.fm-encryption-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Expanded explainer body (hint + field breakdown + notes). */
+.fm-encryption-details {
+  margin-top: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fm-encryption-details .fm-hint {
+  margin: 0;
+}
+
+.fm-encryption-subhead {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #AAB6C2);
+}
+
+.fm-encryption-note {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #AAB6C2);
+}
+
 .fm-encryption-fields {
   display: flex;
   flex-direction: column;

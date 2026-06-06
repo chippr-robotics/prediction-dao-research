@@ -292,6 +292,9 @@ function FriendMarketsModal({
 
   // Encryption state
   const [enableEncryption, setEnableEncryption] = useState(true) // Default to encrypted for privacy
+  // The "What gets encrypted?" field breakdown is collapsed by default to save
+  // space; the user expands it only if they want the detail.
+  const [showEncryptionDetails, setShowEncryptionDetails] = useState(false)
 
   // Reset form function - memoized to prevent stale closures
   const resetForm = useCallback(() => {
@@ -1601,64 +1604,69 @@ function FriendMarketsModal({
                           </div>
                         )}
 
-                        <span className="fm-hint">
-                          {enableEncryption
-                            ? 'End-to-end encrypted. Only participants can decrypt wager details.'
-                            : 'Wager details will be publicly visible on the blockchain.'}
-                        </span>
+                        {!enableEncryption && (
+                          <span className="fm-hint">
+                            Wager details will be publicly visible on the blockchain.
+                          </span>
+                        )}
 
+                        {/* Encryption explainer is collapsed by default to save space;
+                            the toggle + badge convey the state, details are one click away. */}
                         {enableEncryption && (
                           <div className="fm-encryption-info">
-                            <div className="fm-encryption-info-header">
+                            <button
+                              type="button"
+                              className="fm-encryption-info-header fm-encryption-info-toggle"
+                              onClick={() => setShowEncryptionDetails(v => !v)}
+                              aria-expanded={showEncryptionDetails}
+                              aria-controls="fm-encryption-details"
+                            >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <circle cx="12" cy="12" r="10"/>
                                 <path d="M12 16v-4M12 8h.01"/>
                               </svg>
-                              <span>What gets encrypted?</span>
-                            </div>
-                            <div className="fm-encryption-fields">
-                              <div className="fm-field-encrypted">
-                                <span className="fm-field-icon">🔒</span>
-                                <span>Bet description &amp; terms</span>
-                              </div>
-                              <div className="fm-field-encrypted">
-                                <span className="fm-field-icon">🔒</span>
-                                <span>Wager metadata</span>
-                              </div>
-                              <div className="fm-field-public">
-                                <span className="fm-field-icon">🌐</span>
-                                <span>Participant addresses</span>
-                              </div>
-                              <div className="fm-field-public">
-                                <span className="fm-field-icon">🌐</span>
-                                <span>Stake amount &amp; token</span>
-                              </div>
-                              <div className="fm-field-public">
-                                <span className="fm-field-icon">🌐</span>
-                                <span>Wager timing</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
+                              <span>How encryption works</span>
+                              <svg
+                                className={`fm-encryption-chevron ${showEncryptionDetails ? 'open' : ''}`}
+                                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                                aria-hidden="true"
+                              >
+                                <polyline points="6 9 12 15 18 9"/>
+                              </svg>
+                            </button>
 
-                        {enableEncryption && !encryptionInitialized && !encryptionInitializing && (
-                          <div className="fm-encryption-warning">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="10"/>
-                              <path d="M12 16v-4M12 8h.01"/>
-                            </svg>
-                            <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
-                          </div>
-                        )}
-                        {enableEncryption && (friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
-                          <div className="fm-encryption-info" style={{ marginTop: '0.5rem' }}>
-                            <div className="fm-encryption-info-header">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 16v-4M12 8h.01"/>
-                              </svg>
-                              <span>Your opponent must have registered their encryption key to create an encrypted wager.</span>
-                            </div>
+                            {showEncryptionDetails && (
+                              <div id="fm-encryption-details" className="fm-encryption-details">
+                                <p className="fm-hint">
+                                  End-to-end encrypted. Only participants can decrypt wager details.
+                                </p>
+
+                                <div className="fm-encryption-subhead">What gets encrypted?</div>
+                                <div className="fm-encryption-fields">
+                                  <div className="fm-field-encrypted"><span className="fm-field-icon">🔒</span><span>Bet description &amp; terms</span></div>
+                                  <div className="fm-field-encrypted"><span className="fm-field-icon">🔒</span><span>Wager metadata</span></div>
+                                  <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Participant addresses</span></div>
+                                  <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Stake amount &amp; token</span></div>
+                                  <div className="fm-field-public"><span className="fm-field-icon">🌐</span><span>Wager timing</span></div>
+                                </div>
+
+                                {!encryptionInitialized && !encryptionInitializing && (
+                                  <div className="fm-encryption-warning">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <circle cx="12" cy="12" r="10"/>
+                                      <path d="M12 16v-4M12 8h.01"/>
+                                    </svg>
+                                    <span>You&apos;ll be asked to sign a message to derive your encryption keys</span>
+                                  </div>
+                                )}
+
+                                {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                                  <p className="fm-encryption-note">
+                                    Your opponent must have registered their encryption key to create an encrypted wager.
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                         {encryptionInitializing && (

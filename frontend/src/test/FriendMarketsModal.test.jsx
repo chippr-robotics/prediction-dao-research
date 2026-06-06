@@ -231,6 +231,30 @@ describe('FriendMarketsModal', () => {
     global.window.ethereum = undefined
   })
 
+  describe('Private Wager encryption disclosure', () => {
+    it('collapses the whole encryption explainer behind one disclosure, keeping toggle + badge', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+
+      // Encryption is on by default: the toggle + badge stay visible…
+      const toggle = await screen.findByRole('button', { name: /how encryption works/i })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.getByText(/End-to-End Encrypted/i)).toBeInTheDocument()
+      // …but the explainer body (hint + field breakdown) is hidden until expanded.
+      expect(screen.queryByText(/Only participants can decrypt/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Bet description & terms/i)).not.toBeInTheDocument()
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      expect(await screen.findByText(/Only participants can decrypt/i)).toBeInTheDocument()
+      expect(screen.getByText(/Bet description & terms/i)).toBeInTheDocument()
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByText(/Bet description & terms/i)).not.toBeInTheDocument()
+    })
+  })
+
   describe('Modal Visibility', () => {
     it('should not render when isOpen is false', () => {
       const { container } = renderWithProviders(
