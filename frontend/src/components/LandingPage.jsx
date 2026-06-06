@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Header from './Header'
 import LiveStats from './fairwins/LiveStats'
 import { useChainTokens } from '../hooks/useChainTokens'
+import { SHOW_ALL_ORACLE_MODELS } from '../constants/wagerDefaults'
 import './LandingPage.css'
 
 function LandingPage() {
@@ -418,8 +419,12 @@ function LandingPage() {
               <h4>Oracles</h4>
               <ul>
                 <li><a href="https://polymarket.com" target="_blank" rel="noopener noreferrer">Polymarket</a></li>
-                <li><a href="https://chain.link" target="_blank" rel="noopener noreferrer">Chainlink</a></li>
-                <li><a href="https://uma.xyz" target="_blank" rel="noopener noreferrer">UMA Protocol</a></li>
+                {SHOW_ALL_ORACLE_MODELS && (
+                  <>
+                    <li><a href="https://chain.link" target="_blank" rel="noopener noreferrer">Chainlink</a></li>
+                    <li><a href="https://uma.xyz" target="_blank" rel="noopener noreferrer">UMA Protocol</a></li>
+                  </>
+                )}
               </ul>
             </div>
             <div className="footer-section">

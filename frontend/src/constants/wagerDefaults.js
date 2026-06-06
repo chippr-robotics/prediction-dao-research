@@ -144,6 +144,26 @@ export const ORACLE_RESOLUTION_TYPES = new Set([
   ResolutionType.UMA,
 ])
 
+// Which oracle models are EXPOSED in the user-facing UI (selection + landing copy).
+// Single source of truth, driven by VITE_ORACLE_MODELS:
+//   - 'all'                      → every oracle model (today's full behavior)
+//   - 'polymarket-only' / unset  → Polymarket only (default)
+// Polymarket is always exposed. The on-chain contracts/adapters are unchanged;
+// hidden models stay fully supported and can be re-enabled by flipping the flag.
+// Display labels (RESOLUTION_TYPE_LABELS / ResolutionTypeNames) are NOT filtered,
+// so existing non-Polymarket oracle wagers still render and settle.
+const _ORACLE_MODELS_SETTING = (import.meta.env.VITE_ORACLE_MODELS || 'polymarket-only').toLowerCase()
+export const EXPOSED_ORACLE_RESOLUTION_TYPES = _ORACLE_MODELS_SETTING === 'all'
+  ? [ResolutionType.Polymarket, ResolutionType.ChainlinkDataFeed, ResolutionType.ChainlinkFunctions, ResolutionType.UMA]
+  : [ResolutionType.Polymarket]
+
+/** True if the given oracle resolution type is exposed in the UI under the current setting. */
+export const isOracleModelExposed = (rt) => EXPOSED_ORACLE_RESOLUTION_TYPES.includes(rt)
+
+/** True when more than Polymarket is exposed (i.e. VITE_ORACLE_MODELS='all').
+ *  Use to gate marketing/onboarding copy that names Chainlink/UMA. */
+export const SHOW_ALL_ORACLE_MODELS = EXPOSED_ORACLE_RESOLUTION_TYPES.length > 1
+
 export const ResolutionTypeNames = {
   0: 'Either',
   1: 'Creator',
