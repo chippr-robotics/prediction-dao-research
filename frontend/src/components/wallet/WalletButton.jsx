@@ -10,13 +10,10 @@ import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
 import { WAGER_DEFAULTS } from '../../constants/wagerDefaults'
-import { useFriendMarketCreation, loadPendingTransaction, clearPendingTransaction } from '../../hooks/useFriendMarketCreation'
-import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import BlockiesAvatar from '../ui/BlockiesAvatar'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { RoleDetailsSection } from './RoleDetailsCard'
 import walletIcon from '../../assets/wallet_no_text.svg'
-import { FriendMarketsModal, MyMarketsModal } from '../fairwins'
 import './WalletButton.css'
 import './RoleDetailsCard.css'
 
@@ -37,9 +34,6 @@ import './RoleDetailsCard.css'
 
 function WalletButton({ className = '' }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [showFriendMarketModal, setShowFriendMarketModal] = useState(false)
-  const [showMyMarketsModal, setShowMyMarketsModal] = useState(false)
-  const { friendMarkets } = useFriendMarkets()
   const { address, isConnected } = useAccount()
   const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
@@ -60,9 +54,6 @@ function WalletButton({ className = '' }) {
   const [connectorStatus, setConnectorStatus] = useState({})
   const [isCheckingConnectors, setIsCheckingConnectors] = useState(true)
   const [pendingConnector, setPendingConnector] = useState(null)
-
-  // v2: delegate wager creation to the central hook (drives WagerRegistry.createWager)
-  const { createFriendMarket: handleFriendMarketCreation } = useFriendMarketCreation()
 
   // Check connector availability on mount and when connectors change
   useEffect(() => {
@@ -228,17 +219,6 @@ function WalletButton({ className = '' }) {
     await Promise.all([refreshRoles(), refreshRoleDetails()])
   }
 
-  const handleOpenFriendMarket = () => {
-    setIsOpen(false)
-    setShowFriendMarketModal(true)
-  }
-
-  const handleOpenMyMarkets = () => {
-    setIsOpen(false)
-    setShowMyMarketsModal(true)
-  }
-
-
   const handleNavigateToAdmin = () => {
     setIsOpen(false)
     navigate('/admin')
@@ -393,19 +373,12 @@ function WalletButton({ className = '' }) {
                 />
               </div>
 
-              {/* Wagers Section - Unified */}
-              <div className="dropdown-section">
-                <span className="wallet-section-title">Wagers</span>
-                {hasRole(ROLES.WAGER_PARTICIPANT) ? (
-                  <button
-                    onClick={handleOpenFriendMarket}
-                    className="action-button friend-market-btn"
-                    role="menuitem"
-                  >
-                    <span aria-hidden="true">🎯</span>
-                    <span>Create Wager</span>
-                  </button>
-                ) : (
+              {/* Wager creation & management now live on the Dashboard, so the
+                  dropdown no longer carries "Create Wager" / "My Wagers". The
+                  membership upsell stays for non-members. */}
+              {!hasRole(ROLES.WAGER_PARTICIPANT) && (
+                <div className="dropdown-section">
+                  <span className="wallet-section-title">Wagers</span>
                   <div className="friend-market-promo">
                     <p className="promo-text">Create private wagers with friends!</p>
                     <button
@@ -417,16 +390,8 @@ function WalletButton({ className = '' }) {
                       <span>Get Access - from $2 USDC / month</span>
                     </button>
                   </div>
-                )}
-                <button
-                  onClick={handleOpenMyMarkets}
-                  className="action-button my-markets-btn"
-                  role="menuitem"
-                >
-                  <span aria-hidden="true">📋</span>
-                  <span>My Wagers</span>
-                </button>
-              </div>
+                </div>
+              )}
 
               {/* Network Toggle */}
               <div className="dropdown-section">
@@ -505,22 +470,6 @@ function WalletButton({ className = '' }) {
           )}
         </>
       )}
-
-      {/* My Wagers Modal */}
-      <MyMarketsModal
-        isOpen={showMyMarketsModal}
-        onClose={() => setShowMyMarketsModal(false)}
-        friendMarkets={friendMarkets}
-      />
-
-      {/* Create Wager Modal */}
-      <FriendMarketsModal
-        isOpen={showFriendMarketModal}
-        onClose={() => setShowFriendMarketModal(false)}
-        onCreate={handleFriendMarketCreation}
-        pendingTransaction={loadPendingTransaction()}
-        onClearPendingTransaction={clearPendingTransaction}
-      />
 
     </div>
   )

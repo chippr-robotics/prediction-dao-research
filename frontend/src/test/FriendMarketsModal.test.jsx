@@ -357,6 +357,17 @@ describe('FriendMarketsModal', () => {
       expect(screen.queryByRole('tab', { name: /either party/i })).not.toBeInTheDocument()
     })
 
+    it('shows the Polymarket search in the oracle flow (visible even when the tab strip is suppressed)', async () => {
+      // Regression: under the default Polymarket-only exposure the oracle flow has
+      // a single settlement type, so the tab strip is hidden — but the Polymarket
+      // search (PolymarketBrowser) MUST still render. Previously the search was
+      // nested inside the (hidden) tab block and disappeared entirely.
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="oracle" />
+      )
+      expect(await screen.findByTestId('mock-polymarket-browser')).toBeInTheDocument()
+    })
+
     it('locks oracle tabs whose source is unavailable on the active chain', () => {
       // On Hardhat (1337) the Polymarket CTF is unreachable, so the Polymarket
       // tab is shown locked/disabled rather than hidden.
