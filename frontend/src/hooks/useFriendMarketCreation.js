@@ -232,13 +232,19 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const oracleConditionId = data.data.oracleConditionId ?? data.data.polymarketConditionId ?? ''
       const polymarketConditionId = oracleConditionId || ethers.ZeroHash
       const creatorIsYes = Boolean(data.data.creatorIsYes ?? true)
-      // ThirdParty (arbiter) resolution is no longer offered in the create UI:
-      // a designated arbiter can't discover the wagers they oversee, so they
-      // could never resolve them. Every supported resolution type therefore
-      // submits the zero address, which is exactly what WagerRegistry requires
-      // for non-ThirdParty wagers (a non-zero arbitrator reverts
-      // ArbitratorDisallowed).
-      const arbitrator = ethers.ZeroAddress
+      // ThirdParty resolution names a neutral arbitrator (Spec Kit 005); every
+      // other resolution type submits the zero address, which is exactly what
+      // WagerRegistry requires (a non-zero arbitrator on a non-ThirdParty wager
+      // reverts ArbitratorDisallowed; a zero arbitrator on ThirdParty reverts
+      // ArbitratorRequired).
+      let arbitrator = ethers.ZeroAddress
+      if (resolutionType === ResolutionType.ThirdParty) {
+        const arb = (data.data.arbitrator || '').trim()
+        if (!ethers.isAddress(arb) || arb === ethers.ZeroAddress) {
+          throw new Error('ThirdParty resolution requires a valid arbitrator address.')
+        }
+        arbitrator = arb
+      }
 
       // Defense-in-depth: the modal's validateForm should have caught these
       // mismatches before submit. If something slipped through (e.g. a future

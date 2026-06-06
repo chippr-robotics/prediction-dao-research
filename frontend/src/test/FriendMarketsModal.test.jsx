@@ -327,20 +327,33 @@ describe('FriendMarketsModal', () => {
       expect(screen.queryByLabelText(/minimum participants/i)).not.toBeInTheDocument()
     })
 
-    it('participant category shows only people-settled resolution options', () => {
+    it('participant category shows people-settled resolution options incl. Third Party', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} resolutionCategory="participant" />
       )
       const select = screen.getByLabelText(/who can resolve/i)
       const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
-      // Third Party Arbitrator was removed: a designated arbiter can't discover
-      // the wagers they oversee, so they could never resolve them.
+      // ThirdParty is re-enabled (Spec Kit 005): the arbitrator is now indexed
+      // for discovery and encrypted-for, so they can find and resolve the wager.
       expect(labels).toEqual([
         'Either Party',
         'Creator Only',
         'Opponent Only',
+        'Third Party (Arbitrator)',
       ])
-      expect(labels).not.toContain('Third Party Arbitrator')
+    })
+
+    it('selecting Third Party reveals a required arbitrator address input', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="participant" />
+      )
+      const select = screen.getByLabelText(/who can resolve/i)
+      // No arbitrator input until Third Party is chosen…
+      expect(screen.queryByLabelText(/arbitrator address/i)).not.toBeInTheDocument()
+      await user.selectOptions(select, '3') // ResolutionType.ThirdParty
+      // …then the arbitrator input appears.
+      expect(await screen.findByLabelText(/arbitrator address/i)).toBeInTheDocument()
     })
 
     it('oracle category shows oracle resolution tabs (not a dropdown)', () => {
