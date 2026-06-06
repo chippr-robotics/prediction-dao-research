@@ -576,6 +576,12 @@
   color: #AAB6C2;
 }
 
+/* Draw — distinct from resolved (blue) and refunded/cancelled (grey). */
+.mm-status-badge.status-draw {
+  background: rgba(159, 122, 234, 0.15);
+  color: #9F7AEA;
+}
+
 .mm-status-badge.status-default {
   background: rgba(170, 182, 194, 0.15);
   color: #AAB6C2;

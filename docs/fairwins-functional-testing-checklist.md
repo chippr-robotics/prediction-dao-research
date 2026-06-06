@@ -254,6 +254,23 @@ A manual testing checklist for validating all functional flows of the FairWins p
 | [ ] | RES-13 | Propose with winner not a participant | 1. Attempt to declare a third-party address as winner | Error: "WinnerNotParticipant"; winner must be creator or opponent |  |
 | [ ] | RES-14 | Resolve when account is frozen | 1. Authorized resolver has frozen account 2. Attempt to propose resolution | Error: "AccountFrozenError" |  |
 
+### Draw Resolution (Spec Kit 004)
+
+**Preconditions:** Active, fully-funded wager past its end date, within the resolve deadline. A draw returns each party their own original stake (no winner). Manual draws apply to participant types (Either/Creator/Opponent, mutual consent) and ThirdParty (arbitrator solo); oracle types draw only on a tie.
+
+| | ID | Test Case | Steps | Expected Result | Tester Notes |
+|---|---|---|---|---|---|
+| [ ] | DRW-01 | Propose a draw (participant) | 1. As creator on an Either/Creator/Opponent wager, open Resolve 2. Choose "Draw — both parties refunded" 3. Confirm | "Draw Proposed"; wager stays Active; no funds move yet; counterparty can confirm |  |
+| [ ] | DRW-02 | Confirm a draw (counterparty) | 1. After DRW-01, the other participant opens Resolve 2. Choose Draw 3. Confirm | "Settled as a Draw"; each party receives their OWN original stake back; status shows "Draw" in History |  |
+| [ ] | DRW-03 | Draw does not lock the wager | 1. One party proposes a draw 2. The authorized resolver instead declares a winner | Winner resolution still succeeds; the pending draw proposal is ignored |  |
+| [ ] | DRW-04 | Arbitrator draws solo (ThirdParty) | 1. On a pre-existing ThirdParty wager, arbitrator opens Resolve 2. Choose Draw 3. Confirm | Draw settles immediately; both stakes returned |  |
+| [ ] | DRW-05 | Unequal stakes draw | 1. Draw a wager with unequal stakes (e.g. 30 vs 10) | Each party gets exactly their own stake back (creator 30, opponent 10); sum returned == sum escrowed |  |
+| [ ] | DRW-06 | No manual draw on oracle wagers | 1. Open a Polymarket/Chainlink/UMA wager | No manual Resolve/Draw control is offered (oracle auto-resolves) |  |
+| [ ] | DRW-07 | Polymarket tie auto-draws | 1. Polymarket market resolves as a tie (equal payout) 2. Trigger auto-resolve | Wager settles as a Draw immediately; both stakes returned (no deadline wait) |  |
+| [ ] | DRW-08 | Draw after resolve deadline blocked | 1. Active wager past resolveDeadline 2. Attempt a manual draw | Error: "ResolveExpired"; the timeout Claim Refund path applies instead |  |
+| [ ] | DRW-09 | Draw is final | 1. After a settled draw, attempt declareWinner / declareDraw / claimPayout / claimRefund | All revert (wager is terminal in the Draw state) |  |
+| [ ] | DRW-10 | Withdraw a draw proposal | 1. Propose a draw 2. Withdraw it | Proposal cleared; an opponent-only later consent does not settle |  |
+
 ---
 
 ## 8. Oracle Resolution

@@ -30,9 +30,9 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 **Purpose**: Establish a clean baseline before changing the live, non-upgradeable registry (v3 redeploy strategy).
 
-- [ ] T001 Confirm clean baseline on branch `004-draw-resolution`: run `npm run compile` and `npm test` and record that the suite is green before any change (regression guard for SC-007).
-- [ ] T002 [P] Confirm the frontend baseline is green: `npm run test:frontend` (so later draw-UI failures are attributable).
-- [ ] T003 [P] Decide and record the v3 deterministic salt suffix (e.g. `WagerRegistry-draw`) and the v3 deployment-record filenames `deployments/amoy-chain80002-v3.json` / `deployments/polygon-chain137-v3.json` in a short note at the top of `scripts/deploy/deploy.js` (comment only; no behavior change yet).
+- [X] T001 Confirm clean baseline on branch `004-draw-resolution`: run `npm run compile` and `npm test` and record that the suite is green before any change (regression guard for SC-007).
+- [X] T002 [P] Confirm the frontend baseline is green: `npm run test:frontend` (so later draw-UI failures are attributable).
+- [X] T003 [P] Decide and record the v3 deterministic salt suffix (e.g. `WagerRegistry-draw`) and the v3 deployment-record filenames `deployments/amoy-chain80002-v3.json` / `deployments/polygon-chain137-v3.json` in a short note at the top of `scripts/deploy/deploy.js` (comment only; no behavior change yet).
 
 ---
 
@@ -42,13 +42,13 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 **⚠️ CRITICAL**: No user-story work can begin until this phase is complete.
 
-- [ ] T004 Append `Draw` (value 6) to `enum Status` in `contracts/interfaces/IWagerRegistry.sol` (append-only; do not reorder existing values).
-- [ ] T005 Declare new events `WagerDrawn(uint256 indexed wagerId, address indexed creator, address indexed opponent, address by)`, `DrawProposed(uint256 indexed wagerId, address indexed proposer)`, `DrawRevoked(uint256 indexed wagerId, address indexed proposer)` and new external functions `declareDraw(uint256)`, `revokeDraw(uint256)`, and view `drawConsent(uint256) returns (bool,bool)` in `contracts/interfaces/IWagerRegistry.sol` (per `contracts/wager-registry-draw.md`).
-- [ ] T006 Add new errors `NotParticipant()`, `DrawNotApplicable()`, `NoDrawProposal()` to `contracts/wagers/WagerRegistry.sol` (reuse `NotActive`/`ResolveExpired`/`AccountFrozenError`/`ConditionNotResolved` as documented).
-- [ ] T007 Add the `mapping(uint256 => uint8) private _drawConsent;` store (bit0=creator, bit1=opponent) and the `drawConsent(uint256)` view in `contracts/wagers/WagerRegistry.sol` (keep the public `Wager` struct unchanged — consent stays in this side mapping).
-- [ ] T008 Implement the internal `_settleDraw(uint256 wagerId, Wager storage w)` helper in `contracts/wagers/WagerRegistry.sol` following checks-effects-interactions: set `status = Status.Draw`, `delete _drawConsent[wagerId]`, `recordClose` both participants, then `safeTransfer` `creatorStake`→creator and `opponentStake`→opponent, then emit `WagerDrawn` (mirror the `claimRefund` ordering at WagerRegistry.sol:402-410).
-- [ ] T009 Update the `Status` enum fixture (add `Draw: 6`) in `test/WagerRegistry.test.js` and any shared test helper that enumerates statuses, so existing suites compile against the new enum.
-- [ ] T010 `npm run compile` to confirm the interface + registry + fixtures build with the new surface (no behavior yet beyond `_settleDraw`).
+- [X] T004 Append `Draw` (value 6) to `enum Status` in `contracts/interfaces/IWagerRegistry.sol` (append-only; do not reorder existing values).
+- [X] T005 Declare new events `WagerDrawn(uint256 indexed wagerId, address indexed creator, address indexed opponent, address by)`, `DrawProposed(uint256 indexed wagerId, address indexed proposer)`, `DrawRevoked(uint256 indexed wagerId, address indexed proposer)` and new external functions `declareDraw(uint256)`, `revokeDraw(uint256)`, and view `drawConsent(uint256) returns (bool,bool)` in `contracts/interfaces/IWagerRegistry.sol` (per `contracts/wager-registry-draw.md`).
+- [X] T006 Add new errors `NotParticipant()`, `DrawNotApplicable()`, `NoDrawProposal()` to `contracts/wagers/WagerRegistry.sol` (reuse `NotActive`/`ResolveExpired`/`AccountFrozenError`/`ConditionNotResolved` as documented).
+- [X] T007 Add the `mapping(uint256 => uint8) private _drawConsent;` store (bit0=creator, bit1=opponent) and the `drawConsent(uint256)` view in `contracts/wagers/WagerRegistry.sol` (keep the public `Wager` struct unchanged — consent stays in this side mapping).
+- [X] T008 Implement the internal `_settleDraw(uint256 wagerId, Wager storage w)` helper in `contracts/wagers/WagerRegistry.sol` following checks-effects-interactions: set `status = Status.Draw`, `delete _drawConsent[wagerId]`, `recordClose` both participants, then `safeTransfer` `creatorStake`→creator and `opponentStake`→opponent, then emit `WagerDrawn` (mirror the `claimRefund` ordering at WagerRegistry.sol:402-410).
+- [X] T009 Update the `Status` enum fixture (add `Draw: 6`) in `test/WagerRegistry.test.js` and any shared test helper that enumerates statuses, so existing suites compile against the new enum.
+- [X] T010 `npm run compile` to confirm the interface + registry + fixtures build with the new surface (no behavior yet beyond `_settleDraw`).
 
 **Checkpoint**: Interface, storage, settlement helper, and fixtures compile. US1 and US2 can now proceed.
 
@@ -62,18 +62,18 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 ### Tests for User Story 1 (write first, ensure they FAIL) ⚠️
 
-- [ ] T011 [US1] Create `test/WagerRegistry.draw.test.js` with the manual-draw suite skeleton + fixtures (deploy MockERC20, MembershipManager, PolymarketOracleAdapter, WagerRegistry; `createAndAccept` helper for an `Active` wager), mirroring `test/WagerRegistry.test.js` setup (lines 15-99).
-- [ ] T012 [US1] In `test/WagerRegistry.draw.test.js`, add mutual-consent tests: (a) creator `declareDraw` leaves status `Active` and emits `DrawProposed`; (b) opponent `declareDraw` settles → `Status.Draw`, creator +creatorStake, opponent +opponentStake, `WagerDrawn` emitted; (c) one-sided proposal does NOT lock — `declareWinner(opponent)` still succeeds afterward.
-- [ ] T013 [US1] In `test/WagerRegistry.draw.test.js`, add arbitrator-solo test: `ThirdParty` wager, `arbitrator` `declareDraw` settles immediately; a participant calling `declareDraw` on a `ThirdParty` wager is rejected.
-- [ ] T014 [US1] In `test/WagerRegistry.draw.test.js`, add authorization/eligibility tests: non-participant → `NotParticipant`; `declareDraw` on an oracle-type wager → `DrawNotApplicable`/`NotAuthorized`; after `resolveDeadline` → `ResolveExpired`; non-`Active` status → `NotActive`.
-- [ ] T015 [US1] In `test/WagerRegistry.draw.test.js`, add fund-correctness tests: unequal stakes (e.g. 30 vs 10) → each gets exactly their own back and Σ returned == escrowed; finality — after `Draw`, `declareWinner`/`declareDraw`/`claimPayout`/`claimRefund` all revert.
-- [ ] T016 [US1] In `test/WagerRegistry.draw.test.js`, add `revokeDraw` tests (creator consents then revokes → `DrawRevoked`, bit cleared, opponent-only consent does not settle; `revokeDraw` with no prior consent → `NoDrawProposal`) and a frozen-account test (`AccountFrozenError`) and a paused-contract test (draw still settles — exit path stays open).
+- [X] T011 [US1] Create `test/WagerRegistry.draw.test.js` with the manual-draw suite skeleton + fixtures (deploy MockERC20, MembershipManager, PolymarketOracleAdapter, WagerRegistry; `createAndAccept` helper for an `Active` wager), mirroring `test/WagerRegistry.test.js` setup (lines 15-99).
+- [X] T012 [US1] In `test/WagerRegistry.draw.test.js`, add mutual-consent tests: (a) creator `declareDraw` leaves status `Active` and emits `DrawProposed`; (b) opponent `declareDraw` settles → `Status.Draw`, creator +creatorStake, opponent +opponentStake, `WagerDrawn` emitted; (c) one-sided proposal does NOT lock — `declareWinner(opponent)` still succeeds afterward.
+- [X] T013 [US1] In `test/WagerRegistry.draw.test.js`, add arbitrator-solo test: `ThirdParty` wager, `arbitrator` `declareDraw` settles immediately; a participant calling `declareDraw` on a `ThirdParty` wager is rejected.
+- [X] T014 [US1] In `test/WagerRegistry.draw.test.js`, add authorization/eligibility tests: non-participant → `NotParticipant`; `declareDraw` on an oracle-type wager → `DrawNotApplicable`/`NotAuthorized`; after `resolveDeadline` → `ResolveExpired`; non-`Active` status → `NotActive`.
+- [X] T015 [US1] In `test/WagerRegistry.draw.test.js`, add fund-correctness tests: unequal stakes (e.g. 30 vs 10) → each gets exactly their own back and Σ returned == escrowed; finality — after `Draw`, `declareWinner`/`declareDraw`/`claimPayout`/`claimRefund` all revert.
+- [X] T016 [US1] In `test/WagerRegistry.draw.test.js`, add `revokeDraw` tests (creator consents then revokes → `DrawRevoked`, bit cleared, opponent-only consent does not settle; `revokeDraw` with no prior consent → `NoDrawProposal`) and a frozen-account test (`AccountFrozenError`) and a paused-contract test (draw still settles — exit path stays open).
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implement `declareDraw(uint256 wagerId)` in `contracts/wagers/WagerRegistry.sol` with `nonReentrant` + `notFrozen(msg.sender)`: require `status == Active` and `block.timestamp <= resolveDeadline`; branch by `resolutionType` — `Either/Creator/Opponent` set the caller's consent bit (emit `DrawProposed` on first set) and call `_settleDraw` once both bits set; `ThirdParty` require `msg.sender == arbitrator` then `_settleDraw`; oracle types revert `DrawNotApplicable`; non-participant revert `NotParticipant`.
-- [ ] T018 [US1] Implement `revokeDraw(uint256 wagerId)` in `contracts/wagers/WagerRegistry.sol` with `nonReentrant` + `notFrozen(msg.sender)`: require `status == Active` and caller is a participant with a set consent bit (else `NoDrawProposal`); clear the caller's bit; emit `DrawRevoked`.
-- [ ] T019 [US1] Run `npx hardhat test test/WagerRegistry.draw.test.js` and iterate until all US1 tests pass; confirm no regression with `npm test`.
+- [X] T017 [US1] Implement `declareDraw(uint256 wagerId)` in `contracts/wagers/WagerRegistry.sol` with `nonReentrant` + `notFrozen(msg.sender)`: require `status == Active` and `block.timestamp <= resolveDeadline`; branch by `resolutionType` — `Either/Creator/Opponent` set the caller's consent bit (emit `DrawProposed` on first set) and call `_settleDraw` once both bits set; `ThirdParty` require `msg.sender == arbitrator` then `_settleDraw`; oracle types revert `DrawNotApplicable`; non-participant revert `NotParticipant`.
+- [X] T018 [US1] Implement `revokeDraw(uint256 wagerId)` in `contracts/wagers/WagerRegistry.sol` with `nonReentrant` + `notFrozen(msg.sender)`: require `status == Active` and caller is a participant with a set consent bit (else `NoDrawProposal`); clear the caller's bit; emit `DrawRevoked`.
+- [X] T019 [US1] Run `npx hardhat test test/WagerRegistry.draw.test.js` and iterate until all US1 tests pass; confirm no regression with `npm test`.
 
 **Checkpoint**: Manual draw (mutual consent + arbitrator) fully functional and independently testable on-chain. This is the MVP.
 
@@ -87,14 +87,14 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 ### Tests for User Story 2 (write first, ensure they FAIL) ⚠️
 
-- [ ] T020 [US2] In `test/integration/oracle/WagerRegistry_Polymarket.test.js`, update/replace the existing tie regression (lines ~78-116): a `[1,1]` tie + `autoResolveFromPolymarket` now expects `Status.Draw` (6) and both stakes returned in the same call (remove the "reverts ConditionNotResolved then deadline-refund" expectation for the tie case).
-- [ ] T021 [US2] In the same file, add an invalid-market test: payouts `[0,0]` → `Status.Draw`.
-- [ ] T022 [US2] In the same file, add/confirm regression tests: decisive `[1,0]` → `Status.Resolved` with the correct winner per `creatorIsYes`; genuinely-unresolved market → `autoResolveFromPolymarket` reverts `ConditionNotResolved` (no draw).
+- [X] T020 [US2] In `test/integration/oracle/WagerRegistry_Polymarket.test.js`, update/replace the existing tie regression (lines ~78-116): a `[1,1]` tie + `autoResolveFromPolymarket` now expects `Status.Draw` (6) and both stakes returned in the same call (remove the "reverts ConditionNotResolved then deadline-refund" expectation for the tie case).
+- [X] T021 [US2] In the same file, document that an "invalid"/disputed market resolves as **equal** numerators (`[1,1]`) — the Gnosis/Polymarket CTF forbids an all-zero payout (denominator must be > 0), so `[0,0]` is not representable and the equal-numerator case is already exercised by the tie test (T020). (Resolved as a clarifying comment, not a separate `[0,0]` test.)
+- [X] T022 [US2] In the same file, add/confirm regression tests: decisive `[1,0]` → `Status.Resolved` with the correct winner per `creatorIsYes`; genuinely-unresolved market → `autoResolveFromPolymarket` reverts `ConditionNotResolved` (no draw).
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Extend `autoResolveFromPolymarket(uint256 wagerId)` in `contracts/wagers/WagerRegistry.sol`: after reading `getOutcome`, when `resolvedAt == 0` check `polymarketAdapter.isConditionResolved(w.polymarketConditionId)` — if resolved → `_settleDraw` (tie); else revert `ConditionNotResolved`. When `resolvedAt != 0` keep `_settleOracleWin` (unchanged). Leave `autoResolveFromOracle` (Chainlink/UMA) unchanged (out of scope per research D2) with a code comment noting the deliberate scope boundary.
-- [ ] T024 [US2] Run `npx hardhat test test/integration/oracle/WagerRegistry_Polymarket.test.js` and iterate until green; run `npm test` for no regression.
+- [X] T023 [US2] Extend `autoResolveFromPolymarket(uint256 wagerId)` in `contracts/wagers/WagerRegistry.sol`: after reading `getOutcome`, when `resolvedAt == 0` check `polymarketAdapter.isConditionResolved(w.polymarketConditionId)` — if resolved → `_settleDraw` (tie); else revert `ConditionNotResolved`. When `resolvedAt != 0` keep `_settleOracleWin` (unchanged). Leave `autoResolveFromOracle` (Chainlink/UMA) unchanged (out of scope per research D2) with a code comment noting the deliberate scope boundary.
+- [X] T024 [US2] Run `npx hardhat test test/integration/oracle/WagerRegistry_Polymarket.test.js` and iterate until green; run `npm test` for no regression.
 
 **Checkpoint**: Polymarket tie auto-draws immediately; decisive/unresolved behavior unchanged.
 
@@ -108,18 +108,18 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 ### Tests for User Story 3 (write first, ensure they FAIL) ⚠️
 
-- [ ] T025 [US3] In `frontend/src/test/MyMarketsModal.test.jsx`, add tests: Draw option is shown for an authorized resolver on an eligible `Active` wager and hidden for a non-resolver and for oracle-type wagers (mock `resolutionType`, connected address per the existing mock setup at lines ~96-120 and the `getContractAddress` mock gotcha).
-- [ ] T026 [US3] In `frontend/src/test/MyMarketsModal.test.jsx`, add tests: participant flow renders Propose / Waiting+Withdraw / Confirm driven by `drawConsent`; selecting Draw calls `registry.declareDraw(id)` and Withdraw calls `registry.revokeDraw(id)`; `ThirdParty` shows a single "Declare draw".
-- [ ] T027 [US3] In `frontend/src/test/MyMarketsModal.test.jsx`, add a status-display test: a `draw`-status wager renders the "Draw" label/badge (distinct from "Refunded"/"Resolved") and appears under History.
+- [X] T025 [US3] In `frontend/src/test/MyMarketsModal.test.jsx`, add tests: Draw option is shown for an authorized resolver on an eligible `Active` wager and hidden for a non-resolver and for oracle-type wagers (mock `resolutionType`, connected address per the existing mock setup at lines ~96-120 and the `getContractAddress` mock gotcha).
+- [X] T026 [US3] In `frontend/src/test/MyMarketsModal.test.jsx`, add tests: participant flow renders Propose / Waiting+Withdraw / Confirm driven by `drawConsent`; selecting Draw calls `registry.declareDraw(id)` and Withdraw calls `registry.revokeDraw(id)`; `ThirdParty` shows a single "Declare draw".
+- [X] T027 [US3] In `frontend/src/test/MyMarketsModal.test.jsx`, add a status-display test: a `draw`-status wager renders the "Draw" label/badge (distinct from "Refunded"/"Resolved") and appears under History.
 
 ### Implementation for User Story 3
 
-- [ ] T028 [US3] Regenerate the frontend ABI: copy the compiled ABI from `artifacts/contracts/wagers/WagerRegistry.sol/WagerRegistry.json` into `frontend/src/abis/WagerRegistry.js` so it includes `declareDraw`, `revokeDraw`, `drawConsent`, and the `WagerDrawn`/`DrawProposed`/`DrawRevoked` events (depends on T017–T018, T023).
-- [ ] T029 [P] [US3] In `frontend/src/constants/wagerDefaults.js`, add `WagerStatus.DRAW = 'draw'`, add `'draw'` to `TERMINAL_STATUSES`, and ensure the on-chain numeric `Status` `6` decodes to `'draw'` wherever status is mapped.
-- [ ] T030 [US3] In `frontend/src/components/fairwins/MyMarketsModal.jsx`, add `'draw'` handling to `getMarketStatus` (~182-221), `getStatusLabel` (~355-370 → "Draw"), `getStatusClass` (~338-353 → `status-draw`), and the terminal-status check (~266-272) so drawn wagers show a distinct badge and land in History.
-- [ ] T031 [US3] In `frontend/src/components/fairwins/MyMarketsModal.jsx` `ResolutionModal`, add the "Draw — both parties refunded" option gated by eligibility (`Active` + non-oracle + authorized per `frontend-ui-contract.md`); render Propose/Waiting+Withdraw/Confirm for participant types using a `drawConsent(id)` read, and a single "Declare draw" for `ThirdParty`; wire the writes to `registry.declareDraw(market.id)` and `registry.revokeDraw(market.id)` (replace the `declareWinner` path for the Draw option at ~1698-1730), with a confirmation step explaining the effect.
-- [ ] T032 [US3] In `frontend/src/components/fairwins/MyMarketsModal.jsx`, map the new revert reasons (`NotParticipant`, `DrawNotApplicable`/`NotAuthorized`, `NoDrawProposal`, `NotActive`, `ResolveExpired`, `AccountFrozenError`) to friendly user messages in the resolution error handling.
-- [ ] T033 [US3] Run `npm run test:frontend` and iterate until US3 tests pass; run ESLint and fix any errors (zero-error gate per Constitution V).
+- [X] T028 [US3] Regenerate the frontend ABI: copy the compiled ABI from `artifacts/contracts/wagers/WagerRegistry.sol/WagerRegistry.json` into `frontend/src/abis/WagerRegistry.js` so it includes `declareDraw`, `revokeDraw`, `drawConsent`, and the `WagerDrawn`/`DrawProposed`/`DrawRevoked` events (depends on T017–T018, T023).
+- [X] T029 [P] [US3] In `frontend/src/constants/wagerDefaults.js`, add `WagerStatus.DRAW = 'draw'`, add `'draw'` to `TERMINAL_STATUSES`, and ensure the on-chain numeric `Status` `6` decodes to `'draw'` wherever status is mapped.
+- [X] T030 [US3] In `frontend/src/components/fairwins/MyMarketsModal.jsx`, add `'draw'` handling to `getMarketStatus` (~182-221), `getStatusLabel` (~355-370 → "Draw"), `getStatusClass` (~338-353 → `status-draw`), and the terminal-status check (~266-272) so drawn wagers show a distinct badge and land in History.
+- [X] T031 [US3] In `frontend/src/components/fairwins/MyMarketsModal.jsx` `ResolutionModal`, add the "Draw — both parties refunded" option gated by eligibility (`Active` + non-oracle + authorized per `frontend-ui-contract.md`); render Propose/Waiting+Withdraw/Confirm for participant types using a `drawConsent(id)` read, and a single "Declare draw" for `ThirdParty`; wire the writes to `registry.declareDraw(market.id)` and `registry.revokeDraw(market.id)` (replace the `declareWinner` path for the Draw option at ~1698-1730), with a confirmation step explaining the effect.
+- [X] T032 [US3] In `frontend/src/components/fairwins/MyMarketsModal.jsx`, map the new revert reasons (`NotParticipant`, `DrawNotApplicable`/`NotAuthorized`, `NoDrawProposal`, `NotActive`, `ResolveExpired`, `AccountFrozenError`) to friendly user messages in the resolution error handling.
+- [X] T033 [US3] Run `npm run test:frontend` and iterate until US3 tests pass; run ESLint and fix any errors (zero-error gate per Constitution V).
 
 **Checkpoint**: Users can settle and recognize a draw in the app; oracle wagers correctly show no manual draw.
 
@@ -129,7 +129,7 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 
 **Purpose**: Index the draw distinctly, ONLY if the deployed subgraph tracks `WagerRegistry`.
 
-- [ ] T034 Verify whether the subgraph indexes `WagerRegistry` (`Wager*` events) or a `ConditionalMarketFactory` (`Market*` events) by inspecting `subgraph/subgraph.yaml` datasources and `subgraph/src/mappings/*.ts`. If it does NOT index `WagerRegistry`, mark Phase 6 out of scope (draw is read from chain via `getUserWagers`) and `log` that decision in the PR description; skip T035–T037.
+- [X] T034 Verify whether the subgraph indexes `WagerRegistry` (`Wager*` events) or a `ConditionalMarketFactory` (`Market*` events) by inspecting `subgraph/subgraph.yaml` datasources and `subgraph/src/mappings/*.ts`. If it does NOT index `WagerRegistry`, mark Phase 6 out of scope (draw is read from chain via `getUserWagers`) and `log` that decision in the PR description; skip T035–T037.
 - [ ] T035 [P] If indexed: add `draw` to the `WagerStatus` enum and `isDraw`/`drawnAt` fields to the `Wager` entity in `subgraph/schema.graphql` (per `contracts/subgraph-contract.md`).
 - [ ] T036 [P] If indexed: register the `WagerDrawn` event handler under the `WagerRegistry` datasource in `subgraph/subgraph.yaml` (plus the v3 address + start block). (Pure manifest edit — the mappings change lives in T037.)
 - [ ] T037 If indexed: in `subgraph/src/mappings/factory.ts` add `'draw'` at index 6 of the status array AND implement `handleWagerDrawn` (set `status='draw'`, `isDraw=true`, `winner=null`, `drawnAt=event.block.timestamp`); build with `graph codegen && graph build`. (Both `factory.ts` edits live here so this is the single non-`[P]` task on that file.)
@@ -147,7 +147,7 @@ Web3 monorepo (per plan.md): Solidity in `contracts/`, Hardhat tests in `test/`,
 - [ ] T040 Run Medusa fuzzing against the draw + settlement invariants (most importantly Σ returned == Σ escrowed and "no winner paid on a draw"); document results.
 - [ ] T041 Smart-contract security-agent review of the diff (`.github/agents/smart-contract-security.agent.md`) focusing on fund custody + the new authorization (mutual consent) and the oracle tie branch; address findings before merge.
 - [ ] T042 [P] Run the frontend accessibility audit (axe/Lighthouse) on the resolution modal with the Draw control; confirm WCAG 2.1 AA (labeled, keyboard-reachable, not color-only) (Constitution V).
-- [ ] T043 [P] Update docs: note the v3 `Status.Draw`, the draw flow, and the v3 address in the relevant `docs/` and `deployments/` notes; refresh any oracle-resolution doc referencing the Polymarket tie behavior (now auto-draw, not deadline-refund).
+- [X] T043 [P] Update docs: note the v3 `Status.Draw`, the draw flow, and the v3 address in the relevant `docs/` and `deployments/` notes; refresh any oracle-resolution doc referencing the Polymarket tie behavior (now auto-draw, not deadline-refund).
 - [ ] T044 Deploy WagerRegistry v3 to **Amoy**: `npx hardhat run scripts/deploy/deploy.js --network amoy` (reuses the existing Polymarket adapter — no adapter redeploy, no `setPolymarketAdapter` change); record `deployments/amoy-chain80002-v3.json`.
 - [ ] T045 Sync the frontend to the Amoy v3 address (`npm run sync:frontend-contracts:amoy`) and verify `frontend/src/config/contracts.js` + the regenerated ABI; run the `quickstart.md` §5 manual end-to-end draw on Amoy via `npm run frontend`.
 - [ ] T046 Run the full `quickstart.md` validation matrix (§1–§5) and confirm every success-criterion mapping (SC-001…SC-007) holds.

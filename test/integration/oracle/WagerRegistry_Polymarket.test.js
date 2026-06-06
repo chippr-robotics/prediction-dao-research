@@ -7,14 +7,15 @@ const Resolution = {
   Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4,
   ChainlinkDataFeed: 5, ChainlinkFunctions: 6, UMA: 7,
 };
-const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5 };
+const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5, Draw: 6 };
 const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
 const usdc = (n) => ethers.parseUnits(String(n), 6);
 
-// Regression coverage for the Polymarket tie bug: getOutcome must NOT pick a
-// fixed winner when a Polymarket market resolves 50/50 (passNumerator ==
-// failNumerator). It must return the unresolved sentinel (resolvedAt=0) so the
-// wager refunds both stakes via the deadline path instead of paying one side.
+// Coverage for Polymarket tie handling. The adapter's getOutcome still returns
+// the unresolved sentinel (resolvedAt=0) on a 50/50 tie (it never picks a fixed
+// side). Spec Kit 004: the registry now recognizes a *resolved* tie
+// (isConditionResolved==true while getOutcome.resolvedAt==0) and settles a DRAW
+// immediately — returning both stakes without waiting for the deadline.
 describe("WagerRegistry + PolymarketOracleAdapter — tie handling (integration)", function () {
   async function deployFixture() {
     const [admin, alice, bob, charlie, treasury] = await ethers.getSigners();
@@ -90,27 +91,43 @@ describe("WagerRegistry + PolymarketOracleAdapter — tie handling (integration)
     expect(res[2]).to.equal(0n);
   });
 
-  it("TIE: settlement is blocked and both stakes are refunded after the deadline", async () => {
+  it("TIE: autoResolveFromPolymarket settles a DRAW immediately, returning both stakes (no deadline wait)", async () => {
     const fx = await loadFixture(deployFixture);
-    const { wagerId, conditionId, resolveDeadline } = await makeWager(fx, { creatorIsYes: true });
-    await fx.ctf.resolveCondition(conditionId, [1, 1]);
+    const { wagerId, conditionId } = await makeWager(fx, { creatorIsYes: true });
+    await fx.ctf.resolveCondition(conditionId, [1, 1]); // 50/50 tie
 
-    await expect(fx.reg.connect(fx.charlie).autoResolveFromPolymarket(wagerId))
-      .to.be.revertedWithCustomError(fx.reg, "ConditionNotResolved");
-
-    await time.increaseTo(resolveDeadline + 1);
     const aBefore = await fx.usdcToken.balanceOf(fx.alice.address);
     const bBefore = await fx.usdcToken.balanceOf(fx.bob.address);
-    await fx.reg.connect(fx.charlie).claimRefund(wagerId);
+    // Anyone may trigger; settles a draw without advancing past the deadline.
+    await expect(fx.reg.connect(fx.charlie).autoResolveFromPolymarket(wagerId))
+      .to.emit(fx.reg, "WagerDrawn").withArgs(wagerId, fx.alice.address, fx.bob.address, fx.charlie.address);
+
+    expect((await fx.reg.getWager(wagerId)).status).to.equal(Status.Draw);
     expect((await fx.usdcToken.balanceOf(fx.alice.address)) - aBefore).to.equal(usdc(10));
     expect((await fx.usdcToken.balanceOf(fx.bob.address)) - bBefore).to.equal(usdc(10));
-    expect((await fx.reg.getWager(wagerId)).status).to.equal(Status.Refunded);
   });
 
-  it("TIE is refunded regardless of creatorIsYes (not a fixed-side win)", async () => {
+  it("TIE settles a DRAW regardless of creatorIsYes (not a fixed-side win)", async () => {
     const fx = await loadFixture(deployFixture);
     const { wagerId, conditionId } = await makeWager(fx, { creatorIsYes: false });
     await fx.ctf.resolveCondition(conditionId, [1, 1]);
+    const aBefore = await fx.usdcToken.balanceOf(fx.alice.address);
+    const bBefore = await fx.usdcToken.balanceOf(fx.bob.address);
+    await fx.reg.connect(fx.charlie).autoResolveFromPolymarket(wagerId);
+    expect((await fx.reg.getWager(wagerId)).status).to.equal(Status.Draw);
+    expect((await fx.usdcToken.balanceOf(fx.alice.address)) - aBefore).to.equal(usdc(10));
+    expect((await fx.usdcToken.balanceOf(fx.bob.address)) - bBefore).to.equal(usdc(10));
+  });
+
+  // Note: a real "invalid"/disputed Polymarket market resolves with EQUAL payout
+  // numerators (e.g. [1,1]) — the Gnosis/Polymarket CTF forbids an all-zero
+  // payout (denominator must be > 0), so [0,0] is not a representable state. The
+  // equal-numerator "invalid" case is the tie case covered above.
+
+  it("UNRESOLVED market still reverts ConditionNotResolved (no draw, no win)", async () => {
+    const fx = await loadFixture(deployFixture);
+    const { wagerId } = await makeWager(fx, { creatorIsYes: true });
+    // condition prepared but never resolved on the CTF
     await expect(fx.reg.connect(fx.charlie).autoResolveFromPolymarket(wagerId))
       .to.be.revertedWithCustomError(fx.reg, "ConditionNotResolved");
   });

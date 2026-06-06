@@ -45,6 +45,17 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     mapping(address => bool) private _frozen;
     uint256 private _nextWagerId = 1;
 
+    /// @notice Per-wager draw-consent bitmask for participant resolution types
+    ///         (Either/Creator/Opponent). bit0 = creator agreed, bit1 = opponent
+    ///         agreed. A draw settles only once both bits are set; cleared on
+    ///         settle or revoke. Kept out of the Wager struct so getWager's ABI
+    ///         is unchanged. Not used for ThirdParty (arbitrator settles solo)
+    ///         or oracle types (a draw arises only from the oracle tie).
+    mapping(uint256 => uint8) private _drawConsent;
+    uint8 private constant _CONSENT_CREATOR = 1;
+    uint8 private constant _CONSENT_OPPONENT = 2;
+    uint8 private constant _CONSENT_BOTH = 3;
+
     /// @notice Append-only per-user index of every wager a participant has been part of.
     ///         Populated in `createWager` for both creator and opponent; never removed.
     ///         Enables O(N_user) lookup without log scans (avoids `eth_getLogs` block-range limits).
@@ -82,6 +93,9 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     error AlreadyPaid();
     error NotRefundable();
     error NotCreator();
+    error NotParticipant();
+    error DrawNotApplicable();
+    error NoDrawProposal();
     error AccountFrozenError(address user);
 
     modifier notFrozen(address user) {
@@ -328,6 +342,87 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         emit WagerResolved(wagerId, winner, msg.sender);
     }
 
+    /// @notice Settle, or move toward settling, a wager as a DRAW (each party's
+    ///         own stake returned, no winner). Participant types
+    ///         (Either/Creator/Opponent) require BOTH participants to agree: the
+    ///         first call records the caller's consent (emits DrawProposed), the
+    ///         second settles. A ThirdParty arbitrator settles alone. Oracle
+    ///         types cannot be drawn manually — a draw there arises only from the
+    ///         oracle tie (see autoResolveFromPolymarket).
+    /// @dev Not whenNotPaused: a draw is an exit path that returns funds to the
+    ///      participants, so it stays available while paused (parity with
+    ///      declareWinner / claimRefund). Frozen accounts cannot drive it.
+    function declareDraw(uint256 wagerId) external nonReentrant notFrozen(msg.sender) {
+        Wager storage w = _wagers[wagerId];
+        if (w.status != Status.Active) revert NotActive();
+        if (block.timestamp > w.resolveDeadline) revert ResolveExpired();
+        if (_isOracleResolvedType(w.resolutionType)) revert DrawNotApplicable();
+
+        if (w.resolutionType == ResolutionType.ThirdParty) {
+            if (msg.sender != w.arbitrator) revert NotAuthorized();
+            _settleDraw(wagerId, w);
+            return;
+        }
+
+        // Participant types: accumulate mutual consent; settle only when both agree.
+        uint8 bit;
+        if (msg.sender == w.creator) {
+            bit = _CONSENT_CREATOR;
+        } else if (msg.sender == w.opponent) {
+            bit = _CONSENT_OPPONENT;
+        } else {
+            revert NotParticipant();
+        }
+
+        uint8 consent = _drawConsent[wagerId];
+        if ((consent & bit) == 0) {
+            consent |= bit;
+            _drawConsent[wagerId] = consent;
+            emit DrawProposed(wagerId, msg.sender);
+        }
+        if (consent == _CONSENT_BOTH) {
+            _settleDraw(wagerId, w);
+        }
+    }
+
+    /// @notice Withdraw the caller's pending draw consent (participant types).
+    ///         A one-sided proposal never locks the wager; this just clears the
+    ///         caller's bit so they no longer agree to a draw.
+    function revokeDraw(uint256 wagerId) external nonReentrant notFrozen(msg.sender) {
+        Wager storage w = _wagers[wagerId];
+        if (w.status != Status.Active) revert NotActive();
+
+        uint8 bit;
+        if (msg.sender == w.creator) {
+            bit = _CONSENT_CREATOR;
+        } else if (msg.sender == w.opponent) {
+            bit = _CONSENT_OPPONENT;
+        } else {
+            revert NotParticipant();
+        }
+
+        uint8 consent = _drawConsent[wagerId];
+        if ((consent & bit) == 0) revert NoDrawProposal();
+        _drawConsent[wagerId] = consent & ~bit;
+        emit DrawRevoked(wagerId, msg.sender);
+    }
+
+    /// @dev Shared draw settlement: each party gets their own stake back, no
+    ///      winner. Checks-effects-interactions — status and consent are cleared
+    ///      before any token transfer (parity with claimRefund).
+    function _settleDraw(uint256 wagerId, Wager storage w) internal {
+        w.status = Status.Draw;
+        delete _drawConsent[wagerId];
+        membershipManager.recordClose(w.creator, WAGER_PARTICIPANT_ROLE);
+        membershipManager.recordClose(w.opponent, WAGER_PARTICIPANT_ROLE);
+
+        IERC20 token = IERC20(w.token);
+        token.safeTransfer(w.creator, w.creatorStake);
+        token.safeTransfer(w.opponent, w.opponentStake);
+
+        emit WagerDrawn(wagerId, w.creator, w.opponent, msg.sender);
+    }
+
     function autoResolveFromPolymarket(uint256 wagerId) external nonReentrant {
         Wager storage w = _wagers[wagerId];
         if (w.status != Status.Active) revert NotActive();
@@ -335,7 +430,17 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (address(polymarketAdapter) == address(0)) revert AdapterNotSet();
 
         (bool outcome, , uint256 resolvedAt) = polymarketAdapter.getOutcome(w.polymarketConditionId);
-        if (resolvedAt == 0) revert ConditionNotResolved();
+        if (resolvedAt == 0) {
+            // getOutcome returns resolvedAt==0 for BOTH "not resolved" and a
+            // "resolved tie" (equal payout numerators). Disambiguate: a resolved
+            // tie settles a DRAW immediately (both stakes back); a genuinely
+            // unresolved market reverts (unchanged behavior).
+            if (polymarketAdapter.isConditionResolved(w.polymarketConditionId)) {
+                _settleDraw(wagerId, w);
+                return;
+            }
+            revert ConditionNotResolved();
+        }
         _settleOracleWin(wagerId, w, outcome);
     }
 
@@ -437,6 +542,14 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
 
     function getWager(uint256 wagerId) external view returns (Wager memory) {
         return _wagers[wagerId];
+    }
+
+    /// @notice Pending draw-consent for a wager (participant resolution types).
+    ///         Both true would have already settled, so at most one is true for
+    ///         a live wager; both read false once drawn, revoked, or never proposed.
+    function drawConsent(uint256 wagerId) external view returns (bool creatorAgreed, bool opponentAgreed) {
+        uint8 c = _drawConsent[wagerId];
+        return ((c & _CONSENT_CREATOR) != 0, (c & _CONSENT_OPPONENT) != 0);
     }
 
     function isAllowedToken(address token) external view returns (bool) {
