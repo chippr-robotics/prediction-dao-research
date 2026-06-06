@@ -1387,11 +1387,30 @@ function MarketDetailView({
         </div>
       </div>
 
-      {/* Encrypted wager: show decrypt prompt or decrypted content */}
+      {/* Encrypted wager: decrypt prompt, in-progress, or (FR-010) terms-unavailable.
+          A decrypt/fetch failure shows a clear state with a retry — and crucially
+          does NOT hide the resolve/withdraw/refund action row below, which needs no
+          plaintext (resolution is on-chain by winner address). */}
       {market.isEncrypted && !market.decryptedMetadata && (
         <div className="mm-detail-description">
           {isDecrypting ? (
             <p style={{ opacity: 0.7 }}>Decrypting...</p>
+          ) : (market.decryptionError || market.ipfsEnvelopeError) ? (
+            <div className="mm-decrypt-error" role="alert">
+              <p className="mm-decrypt-error-message">
+                Terms unavailable — {market.ipfsEnvelopeError
+                  ? 'the encrypted terms could not be retrieved.'
+                  : market.decryptionError}
+              </p>
+              <button
+                type="button"
+                className="mm-btn-primary"
+                onClick={() => onDecrypt?.(market.id)}
+                style={{ marginTop: '8px' }}
+              >
+                Try again
+              </button>
+            </div>
           ) : (
             <button
               type="button"
