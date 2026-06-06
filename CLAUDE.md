@@ -48,7 +48,6 @@ artifacts live under `specs/<feature>/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan:
-`specs/002-e2e-encryption-lifecycle/plan.md` (complete the remaining E2E stubs —
-encryption key registration, encrypted privacy round-trip, lifecycle journeys).
+shell commands, and other important information, read the current plan
+at specs/005-multi-recipient-encryption/plan.md
 <!-- SPECKIT END -->
