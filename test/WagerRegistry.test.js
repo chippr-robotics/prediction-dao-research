@@ -4,7 +4,7 @@ const { time, loadFixture } = require("@nomicfoundation/hardhat-network-helpers"
 
 const Tier = { None: 0, Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
 const Resolution = { Either: 0, Creator: 1, Opponent: 2, ThirdParty: 3, Polymarket: 4 };
-const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5 };
+const Status = { None: 0, Open: 1, Active: 2, Resolved: 3, Cancelled: 4, Refunded: 5, Draw: 6 };
 const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes("WAGER_PARTICIPANT_ROLE"));
 const GUARDIAN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("GUARDIAN_ROLE"));
 const ACCOUNT_MODERATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ACCOUNT_MODERATOR_ROLE"));

@@ -221,6 +221,12 @@ async function main() {
   // -------- WagerRegistry --------
   // Salt suffix bumped (`-userindex`) when the per-user EnumerableSet index was added
   // to force a fresh deterministic address; old wagers stay on the prior registry.
+  // v3 / Draw resolution (Spec Kit 004): the Draw outcome (Status.Draw +
+  // declareDraw/revokeDraw + Polymarket tie auto-draw) changes the bytecode, so
+  // CREATE2 already yields a new address. When cutting v3 over, bump this suffix
+  // to `WagerRegistry-userindex-draw` for an explicit fresh address and record
+  // the result as deployments/<network>-chain<id>-v3.json. The Polymarket adapter
+  // is REUSED as-is (no adapter redeploy / no setPolymarketAdapter change).
   const regDeploy = await deployDeterministic(
     "WagerRegistry",
     [deployer.address, mgrDeploy.address, adapter.address, [usdc, wmatic]],

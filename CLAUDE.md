@@ -48,7 +48,6 @@ artifacts live under `specs/<feature>/`.
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan:
-`specs/003-polymarket-only-oracle-ui/plan.md` (hide all oracle models except
-Polymarket in the frontend, reversibly via one config flag).
+shell commands, and other important information, read the current plan
+at specs/004-draw-resolution/plan.md
 <!-- SPECKIT END -->
