@@ -1,89 +1,117 @@
 /**
- * E2E Tests: Full Lifecycle Scenarios
+ * E2E Tests: Full Lifecycle Scenarios (Full-tier)
  *
- * Six complete end-to-end lifecycle scenarios combining multiple
- * functional areas into connected journeys.
+ * Requires a running Hardhat node with deployed contracts (chain 1337).
+ * Five connected end-to-end journeys verified through their full state machine
+ * (Open → Active → Resolved|Refunded) against the real contracts. State
+ * transitions are driven via the chainTx setup task (reliable) and asserted on
+ * the wager's on-chain status/winner/paid; the headline happy path also confirms
+ * the user-visible outcome in the UI.
  *
- * Checklist: E2E-01..E2E-06
+ * The obsolete "Challenged Resolution with Arbitrator" journey is intentionally
+ * removed — the challenge/dispute/arbitrator-reresolution feature was deleted in
+ * #621/#625 (declareWinner is final), the same obsolescence as the removed
+ * 09-challenge-dispute spec.
+ *
+ * Status enum: None=0 Open=1 Active=2 Resolved=3 Cancelled=4 Refunded=5
+ * Checklist: E2E-01..E2E-05
  */
 
+const CREATOR = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' // #0
+const OPPONENT = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' // #1
+
 describe('End-to-End Lifecycle Scenarios', () => {
-  beforeEach(() => {
-    cy.mockWeb3Provider()
-    cy.visit('/fairwins')
+  afterEach(() => {
+    cy.restoreGlobalState() // unfreeze anything a journey froze
   })
 
-  it('[E2E-01] Happy Path — 1v1 USDC Wager with Manual Resolution', () => {
-    // Step 1: Creator connects wallet (WAL-01)
-    cy.connectWallet()
-
-    // Step 2: Creator purchases Bronze membership (MEM-01)
-    // Step 3: Creator registers encryption key (ENC-02)
-    // Step 4: Creator creates 1v1 wager (10 USDC, Either Party, encrypted) (CRE-01, CRE-07)
-    // Step 5: Creator shares QR code with opponent (SHR-01)
-    // Step 6: Opponent scans QR, connects, decrypts, accepts (ACC-01, ACC-03)
-    // Step 7: End date passes, status = Pending Resolution (RES-01)
-    // Step 8: Creator proposes resolution (creator wins) (RES-01)
-    // Step 9: 24h challenge period passes, no challenge (RES-06)
-    // Step 10: Creator claims 20 USDC payout (CLM-01)
-
-    cy.get('body').should('be.visible')
+  it('[E2E-01] Happy path — 1v1 manual resolution: create → accept → resolve → winner claims', () => {
+    cy.createAndAcceptWager({ resolutionType: 0 }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>
+        expect(i.status, 'Active after accept').to.equal(2))
+      cy.task('chainTx', { action: 'declareWinner', args: { callerIndex: 0, wagerId, winner: CREATOR } })
+        .then((r) => expect(r.ok, 'declareWinner').to.be.true)
+      // Capture the winner's token balance, claim, and prove the funds actually arrived.
+      cy.task('chainTx', { action: 'tokenBalance', args: { address: CREATOR } }).then((b1) => {
+        cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
+          .then((r) => expect(r.ok, 'winner claims payout').to.be.true)
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+          expect(i.status, 'Resolved').to.equal(3)
+          expect(i.winner.toLowerCase(), 'winner is creator').to.equal(CREATOR.toLowerCase())
+          expect(i.paid, 'payout paid').to.be.true
+        })
+        cy.task('chainTx', { action: 'tokenBalance', args: { address: CREATOR } }).then((b2) => {
+          expect(BigInt(b2.balance) > BigInt(b1.balance), 'winner received the payout (token balance increased)').to.be.true
+        })
+      })
+      // User-visible: the creator can reach their wagers list (rows render).
+      cy.mockWeb3Provider({ account: CREATOR })
+      cy.visit('/fairwins')
+      cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
+      cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+      cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+      cy.openMyWagers('created')
+      cy.get('.mm-table-row', { timeout: 15000 }).should('exist')
+    })
   })
 
-  it('[E2E-02] Happy Path — Polymarket Auto-Resolved Wager', () => {
-    // Step 1: Creator creates Polymarket-pegged wager, selects YES (CRE-12)
-    // Step 2: Opponent accepts (ACC-01)
-    // Step 3: Polymarket resolves to YES (ORC-01)
-    // Step 4: Anyone calls autoResolveFromPolymarket (ORC-06)
-    // Step 5: Creator claims payout (CLM-01)
-
-    cy.connectWallet()
-    cy.get('body').should('be.visible')
+  it('[E2E-02] Happy path — Polymarket auto-resolved wager settles the correct winner', () => {
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'e2e-poly' } }).then((p) => {
+      cy.createAndAcceptWager({ resolutionType: 4, conditionId: p.conditionId, creatorIsYes: true }).then((wagerId) => {
+        cy.resolveMockCondition(p.conditionId, [1, 0]) // YES
+        cy.task('chainTx', { action: 'autoResolve', args: { wagerId } })
+          .then((r) => expect(r.ok, 'auto-resolve').to.be.true)
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+          expect(i.status, 'Resolved').to.equal(3)
+          expect(i.winner.toLowerCase(), 'YES → creator').to.equal(CREATOR.toLowerCase())
+        })
+      })
+    })
   })
 
-  it('[E2E-03] Unhappy Path — Acceptance Timeout Refund', () => {
-    // Step 1: Creator creates wager with 48h acceptance deadline (CRE-01)
-    // Step 2: Opponent never accepts
-    // Step 3: 48+ hours pass
-    // Step 4: Creator calls claimRefund (REF-01)
-    // Step 5: Creator receives stake back
-
-    cy.connectWallet()
-    cy.get('body').should('be.visible')
+  it('[E2E-03] Unhappy path — acceptance timeout refunds the creator', () => {
+    cy.createAndAcceptWager({ accept: false, acceptIn: 60, resolveIn: 7200 }).then((wagerId) => {
+      cy.advanceTime(120)
+      cy.task('chainTx', { action: 'claimRefund', args: { callerIndex: 0, wagerId } })
+        .then((r) => expect(r.ok, 'creator refund').to.be.true)
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>
+        expect(i.status, 'Refunded').to.equal(5))
+    })
   })
 
-  it('[E2E-04] Unhappy Path — Challenged Resolution with Arbitrator', () => {
-    // Step 1: Creator creates 1v1 with Third Party arbitrator (CRE-06)
-    // Step 2: Opponent accepts (ACC-01)
-    // Step 3: End date passes
-    // Step 4: Arbitrator declares creator as winner (RES-05)
-    // Step 5: Opponent challenges (CHL-01)
-    // Step 6: Arbitrator re-resolves dispute (CHL-02)
-    // Step 7: Final winner claims (CLM-01)
-
-    cy.connectWallet()
-    cy.get('body').should('be.visible')
+  it('[E2E-04] Unhappy path — oracle resolve timeout refunds both parties', () => {
+    cy.task('chainTx', { action: 'prepareCondition', args: { question: 'e2e-poly-timeout' } }).then((p) => {
+      cy.createAndAcceptWager({ resolutionType: 4, conditionId: p.conditionId, creatorIsYes: true, acceptIn: 60, resolveIn: 7200 }).then((wagerId) => {
+        cy.advanceTime(7300) // never resolved → past resolveDeadline
+        cy.task('chainTx', { action: 'claimRefund', args: { callerIndex: 0, wagerId } })
+          .then((r) => expect(r.ok, 'refund after oracle timeout').to.be.true)
+        cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>
+          expect(i.status, 'Refunded').to.equal(5))
+      })
+    })
   })
 
-  it('[E2E-05] Unhappy Path — Oracle Timeout (30 days)', () => {
-    // Step 1: Creator creates Chainlink-pegged wager (CRE-13)
-    // Step 2: Opponent accepts (ACC-01)
-    // Step 3: Oracle never resolves (30+ days pass)
-    // Step 4: Either party triggers refund (ORC-12, REF-04)
-    // Step 5: Both parties receive original stakes back
-
-    cy.connectWallet()
-    cy.get('body').should('be.visible')
-  })
-
-  it('[E2E-06] Unhappy Path — Frozen Winner Cannot Claim', () => {
-    // Step 1: 1v1 wager resolves, creator wins (RES-01)
-    // Step 2: Admin freezes creator's account (ADM-09)
-    // Step 3: Creator attempts to claim, blocked (FRZ-05)
-    // Step 4: Admin unfreezes creator (ADM-10)
-    // Step 5: Creator claims payout (FRZ-10, CLM-01)
-
-    cy.connectWallet()
-    cy.get('body').should('be.visible')
+  it('[E2E-05] Unhappy path — a frozen winner cannot claim until unfrozen', () => {
+    cy.createAndAcceptWager({ resolutionType: 0 }).then((wagerId) => {
+      cy.task('chainTx', { action: 'declareWinner', args: { callerIndex: 0, wagerId, winner: CREATOR } })
+      cy.setAccountFrozen(CREATOR, true)
+      // Verify the freeze actually applied on-chain (so the block below is from the freeze).
+      cy.task('chainTx', { action: 'isFrozen', args: { address: CREATOR } })
+        .then((r) => expect(r.frozen, 'winner is frozen').to.be.true)
+      cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
+        .then((r) => {
+          expect(r.ok, 'frozen winner blocked from claiming').to.be.false
+          expect(r.error, 'a revert reason was surfaced').to.be.a('string')
+        })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>
+        expect(i.paid, 'not paid while frozen').to.equal(false))
+      cy.setAccountFrozen(CREATOR, false)
+      cy.task('chainTx', { action: 'isFrozen', args: { address: CREATOR } })
+        .then((r) => expect(r.frozen, 'winner unfrozen').to.be.false)
+      cy.task('chainTx', { action: 'claimPayout', args: { callerIndex: 0, wagerId } })
+        .then((r) => expect(r.ok, 'claims after unfreeze').to.be.true)
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) =>
+        expect(i.paid, 'paid after unfreeze').to.be.true)
+    })
   })
 })

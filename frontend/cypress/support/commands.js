@@ -59,8 +59,13 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
               resolve('0x56bc75e2d63100000') // 100 ETH
               break
             case 'personal_sign':
-              // Return a deterministic mock signature for key derivation
-              resolve('0x' + 'ab'.repeat(65))
+            case 'eth_sign':
+              // Deterministic PER-ACCOUNT signature. encryption.js derives keys via
+              // keccak256(toUtf8Bytes(signature)) and never verifies the signature,
+              // so any account-distinct deterministic value yields per-account keys
+              // (a same-for-all value would let a non-participant decrypt). Expand
+              // the 40-hex-char account to a 65-byte (130-hex) value.
+              resolve('0x' + account.slice(2).toLowerCase().repeat(4).slice(0, 130))
               break
             default:
               fetch(rpcUrl, {
@@ -424,6 +429,34 @@ Cypress.Commands.add('restoreGlobalState', (accounts = TEST_ACCOUNTS) => {
   accounts.forEach((address) => cy.task('chainTx', { action: 'unfreeze', args: { address } }))
 })
 
+/** Read KeyRegistry: has this account registered an encryption key? */
+Cypress.Commands.add('hasRegisteredKey', (address) => {
+  return cy.task('chainTx', { action: 'hasKey', args: { address } }).then((r) => r.registered)
+})
+
+/**
+ * Register the connected account's encryption key via the WalletPage Security tab.
+ * Idempotent — if already registered, it just confirms. Polls KeyRegistry until
+ * the key is on-chain. The connected account must already be connected (the mock
+ * provides per-account signatures so the registered key is account-specific).
+ */
+Cypress.Commands.add('registerEncryptionKeyViaUI', (address) => {
+  cy.visit('/wallet')
+  cy.contains('button', /security/i, { timeout: 10000 }).click()
+  cy.get('body', { timeout: 10000 }).then(($b) => {
+    if (/register encryption key/i.test($b.text())) {
+      cy.contains('button', /register encryption key/i).click()
+    }
+  })
+  const poll = (n) => cy.task('chainTx', { action: 'hasKey', args: { address } }).then((r) => {
+    if (r.registered) return cy.wrap(true)
+    if (n <= 0) throw new Error(`encryption key not registered for ${address}`)
+    cy.wait(1000)
+    return poll(n - 1)
+  })
+  return poll(30)
+})
+
 /** Mint a large stake-token balance to an account (so create/accept never reverts). */
 Cypress.Commands.add('fundAccount', (address) => {
   return cy.task('chainTx', { action: 'fund', args: { address } }).then((r) => {
@@ -503,6 +536,63 @@ Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
     })
     cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
     cy.waitForWagerId(before + 1)
+  })
+})
+
+/**
+ * Mock the IPFS (Pinata) boundary: store uploaded JSON in-memory and serve it back
+ * on fetch, so the app's real encrypt → store → retrieve → decrypt round-trip runs
+ * without a network. Call BEFORE cy.visit. `{ failFetch:true }` makes gateway reads
+ * return 500 (to drive the graceful-error path). CIDs are valid CIDv0 strings.
+ */
+// Module-level IPFS store: persists across tests in a spec so a private wager can
+// be created once (uploads stored here) and decrypted in a later test (fetched here).
+const __ipfsStore = {}
+let __ipfsCounter = 0
+Cypress.Commands.add('interceptIpfs', (opts = {}) => {
+  const mkCid = () => 'Qm' + String(1000 + __ipfsCounter++).split('').map((c) => 'abcdefghij'[+c]).join('') + 'a'.repeat(40)
+  cy.intercept('POST', '**/pinJSONToIPFS', (req) => {
+    const cid = mkCid()
+    const content = (req.body && req.body.pinataContent) || req.body
+    __ipfsStore[cid] = content
+    req.reply({ statusCode: 200, body: { IpfsHash: cid, PinSize: 1, Timestamp: '2026-01-01T00:00:00Z' } })
+  }).as('ipfsUpload')
+  cy.intercept('GET', '**/ipfs/*', (req) => {
+    if (opts.failFetch) { req.reply({ statusCode: 500, body: 'mock IPFS unreachable' }); return }
+    const cid = req.url.split('/ipfs/')[1].split(/[?#/]/)[0]
+    if (__ipfsStore[cid]) req.reply({ statusCode: 200, body: __ipfsStore[cid] })
+    else req.reply({ statusCode: 404, body: 'not found' })
+  }).as('ipfsFetch')
+})
+
+/**
+ * Create a 1v1 PRIVATE (encrypted) wager through the UI — leaves the "Private
+ * Wager" toggle ON. Requires `interceptIpfs()` active and BOTH parties to have a
+ * registered encryption key (creator and `opponent`). Confirms the wager landed
+ * and its metadataUri is an `encrypted:ipfs` reference. Yields the wagerId.
+ */
+Cypress.Commands.add('createPrivateWagerViaUI', (cfg = {}) => {
+  const o = { description: 'E2E private encrypted wager', opponent: TEST_ACCOUNTS[1], stake: 2, ...cfg }
+  cy.lastWagerId().then((before) => {
+    cy.openCreateWagerModal('oneVsOne')
+    cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+    cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+    cy.wait(300)
+    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    const p2 = (n) => String(n).padStart(2, '0')
+    const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
+    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
+    // Leave the encryption toggle ON (do NOT uncheck).
+    cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+    // The encrypted metadata is uploaded to (mocked) IPFS during create.
+    cy.wait('@ipfsUpload', { timeout: 30000 }).its('response.statusCode').should('eq', 200)
+    cy.waitForWagerId(before + 1).then((id) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId: id } }).then((i) => {
+        expect(i.metadataUri, 'encrypted metadata reference').to.match(/^encrypted:ipfs/)
+      })
+      return cy.wrap(id)
+    })
   })
 })
 
