@@ -1078,9 +1078,9 @@ function FriendMarketsModal({
                               : RESOLUTION_TYPE_HINTS[formData.resolutionType]}
                             {resolutionCategory === 'oracle' && !anyOracleEnabled && (
                               <em style={{ display: 'block', marginTop: '0.25rem', opacity: 0.75 }}>
-                                No oracle is available on this network. Switch to a chain with the
-                                Polymarket CTF (Polygon Amoy or Mainnet) or a deployed Chainlink/UMA
-                                adapter, or create a wager that your friends settle instead.
+                                {isOracleModelExposed(ResolutionType.ChainlinkDataFeed)
+                                  ? 'No oracle is available on this network. Switch to a chain with the Polymarket CTF (Polygon Amoy or Mainnet) or a deployed Chainlink/UMA adapter, or create a wager that your friends settle instead.'
+                                  : 'No oracle is available on this network. Switch to a chain with the Polymarket CTF (Polygon Amoy or Mainnet), or create a wager that your friends settle instead.'}
                               </em>
                             )}
                           </span>
