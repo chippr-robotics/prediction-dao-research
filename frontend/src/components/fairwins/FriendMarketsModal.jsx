@@ -34,12 +34,11 @@ const PARTICIPANT_RESOLUTION_TYPES = [
   ResolutionType.Either,
   ResolutionType.Creator,
   ResolutionType.Opponent,
-  // ResolutionType.ThirdParty intentionally omitted: a designated arbiter has
-  // no way to discover the wagers they oversee (the WagerRegistry per-user
-  // index and the subgraph/event queries surface only the creator and
-  // opponent, never the arbiter), so they could never resolve them. The
-  // on-chain enum value and resolution branch remain for any pre-existing
-  // wagers; we just stop offering it as a create-time choice.
+  // ThirdParty re-enabled (Spec Kit 005): the WagerRegistry v3 per-user index now
+  // records the arbitrator (so they can discover the wagers they oversee via
+  // getUserWagers), and the creator encrypts the private terms for the arbitrator
+  // too — so a designated arbiter can both find and read the wager to resolve it.
+  ResolutionType.ThirdParty,
 ]
 
 // Dropdown labels + helper text for every resolution type. Kept here so the
@@ -49,6 +48,7 @@ const RESOLUTION_TYPE_LABELS = {
   [ResolutionType.Either]: 'Either Party',
   [ResolutionType.Creator]: 'Creator Only',
   [ResolutionType.Opponent]: 'Opponent Only',
+  [ResolutionType.ThirdParty]: 'Third Party (Arbitrator)',
   [ResolutionType.Polymarket]: 'Linked Market (Polymarket)',
   [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed (price condition)',
   [ResolutionType.ChainlinkFunctions]: 'Chainlink Functions (custom request)',
@@ -58,6 +58,7 @@ const RESOLUTION_TYPE_HINTS = {
   [ResolutionType.Either]: 'Either you or your opponent can resolve the wager',
   [ResolutionType.Creator]: 'Only you (the creator) can resolve the wager',
   [ResolutionType.Opponent]: 'Only your opponent can resolve the wager',
+  [ResolutionType.ThirdParty]: 'A neutral third party you name resolves the wager (they can read the terms but cannot take a side)',
   [ResolutionType.Polymarket]: 'Settles automatically when the linked Polymarket market resolves',
   [ResolutionType.ChainlinkDataFeed]: 'Settles automatically once the price feed reading at the deadline passes the threshold',
   [ResolutionType.ChainlinkFunctions]: 'Settles when the Chainlink Functions DON returns a result (admin-registered request)',
@@ -243,6 +244,10 @@ function FriendMarketsModal({
     // an ENS name); `opponentResolved` is the 0x address used for validation
     // and contract submission.
     opponentResolved: '',
+    // Arbitrator (ThirdParty resolution only). `arbitrator` is the raw input
+    // (may be an ENS name); `arbitratorResolved` is the 0x address.
+    arbitrator: '',
+    arbitratorResolved: '',
     endDateTime: getDefaultEndDateTime(),
     stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
     stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
@@ -302,6 +307,8 @@ function FriendMarketsModal({
       description: '',
       opponent: '',
       opponentResolved: '',
+      arbitrator: '',
+      arbitratorResolved: '',
       endDateTime: getDefaultEndDateTime(),
       stakeAmount: WAGER_DEFAULTS.STAKE_AMOUNT,
       stakeTokenId: WAGER_DEFAULTS.STAKE_TOKEN_ID,
@@ -637,6 +644,27 @@ function FriendMarketsModal({
       }
     }
 
+    // Arbitrator (ThirdParty resolution): a neutral third party, distinct from
+    // both participants (the contract reverts ArbitratorRequired/ArbitratorDisallowed).
+    if (formData.resolutionType === ResolutionType.ThirdParty) {
+      const rawArb = (formData.arbitrator || '').trim()
+      const resolvedArb = (formData.arbitratorResolved || '').trim()
+      const opp = (formData.opponentResolved || '').trim().toLowerCase()
+      if (!rawArb) {
+        newErrors.arbitrator = 'Arbitrator address is required for third-party resolution'
+      } else if (!resolvedArb) {
+        newErrors.arbitrator = isEnsName(rawArb)
+          ? 'Could not resolve ENS name — check the name and try again'
+          : 'Enter a valid Ethereum address or ENS name'
+      } else if (resolvedArb.toLowerCase() === '0x0000000000000000000000000000000000000000') {
+        newErrors.arbitrator = 'Cannot use the zero address'
+      } else if (resolvedArb.toLowerCase() === account?.toLowerCase()) {
+        newErrors.arbitrator = 'The arbitrator must be neutral — it cannot be you (the creator)'
+      } else if (opp && resolvedArb.toLowerCase() === opp) {
+        newErrors.arbitrator = 'The arbitrator must be neutral — it cannot be the opponent'
+      }
+    }
+
     const stake = parseFloat(formData.stakeAmount)
     const selectedToken = STAKE_TOKEN_OPTIONS.find(t => t.id === formData.stakeTokenId)
     if (!formData.stakeAmount || stake <= 0) {
@@ -834,6 +862,22 @@ function FriendMarketsModal({
           // undefined `ephemeralPublicKey` off an X-Wing wrapped-key entry.
           const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519' })
           finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
+
+          // ThirdParty (Spec Kit 005): the arbitrator must also read the private
+          // terms to resolve the wager, so encrypt for them as a third recipient.
+          // Key-gate: they must have a registered encryption key (mirrors the
+          // opponent gate above) — otherwise block, don't create an unreadable wager.
+          if (formData.resolutionType === ResolutionType.ThirdParty && formData.arbitratorResolved) {
+            const arbitratorKey = await lookupOpponentKey(formData.arbitratorResolved)
+            if (!arbitratorKey) {
+              throw new Error(
+                'The arbitrator has not registered their encryption key yet. ' +
+                'They must register their key before you can create an encrypted third-party wager, ' +
+                'or you can create an unencrypted wager instead.'
+              )
+            }
+            finalMetadata = addRecipientByPublicKey(finalMetadata, formData.arbitratorResolved, arbitratorKey)
+          }
         } else {
           // Defensive fallback: validation guarantees an opponent, but if one
           // is somehow missing, encrypt to the creator only rather than crash.
@@ -880,6 +924,9 @@ function FriendMarketsModal({
           // address. Substitute the ENS-resolved value so a user can enter
           // `name.eth` and the contract still gets a hex address.
           opponent: formData.opponentResolved || formData.opponent,
+          // Arbitrator (ENS-resolved) for ThirdParty resolution; the creation
+          // hook only forwards it on-chain when the resolution type is ThirdParty.
+          arbitrator: formData.arbitratorResolved || formData.arbitrator || '',
           // Translated UI → contract semantics (see comment above).
           creatorIsYes,
           // Pass calculated trading period so downstream uses the user's selected end date.
@@ -1461,6 +1508,31 @@ function FriendMarketsModal({
                         </select>
                         <span className="fm-hint">
                           {RESOLUTION_TYPE_HINTS[formData.resolutionType]}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Arbitrator address — required when a neutral third party resolves. */}
+                    {formData.resolutionType === ResolutionType.ThirdParty &&
+                     (friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                      <div className="fm-form-group fm-form-full">
+                        <label htmlFor="fm-arbitrator">
+                          Arbitrator Address <span className="fm-required">*</span>
+                        </label>
+                        <AddressInput
+                          id="fm-arbitrator"
+                          value={formData.arbitrator}
+                          onChange={(e) => handleFormChange('arbitrator', e.target.value)}
+                          onResolvedChange={(addr) => handleFormChange('arbitratorResolved', addr || '')}
+                          placeholder="0x... or ENS name — the neutral resolver"
+                          disabled={submitting}
+                          error={!!errors.arbitrator}
+                          errorMessage={errors.arbitrator}
+                        />
+                        <span className="fm-hint">
+                          A neutral third party who decides the outcome and can read the
+                          {enableEncryption ? ' private ' : ' '}wager terms to resolve it — they cannot take a side.
+                          They must have registered an encryption key.
                         </span>
                       </div>
                     )}
