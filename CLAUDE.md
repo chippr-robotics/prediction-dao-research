@@ -49,6 +49,6 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/002-e2e-encryption-lifecycle/plan.md` (complete the remaining E2E stubs —
-encryption key registration, encrypted privacy round-trip, lifecycle journeys).
+`specs/003-polymarket-only-oracle-ui/plan.md` (hide all oracle models except
+Polymarket in the frontend, reversibly via one config flag).
 <!-- SPECKIT END -->
