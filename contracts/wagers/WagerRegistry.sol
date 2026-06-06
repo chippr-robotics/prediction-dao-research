@@ -256,6 +256,12 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
 
         _userWagerIds[msg.sender].add(wagerId);
         _userWagerIds[opponent].add(wagerId);
+        // Spec Kit 005: index the arbitrator too (ThirdParty wagers set a non-zero
+        // arbitrator) so they can discover the wagers they oversee via
+        // getUserWagers(arbitrator) — enabling third-party resolution end-to-end.
+        if (arbitrator != address(0)) {
+            _userWagerIds[arbitrator].add(wagerId);
+        }
 
         // Interactions
         IERC20(token).safeTransferFrom(msg.sender, address(this), creatorStake);
