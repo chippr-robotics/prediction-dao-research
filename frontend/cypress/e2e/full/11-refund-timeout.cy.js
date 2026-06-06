@@ -1,67 +1,52 @@
 /**
- * E2E Tests: Refund & Timeout Flows
+ * E2E Tests: Refund & Timeout Flows (Full-tier)
  *
- * Tests refund paths for expired, timed-out, and oracle-timeout wagers.
- * Requires Hardhat node for time manipulation.
+ * Requires a running Hardhat node with deployed contracts (chain 1337).
+ * Verifies that no stake is stranded by inaction:
+ *  - an Open wager not accepted by its acceptDeadline can be refunded (creator);
+ *  - an Active wager not resolved by its resolveDeadline can be refunded (both).
+ * Wagers are set up on-chain (createAndAcceptWager), time is advanced past the
+ * deadline, the refund is claimed, and the outcome is asserted via the wager's
+ * on-chain status. Also asserts the refund is NOT allowed before the deadline.
+ *
+ * Status enum: None=0 Open=1 Active=2 Resolved=3 Cancelled=4 Refunded=5
  *
  * Checklist: REF-01..REF-08
  */
 
-describe('Refund & Timeout Flows', () => {
-  beforeEach(() => {
-    cy.mockWeb3Provider()
-    cy.visit('/fairwins')
-  })
-
-  describe('Happy Path', () => {
-    it('[REF-01] Refund expired open wager — no opponent accepted', () => {
-      cy.connectWallet()
-      // Create wager, advance past acceptance deadline, call claimRefund
-      // Verify creator stake returned, wager status = Refunded
-      cy.get('body').should('be.visible')
-    })
-
-    it('[REF-02] Refund timed-out active wager — no resolution', () => {
-      cy.connectWallet()
-      // Create and accept wager, advance past resolveDeadline, call claimRefund
-      // Verify both stakes returned
-      cy.get('body').should('be.visible')
-    })
-
-    it('[REF-03] Third party triggers refund for eligible wager', () => {
-      cy.connectWallet()
-      // Neutral third party (account #4) calls claimRefund
-      // Stakes go to original parties, not the caller
-      cy.get('body').should('be.visible')
-    })
-
-    it('[REF-04] Oracle timeout mutual refund after 30 days', () => {
-      cy.connectWallet()
-      // Oracle-pegged wager, advance 31 days, trigger refund
-      cy.get('body').should('be.visible')
+describe('Refund & Timeout', () => {
+  it('[REF-01] an unaccepted wager refunds the creator only after the accept deadline', () => {
+    cy.createAndAcceptWager({ accept: false, acceptIn: 60, resolveIn: 7200 }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager starts Open').to.equal(1)
+      })
+      // Refund is NOT allowed before the accept deadline.
+      cy.task('chainTx', { action: 'claimRefund', args: { callerIndex: 0, wagerId } }).then((r) => {
+        expect(r.ok, 'refund blocked before deadline').to.not.equal(true)
+      })
+      cy.advanceTime(120) // past acceptDeadline
+      cy.task('chainTx', { action: 'claimRefund', args: { callerIndex: 0, wagerId } }).then((r) => {
+        expect(r.ok, 'creator refund succeeds after deadline').to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Refunded after accept-timeout').to.equal(5)
+      })
     })
   })
 
-  describe('Non-Happy Path', () => {
-    it('[REF-05] Claim refund before deadline — NotRefundable', () => {
-      cy.connectWallet()
-      // Open wager still within acceptance deadline
-      cy.get('body').should('be.visible')
-    })
-
-    it('[REF-06] Claim refund on active wager before resolve deadline', () => {
-      cy.connectWallet()
-      cy.get('body').should('be.visible')
-    })
-
-    it('[REF-07] Claim refund on already-resolved wager', () => {
-      cy.connectWallet()
-      cy.get('body').should('be.visible')
-    })
-
-    it('[REF-08] Frozen account triggers refund — AccountFrozenError', () => {
-      cy.connectWallet()
-      cy.get('body').should('be.visible')
+  it('[REF-02] an unresolved active wager refunds after the resolve deadline', () => {
+    // Active (accepted) wager with a valid window; advance past resolveDeadline.
+    cy.createAndAcceptWager({ acceptIn: 60, resolveIn: 7200 }).then((wagerId) => {
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Active').to.equal(2)
+      })
+      cy.advanceTime(7300) // past resolveDeadline
+      cy.task('chainTx', { action: 'claimRefund', args: { callerIndex: 0, wagerId } }).then((r) => {
+        expect(r.ok, 'refund after resolve-timeout succeeds').to.be.true
+      })
+      cy.task('chainTx', { action: 'wagerInfo', args: { wagerId } }).then((i) => {
+        expect(i.status, 'wager is Refunded after resolve-timeout').to.equal(5)
+      })
     })
   })
 })

@@ -23,6 +23,13 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
   const account = options.account || TEST_ACCOUNTS[0]
 
   cy.on('window:before:load', (win) => {
+    // Suppress the dev-warning modal/onboarding tutorial and the dev banner so
+    // their fixed-position overlays don't cover interactive elements in tests.
+    try {
+      win.localStorage.setItem('dev_warning_modal_seen_v2', 'true')
+      win.localStorage.setItem('dev_warning_banner_dismissed', 'true')
+    } catch { /* localStorage may be unavailable; ignore */ }
+
     win.ethereum = {
       isMetaMask: true,
       selectedAddress: account,
@@ -67,7 +74,21 @@ Cypress.Commands.add('mockWeb3Provider', (options = {}) => {
                 })
               })
               .then(r => r.json())
-              .then(data => resolve(data.result))
+              .then(data => {
+                // Propagate JSON-RPC errors as a real rejection (EIP-1193 shape)
+                // so viem/ethers can handle reverts/estimateGas failures instead
+                // of receiving `undefined`. This is what makes write txs work:
+                // a reverting eth_estimateGas now rejects (ethers retries/falls
+                // back) and eth_sendTransaction surfaces real errors.
+                if (data && data.error) {
+                  const e = new Error(data.error.message || 'RPC error')
+                  e.code = data.error.code
+                  e.data = data.error.data
+                  reject(e)
+                } else {
+                  resolve(data.result)
+                }
+              })
               .catch(err => reject(err))
           }
         })
@@ -336,5 +357,180 @@ Cypress.Commands.add('checkA11y', () => {
         expect(hasText || hasAriaLabel || hasAriaLabelledBy).to.be.true
       })
     }
+  })
+})
+
+// ***********************************************
+// Precondition helpers (chain 1337 setup) — see
+// specs/001-cypress-e2e-flows/contracts/test-helpers.md.
+// These send admin transactions to the local Hardhat node via the `chainTx`
+// task (cypress.config.js) to arrange on-chain state the UI can't set, or that
+// is faster to set directly. Account #0 holds all admin roles locally.
+// ***********************************************
+
+/** Pause / unpause the WagerRegistry (Guardian = #0). Idempotent. */
+Cypress.Commands.add('setProtocolPaused', (paused) => {
+  return cy.task('chainTx', { action: paused ? 'pause' : 'unpause' }).then((r) => {
+    expect(r.ok, 'setProtocolPaused tx ok').to.be.true
+    return r
+  })
+})
+
+/** Freeze / unfreeze an account (Moderator = #0). */
+Cypress.Commands.add('setAccountFrozen', (address, frozen) => {
+  return cy.task('chainTx', {
+    action: frozen ? 'freeze' : 'unfreeze',
+    args: { address },
+  }).then((r) => {
+    expect(r.ok, 'setAccountFrozen tx ok').to.be.true
+    return r
+  })
+})
+
+/** Grant a WAGER_PARTICIPANT membership (ROLE_MANAGER = #0). */
+Cypress.Commands.add('grantMembershipFor', (address, { tier = 1, durationDays = 30 } = {}) => {
+  return cy.task('chainTx', {
+    action: 'grantMembership',
+    args: { address, tier, durationDays },
+  }).then((r) => {
+    expect(r.ok, 'grantMembershipFor tx ok').to.be.true
+    return r
+  })
+})
+
+/** Resolve a MockPolymarketCTF condition. payouts: [1,0]=YES, [0,1]=NO, [1,1]=tie. */
+Cypress.Commands.add('resolveMockCondition', (conditionId, payouts) => {
+  return cy.task('chainTx', {
+    action: 'resolveCondition',
+    args: { conditionId, payouts },
+  }).then((r) => {
+    expect(r.ok, 'resolveMockCondition tx ok').to.be.true
+    return r
+  })
+})
+
+/** Latest wager id (nextWagerId - 1) for status/winner assertions. */
+Cypress.Commands.add('lastWagerId', () => {
+  return cy.task('lastWagerId')
+})
+
+/**
+ * Restore global state a spec may have changed so the shared node is clean for
+ * later specs. Call in afterEach. Unpauses the protocol and unfreezes the given
+ * accounts (defaults to all five test accounts).
+ */
+Cypress.Commands.add('restoreGlobalState', (accounts = TEST_ACCOUNTS) => {
+  cy.task('chainTx', { action: 'unpause' })
+  accounts.forEach((address) => cy.task('chainTx', { action: 'unfreeze', args: { address } }))
+})
+
+/** Mint a large stake-token balance to an account (so create/accept never reverts). */
+Cypress.Commands.add('fundAccount', (address) => {
+  return cy.task('chainTx', { action: 'fund', args: { address } }).then((r) => {
+    expect(r.ok, 'fundAccount tx ok').to.be.true
+    return r
+  })
+})
+
+/** Connect the mocked wallet as `account` and reach the app. */
+Cypress.Commands.add('connectAs', (account) => {
+  cy.mockWeb3Provider({ account })
+  cy.visit('/fairwins')
+  cy.get('body', { timeout: 10000 }).should('be.visible')
+  cy.get('.wallet-connect-button, button[aria-label="Connect Wallet"]', { timeout: 10000 }).click()
+  cy.get('.connector-option:not(.unavailable)', { timeout: 5000 }).first().click()
+  cy.get('.wallet-account-button, button[aria-label="Wallet Account"]', { timeout: 10000 }).should('be.visible')
+})
+
+/**
+ * Open the create modal, fill it, disable privacy, and submit — WITHOUT asserting
+ * success. Use for "blocked" cases (paused / frozen / expired membership) where
+ * the create should NOT produce a wager; assert lastWagerId is unchanged after.
+ */
+Cypress.Commands.add('attemptCreateWager', (cfg = {}) => {
+  const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, ...cfg }
+  cy.openCreateWagerModal('oneVsOne')
+  cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+  cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+  cy.wait(300)
+  cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+  cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
+    if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
+  })
+  cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+})
+
+/** Poll lastWagerId until it reaches `target` (default ~40s). Yields the id. */
+Cypress.Commands.add('waitForWagerId', (target, tries = 40) => {
+  const check = (remaining) => cy.task('lastWagerId').then((id) => {
+    if (id >= target) return cy.wrap(id)
+    if (remaining <= 0) throw new Error(`wager ${target} not created (last=${id})`)
+    cy.wait(1000)
+    return check(remaining - 1)
+  })
+  return check(tries)
+})
+
+/**
+ * Create a 1v1 wager through the real UI as the connected account, and confirm
+ * it landed on-chain (polls the wager count — robust to success-copy wording).
+ * The creator must already be funded + approved + a member (e.g. via the same
+ * fund/approve/grant the spec does for createAndAcceptWager). "Private Wager" is
+ * turned off so the create flow doesn't block on an IPFS upload (no IPFS in tests).
+ */
+Cypress.Commands.add('createWagerViaUI', (cfg = {}) => {
+  // description must be >= 10 chars (form validation)
+  const o = { description: 'E2E automated wager flow', opponent: TEST_ACCOUNTS[1], stake: 2, resolutionType: 0, ...cfg }
+  cy.lastWagerId().then((before) => {
+    cy.openCreateWagerModal('oneVsOne')
+    cy.get('#fm-description, [role="dialog"] input[type="text"]').first().clear().type(o.description)
+    cy.get('#fm-opponent, [role="dialog"] input[placeholder*="0x"]').first().clear().type(o.opponent)
+    cy.wait(300)
+    cy.get('#fm-stake, [role="dialog"] input[type="number"]').first().clear().type(String(o.stake))
+    if (o.resolutionType !== undefined) {
+      cy.get('#fm-resolution-type, [role="dialog"] .fm-select').first().select(String(o.resolutionType))
+    }
+    // Set a far-future end date (~20 days, within the 21-day max) so acceptDeadline
+    // (the midpoint) stays well ahead of the chain clock even after a spec advances
+    // time — otherwise the UI computes deadlines from browser time and the create
+    // reverts with BadDeadlines once the chain is ahead.
+    const end = new Date(Date.now() + 20 * 24 * 3600 * 1000)
+    const p2 = (n) => String(n).padStart(2, '0')
+    const dtl = `${end.getFullYear()}-${p2(end.getMonth() + 1)}-${p2(end.getDate())}T${p2(end.getHours())}:${p2(end.getMinutes())}`
+    cy.get('#fm-end-date').then(($d) => { if ($d.length) cy.wrap($d).clear().type(dtl) })
+    cy.get('.fm-encryption-toggle input[type="checkbox"]').then(($e) => {
+      if ($e.length && $e.is(':checked')) cy.wrap($e.first()).uncheck({ force: true })
+    })
+    cy.get('[role="dialog"], .modal').find('button').filter(':contains("Create")').click({ force: true })
+    cy.waitForWagerId(before + 1)
+  })
+})
+
+/**
+ * Set up a wager directly on-chain (reliable) so specs can assert UI behavior on
+ * it. Funds + approves + grants membership for both parties, then createWager and
+ * (unless {accept:false}) acceptWager via the chainTx task. Yields the wagerId.
+ *
+ * cfg: { creatorIndex=0, opponentIndex=1, resolutionType=0, creatorIsYes,
+ *        conditionId, acceptIn, resolveIn, stake, accept }
+ */
+Cypress.Commands.add('createAndAcceptWager', (cfg = {}) => {
+  const creatorIndex = cfg.creatorIndex ?? 0
+  const opponentIndex = cfg.opponentIndex ?? 1
+  const creator = TEST_ACCOUNTS[creatorIndex]
+  const opponent = TEST_ACCOUNTS[opponentIndex]
+  cy.task('chainTx', { action: 'fund', args: { address: creator } })
+  cy.task('chainTx', { action: 'fund', args: { address: opponent } })
+  cy.task('chainTx', { action: 'approve', args: { index: creatorIndex } })
+  cy.task('chainTx', { action: 'approve', args: { index: opponentIndex } })
+  cy.task('chainTx', { action: 'grantMembership', args: { address: creator, tier: 4, durationDays: 365 } })
+  cy.task('chainTx', { action: 'grantMembership', args: { address: opponent, tier: 4, durationDays: 365 } })
+  return cy.task('chainTx', { action: 'createWager', args: { ...cfg, creatorIndex, opponent } }).then((r) => {
+    expect(r.ok, 'createWager ok').to.be.true
+    if (cfg.accept === false) return cy.wrap(r.wagerId)
+    return cy.task('chainTx', { action: 'acceptWager', args: { opponentIndex, wagerId: r.wagerId } }).then((a) => {
+      expect(a.ok, 'acceptWager ok').to.be.true
+      return cy.wrap(r.wagerId)
+    })
   })
 })
