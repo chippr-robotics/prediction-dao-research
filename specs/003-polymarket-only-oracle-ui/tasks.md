@@ -45,22 +45,23 @@ description: "Task list — Polymarket-only oracle selection (frontend)"
 
 ## Phase 3: User Story 1 — Only Polymarket is selectable (P1) 🎯 MVP
 
-**Goal**: a user creating an oracle wager sees and can select only Polymarket.
-**Independent test**: open the oracle create flow → Polymarket is the only model offered; no Chainlink/UMA by any path; Polymarket create still works.
+**Goal**: a user creating an oracle wager (1v1 **and Bookmaker**) sees and can select only Polymarket.
+**Independent test**: open the oracle create flow in both the 1v1 and Bookmaker paths → Polymarket is the only model offered; no Chainlink/UMA by any path; Polymarket create still works.
 
-- [ ] T003 [US1] In `frontend/src/components/fairwins/FriendMarketsModal.jsx`, derive the oracle tab list (`ORACLE_TAB_TYPES`, ~L70–75; consumed at `availableResolutionTypes` ~L192 and the tab render ~L1045) from `EXPOSED_ORACLE_RESOLUTION_TYPES`. When only one oracle model is exposed: default `formData.resolutionType` to Polymarket for the oracle category and **suppress the multi-tab oracle chooser** (no dead single-tab/empty selector — FR-002). If an initial/pre-selected `resolutionType` is a now-hidden model, fall back to Polymarket. Do not change the Chainlink/UMA branches (`OracleConditionPicker`) — they become unreachable.
-- [ ] T004 [US1] Add `frontend/src/test/oracleExposure.test.jsx`: (a) default flag → the oracle selector offers exactly one model (Polymarket) and no Chainlink/UMA option is selectable (SC-001); (b) `VITE_ORACLE_MODELS='all'` → the selector offers all four models (SC-004 — also serves US3); (c) a wager whose model is Chainlink or UMA still renders its label (SC-005/FR-006).
+- [ ] T003 [US1] In `frontend/src/components/fairwins/FriendMarketsModal.jsx`, derive the oracle tab list (`ORACLE_TAB_TYPES`, ~L70–75; consumed at `availableResolutionTypes` ~L192 and the tab render ~L1045) from `EXPOSED_ORACLE_RESOLUTION_TYPES`. This covers **both the 1v1 and the Bookmaker** flows (the Bookmaker uses `resolutionCategory='all'` → participant + the same `ORACLE_TAB_TYPES`). When only one oracle model is exposed: default `formData.resolutionType` to Polymarket for the oracle category and **suppress the multi-tab oracle chooser** (no dead single-tab/empty selector — FR-002). If an initial/pre-selected `resolutionType` is a now-hidden model, fall back to Polymarket. Do not change the Chainlink/UMA branches (`OracleConditionPicker`) — they become unreachable.
+- [ ] T004 [US1] Add `frontend/src/test/oracleExposure.test.jsx`: (a) default flag → the oracle selector offers exactly one model (Polymarket) and no Chainlink/UMA option is selectable, **in both the 1v1 and the Bookmaker (`resolutionCategory='all'`) flows** (SC-001/SC-002); (b) `VITE_ORACLE_MODELS='all'` → the selector offers all four models (SC-004 — also serves US3); (c) a wager whose model is Chainlink or UMA still renders its label (SC-005/FR-006).
 
 **Checkpoint**: `npm --prefix frontend run test -- oracleExposure` passes; the Polymarket create path is unchanged.
 
 ---
 
-## Phase 4: User Story 2 — Copy reflects Polymarket-only (P2)
+## Phase 4: User Story 2 — Copy + landing pages reflect Polymarket-only (P2)
 
-**Goal**: explanatory/onboarding copy doesn't advertise Chainlink/UMA as selectable.
-**Independent test**: dashboard + onboarding name only Polymarket as the auto-settlement source under the default flag.
+**Goal**: explanatory/onboarding copy AND landing/marketing pages don't advertise or link Chainlink/UMA.
+**Independent test**: dashboard + onboarding + every landing/marketing page name only Polymarket (zero "Chainlink"/"UMA" text or links) under the default flag.
 
 - [ ] T005 [US2] Condition the oracle copy on the exposure setting: `frontend/src/components/fairwins/Dashboard.jsx` (L54 "Auto-settles from Polymarket, Chainlink or UMA") and `frontend/src/components/fairwins/OnboardingTutorial.jsx` (the Chainlink/UMA explainer cards + "Polymarket, Chainlink or UMA", ~L191–198/L277) render Polymarket-only wording when the flag is default, and the full wording when `all` (FR-004).
+- [ ] T005b [US2] In `frontend/src/components/LandingPage.jsx`, gate the footer "Oracles" list (~L420–423) on the exposure setting: render only the Polymarket link by default; restore the Chainlink (`chain.link`) and "UMA Protocol" (`uma.xyz`) links when `all`. Confirm no other landing/marketing copy contains "Chainlink"/"UMA" (folded from 004; FR-004/SC-003).
 
 ---
 

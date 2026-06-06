@@ -6,14 +6,17 @@
 
 ## Summary
 
-Hide every oracle model except **Polymarket** in the user-facing wager-creation
-flow, reversibly. The change is driven by a **single source of truth** — an
-"exposed oracle models" constant derived from one `VITE_*` env flag (default:
+Hide every oracle model except **Polymarket** across the user-facing frontend,
+reversibly. The change is driven by a **single source of truth** — an "exposed
+oracle models" constant derived from one `VITE_*` env flag (default:
 Polymarket-only). The oracle tab strip in `FriendMarketsModal` renders from that
-constant; with one model it auto-selects Polymarket and shows no multi-tab chooser.
-Display labels for resolution types stay intact so existing non-Polymarket oracle
-wagers still render and settle. Onboarding/dashboard copy is made conditional on
-the same flag. **No contract, ABI, deployment, or admin-tab changes.**
+constant — covering **both the 1v1 and the Bookmaker** flows (they share the same
+oracle selection via `resolutionCategory='all'`); with one model it auto-selects
+Polymarket and shows no multi-tab chooser. The **landing page** footer "Oracles"
+list and the onboarding/dashboard copy are conditioned on the same flag (Chainlink/
+UMA names + links removed when Polymarket-only). Display labels stay intact so
+existing non-Polymarket oracle wagers still render and settle. **No contract, ABI,
+deployment, or admin-tab changes.** (Folds in former feature 004 — same flag.)
 
 ## Technical Context
 
@@ -95,12 +98,14 @@ specs/003-polymarket-only-oracle-ui/
 frontend/
 ├── src/
 │   ├── constants/wagerDefaults.js        # + EXPOSED_ORACLE_RESOLUTION_TYPES derived from a VITE flag (single source of truth)
-│   ├── components/fairwins/
-│   │   ├── FriendMarketsModal.jsx        # ORACLE_TAB_TYPES -> derive from EXPOSED_*; default-select Polymarket; suppress single-tab strip
-│   │   ├── Dashboard.jsx                  # copy: "Polymarket, Chainlink or UMA" -> conditional on the flag
-│   │   └── OnboardingTutorial.jsx         # copy: Chainlink/UMA explainer cards -> conditional on the flag
+│   ├── components/
+│   │   ├── LandingPage.jsx                # footer "Oracles" list (L~421-422): drop Chainlink/UMA links unless flag=all (folded from 004)
+│   │   └── fairwins/
+│   │       ├── FriendMarketsModal.jsx    # ORACLE_TAB_TYPES -> derive from EXPOSED_*; covers BOTH 1v1 + Bookmaker (resolutionCategory 'all'); default-select Polymarket; suppress single-tab strip
+│   │       ├── Dashboard.jsx              # copy: "Polymarket, Chainlink or UMA" -> conditional on the flag
+│   │       └── OnboardingTutorial.jsx     # copy: Chainlink/UMA explainer cards -> conditional on the flag
 │   └── test/
-│       └── oracleExposure.test.jsx        # NEW — selector shows only Polymarket by default; all four when flag=all
+│       └── oracleExposure.test.jsx        # NEW — 1v1 + Bookmaker selector shows only Polymarket by default; all four when flag=all; landing has no Chainlink/UMA
 │   # READ-ONLY / unchanged: OracleConditionPicker.jsx (unreachable branches), components/admin/OracleAdaptersTab.jsx (out of scope)
 contracts/ subgraph/                        # UNTOUCHED (no on-chain changes)
 ```

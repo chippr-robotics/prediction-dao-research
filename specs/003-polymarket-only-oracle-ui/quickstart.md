@@ -13,12 +13,15 @@ display. Frontend-only; no chain/contract changes.
 # default: VITE_ORACLE_MODELS unset (or 'polymarket-only')
 npm --prefix frontend run dev
 ```
-Open the app → start creating an **oracle / auto-settled** wager:
+Open the app → start creating an **oracle / auto-settled** wager (check **both** the
+1v1 and the **Bookmaker** flows):
 - **Expect**: Polymarket is the only oracle model offered and is selected; there is
   **no** Chainlink Data Feed / Chainlink Functions / UMA option (no tab, dropdown
-  entry, or keyboard path), and no empty/dead oracle chooser.
+  entry, or keyboard path), and no empty/dead oracle chooser — in both flows.
 - Pick a Polymarket market and create the wager → **works as before**.
 - Dashboard/onboarding copy names only Polymarket as the auto-settlement source.
+- **Landing page** footer "Oracles" list shows only Polymarket — no Chainlink/UMA
+  links; no landing/marketing page contains "Chainlink"/"UMA".
 
 ## Validate reversibility (all oracles)
 

@@ -18,8 +18,9 @@ isOracleModelExposed(rt)      // helper: boolean (rt ∈ exposed set)
 
 ## Per-surface acceptance contract (what "done" means)
 
-- **FriendMarketsModal — oracle selection**:
-  - Renders only `EXPOSED_ORACLE_RESOLUTION_TYPES` as choices.
+- **FriendMarketsModal — oracle selection (1v1 AND Bookmaker)**:
+  - Renders only `EXPOSED_ORACLE_RESOLUTION_TYPES` as choices — in both the 1v1 and
+    the Bookmaker (`resolutionCategory='all'`) flows.
   - With one exposed model: oracle resolution defaults to Polymarket and **no
     multi-tab oracle chooser / empty selector** is shown (FR-002).
   - No keyboard/DOM/programmatic path selects a hidden model (FR-001).
@@ -27,6 +28,9 @@ isOracleModelExposed(rt)      // helper: boolean (rt ∈ exposed set)
   - A pre-selected hidden model (deep link/draft) falls back to Polymarket.
 - **Dashboard / OnboardingTutorial copy**: names only Polymarket as the auto-
   settlement source when Polymarket-only; full wording when `all` (FR-004).
+- **LandingPage footer "Oracles" list** (folded from 004): only the Polymarket link
+  when Polymarket-only; Chainlink/UMA links restored when `all`; no landing/marketing
+  page contains "Chainlink"/"UMA" text (FR-004/SC-003).
 - **Display of existing wagers**: a hidden-model wager still shows its model name
   and resolves — `RESOLUTION_TYPE_LABELS` and read/settlement paths unchanged (FR-006).
 - **Reversibility**: setting `VITE_ORACLE_MODELS=all` restores all four models in
