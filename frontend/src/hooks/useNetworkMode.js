@@ -3,8 +3,8 @@ import { useChainId, useSwitchChain } from 'wagmi'
 import { getNetwork, TESTNET_MAINNET_PAIR, getCurrentChainId } from '../config/networks'
 
 /**
- * Testnet ↔ Mainnet toggle. The default network is Polygon Amoy (testnet);
- * the user can flip to Polygon Mainnet via the toggle, which calls
+ * Testnet ↔ Mainnet toggle. The default network is Polygon Mainnet; the user
+ * can flip to Polygon Amoy (testnet) via the toggle, which calls
  * wagmi.switchChain so the wallet prompts the user. The DEX context and
  * chain-token hooks react automatically once the chain switches.
  *

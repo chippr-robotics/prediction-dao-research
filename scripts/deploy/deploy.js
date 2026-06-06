@@ -196,7 +196,7 @@ async function main() {
 
   const adapter = await deployDeterministic(
     "PolymarketOracleAdapter",
-    [polymarketCTF],
+    [deployer.address, polymarketCTF],
     generateSalt(SALT_PREFIXES.V2 + "PolymarketOracleAdapter"),
     deployer
   );

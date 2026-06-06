@@ -26,7 +26,7 @@ describe("WagerRegistry", function () {
     await ctf.waitForDeployment();
 
     const PolymarketAdapter = await ethers.getContractFactory("PolymarketOracleAdapter");
-    const adapter = await PolymarketAdapter.deploy(await ctf.getAddress());
+    const adapter = await PolymarketAdapter.deploy(admin.address, await ctf.getAddress());
     await adapter.waitForDeployment();
 
     const MembershipManager = await ethers.getContractFactory("MembershipManager");

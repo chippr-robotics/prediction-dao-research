@@ -108,7 +108,7 @@ export function WalletProvider({ children }) {
     return () => { cancelled = true }
   }, [isConnected, address, walletClient])
 
-  // Auto-switch to Amoy (PRIMARY_CHAIN_ID) when the wallet connects on an
+  // Auto-switch to Polygon (PRIMARY_CHAIN_ID) when the wallet connects on an
   // unsupported chain. If the switch fails, show a network error instead.
   useEffect(() => {
     if (!isConnected) {
@@ -126,7 +126,7 @@ export function WalletProvider({ children }) {
         onError: () => {
           const primary = getNetwork(PRIMARY_CHAIN_ID)
           setNetworkError(
-            `Please switch to ${primary?.name || 'Polygon Amoy'} in your wallet.`
+            `Please switch to ${primary?.name || 'Polygon'} in your wallet.`
           )
         },
       }

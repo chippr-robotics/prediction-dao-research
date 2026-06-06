@@ -87,8 +87,12 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
     error InvalidConditionId();
     error FetchFailed();
 
-    constructor(address _polymarketCTF) Ownable(msg.sender) {
-        if (_polymarketCTF == address(0)) revert InvalidAddress();
+    // `admin` (not msg.sender) becomes the owner so deterministic CREATE2-via-
+    // factory deploys are owned by the intended admin EOA rather than the
+    // singleton factory — matching the other oracle adapters. See
+    // test/oracles/AdapterDeterministicOwnership.test.js.
+    constructor(address admin, address _polymarketCTF) Ownable(admin) {
+        if (admin == address(0) || _polymarketCTF == address(0)) revert InvalidAddress();
         polymarketCTF = _polymarketCTF;
         supportedCTFContracts[_polymarketCTF] = true;
         emit CTFContractAdded(_polymarketCTF);
@@ -481,6 +485,14 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
     ) {
         CachedResolution storage cached = resolutionCache[conditionId];
         if (cached.resolved) {
+            // A tie (equal payout numerators — e.g. a 50/50 split or an
+            // "invalid"/UMA-disputed Polymarket resolution) is not a decidable
+            // YES/NO outcome. Return the unresolved sentinel (resolvedAt=0) so
+            // WagerRegistry leaves the wager unsettled and the deadline-based
+            // refund path returns both stakes, rather than paying a fixed side.
+            if (cached.passNumerator == cached.failNumerator) {
+                return (false, 0, 0);
+            }
             return (
                 cached.passNumerator > cached.failNumerator,
                 10000, // 100% confidence for resolved conditions
@@ -495,6 +507,11 @@ contract PolymarketOracleAdapter is IOracleAdapter, Ownable, ReentrancyGuard {
             }
             uint256[] memory payouts = IPolymarketOracle(polymarketCTF).getPayoutNumerators(conditionId);
             if (payouts.length >= 2) {
+                // Tie / invalid market (incl. both-zero) -> unresolved sentinel
+                // so the wager refunds via the deadline path (see cached branch).
+                if (payouts[0] == payouts[1]) {
+                    return (false, 0, 0);
+                }
                 return (
                     payouts[0] > payouts[1],
                     10000,

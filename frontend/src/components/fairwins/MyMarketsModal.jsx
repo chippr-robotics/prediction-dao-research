@@ -1644,6 +1644,8 @@ function ResolutionModal({
   const [error, setError] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [step, setStep] = useState('select') // 'select', 'confirm', 'success'
+  // Chain-aware explorer link for the payout receipt (avoids a hardcoded testnet host).
+  const { chainId } = useWeb3()
 
   // Canonical outcome keys preserve the on-chain mapping:
   //   outcomes[0] => creator wins, outcomes[1] => opponent wins.
@@ -1934,7 +1936,7 @@ function ResolutionModal({
               </p>
               {txHash && (
                 <p className="mm-success-hint">
-                  <a href={`https://etc-mordor.blockscout.com/tx/${txHash}`} target="_blank" rel="noopener noreferrer">
+                  <a href={getTransactionUrl(chainId, txHash)} target="_blank" rel="noopener noreferrer">
                     View transaction
                   </a>
                 </p>

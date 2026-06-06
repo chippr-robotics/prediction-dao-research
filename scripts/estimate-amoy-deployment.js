@@ -62,7 +62,7 @@ async function main() {
   const mockCTF = await deploy("MockPolymarketCTF"); deploys.push(mockCTF);
 
   // PolymarketOracleAdapter
-  const adapter = await deploy("PolymarketOracleAdapter", [mockCTF.address]);
+  const adapter = await deploy("PolymarketOracleAdapter", [deployer.address, mockCTF.address]);
   deploys.push(adapter);
 
   // Configured Amoy tokens (used in ctors only; no transfers happen here)

@@ -22,7 +22,7 @@ describe("WagerRegistry + UMAOptimisticOracleV3Adapter (integration)", function 
     const Ctf = await ethers.getContractFactory("MockPolymarketCTF");
     const ctf = await Ctf.deploy();
     const PolymarketAdapter = await ethers.getContractFactory("PolymarketOracleAdapter");
-    const pmAdapter = await PolymarketAdapter.deploy(await ctf.getAddress());
+    const pmAdapter = await PolymarketAdapter.deploy(admin.address, await ctf.getAddress());
 
     const OO = await ethers.getContractFactory("MockOptimisticOracleV3");
     const oo = await OO.deploy();

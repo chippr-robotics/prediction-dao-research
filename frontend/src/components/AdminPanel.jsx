@@ -47,6 +47,7 @@ const MEMBERSHIP_ADMIN_ABI = [
   'function grantRole(bytes32 role, address account)',
   'function revokeRole(bytes32 role, address account)',
   'function accruedFees() view returns (uint128)',
+  'function treasury() view returns (address)',
 ]
 
 function shortAddr(address) {
@@ -82,6 +83,7 @@ function AdminPanel() {
   const [contractState, setContractState] = useState({
     isPaused: false,
     accruedFees: '0',
+    treasury: '',
     isLoaded: false,
   })
 
@@ -110,6 +112,13 @@ function AdminPanel() {
 
   // Withdraw form
   const [withdrawForm, setWithdrawForm] = useState({ to: '', amount: '' })
+  // Default the withdrawal recipient to the on-chain treasury (the configured
+  // sales destination) until the admin types a different address.
+  useEffect(() => {
+    if (contractState.treasury) {
+      setWithdrawForm((f) => (f.to ? f : { ...f, to: contractState.treasury }))
+    }
+  }, [contractState.treasury])
   const withdrawEns = useEnsResolution(withdrawForm.to || '')
 
   const wagerRegistryAddr = getContractAddress('wagerRegistry')
@@ -130,13 +139,15 @@ function AdminPanel() {
   const fetchContractState = useCallback(async () => {
     if (!wagerRegistryRead || !membershipManagerRead) return
     try {
-      const [paused, fees] = await Promise.all([
+      const [paused, fees, treasury] = await Promise.all([
         wagerRegistryRead.paused().catch(() => false),
         membershipManagerRead.accruedFees().catch(() => 0n),
+        membershipManagerRead.treasury().catch(() => ''),
       ])
       setContractState({
         isPaused: paused,
         accruedFees: ethers.formatUnits(fees, USDC_DECIMALS),
+        treasury: treasury || '',
         isLoaded: true,
       })
     } catch (err) {
@@ -647,6 +658,10 @@ function AdminPanel() {
                     onChange={(e) => setWithdrawForm({ ...withdrawForm, to: e.target.value })} />
                   {withdrawEns.resolvedAddress && withdrawEns.isEns && (
                     <span className="hint">→ {shortAddr(withdrawEns.resolvedAddress)}</span>
+                  )}
+                  {contractState.treasury && withdrawForm.to &&
+                    withdrawForm.to.toLowerCase() === contractState.treasury.toLowerCase() && (
+                    <span className="hint">Configured treasury</span>
                   )}
                 </label>
                 <label>

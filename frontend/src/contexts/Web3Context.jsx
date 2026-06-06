@@ -106,7 +106,7 @@ export function Web3Provider({ children }) {
   }, [disconnect])
 
   const handleSwitchNetwork = useCallback(async () => {
-    // Switch to the configured primary chain (Polygon Amoy). This path only
+    // Switch to the configured primary chain (Polygon mainnet). This path only
     // runs when the user is on an unrecognized network.
     const target = PRIMARY_CHAIN_ID
     try {
@@ -116,7 +116,7 @@ export function Web3Provider({ children }) {
       const targetNet = getNetwork(target)
       alert(
         `Please manually switch to the correct network in your wallet:\n` +
-        `Network: ${targetNet?.name || 'Polygon Amoy'}\nChain ID: ${target}`
+        `Network: ${targetNet?.name || 'Polygon'}\nChain ID: ${target}`
       )
     }
   }, [switchChain])

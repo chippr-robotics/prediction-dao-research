@@ -140,7 +140,10 @@ jobs:
 
       - name: Run Slither analysis
         run: |
-          slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md
+          # Slither exits non-zero when it reports findings; that is informational
+          # for this weekly job (the report is uploaded as an artifact), so don't
+          # let a finding fail the job — matches security-testing.yml behavior.
+          slither . --config-file slither.config.json --checklist --markdown-root . > slither-report.md || true
 
       - name: Upload Slither reports
         uses: actions/upload-artifact@v4
@@ -155,6 +158,11 @@ jobs:
   manticore-analysis:
     name: Manticore Symbolic Execution
     runs-on: ubuntu-latest
+    # Manticore is a best-effort weekly tool with a fragile install (protobuf /
+    # wasm / Python compat). Its analysis steps are already continue-on-error;
+    # mark the whole job non-blocking so an install failure doesn't fail the
+    # weekly torture test. Results are still uploaded as artifacts when it runs.
+    continue-on-error: true
     timeout-minutes: 180
     
     steps:

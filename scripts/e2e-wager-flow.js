@@ -32,7 +32,7 @@ async function deployInProcess(admin) {
   await wmatic.waitForDeployment();
   const ctf = await (await ethers.getContractFactory("MockPolymarketCTF")).deploy();
   await ctf.waitForDeployment();
-  const adapter = await (await ethers.getContractFactory("PolymarketOracleAdapter")).deploy(await ctf.getAddress());
+  const adapter = await (await ethers.getContractFactory("PolymarketOracleAdapter")).deploy(admin.address, await ctf.getAddress());
   await adapter.waitForDeployment();
   const mgr = await (await ethers.getContractFactory("MembershipManager")).deploy(admin.address, await usdc.getAddress(), admin.address);
   await mgr.waitForDeployment();
