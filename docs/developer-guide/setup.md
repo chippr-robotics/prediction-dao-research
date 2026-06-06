@@ -158,6 +158,74 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173`
 
+### 5. Seed Wallets & End-to-End Testing
+
+`deploy:local` deploys the contracts but does **not** fund any wallet. To exercise the
+full create → accept → resolve wager lifecycle locally you also need two wallets that
+hold the test stake token, an active `WAGER_PARTICIPANT` membership, and an allowance to
+the WagerRegistry. Bring the whole environment up with one command (with the node from
+step 1 already running):
+
+```bash
+npm run setup:local
+```
+
+`setup:local` runs three steps in order:
+
+1. `deploy:local` — deploys the v2 contract set and writes
+   `deployments/localhost-chain1337-v2.json`.
+2. `sync:frontend-contracts:local` — writes the local addresses into the frontend's
+   `HARDHAT_CONTRACTS` block (generated, never hand-edited).
+3. `seed:local` — for the two developer wallets below: mints the test ERC20 stake token
+   (USDC + WMATIC), grants an active `WAGER_PARTICIPANT` membership, and approves the
+   WagerRegistry. Re-runnable on its own after a redeploy (idempotent).
+
+You can also run any step individually (e.g. `npm run seed:local` after a fresh deploy).
+Seed amounts are overridable via `SEED_USDC_AMOUNT`, `SEED_WMATIC_AMOUNT`, and
+`SEED_MEMBERSHIP_DAYS`.
+
+#### The two funded wallets
+
+These are the first two default Hardhat accounts — deterministic, **local-only**, no real
+value:
+
+| Role | Address | Hardhat account |
+|------|---------|-----------------|
+| Wallet #0 (creator / deployer) | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` | Account #0 |
+| Wallet #1 (acceptor) | `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` | Account #1 |
+
+`npm run node` prints all 20 accounts **with their private keys** on startup. Import
+Account #0 and Account #1 into MetaMask using the keys from that console output — this
+repo intentionally does not store any private key. These keys are for the local chain
+only and must never be used on a real network.
+
+#### Run the app end-to-end
+
+```bash
+VITE_NETWORK_ID=1337 npm run frontend
+```
+
+Then, in the app: connect **Wallet #0** and create + fund a wager; connect **Wallet #1**
+and accept + fund it; resolve it and confirm the winner's payout. No remote network calls
+are required. The automated invariant check (no browser needed) is:
+
+```bash
+npx hardhat test test/integration/seed-local.test.js
+```
+
+#### Reset to a clean state
+
+The local chain is ephemeral. Stop `npm run node` (Ctrl-C), start it again, then re-run
+`npm run setup:local` to return to a fresh, fully funded state.
+
+> **Note:** `setup:local` targets the `localhost` network at `http://127.0.0.1:8545`. If
+> another node already occupies port 8545, stop it (or free the port) before running
+> `npm run node`, since the contracts must deploy to the same chain the frontend and
+> wallets point at.
+
+The full runbook lives at
+[`specs/006-local-dev-environment/quickstart.md`](../../specs/006-local-dev-environment/quickstart.md).
+
 ## Configuration
 
 ### Configure MetaMask for Local Development
