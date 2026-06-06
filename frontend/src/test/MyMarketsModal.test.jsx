@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
@@ -60,6 +60,7 @@ vi.mock('../hooks/useEncryption', () => ({
 }))
 
 import { useWallet, useWeb3 } from '../hooks'
+import { useLazyMarketDecryption } from '../hooks/useEncryption'
 
 describe('MyMarketsModal', () => {
   const mockOnClose = vi.fn()
@@ -625,6 +626,64 @@ describe('MyMarketsModal', () => {
       await waitFor(() => {
         expect(screen.getByText('Friend bet on game')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('FR-010 graceful degradation (terms unavailable)', () => {
+    const me = '0x1234567890123456789012345678901234567890'
+
+    // The helper installs a persistent useLazyMarketDecryption.mockReturnValue;
+    // restore the default mapping impl after each test so it doesn't leak into
+    // sibling describes (e.g. Draw US3, which relies on the default mock).
+    afterEach(() => {
+      useLazyMarketDecryption.mockImplementation((markets) => ({
+        markets: (markets || []).map((m) => ({ ...m, encryptionStatus: 'not_encrypted', isPrivate: false, canView: true })),
+        decryptMarket: vi.fn().mockResolvedValue({}),
+        isMarketDecrypting: vi.fn().mockReturnValue(false),
+        isAnyDecrypting: false,
+        clearCache: vi.fn(),
+      }))
+    })
+
+    // Render the modal so that decryptableMarkets yields a single encrypted,
+    // user-created wager whose decryption has failed, then open its detail view.
+    const openFailedEncryptedDetail = async (failure) => {
+      const market = {
+        id: '42', description: 'Encrypted Wager Forty Two', creator: me,
+        participants: [me], status: 'active', marketType: 'friend',
+        tradingEndTime: BigInt(Math.floor(Date.now() / 1000) + 86400),
+        isEncrypted: true, decryptedMetadata: null, ...failure,
+      }
+      useLazyMarketDecryption.mockReturnValue({
+        markets: [market],
+        decryptMarket: vi.fn().mockResolvedValue({}),
+        isMarketDecrypting: vi.fn().mockReturnValue(false),
+        isAnyDecrypting: false,
+        clearCache: vi.fn(),
+      })
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(<MyMarketsModal isOpen={true} onClose={mockOnClose} />)
+      })
+      const createdTab = screen.getByRole('tab', { name: /created/i })
+      await user.click(createdTab)
+      const row = await screen.findByText('Encrypted Wager Forty Two')
+      await user.click(row)
+      return user
+    }
+
+    it('shows a "terms unavailable" state with a retry when decryption fails', async () => {
+      await openFailedEncryptedDetail({ decryptionError: 'Signature rejected' })
+      expect(await screen.findByText(/terms unavailable/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+      // Not the silent stuck "Decrypt Wager Details" button.
+      expect(screen.queryByRole('button', { name: /decrypt wager details/i })).not.toBeInTheDocument()
+    })
+
+    it('shows the same state when the IPFS envelope is unavailable', async () => {
+      await openFailedEncryptedDetail({ ipfsEnvelopeError: 'Gateway timeout' })
+      expect(await screen.findByText(/terms unavailable/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
     })
   })
 
