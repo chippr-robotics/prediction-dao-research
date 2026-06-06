@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
@@ -632,6 +632,19 @@ describe('MyMarketsModal', () => {
   describe('FR-010 graceful degradation (terms unavailable)', () => {
     const me = '0x1234567890123456789012345678901234567890'
 
+    // The helper installs a persistent useLazyMarketDecryption.mockReturnValue;
+    // restore the default mapping impl after each test so it doesn't leak into
+    // sibling describes (e.g. Draw US3, which relies on the default mock).
+    afterEach(() => {
+      useLazyMarketDecryption.mockImplementation((markets) => ({
+        markets: (markets || []).map((m) => ({ ...m, encryptionStatus: 'not_encrypted', isPrivate: false, canView: true })),
+        decryptMarket: vi.fn().mockResolvedValue({}),
+        isMarketDecrypting: vi.fn().mockReturnValue(false),
+        isAnyDecrypting: false,
+        clearCache: vi.fn(),
+      }))
+    })
+
     // Render the modal so that decryptableMarkets yields a single encrypted,
     // user-created wager whose decryption has failed, then open its detail view.
     const openFailedEncryptedDetail = async (failure) => {
@@ -671,6 +684,87 @@ describe('MyMarketsModal', () => {
       await openFailedEncryptedDetail({ ipfsEnvelopeError: 'Gateway timeout' })
       expect(await screen.findByText(/terms unavailable/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+    })
+  })
+
+  describe('Draw resolution (US3)', () => {
+    const me = '0x1234567890123456789012345678901234567890'
+    const other = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+    // tradingEndTime in the past (ms) so the resolve window is open and the
+    // Resolve button renders (no resolveDeadlineTime → deadline gate skipped).
+    const pastEnd = Date.now() - 86_400_000
+
+    it('shows a distinct "Draw" status for a drawn wager in History', async () => {
+      const user = userEvent.setup()
+      const drawn = {
+        id: '7', description: 'Drawn Wager', creator: me, participants: [me, other],
+        status: 'draw', marketType: 'friend',
+        endDate: new Date(Date.now() - 3_600_000).toISOString(),
+      }
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[drawn]} />
+        )
+      })
+
+      const historyTab = screen.getByRole('tab', { name: /history/i })
+      await user.click(historyTab)
+
+      await waitFor(() => {
+        expect(screen.getByText('Drawn Wager')).toBeInTheDocument()
+      })
+      // The status badge reads "Draw" (distinct text — not "Refunded"/"Resolved").
+      expect(screen.getAllByText('Draw').length).toBeGreaterThan(0)
+      expect(screen.queryByText('Refunded')).not.toBeInTheDocument()
+    })
+
+    it('offers a labeled Draw option in the resolution modal for an authorized resolver', async () => {
+      const user = userEvent.setup()
+      const active = {
+        id: '8', description: 'Either Bet', creator: me, opponent: other,
+        participants: [me, other], resolutionType: 0, status: 'active',
+        marketType: 'friend', tradingEndTime: pastEnd,
+      }
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[active]} />
+        )
+      })
+
+      const createdTab = screen.getByRole('tab', { name: /created/i })
+      await user.click(createdTab)
+
+      const resolveBtn = await screen.findByRole('button', { name: /^resolve$/i })
+      await user.click(resolveBtn)
+
+      // Modal opens; the Draw option is presented alongside the winner options.
+      expect(await screen.findByText(/Draw — both parties refunded/i)).toBeInTheDocument()
+      // Winner options are also present for an Either resolver.
+      expect(screen.getByText('Creator wins')).toBeInTheDocument()
+    })
+
+    it('does not offer a manual Draw for an oracle-resolved (Polymarket) wager', async () => {
+      const user = userEvent.setup()
+      const oracleWager = {
+        id: '9', description: 'Polymarket Bet', creator: me, opponent: other,
+        participants: [me, other], resolutionType: 4, status: 'active',
+        marketType: 'friend', tradingEndTime: pastEnd,
+      }
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={[oracleWager]} />
+        )
+      })
+
+      const createdTab = screen.getByRole('tab', { name: /created/i })
+      await user.click(createdTab)
+
+      await waitFor(() => {
+        expect(screen.getByText('Polymarket Bet')).toBeInTheDocument()
+      })
+      // Oracle wagers resolve automatically — no manual Resolve/Draw control.
+      expect(screen.queryByRole('button', { name: /^resolve$/i })).not.toBeInTheDocument()
+      expect(screen.queryByText(/Draw — both parties refunded/i)).not.toBeInTheDocument()
     })
   })
 

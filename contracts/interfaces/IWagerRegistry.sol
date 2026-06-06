@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 /// @notice Public surface area for off-chain integrators (frontend, indexers).
 interface IWagerRegistry {
     enum ResolutionType { Either, Creator, Opponent, ThirdParty, Polymarket, ChainlinkDataFeed, ChainlinkFunctions, UMA }
-    enum Status { None, Open, Active, Resolved, Cancelled, Refunded }
+    enum Status { None, Open, Active, Resolved, Cancelled, Refunded, Draw }
 
     struct Wager {
         address creator;
@@ -42,6 +42,9 @@ interface IWagerRegistry {
     event WagerDeclined(uint256 indexed wagerId, address indexed opponent);
     event WagerResolved(uint256 indexed wagerId, address indexed winner, address indexed by);
     event WagerRefunded(uint256 indexed wagerId, address indexed creator, address indexed opponent);
+    event WagerDrawn(uint256 indexed wagerId, address indexed creator, address indexed opponent, address by);
+    event DrawProposed(uint256 indexed wagerId, address indexed proposer);
+    event DrawRevoked(uint256 indexed wagerId, address indexed proposer);
     event PayoutClaimed(uint256 indexed wagerId, address indexed winner, uint256 amount);
     event PolymarketLinked(uint256 indexed wagerId, bytes32 indexed conditionId, bool creatorIsYes);
     event OracleAdapterUpdated(ResolutionType indexed resolutionType, address indexed adapter);
@@ -74,6 +77,8 @@ interface IWagerRegistry {
     function cancelOpen(uint256 wagerId) external;
     function declineWager(uint256 wagerId) external;
     function declareWinner(uint256 wagerId, address winner) external;
+    function declareDraw(uint256 wagerId) external;
+    function revokeDraw(uint256 wagerId) external;
     function autoResolveFromPolymarket(uint256 wagerId) external;
     function autoResolveFromOracle(uint256 wagerId) external;
     function claimPayout(uint256 wagerId) external;
@@ -85,6 +90,7 @@ interface IWagerRegistry {
     function isFrozen(address user) external view returns (bool);
 
     function getWager(uint256 wagerId) external view returns (Wager memory);
+    function drawConsent(uint256 wagerId) external view returns (bool creatorAgreed, bool opponentAgreed);
     function isAllowedToken(address token) external view returns (bool);
     function nextWagerId() external view returns (uint256);
 

@@ -200,6 +200,7 @@ function MyMarketsModal({
       if (statusLower === 'declined') return MarketStatus.DECLINED
       if (statusLower === 'resolved') return MarketStatus.RESOLVED
       if (statusLower === 'refunded') return MarketStatus.REFUNDED
+      if (statusLower === 'draw') return MarketStatus.DRAW
       if (statusLower === 'oracle_timed_out') return MarketStatus.ORACLE_TIMED_OUT
       if (statusLower === 'challenged') return MarketStatus.CHALLENGED
 
@@ -268,6 +269,7 @@ function MyMarketsModal({
         status === MarketStatus.CANCELLED ||
         status === MarketStatus.DECLINED ||
         status === MarketStatus.REFUNDED ||
+        status === MarketStatus.DRAW ||
         status === MarketStatus.ORACLE_TIMED_OUT
       ) {
         if (isCreator(market) || isParticipant(market)) {
@@ -347,6 +349,7 @@ function MyMarketsModal({
       case MarketStatus.DECLINED: return 'status-cancelled'
       case MarketStatus.EXPIRED: return 'status-expired'
       case MarketStatus.REFUNDED: return 'status-cancelled'
+      case MarketStatus.DRAW: return 'status-draw'
       case MarketStatus.ORACLE_TIMED_OUT: return 'status-cancelled'
       default: return 'status-default'
     }
@@ -364,6 +367,7 @@ function MyMarketsModal({
       case MarketStatus.DECLINED: return 'Declined'
       case MarketStatus.EXPIRED: return 'Expired'
       case MarketStatus.REFUNDED: return 'Refunded'
+      case MarketStatus.DRAW: return 'Draw'
       case MarketStatus.ORACLE_TIMED_OUT: return 'Timed Out'
       default: return status
     }
@@ -1124,7 +1128,13 @@ function ResolveButtonWithCountdown({ market, onResolve, account, variant = 'com
     return false
   })()
 
-  if (!isAuthorized) return null
+  // A draw returns both stakes and so needs BOTH participants to agree; allow
+  // either participant to open the resolution flow to propose/confirm a draw on
+  // participant-resolved types (Either/Creator/Opponent), even when they cannot
+  // declare a winner (e.g. the opponent on a Creator-resolved wager).
+  const canProposeDraw = (resType === 0 || resType === 1 || resType === 2) && (isCreator || isOpponent)
+
+  if (!isAuthorized && !canProposeDraw) return null
 
   const status = market.computedStatus || market.status
   if (status === 'resolved' || status === 'disputed' || status === 'cancelled' ||
@@ -1663,6 +1673,9 @@ function ResolutionModal({
   const [error, setError] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [step, setStep] = useState('select') // 'select', 'confirm', 'success'
+  // For a draw on a participant wager, the first call only PROPOSES (awaiting the
+  // counterparty); the second SETTLES. Detected from the WagerDrawn event below.
+  const [drawSettled, setDrawSettled] = useState(false)
   // Chain-aware explorer link for the payout receipt (avoids a hardcoded testnet host).
   const { chainId } = useWeb3()
 
@@ -1685,9 +1698,37 @@ function ResolutionModal({
     [outcomes[1]]: { title: 'Opponent wins', who: fmtParty(market.opponent) },
   }
   const labelFor = (outcome) => {
+    if (outcome === DRAW) return 'Draw — both parties refunded'
     const meta = outcomeLabels[outcome]
     return meta ? `${meta.title} — ${meta.who}` : outcome
   }
+
+  // Resolution authority (mirrors the contract). A winner declaration is
+  // gated by resolutionType; a DRAW additionally requires both participants to
+  // agree for participant types (Either/Creator/Opponent) and is arbitrator-only
+  // for ThirdParty. Oracle types are never manually drawn here.
+  const DRAW = 'Draw'
+  const userAddr = account?.toLowerCase()
+  const isCreator = market.creator?.toLowerCase() === userAddr
+  const isOpponent = market.participants?.length > 1 &&
+    market.participants[1]?.toLowerCase() === userAddr
+  const isArbitrator = market.arbitrator &&
+    market.arbitrator !== ethers.ZeroAddress &&
+    market.arbitrator.toLowerCase() === userAddr
+  const resType = market.resolutionType ?? 0
+  const isOracleType = resType >= 4 // Polymarket(4), Chainlink(5,6), UMA(7)
+  const canDeclareWinner = (() => {
+    if (resType === 0) return isCreator || isOpponent || isArbitrator
+    if (resType === 1) return isCreator
+    if (resType === 2) return isOpponent
+    if (resType === 3) return isArbitrator
+    return false
+  })()
+  const canDraw = !isOracleType && (
+    ((resType === 0 || resType === 1 || resType === 2) && (isCreator || isOpponent)) ||
+    (resType === 3 && isArbitrator)
+  )
+  const isDrawSelected = selectedOutcome === DRAW
 
   const handleSubmit = async () => {
     if (!selectedOutcome) {
@@ -1722,6 +1763,30 @@ function ResolutionModal({
     )
 
     try {
+      const feeOverrides = await getFeeOverrides(signer.provider)
+
+      // Draw: returns each party their own stake. For participant types the
+      // first call only proposes (awaiting the counterparty); the second settles.
+      if (isDrawSelected) {
+        const tx = await registry.declareDraw(market.id, feeOverrides)
+        setTxHash(tx.hash)
+        const receipt = await tx.wait()
+        if (receipt && receipt.status === 0) {
+          throw new Error('Transaction reverted on-chain. Draw failed.')
+        }
+        if (!receipt) {
+          throw new Error('Transaction was dropped or replaced. Please try again.')
+        }
+        // A WagerDrawn event means the draw settled now; otherwise it's a pending
+        // proposal awaiting the counterparty's confirmation.
+        const settled = receipt.logs.some((l) => {
+          try { return registry.interface.parseLog(l)?.name === 'WagerDrawn' } catch { return false }
+        })
+        setDrawSettled(settled)
+        setStep('success')
+        return
+      }
+
       // outcome: true = first option wins (Pass/Yes/creator), false = second option (Fail/No/opponent)
       const outcomeBool = selectedOutcome === outcomes[0]
 
@@ -1735,7 +1800,6 @@ function ResolutionModal({
         notes: resolutionNotes,
       })
 
-      const feeOverrides = await getFeeOverrides(signer.provider)
       const tx = await registry.declareWinner(market.id, winner, feeOverrides)
       setTxHash(tx.hash)
 
@@ -1767,6 +1831,12 @@ function ResolutionModal({
               setError('This wager is not active. It may have already been resolved or is still pending acceptance.')
             } else if (decodedName === 'NotAuthorized') {
               setError('You are not authorized to resolve this wager based on its resolution type.')
+            } else if (decodedName === 'NotParticipant') {
+              setError('Only the two participants can settle this wager as a draw.')
+            } else if (decodedName === 'DrawNotApplicable') {
+              setError('This wager resolves from an oracle, so it cannot be settled as a draw manually.')
+            } else if (decodedName === 'NoDrawProposal') {
+              setError('There is no draw proposal of yours to withdraw.')
             } else {
               setError(`Contract rejected the transaction: ${decodedName}`)
             }
@@ -1827,27 +1897,53 @@ function ResolutionModal({
               <div className="mm-resolution-market-info">
                 <h4>{getMarketDisplayTitle(market)}</h4>
                 <p className="mm-resolution-hint">
-                  Select the winning party for this wager. This pays out the entire pot to
-                  the chosen participant and is final once confirmed on-chain.
+                  {canDeclareWinner
+                    ? 'Select the winning party — this pays the entire pot to the chosen participant and is final once confirmed on-chain.'
+                    : 'You can settle this wager as a draw.'}
+                  {canDraw && ' A draw returns each party their original stake; no winner is paid.'}
                 </p>
               </div>
 
               <div className="mm-resolution-outcomes">
-                <label className="mm-outcome-label">Who won?</label>
-                <div className="mm-outcome-options">
-                  {outcomes.map(outcome => (
+                {canDeclareWinner && (
+                  <>
+                    <label className="mm-outcome-label">Who won?</label>
+                    <div className="mm-outcome-options">
+                      {outcomes.map(outcome => (
+                        <button
+                          key={outcome}
+                          type="button"
+                          className={`mm-outcome-btn ${selectedOutcome === outcome ? 'selected' : ''} ${outcome === outcomes[0] ? 'positive' : 'negative'}`}
+                          onClick={() => setSelectedOutcome(outcome)}
+                          disabled={submitting}
+                        >
+                          <span className="mm-outcome-title">{outcomeLabels[outcome]?.title || outcome}</span>
+                          <span className="mm-outcome-addr">{outcomeLabels[outcome]?.who}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {canDraw && (
+                  <div className="mm-resolution-draw">
+                    <label className="mm-outcome-label">Or settle without a winner</label>
                     <button
-                      key={outcome}
                       type="button"
-                      className={`mm-outcome-btn ${selectedOutcome === outcome ? 'selected' : ''} ${outcome === outcomes[0] ? 'positive' : 'negative'}`}
-                      onClick={() => setSelectedOutcome(outcome)}
+                      className={`mm-outcome-btn mm-outcome-draw ${isDrawSelected ? 'selected' : ''}`}
+                      onClick={() => setSelectedOutcome(DRAW)}
                       disabled={submitting}
+                      aria-pressed={isDrawSelected}
                     >
-                      <span className="mm-outcome-title">{outcomeLabels[outcome]?.title || outcome}</span>
-                      <span className="mm-outcome-addr">{outcomeLabels[outcome]?.who}</span>
+                      <span className="mm-outcome-title">Draw — both parties refunded</span>
+                      <span className="mm-outcome-addr">
+                        {resType === 3
+                          ? 'Returns each party their original stake'
+                          : 'Both players must select Draw — the second confirms it'}
+                      </span>
                     </button>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
 
               <div className="mm-resolution-notes">
@@ -1903,14 +1999,30 @@ function ResolutionModal({
             <>
               <div className="mm-confirmation">
                 <div className="mm-confirmation-icon">&#9888;</div>
-                <h4>Confirm Resolution</h4>
-                <p>
-                  You are about to resolve this wager in favour of: <strong>{labelFor(selectedOutcome)}</strong>
-                </p>
-                <p className="mm-confirmation-warning">
-                  This action cannot be undone. The full pot is paid to the winner immediately
-                  and the result is final.
-                </p>
+                <h4>{isDrawSelected ? 'Confirm Draw' : 'Confirm Resolution'}</h4>
+                {isDrawSelected ? (
+                  <>
+                    <p>
+                      You are about to settle this wager as a <strong>draw</strong>: each party gets
+                      their original stake back and no winner is paid.
+                    </p>
+                    <p className="mm-confirmation-warning">
+                      {resType === 3
+                        ? 'As the arbitrator you settle the draw immediately. This is final.'
+                        : 'A draw needs both players. If your counterparty has not agreed yet, this records your proposal and waits for their confirmation; the second confirmation settles it.'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      You are about to resolve this wager in favour of: <strong>{labelFor(selectedOutcome)}</strong>
+                    </p>
+                    <p className="mm-confirmation-warning">
+                      This action cannot be undone. The full pot is paid to the winner immediately
+                      and the result is final.
+                    </p>
+                  </>
+                )}
               </div>
 
               {error && <div className="mm-error-banner">{error}</div>}
@@ -1946,13 +2058,23 @@ function ResolutionModal({
           {step === 'success' && (
             <div className="mm-success-state">
               <div className="mm-success-icon">&#9989;</div>
-              <h4>Wager Resolved</h4>
-              <p>
-                Winnings sent to: <strong>{labelFor(selectedOutcome)}</strong>
-              </p>
-              <p className="mm-success-hint">
-                The full pot has been paid out on-chain. This result is final.
-              </p>
+              <h4>{isDrawSelected ? (drawSettled ? 'Settled as a Draw' : 'Draw Proposed') : 'Wager Resolved'}</h4>
+              {isDrawSelected ? (
+                drawSettled ? (
+                  <p>Both parties have been refunded their original stake. This result is final.</p>
+                ) : (
+                  <p>Your draw proposal is recorded. The wager settles as a draw once your counterparty also chooses Draw.</p>
+                )
+              ) : (
+                <p>
+                  Winnings sent to: <strong>{labelFor(selectedOutcome)}</strong>
+                </p>
+              )}
+              {!isDrawSelected && (
+                <p className="mm-success-hint">
+                  The full pot has been paid out on-chain. This result is final.
+                </p>
+              )}
               {txHash && (
                 <p className="mm-success-hint">
                   <a href={getTransactionUrl(chainId, txHash)} target="_blank" rel="noopener noreferrer">

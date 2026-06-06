@@ -99,6 +99,11 @@ export const WAGER_REGISTRY_ABI = [
   },
   {
     "inputs": [],
+    "name": "DrawNotApplicable",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "EnforcedPause",
     "type": "error"
   },
@@ -110,6 +115,11 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "MembershipDenied",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NoDrawProposal",
     "type": "error"
   },
   {
@@ -140,6 +150,11 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [],
     "name": "NotOpponent",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotParticipant",
     "type": "error"
   },
   {
@@ -265,6 +280,44 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "AccountUnfrozen",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "proposer",
+        "type": "address"
+      }
+    ],
+    "name": "DrawProposed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "proposer",
+        "type": "address"
+      }
+    ],
+    "name": "DrawRevoked",
     "type": "event"
   },
   {
@@ -557,25 +610,6 @@ export const WAGER_REGISTRY_ABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "opponent",
-        "type": "address"
-      }
-    ],
-    "name": "WagerDeclined",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "wagerId",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
         "name": "creator",
         "type": "address"
       },
@@ -623,6 +657,56 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "WagerCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "opponent",
+        "type": "address"
+      }
+    ],
+    "name": "WagerDeclined",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "creator",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "opponent",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      }
+    ],
+    "name": "WagerDrawn",
     "type": "event"
   },
   {
@@ -795,6 +879,19 @@ export const WAGER_REGISTRY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256[]",
+        "name": "wagerIds",
+        "type": "uint256[]"
+      }
+    ],
+    "name": "batchExpireOpen",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "wagerId",
         "type": "uint256"
@@ -813,33 +910,7 @@ export const WAGER_REGISTRY_ABI = [
         "type": "uint256"
       }
     ],
-    "name": "declineWager",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "wagerId",
-        "type": "uint256"
-      }
-    ],
     "name": "claimPayout",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256[]",
-        "name": "wagerIds",
-        "type": "uint256[]"
-      }
-    ],
-    "name": "batchExpireOpen",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -937,6 +1008,19 @@ export const WAGER_REGISTRY_ABI = [
         "internalType": "uint256",
         "name": "wagerId",
         "type": "uint256"
+      }
+    ],
+    "name": "declareDraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
       },
       {
         "internalType": "address",
@@ -947,6 +1031,43 @@ export const WAGER_REGISTRY_ABI = [
     "name": "declareWinner",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "declineWager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "drawConsent",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "creatorAgreed",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "opponentAgreed",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1418,6 +1539,19 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "renounceRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "name": "revokeDraw",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

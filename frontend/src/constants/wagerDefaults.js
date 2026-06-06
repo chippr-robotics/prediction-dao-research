@@ -108,6 +108,7 @@ export const WagerStatus = {
   CANCELLED: 'cancelled',
   DECLINED: 'declined',
   REFUNDED: 'refunded',
+  DRAW: 'draw',
   ORACLE_TIMED_OUT: 'oracle_timed_out',
 }
 
@@ -192,6 +193,7 @@ export const TERMINAL_STATUSES = new Set([
   'cancelled',
   'declined',
   'refunded',
+  'draw',
   'oracle_timed_out',
 ])
 
