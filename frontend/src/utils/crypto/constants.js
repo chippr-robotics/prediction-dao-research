@@ -186,3 +186,33 @@ export function isVersionSupported(version) {
 export function getSupportedVersions() {
   return Object.keys(SIGNING_MESSAGES).map(Number).sort((a, b) => a - b)
 }
+
+/**
+ * ==========================================================================
+ * Per-wager Terms-version binding (Spec 007, FR-056/FR-057)
+ * ==========================================================================
+ * The governing T&C version hash is bound into each wager's ChaCha20-Poly1305
+ * AEAD as Associated Data (AAD). This makes the claimed `termsVersion` field in
+ * the envelope tamper-evident WITHOUT entering key derivation (the SIGNING_MESSAGES /
+ * MARKET_SIGNING_MESSAGES above are intentionally untouched so the derived key stays
+ * versionless and reproducible — FR-041).
+ *
+ * The AAD MUST be byte-identical on seal and open; build it ONLY via buildTermsAAD()
+ * from the envelope's authenticated `termsVersion.hash`.
+ */
+export const TERMS_AAD_PREFIX = 'FairWins-TC'
+
+/**
+ * Build the deterministic AAD bytes binding a wager to its governing T&C version.
+ * @param {string} schemaVersion - the encrypted-metadata schema version (e.g. "1.1")
+ * @param {string} termsVersionHashHex - SHA-256 hex of the canonicalized T&C bytes
+ * @returns {Uint8Array} UTF-8 bytes: `FairWins-TC|<schemaVersion>|<hashHex>`
+ */
+export function buildTermsAAD(schemaVersion, termsVersionHashHex) {
+  if (!schemaVersion || !termsVersionHashHex) {
+    throw new Error('buildTermsAAD requires schemaVersion and termsVersionHashHex')
+  }
+  return new TextEncoder().encode(
+    `${TERMS_AAD_PREFIX}|${schemaVersion}|${termsVersionHashHex}`
+  )
+}

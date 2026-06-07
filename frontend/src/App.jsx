@@ -18,6 +18,7 @@ import Header from './components/Header'
 // add-ons
 import WalletPage from './pages/WalletPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
+import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 
 //admin
 import AdminPanel from './components/AdminPanel'
@@ -92,6 +93,11 @@ function AppContent() {
         />
         <Route path="/ui-components" element={<ComponentExamples />} />
         <Route path="/state-demo" element={<StateManagementDemo />} />
+
+        {/* Public versioned legal documents (Spec 007) — readable before the entry gate */}
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/risk" element={<RiskPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
 
         {/* App routes with header + wallet button */}
         <Route element={<AppLayout />}>

@@ -36,6 +36,7 @@ const HARDHAT_CONTRACTS = {
   wagerRegistry: '0x260Fad26873AC132b34dD6FA5761DcfF0e26cbd0',
   membershipManager: '0x81010Af3Ef2BBc092c898944D9D39E6c94124660',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
+  sanctionsGuard: '',
   polymarketAdapter: '0x19D004863fB8F5A1707091C120e08aA1FEE8d65F',
   paymentToken: '0x065606eeE0D7BB3d2e7959D56c3ca177625385a7',
   wmatic: '0xE80bf16CAF66CAe0Ae5aBC4a5ab4acc27361553F',
@@ -51,6 +52,7 @@ const AMOY_CONTRACTS = {
   wagerRegistry: '0x95cC567EF97f21bdd135844652aD8792fa8ba266',
   membershipManager: '0xFaEbF662aa591fF95e97306b413522efC958540f',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
+  sanctionsGuard: '',
   polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',
   // Stake / payment tokens (Circle USDC + Wrapped MATIC on Amoy)
   paymentToken: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
@@ -71,6 +73,7 @@ const POLYGON_CONTRACTS = {
   wagerRegistry: '0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4',
   membershipManager: '0x7441700979e37a9a1F17093a4859c8f261780c95',
   keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
+  sanctionsGuard: '', // populated by sync once SanctionsGuard is deployed on Polygon
   polymarketAdapter: '0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4', // tie-fix + admin-owner redeploy
   // Stake / payment tokens (Circle USDC + Wrapped MATIC on Polygon)
   paymentToken: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',

@@ -10,6 +10,7 @@ import { isValidEthereumAddress } from '../utils/validation'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddress } from '../config/contracts'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
+import DenyListAdmin from './admin/DenyListAdmin'
 import './AdminPanel.css'
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
@@ -367,6 +368,11 @@ function AdminPanel() {
             className={`admin-panel-tab ${activeTab === 'oracle-adapters' ? 'active' : ''}`}
             onClick={() => setActiveTab('oracle-adapters')}>Oracle Adapters</button>
         )}
+        {isAdmin && (
+          <button role="tab" aria-selected={activeTab === 'deny-list'}
+            className={`admin-panel-tab ${activeTab === 'deny-list' ? 'active' : ''}`}
+            onClick={() => setActiveTab('deny-list')}>Deny-list</button>
+        )}
       </nav>
 
       <main className="admin-panel-content">
@@ -683,6 +689,16 @@ function AdminPanel() {
 
         {activeTab === 'oracle-adapters' && isAdmin && (
           <OracleAdaptersTab
+            signer={signer}
+            account={account}
+            contracts={DEPLOYED_CONTRACTS}
+            runTx={runTx}
+            pendingTx={pendingTx}
+          />
+        )}
+
+        {activeTab === 'deny-list' && isAdmin && (
+          <DenyListAdmin
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}

@@ -1,3 +1,22 @@
+# --- Origin lock (Spec 007, FR-007/FR-008) ---
+# Cloudflare injects `X-Origin-Auth: <secret>` (Transform Rule) on every proxied request.
+# We allow a request only when it matches ORIGIN_LOCK_SECRET. Enforcement is active only
+# when ORIGIN_LOCK_ENABLED=1 (i.e. the secret is configured — see docker-entrypoint.sh),
+# so dev/local and pre-Cloudflare environments are not bricked. A bare CF-IP allowlist is
+# insufficient because Cloudflare egress IPs are shared across tenants.
+# $origin_denied = 1 ⇒ block (403). The secret is never written to logs.
+map "${ORIGIN_LOCK_ENABLED}:$http_x_origin_auth" $origin_denied {
+    default                      1;   # enforcement on + header missing/mismatch ⇒ deny
+    "~^0:"                       0;   # enforcement off ⇒ allow everything
+    "1:${ORIGIN_LOCK_SECRET}"    0;   # enforcement on + exact secret match ⇒ allow
+}
+
+# Access log including the edge-provided country-of-record / client IP (Spec 007, FR-009)
+# as the geo/IP enforcement-evidence tier. Does NOT log the origin-lock secret.
+log_format fairwins_edge '$remote_addr cf_ip=$http_cf_connecting_ip '
+                         'cf_country=$http_cf_ipcountry "$request" $status '
+                         '$body_bytes_sent rt=$request_time "$http_user_agent"';
+
 server {
     listen 8080;
     server_name _;
@@ -5,9 +24,21 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    access_log /dev/stdout fairwins_edge;
+
+    # Unauthenticated health endpoint (exempt from the origin lock) for probes/uptime.
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
     # Pinata API proxy - bypasses CORS restrictions
     # JWT is injected at container startup via envsubst
     location /api/pinata/ {
+        # Origin lock: only Cloudflare-proxied requests may use the authenticated proxy.
+        if ($origin_denied) { return 403; }
+
         # Proxy to Pinata API
         proxy_pass https://api.pinata.cloud/pinning/;
         proxy_ssl_server_name on;
@@ -44,11 +75,14 @@ server {
 
     # Handle SPA routing - all routes should serve index.html
     location / {
+        # Origin lock (Spec 007): refuse requests not proxied through Cloudflare.
+        if ($origin_denied) { return 403; }
         try_files $uri $uri/ /index.html;
     }
 
     # Cache static assets
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        if ($origin_denied) { return 403; }
         expires 1y;
         add_header Cache-Control "public, immutable";
     }

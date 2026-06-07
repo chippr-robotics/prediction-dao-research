@@ -157,6 +157,7 @@ function main() {
         wagerRegistry: deployed.wagerRegistry,
         membershipManager: deployed.membershipManager,
         keyRegistry: deployed.keyRegistry,
+        sanctionsGuard: deployed.sanctionsGuard,
         polymarketAdapter: deployed.polymarketAdapter,
         chainlinkDataFeedAdapter: deployed.chainlinkDataFeedAdapter,
         chainlinkFunctionsAdapter: deployed.chainlinkFunctionsAdapter,

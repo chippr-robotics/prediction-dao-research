@@ -14,6 +14,17 @@ import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefau
 import QRScanner from '../ui/QRScanner'
 import AddressInput from '../ui/AddressInput'
 import { isEnsName } from '../../utils/validation'
+import { getCurrentDocument } from '../../utils/legalDocs'
+
+/**
+ * The in-force Terms version bound into a new wager's encryption (Spec 007, FR-056/FR-058):
+ * { id, hash } of the current Terms & Conditions, so the wager carries tamper-evident proof
+ * of its governing terms. Returns null if unavailable (legacy/no-AAD path).
+ */
+function currentTermsVersion() {
+  const t = getCurrentDocument('terms')
+  return t ? { id: t.id, hash: t.hash } : null
+}
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 import PolymarketBrowser from './PolymarketBrowser'
@@ -860,7 +871,7 @@ function FriendMarketsModal({
           // (v2.0) path can't be used here because the registry only stores
           // 32-byte X25519 keys; addRecipientByPublicKey would then read an
           // undefined `ephemeralPublicKey` off an X-Wing wrapped-key entry.
-          const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519' })
+          const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519', termsVersion: currentTermsVersion() })
           finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
 
           // ThirdParty (Spec Kit 005): the arbitrator must also read the private
@@ -881,7 +892,7 @@ function FriendMarketsModal({
         } else {
           // Defensive fallback: validation guarantees an opponent, but if one
           // is somehow missing, encrypt to the creator only rather than crash.
-          const { envelope } = await createEncrypted(marketMetadata)
+          const { envelope } = await createEncrypted(marketMetadata, { termsVersion: currentTermsVersion() })
           finalMetadata = envelope
         }
       }

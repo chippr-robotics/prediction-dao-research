@@ -27,7 +27,13 @@ steps:
 
   # Deploy to Cloud Run
   # The VITE_PINATA_JWT environment variable is already configured in Cloud Run
-  # to be pulled from Secret Manager at runtime
+  # to be pulled from Secret Manager at runtime.
+  # ORIGIN_LOCK_SECRET (Spec 007 origin lock, FR-008) is likewise configured on the
+  # Cloud Run service from Secret Manager — see infra/cloudflare/origin-lock.md. It is
+  # intentionally NOT set here so deploys don't fail before the secret exists; once it is
+  # created, it can be wired declaratively with:
+  #   - '--update-secrets'
+  #   - 'ORIGIN_LOCK_SECRET=origin-lock-secret:latest'
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:

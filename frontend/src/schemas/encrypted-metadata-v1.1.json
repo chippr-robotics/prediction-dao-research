@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fairwins.app/schemas/encrypted-metadata-v1.1.json",
+  "title": "Encrypted Market Metadata Schema v1.1",
+  "description": "Runtime envelope shape for encrypted friend-market/wager metadata. v1.1 adds the OPTIONAL, authenticated `termsVersion` binding (Spec 007, FR-056): the governing T&C version hash bound into the ChaCha20-Poly1305 AAD so it is tamper-evident. Absent `termsVersion` ⇒ a legacy envelope (no AAD) governed by the launch version (FR-057). This schema reconciles to the runtime envelope (nested content/keys) rather than the older v1.0 top-level shape.",
+  "type": "object",
+  "required": ["version", "algorithm", "signingVersion", "content", "keys"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Envelope/algorithm version: '1.0' = x25519, '2.0' = X-Wing hybrid.",
+      "enum": ["1.0", "2.0"]
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": ["x25519-chacha20poly1305", "xwing-chacha20poly1305"]
+    },
+    "signingVersion": {
+      "type": "integer",
+      "description": "Key-derivation signing-message version (NOT the T&C version)."
+    },
+    "termsVersion": {
+      "type": "object",
+      "description": "OPTIONAL governing T&C binding (FR-056). Authenticated via AAD: tampering fails decryption. Absence ⇒ legacy wager governed by the launch version (FR-057).",
+      "required": ["hash"],
+      "properties": {
+        "id": {
+          "type": ["string", "null"],
+          "description": "Human-readable version id of the in-force Terms at wager creation."
+        },
+        "hash": {
+          "type": "string",
+          "description": "SHA-256 (lowercase hex) of the canonicalized Terms content (NFC/LF/UTF-8/trim).",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "content": {
+      "type": "object",
+      "required": ["nonce", "ciphertext"],
+      "properties": {
+        "nonce": { "type": "string", "description": "Hex-encoded 12-byte content nonce" },
+        "ciphertext": { "type": "string", "description": "Hex-encoded ChaCha20-Poly1305 ciphertext + tag" }
+      },
+      "additionalProperties": false
+    },
+    "keys": {
+      "type": "array",
+      "description": "Per-recipient wrapped DEK entries (x25519 ephemeral or X-Wing ciphertext).",
+      "items": { "type": "object" },
+      "minItems": 1
+    }
+  },
+  "additionalProperties": false
+}

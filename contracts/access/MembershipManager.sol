@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../interfaces/IMembershipManager.sol";
+import "../interfaces/ISanctionsGuard.sol";
 
 /// @title MembershipManager
 /// @notice Tiered, time-bound memberships per role. USDC-denominated. The only
@@ -29,10 +30,15 @@ contract MembershipManager is IMembershipManager, AccessControl {
     address public treasury;
     uint128 public accruedFees;
 
+    /// @notice Non-bypassable on-chain sanctions guard (Spec 007, FR-054). When unset
+    ///         (address(0)) screening is skipped — the production deploy wires it in.
+    ISanctionsGuard public sanctionsGuard;
+
     event TierSet(bytes32 indexed role, Tier indexed tier, uint128 priceUSDC, uint32 durationDays, bool active);
     event TreasuryUpdated(address indexed treasury);
     event PaymentTokenUpdated(address indexed token);
     event AuthorizedCallerSet(address indexed caller, bool allowed);
+    event SanctionsGuardUpdated(address indexed guard);
     event MembershipPurchased(address indexed user, bytes32 indexed role, Tier tier, uint128 price, uint64 expiresAt);
     event MembershipUpgraded(address indexed user, bytes32 indexed role, Tier fromTier, Tier toTier, uint128 delta);
     event MembershipExtended(address indexed user, bytes32 indexed role, uint32 durationDays, uint128 price, uint64 expiresAt);
@@ -99,6 +105,19 @@ contract MembershipManager is IMembershipManager, AccessControl {
         emit AuthorizedCallerSet(caller, allowed);
     }
 
+    /// @notice Set the on-chain sanctions guard. Pass address(0) to disable screening.
+    function setSanctionsGuard(address guard) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        sanctionsGuard = ISanctionsGuard(guard);
+        emit SanctionsGuardUpdated(guard);
+    }
+
+    /// @dev Sanctions screen (Spec 007, FR-054). No-op when unset; otherwise reverts for a
+    ///      listed/sanctioned address. Read-only Check, before any fee transfer/effects.
+    function _screen(address account) internal view {
+        ISanctionsGuard guard = sanctionsGuard;
+        if (address(guard) != address(0)) guard.checkBlocked(account);
+    }
+
     function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external onlyRole(ROLE_MANAGER_ROLE) {
         if (user == address(0)) revert ZeroAddress();
         if (tier == Tier.None) revert TierNone();
@@ -131,6 +150,7 @@ contract MembershipManager is IMembershipManager, AccessControl {
     // ---------- User ----------
 
     function purchaseTier(bytes32 role, Tier tier) external {
+        _screen(msg.sender); // Sanctions screen (Spec 007, FR-054) — before any fee transfer
         if (tier == Tier.None) revert TierNone();
         TierConfig memory cfg = _tiers[role][tier];
         if (!cfg.active) revert TierInactive();
@@ -152,6 +172,7 @@ contract MembershipManager is IMembershipManager, AccessControl {
     }
 
     function upgradeTier(bytes32 role, Tier newTier) external {
+        _screen(msg.sender); // Sanctions screen (Spec 007, FR-054) — before any fee transfer
         Membership storage m = _memberships[msg.sender][role];
         if (m.tier == Tier.None || m.expiresAt <= block.timestamp) revert NoActiveMembership();
         TierConfig memory current = _tiers[role][m.tier];
@@ -169,6 +190,7 @@ contract MembershipManager is IMembershipManager, AccessControl {
     }
 
     function extendMembership(bytes32 role) external {
+        _screen(msg.sender); // Sanctions screen (Spec 007, FR-054) — paid path, same risk class
         Membership storage m = _memberships[msg.sender][role];
         if (m.tier == Tier.None) revert NoActiveMembership();
         TierConfig memory cfg = _tiers[role][m.tier];
