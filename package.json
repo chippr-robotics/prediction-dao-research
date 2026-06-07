@@ -23,6 +23,8 @@
     "sync:frontend-contracts": "node scripts/utils/sync-frontend-contracts.js --network mordor --chainId 63",
     "sync:frontend-contracts:amoy": "node scripts/utils/sync-frontend-contracts.js --network amoy --chainId 80002",
     "sync:frontend-contracts:polygon": "node scripts/utils/sync-frontend-contracts.js --network polygon --chainId 137",
+    "migrate:memberships:polygon": "hardhat run scripts/operations/migrate-memberships-007.js --network polygon",
+    "lockdown:polygon": "hardhat run scripts/operations/prelaunch-lockdown-007.js --network polygon",
     "sync:frontend-contracts:local": "node scripts/utils/sync-frontend-contracts.js --network localhost --chainId 1337",
     "test:frontend": "npm --prefix frontend run test:run",
     "lock:sync": "npm install --package-lock-only && npm --prefix frontend install --package-lock-only",

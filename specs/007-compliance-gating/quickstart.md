@@ -73,31 +73,69 @@ address — FR-055). Records are chainId-scoped (no cross-network leak — FR-02
 4. Query by address via chain/subgraph → full consent history with governing versions
    (SC-007). A reverted consent tx leaves no record (fail-closed, SC-011).
 
-## 6. Deployment & migration (Spec 007) — operator runbook
+## 6. Mainnet (137) deployment & cutover (Spec 007) — operator runbook
 
 > **Live, non-upgradeable contracts.** `WagerRegistry`, `MembershipManager`, and `KeyRegistry`
 > are already deployed and are not proxies. This feature adds storage (`wagerTermsVersionHash`,
 > `sanctionsGuard`, `memberTermsHash`) and additive function overloads, so it ships as a
 > **fresh deployment + migration**, not an in-place upgrade.
+>
+> **Decisions for this cutover:** Polygon **mainnet (137)** now; **full cutover + migrate** (not
+> parallel-run). The **prior contracts are already paused**, so there are no open wagers to settle
+> and the switch is clean. The app is **not live yet**, so the new contracts are **deployed paused**
+> (lockdown step 6) and only opened at go-live.
+>
+> Steps marked **[operator]** require the air-gapped floppy keystore (mainnet broadcast / admin
+> roles); steps marked **[agent]** are repo work I run and commit. Mainnet broadcast also requires
+> `CONFIRM_MAINNET=true`.
 
-1. **Deploy + wire (per chain):** `npm run deploy:<network>` deploys `SanctionsGuard` with the
-   per-chain Chainalysis oracle injected (137 = `0x40C5…8fb`; Amoy/local get a `MockSanctionsOracle`),
-   then wires it into the (re)deployed `WagerRegistry`/`MembershipManager` (`setSanctionsGuard`,
-   idempotent). Admin roles (`SANCTIONS_ADMIN_ROLE` + `DEFAULT_ADMIN_ROLE`) go to the floppy-keystore admin.
-2. **Migration:** old wagers/memberships remain on the prior contracts (read-only/exit). New
-   activity uses the new addresses. Decide the cutover (parallel-run vs hard switch) and record
-   prior addresses in `deployments/`. Legacy wagers (no bound version) are governed by the launch
-   version (prospective-only — FR-057).
-3. **Sync frontend:** `npm run sync:frontend-contracts:<network>` writes the new addresses
+1. **[operator] Deploy + wire (137):** with the floppy mounted,
+   `CONFIRM_MAINNET=true npm run deploy:polygon` deploys `SanctionsGuard` with the real Chainalysis
+   oracle injected (`0x40C5…8fb`), redeploys `WagerRegistry`/`MembershipManager`/`KeyRegistry`
+   (deterministic CREATE2), and wires the guard in (`setSanctionsGuard`, idempotent). Admin roles
+   (`DEFAULT_ADMIN_ROLE`, `SANCTIONS_ADMIN_ROLE`, `GUARDIAN_ROLE`, `ROLE_MANAGER_ROLE`) land on the
+   floppy admin. The run writes/updates `deployments/polygon-chain137-v2.json` (now incl.
+   `sanctionsGuard`). Commit that record.
+2. **[agent] Sync frontend:** `npm run sync:frontend-contracts:polygon` writes the new addresses
    (incl. `sanctionsGuard`) into `frontend/src/config/contracts.js`; ABIs are committed,
-   artifact-derived (`src/abis/*`). Verify no address is hand-hardcoded (FR-055).
-4. **Edge config (Cloudflare):** apply `infra/cloudflare/waf-geo.md` (country gate → 451) and
-   `infra/cloudflare/origin-lock.md` (Transform Rule secret header). Set `ORIGIN_LOCK_SECRET` on
-   Cloud Run from Secret Manager (the nginx origin-lock stays inert until it is set).
-5. **CI / fork tests:** set the `POLYGON_RPC_URL` repo secret so the Chainalysis fork test
+   artifact-derived (`src/abis/*`). Bump `wagerRegistry` in `DEPLOYMENT_BLOCKS_BY_CHAIN[137]` to the
+   new deploy block. Verify no address is hand-hardcoded (FR-055) and commit.
+3. **[operator] Verify on Polygonscan:** verify the new contract sources so the public can read the
+   compliance logic.
+4. **[operator] Migrate memberships:** the OLD `MembershipManager` (`0x7441…0c95`) holds the active
+   memberships; re-grant the still-active ones onto the new contract. Dry-run first, then execute:
+   ```bash
+   OLD_MEMBERSHIP_MANAGER=0x7441700979e37a9a1F17093a4859c8f261780c95 START_BLOCK=<oldMMdeployBlock> \
+     npm run migrate:memberships:polygon                      # dry run (DRY_RUN defaults true)
+   DRY_RUN=false OLD_MEMBERSHIP_MANAGER=0x7441700979e37a9a1F17093a4859c8f261780c95 START_BLOCK=<oldMMdeployBlock> \
+     npm run migrate:memberships:polygon                      # execute (floppy mounted)
+   ```
+   Idempotent + sanctions-aware: a sanctioned old member is correctly skipped. `grantMembership` does
+   not check tier `active`, so this runs even with the tiers deactivated by the lockdown.
+5. **[operator] Edge config (Cloudflare):** apply `infra/cloudflare/waf-geo.md` (country gate → 451,
+   stage in observe mode first) and `infra/cloudflare/origin-lock.md` (Transform Rule secret header).
+   Set `ORIGIN_LOCK_SECRET` on Cloud Run from Secret Manager (the nginx origin-lock stays inert until
+   it is set).
+6. **[operator] Pre-launch lockdown (app not live):** with the floppy mounted, pause the new
+   contracts so nobody can wager or buy a membership before go-live. Dry-run first:
+   ```bash
+   npm run lockdown:polygon                                   # dry run — prints planned actions
+   DRY_RUN=false npm run lockdown:polygon                     # pause WagerRegistry + deactivate tiers
+   ```
+   This pauses `WagerRegistry` (blocks create/accept; exit paths stay open) and deactivates the
+   seeded membership tiers (blocks purchase/upgrade/extend — `MembershipManager` has no `pause()`).
+   Run migration (step 4) **before** this, or run it anyway — `grantMembership` is unaffected.
+7. **[operator] Go-live (when ready):** reverse the lockdown.
+   ```bash
+   DRY_RUN=false ACTION=unlock npm run lockdown:polygon       # unpause + re-activate tiers
+   ```
+8. **CI / fork tests:** set the `POLYGON_RPC_URL` repo secret so the Chainalysis fork test
    (Polygon 137) runs in `oracle-fork-tests.yml`; Slither/Medusa run in `security-testing.yml`.
-6. **Pre-merge gate (Principle I):** Slither + Medusa clean of new high/critical, EthTrust-SL L2,
+9. **Pre-merge gate (Principle I):** Slither + Medusa clean of new high/critical, EthTrust-SL L2,
    and a smart-contract-security agent review of the `contracts/` changes.
+
+> Legacy wagers (no bound version) are governed by the launch terms version (prospective-only —
+> FR-057). Records are chainId-scoped; testnet memberships never appear active on mainnet.
 
 ## Open items pending counsel (see spec "Open Legal-Reconciliation Items")
 
