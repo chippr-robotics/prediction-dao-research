@@ -151,6 +151,15 @@ describe("Sanctions gating (integration)", function () {
         fx.mgr.connect(fx.alice).upgradeTier(WAGER_PARTICIPANT_ROLE, Tier.Silver)
       ).to.be.revertedWithCustomError(fx.guard, "SanctionedAddress");
     });
+
+    it("blocks the admin grantMembership path for a deny-listed grantee (non-bypassable)", async function () {
+      const fx = await loadFixture(deployFixture);
+      // admin holds ROLE_MANAGER_ROLE in the fixture; grantMembership must still screen.
+      await fx.guard.connect(fx.admin).setDenied(fx.bob.address, true, "ofac");
+      await expect(
+        fx.mgr.connect(fx.admin).grantMembership(fx.bob.address, WAGER_PARTICIPANT_ROLE, Tier.Bronze, 30)
+      ).to.be.revertedWithCustomError(fx.guard, "SanctionedAddress");
+    });
   });
 
   describe("exit paths stay ungated (a listed party can recover funds)", function () {

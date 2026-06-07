@@ -134,6 +134,9 @@ contract MembershipManager is IMembershipManager, AccessControl {
     function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external onlyRole(ROLE_MANAGER_ROLE) {
         if (user == address(0)) revert ZeroAddress();
         if (tier == Tier.None) revert TierNone();
+        // Spec 007 (FR-054): the sanctions guard is non-bypassable — an admin grant must not
+        // hand a sanctioned/deny-listed address standing either. Screen the grantee.
+        _screen(user);
         Membership storage m = _memberships[user][role];
         m.tier = tier;
         m.expiresAt = uint64(block.timestamp) + uint64(durationDays) * 1 days;

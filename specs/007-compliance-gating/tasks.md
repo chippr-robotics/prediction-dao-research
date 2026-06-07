@@ -196,7 +196,7 @@ Existing multi-part repo: `contracts/`, `test/`, `frontend/src/`, `scripts/`, `s
 **Purpose**: Security gates, accessibility, CI, optional indexing, validation.
 
 - [ ] T052 [P] Run Slither + Medusa on the contract changes; resolve or document new high/critical findings (Principle I)
-- [ ] T053 Smart-contract-security agent review of `SanctionsGuard` + WagerRegistry/MembershipManager/KeyRegistry changes (`.github/agents/`) before merge
+- [X] T053 Smart-contract-security agent review of `SanctionsGuard` + WagerRegistry/MembershipManager/KeyRegistry changes (`.github/agents/`) before merge
 - [X] T054 [P] axe + Lighthouse accessibility audit (WCAG 2.1 AA) of EntryGate, membership checkboxes, legal doc pages, 451 page, DenyListAdmin; wire checks into CI (Principle V)
 - [X] T055 Update CI to run new Hardhat unit/integration/fork + Vitest + Slither with no `continue-on-error` on lint/test/build/security (Principle IV)
 - [ ] T056 [P] (Optional) Extend `subgraph/` to index `WagerCreated.termsVersionHash`, `Membership*` accepted hash, and `DenyListUpdated` for address-keyed consent queries (FR-047)
