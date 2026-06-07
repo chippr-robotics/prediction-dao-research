@@ -32,19 +32,14 @@ jobs:
             --build-arg VITE_NETWORK_ID="${{ vars.VITE_NETWORK_ID || '80002' }}" \
             --build-arg VITE_RPC_URL="${{ vars.VITE_RPC_URL || 'https://rpc-amoy.polygon.technology' }}" \
             --build-arg VITE_IPFS_GATEWAY="${{ vars.VITE_IPFS_GATEWAY || 'https://gateway.pinata.cloud' }}" \
-            --build-arg VITE_PINATA_JWT="${{ secrets.VITE_PINATA_JWT || '' }}" \
             -t us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }} .
           docker push us-central1-docker.pkg.dev/chippr-bots-site-wp/prediction-dao/app:${{ github.sha }}
-      - name: Debug secrets
-        env:
-          PINATA_JWT_SET: ${{ secrets.VITE_PINATA_JWT != '' }}
-        run: |
-          if [ "$PINATA_JWT_SET" = "true" ]; then
-            echo "✅ VITE_PINATA_JWT is set"
-          else
-            echo "❌ VITE_PINATA_JWT is empty or not set"
-          fi
-    
+      # SECURITY: VITE_PINATA_JWT is intentionally NOT passed as a build arg — it must never
+      # be inlined into the client bundle. To enable server-side IPFS uploads, inject it as a
+      # Cloud Run RUNTIME secret on the deploy step below, e.g.:
+      #   --update-secrets VITE_PINATA_JWT=PINATA_JWT:latest
+      # The nginx entrypoint (frontend/docker-entrypoint.sh) reads it at container start.
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy prediction-dao-research \

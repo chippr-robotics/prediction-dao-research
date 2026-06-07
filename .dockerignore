@@ -52,10 +52,14 @@ scripts
 *.swo
 *~
 
-# Environment files
+# Environment files — never copy secrets into the build image. The **/ patterns match
+# any depth (e.g. frontend/.env) so a local `docker build .` cannot sweep a real
+# VITE_PINATA_* / VITE_RPC_URL secret into the context where Vite would inline it.
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.*
 
 # Logs
 logs
