@@ -409,13 +409,15 @@ async function main() {
       membershipManager: mgrDeploy.address,
       wagerRegistry: regDeploy.address,
       keyRegistry: keyDeploy.address,
+      sanctionsGuard: guardDeploy.address,
       ...oracleDeployments,
     },
-    mocks: deployments.mockUSDC || deployments.mockWMATIC || deployments.polymarketCTF
+    mocks: deployments.mockUSDC || deployments.mockWMATIC || deployments.polymarketCTF || deployments.mockSanctionsOracle
       ? {
           mockUSDC: deployments.mockUSDC,
           mockWMATIC: deployments.mockWMATIC,
           mockPolymarketCTF: deployments.polymarketCTF,
+          mockSanctionsOracle: deployments.mockSanctionsOracle,
         }
       : null,
     saltPrefix: SALT_PREFIXES.V2,
