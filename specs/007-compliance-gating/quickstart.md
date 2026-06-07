@@ -72,3 +72,36 @@ address — FR-055). Records are chainId-scoped (no cross-network leak — FR-02
    (prospective-only, SC-017); the next new wager binds the NEW version.
 4. Query by address via chain/subgraph → full consent history with governing versions
    (SC-007). A reverted consent tx leaves no record (fail-closed, SC-011).
+
+## 6. Deployment & migration (Spec 007) — operator runbook
+
+> **Live, non-upgradeable contracts.** `WagerRegistry`, `MembershipManager`, and `KeyRegistry`
+> are already deployed and are not proxies. This feature adds storage (`wagerTermsVersionHash`,
+> `sanctionsGuard`, `memberTermsHash`) and additive function overloads, so it ships as a
+> **fresh deployment + migration**, not an in-place upgrade.
+
+1. **Deploy + wire (per chain):** `npm run deploy:<network>` deploys `SanctionsGuard` with the
+   per-chain Chainalysis oracle injected (137 = `0x40C5…8fb`; Amoy/local get a `MockSanctionsOracle`),
+   then wires it into the (re)deployed `WagerRegistry`/`MembershipManager` (`setSanctionsGuard`,
+   idempotent). Admin roles (`SANCTIONS_ADMIN_ROLE` + `DEFAULT_ADMIN_ROLE`) go to the floppy-keystore admin.
+2. **Migration:** old wagers/memberships remain on the prior contracts (read-only/exit). New
+   activity uses the new addresses. Decide the cutover (parallel-run vs hard switch) and record
+   prior addresses in `deployments/`. Legacy wagers (no bound version) are governed by the launch
+   version (prospective-only — FR-057).
+3. **Sync frontend:** `npm run sync:frontend-contracts:<network>` writes the new addresses
+   (incl. `sanctionsGuard`) into `frontend/src/config/contracts.js`; ABIs are committed,
+   artifact-derived (`src/abis/*`). Verify no address is hand-hardcoded (FR-055).
+4. **Edge config (Cloudflare):** apply `infra/cloudflare/waf-geo.md` (country gate → 451) and
+   `infra/cloudflare/origin-lock.md` (Transform Rule secret header). Set `ORIGIN_LOCK_SECRET` on
+   Cloud Run from Secret Manager (the nginx origin-lock stays inert until it is set).
+5. **CI / fork tests:** set the `POLYGON_RPC_URL` repo secret so the Chainalysis fork test
+   (Polygon 137) runs in `oracle-fork-tests.yml`; Slither/Medusa run in `security-testing.yml`.
+6. **Pre-merge gate (Principle I):** Slither + Medusa clean of new high/critical, EthTrust-SL L2,
+   and a smart-contract-security agent review of the `contracts/` changes.
+
+## Open items pending counsel (see spec "Open Legal-Reconciliation Items")
+
+- Finalize Terms / Risk / **Privacy Policy** copy (drafts in `frontend/src/legal/`); the SHA-256
+  version is computed from whatever is published.
+- Set the launch **permitted-country allowlist** in the Cloudflare rule (runbook in
+  `infra/cloudflare/waf-geo.md`); reconcile T&C §5/§7/§11 with the implemented controls.
