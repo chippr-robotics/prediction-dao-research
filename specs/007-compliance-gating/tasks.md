@@ -197,10 +197,10 @@ Existing multi-part repo: `contracts/`, `test/`, `frontend/src/`, `scripts/`, `s
 
 - [ ] T052 [P] Run Slither + Medusa on the contract changes; resolve or document new high/critical findings (Principle I)
 - [ ] T053 Smart-contract-security agent review of `SanctionsGuard` + WagerRegistry/MembershipManager/KeyRegistry changes (`.github/agents/`) before merge
-- [ ] T054 [P] axe + Lighthouse accessibility audit (WCAG 2.1 AA) of EntryGate, membership checkboxes, legal doc pages, 451 page, DenyListAdmin; wire checks into CI (Principle V)
-- [ ] T055 Update CI to run new Hardhat unit/integration/fork + Vitest + Slither with no `continue-on-error` on lint/test/build/security (Principle IV)
+- [X] T054 [P] axe + Lighthouse accessibility audit (WCAG 2.1 AA) of EntryGate, membership checkboxes, legal doc pages, 451 page, DenyListAdmin; wire checks into CI (Principle V)
+- [X] T055 Update CI to run new Hardhat unit/integration/fork + Vitest + Slither with no `continue-on-error` on lint/test/build/security (Principle IV)
 - [ ] T056 [P] (Optional) Extend `subgraph/` to index `WagerCreated.termsVersionHash`, `Membership*` accepted hash, and `DenyListUpdated` for address-keyed consent queries (FR-047)
-- [ ] T057 [P] Update docs: `README`/`CLAUDE.md` pointers, the Open Legal-Reconciliation Items (counsel), permitted-country allowlist runbook, and the legacy-wager migration note (governed by launch version)
+- [X] T057 [P] Update docs: `README`/`CLAUDE.md` pointers, the Open Legal-Reconciliation Items (counsel), permitted-country allowlist runbook, and the legacy-wager migration note (governed by launch version)
 - [ ] T058 Run `specs/007-compliance-gating/quickstart.md` end-to-end on Amoy + a Polygon-137 fork; confirm all SCs
 
 ---
