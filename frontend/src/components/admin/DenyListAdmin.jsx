@@ -34,6 +34,7 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
   const [status, setStatus] = useState(null) // { denied, allowed } | null
   const [history, setHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [truncated, setTruncated] = useState(false)
   const [error, setError] = useState('')
 
   const writer = useCallback(() => {
@@ -46,8 +47,26 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
     setLoadingHistory(true)
     setError('')
     try {
-      const reader = new ethers.Contract(guardAddress, GUARD_ABI, signer.provider)
-      const events = await reader.queryFilter(reader.filters.DenyListUpdated())
+      const provider = signer.provider
+      const reader = new ethers.Contract(guardAddress, GUARD_ABI, provider)
+      const filter = reader.filters.DenyListUpdated()
+      const latest = await provider.getBlockNumber()
+      // Page in bounded ranges: a single unbounded queryFilter scans the whole chain and
+      // times out / hits provider log-range limits on Polygon mainnet. CHUNK keeps each
+      // eth_getLogs call safe; MAX_SPAN bounds the total scan to recent history (older
+      // entries are surfaced via the truncation note rather than silently dropped).
+      const CHUNK = 45_000
+      const MAX_SPAN = 3_000_000
+      const floor = Math.max(0, latest - MAX_SPAN)
+      const events = []
+      let to = latest
+      while (to >= floor) {
+        const from = Math.max(floor, to - CHUNK + 1)
+        const batch = await reader.queryFilter(filter, from, to)
+        events.push(...batch)
+        if (from === floor) break
+        to = from - 1
+      }
       const rows = events
         .map((e) => ({
           account: e.args.account,
@@ -56,8 +75,9 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
           reason: e.args.reason,
           block: e.blockNumber,
         }))
-        .reverse()
+        .sort((a, b) => b.block - a.block)
       setHistory(rows)
+      setTruncated(floor > 0)
     } catch (err) {
       setError(`Could not load audit trail: ${err.message || err}`)
     } finally {
@@ -160,6 +180,12 @@ function DenyListAdmin({ signer, contracts, runTx, pendingTx }) {
       <button type="button" className="confirm-btn" onClick={loadHistory} disabled={loadingHistory}>
         {loadingHistory ? 'Loading…' : 'Refresh'}
       </button>
+      {truncated && (
+        <p role="note" className="denylist-note">
+          Showing the most recent history only (older entries beyond the scanned block window
+          are not loaded). Query the chain/subgraph directly for the full audit trail.
+        </p>
+      )}
       {history.length === 0 && !loadingHistory ? (
         <p role="status">No deny-list changes recorded.</p>
       ) : (

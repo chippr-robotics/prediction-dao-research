@@ -30,7 +30,8 @@ import {
   XWING_ENVELOPE_INFO,
   XWING_ALGORITHM,
   SUPPORTED_ALGORITHMS,
-  buildTermsAAD
+  buildTermsAAD,
+  TERMS_AAD_VERSION
 } from './constants.js'
 
 // ==================== X-Wing Hybrid KEM Implementation ====================
@@ -305,7 +306,7 @@ export function encryptEnvelope(data, recipients, signingVersion = CURRENT_ENCRY
     ? utf8ToBytes(data)
     : utf8ToBytes(JSON.stringify(data))
 
-  const aad = termsVersion?.hash ? buildTermsAAD('1.0', termsVersion.hash) : undefined
+  const aad = termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, termsVersion.hash) : undefined
   const contentNonce = randomBytes(12)
   const cipher = chacha20poly1305(dek, contentNonce, aad)
   const encryptedContent = cipher.encrypt(plaintext)
@@ -390,7 +391,7 @@ export function decryptEnvelope(envelope, myAddress, myPrivateKey) {
   // fails authentication. Legacy envelopes (no termsVersion) decrypt with no AAD as before.
   const contentNonce = hexToBytes(envelope.content.nonce)
   const ciphertext = hexToBytes(envelope.content.ciphertext)
-  const aad = envelope.termsVersion?.hash ? buildTermsAAD(envelope.version, envelope.termsVersion.hash) : undefined
+  const aad = envelope.termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, envelope.termsVersion.hash) : undefined
   const contentCipher = chacha20poly1305(dek, contentNonce, aad)
   const plaintext = contentCipher.decrypt(ciphertext)
 
@@ -490,7 +491,7 @@ export function encryptEnvelopeXWing(data, recipients, signingVersion = CURRENT_
     ? utf8ToBytes(data)
     : utf8ToBytes(JSON.stringify(data))
 
-  const aad = termsVersion?.hash ? buildTermsAAD('2.0', termsVersion.hash) : undefined
+  const aad = termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, termsVersion.hash) : undefined
   const contentNonce = randomBytes(12)
   const cipher = chacha20poly1305(dek, contentNonce, aad)
   const encryptedContent = cipher.encrypt(plaintext)
@@ -568,7 +569,7 @@ export function decryptEnvelopeXWing(envelope, myAddress, mySecretKey) {
   // fails authentication. Legacy envelopes (no termsVersion) decrypt with no AAD as before.
   const contentNonce = hexToBytes(envelope.content.nonce)
   const ciphertext = hexToBytes(envelope.content.ciphertext)
-  const aad = envelope.termsVersion?.hash ? buildTermsAAD(envelope.version, envelope.termsVersion.hash) : undefined
+  const aad = envelope.termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, envelope.termsVersion.hash) : undefined
   const contentCipher = chacha20poly1305(dek, contentNonce, aad)
   const plaintext = contentCipher.decrypt(ciphertext)
 

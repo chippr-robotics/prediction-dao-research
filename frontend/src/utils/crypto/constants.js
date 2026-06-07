@@ -203,6 +203,14 @@ export function getSupportedVersions() {
 export const TERMS_AAD_PREFIX = 'FairWins-TC'
 
 /**
+ * Schema-binding version component of the terms AAD (Spec 007). This is the
+ * encrypted-metadata SCHEMA version that introduced the binding (v1.1) — NOT the envelope
+ * algorithm version ('1.0' x25519 / '2.0' x-wing). It is used identically on seal and open
+ * so the AAD does not vary by algorithm; bump it only if the AAD format itself changes.
+ */
+export const TERMS_AAD_VERSION = '1.1'
+
+/**
  * Build the deterministic AAD bytes binding a wager to its governing T&C version.
  * @param {string} schemaVersion - the encrypted-metadata schema version (e.g. "1.1")
  * @param {string} termsVersionHashHex - SHA-256 hex of the canonicalized T&C bytes
