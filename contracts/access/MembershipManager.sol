@@ -34,11 +34,16 @@ contract MembershipManager is IMembershipManager, AccessControl {
     ///         (address(0)) screening is skipped — the production deploy wires it in.
     ISanctionsGuard public sanctionsGuard;
 
+    /// @notice Accepted T&C version hash recorded at membership purchase/upgrade
+    ///         (Spec 007, FR-039): user => role => SHA-256 of the in-force Terms.
+    mapping(address => mapping(bytes32 => bytes32)) public memberTermsHash;
+
     event TierSet(bytes32 indexed role, Tier indexed tier, uint128 priceUSDC, uint32 durationDays, bool active);
     event TreasuryUpdated(address indexed treasury);
     event PaymentTokenUpdated(address indexed token);
     event AuthorizedCallerSet(address indexed caller, bool allowed);
     event SanctionsGuardUpdated(address indexed guard);
+    event MembershipTermsRecorded(address indexed user, bytes32 indexed role, bytes32 termsHash, uint64 at);
     event MembershipPurchased(address indexed user, bytes32 indexed role, Tier tier, uint128 price, uint64 expiresAt);
     event MembershipUpgraded(address indexed user, bytes32 indexed role, Tier fromTier, Tier toTier, uint128 delta);
     event MembershipExtended(address indexed user, bytes32 indexed role, uint32 durationDays, uint128 price, uint64 expiresAt);
@@ -118,6 +123,14 @@ contract MembershipManager is IMembershipManager, AccessControl {
         if (address(guard) != address(0)) guard.checkBlocked(account);
     }
 
+    /// @dev Record the accepted T&C version hash for msg.sender (Spec 007, FR-039).
+    function _recordTerms(bytes32 role, bytes32 acceptedTermsHash) internal {
+        if (acceptedTermsHash != bytes32(0)) {
+            memberTermsHash[msg.sender][role] = acceptedTermsHash;
+            emit MembershipTermsRecorded(msg.sender, role, acceptedTermsHash, uint64(block.timestamp));
+        }
+    }
+
     function grantMembership(address user, bytes32 role, Tier tier, uint32 durationDays) external onlyRole(ROLE_MANAGER_ROLE) {
         if (user == address(0)) revert ZeroAddress();
         if (tier == Tier.None) revert TierNone();
@@ -150,6 +163,17 @@ contract MembershipManager is IMembershipManager, AccessControl {
     // ---------- User ----------
 
     function purchaseTier(bytes32 role, Tier tier) external {
+        _purchaseTier(role, tier);
+    }
+
+    /// @notice Like {purchaseTier} but records the accepted T&C version hash on-chain
+    ///         (Spec 007, FR-039). Existing purchaseTier ABI is preserved.
+    function purchaseTierWithTerms(bytes32 role, Tier tier, bytes32 acceptedTermsHash) external {
+        _purchaseTier(role, tier);
+        _recordTerms(role, acceptedTermsHash);
+    }
+
+    function _purchaseTier(bytes32 role, Tier tier) internal {
         _screen(msg.sender); // Sanctions screen (Spec 007, FR-054) — before any fee transfer
         if (tier == Tier.None) revert TierNone();
         TierConfig memory cfg = _tiers[role][tier];
@@ -172,6 +196,17 @@ contract MembershipManager is IMembershipManager, AccessControl {
     }
 
     function upgradeTier(bytes32 role, Tier newTier) external {
+        _upgradeTier(role, newTier);
+    }
+
+    /// @notice Like {upgradeTier} but records the accepted T&C version hash on-chain
+    ///         (Spec 007, FR-039). Existing upgradeTier ABI is preserved.
+    function upgradeTierWithTerms(bytes32 role, Tier newTier, bytes32 acceptedTermsHash) external {
+        _upgradeTier(role, newTier);
+        _recordTerms(role, acceptedTermsHash);
+    }
+
+    function _upgradeTier(bytes32 role, Tier newTier) internal {
         _screen(msg.sender); // Sanctions screen (Spec 007, FR-054) — before any fee transfer
         Membership storage m = _memberships[msg.sender][role];
         if (m.tier == Tier.None || m.expiresAt <= block.timestamp) revert NoActiveMembership();

@@ -10,6 +10,7 @@
 import { ethers } from 'ethers'
 import { KEY_REGISTRY_ABI } from '../abis/KeyRegistry'
 import { getContractAddress } from '../config/contracts'
+import { getCurrentDocument } from './legalDocs'
 
 // In-memory cache: address → { publicKeyHex, timestamp }
 const keyCache = new Map()
@@ -139,7 +140,21 @@ export async function registerEncryptionKey(signer, publicKeyBytes) {
 
   const contract = new ethers.Contract(address, KEY_REGISTRY_ABI, signer)
   // Both old ZKKeyManager (string param) and new KeyRegistry (bytes param) accept a 0x-prefixed hex string.
-  const tx = await contract.registerKey('0x' + publicKeyHex)
+  // Spec 007 (FR-043): when the KeyRegistry supports it, record the eligibility ack on-chain
+  // referencing the in-force Terms version hash. Fall back to plain registerKey for older
+  // deployments that lack the overload (pre-redeploy).
+  const termsHash = getCurrentDocument('terms')?.hash
+  let tx
+  if (termsHash && typeof contract.registerKeyWithEligibility === 'function') {
+    try {
+      tx = await contract.registerKeyWithEligibility('0x' + publicKeyHex, '0x' + termsHash)
+    } catch (e) {
+      console.warn('registerKeyWithEligibility unavailable on-chain; falling back to registerKey:', e?.message)
+      tx = await contract.registerKey('0x' + publicKeyHex)
+    }
+  } else {
+    tx = await contract.registerKey('0x' + publicKeyHex)
+  }
   const receipt = await tx.wait()
 
   // Invalidate cache for this user

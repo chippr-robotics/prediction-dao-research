@@ -1082,7 +1082,7 @@ const PAYMENT_PROCESSOR_ABI = [
  * @param {string} action - 'purchase' (default), 'upgrade', or 'extend'
  * @returns {Promise<Object>} Transaction receipt with roleGranted status
  */
-export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase') {
+export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tier = MembershipTier.BRONZE, action = 'purchase', termsHash = null) {
   if (!signer) {
     throw new Error('Wallet not connected')
   }
@@ -1135,13 +1135,20 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
         await approveTx.wait()
       }
 
+      // Spec 007 (FR-039): when an accepted T&C version hash is supplied, use the
+      // *WithTerms overloads so the accepted version is recorded on-chain at purchase.
+      const hasTerms = typeof termsHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(termsHash)
       let tx
       if (action === 'upgrade') {
-        tx = await mm.upgradeTier(roleHash, validTier)
+        tx = hasTerms
+          ? await mm.upgradeTierWithTerms(roleHash, validTier, termsHash)
+          : await mm.upgradeTier(roleHash, validTier)
       } else if (action === 'extend') {
         tx = await mm.extendMembership(roleHash)
       } else {
-        tx = await mm.purchaseTier(roleHash, validTier)
+        tx = hasTerms
+          ? await mm.purchaseTierWithTerms(roleHash, validTier, termsHash)
+          : await mm.purchaseTier(roleHash, validTier)
       }
       const receipt = await tx.wait()
       return {

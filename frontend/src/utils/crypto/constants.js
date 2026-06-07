@@ -216,3 +216,29 @@ export function buildTermsAAD(schemaVersion, termsVersionHashHex) {
     `${TERMS_AAD_PREFIX}|${schemaVersion}|${termsVersionHashHex}`
   )
 }
+
+/**
+ * ==========================================================================
+ * Key-generation eligibility disclosure (Spec 007 — US6, FR-040/FR-044)
+ * ==========================================================================
+ * Shown to the user at account key generation. The DETERMINISTIC key-derivation message
+ * (SIGNING_MESSAGES / MARKET_SIGNING_MESSAGES above) is intentionally unchanged so the
+ * derived key stays reproducible (FR-041); the standing eligibility facts + the
+ * key-derivation coupling are surfaced here as a disclosure, and the dated record is the
+ * on-chain key registration (KeyRegistry.EligibilityAcknowledged, FR-043). Terms are
+ * referenced generically ("as published"), with no date/version in the signed payload.
+ */
+export const KEYGEN_TERMS_URL = 'https://fairwins.app/terms'
+
+export const ELIGIBILITY_DISCLOSURE = {
+  title: 'FairWins — Account Key Generation',
+  facts: [
+    'I am at least 21 years old.',
+    'I am not a U.S. person and am not located in a Restricted Jurisdiction.',
+    'I am not a sanctioned or restricted party.',
+    'I have sole control of this wallet and its private keys, and I meet and continue to meet the eligibility requirements of the FairWins Terms & Conditions.',
+  ],
+  termsReference: `FairWins Terms & Conditions (as published) at ${KEYGEN_TERMS_URL}`,
+  keyDerivationNotice:
+    'Signing this message deterministically derives the encryption key for your FairWins account. It does not authorize any transaction, transfer, or wager, and costs no gas. If you lose your wallet/keys, this account key cannot be recovered.',
+}

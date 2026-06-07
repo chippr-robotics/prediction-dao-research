@@ -139,12 +139,12 @@ Existing multi-part repo: `contracts/`, `test/`, `frontend/src/`, `scripts/`, `s
 
 ### Tests for User Story 4
 
-- [ ] T040 [P] [US4] Vitest: EntryGate blocks until acknowledged, "Leave" withholds, acknowledged versions persisted, current versioned docs linked, in `frontend/src/test/EntryGate.test.jsx`
+- [X] T040 [P] [US4] Vitest: EntryGate blocks until acknowledged, "Leave" withholds, acknowledged versions persisted, current versioned docs linked, in `frontend/src/test/EntryGate.test.jsx`
 
 ### Implementation for User Story 4
 
-- [ ] T041 [US4] Implement `frontend/src/components/compliance/EntryGate.jsx` (focus-trapped labeled modal; affirmations 21+/non-US/non-restricted/non-sanctioned/lawful; VPN warning; Enter/Leave; links versioned docs by hash; client-state ack) — WCAG 2.1 AA
-- [ ] T042 [US4] Mount EntryGate in `frontend/src/App.jsx`/`AppLayout` before app content on first visit; skip for returning visitors via client state (re-consent enforced on-chain at next consequential act)
+- [X] T041 [US4] Implement `frontend/src/components/compliance/EntryGate.jsx` (focus-trapped labeled modal; affirmations 21+/non-US/non-restricted/non-sanctioned/lawful; VPN warning; Enter/Leave; links versioned docs by hash; client-state ack) — WCAG 2.1 AA
+- [X] T042 [US4] Mount EntryGate in `frontend/src/App.jsx`/`AppLayout` before app content on first visit; skip for returning visitors via client state (re-consent enforced on-chain at next consequential act)
 
 **Checkpoint**: Entry notice gate live; downstream on-chain consents carry the legal weight.
 
@@ -158,14 +158,14 @@ Existing multi-part repo: `contracts/`, `test/`, `frontend/src/`, `scripts/`, `s
 
 ### Tests for User Story 5
 
-- [ ] T043 [P] [US5] Vitest: checkboxes un-pre-ticked, submit blocked until all required ticked, copy mirrors FR-037/FR-038, in `frontend/src/test/MembershipAttestation.test.jsx`
-- [ ] T044 [P] [US5] Hardhat test: `purchaseTier`/`upgradeTier` record + emit `acceptedTermsHash`, in `test/MembershipManager.terms.test.js`
+- [X] T043 [P] [US5] Vitest: checkboxes un-pre-ticked, submit blocked until all required ticked, copy mirrors FR-037/FR-038, in `frontend/src/test/MembershipAttestation.test.jsx`
+- [X] T044 [P] [US5] Hardhat test: `purchaseTier`/`upgradeTier` record + emit `acceptedTermsHash`, in `test/MembershipManager.terms.test.js`
 
 ### Implementation for User Story 5
 
-- [ ] T045 [US5] Modify `contracts/access/MembershipManager.sol`: add `acceptedTermsHash`/`acceptedAt` to the membership record + `purchaseTier`/`upgradeTier` params + extended events — **depends on T025 (same file)**
-- [ ] T046 [US5] Implement `frontend/src/components/compliance/MembershipAttestation.jsx` (discrete un-pre-ticked checkboxes per FR-037/FR-038; on confirm pass `acceptedTermsHash`) — WCAG 2.1 AA
-- [ ] T047 [US5] Integrate MembershipAttestation into the existing membership flow (`frontend/src/pages/WalletPage.jsx` Membership tab); prompt re-acceptance when the in-force version is flagged material
+- [X] T045 [US5] Modify `contracts/access/MembershipManager.sol`: add `acceptedTermsHash`/`acceptedAt` to the membership record + `purchaseTier`/`upgradeTier` params + extended events — **depends on T025 (same file)**
+- [X] T046 [US5] Implement `frontend/src/components/compliance/MembershipAttestation.jsx` (discrete un-pre-ticked checkboxes per FR-037/FR-038; on confirm pass `acceptedTermsHash`) — WCAG 2.1 AA
+- [X] T047 [US5] Integrate MembershipAttestation into the existing membership flow (`frontend/src/pages/WalletPage.jsx` Membership tab); prompt re-acceptance when the in-force version is flagged material
 
 **Checkpoint**: Itemized, dated, on-chain membership consent live.
 
@@ -179,13 +179,13 @@ Existing multi-part repo: `contracts/`, `test/`, `frontend/src/`, `scripts/`, `s
 
 ### Tests for User Story 6
 
-- [ ] T048 [P] [US6] Vitest: eligibility message determinism (byte-identical), required content + disclosure, recovered-address reproducibility, in `frontend/src/test/keygenEligibility.test.js`
-- [ ] T049 [P] [US6] Hardhat test: `KeyRegistry` emits `EligibilityAcknowledged` dated by block, in `test/KeyRegistry.eligibility.test.js`
+- [X] T048 [P] [US6] Vitest: eligibility message determinism (byte-identical), required content + disclosure, recovered-address reproducibility, in `frontend/src/test/keygenEligibility.test.js`
+- [X] T049 [P] [US6] Hardhat test: `KeyRegistry` emits `EligibilityAcknowledged` dated by block, in `test/KeyRegistry.eligibility.test.js`
 
 ### Implementation for User Story 6
 
-- [ ] T050 [US6] Update the key-generation signing UI/flow (`frontend/src/hooks/useEncryption.js` / `frontend/src/utils/keyRegistryService.js`) to present the eligibility facts + generic Terms ref + wallet address + key-derivation disclosure — **the key-derivation message itself stays UNCHANGED** (deterministic, versionless)
-- [ ] T051 [US6] Modify `contracts/privacy/KeyRegistry.sol` to emit `EligibilityAcknowledged(account, termsRef)` at registration (dated by block timestamp)
+- [X] T050 [US6] Update the key-generation signing UI/flow (`frontend/src/hooks/useEncryption.js` / `frontend/src/utils/keyRegistryService.js`) to present the eligibility facts + generic Terms ref + wallet address + key-derivation disclosure — **the key-derivation message itself stays UNCHANGED** (deterministic, versionless)
+- [X] T051 [US6] Modify `contracts/privacy/KeyRegistry.sol` to emit `EligibilityAcknowledged(account, termsRef)` at registration (dated by block timestamp)
 
 **Checkpoint**: All six stories independently functional.
 

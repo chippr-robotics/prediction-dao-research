@@ -19,6 +19,7 @@ import Header from './components/Header'
 import WalletPage from './pages/WalletPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
+import EntryGate from './components/compliance/EntryGate'
 
 //admin
 import AdminPanel from './components/AdminPanel'
@@ -33,6 +34,8 @@ function AppLayout() {
   return (
     <>
       <Header appMode />
+      {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
+      <EntryGate />
       <Outlet />
     </>
   )
