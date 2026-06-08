@@ -77,9 +77,12 @@ function updateObjectLiteralValue(source, key, newValueLiteral, blockName = null
     const block = source.slice(bodyStart, bodyEnd)
     const after = source.slice(bodyEnd)
 
-    const re = new RegExp(`(^\\s*${key}\\s*:\\s*)([^,\\n]+)(\\s*,?)$`, 'm')
+    // Trailing `// comment` after the value must be tolerated, else the `$`
+    // anchor fails to match and the key is wrongly treated as missing → a
+    // duplicate gets inserted (e.g. sanctionsGuard/polymarketAdapter).
+    const re = new RegExp(`(^\\s*${key}\\s*:\\s*)([^,\\n]+)(\\s*,?)(\\s*\\/\\/[^\\n]*)?$`, 'm')
     if (re.test(block)) {
-      const updated = block.replace(re, `$1${newValueLiteral}$3`)
+      const updated = block.replace(re, `$1${newValueLiteral}$3$4`)
       return before + updated + after
     }
     // Insert at end of block (before closing brace)
@@ -87,11 +90,12 @@ function updateObjectLiteralValue(source, key, newValueLiteral, blockName = null
     return before + block + line + after
   }
 
-  // Matches: <spaces>key: <value>,
+  // Matches: <spaces>key: <value>,  (optionally followed by a // comment, which
+  // must be tolerated so the key isn't treated as missing and re-inserted).
   // key is assumed to be a simple identifier (no quotes) as used in contracts.js.
-  const re = new RegExp(`(^\\s*${key}\\s*:\\s*)([^,\\n]+)(\\s*,?)$`, 'm')
+  const re = new RegExp(`(^\\s*${key}\\s*:\\s*)([^,\\n]+)(\\s*,?)(\\s*\\/\\/[^\\n]*)?$`, 'm')
   if (re.test(source)) {
-    return source.replace(re, `$1${newValueLiteral}$3`)
+    return source.replace(re, `$1${newValueLiteral}$3$4`)
   }
 
   // Insert before closing brace of DEPLOYED_CONTRACTS.

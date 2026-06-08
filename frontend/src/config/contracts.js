@@ -73,7 +73,7 @@ const POLYGON_CONTRACTS = {
   wagerRegistry: '0x5023765809fDA93ab9F11B684fdb76521eD31774',
   membershipManager: '0x00c3ef4e02Ef00Ad6eE955dF5022A22F6ea73dae',
   keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
-  sanctionsGuard: '', // populated by sync once SanctionsGuard is deployed on Polygon
+  sanctionsGuard: '0x2Dc53d91A189be71DfE96Ea9BCFCF6aDDA77BC76', // Spec 007 compliance guard
   polymarketAdapter: '0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4', // tie-fix + admin-owner redeploy
   // Stake / payment tokens (Circle USDC + Wrapped MATIC on Polygon)
   paymentToken: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
@@ -81,8 +81,6 @@ const POLYGON_CONTRACTS = {
   chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
   chainlinkFunctionsAdapter: '0x148C2E347a601AC1a680b17321529b0Ffc31AeFc',
   umaAdapter: '0x8224433d099Af6cd30540A78421aBFd6e044E949',
-  sanctionsGuard: '0x2Dc53d91A189be71DfE96Ea9BCFCF6aDDA77BC76',
-  polymarketAdapter: '0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4',
 }
 
 const NETWORK_CONTRACTS = {
