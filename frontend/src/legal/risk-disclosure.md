@@ -1,8 +1,6 @@
 # FairWins — Risk Disclosure
 
 
-**Last updated: [DATE] · Version: [YYYY-MM-HASH]**
-
 ---
 
 ## Read This Before You Participate
@@ -86,7 +84,7 @@ We do not guarantee that the Service, any interface, any market, or any counterp
 
 ## 16. Responsible Participation
 
-Wagering can be habit-forming and can cause financial and personal harm. Wager only what you can afford to lose. Set limits for yourself. If you believe your participation may be becoming harmful, stop and seek help. Resources for problem gambling are available through `[REGION-APPROPRIATE PROBLEM-GAMBLING RESOURCE / HELPLINE — TO BE CONFIRMED]`. Where the Service offers self-limitation or self-exclusion tools, you are encouraged to use them.
+Wagering can be habit-forming and can cause financial and personal harm. Wager only what you can afford to lose. Set limits for yourself. If you believe your participation may be becoming harmful, stop and seek help.  Where the Service offers self-limitation or self-exclusion tools, you are encouraged to use them.
 
 ## 17. Acknowledgement
 
