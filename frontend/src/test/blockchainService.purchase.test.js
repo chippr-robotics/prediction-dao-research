@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Regression guard for the "purchase contract is not found" bug: the membership
 // purchase flow used to resolve the MembershipManager via the build-time chain
@@ -17,7 +17,7 @@ vi.mock('../config/contracts', async (importOriginal) => {
   return { ...actual, getContractAddressForChain: resolverMock }
 })
 
-import { purchaseRoleWithStablecoin } from '../utils/blockchainService'
+import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../utils/blockchainService'
 
 // A signer/provider stub. On the "no code on this chain" path the function only
 // touches signer.provider.getNetwork() and signer.provider.getCode(), so no real
@@ -62,5 +62,29 @@ describe('purchaseRoleWithStablecoin — chain-aware contract resolution', () =>
     await expect(
       purchaseRoleWithStablecoin(signer, 'WAGER_PARTICIPANT', 2, 1, 'purchase', null)
     ).rejects.not.toThrow(/No purchase contract found/i)
+  })
+})
+
+describe('getUserTierOnChain — chain-aware tier read', () => {
+  beforeEach(() => resolverMock.mockReset())
+  // The test env sets VITE_SKIP_BLOCKCHAIN_CALLS=true (vite.config.js) which
+  // short-circuits the function; un-skip it so the chain-aware resolution runs.
+  afterEach(() => vi.unstubAllEnvs())
+
+  it("resolves the membership contract for the passed chain id, not the build chain", async () => {
+    vi.stubEnv('VITE_SKIP_BLOCKCHAIN_CALLS', 'false')
+    // No membership contract on this chain -> tier 0. The point of the test is
+    // the resolver is queried with the wallet's chain id, guarding against the
+    // bug where a testnet (Amoy) tier leaked into the mainnet purchase view.
+    resolverMock.mockReturnValue(undefined)
+
+    const res = await getUserTierOnChain(
+      '0x0000000000000000000000000000000000000001',
+      'WAGER_PARTICIPANT',
+      80002
+    )
+
+    expect(resolverMock).toHaveBeenCalledWith('membershipManager', 80002)
+    expect(res).toEqual({ tier: 0, tierName: 'None' })
   })
 })
