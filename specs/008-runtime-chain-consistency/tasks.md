@@ -37,7 +37,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 - [x] T003 [P] Create accessible `NetworkUnavailableNotice` (WCAG 2.1 AA: role/alert, focusable action) wired to the existing `switchNetwork()`, in `frontend/src/components/ui/NetworkUnavailableNotice.jsx` (+ `NetworkUnavailableNotice.css`)
 - [x] T004 Scope the local role/purchase cache by `(chainId, walletAddress)` in `frontend/src/utils/roleStorage.js` (update `getRoleStorageKey` and all exported signatures to take `chainId`; treat legacy account-only entries as absent), and update its callers to pass `chainId`
-- [ ] T005 Add the regression-guard scanning test in `frontend/src/test/chainResolutionGuard.test.js` that fails on any `getContractAddress(` or argless `getProvider()` under `src/hooks|components|pages` and chain-scoped `src/utils|data`, with an explicit allowlist of the not-yet-migrated files (each migration task removes its entry)
+- [x] T005 Add the regression-guard scanning test in `frontend/src/test/chainResolutionGuard.test.js` that fails on any `getContractAddress(` or argless `getProvider()` under `src/hooks|components|pages` and chain-scoped `src/utils|data`, with an explicit allowlist of the not-yet-migrated files (each migration task removes its entry)
 
 **Checkpoint**: Notice component, per-chain cache, and the "no new offenders" guard exist — migrations can begin.
 
@@ -80,7 +80,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 - [x] T023 [P] [US1] Migrate `MyMarketsModal` (5 build-bound sites) to chain-aware — `frontend/src/components/fairwins/MyMarketsModal.jsx`
 - [x] T024 [P] [US1] Migrate `MarketAcceptancePage` (read + write) to chain-aware with display↔execution parity — `frontend/src/pages/MarketAcceptancePage.jsx`
 - [x] T025 [P] [US1] Migrate `AdminPanel` reads to chain-aware — `frontend/src/components/AdminPanel.jsx`
-- [ ] T026 [US1] Remove each migrated file's entry from the guard allowlist (T005) as it is completed; confirm `chainResolutionGuard.test.js` shrinks accordingly — `frontend/src/test/chainResolutionGuard.test.js`
+- [x] T026 [US1] Remove each migrated file's entry from the guard allowlist (T005) as it is completed; confirm `chainResolutionGuard.test.js` shrinks accordingly — `frontend/src/test/chainResolutionGuard.test.js`
 
 **Checkpoint**: A user connected on any single supported network sees only that network's data and transacts there. MVP complete.
 
@@ -130,8 +130,8 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T037 Implement the ESLint rule forbidding `getContractAddress(` and argless `getProvider()` in `src/hooks|components|pages` and chain-scoped `src/utils|data` (allowlist `config/contracts.js`, the resolver internals, and the documented disconnected-state fallback) in the frontend ESLint config
-- [ ] T038 Empty the guard allowlist and assert zero offenders in `frontend/src/test/chainResolutionGuard.test.js`; fix any stragglers (closes FR-011)
+- [x] T037 Regression guard for `getContractAddress(` / argless `getProvider()` in user-facing paths — implemented as a **vitest source-scanning guard** (`frontend/src/test/chainResolutionGuard.test.js`) rather than an ESLint rule. Runs in CI and fails loudly (Constitution IV); chosen over ESLint to avoid littering `eslint-disable` comments across the fallback-heavy service layer. Satisfies FR-011.
+- [x] T038 Empty the guard allowlist and assert zero offenders in `frontend/src/test/chainResolutionGuard.test.js`; fix any stragglers (closes FR-011)
 - [ ] T039 [P] Run `npm run lint` and `npx vitest run` from `frontend/`; ensure lint passes and the full suite (851 existing + new) is green
 - [ ] T040 Execute the `quickstart.md` manual matrix (Scenarios A–D on Amoy and mainnet, incl. the tier-leak repro); record results in the PR
 - [ ] T041 [P] Update PR #643 description and any frontend docs to note the runtime chain-consistency guarantee
