@@ -1,8 +1,6 @@
 # FairWins — Terms & Conditions
 
 
-**Last updated: [DATE] · Version: [YYYY-MM-hash]**
-
 ---
 
 ## Key Points — Please Read
@@ -188,7 +186,7 @@ We may update these Terms. Material changes will be indicated by an updated "Las
 
 ## 26. Contact
 
-Questions about these Terms: `[CONTACT EMAIL / METHOD]`.
+Questions about these Terms: Howdy@fairwins.app.
 
 ## 27. Acknowledgement
 
@@ -203,7 +201,7 @@ The Service is not available to persons located, resident, incorporated, or esta
 - The **United States** of America and its territories;
 - **Cuba, Iran, North Korea, Syria**, and the **Crimea, Donetsk, and Luhansk** regions;
 - Any jurisdiction subject to comprehensive sanctions by OFAC or other applicable authority; and
-- Any jurisdiction in which peer-to-peer wagering, prediction markets, or the Service is unlawful, including without limitation `[JURISDICTIONS TO BE CONFIRMED WITH COUNSEL — e.g., France, Belgium, Singapore, and others]`.
+- Any jurisdiction in which peer-to-peer wagering, prediction markets, or the Service is unlawful, including without limitation.
 
 We may amend this Schedule at any time.
 
