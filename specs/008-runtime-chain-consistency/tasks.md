@@ -69,10 +69,10 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 ### Implementation for User Story 1 — services & data
 
 - [ ] T017 [US1] Add an optional `chainId` to the remaining build-bound read helpers in `frontend/src/utils/blockchainService.js` (stats, key registry, role-manager, friend factory, balance/allowance), resolving via `getContractAddressForChain` + `getProvider(chainId)`
-- [ ] T018 [P] [US1] Migrate `keyRegistryService` to accept/resolve `chainId` — `frontend/src/utils/keyRegistryService.js`
-- [ ] T019 [P] [US1] Migrate `sanctionsScreen` to accept/resolve `chainId` — `frontend/src/utils/sanctionsScreen.js`
+- [x] T018 [P] [US1] Migrate `keyRegistryService` to accept/resolve `chainId` — `frontend/src/utils/keyRegistryService.js`
+- [x] T019 [P] [US1] Migrate `sanctionsScreen` to accept/resolve `chainId` — `frontend/src/utils/sanctionsScreen.js`
 - [ ] T020 [P] [US1] Migrate `EventsSource` (address + argless `getProvider()`) to chain-aware — `frontend/src/data/wagers/EventsSource.js`
-- [ ] T021 [P] [US1] Migrate `WalletButton` balance read (argless `getProvider()`) to the connected chain — `frontend/src/components/wallet/WalletButton.jsx`
+- [x] T021 [P] [US1] N/A — `WalletButton` uses wagmi `connector.getProvider()` (already chain-aware); the audit's argless-`getProvider()` match was a false positive — `frontend/src/components/wallet/WalletButton.jsx`
 
 ### Implementation for User Story 1 — modals & pages (consume chainId, pass to services)
 

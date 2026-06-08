@@ -13,7 +13,7 @@
 
 import { ethers } from 'ethers'
 import { SANCTIONS_GUARD_ABI } from '../abis/SanctionsGuard'
-import { getContractAddress } from '../config/contracts'
+import { getContractAddress, getContractAddressForChain } from '../config/contracts'
 
 /**
  * Screen using an already-constructed guard contract (testable seam).
@@ -37,8 +37,17 @@ export async function screenWithContract(guard, account) {
  * @returns {Promise<{ allowed: boolean, available: boolean }>}
  */
 export async function screenAddress(account, provider) {
-  const address = getContractAddress('sanctionsGuard')
-  if (!address) return { allowed: false, available: false } // not configured -> can't screen
+  // Resolve the SanctionsGuard for the chain the provider talks to, so a mainnet
+  // screen never reads a testnet guard (or vice versa). Fall back to the
+  // build-time chain only when the provider can't report its network.
+  let address
+  try {
+    const net = await provider.getNetwork()
+    address = getContractAddressForChain('sanctionsGuard', Number(net.chainId))
+  } catch {
+    address = getContractAddress('sanctionsGuard')
+  }
+  if (!address) return { allowed: false, available: false } // not configured on this chain -> can't screen
   const guard = new ethers.Contract(address, SANCTIONS_GUARD_ABI, provider)
   return screenWithContract(guard, account)
 }
