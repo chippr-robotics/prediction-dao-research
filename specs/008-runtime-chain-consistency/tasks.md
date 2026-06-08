@@ -24,7 +24,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 **Purpose**: Conventions and test scaffolding reused by every later task.
 
-- [ ] T001 [P] Add reusable chain-aware test helpers (mock `getContractAddressForChain`, fake signer/provider exposing a `chainId`) in `frontend/src/test/helpers/chainMocks.js`
+- [x] T001 [P] Add reusable chain-aware test helpers (mock `getContractAddressForChain`, fake signer/provider exposing a `chainId`) in `frontend/src/test/helpers/chainMocks.js`
 - [ ] T002 Add a thin `useActiveChainId()` hook that returns `useWeb3().chainId` and documents the disconnected→primary-chain fallback, in `frontend/src/hooks/useActiveChainId.js`, referencing `specs/008-runtime-chain-consistency/contracts/chain-resolution.md`
 
 ---
@@ -35,7 +35,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 **⚠️ CRITICAL**: No user-story work begins until this phase is complete.
 
-- [ ] T003 [P] Create accessible `NetworkUnavailableNotice` (WCAG 2.1 AA: role/alert, focusable action) wired to the existing `switchNetwork()`, in `frontend/src/components/ui/NetworkUnavailableNotice.jsx` (+ `NetworkUnavailableNotice.css`)
+- [x] T003 [P] Create accessible `NetworkUnavailableNotice` (WCAG 2.1 AA: role/alert, focusable action) wired to the existing `switchNetwork()`, in `frontend/src/components/ui/NetworkUnavailableNotice.jsx` (+ `NetworkUnavailableNotice.css`)
 - [ ] T004 Scope the local role/purchase cache by `(chainId, walletAddress)` in `frontend/src/utils/roleStorage.js` (update `getRoleStorageKey` and all exported signatures to take `chainId`; treat legacy account-only entries as absent), and update its callers to pass `chainId`
 - [ ] T005 Add the regression-guard scanning test in `frontend/src/test/chainResolutionGuard.test.js` that fails on any `getContractAddress(` or argless `getProvider()` under `src/hooks|components|pages` and chain-scoped `src/utils|data`, with an explicit allowlist of the not-yet-migrated files (each migration task removes its entry)
 
@@ -51,16 +51,16 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 ### Tests for User Story 1
 
-- [ ] T006 [P] [US1] Test `useTierPrices` resolves `membershipManager` for the active `chainId` (prices/limits) in `frontend/src/test/useTierPrices.chain.test.js`
-- [ ] T007 [P] [US1] Test `useRoleDetails` resolves membership reads for the connected `chainId` in `frontend/src/test/useRoleDetails.chain.test.js`
+- [x] T006 [P] [US1] Test `useTierPrices` resolves `membershipManager` for the active `chainId` (prices/limits) in `frontend/src/test/useTierPrices.chain.test.js`
+- [x] T007 [P] [US1] Test `useRoleDetails` resolves membership reads for the connected `chainId` in `frontend/src/test/useRoleDetails.chain.test.js`
 - [ ] T008 [P] [US1] Test remaining `blockchainService` read helpers (stats, key registry, role-manager, friend factory, balance/allowance) resolve for the passed `chainId` in `frontend/src/test/blockchainService.chain.test.js`
 - [ ] T009 [P] [US1] Test `EventsSource` and service wager reads resolve for the passed `chainId` in `frontend/src/test/eventsSource.chain.test.js`
 - [ ] T010 [P] [US1] Test `roleStorage` returns a record only for its `(chainId, account)` and never across chains in `frontend/src/test/roleStorage.chain.test.js`
 
 ### Implementation for User Story 1 — hooks
 
-- [ ] T011 [P] [US1] Migrate `useTierPrices` to `getContractAddressForChain(name, chainId)` + `getProvider(chainId)` (chainId from `useActiveChainId`); remove its guard allowlist entry — `frontend/src/hooks/useTierPrices.js`
-- [ ] T012 [P] [US1] Migrate `useRoleDetails` to resolve `membershipManager` for the connected `chainId` (already reads via wallet provider) — `frontend/src/hooks/useRoleDetails.js`
+- [x] T011 [P] [US1] Migrate `useTierPrices` to `getContractAddressForChain(name, chainId)` + `getProvider(chainId)` (chainId from `useActiveChainId`); remove its guard allowlist entry — `frontend/src/hooks/useTierPrices.js`
+- [x] T012 [P] [US1] Migrate `useRoleDetails` to resolve `membershipManager` for the connected `chainId` (already reads via wallet provider) — `frontend/src/hooks/useRoleDetails.js`
 - [ ] T013 [P] [US1] Migrate `useTreasuryVault` reads to chain-aware — `frontend/src/hooks/useTreasuryVault.js`
 - [ ] T014 [P] [US1] Migrate `useSiteStats` (address + argless `getProvider()`) to chain-aware — `frontend/src/hooks/useSiteStats.js`
 - [ ] T015 [P] [US1] Migrate `useFriendMarketCreation` (registry/token reads + write execution) to chain-aware with display↔execution parity — `frontend/src/hooks/useFriendMarketCreation.js`
@@ -115,7 +115,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 ### Tests for User Story 3
 
-- [ ] T032 [P] [US3] `NetworkUnavailableNotice` component test (message names a supported network, switch action invokes `switchNetwork`, correct ARIA role) in `frontend/src/test/NetworkUnavailableNotice.test.jsx`
+- [x] T032 [P] [US3] `NetworkUnavailableNotice` component test (message names a supported network, switch action invokes `switchNetwork`, correct ARIA role) in `frontend/src/test/NetworkUnavailableNotice.test.jsx`
 - [ ] T033 [P] [US3] Per-path "renders notice / actionable error when address absent on connected chain" tests in `frontend/src/test/networkUnavailable.paths.test.jsx`
 
 ### Implementation for User Story 3

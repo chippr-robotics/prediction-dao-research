@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useAccount } from 'wagmi'
 import { useWeb3 } from './useWeb3'
-import { getContractAddress } from '../config/contracts'
+import { getContractAddressForChain } from '../config/contracts'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
 /**
@@ -63,7 +63,7 @@ function emptyDetails(roleName) {
 
 export function useRoleDetails() {
   const { address, isConnected } = useAccount()
-  const { provider } = useWeb3()
+  const { provider, chainId } = useWeb3()
   const [roleDetails, setRoleDetails] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -73,7 +73,10 @@ export function useRoleDetails() {
     const roleBytes = ROLE_BYTES32[roleName]
     if (!roleBytes) return null
 
-    const managerAddr = getContractAddress('membershipManager')
+    // Resolve the MembershipManager for the wallet's connected chain so a
+    // membership held on one network is not read on another (the address used to
+    // be build-bound while the provider was the wallet's — a chain mismatch).
+    const managerAddr = getContractAddressForChain('membershipManager', chainId)
     if (!managerAddr) return emptyDetails(roleName)
 
     try {
@@ -119,7 +122,7 @@ export function useRoleDetails() {
       console.error(`Error fetching ${roleName} details:`, err)
       return emptyDetails(roleName)
     }
-  }, [address, provider])
+  }, [address, provider, chainId])
 
   const fetchAllRoleDetails = useCallback(async () => {
     if (!address || !provider) {

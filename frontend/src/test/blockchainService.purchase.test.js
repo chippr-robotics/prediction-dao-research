@@ -18,19 +18,11 @@ vi.mock('../config/contracts', async (importOriginal) => {
 })
 
 import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../utils/blockchainService'
+import { makeSigner } from './helpers/chainMocks'
 
-// A signer/provider stub. On the "no code on this chain" path the function only
-// touches signer.provider.getNetwork() and signer.provider.getCode(), so no real
-// ethers contract calls are made.
-function makeSigner({ chainId, code }) {
-  return {
-    getAddress: async () => '0x0000000000000000000000000000000000000001',
-    provider: {
-      getNetwork: async () => ({ chainId: BigInt(chainId) }),
-      getCode: async () => code,
-    },
-  }
-}
+// makeSigner (shared) returns a signer whose provider reports chainId via
+// getNetwork() and returns `code` from getCode(); on the "no code on this chain"
+// path the function only touches those, so no real ethers contract calls happen.
 
 const POLYGON_MM = '0x00c3ef4e02Ef00Ad6eE955dF5022A22F6ea73dae'
 
