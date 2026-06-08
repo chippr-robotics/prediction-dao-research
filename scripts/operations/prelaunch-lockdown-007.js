@@ -91,7 +91,16 @@ async function main() {
   if (!wagerAddr) throw new Error("wagerRegistry missing from deployment file.");
   if (lockMemberships && !mmAddr) throw new Error("membershipManager missing from deployment file (or set LOCK_MEMBERSHIPS=false).");
 
-  const [signer] = await ethers.getSigners();
+  const [rawSigner] = await ethers.getSigners();
+  // Wrap in a client-side NonceManager so the sequential pause + setTier txs
+  // don't re-fetch a stale nonce from a load-balanced public RPC ("nonce too
+  // low"). The base nonce is fetched once, then incremented locally.
+  let signer = rawSigner;
+  if (rawSigner) {
+    const { NonceManager } = require("ethers");
+    signer = new NonceManager(rawSigner);
+    signer.address = await rawSigner.getAddress();
+  }
   console.log("=".repeat(64));
   console.log(`Pre-launch ${action.toUpperCase()} | ${net} (${chainId}) | DRY_RUN=${dryRun}`);
   console.log("=".repeat(64));
