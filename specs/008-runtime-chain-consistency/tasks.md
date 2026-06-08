@@ -62,7 +62,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 - [x] T011 [P] [US1] Migrate `useTierPrices` to `getContractAddressForChain(name, chainId)` + `getProvider(chainId)` (chainId from `useActiveChainId`); remove its guard allowlist entry — `frontend/src/hooks/useTierPrices.js`
 - [x] T012 [P] [US1] Migrate `useRoleDetails` to resolve `membershipManager` for the connected `chainId` (already reads via wallet provider) — `frontend/src/hooks/useRoleDetails.js`
 - [ ] T013 [P] [US1] Migrate `useTreasuryVault` reads to chain-aware — `frontend/src/hooks/useTreasuryVault.js`
-- [ ] T014 [P] [US1] Migrate `useSiteStats` (address + argless `getProvider()`) to chain-aware — `frontend/src/hooks/useSiteStats.js`
+- [x] T014 [P] [US1] Migrate `useSiteStats` (address + argless `getProvider()`) to chain-aware — `frontend/src/hooks/useSiteStats.js`
 - [ ] T015 [P] [US1] Migrate `useFriendMarketCreation` (registry/token reads + write execution) to chain-aware with display↔execution parity — `frontend/src/hooks/useFriendMarketCreation.js`
 - [ ] T016 [P] [US1] Migrate `useNullifierContracts` to chain-aware — `frontend/src/hooks/useNullifierContracts.js`
 
