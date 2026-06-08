@@ -134,8 +134,14 @@ async function main() {
 
   await ensureSingletonFactory();
 
-  const [deployer] = await ethers.getSigners();
-  if (!deployer) throw new Error(`No signer for network '${networkName}'`);
+  const [rawDeployer] = await ethers.getSigners();
+  if (!rawDeployer) throw new Error(`No signer for network '${networkName}'`);
+  // Wrap the signer in a client-side NonceManager so a sequence of txs doesn't
+  // re-fetch a stale nonce from a load-balanced public RPC (the "nonce too low"
+  // failure mode). The base nonce is fetched once, then incremented locally.
+  const { NonceManager } = require("ethers");
+  const deployer = new NonceManager(rawDeployer);
+  deployer.address = await rawDeployer.getAddress();
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log(`\nDeployer: ${deployer.address}`);
   console.log(`Balance:  ${ethers.formatEther(balance)} ${networkName === "amoy" ? "POL" : "ETH"}`);
@@ -212,7 +218,7 @@ async function main() {
   deployments.membershipManager = mgrDeploy.address;
   const membershipManager = mgrDeploy.contract;
 
-  if (!mgrDeploy.alreadyDeployed) {
+  if (!mgrDeploy.alreadyDeployed || process.env.FORCE_SEED_TIERS === "true") {
     await seedTiers(membershipManager, deployer, ROLE_HASHES.WAGER_PARTICIPANT_ROLE, "WAGER_PARTICIPANT", WAGER_PARTICIPANT_TIERS);
   } else {
     console.log("\nMembershipManager already deployed — skipping tier seed (idempotent re-runs should re-seed manually if config changed)");
