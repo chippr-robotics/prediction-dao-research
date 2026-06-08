@@ -203,7 +203,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         tierValue,
         txHash: receipt.hash,
         purchasedBy: account,
-      })
+      }, chainId)
       setPurchaseResult({ success: true, tier: tierName, txHash: receipt.hash })
       try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
       showNotification(`${tierName} membership activated.`, 'success', 7000)

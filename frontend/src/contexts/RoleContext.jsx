@@ -17,7 +17,7 @@ import { RoleContext, ROLES, ROLE_INFO, ADMIN_ROLES, isAdminRole } from './RoleC
  * - Provides utilities for checking and managing roles
  */
 export function RoleProvider({ children }) {
-  const { account, isConnected } = useWeb3()
+  const { account, isConnected, chainId } = useWeb3()
   const [roles, setRoles] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [blockchainSynced, setBlockchainSynced] = useState(false)
@@ -25,28 +25,28 @@ export function RoleProvider({ children }) {
   // Load roles when wallet connects
   useEffect(() => {
     if (isConnected && account) {
-      loadRoles(account)
+      loadRoles(account, chainId)
     } else {
       // Reset to empty when disconnected
       setRoles([])
       setBlockchainSynced(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, isConnected])
+  }, [account, isConnected, chainId])
 
   /**
    * Load roles from both localStorage and blockchain
    * Blockchain is the source of truth - local storage is synced to match
    */
-  const loadRoles = useCallback(async (walletAddress) => {
+  const loadRoles = useCallback(async (walletAddress, activeChainId) => {
     setIsLoading(true)
     try {
-      // First load from local storage (immediate response)
-      const localRoles = getUserRoles(walletAddress)
+      // First load from local storage (immediate response), scoped to the chain
+      const localRoles = getUserRoles(walletAddress, activeChainId)
       setRoles(localRoles)
 
       // Then sync with blockchain (authoritative source)
-      const onChainRoles = await syncRolesWithBlockchain(walletAddress, localRoles)
+      const onChainRoles = await syncRolesWithBlockchain(walletAddress, localRoles, activeChainId)
       if (onChainRoles) {
         setRoles(onChainRoles)
         setBlockchainSynced(true)
@@ -65,7 +65,7 @@ export function RoleProvider({ children }) {
    * If a role exists on-chain but not locally, add it
    * If a role exists locally but not on-chain, keep it (may be pending)
    */
-  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles) => {
+  const syncRolesWithBlockchain = useCallback(async (walletAddress, localRoles, activeChainId) => {
     try {
       // Paid role on MembershipManager + admin roles on WagerRegistry / MembershipManager
       const premiumRoles = ['WAGER_PARTICIPANT']
@@ -77,14 +77,14 @@ export function RoleProvider({ children }) {
 
       // Check each role on-chain
       for (const roleName of allRolesToSync) {
-        const hasOnChain = await hasRoleOnChain(walletAddress, roleName)
+        const hasOnChain = await hasRoleOnChain(walletAddress, roleName, activeChainId)
         const hasLocally = localRoles.includes(roleName)
 
         if (hasOnChain && !hasLocally) {
           // Role exists on-chain but not locally - add it
           console.log(`Syncing role ${roleName} from blockchain to local storage`)
           updatedRoles.push(roleName)
-          addUserRole(walletAddress, roleName)
+          addUserRole(walletAddress, roleName, activeChainId)
           hasChanges = true
         }
         // Note: We don't remove local roles that aren't on-chain
@@ -100,18 +100,18 @@ export function RoleProvider({ children }) {
 
   const hasRole = useCallback((role) => {
     if (!account) return false
-    return checkRole(account, role)
-  }, [account])
+    return checkRole(account, role, chainId)
+  }, [account, chainId])
 
   const hasAnyRole = useCallback((rolesToCheck) => {
     if (!account || !Array.isArray(rolesToCheck)) return false
-    return rolesToCheck.some(role => checkRole(account, role))
-  }, [account])
+    return rolesToCheck.some(role => checkRole(account, role, chainId))
+  }, [account, chainId])
 
   const hasAllRoles = useCallback((rolesToCheck) => {
     if (!account || !Array.isArray(rolesToCheck)) return false
-    return rolesToCheck.every(role => checkRole(account, role))
-  }, [account])
+    return rolesToCheck.every(role => checkRole(account, role, chainId))
+  }, [account, chainId])
 
   const grantRole = useCallback((role) => {
     if (!account) {
@@ -120,15 +120,15 @@ export function RoleProvider({ children }) {
     }
 
     try {
-      addUserRole(account, role)
-      const updatedRoles = getUserRoles(account)
+      addUserRole(account, role, chainId)
+      const updatedRoles = getUserRoles(account, chainId)
       setRoles(updatedRoles)
       return true
     } catch (error) {
       console.error('Error granting role:', error)
       return false
     }
-  }, [account])
+  }, [account, chainId])
 
   const revokeRole = useCallback((role) => {
     if (!account) {
@@ -137,15 +137,15 @@ export function RoleProvider({ children }) {
     }
 
     try {
-      removeUserRole(account, role)
-      const updatedRoles = getUserRoles(account)
+      removeUserRole(account, role, chainId)
+      const updatedRoles = getUserRoles(account, chainId)
       setRoles(updatedRoles)
       return true
     } catch (error) {
       console.error('Error revoking role:', error)
       return false
     }
-  }, [account])
+  }, [account, chainId])
 
   const grantRoleToUser = useCallback((walletAddress, role) => {
     // Only admins can grant roles to others
@@ -155,13 +155,13 @@ export function RoleProvider({ children }) {
     }
 
     try {
-      addUserRole(walletAddress, role)
+      addUserRole(walletAddress, role, chainId)
       return true
     } catch (error) {
       console.error('Error granting role to user:', error)
       return false
     }
-  }, [hasRole])
+  }, [hasRole, chainId])
 
   const revokeRoleFromUser = useCallback((walletAddress, role) => {
     // Only admins can revoke roles from others
@@ -171,13 +171,13 @@ export function RoleProvider({ children }) {
     }
 
     try {
-      removeUserRole(walletAddress, role)
+      removeUserRole(walletAddress, role, chainId)
       return true
     } catch (error) {
       console.error('Error revoking role from user:', error)
       return false
     }
-  }, [hasRole])
+  }, [hasRole, chainId])
 
   const getRoleInfo = useCallback((role) => {
     return ROLE_INFO[role] || { name: role, description: 'Unknown role', premium: false }

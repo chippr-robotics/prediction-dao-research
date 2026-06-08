@@ -36,7 +36,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 **⚠️ CRITICAL**: No user-story work begins until this phase is complete.
 
 - [x] T003 [P] Create accessible `NetworkUnavailableNotice` (WCAG 2.1 AA: role/alert, focusable action) wired to the existing `switchNetwork()`, in `frontend/src/components/ui/NetworkUnavailableNotice.jsx` (+ `NetworkUnavailableNotice.css`)
-- [ ] T004 Scope the local role/purchase cache by `(chainId, walletAddress)` in `frontend/src/utils/roleStorage.js` (update `getRoleStorageKey` and all exported signatures to take `chainId`; treat legacy account-only entries as absent), and update its callers to pass `chainId`
+- [x] T004 Scope the local role/purchase cache by `(chainId, walletAddress)` in `frontend/src/utils/roleStorage.js` (update `getRoleStorageKey` and all exported signatures to take `chainId`; treat legacy account-only entries as absent), and update its callers to pass `chainId`
 - [ ] T005 Add the regression-guard scanning test in `frontend/src/test/chainResolutionGuard.test.js` that fails on any `getContractAddress(` or argless `getProvider()` under `src/hooks|components|pages` and chain-scoped `src/utils|data`, with an explicit allowlist of the not-yet-migrated files (each migration task removes its entry)
 
 **Checkpoint**: Notice component, per-chain cache, and the "no new offenders" guard exist — migrations can begin.
@@ -55,7 +55,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 - [x] T007 [P] [US1] Test `useRoleDetails` resolves membership reads for the connected `chainId` in `frontend/src/test/useRoleDetails.chain.test.js`
 - [ ] T008 [P] [US1] Test remaining `blockchainService` read helpers (stats, key registry, role-manager, friend factory, balance/allowance) resolve for the passed `chainId` in `frontend/src/test/blockchainService.chain.test.js`
 - [ ] T009 [P] [US1] Test `EventsSource` and service wager reads resolve for the passed `chainId` in `frontend/src/test/eventsSource.chain.test.js`
-- [ ] T010 [P] [US1] Test `roleStorage` returns a record only for its `(chainId, account)` and never across chains in `frontend/src/test/roleStorage.chain.test.js`
+- [x] T010 [P] [US1] Test `roleStorage` returns a record only for its `(chainId, account)` and never across chains in `frontend/src/test/roleStorage.chain.test.js`
 
 ### Implementation for User Story 1 — hooks
 
