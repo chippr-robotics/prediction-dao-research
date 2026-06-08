@@ -1087,14 +1087,27 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
     throw new Error('Wallet not connected')
   }
 
-  // v2 path: MembershipManager.purchaseTier / upgradeTier / extendMembership.
-  const mmAddress = getContractAddress('membershipManager')
+  // Resolve the MembershipManager for the wallet's CURRENT chain, not the
+  // build-time chain. The network gate (isCorrectNetwork) accepts any supported
+  // chain (Polygon 137, Amoy 80002, local 1337), so a wallet on e.g. Amoy must
+  // use the Amoy deployment. Resolving the build-bound address instead would
+  // point at a contract that doesn't exist on the connected chain and surface a
+  // misleading "no purchase contract found" error.
+  let walletChainId = null
+  try {
+    walletChainId = Number((await signer.provider.getNetwork()).chainId)
+  } catch {
+    // Provider without a network; getContractAddressForChain(null) falls back to
+    // the build-time chain.
+  }
+  const mmAddress = getContractAddressForChain('membershipManager', walletChainId)
   if (mmAddress) {
     const provider = signer.provider
     const code = await provider.getCode(mmAddress)
     if (!code || code === '0x') {
-      console.warn(
-        `[purchaseRole] MembershipManager has no code at ${mmAddress} — falling through to legacy path`
+      throw new Error(
+        `No membership contract is deployed at ${mmAddress} on the connected network (chain ${walletChainId ?? 'unknown'}). ` +
+          `Please switch your wallet to Polygon and try again.`
       )
     } else {
       const roleHash = getRoleHash(roleName)
@@ -1176,7 +1189,8 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
 
     if (!paymentProcessorAddress) {
       throw new Error(
-        'No purchase contract found on this network. Please verify you are connected to the correct chain and that contracts are deployed.'
+        `Membership purchases aren't available on the connected network (chain ${walletChainId ?? 'unknown'}). ` +
+          `Please switch your wallet to Polygon and try again.`
       )
     }
 
