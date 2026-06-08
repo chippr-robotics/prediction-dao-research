@@ -70,9 +70,9 @@ const POLYGON_CONTRACTS = {
   // Treasury / membership-sales recipient = chipprbots.eth (hardware wallet).
   treasury: '0x1215185387E70a48b07D73AcB67002A073F18575',
   // v2 core (populated by `npm run sync:frontend-contracts -- --network polygon --chainId 137`)
-  wagerRegistry: '0x7bb3ef3E65DB9bd9D7133Bd7F25e8754Bf11F2D4',
-  membershipManager: '0x7441700979e37a9a1F17093a4859c8f261780c95',
-  keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
+  wagerRegistry: '0x5023765809fDA93ab9F11B684fdb76521eD31774',
+  membershipManager: '0x00c3ef4e02Ef00Ad6eE955dF5022A22F6ea73dae',
+  keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
   sanctionsGuard: '', // populated by sync once SanctionsGuard is deployed on Polygon
   polymarketAdapter: '0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4', // tie-fix + admin-owner redeploy
   // Stake / payment tokens (Circle USDC + Wrapped MATIC on Polygon)
@@ -81,6 +81,8 @@ const POLYGON_CONTRACTS = {
   chainlinkDataFeedAdapter: '0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23',
   chainlinkFunctionsAdapter: '0x148C2E347a601AC1a680b17321529b0Ffc31AeFc',
   umaAdapter: '0x8224433d099Af6cd30540A78421aBFd6e044E949',
+  sanctionsGuard: '0x2Dc53d91A189be71DfE96Ea9BCFCF6aDDA77BC76',
+  polymarketAdapter: '0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4',
 }
 
 const NETWORK_CONTRACTS = {
@@ -108,7 +110,7 @@ export const DEPLOYED_CONTRACTS =
 const DEPLOYMENT_BLOCKS_BY_CHAIN = {
   63: { friendGroupMarketFactory: 15658191, wagerRegistry: 0 },
   80002: { friendGroupMarketFactory: 0, wagerRegistry: 0 },
-  137: { friendGroupMarketFactory: 0, wagerRegistry: 87937155 },
+  137: { friendGroupMarketFactory: 0, wagerRegistry: 88118344 },
 }
 
 export const DEPLOYMENT_BLOCKS =
