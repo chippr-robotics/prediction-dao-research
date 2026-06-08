@@ -299,10 +299,12 @@ export function useEncryption() {
    * Uses X-Wing (post-quantum) by default for new markets
    *
    * @param {Object} metadata - Market metadata to encrypt
-   * @param {Object} options - { algorithm: 'xwing' | 'x25519' }
+   * @param {Object} options - { algorithm: 'xwing' | 'x25519', termsVersion?: {id, hash} }
+   *   termsVersion (Spec 007, FR-056): the in-force T&C version bound into the wager's
+   *   AEAD so it carries tamper-evident proof of its governing terms.
    */
   const createEncrypted = useCallback(async (metadata, options = {}) => {
-    const { algorithm = 'xwing' } = options
+    const { algorithm = 'xwing', termsVersion = null } = options
 
     if (!signer || !account) {
       throw new Error('Wallet not connected')
@@ -312,9 +314,9 @@ export function useEncryption() {
 
     // Use X-Wing (post-quantum) by default for new markets
     if (algorithm === 'xwing') {
-      return createEncryptedMarketXWing(metadata, signer, account)
+      return createEncryptedMarketXWing(metadata, signer, account, termsVersion)
     } else {
-      return createEncryptedMarket(metadata, signer, account)
+      return createEncryptedMarket(metadata, signer, account, termsVersion)
     }
   }, [signer, account, ensureInitialized])
 

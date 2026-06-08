@@ -14,11 +14,22 @@ import QRScanner from '../ui/QRScanner'
 import WagerQRCode from '../ui/WagerQRCode'
 import AddressInput from '../ui/AddressInput'
 import { isEnsName } from '../../utils/validation'
+import { getCurrentDocument } from '../../utils/legalDocs'
+
+/**
+ * The in-force Terms version bound into a new wager's encryption (Spec 007, FR-056/FR-058):
+ * { id, hash } of the current Terms & Conditions, so the wager carries tamper-evident proof
+ * of its governing terms. Returns null if unavailable (legacy/no-AAD path).
+ */
+function currentTermsVersion() {
+  const t = getCurrentDocument('terms')
+  return t ? { id: t.id, hash: t.hash } : null
+}
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 import PolymarketBrowser from './PolymarketBrowser'
 import OracleConditionPicker from './OracleConditionPicker'
-import { getContractAddress } from '../../config/contracts'
+import { getContractAddressForChain } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -112,7 +123,7 @@ function FriendMarketsModal({
   initialPolymarketMarket = null
 }) {
   const { isConnected, account } = useWallet()
-  const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { signer, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
 
   // Per-chain capabilities — drives which resolution-type options the user
   // sees. Polymarket-pegged side bets only render on chains where the
@@ -124,9 +135,9 @@ function FriendMarketsModal({
   // in the resolution-type dropdown self-gates on the adapter being deployed
   // on the active chain — synced into frontend/src/config/contracts.js by
   // `npm run sync:frontend-contracts`.
-  const chainlinkDataFeedAdapter  = getContractAddress('chainlinkDataFeedAdapter')
-  const chainlinkFunctionsAdapter = getContractAddress('chainlinkFunctionsAdapter')
-  const umaAdapter                = getContractAddress('umaAdapter')
+  const chainlinkDataFeedAdapter  = getContractAddressForChain('chainlinkDataFeedAdapter', chainId)
+  const chainlinkFunctionsAdapter = getContractAddressForChain('chainlinkFunctionsAdapter', chainId)
+  const umaAdapter                = getContractAddressForChain('umaAdapter', chainId)
   const isExtensibleOracleType = (t) => (
     t === ResolutionType.ChainlinkDataFeed ||
     t === ResolutionType.ChainlinkFunctions ||
@@ -860,7 +871,7 @@ function FriendMarketsModal({
           // (v2.0) path can't be used here because the registry only stores
           // 32-byte X25519 keys; addRecipientByPublicKey would then read an
           // undefined `ephemeralPublicKey` off an X-Wing wrapped-key entry.
-          const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519' })
+          const { envelope } = await createEncrypted(marketMetadata, { algorithm: 'x25519', termsVersion: currentTermsVersion() })
           finalMetadata = addRecipientByPublicKey(envelope, opponentAddress, opponentKey)
 
           // ThirdParty (Spec Kit 005): the arbitrator must also read the private
@@ -881,7 +892,7 @@ function FriendMarketsModal({
         } else {
           // Defensive fallback: validation guarantees an opponent, but if one
           // is somehow missing, encrypt to the creator only rather than crash.
-          const { envelope } = await createEncrypted(marketMetadata)
+          const { envelope } = await createEncrypted(marketMetadata, { termsVersion: currentTermsVersion() })
           finalMetadata = envelope
         }
       }

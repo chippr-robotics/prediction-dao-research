@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../interfaces/IWagerRegistry.sol";
 import "../interfaces/IMembershipManager.sol";
+import "../interfaces/ISanctionsGuard.sol";
 import "../oracles/IOracleAdapter.sol";
 
 /// @title WagerRegistry
@@ -36,6 +37,10 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     IMembershipManager public membershipManager;
     IOracleAdapter public polymarketAdapter;
 
+    /// @notice Non-bypassable on-chain sanctions guard (Spec 007, FR-054). When unset
+    ///         (address(0)) screening is skipped — the production deploy wires it in.
+    ISanctionsGuard public sanctionsGuard;
+
     /// @notice Generic registry for non-Polymarket oracle adapters keyed by ResolutionType.
     ///         Polymarket retains its dedicated `polymarketAdapter` slot for ABI compatibility.
     mapping(ResolutionType => IOracleAdapter) public oracleAdapters;
@@ -43,6 +48,11 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
     mapping(address => bool) private _allowedTokens;
     mapping(uint256 => Wager) private _wagers;
     mapping(address => bool) private _frozen;
+
+    /// @notice Governing T&C version hash bound to a wager at creation (Spec 007, FR-056/
+    ///         FR-057). 0 ⇒ legacy/unbound (governed by the launch version). Set only via
+    ///         createWagerWithTerms; never re-bound (prospective-only).
+    mapping(uint256 => bytes32) public wagerTermsVersionHash;
     uint256 private _nextWagerId = 1;
 
     /// @notice Per-wager draw-consent bitmask for participant resolution types
@@ -63,6 +73,8 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
 
     event MembershipManagerUpdated(address indexed manager);
     event PolymarketAdapterUpdated(address indexed adapter);
+    event SanctionsGuardUpdated(address indexed guard);
+    event WagerTermsBound(uint256 indexed wagerId, bytes32 indexed termsVersionHash);
     event TokenAllowed(address indexed token, bool allowed);
 
     error ZeroAddress();
@@ -136,6 +148,20 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         emit PolymarketAdapterUpdated(adapter);
     }
 
+    /// @notice Set the on-chain sanctions guard. Pass address(0) to disable screening.
+    function setSanctionsGuard(address guard) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        sanctionsGuard = ISanctionsGuard(guard);
+        emit SanctionsGuardUpdated(guard);
+    }
+
+    /// @dev Sanctions screen (Spec 007, FR-054). No-op when the guard is unset; otherwise
+    ///      reverts ISanctionsGuard.SanctionedAddress(account) for a listed/sanctioned
+    ///      address. Called read-only during the Checks phase (before effects/transfers).
+    function _screen(address account) internal view {
+        ISanctionsGuard guard = sanctionsGuard;
+        if (address(guard) != address(0)) guard.checkBlocked(account);
+    }
+
     /// @notice Set the adapter for one of the new (non-Polymarket) oracle resolution types.
     ///         Pass `address(0)` to disable that resolution type.
     /// @dev Rejects the legacy types — Either/Creator/Opponent/ThirdParty have no adapter,
@@ -202,6 +228,49 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         bytes32 metadataHash,
         string calldata metadataUri
     ) external nonReentrant whenNotPaused notFrozen(msg.sender) returns (uint256 wagerId) {
+        // Existing ABI preserved: no governing-terms binding (legacy path).
+        return _createWager(opponent, arbitrator, token, creatorStake, opponentStake, acceptDeadline, resolveDeadline, resolutionType, polymarketConditionId, creatorIsYes, metadataHash, metadataUri, bytes32(0));
+    }
+
+    /// @notice Like {createWager} but binds the governing T&C version hash on-chain at
+    ///         creation (Spec 007, FR-056/FR-058). The hash is the SHA-256 of the in-force
+    ///         Terms; it is recorded in {wagerTermsVersionHash} and emitted via
+    ///         {WagerTermsBound}, and is also bound into the wager's encrypted metadata AAD.
+    function createWagerWithTerms(
+        address opponent,
+        address arbitrator,
+        address token,
+        uint128 creatorStake,
+        uint128 opponentStake,
+        uint64 acceptDeadline,
+        uint64 resolveDeadline,
+        ResolutionType resolutionType,
+        bytes32 polymarketConditionId,
+        bool creatorIsYes,
+        bytes32 metadataHash,
+        string calldata metadataUri,
+        bytes32 termsVersionHash
+    ) external nonReentrant whenNotPaused notFrozen(msg.sender) returns (uint256 wagerId) {
+        return _createWager(opponent, arbitrator, token, creatorStake, opponentStake, acceptDeadline, resolveDeadline, resolutionType, polymarketConditionId, creatorIsYes, metadataHash, metadataUri, termsVersionHash);
+    }
+
+    function _createWager(
+        address opponent,
+        address arbitrator,
+        address token,
+        uint128 creatorStake,
+        uint128 opponentStake,
+        uint64 acceptDeadline,
+        uint64 resolveDeadline,
+        ResolutionType resolutionType,
+        bytes32 polymarketConditionId,
+        bool creatorIsYes,
+        bytes32 metadataHash,
+        string calldata metadataUri,
+        bytes32 termsVersionHash
+    ) internal returns (uint256 wagerId) {
+        // Sanctions screen (Spec 007, FR-054) — first Check, before any effects/transfers.
+        _screen(msg.sender);
         if (opponent == address(0)) revert ZeroAddress();
         if (opponent == msg.sender) revert SelfWager();
         if (!_allowedTokens[token]) revert NotAllowedToken();
@@ -262,6 +331,11 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (arbitrator != address(0)) {
             _userWagerIds[arbitrator].add(wagerId);
         }
+        // Spec 007 (FR-056/FR-057): bind the governing T&C version (Effect, before
+        // interactions). 0 ⇒ legacy/unbound. Prospective-only — never re-bound elsewhere.
+        if (termsVersionHash != bytes32(0)) {
+            wagerTermsVersionHash[wagerId] = termsVersionHash;
+        }
 
         // Interactions
         IERC20(token).safeTransferFrom(msg.sender, address(this), creatorStake);
@@ -273,6 +347,9 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         } else if (_isExtensibleOracleType(resolutionType)) {
             emit OracleConditionLinked(wagerId, resolutionType, polymarketConditionId, creatorIsYes);
         }
+        if (termsVersionHash != bytes32(0)) {
+            emit WagerTermsBound(wagerId, termsVersionHash);
+        }
     }
 
     function acceptWager(uint256 wagerId) external nonReentrant whenNotPaused notFrozen(msg.sender) {
@@ -280,6 +357,10 @@ contract WagerRegistry is IWagerRegistry, AccessControl, ReentrancyGuard, Pausab
         if (w.status != Status.Open) revert NotOpen();
         if (msg.sender != w.opponent) revert NotOpponent();
         if (block.timestamp > w.acceptDeadline) revert AcceptExpired();
+        // Sanctions screen both parties (Spec 007, FR-054): the accepting opponent AND the
+        // creator (counterparty) — a creator listed after creation blocks acceptance.
+        _screen(msg.sender);
+        _screen(w.creator);
         if (!membershipManager.checkCanCreate(msg.sender, WAGER_PARTICIPANT_ROLE)) revert MembershipDenied();
 
         w.status = Status.Active;

@@ -45,7 +45,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -74,10 +74,13 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run Amoy fork tests
+      - name: Run fork tests (Amoy oracles + Polygon-137 Chainalysis sanctions)
         env:
           AMOY_RPC_URL: ${{ secrets.AMOY_RPC_URL }}
           AMOY_FORK_BLOCK: ${{ github.event.inputs.block_number }}
+          # Spec 007: the Chainalysis sanctions oracle fork test forks Polygon mainnet (137).
+          # Without POLYGON_RPC_URL it enters describe.skip (no-op); set the secret to run it.
+          POLYGON_RPC_URL: ${{ secrets.POLYGON_RPC_URL }}
         run: npm run test:fork
 
       - name: Upload Hardhat compiler cache (for debugging fork failures)

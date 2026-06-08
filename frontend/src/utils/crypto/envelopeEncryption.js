@@ -29,7 +29,9 @@ import {
   ENVELOPE_INFO,
   XWING_ENVELOPE_INFO,
   XWING_ALGORITHM,
-  SUPPORTED_ALGORITHMS
+  SUPPORTED_ALGORITHMS,
+  buildTermsAAD,
+  TERMS_AAD_VERSION
 } from './constants.js'
 
 // ==================== X-Wing Hybrid KEM Implementation ====================
@@ -292,17 +294,21 @@ export function deriveXWingKeyPairFromSignature(signature) {
  * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version used for key derivation
  * @returns {Object} - Encrypted envelope with version info
  */
-export function encryptEnvelope(data, recipients, signingVersion = CURRENT_ENCRYPTION_VERSION) {
+export function encryptEnvelope(data, recipients, signingVersion = CURRENT_ENCRYPTION_VERSION, termsVersion = null) {
   // 1. Generate random Data Encryption Key (DEK)
   const dek = randomBytes(32)
 
-  // 2. Encrypt the content with DEK
+  // 2. Encrypt the content with DEK.
+  //    Spec 007 (FR-056): bind the governing T&C version hash as ChaCha20-Poly1305 AAD so
+  //    the `termsVersion` field below is tamper-evident. Omitting termsVersion ⇒ aad
+  //    undefined ⇒ byte-identical to legacy (no behavior change for existing callers).
   const plaintext = typeof data === 'string'
     ? utf8ToBytes(data)
     : utf8ToBytes(JSON.stringify(data))
 
+  const aad = termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, termsVersion.hash) : undefined
   const contentNonce = randomBytes(12)
-  const cipher = chacha20poly1305(dek, contentNonce)
+  const cipher = chacha20poly1305(dek, contentNonce, aad)
   const encryptedContent = cipher.encrypt(plaintext)
 
   // 3. Encrypt DEK for each recipient using X25519 + HKDF + ChaCha20
@@ -336,6 +342,9 @@ export function encryptEnvelope(data, recipients, signingVersion = CURRENT_ENCRY
     algorithm: 'x25519-chacha20poly1305',
     // Store the signing message version for decryption
     signingVersion: signingVersion,
+    // Spec 007 (FR-056): authenticated governing-terms binding (present only when supplied).
+    // Authenticated via AAD above; tampering with this field fails decryption.
+    ...(termsVersion?.hash ? { termsVersion: { id: termsVersion.id ?? null, hash: termsVersion.hash } } : {}),
     content: {
       nonce: bytesToHex(contentNonce),
       ciphertext: bytesToHex(encryptedContent)
@@ -377,10 +386,13 @@ export function decryptEnvelope(envelope, myAddress, myPrivateKey) {
   const keyCipher = chacha20poly1305(kek, keyNonce)
   const dek = keyCipher.decrypt(wrappedKey)
 
-  // Decrypt the content
+  // Decrypt the content. Spec 007 (FR-056): if the envelope carries a governing-terms
+  // binding, reconstruct the AAD from the authenticated field so a tampered termsVersion
+  // fails authentication. Legacy envelopes (no termsVersion) decrypt with no AAD as before.
   const contentNonce = hexToBytes(envelope.content.nonce)
   const ciphertext = hexToBytes(envelope.content.ciphertext)
-  const contentCipher = chacha20poly1305(dek, contentNonce)
+  const aad = envelope.termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, envelope.termsVersion.hash) : undefined
+  const contentCipher = chacha20poly1305(dek, contentNonce, aad)
   const plaintext = contentCipher.decrypt(ciphertext)
 
   // Parse as JSON if possible
@@ -469,17 +481,19 @@ export function removeRecipient(envelope, addressToRemove) {
  * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version
  * @returns {Object} - X-Wing encrypted envelope (v2.0)
  */
-export function encryptEnvelopeXWing(data, recipients, signingVersion = CURRENT_ENCRYPTION_VERSION) {
+export function encryptEnvelopeXWing(data, recipients, signingVersion = CURRENT_ENCRYPTION_VERSION, termsVersion = null) {
   // 1. Generate random Data Encryption Key (DEK)
   const dek = randomBytes(32)
 
-  // 2. Encrypt the content with DEK (same as v1.0)
+  // 2. Encrypt the content with DEK (same as v1.0). Spec 007 (FR-056): governing-terms
+  //    AAD binding when termsVersion is supplied; omitted ⇒ identical to legacy.
   const plaintext = typeof data === 'string'
     ? utf8ToBytes(data)
     : utf8ToBytes(JSON.stringify(data))
 
+  const aad = termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, termsVersion.hash) : undefined
   const contentNonce = randomBytes(12)
-  const cipher = chacha20poly1305(dek, contentNonce)
+  const cipher = chacha20poly1305(dek, contentNonce, aad)
   const encryptedContent = cipher.encrypt(plaintext)
 
   // 3. Wrap DEK for each recipient using X-Wing KEM
@@ -508,6 +522,7 @@ export function encryptEnvelopeXWing(data, recipients, signingVersion = CURRENT_
     version: '2.0',
     algorithm: XWING_ALGORITHM,
     signingVersion: signingVersion,
+    ...(termsVersion?.hash ? { termsVersion: { id: termsVersion.id ?? null, hash: termsVersion.hash } } : {}),
     content: {
       nonce: bytesToHex(contentNonce),
       ciphertext: bytesToHex(encryptedContent)
@@ -549,10 +564,13 @@ export function decryptEnvelopeXWing(envelope, myAddress, mySecretKey) {
   const keyCipher = chacha20poly1305(kek, keyNonce)
   const dek = keyCipher.decrypt(wrappedKey)
 
-  // Decrypt the content
+  // Decrypt the content. Spec 007 (FR-056): if the envelope carries a governing-terms
+  // binding, reconstruct the AAD from the authenticated field so a tampered termsVersion
+  // fails authentication. Legacy envelopes (no termsVersion) decrypt with no AAD as before.
   const contentNonce = hexToBytes(envelope.content.nonce)
   const ciphertext = hexToBytes(envelope.content.ciphertext)
-  const contentCipher = chacha20poly1305(dek, contentNonce)
+  const aad = envelope.termsVersion?.hash ? buildTermsAAD(TERMS_AAD_VERSION, envelope.termsVersion.hash) : undefined
+  const contentCipher = chacha20poly1305(dek, contentNonce, aad)
   const plaintext = contentCipher.decrypt(ciphertext)
 
   // Parse as JSON if possible
@@ -712,14 +730,14 @@ function generateEphemeralKeyPair() {
  * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version
  * @returns {Object} - Encrypted envelope ready for IPFS
  */
-export function encryptMarketMetadata(metadata, participants, signingVersion = CURRENT_ENCRYPTION_VERSION) {
+export function encryptMarketMetadata(metadata, participants, signingVersion = CURRENT_ENCRYPTION_VERSION, termsVersion = null) {
   // Convert signatures to public keys
   const recipients = participants.map(p => ({
     address: p.address,
     publicKey: publicKeyFromSignature(p.signature)
   }))
 
-  return encryptEnvelope(metadata, recipients, signingVersion)
+  return encryptEnvelope(metadata, recipients, signingVersion, termsVersion)
 }
 
 /**
@@ -769,14 +787,14 @@ export function getEnvelopeSigningVersion(envelope) {
  * @param {string} creatorAddress - Creator's address
  * @returns {Promise<{envelope: Object, creatorSignature: string, signingVersion: number}>}
  */
-export async function createEncryptedMarket(metadata, signer, creatorAddress) {
+export async function createEncryptedMarket(metadata, signer, creatorAddress, termsVersion = null) {
   // Use current version for new markets
   const { signature, version } = await deriveKeyPair(signer, CURRENT_ENCRYPTION_VERSION)
 
   // Start with just creator as recipient
   const envelope = encryptMarketMetadata(metadata, [
     { address: creatorAddress, signature }
-  ], version)
+  ], version, termsVersion)
 
   return {
     envelope,
@@ -831,14 +849,14 @@ export async function addParticipantToMarket(envelope, existingAddress, existing
  * @param {number} [signingVersion=CURRENT_ENCRYPTION_VERSION] - Signing message version
  * @returns {Object} - X-Wing encrypted envelope
  */
-export function encryptMarketMetadataXWing(metadata, participants, signingVersion = CURRENT_ENCRYPTION_VERSION) {
+export function encryptMarketMetadataXWing(metadata, participants, signingVersion = CURRENT_ENCRYPTION_VERSION, termsVersion = null) {
   // Convert signatures to X-Wing public keys
   const recipients = participants.map(p => ({
     address: p.address,
     publicKey: xwingPublicKeyFromSignature(p.signature)
   }))
 
-  return encryptEnvelopeXWing(metadata, recipients, signingVersion)
+  return encryptEnvelopeXWing(metadata, recipients, signingVersion, termsVersion)
 }
 
 /**
@@ -849,14 +867,14 @@ export function encryptMarketMetadataXWing(metadata, participants, signingVersio
  * @param {string} creatorAddress - Creator's address
  * @returns {Promise<{envelope: Object, creatorSignature: string, signingVersion: number}>}
  */
-export async function createEncryptedMarketXWing(metadata, signer, creatorAddress) {
+export async function createEncryptedMarketXWing(metadata, signer, creatorAddress, termsVersion = null) {
   // Use current version for new markets
   const { signature, version } = await deriveXWingKeyPair(signer, CURRENT_ENCRYPTION_VERSION)
 
   // Start with just creator as recipient
   const envelope = encryptMarketMetadataXWing(metadata, [
     { address: creatorAddress, signature }
-  ], version)
+  ], version, termsVersion)
 
   return {
     envelope,

@@ -4,6 +4,19 @@ import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import { UserPreferencesContext, WalletContext, FriendMarketsContext, UIContext, DexContext } from '../contexts'
 
+// Stub the create modal to record the props each QuickActions card opens it with,
+// so we can assert the button → flow wiring (participant / oracle / all) without
+// rendering the heavy modal internals.
+vi.mock('../components/fairwins/FriendMarketsModal', () => ({
+  default: ({ isOpen, initialType, resolutionCategory }) => isOpen ? (
+    <div
+      data-testid="friend-modal"
+      data-initial-type={initialType}
+      data-resolution-category={resolutionCategory}
+    />
+  ) : null,
+}))
+
 describe('Dashboard Component', () => {
   const defaultWalletContext = {
     account: '0x1234567890abcdef1234567890abcdef12345678',
@@ -123,6 +136,37 @@ describe('Dashboard Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  describe('QuickActions button flows', () => {
+    const openVia = (cardText) => {
+      renderWithProviders(<Dashboard />)
+      fireEvent.click(screen.getByText(cardText))
+      return screen.getByTestId('friend-modal')
+    }
+
+    it('"Friends Decide (1v1)" opens the participant flow', () => {
+      const modal = openVia('Friends Decide (1v1)')
+      expect(modal).toHaveAttribute('data-initial-type', 'oneVsOne')
+      expect(modal).toHaveAttribute('data-resolution-category', 'participant')
+    })
+
+    it('"Oracle Settles (1v1)" opens the oracle flow (lands on Polymarket search)', () => {
+      const modal = openVia('Oracle Settles (1v1)')
+      expect(modal).toHaveAttribute('data-initial-type', 'oneVsOne')
+      expect(modal).toHaveAttribute('data-resolution-category', 'oracle')
+    })
+
+    it('"Bookmaker" opens the all-resolution flow', () => {
+      const modal = openVia('Bookmaker')
+      expect(modal).toHaveAttribute('data-initial-type', 'bookmaker')
+      expect(modal).toHaveAttribute('data-resolution-category', 'all')
+    })
+
+    it('the create modal is closed until a card is clicked', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByTestId('friend-modal')).not.toBeInTheDocument()
+    })
   })
 
   describe('Rendering', () => {

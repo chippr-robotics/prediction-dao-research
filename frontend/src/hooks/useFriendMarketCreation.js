@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
-import { getContractAddress } from '../config/contracts'
+import { getContractAddress, getContractAddressForChain } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import { ResolutionType, ORACLE_RESOLUTION_TYPES, WAGER_DEFAULTS } from '../constants/wagerDefaults'
@@ -10,6 +10,7 @@ import {
   buildEncryptedIpfsReference
 } from '../utils/ipfsService'
 import { getFeeOverrides } from '../utils/feeOverrides'
+import { getCurrentDocument } from '../utils/legalDocs'
 
 const ERC20_ABI = [
   'function balanceOf(address owner) view returns (uint256)',
@@ -25,10 +26,17 @@ const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTIC
 
 async function expireStaleWagers(registry, userAddress, onProgress) {
   try {
-    const membershipManagerAddr = getContractAddress('membershipManager')
+    const provider = registry.runner?.provider || registry.provider
+    // Resolve MembershipManager for the chain this registry/signer is on.
+    let membershipManagerAddr
+    try {
+      const cid = Number((await provider.getNetwork()).chainId)
+      membershipManagerAddr = getContractAddressForChain('membershipManager', cid)
+    } catch {
+      membershipManagerAddr = getContractAddress('membershipManager')
+    }
     if (!membershipManagerAddr) return
 
-    const provider = registry.runner?.provider || registry.provider
     const mgr = new ethers.Contract(membershipManagerAddr, MEMBERSHIP_MANAGER_ABI, provider)
     const membership = await mgr.getMembership(userAddress, WAGER_PARTICIPANT_ROLE)
     const tierNum = Number(membership.tier)
@@ -121,7 +129,20 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
     try {
       onProgress({ step: 'verify', message: 'Validating wager...' })
 
-      const wagerRegistryAddress = getContractAddress('wagerRegistry')
+      // Resolve contracts for the chain the signer will execute on, so the
+      // registry + stake token always match the transaction's network (display
+      // ↔ execution parity). Falls back to the build-time chain only if the
+      // signer can't report its network.
+      let executionChainId
+      try {
+        executionChainId = Number((await activeSigner.provider.getNetwork()).chainId)
+      } catch {
+        executionChainId = undefined
+      }
+      const resolve = (name) =>
+        executionChainId != null ? getContractAddressForChain(name, executionChainId) : getContractAddress(name)
+
+      const wagerRegistryAddress = resolve('wagerRegistry')
       if (!wagerRegistryAddress) {
         throw new Error('WagerRegistry not deployed on this network. Run scripts/deploy/deploy.js first.')
       }
@@ -130,7 +151,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const requestedToken = data.data?.collateralToken
       const stakeTokenAddress = (requestedToken && requestedToken !== ethers.ZeroAddress)
         ? requestedToken
-        : getContractAddress('paymentToken')
+        : resolve('paymentToken')
       if (!stakeTokenAddress || stakeTokenAddress === ethers.ZeroAddress) {
         throw new Error('A stake token (USDC or WMATIC) is required. Native MATIC is not supported.')
       }
@@ -321,16 +342,26 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       // has fewer truly-active wagers than their tier allows.
       await expireStaleWagers(registry, userAddress, onProgress)
 
+      // Spec 007 (FR-056/FR-058): bind the in-force T&C version hash on-chain when the
+      // registry supports it. legalDocs hashes are bare 64-hex → normalize to bytes32.
+      // Falls back to plain createWager on older registries lacking the overload.
+      const termsHashHex = getCurrentDocument('terms')?.hash
+      const termsBytes32 = termsHashHex && /^[0-9a-fA-F]{64}$/.test(termsHashHex) ? '0x' + termsHashHex : null
+      const useTerms = Boolean(termsBytes32) && typeof registry.createWagerWithTerms === 'function'
+      const createMethod = useTerms ? 'createWagerWithTerms' : 'createWager'
+      const createArgs = [
+        opponent, arbitrator, stakeTokenAddress,
+        creatorStakeWei, opponentStakeWei,
+        acceptDeadline, resolveDeadline,
+        resolutionType, polymarketConditionId, creatorIsYes,
+        metadataHash, metadataReference,
+        ...(useTerms ? [termsBytes32] : []),
+      ]
+
       // Simulate to catch reverts pre-wallet-prompt
       try {
         onProgress({ step: 'create', message: 'Validating transaction...' })
-        await registry.createWager.staticCall(
-          opponent, arbitrator, stakeTokenAddress,
-          creatorStakeWei, opponentStakeWei,
-          acceptDeadline, resolveDeadline,
-          resolutionType, polymarketConditionId, creatorIsYes,
-          metadataHash, metadataReference
-        )
+        await registry[createMethod].staticCall(...createArgs)
       } catch (simError) {
         const reason = simError.reason || simError.shortMessage || simError.message || ''
         throw new Error(translateRevert(reason))
@@ -338,13 +369,6 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
 
       onProgress({ step: 'create', message: 'Please confirm in your wallet...' })
       const feeOverrides = await getFeeOverrides(activeSigner.provider)
-      const createArgs = [
-        opponent, arbitrator, stakeTokenAddress,
-        creatorStakeWei, opponentStakeWei,
-        acceptDeadline, resolveDeadline,
-        resolutionType, polymarketConditionId, creatorIsYes,
-        metadataHash, metadataReference,
-      ]
 
       // Estimate gas explicitly with a short retry so a transient stale read on
       // a load-balanced RPC doesn't surface a raw "missing revert data" error.
@@ -354,7 +378,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       let gasLimit
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const estimate = await registry.createWager.estimateGas(...createArgs)
+          const estimate = await registry[createMethod].estimateGas(...createArgs)
           gasLimit = (estimate * 120n) / 100n // +20% headroom
           break
         } catch {
@@ -366,7 +390,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
         }
       }
 
-      const tx = await registry.createWager(
+      const tx = await registry[createMethod](
         ...createArgs,
         { ...feeOverrides, gasLimit }
       )

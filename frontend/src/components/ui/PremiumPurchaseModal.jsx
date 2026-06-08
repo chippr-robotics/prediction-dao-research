@@ -7,6 +7,8 @@ import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../../utils/blockchainService'
 import { ensureKeyRegistered } from '../../utils/keyRegistryService'
+import { getCurrentDocument } from '../../utils/legalDocs'
+import MembershipAttestation from '../compliance/MembershipAttestation'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -107,8 +109,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   useEffect(() => {
     let cancelled = false
     if (!account) return
+    // Clear any tier read from a previously-selected chain so a testnet tier
+    // doesn't linger when the wallet switches to mainnet (where the user may
+    // have no membership). Re-fetch for the chain the wallet is now on.
+    setUserCurrentTier(0)
     setIsLoadingTier(true)
-    getUserTierOnChain(account, ROLE_KEY).then(({ tier }) => {
+    getUserTierOnChain(account, ROLE_KEY, chainId).then(({ tier }) => {
       if (cancelled) return
       setUserCurrentTier(tier || 0)
       // Default tier select to the lowest available upgrade (or BRONZE for fresh)
@@ -123,7 +129,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       if (!cancelled) setIsLoadingTier(false)
     })
     return () => { cancelled = true }
-  }, [account])
+  }, [account, chainId])
 
   const availableTiers = useMemo(() => {
     return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
@@ -186,7 +192,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       const provider = new ethers.BrowserProvider(window.ethereum)
       const signer = await provider.getSigner()
 
-      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue, action)
+      // Spec 007 (FR-039): record the accepted in-force Terms version hash on-chain.
+      const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
+      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue, action, acceptedTermsHash)
       grantRole(ROLE_KEY)
       recordRolePurchase(account, ROLE_KEY, {
         price: selectedPrice,
@@ -195,7 +203,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         tierValue,
         txHash: receipt.hash,
         purchasedBy: account,
-      })
+      }, chainId)
       setPurchaseResult({ success: true, tier: tierName, txHash: receipt.hash })
       try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
       showNotification(`${tierName} membership activated.`, 'success', 7000)
@@ -465,15 +473,11 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                         confirmed, it cannot be reversed.
                       </li>
                     </ul>
-                    <label className="ppm-acknowledge">
-                      <input
-                        type="checkbox"
-                        checked={acknowledged}
-                        onChange={(e) => setAcknowledged(e.target.checked)}
-                        disabled={isPurchasing}
-                      />
-                      I acknowledge the protocol's pause and account-moderation provisions.
-                    </label>
+                    {/* Spec 007 (US5): discrete, un-pre-ticked eligibility attestations.
+                        allTicked drives `acknowledged`, which gates validation + the
+                        purchase button below; the accepted Terms version is recorded
+                        on-chain via purchaseTierWithTerms in handlePurchase. */}
+                    <MembershipAttestation onChange={setAcknowledged} />
                     {errors.ack && <div className="ppm-error">{errors.ack}</div>}
                   </div>
                 </div>

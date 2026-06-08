@@ -7,9 +7,11 @@ import { useEnsResolution } from '../hooks/useEnsResolution'
 import { useChainTokens } from '../hooks/useChainTokens'
 import { ROLES, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
-import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddress } from '../config/contracts'
+import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddressForChain } from '../config/contracts'
+import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import OracleAdaptersTab from './admin/OracleAdaptersTab'
+import DenyListAdmin from './admin/DenyListAdmin'
 import './AdminPanel.css'
 
 const TIER_NAMES = { 1: 'Bronze', 2: 'Silver', 3: 'Gold', 4: 'Platinum' }
@@ -68,7 +70,7 @@ function shortAddr(address) {
  */
 function AdminPanel() {
   const { hasRole, hasAnyRole } = useRoles()
-  const { account, signer, provider } = useWeb3()
+  const { account, signer, provider, chainId } = useWeb3()
   const { showNotification } = useNotification()
   const { native: nativeSymbol } = useChainTokens()
 
@@ -121,20 +123,20 @@ function AdminPanel() {
   }, [contractState.treasury])
   const withdrawEns = useEnsResolution(withdrawForm.to || '')
 
-  const wagerRegistryAddr = getContractAddress('wagerRegistry')
-  const membershipManagerAddr = getContractAddress('membershipManager')
+  const wagerRegistryAddr = getContractAddressForChain('wagerRegistry', chainId)
+  const membershipManagerAddr = getContractAddressForChain('membershipManager', chainId)
 
   const wagerRegistryRead = useMemo(() => {
     if (!wagerRegistryAddr) return null
-    const p = provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+    const p = provider || getProvider(chainId)
     return new ethers.Contract(wagerRegistryAddr, WAGER_REGISTRY_ADMIN_ABI, p)
-  }, [provider, wagerRegistryAddr])
+  }, [provider, wagerRegistryAddr, chainId])
 
   const membershipManagerRead = useMemo(() => {
     if (!membershipManagerAddr) return null
-    const p = provider || new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl)
+    const p = provider || getProvider(chainId)
     return new ethers.Contract(membershipManagerAddr, MEMBERSHIP_ADMIN_ABI, p)
-  }, [provider, membershipManagerAddr])
+  }, [provider, membershipManagerAddr, chainId])
 
   const fetchContractState = useCallback(async () => {
     if (!wagerRegistryRead || !membershipManagerRead) return
@@ -366,6 +368,11 @@ function AdminPanel() {
           <button role="tab" aria-selected={activeTab === 'oracle-adapters'}
             className={`admin-panel-tab ${activeTab === 'oracle-adapters' ? 'active' : ''}`}
             onClick={() => setActiveTab('oracle-adapters')}>Oracle Adapters</button>
+        )}
+        {isAdmin && (
+          <button role="tab" aria-selected={activeTab === 'deny-list'}
+            className={`admin-panel-tab ${activeTab === 'deny-list' ? 'active' : ''}`}
+            onClick={() => setActiveTab('deny-list')}>Deny-list</button>
         )}
       </nav>
 
@@ -683,6 +690,16 @@ function AdminPanel() {
 
         {activeTab === 'oracle-adapters' && isAdmin && (
           <OracleAdaptersTab
+            signer={signer}
+            account={account}
+            contracts={DEPLOYED_CONTRACTS}
+            runTx={runTx}
+            pendingTx={pendingTx}
+          />
+        )}
+
+        {activeTab === 'deny-list' && isAdmin && (
+          <DenyListAdmin
             signer={signer}
             account={account}
             contracts={DEPLOYED_CONTRACTS}

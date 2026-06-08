@@ -9,7 +9,8 @@
 
 import { ethers } from 'ethers'
 import { KEY_REGISTRY_ABI } from '../abis/KeyRegistry'
-import { getContractAddress } from '../config/contracts'
+import { getContractAddress, getContractAddressForChain } from '../config/contracts'
+import { getCurrentDocument } from './legalDocs'
 
 // In-memory cache: address → { publicKeyHex, timestamp }
 const keyCache = new Map()
@@ -19,8 +20,17 @@ const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
  * Get a read-only KeyRegistry contract instance.
  * Falls back to legacy `zkKeyManager` config field for Mordor deployments.
  */
-function getKeyRegistryContract(provider) {
-  const address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
+async function getKeyRegistryContract(provider) {
+  // Resolve KeyRegistry for the chain the provider talks to, so a key lookup on
+  // one network never reads another's registry. Fall back to the build-time
+  // chain only when the provider can't report its network.
+  let address
+  try {
+    const cid = Number((await provider.getNetwork()).chainId)
+    address = getContractAddressForChain('keyRegistry', cid) || getContractAddressForChain('zkKeyManager', cid)
+  } catch {
+    address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
+  }
   if (!address) {
     throw new Error('KeyRegistry contract address not configured')
   }
@@ -69,7 +79,7 @@ export async function lookupPublicKey(address, provider) {
   }
 
   try {
-    const contract = getKeyRegistryContract(provider)
+    const contract = await getKeyRegistryContract(provider)
     const publicKeyHex = await contract.getPublicKey(address)
 
     if (!publicKeyHex || publicKeyHex === '') {
@@ -105,7 +115,7 @@ export async function hasRegisteredKey(address, provider) {
   if (!address || !provider) return false
 
   try {
-    const contract = getKeyRegistryContract(provider)
+    const contract = await getKeyRegistryContract(provider)
     // v2 KeyRegistry uses hasKey(); legacy ZKKeyManager used hasValidKey()
     if (typeof contract.hasKey === 'function') {
       return await contract.hasKey(address)
@@ -132,14 +142,34 @@ export async function registerEncryptionKey(signer, publicKeyBytes) {
 
   const publicKeyHex = bytesToHex(publicKeyBytes)
 
-  const address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
+  let address
+  try {
+    const cid = Number((await signer.provider.getNetwork()).chainId)
+    address = getContractAddressForChain('keyRegistry', cid) || getContractAddressForChain('zkKeyManager', cid)
+  } catch {
+    address = getContractAddress('keyRegistry') || getContractAddress('zkKeyManager')
+  }
   if (!address) {
     throw new Error('KeyRegistry contract not configured')
   }
 
   const contract = new ethers.Contract(address, KEY_REGISTRY_ABI, signer)
   // Both old ZKKeyManager (string param) and new KeyRegistry (bytes param) accept a 0x-prefixed hex string.
-  const tx = await contract.registerKey('0x' + publicKeyHex)
+  // Spec 007 (FR-043): when the KeyRegistry supports it, record the eligibility ack on-chain
+  // referencing the in-force Terms version hash. Fall back to plain registerKey for older
+  // deployments that lack the overload (pre-redeploy).
+  const termsHash = getCurrentDocument('terms')?.hash
+  let tx
+  if (termsHash && typeof contract.registerKeyWithEligibility === 'function') {
+    try {
+      tx = await contract.registerKeyWithEligibility('0x' + publicKeyHex, '0x' + termsHash)
+    } catch (e) {
+      console.warn('registerKeyWithEligibility unavailable on-chain; falling back to registerKey:', e?.message)
+      tx = await contract.registerKey('0x' + publicKeyHex)
+    }
+  } else {
+    tx = await contract.registerKey('0x' + publicKeyHex)
+  }
   const receipt = await tx.wait()
 
   // Invalidate cache for this user

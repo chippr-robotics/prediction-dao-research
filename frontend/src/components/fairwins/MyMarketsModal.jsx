@@ -5,7 +5,7 @@ import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
-import { getContractAddress } from '../../config/contracts'
+import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
@@ -151,7 +151,7 @@ function MyMarketsModal({
   // Combine and categorize markets
   const categorizedMarkets = useMemo(() => {
     const userAddr = account?.toLowerCase()
-    if (!userAddr) return { participating: [], created: [], history: [] }
+    if (!userAddr) return { participating: [], created: [], arbitrating: [], history: [] }
 
     // Combine fetched and friend markets
     const allMarkets = [
@@ -237,9 +237,16 @@ function MyMarketsModal({
         hasPosition(market.id)
     }
 
+    // Check if the connected wallet is the (neutral) arbitrator for the wager.
+    const isArbitrator = (market) => {
+      const arb = market.arbitrator?.toLowerCase()
+      return !!arb && arb !== '0x0000000000000000000000000000000000000000' && arb === userAddr
+    }
+
     // Categorize markets
     const participating = []
     const created = []
+    const arbitrating = []
     const history = []
 
     marketsList.forEach(market => {
@@ -272,7 +279,7 @@ function MyMarketsModal({
         status === MarketStatus.DRAW ||
         status === MarketStatus.ORACLE_TIMED_OUT
       ) {
-        if (isCreator(market) || isParticipant(market)) {
+        if (isCreator(market) || isParticipant(market) || isArbitrator(market)) {
           history.push(marketWithStatus)
         }
       } else {
@@ -281,6 +288,11 @@ function MyMarketsModal({
         }
         if (isParticipant(market) && !isCreator(market)) {
           participating.push(marketWithStatus)
+        }
+        // The neutral arbitrator (not a participant) sees the wagers they oversee
+        // under "Arbitrating" so they can resolve them.
+        if (isArbitrator(market) && !isCreator(market) && !isParticipant(market)) {
+          arbitrating.push(marketWithStatus)
         }
       }
     })
@@ -292,9 +304,10 @@ function MyMarketsModal({
       (Number(b.id) || 0) - (Number(a.id) || 0)
     participating.sort(byNewest)
     created.sort(byNewest)
+    arbitrating.sort(byNewest)
     history.sort(byNewest)
 
-    return { participating, created, history }
+    return { participating, created, arbitrating, history }
   }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter, dismissedIds, chainId])
 
   // Derive the selected market from the live categorized lists so the detail
@@ -306,6 +319,7 @@ function MyMarketsModal({
     const all = [
       ...categorizedMarkets.participating,
       ...categorizedMarkets.created,
+      ...categorizedMarkets.arbitrating,
       ...categorizedMarkets.history,
     ]
     return all.find(m => String(m.id) === String(selectedMarketId)) || null
@@ -514,7 +528,7 @@ function MyMarketsModal({
           try { await switchNetwork() } catch { /* user declined */ }
         }
         const registry = new ethers.Contract(
-          getContractAddress('wagerRegistry'),
+          getContractAddressForChain('wagerRegistry', chainId),
           WAGER_REGISTRY_ABI,
           signer
         )
@@ -532,7 +546,7 @@ function MyMarketsModal({
     }
 
     dismissMarket(market.id)
-  }, [account, signer, isCorrectNetwork, switchNetwork, dismissMarket])
+  }, [account, signer, isCorrectNetwork, switchNetwork, dismissMarket, chainId])
 
   const handleClearAllExpired = useCallback((markets) => {
     dismissMarkets(markets.map(m => m.id))
@@ -611,6 +625,20 @@ function MyMarketsModal({
               <span className="mm-tab-badge">{categorizedMarkets.created.length}</span>
             )}
           </button>
+          {categorizedMarkets.arbitrating.length > 0 && (
+            <button
+              className={`mm-tab ${activeTab === 'arbitrating' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('arbitrating'); setSelectedMarketId(null) }}
+              role="tab"
+              aria-selected={activeTab === 'arbitrating'}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 3v18M5 7h14M5 7l-3 6a4 4 0 008 0L5 7zM19 7l-3 6a4 4 0 008 0l-5-6z"/>
+              </svg>
+              <span>Arbitrating</span>
+              <span className="mm-tab-badge">{categorizedMarkets.arbitrating.length}</span>
+            </button>
+          )}
           <button
             className={`mm-tab ${activeTab === 'history' ? 'active' : ''}`}
             onClick={() => { setActiveTab('history'); setSelectedMarketId(null) }}
@@ -810,6 +838,54 @@ function MyMarketsModal({
                 </div>
               )}
 
+              {/* Arbitrating Tab — wagers the connected wallet resolves as the neutral arbitrator */}
+              {activeTab === 'arbitrating' && (
+                <div role="tabpanel" className="mm-panel">
+                  {selectedMarket ? (
+                    <MarketDetailView
+                      market={selectedMarket}
+                      onBack={handleBackToList}
+                      formatDate={formatDate}
+                      formatAddress={formatAddress}
+                      getStatusClass={getStatusClass}
+                      getStatusLabel={getStatusLabel}
+                      getTimeRemaining={getTimeRemaining}
+                      account={account}
+                      userPositions={userPositions}
+                      canResolve={canResolve}
+                      onOpenResolution={handleOpenResolution}
+                      onDecrypt={handleDecryptMarket}
+                      isDecrypting={isMarketDecrypting(selectedMarket?.id)}
+                      signer={signer}
+                      isCorrectNetwork={isCorrectNetwork}
+                      switchNetwork={switchNetwork}
+                    />
+                  ) : categorizedMarkets.arbitrating.length === 0 ? (
+                    <div className="mm-empty-state">
+                      <div className="mm-empty-icon">&#9878;</div>
+                      <h3>Nothing to Arbitrate</h3>
+                      <p>You aren&apos;t the arbitrator on any active wagers.</p>
+                      <p className="mm-hint">When someone names you as the neutral resolver, those wagers appear here.</p>
+                    </div>
+                  ) : (
+                    <MarketsTable
+                      markets={categorizedMarkets.arbitrating}
+                      onSelect={handleMarketSelect}
+                      formatDate={formatDate}
+                      getStatusClass={getStatusClass}
+                      getStatusLabel={getStatusLabel}
+                      getTimeRemaining={getTimeRemaining}
+                      canResolve={canResolve}
+                      onResolve={handleOpenResolution}
+                      showActions
+                      account={account}
+                      showResolveCountdown
+                      statusFilter={statusFilter}
+                    />
+                  )}
+                </div>
+              )}
+
               {/* History Tab */}
               {activeTab === 'history' && (
                 <div role="tabpanel" className="mm-panel">
@@ -876,7 +952,7 @@ function MyMarketsModal({
           marketId={acceptanceMarket.id}
           marketData={acceptanceMarket}
           onAccepted={handleMarketAccepted}
-          contractAddress={getContractAddress('wagerRegistry')}
+          contractAddress={getContractAddressForChain('wagerRegistry', chainId)}
           contractABI={WAGER_REGISTRY_ABI}
         />
       )}
@@ -1275,7 +1351,7 @@ function MarketDetailView({
 
     try {
       const contract = new ethers.Contract(
-        getContractAddress('wagerRegistry'),
+        getContractAddressForChain('wagerRegistry', chainId),
         WAGER_REGISTRY_ABI,
         signer
       )
@@ -1329,7 +1405,7 @@ function MarketDetailView({
 
     try {
       const registry = new ethers.Contract(
-        getContractAddress('wagerRegistry'),
+        getContractAddressForChain('wagerRegistry', chainId),
         WAGER_REGISTRY_ABI,
         signer
       )
@@ -1755,7 +1831,7 @@ function ResolutionModal({
     setSubmitting(true)
     setError(null)
 
-    const registryAddress = getContractAddress('wagerRegistry')
+    const registryAddress = getContractAddressForChain('wagerRegistry', chainId)
     const registry = new ethers.Contract(
       registryAddress,
       WAGER_REGISTRY_ABI,

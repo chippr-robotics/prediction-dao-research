@@ -4,7 +4,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../hooks'
 import MarketAcceptanceModal from '../components/fairwins/MarketAcceptanceModal'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
-import { getContractAddress, DEPLOYED_CONTRACTS } from '../config/contracts'
+import { getContractAddressForChain, DEPLOYED_CONTRACTS } from '../config/contracts'
 import { WAGER_DEFAULTS, deriveWagerType } from '../constants/wagerDefaults'
 import { parseEncryptedIpfsReference } from '../utils/ipfsService'
 import './MarketAcceptancePage.css'
@@ -51,7 +51,7 @@ function getIpfsCid(desc) {
 function MarketAcceptancePage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { provider } = useWeb3()
+  const { provider, chainId } = useWeb3()
   useWallet()
 
   const [marketData, setMarketData] = useState(null)
@@ -102,7 +102,7 @@ function MarketAcceptancePage() {
 
       try {
         setLoading(true)
-        const registryAddress = getContractAddress('wagerRegistry')
+        const registryAddress = getContractAddressForChain('wagerRegistry', chainId)
         if (!registryAddress) throw new Error('WagerRegistry not deployed on this network')
 
         const registry = new ethers.Contract(registryAddress, WAGER_REGISTRY_ABI, provider)
@@ -211,7 +211,7 @@ function MarketAcceptancePage() {
       }
     }
     fetch()
-  }, [marketId, provider, urlCreator, urlStake, urlToken, urlDeadline, urlSharedSignature, urlCid])
+  }, [marketId, provider, chainId, urlCreator, urlStake, urlToken, urlDeadline, urlSharedSignature, urlCid])
 
   const handleClose = () => navigate('/')
   const handleAccepted = () => { setLoading(true); window.location.reload() }
@@ -244,7 +244,7 @@ function MarketAcceptancePage() {
         marketId={marketId}
         marketData={marketData}
         onAccepted={handleAccepted}
-        contractAddress={getContractAddress('wagerRegistry')}
+        contractAddress={getContractAddressForChain('wagerRegistry', chainId)}
         contractABI={WAGER_REGISTRY_ABI}
       />
     </div>
