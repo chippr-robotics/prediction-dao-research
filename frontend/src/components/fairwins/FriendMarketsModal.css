@@ -379,6 +379,17 @@
   align-self: flex-start;
 }
 
+/* Pin the icon's box. The global `img, video, svg { height: auto }` rule in
+   App.css can collapse an inline SVG that relies on its width/height attributes
+   inside a tight flex button, leaving a blank box (spec 009 FR-012). An explicit
+   size + `flex: none` keeps the QR glyph visible in every theme/context. */
+.fm-scan-btn svg,
+.fm-lookup-btn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
 .fm-scan-btn:hover:not(:disabled),
 .fm-lookup-btn:hover:not(:disabled) {
   border-color: #36B37E;

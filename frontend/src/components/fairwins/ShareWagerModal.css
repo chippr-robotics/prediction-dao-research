@@ -92,7 +92,9 @@
 }
 
 .share-wager-qr-container {
-  background: var(--bg-primary, #0E141B);
+  /* Solid white backing (theme-independent) so the dark QR modules always have
+     a light field behind them and stay scannable inside the dark modal. */
+  background: #FFFFFF;
   padding: 1rem;
   border-radius: 12px;
   border: 1px solid var(--border-color, #23303D);

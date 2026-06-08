@@ -161,6 +161,15 @@ vi.mock('../components/fairwins/OracleConditionPicker', () => ({
   )
 }))
 
+// Stub QRScanner so opening it from the Opponent-address scan button doesn't
+// boot the real html5-qrcode camera stack (jsdom has no MediaStreamTrack). The
+// scanner's own behavior is covered by QRScanner.test.jsx; here we only assert
+// the scan button opens it (spec 009 US4, S3).
+vi.mock('../components/ui/QRScanner', () => ({
+  default: ({ isOpen }) =>
+    isOpen ? <div role="dialog" aria-label="QR code scanner" /> : null,
+}))
+
 const renderWithProviders = (ui, { isConnected = true, account = '0x1234567890123456789012345678901234567890', isCorrectNetwork = true, chainId = 61 } = {}) => {
   mockWalletState.isConnected = isConnected
   mockWalletState.account = isConnected ? account : null
@@ -503,6 +512,29 @@ describe('FriendMarketsModal', () => {
     })
   })
 
+  // Spec 009 US4 — the QR-scan affordance next to the Opponent Address field
+  // must show its icon and open the scanner (contracts/qr-ui-contract.md S1–S3).
+  describe('QR scan affordance (Opponent address)', () => {
+    it('renders an accessible scan button with a QR icon', () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      const scanBtn = screen.getByRole('button', { name: /scan qr code/i })
+      expect(scanBtn).toBeInTheDocument()
+      // The button must not be empty — its QR glyph icon must be present and sized.
+      const icon = scanBtn.querySelector('svg')
+      expect(icon).toBeTruthy()
+      expect(icon).toHaveAttribute('width')
+      expect(icon).toHaveAttribute('height')
+    })
+
+    it('opens the QR scanner when activated', async () => {
+      renderWithProviders(<FriendMarketsModal {...defaultProps} />)
+      await userEvent.click(screen.getByRole('button', { name: /scan qr code/i }))
+      expect(
+        await screen.findByRole('dialog', { name: /qr code scanner/i })
+      ).toBeInTheDocument()
+    })
+  })
+
   describe('Success State', () => {
     const fillAndSubmit = async () => {
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -524,6 +556,25 @@ describe('FriendMarketsModal', () => {
         expect(screen.getByTestId('qr-code')).toBeInTheDocument()
         expect(screen.getByText('Share this QR code with participants to accept the wager')).toBeInTheDocument()
       })
+    })
+
+    // Spec 009 US1 / FR-005: the success QR must encode exactly the acceptance
+    // link shown in the copy field (no broken/empty QR, no mismatched payload).
+    it('success QR encodes the same acceptance link shown in the copy field', async () => {
+      const onCreate = vi.fn().mockResolvedValue({ id: 'new-market-123' })
+      renderWithProviders(<FriendMarketsModal {...defaultProps} onCreate={onCreate} />)
+
+      await fillAndSubmit()
+
+      await waitFor(() => {
+        expect(screen.getByText('Wager Created!')).toBeInTheDocument()
+      })
+
+      const qr = screen.getByTestId('qr-code')
+      const linkInput = screen.getByLabelText(/acceptance link/i)
+      expect(qr.getAttribute('data-value')).toBeTruthy()
+      expect(qr.getAttribute('data-value')).toBe(linkInput.value)
+      expect(qr.getAttribute('data-value')).toContain('new-market-123')
     })
 
     it('should have Create Another button in success state', async () => {

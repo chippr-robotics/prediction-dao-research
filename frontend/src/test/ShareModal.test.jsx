@@ -62,6 +62,15 @@ describe('ShareModal Component', () => {
       expect(qrCode).toBeInTheDocument()
     })
 
+    // Spec 009 / FR-002 + FR-004: the QR must embed no center image, so a
+    // missing logo can never surface as a broken-image placeholder.
+    it('renders the QR with no embedded image (broken-image-proof)', () => {
+      const { container } = render(
+        <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
+      )
+      expect(container.querySelector('image')).toBeNull()
+    })
+
     it('displays primary share button', () => {
       render(
         <ShareModal isOpen={true} onClose={mockOnClose} market={mockMarket} />
