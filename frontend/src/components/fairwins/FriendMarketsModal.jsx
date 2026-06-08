@@ -29,7 +29,7 @@ import { useChainTokens } from '../../hooks/useChainTokens'
 import { usePolymarketSearch } from '../../hooks/usePolymarketSearch'
 import PolymarketBrowser from './PolymarketBrowser'
 import OracleConditionPicker from './OracleConditionPicker'
-import { getContractAddress } from '../../config/contracts'
+import { getContractAddressForChain } from '../../config/contracts'
 import { formatUSD, getMarketUrl } from './marketHelpers'
 import TransactionProgress from './TransactionProgress'
 import './FriendMarketsModal.css'
@@ -123,7 +123,7 @@ function FriendMarketsModal({
   initialPolymarketMarket = null
 }) {
   const { isConnected, account } = useWallet()
-  const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+  const { signer, isCorrectNetwork, switchNetwork, chainId } = useWeb3()
 
   // Per-chain capabilities — drives which resolution-type options the user
   // sees. Polymarket-pegged side bets only render on chains where the
@@ -135,9 +135,9 @@ function FriendMarketsModal({
   // in the resolution-type dropdown self-gates on the adapter being deployed
   // on the active chain — synced into frontend/src/config/contracts.js by
   // `npm run sync:frontend-contracts`.
-  const chainlinkDataFeedAdapter  = getContractAddress('chainlinkDataFeedAdapter')
-  const chainlinkFunctionsAdapter = getContractAddress('chainlinkFunctionsAdapter')
-  const umaAdapter                = getContractAddress('umaAdapter')
+  const chainlinkDataFeedAdapter  = getContractAddressForChain('chainlinkDataFeedAdapter', chainId)
+  const chainlinkFunctionsAdapter = getContractAddressForChain('chainlinkFunctionsAdapter', chainId)
+  const umaAdapter                = getContractAddressForChain('umaAdapter', chainId)
   const isExtensibleOracleType = (t) => (
     t === ResolutionType.ChainlinkDataFeed ||
     t === ResolutionType.ChainlinkFunctions ||

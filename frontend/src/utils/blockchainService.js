@@ -490,7 +490,7 @@ async function fetchWagersForUserV2(userAddress, provider, registryAddress) {
   return wagers
 }
 
-export async function fetchFriendMarketsForUser(userAddress) {
+export async function fetchFriendMarketsForUser(userAddress, chainId) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return []
@@ -501,15 +501,20 @@ export async function fetchFriendMarketsForUser(userAddress) {
       return []
     }
 
-    const provider = getProvider()
+    // Read from the wallet's connected chain so a user on testnet isn't shown
+    // mainnet wagers (or vice versa). Falls back to the build-time chain when no
+    // chainId is supplied (disconnected/legacy callers).
+    const resolve = (name) =>
+      chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
+    const provider = getProvider(chainId)
 
     // v2 path: WagerRegistry event scan
-    const registryAddress = getContractAddress('wagerRegistry')
+    const registryAddress = resolve('wagerRegistry')
     if (registryAddress) {
       return await fetchWagersForUserV2(userAddress, provider, registryAddress)
     }
 
-    const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+    const friendFactoryAddress = resolve('friendGroupMarketFactory')
 
     if (!friendFactoryAddress) {
       console.warn('FriendGroupMarketFactory address not configured')

@@ -63,7 +63,7 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 - [x] T012 [P] [US1] Migrate `useRoleDetails` to resolve `membershipManager` for the connected `chainId` (already reads via wallet provider) — `frontend/src/hooks/useRoleDetails.js`
 - [ ] T013 [P] [US1] Migrate `useTreasuryVault` reads to chain-aware — `frontend/src/hooks/useTreasuryVault.js`
 - [x] T014 [P] [US1] Migrate `useSiteStats` (address + argless `getProvider()`) to chain-aware — `frontend/src/hooks/useSiteStats.js`
-- [ ] T015 [P] [US1] Migrate `useFriendMarketCreation` (registry/token reads + write execution) to chain-aware with display↔execution parity — `frontend/src/hooks/useFriendMarketCreation.js`
+- [x] T015 [P] [US1] Migrate `useFriendMarketCreation` (registry/token reads + write execution) to chain-aware with display↔execution parity — `frontend/src/hooks/useFriendMarketCreation.js`
 - [ ] T016 [P] [US1] Migrate `useNullifierContracts` to chain-aware — `frontend/src/hooks/useNullifierContracts.js`
 
 ### Implementation for User Story 1 — services & data
@@ -76,10 +76,10 @@ description: "Task list for Runtime Chain Consistency Across Frontend Modals"
 
 ### Implementation for User Story 1 — modals & pages (consume chainId, pass to services)
 
-- [ ] T022 [P] [US1] Migrate `FriendMarketsModal` contract reads to chain-aware (pass `chainId` to services) — `frontend/src/components/fairwins/FriendMarketsModal.jsx`
-- [ ] T023 [P] [US1] Migrate `MyMarketsModal` (5 build-bound sites) to chain-aware — `frontend/src/components/fairwins/MyMarketsModal.jsx`
-- [ ] T024 [P] [US1] Migrate `MarketAcceptancePage` (read + write) to chain-aware with display↔execution parity — `frontend/src/pages/MarketAcceptancePage.jsx`
-- [ ] T025 [P] [US1] Migrate `AdminPanel` reads to chain-aware — `frontend/src/components/AdminPanel.jsx`
+- [x] T022 [P] [US1] Migrate `FriendMarketsModal` contract reads to chain-aware (pass `chainId` to services) — `frontend/src/components/fairwins/FriendMarketsModal.jsx`
+- [x] T023 [P] [US1] Migrate `MyMarketsModal` (5 build-bound sites) to chain-aware — `frontend/src/components/fairwins/MyMarketsModal.jsx`
+- [x] T024 [P] [US1] Migrate `MarketAcceptancePage` (read + write) to chain-aware with display↔execution parity — `frontend/src/pages/MarketAcceptancePage.jsx`
+- [x] T025 [P] [US1] Migrate `AdminPanel` reads to chain-aware — `frontend/src/components/AdminPanel.jsx`
 - [ ] T026 [US1] Remove each migrated file's entry from the guard allowlist (T005) as it is completed; confirm `chainResolutionGuard.test.js` shrinks accordingly — `frontend/src/test/chainResolutionGuard.test.js`
 
 **Checkpoint**: A user connected on any single supported network sees only that network's data and transacts there. MVP complete.

@@ -5,7 +5,7 @@ import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
-import { getContractAddress } from '../../config/contracts'
+import { getContractAddressForChain } from '../../config/contracts'
 import { getNetwork } from '../../config/networks'
 import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
@@ -528,7 +528,7 @@ function MyMarketsModal({
           try { await switchNetwork() } catch { /* user declined */ }
         }
         const registry = new ethers.Contract(
-          getContractAddress('wagerRegistry'),
+          getContractAddressForChain('wagerRegistry', chainId),
           WAGER_REGISTRY_ABI,
           signer
         )
@@ -546,7 +546,7 @@ function MyMarketsModal({
     }
 
     dismissMarket(market.id)
-  }, [account, signer, isCorrectNetwork, switchNetwork, dismissMarket])
+  }, [account, signer, isCorrectNetwork, switchNetwork, dismissMarket, chainId])
 
   const handleClearAllExpired = useCallback((markets) => {
     dismissMarkets(markets.map(m => m.id))
@@ -952,7 +952,7 @@ function MyMarketsModal({
           marketId={acceptanceMarket.id}
           marketData={acceptanceMarket}
           onAccepted={handleMarketAccepted}
-          contractAddress={getContractAddress('wagerRegistry')}
+          contractAddress={getContractAddressForChain('wagerRegistry', chainId)}
           contractABI={WAGER_REGISTRY_ABI}
         />
       )}
@@ -1351,7 +1351,7 @@ function MarketDetailView({
 
     try {
       const contract = new ethers.Contract(
-        getContractAddress('wagerRegistry'),
+        getContractAddressForChain('wagerRegistry', chainId),
         WAGER_REGISTRY_ABI,
         signer
       )
@@ -1405,7 +1405,7 @@ function MarketDetailView({
 
     try {
       const registry = new ethers.Contract(
-        getContractAddress('wagerRegistry'),
+        getContractAddressForChain('wagerRegistry', chainId),
         WAGER_REGISTRY_ABI,
         signer
       )
@@ -1831,7 +1831,7 @@ function ResolutionModal({
     setSubmitting(true)
     setError(null)
 
-    const registryAddress = getContractAddress('wagerRegistry')
+    const registryAddress = getContractAddressForChain('wagerRegistry', chainId)
     const registry = new ethers.Contract(
       registryAddress,
       WAGER_REGISTRY_ABI,

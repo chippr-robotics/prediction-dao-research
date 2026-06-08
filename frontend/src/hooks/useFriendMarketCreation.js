@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { ethers } from 'ethers'
 import { useWeb3 } from './useWeb3'
-import { getContractAddress } from '../config/contracts'
+import { getContractAddress, getContractAddressForChain } from '../config/contracts'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 import { ResolutionType, ORACLE_RESOLUTION_TYPES, WAGER_DEFAULTS } from '../constants/wagerDefaults'
@@ -26,10 +26,17 @@ const WAGER_PARTICIPANT_ROLE = ethers.keccak256(ethers.toUtf8Bytes('WAGER_PARTIC
 
 async function expireStaleWagers(registry, userAddress, onProgress) {
   try {
-    const membershipManagerAddr = getContractAddress('membershipManager')
+    const provider = registry.runner?.provider || registry.provider
+    // Resolve MembershipManager for the chain this registry/signer is on.
+    let membershipManagerAddr
+    try {
+      const cid = Number((await provider.getNetwork()).chainId)
+      membershipManagerAddr = getContractAddressForChain('membershipManager', cid)
+    } catch {
+      membershipManagerAddr = getContractAddress('membershipManager')
+    }
     if (!membershipManagerAddr) return
 
-    const provider = registry.runner?.provider || registry.provider
     const mgr = new ethers.Contract(membershipManagerAddr, MEMBERSHIP_MANAGER_ABI, provider)
     const membership = await mgr.getMembership(userAddress, WAGER_PARTICIPANT_ROLE)
     const tierNum = Number(membership.tier)
@@ -122,7 +129,20 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
     try {
       onProgress({ step: 'verify', message: 'Validating wager...' })
 
-      const wagerRegistryAddress = getContractAddress('wagerRegistry')
+      // Resolve contracts for the chain the signer will execute on, so the
+      // registry + stake token always match the transaction's network (display
+      // ↔ execution parity). Falls back to the build-time chain only if the
+      // signer can't report its network.
+      let executionChainId
+      try {
+        executionChainId = Number((await activeSigner.provider.getNetwork()).chainId)
+      } catch {
+        executionChainId = undefined
+      }
+      const resolve = (name) =>
+        executionChainId != null ? getContractAddressForChain(name, executionChainId) : getContractAddress(name)
+
+      const wagerRegistryAddress = resolve('wagerRegistry')
       if (!wagerRegistryAddress) {
         throw new Error('WagerRegistry not deployed on this network. Run scripts/deploy/deploy.js first.')
       }
@@ -131,7 +151,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       const requestedToken = data.data?.collateralToken
       const stakeTokenAddress = (requestedToken && requestedToken !== ethers.ZeroAddress)
         ? requestedToken
-        : getContractAddress('paymentToken')
+        : resolve('paymentToken')
       if (!stakeTokenAddress || stakeTokenAddress === ethers.ZeroAddress) {
         throw new Error('A stake token (USDC or WMATIC) is required. Native MATIC is not supported.')
       }
