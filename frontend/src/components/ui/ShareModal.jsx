@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import WagerQRCode from './WagerQRCode'
 import './ShareModal.css'
 
 function ShareModal({ isOpen, onClose, market, marketUrl }) {
@@ -117,20 +117,10 @@ function ShareModal({ isOpen, onClose, market, marketUrl }) {
           <div className="qr-section" ref={qrRef}>
             <div className="qr-code-container">
               <div className="qr-code-frame">
-                <QRCodeSVG 
+                <WagerQRCode
                   value={url}
                   size={240}
-                  level="H"
-                  includeMargin={false}
-                  fgColor="#36B37E"
-                  bgColor="transparent"
-                  aria-label="QR code for market link"
-                  imageSettings={{
-                    src: '/assets/fairwins_no-text_logo.svg',
-                    height: 48,
-                    width: 48,
-                    excavate: true,
-                  }}
+                  ariaLabel="QR code for market link"
                 />
               </div>
             </div>

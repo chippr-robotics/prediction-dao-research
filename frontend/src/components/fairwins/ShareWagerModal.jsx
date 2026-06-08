@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import WagerQRCode from '../ui/WagerQRCode'
 import './ShareWagerModal.css'
 
 function ShareWagerModal({
@@ -51,20 +51,10 @@ function ShareWagerModal({
 
         <div className="share-wager-qr-section">
           <div className="share-wager-qr-container">
-            <QRCodeSVG
+            <WagerQRCode
               value={url}
               size={200}
-              level="H"
-              includeMargin={false}
-              fgColor="#36B37E"
-              bgColor="transparent"
-              aria-label="QR code to share this wager"
-              imageSettings={{
-                src: '/assets/logo_fairwins.svg',
-                height: 32,
-                width: 32,
-                excavate: true,
-              }}
+              ariaLabel="QR code to share this wager"
             />
           </div>
           <p className="share-wager-qr-hint">
