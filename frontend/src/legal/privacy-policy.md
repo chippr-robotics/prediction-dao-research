@@ -1,10 +1,8 @@
 # FairWins — Privacy Policy
 
-**Last updated: [DATE] · Version: [auto — SHA-256 of this document]**
-
 ---
 
-> **Draft pending counsel.** This Privacy Policy is incorporated by reference into the
+> This Privacy Policy is incorporated by reference into the
 > [Terms & Conditions](/terms) and the [Risk Disclosure](/risk) and forms part of your
 > agreement with us. Capitalized terms have the meanings given in the Terms & Conditions.
 
@@ -59,8 +57,7 @@ the Chainalysis on-chain oracle); and where required by law or to protect our ri
 
 Because the Service is largely non-custodial and pseudonymous, our ability to identify you
 is limited. Where applicable law grants you rights over personal data (such as access or
-erasure of the access-log data that can be linked to you), you may contact us at
-`[CONTACT EMAIL / METHOD]`. Note that **on-chain data cannot be erased**.
+erasure of the access-log data that can be linked to you), you may contact us at howdy@fairwins.app. Note that **on-chain data cannot be erased**.
 
 ## 7. Security
 
@@ -81,6 +78,6 @@ We may update this Privacy Policy; material changes are indicated by an updated 
 
 ## 10. Contact
 
-Questions about privacy: `[CONTACT EMAIL / METHOD]`.
+Questions about privacy: Howdy@fairwins.app
 
 *— End of Privacy Policy —*
