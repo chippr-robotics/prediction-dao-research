@@ -186,3 +186,67 @@ export function isVersionSupported(version) {
 export function getSupportedVersions() {
   return Object.keys(SIGNING_MESSAGES).map(Number).sort((a, b) => a - b)
 }
+
+/**
+ * ==========================================================================
+ * Per-wager Terms-version binding (Spec 007, FR-056/FR-057)
+ * ==========================================================================
+ * The governing T&C version hash is bound into each wager's ChaCha20-Poly1305
+ * AEAD as Associated Data (AAD). This makes the claimed `termsVersion` field in
+ * the envelope tamper-evident WITHOUT entering key derivation (the SIGNING_MESSAGES /
+ * MARKET_SIGNING_MESSAGES above are intentionally untouched so the derived key stays
+ * versionless and reproducible — FR-041).
+ *
+ * The AAD MUST be byte-identical on seal and open; build it ONLY via buildTermsAAD()
+ * from the envelope's authenticated `termsVersion.hash`.
+ */
+export const TERMS_AAD_PREFIX = 'FairWins-TC'
+
+/**
+ * Schema-binding version component of the terms AAD (Spec 007). This is the
+ * encrypted-metadata SCHEMA version that introduced the binding (v1.1) — NOT the envelope
+ * algorithm version ('1.0' x25519 / '2.0' x-wing). It is used identically on seal and open
+ * so the AAD does not vary by algorithm; bump it only if the AAD format itself changes.
+ */
+export const TERMS_AAD_VERSION = '1.1'
+
+/**
+ * Build the deterministic AAD bytes binding a wager to its governing T&C version.
+ * @param {string} schemaVersion - the encrypted-metadata schema version (e.g. "1.1")
+ * @param {string} termsVersionHashHex - SHA-256 hex of the canonicalized T&C bytes
+ * @returns {Uint8Array} UTF-8 bytes: `FairWins-TC|<schemaVersion>|<hashHex>`
+ */
+export function buildTermsAAD(schemaVersion, termsVersionHashHex) {
+  if (!schemaVersion || !termsVersionHashHex) {
+    throw new Error('buildTermsAAD requires schemaVersion and termsVersionHashHex')
+  }
+  return new TextEncoder().encode(
+    `${TERMS_AAD_PREFIX}|${schemaVersion}|${termsVersionHashHex}`
+  )
+}
+
+/**
+ * ==========================================================================
+ * Key-generation eligibility disclosure (Spec 007 — US6, FR-040/FR-044)
+ * ==========================================================================
+ * Shown to the user at account key generation. The DETERMINISTIC key-derivation message
+ * (SIGNING_MESSAGES / MARKET_SIGNING_MESSAGES above) is intentionally unchanged so the
+ * derived key stays reproducible (FR-041); the standing eligibility facts + the
+ * key-derivation coupling are surfaced here as a disclosure, and the dated record is the
+ * on-chain key registration (KeyRegistry.EligibilityAcknowledged, FR-043). Terms are
+ * referenced generically ("as published"), with no date/version in the signed payload.
+ */
+export const KEYGEN_TERMS_URL = 'https://fairwins.app/terms'
+
+export const ELIGIBILITY_DISCLOSURE = {
+  title: 'FairWins — Account Key Generation',
+  facts: [
+    'I am at least 21 years old.',
+    'I am not a U.S. person and am not located in a Restricted Jurisdiction.',
+    'I am not a sanctioned or restricted party.',
+    'I have sole control of this wallet and its private keys, and I meet and continue to meet the eligibility requirements of the FairWins Terms & Conditions.',
+  ],
+  termsReference: `FairWins Terms & Conditions (as published) at ${KEYGEN_TERMS_URL}`,
+  keyDerivationNotice:
+    'Signing this message deterministically derives the encryption key for your FairWins account. It does not authorize any transaction, transfer, or wager, and costs no gas. If you lose your wallet/keys, this account key cannot be recovered.',
+}

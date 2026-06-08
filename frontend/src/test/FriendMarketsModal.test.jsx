@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
@@ -13,6 +13,18 @@ import {
   DexProvider,
   PriceProvider
 } from '../contexts'
+
+// The exposed oracle resolution tabs (Chainlink Data Feed / Functions / UMA) are
+// gated by VITE_ORACLE_MODELS, which constants/wagerDefaults reads ONCE at module
+// load. vi.hoisted runs before the (hoisted) component import, so set it to 'all'
+// here — otherwise the default 'polymarket-only' hides those tabs and every
+// oracle-tab spec below fails. Self-contained: vitest isolates env per test file.
+vi.hoisted(() => {
+  vi.stubEnv('VITE_ORACLE_MODELS', 'all')
+})
+afterAll(() => {
+  vi.unstubAllEnvs()
+})
 
 // Mock wallet and network state
 let mockWalletState = {

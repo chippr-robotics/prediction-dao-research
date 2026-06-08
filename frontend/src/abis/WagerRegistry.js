@@ -540,6 +540,19 @@ export const WAGER_REGISTRY_ABI = [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "guard",
+        "type": "address"
+      }
+    ],
+    "name": "SanctionsGuardUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "token",
         "type": "address"
       },
@@ -757,6 +770,25 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "WagerResolved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "termsVersionHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "WagerTermsBound",
     "type": "event"
   },
   {
@@ -992,6 +1024,85 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "createWager",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "wagerId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "opponent",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "arbitrator",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128",
+        "name": "creatorStake",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint128",
+        "name": "opponentStake",
+        "type": "uint128"
+      },
+      {
+        "internalType": "uint64",
+        "name": "acceptDeadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "uint64",
+        "name": "resolveDeadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "enum IWagerRegistry.ResolutionType",
+        "name": "resolutionType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "polymarketConditionId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bool",
+        "name": "creatorIsYes",
+        "type": "bool"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "metadataHash",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "metadataUri",
+        "type": "string"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "termsVersionHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "createWagerWithTerms",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1575,6 +1686,19 @@ export const WAGER_REGISTRY_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "sanctionsGuard",
+    "outputs": [
+      {
+        "internalType": "contract ISanctionsGuard",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1614,6 +1738,19 @@ export const WAGER_REGISTRY_ABI = [
       }
     ],
     "name": "setPolymarketAdapter",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "guard",
+        "type": "address"
+      }
+    ],
+    "name": "setSanctionsGuard",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1673,6 +1810,25 @@ export const WAGER_REGISTRY_ABI = [
     "name": "unpause",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "wagerTermsVersionHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ]

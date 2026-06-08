@@ -134,8 +134,14 @@ async function main() {
 
   await ensureSingletonFactory();
 
-  const [deployer] = await ethers.getSigners();
-  if (!deployer) throw new Error(`No signer for network '${networkName}'`);
+  const [rawDeployer] = await ethers.getSigners();
+  if (!rawDeployer) throw new Error(`No signer for network '${networkName}'`);
+  // Wrap the signer in a client-side NonceManager so a sequence of txs doesn't
+  // re-fetch a stale nonce from a load-balanced public RPC (the "nonce too low"
+  // failure mode). The base nonce is fetched once, then incremented locally.
+  const { NonceManager } = require("ethers");
+  const deployer = new NonceManager(rawDeployer);
+  deployer.address = await rawDeployer.getAddress();
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log(`\nDeployer: ${deployer.address}`);
   console.log(`Balance:  ${ethers.formatEther(balance)} ${networkName === "amoy" ? "POL" : "ETH"}`);
@@ -212,7 +218,7 @@ async function main() {
   deployments.membershipManager = mgrDeploy.address;
   const membershipManager = mgrDeploy.contract;
 
-  if (!mgrDeploy.alreadyDeployed) {
+  if (!mgrDeploy.alreadyDeployed || process.env.FORCE_SEED_TIERS === "true") {
     await seedTiers(membershipManager, deployer, ROLE_HASHES.WAGER_PARTICIPANT_ROLE, "WAGER_PARTICIPANT", WAGER_PARTICIPANT_TIERS);
   } else {
     console.log("\nMembershipManager already deployed — skipping tier seed (idempotent re-runs should re-seed manually if config changed)");
@@ -242,6 +248,58 @@ async function main() {
     console.log("  ✓ WagerRegistry can call recordCreate/recordClose");
   }
   const wagerRegistry = regDeploy.contract;
+
+  // -------- SanctionsGuard (Spec 007, FR-054) --------
+  // Resolve the Chainalysis on-chain Sanctions Oracle per chain. Mainnet 137 has the real
+  // oracle; Amoy/local have none, so deploy a MockSanctionsOracle there (mocks confined to
+  // contracts/mocks; never used on a mainnet path — constitution III / FR-022). Address is
+  // injected, never hardcoded in the contract (FR-055).
+  const CHAINALYSIS_ORACLE = { 137: "0x40C57923924B5c5c5455c48D93317139ADDaC8fb" };
+  let sanctionsOracleAddr =
+    process.env[`CHAINALYSIS_SANCTIONS_ORACLE_${chainId}`] || CHAINALYSIS_ORACLE[chainId];
+  if (sanctionsOracleAddr && !ethers.isAddress(sanctionsOracleAddr)) {
+    throw new Error(`CHAINALYSIS_SANCTIONS_ORACLE_${chainId} is not a valid address: ${sanctionsOracleAddr}`);
+  }
+  if (!sanctionsOracleAddr) {
+    if (isMainnet) {
+      throw new Error(
+        `A Chainalysis sanctions oracle address is required on mainnet '${networkName}' (chainId ${chainId}). ` +
+          `Set CHAINALYSIS_SANCTIONS_ORACLE_${chainId} or add it to CHAINALYSIS_ORACLE in deploy.js.`
+      );
+    }
+    console.log(`\nNo Chainalysis oracle on ${networkName}; deploying MockSanctionsOracle...`);
+    const mockOracle = await deployDeterministic(
+      "MockSanctionsOracle",
+      [],
+      generateSalt(SALT_PREFIXES.V2 + "MockSanctionsOracle"),
+      deployer
+    );
+    sanctionsOracleAddr = mockOracle.address;
+    deployments.mockSanctionsOracle = mockOracle.address;
+  }
+  console.log(`Chainalysis Sanctions Oracle: ${sanctionsOracleAddr}`);
+
+  const guardDeploy = await deployDeterministic(
+    "SanctionsGuard",
+    [deployer.address, sanctionsOracleAddr],
+    generateSalt(SALT_PREFIXES.V2 + "SanctionsGuard"),
+    deployer
+  );
+  deployments.sanctionsGuard = guardDeploy.address;
+
+  // Wire the guard into both fund contracts (idempotent: skip if already pointing at it).
+  if ((await wagerRegistry.sanctionsGuard()).toLowerCase() !== guardDeploy.address.toLowerCase()) {
+    console.log("\nWiring SanctionsGuard into WagerRegistry...");
+    const tx = await wagerRegistry.connect(deployer).setSanctionsGuard(guardDeploy.address);
+    await tx.wait();
+    console.log("  ✓ WagerRegistry screens create/accept");
+  }
+  if ((await membershipManager.sanctionsGuard()).toLowerCase() !== guardDeploy.address.toLowerCase()) {
+    console.log("Wiring SanctionsGuard into MembershipManager...");
+    const tx = await membershipManager.connect(deployer).setSanctionsGuard(guardDeploy.address);
+    await tx.wait();
+    console.log("  ✓ MembershipManager screens purchase/upgrade/extend");
+  }
 
   // -------- Chainlink + UMA oracle adapters --------
   // Each adapter is only deployed when its required network config resolves.
@@ -357,13 +415,15 @@ async function main() {
       membershipManager: mgrDeploy.address,
       wagerRegistry: regDeploy.address,
       keyRegistry: keyDeploy.address,
+      sanctionsGuard: guardDeploy.address,
       ...oracleDeployments,
     },
-    mocks: deployments.mockUSDC || deployments.mockWMATIC || deployments.polymarketCTF
+    mocks: deployments.mockUSDC || deployments.mockWMATIC || deployments.polymarketCTF || deployments.mockSanctionsOracle
       ? {
           mockUSDC: deployments.mockUSDC,
           mockWMATIC: deployments.mockWMATIC,
           mockPolymarketCTF: deployments.polymarketCTF,
+          mockSanctionsOracle: deployments.mockSanctionsOracle,
         }
       : null,
     saltPrefix: SALT_PREFIXES.V2,

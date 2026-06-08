@@ -7,6 +7,8 @@ import { useEncryption } from '../../hooks/useEncryption'
 import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../../utils/blockchainService'
 import { ensureKeyRegistered } from '../../utils/keyRegistryService'
+import { getCurrentDocument } from '../../utils/legalDocs'
+import MembershipAttestation from '../compliance/MembershipAttestation'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
 
@@ -186,7 +188,9 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       const provider = new ethers.BrowserProvider(window.ethereum)
       const signer = await provider.getSigner()
 
-      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue, action)
+      // Spec 007 (FR-039): record the accepted in-force Terms version hash on-chain.
+      const acceptedTermsHash = getCurrentDocument('terms')?.hash || null
+      const receipt = await purchaseRoleWithStablecoin(signer, ROLE_KEY, selectedPrice, tierValue, action, acceptedTermsHash)
       grantRole(ROLE_KEY)
       recordRolePurchase(account, ROLE_KEY, {
         price: selectedPrice,
@@ -465,15 +469,11 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                         confirmed, it cannot be reversed.
                       </li>
                     </ul>
-                    <label className="ppm-acknowledge">
-                      <input
-                        type="checkbox"
-                        checked={acknowledged}
-                        onChange={(e) => setAcknowledged(e.target.checked)}
-                        disabled={isPurchasing}
-                      />
-                      I acknowledge the protocol's pause and account-moderation provisions.
-                    </label>
+                    {/* Spec 007 (US5): discrete, un-pre-ticked eligibility attestations.
+                        allTicked drives `acknowledged`, which gates validation + the
+                        purchase button below; the accepted Terms version is recorded
+                        on-chain via purchaseTierWithTerms in handlePurchase. */}
+                    <MembershipAttestation onChange={setAcknowledged} />
                     {errors.ack && <div className="ppm-error">{errors.ack}</div>}
                   </div>
                 </div>
