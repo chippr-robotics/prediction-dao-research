@@ -88,7 +88,7 @@ export function FriendMarketsProvider({ children }) {
     const fetchMarkets = async (attempt = 0) => {
       setLoading(true)
       try {
-        const blockchainMarkets = await fetchFriendMarketsForUser(address)
+        const blockchainMarkets = await fetchFriendMarketsForUser(address, chainId)
         if (cancelled) return
 
         const marketsWithUniqueIds = tagMarkets(blockchainMarkets, chainId)
@@ -116,7 +116,7 @@ export function FriendMarketsProvider({ children }) {
     if (!address || !isConnected) return
     setLoading(true)
     try {
-      const blockchainMarkets = await fetchFriendMarketsForUser(address)
+      const blockchainMarkets = await fetchFriendMarketsForUser(address, chainId)
       const marketsWithUniqueIds = tagMarkets(blockchainMarkets, chainId)
       setFriendMarkets(marketsWithUniqueIds)
       saveToStorage(chainId, marketsWithUniqueIds)

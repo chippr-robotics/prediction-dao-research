@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ethers } from 'ethers'
-import { getContractAddress, NETWORK_CONFIG } from '../config/contracts'
+import { getContractAddressForChain } from '../config/contracts'
+import { getProvider } from '../utils/blockchainService'
+import { useWeb3 } from './useWeb3'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
 
 /**
@@ -41,16 +43,25 @@ export function useTierPrices() {
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
 
-  const provider = useMemo(() => new ethers.JsonRpcProvider(NETWORK_CONFIG.rpcUrl), [])
+  // Resolve the MembershipManager + provider for the wallet's connected chain so
+  // tier prices/limits reflect the network the user is actually on, not the
+  // build-time default. Falls back to the primary chain when disconnected
+  // (getProvider/getContractAddressForChain handle a null chainId).
+  const { chainId } = useWeb3()
+  const provider = useMemo(() => getProvider(chainId), [chainId])
 
   const contract = useMemo(() => {
-    const addr = getContractAddress('membershipManager')
+    const addr = getContractAddressForChain('membershipManager', chainId)
     if (!addr) return null
     return new ethers.Contract(addr, MEMBERSHIP_MANAGER_ABI, provider)
-  }, [provider])
+  }, [provider, chainId])
 
   const fetchPrices = useCallback(async () => {
     if (!contract) {
+      // No MembershipManager on the connected chain — show fallback prices, not
+      // whatever was fetched for a previously-connected network.
+      setTierPrices(FALLBACK_PRICES)
+      setTierLimits({})
       setError('MembershipManager not deployed')
       setIsLoading(false)
       return

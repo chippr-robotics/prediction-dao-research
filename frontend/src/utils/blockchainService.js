@@ -490,7 +490,7 @@ async function fetchWagersForUserV2(userAddress, provider, registryAddress) {
   return wagers
 }
 
-export async function fetchFriendMarketsForUser(userAddress) {
+export async function fetchFriendMarketsForUser(userAddress, chainId) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return []
@@ -501,15 +501,20 @@ export async function fetchFriendMarketsForUser(userAddress) {
       return []
     }
 
-    const provider = getProvider()
+    // Read from the wallet's connected chain so a user on testnet isn't shown
+    // mainnet wagers (or vice versa). Falls back to the build-time chain when no
+    // chainId is supplied (disconnected/legacy callers).
+    const resolve = (name) =>
+      chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
+    const provider = getProvider(chainId)
 
     // v2 path: WagerRegistry event scan
-    const registryAddress = getContractAddress('wagerRegistry')
+    const registryAddress = resolve('wagerRegistry')
     if (registryAddress) {
       return await fetchWagersForUserV2(userAddress, provider, registryAddress)
     }
 
-    const friendFactoryAddress = getContractAddress('friendGroupMarketFactory')
+    const friendFactoryAddress = resolve('friendGroupMarketFactory')
 
     if (!friendFactoryAddress) {
       console.warn('FriendGroupMarketFactory address not configured')
@@ -861,24 +866,38 @@ export async function checkRoleSyncNeeded(userAddress, roleName) {
 }
 
 /**
- * Get user's current membership tier for a role from blockchain
+ * Get user's current membership tier for a role from blockchain.
+ *
+ * Pass the wallet's CURRENT chainId so the tier is read from the chain the user
+ * is actually on. Without it the address/provider default to the build-time
+ * chain, so a tier held on testnet would be reported on mainnet (and vice
+ * versa) — the cause of "current membership is already Silver" appearing after
+ * switching from Amoy to Polygon. Mirrors hasRoleOnChain's chain-aware reads.
+ *
  * @param {string} userAddress - User's wallet address
  * @param {string} roleName - Role name or constant
+ * @param {number} [chainId] - Chain to read from; defaults to the build-time chain
  * @returns {Promise<{tier: number, tierName: string}>} Current tier (0=None, 1=Bronze, 2=Silver, 3=Gold, 4=Platinum)
  */
-export async function getUserTierOnChain(userAddress, roleName) {
+export async function getUserTierOnChain(userAddress, roleName, chainId) {
   // Skip blockchain calls in test environment
   if (import.meta.env.VITE_SKIP_BLOCKCHAIN_CALLS === 'true') {
     return { tier: 0, tierName: 'None' }
   }
 
+  // Resolve the contract + provider against the selected chain (see hasRoleOnChain)
+  // so a membership held on one network is not read on another.
+  const resolveAddress = (name) =>
+    chainId != null ? getContractAddressForChain(name, chainId) : getContractAddress(name)
+  const provider = getProvider(chainId)
+
   // v2 path: MembershipManager.getActiveTier
-  const mmAddress = getContractAddress('membershipManager')
+  const mmAddress = resolveAddress('membershipManager')
   if (mmAddress) {
     try {
       const roleHash = getRoleHash(roleName)
       if (!roleHash) return { tier: 0, tierName: 'None' }
-      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, getProvider())
+      const mm = new ethers.Contract(mmAddress, MEMBERSHIP_MANAGER_ABI, provider)
       const tier = Number(await mm.getActiveTier(userAddress, roleHash))
       const tierName = tier === 0 ? 'None' : (TIER_NAMES[tier] || 'Unknown')
       return { tier, tierName }
@@ -889,7 +908,7 @@ export async function getUserTierOnChain(userAddress, roleName) {
   }
 
   try {
-    const tierRegistryAddress = getContractAddress('tierRegistry')
+    const tierRegistryAddress = resolveAddress('tierRegistry')
     if (!tierRegistryAddress) {
       console.warn('TierRegistry not deployed - cannot check user tier')
       return { tier: 0, tierName: 'None' }
@@ -901,7 +920,6 @@ export async function getUserTierOnChain(userAddress, roleName) {
       return { tier: 0, tierName: 'None' }
     }
 
-    const provider = getProvider()
     const tierRegistry = new ethers.Contract(
       tierRegistryAddress,
       TIER_REGISTRY_ABI,
@@ -1087,14 +1105,27 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
     throw new Error('Wallet not connected')
   }
 
-  // v2 path: MembershipManager.purchaseTier / upgradeTier / extendMembership.
-  const mmAddress = getContractAddress('membershipManager')
+  // Resolve the MembershipManager for the wallet's CURRENT chain, not the
+  // build-time chain. The network gate (isCorrectNetwork) accepts any supported
+  // chain (Polygon 137, Amoy 80002, local 1337), so a wallet on e.g. Amoy must
+  // use the Amoy deployment. Resolving the build-bound address instead would
+  // point at a contract that doesn't exist on the connected chain and surface a
+  // misleading "no purchase contract found" error.
+  let walletChainId = null
+  try {
+    walletChainId = Number((await signer.provider.getNetwork()).chainId)
+  } catch {
+    // Provider without a network; getContractAddressForChain(null) falls back to
+    // the build-time chain.
+  }
+  const mmAddress = getContractAddressForChain('membershipManager', walletChainId)
   if (mmAddress) {
     const provider = signer.provider
     const code = await provider.getCode(mmAddress)
     if (!code || code === '0x') {
-      console.warn(
-        `[purchaseRole] MembershipManager has no code at ${mmAddress} — falling through to legacy path`
+      throw new Error(
+        `No membership contract is deployed at ${mmAddress} on the connected network (chain ${walletChainId ?? 'unknown'}). ` +
+          `Please switch your wallet to Polygon and try again.`
       )
     } else {
       const roleHash = getRoleHash(roleName)
@@ -1176,7 +1207,8 @@ export async function purchaseRoleWithStablecoin(signer, roleName, priceUSD, tie
 
     if (!paymentProcessorAddress) {
       throw new Error(
-        'No purchase contract found on this network. Please verify you are connected to the correct chain and that contracts are deployed.'
+        `Membership purchases aren't available on the connected network (chain ${walletChainId ?? 'unknown'}). ` +
+          `Please switch your wallet to Polygon and try again.`
       )
     }
 

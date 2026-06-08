@@ -109,8 +109,12 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
   useEffect(() => {
     let cancelled = false
     if (!account) return
+    // Clear any tier read from a previously-selected chain so a testnet tier
+    // doesn't linger when the wallet switches to mainnet (where the user may
+    // have no membership). Re-fetch for the chain the wallet is now on.
+    setUserCurrentTier(0)
     setIsLoadingTier(true)
-    getUserTierOnChain(account, ROLE_KEY).then(({ tier }) => {
+    getUserTierOnChain(account, ROLE_KEY, chainId).then(({ tier }) => {
       if (cancelled) return
       setUserCurrentTier(tier || 0)
       // Default tier select to the lowest available upgrade (or BRONZE for fresh)
@@ -125,7 +129,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
       if (!cancelled) setIsLoadingTier(false)
     })
     return () => { cancelled = true }
-  }, [account])
+  }, [account, chainId])
 
   const availableTiers = useMemo(() => {
     return Object.entries(MEMBERSHIP_TIERS).filter(([, tier]) => {
@@ -199,7 +203,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
         tierValue,
         txHash: receipt.hash,
         purchasedBy: account,
-      })
+      }, chainId)
       setPurchaseResult({ success: true, tier: tierName, txHash: receipt.hash })
       try { await loadRoles() } catch (e) { console.warn('refresh roles failed:', e) }
       showNotification(`${tierName} membership activated.`, 'success', 7000)

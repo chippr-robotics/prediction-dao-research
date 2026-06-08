@@ -17,14 +17,16 @@ vi.mock('../hooks', () => ({
   }))
 }))
 
-// Mock getContractAddress
+// Mock getContractAddress + getContractAddressForChain (chain-aware resolver;
+// resolves by name here, ignoring chainId). vi.hoisted so the vi.mock factory
+// can reference it (see frontend-test-gotchas #3).
+const { mockResolveByName } = vi.hoisted(() => ({
+  mockResolveByName: (name) =>
+    name === 'friendGroupMarketFactory' ? '0xContractAddress00000000000000000000000001' : null,
+}))
 vi.mock('../config/contracts', () => ({
-  getContractAddress: vi.fn((name) => {
-    if (name === 'friendGroupMarketFactory') {
-      return '0xContractAddress00000000000000000000000001'
-    }
-    return null
-  })
+  getContractAddress: vi.fn(mockResolveByName),
+  getContractAddressForChain: vi.fn((name) => mockResolveByName(name)),
 }))
 
 // Mock ethers

@@ -18,7 +18,8 @@
 import { useEffect, useState } from 'react'
 import { Contract, formatUnits } from 'ethers'
 import { getProvider } from '../utils/blockchainService'
-import { getContractAddress } from '../config/contracts'
+import { getContractAddressForChain } from '../config/contracts'
+import { useWeb3 } from './useWeb3'
 import { WAGER_REGISTRY_ABI } from '../abis/WagerRegistry'
 
 const SUBGRAPH_URL = import.meta.env?.VITE_SUBGRAPH_URL || ''
@@ -41,7 +42,9 @@ const STATS_QUERY = `
   }
 `
 
-let cache = null // { value, ts }
+// Cache stats per connected chain so switching networks doesn't show another
+// chain's figures within the TTL window (spec 008).
+const cacheByChain = new Map() // chainId -> { value, ts }
 
 function emptyStats() {
   return {
@@ -88,28 +91,30 @@ async function fetchFromSubgraph() {
   }
 }
 
-async function fetchFromRpc() {
+async function fetchFromRpc(chainId) {
   const stats = emptyStats()
-  const address = getContractAddress('wagerRegistry')
+  const address = getContractAddressForChain('wagerRegistry', chainId)
   if (!address) return stats
-  const registry = new Contract(address, WAGER_REGISTRY_ABI, getProvider())
+  const registry = new Contract(address, WAGER_REGISTRY_ABI, getProvider(chainId))
   const nextId = await registry.nextWagerId()
   // ids start at 1, so total created = nextWagerId - 1
   stats.totalWagers = Math.max(0, Number(nextId) - 1)
   return stats
 }
 
-async function loadStats() {
-  if (cache && Date.now() - cache.ts < STATS_TTL_MS) return cache.value
+async function loadStats(chainId) {
+  const cacheKey = chainId ?? 'default'
+  const cached = cacheByChain.get(cacheKey)
+  if (cached && Date.now() - cached.ts < STATS_TTL_MS) return cached.value
 
   let live = emptyStats()
   let isLive = false
   try {
-    live = SUBGRAPH_URL ? await fetchFromSubgraph() : await fetchFromRpc()
+    live = SUBGRAPH_URL ? await fetchFromSubgraph() : await fetchFromRpc(chainId)
     isLive = true
   } catch {
     try {
-      live = await fetchFromRpc()
+      live = await fetchFromRpc(chainId)
       isLive = true
     } catch {
       isLive = false
@@ -124,7 +129,7 @@ async function loadStats() {
   }
 
   const value = { stats, isLive }
-  cache = { value, ts: Date.now() }
+  cacheByChain.set(cacheKey, { value, ts: Date.now() })
   return value
 }
 
@@ -134,10 +139,11 @@ export function useSiteStats() {
   const [stats, setStats] = useState(emptyStats)
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(true)
+  const { chainId } = useWeb3()
 
   useEffect(() => {
     let cancelled = false
-    loadStats()
+    loadStats(chainId)
       .then((res) => {
         if (cancelled) return
         setStats(res.stats)
@@ -149,7 +155,7 @@ export function useSiteStats() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [chainId])
 
   return { stats, isLive, loading }
 }

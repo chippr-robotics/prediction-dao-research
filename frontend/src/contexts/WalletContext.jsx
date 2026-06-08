@@ -188,14 +188,14 @@ export function WalletProvider({ children }) {
           updatedRoles.push(roleName)
           if (!hasLocally) {
             console.log(`[RoleSync] Adding ${roleName} from blockchain to local storage`)
-            addUserRole(walletAddress, roleName)
+            addUserRole(walletAddress, roleName, activeChainId)
             hasChanges = true
           }
         } else if (hasLocally) {
           // Role exists locally but not on-chain - it has expired or was never purchased
           // Blockchain is the source of truth - remove the stale local role
           console.log(`[RoleSync] ${roleName} not found on-chain - removing stale local role`)
-          removeUserRole(walletAddress, roleName)
+          removeUserRole(walletAddress, roleName, activeChainId)
           hasChanges = true
           // Don't add to updatedRoles - role is no longer valid
         }
@@ -232,8 +232,8 @@ export function WalletProvider({ children }) {
     setRolesLoading(true)
     setBlockchainSynced(false)
     try {
-      // First load from local storage (immediate response)
-      const localRoles = getUserRoles(walletAddress)
+      // First load from local storage (immediate response), scoped to the chain
+      const localRoles = getUserRoles(walletAddress, activeChainId)
       setRoles(localRoles)
 
       // Then sync with blockchain (authoritative source) for the active chain
@@ -472,15 +472,15 @@ export function WalletProvider({ children }) {
     }
 
     try {
-      addUserRole(address, role)
-      const updatedRoles = getUserRoles(address)
+      addUserRole(address, role, chainId)
+      const updatedRoles = getUserRoles(address, chainId)
       setRoles(updatedRoles)
       return true
     } catch (error) {
       console.error('Error granting role:', error)
       return false
     }
-  }, [address])
+  }, [address, chainId])
 
   const revokeRole = useCallback((role) => {
     if (!address) {
@@ -488,15 +488,15 @@ export function WalletProvider({ children }) {
     }
 
     try {
-      removeUserRole(address, role)
-      const updatedRoles = getUserRoles(address)
+      removeUserRole(address, role, chainId)
+      const updatedRoles = getUserRoles(address, chainId)
       setRoles(updatedRoles)
       return true
     } catch (error) {
       console.error('Error revoking role:', error)
       return false
     }
-  }, [address])
+  }, [address, chainId])
 
   // Computed values. "Correct" here means a supported chain (Polygon Amoy
   // or local Hardhat). Per-chain feature gates (e.g. polymarketSidebets) are

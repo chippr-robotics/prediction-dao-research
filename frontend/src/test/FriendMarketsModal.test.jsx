@@ -129,6 +129,9 @@ vi.mock('../config/contracts', async (importOriginal) => {
   return {
     ...actual,
     getContractAddress: (name) => stubs[name] ?? actual.getContractAddress(name),
+    // The modal now resolves adapters chain-aware; mirror the stubs here so the
+    // oracle resolution types are still treated as available in tests.
+    getContractAddressForChain: (name) => stubs[name] ?? actual.getContractAddress(name),
   }
 })
 
