@@ -1,6 +1,6 @@
 # Multi-stage build for React frontend with Vite
 # Stage 1: Build the React application
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app/frontend
 
