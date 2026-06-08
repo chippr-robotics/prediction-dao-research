@@ -31,7 +31,9 @@ const fs = require("fs");
 const path = require("path");
 
 const DAY = 86400n;
-const CHUNK = 45_000;
+// getLogs page size. Public RPCs cap the block range (e.g. publicnode = 10k),
+// so allow an override: LOG_CHUNK=9000 npm run migrate:memberships:polygon
+const CHUNK = Number(process.env.LOG_CHUNK || 45_000);
 
 const ABI = [
   "event MembershipPurchased(address indexed user, bytes32 indexed role, uint8 tier, uint128 price, uint64 expiresAt)",
