@@ -48,4 +48,10 @@ describe('MembershipAttestation (T043)', () => {
     expect(screen.getByText(/no regulator or authority/i)).toBeInTheDocument()
     expect(screen.getByText(/VPN, proxy/i)).toBeInTheDocument()
   })
+
+  it('links the Terms & Conditions and Risk Disclosure for review (Spec 010 — FR-001)', () => {
+    render(<MembershipAttestation onChange={() => {}} />)
+    expect(screen.getByRole('link', { name: /Terms & Conditions/i })).toHaveAttribute('href', '/terms')
+    expect(screen.getByRole('link', { name: /Risk Disclosure/i })).toHaveAttribute('href', '/risk')
+  })
 })

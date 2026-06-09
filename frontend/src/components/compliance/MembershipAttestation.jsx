@@ -41,6 +41,11 @@ export default function MembershipAttestation({ onChange }) {
         wagered, or returned as winnings, and are <strong>non-refundable</strong> — including if
         you are later restricted, suspended, or unable to access the platform.
       </p>
+      <p className="membership-attestation-review">
+        Before agreeing, please read the{' '}
+        <a href="/terms" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a> and{' '}
+        <a href="/risk" target="_blank" rel="noopener noreferrer">Risk Disclosure</a>.
+      </p>
       <fieldset>
         <legend>By purchasing or upgrading, I confirm and agree:</legend>
         {ATTESTATIONS.map((a) => (

@@ -7,6 +7,7 @@ import { useEnsResolution } from '../hooks/useEnsResolution'
 import { useChainTokens } from '../hooks/useChainTokens'
 import { ROLES, ADMIN_ROLES } from '../contexts/RoleContext'
 import { isValidEthereumAddress } from '../utils/validation'
+import { ACCOUNT_MODERATION_PATH } from '../constants/legalLinks'
 import { NETWORK_CONFIG, DEPLOYED_CONTRACTS, getContractAddressForChain } from '../config/contracts'
 import { getProvider } from '../utils/blockchainService'
 import { MEMBERSHIP_MANAGER_ABI } from '../abis/MembershipManager'
@@ -575,7 +576,7 @@ function AdminPanel() {
                 A frozen account cannot create wagers, accept wagers, cancel, declare a winner,
                 claim payouts, or claim refunds on WagerRegistry. Polymarket auto-resolution is
                 permissionless and continues to work — but the winner still cannot claim while
-                frozen. See <a href="/docs/system-overview/account-moderation" target="_blank" rel="noreferrer">policy</a>.
+                frozen. See <a href={ACCOUNT_MODERATION_PATH} target="_blank" rel="noopener noreferrer">policy</a>.
               </p>
               <div className="admin-form">
                 <label>

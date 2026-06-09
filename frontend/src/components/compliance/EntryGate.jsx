@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentDocument } from '../../utils/legalDocs'
+import './EntryGate.css'
 
 /**
  * EntryGate (Spec 007 — US4, FR-031/FR-033/FR-034)

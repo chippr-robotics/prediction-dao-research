@@ -14,6 +14,7 @@ import AnnouncementRegion from './components/ui/AnnouncementRegion'
 import LandingPage from './components/LandingPage'
 import Dashboard from './components/fairwins/Dashboard'
 import Header from './components/Header'
+import Footer from './components/Footer'
 
 // add-ons
 import WalletPage from './pages/WalletPage'
@@ -37,6 +38,8 @@ function AppLayout() {
       {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
       <EntryGate />
       <Outlet />
+      {/* Spec 010 (US2): condensed legal/policy footer inside the app. */}
+      <Footer variant="condensed" />
     </>
   )
 }

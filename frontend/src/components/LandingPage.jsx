@@ -2,22 +2,17 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from './Header'
 import LiveStats from './fairwins/LiveStats'
+import Footer from './Footer'
 import { useChainTokens } from '../hooks/useChainTokens'
-import { SHOW_ALL_ORACLE_MODELS } from '../constants/wagerDefaults'
 import './LandingPage.css'
 
 function LandingPage() {
   const navigate = useNavigate()
-  const [logoErrors, setLogoErrors] = useState({ fairwins: false })
   const [visibleSections, setVisibleSections] = useState(new Set())
   const { native: nativeSymbol, networkName } = useChainTokens()
 
   const handleGetStarted = () => {
     navigate('/app')
-  }
-
-  const handleLogoError = (platform) => {
-    setLogoErrors(prev => ({ ...prev, [platform]: true }))
   }
 
   // Intersection observer for scroll-triggered animations
@@ -396,59 +391,7 @@ function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="landing-footer">
-        <div className="container">
-          <div className="footer-content">
-            <div className="footer-section footer-brand">
-              {!logoErrors.fairwins ? (
-                <img
-                  src="/assets/logo_fairwins.svg"
-                  alt="FairWins"
-                  className="footer-logo"
-                  width="40"
-                  height="40"
-                  loading="lazy"
-                  onError={() => handleLogoError('fairwins')}
-                />
-              ) : (
-                <div className="footer-logo-fallback" aria-label="FairWins">FW</div>
-              )}
-              <p>P2P wager management layer with multi-oracle resolution.</p>
-            </div>
-            <div className="footer-section">
-              <h4>Oracles</h4>
-              <ul>
-                <li><a href="https://polymarket.com" target="_blank" rel="noopener noreferrer">Polymarket</a></li>
-                {SHOW_ALL_ORACLE_MODELS && (
-                  <>
-                    <li><a href="https://chain.link" target="_blank" rel="noopener noreferrer">Chainlink</a></li>
-                    <li><a href="https://uma.xyz" target="_blank" rel="noopener noreferrer">UMA Protocol</a></li>
-                  </>
-                )}
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h4>Docs</h4>
-              <ul>
-                <li><a href="https://docs.FairWins.app/user-guide/getting-started/" target="_blank" rel="noopener noreferrer">User Guide</a></li>
-                <li><a href="https://docs.FairWins.app/developer-guide/setup/" target="_blank" rel="noopener noreferrer">Developer Docs</a></li>
-                <li><a href="https://docs.FairWins.app/security/" target="_blank" rel="noopener noreferrer">Security Audits</a></li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h4>Community</h4>
-              <ul>
-                <li><a href="https://x.com/fairwins_app" target="_blank" rel="noopener noreferrer">Twitter / X</a></li>
-                <li><a href="https://discord.gg/rkYvPFdRRr" target="_blank" rel="noopener noreferrer">Discord</a></li>
-                <li><a href="https://github.com/chippr-robotics/prediction-dao-research" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <p>&copy; 2024 ChipprRobotics LLC. Apache License 2.0</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }
