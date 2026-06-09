@@ -1,447 +1,183 @@
 # Architecture Overview
 
-This document covers the two main system architectures: the **P2P Wager System** (FairWins) and the **Governance System** (ClearPath).
+FairWins is three deployable pieces — Solidity contracts, a React SPA, and
+static-serving infrastructure — with **no application backend**. Everything
+"server-side" happens on-chain, on IPFS, or at the CDN edge.
 
-## P2P Wager Architecture (FairWins)
+## System context
 
-The primary user-facing system. For a detailed assessment, see [P2P Wager Platform Assessment](../architecture/P2P_WAGER_PLATFORM_ASSESSMENT.md) and [Implementation Plan](../architecture/IMPLEMENTATION_PLAN.md).
+```mermaid
+flowchart TB
+    subgraph User ["User's device"]
+        Wallet[Wallet<br/>MetaMask / WalletConnect]
+        SPA[FairWins SPA<br/>React + Vite + wagmi/ethers]
+        Wallet <--> SPA
+    end
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  FriendGroupMarketFactory                        │
-│              (P2P Wager Coordination Layer)                      │
-│                                                                   │
-│  - Wager Creation & Invite Links                                 │
-│  - Stake Escrow Management                                       │
-│  - Oracle Source Selection                                       │
-│  - Resolution & Payout                                           │
-└───────────┬─────────────────────────────────────────────────────┘
-            │
-            │ Coordinates
-            │
-    ┌───────┴──────────┬──────────────┬────────────────┐
-    │                  │              │                │
-    ▼                  ▼              ▼                ▼
-┌─────────┐    ┌──────────────┐  ┌────────────┐  ┌──────────┐
-│ Oracle  │    │  Conditional │  │  CTF1155   │  │ Tiered   │
-│Resolver │    │  Market      │  │ Conditional│  │ Role     │
-│         │    │  Factory     │  │ Tokens     │  │ Manager  │
-└─────────┘    └──────────────┘  └────────────┘  └──────────┘
-```
+    subgraph Edge ["Serving infrastructure"]
+        CF[Cloudflare<br/>DNS + proxy] --> CR[Cloud Run<br/>nginx serving static SPA]
+    end
 
-### P2P Wager Lifecycle
+    subgraph Polygon ["Polygon (137 mainnet / 80002 Amoy)"]
+        WR[WagerRegistry]
+        MM[MembershipManager]
+        SG[SanctionsGuard]
+        KR[KeyRegistry]
+        PA[PolymarketOracleAdapter]
+        CDF[ChainlinkDataFeedOracleAdapter]
+        CFN[ChainlinkFunctionsOracleAdapter]
+        UMA[UMAOptimisticOracleV3Adapter]
+    end
 
-```
-1. CREATE WAGER
-   Creator → FriendGroupMarketFactory
-   - Define topic and binary outcome type
-   - Set stake amount and token
-   - Select oracle source (Polymarket, Chainlink, UMA, manual)
-   - Generate invite link / QR code
+    subgraph External ["External systems"]
+        PM[Polymarket CTF]
+        CL[Chainlink feeds / DON]
+        UMAOO[UMA Optimistic Oracle V3]
+        CHA[Chainalysis sanctions oracle]
+        IPFS[(IPFS via Pinata)]
+        GAMMA[Polymarket Gamma API]
+    end
 
-2. ACCEPT WAGER
-   Counterparty → FriendGroupMarketFactory
-   - Accept via invite link
-   - Match stake deposited to escrow
-   - Both stakes locked in contract
+    SPA -- "loads app" --> CF
+    SPA -- "JSON-RPC reads/writes" --> WR
+    SPA --> MM
+    SPA --> KR
+    SPA -- "encrypted wager terms" --> IPFS
+    SPA -- "market search" --> GAMMA
 
-3. RESOLUTION
-   Oracle → OracleResolver → FriendGroupMarketFactory
-   - Polymarket: Peg to existing market outcome
-   - Chainlink: Price feed comparison at deadline
-   - UMA: Custom assertion with dispute window
-   - Manual: Creator resolves, 24h challenge period
-
-4. SETTLEMENT
-   FriendGroupMarketFactory → Winner
-   - Winner claims combined stake
-   - Unclaimed winnings return after 90 days
+    WR -- "tier & rate limits" --> MM
+    WR -- "screening" --> SG
+    WR -- "outcomes" --> PA & CDF & CFN & UMA
+    SG --> CHA
+    PA --> PM
+    CDF --> CL
+    CFN --> CL
+    UMA --> UMAOO
 ```
 
----
+## Contract layer
 
-## Governance Architecture (ClearPath)
+The active contracts live under `contracts/` (everything in
+`contracts-archive/` is reference-only — never import or deploy it).
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      FutarchyGovernor                            │
-│                  (Main Coordination Layer)                       │
-│                                                                   │
-│  - Proposal Lifecycle Management                                 │
-│  - Phase Transitions (Submit → Trade → Resolve → Execute)        │
-│  - Timelock & Emergency Controls                                 │
-│  - Treasury Integration                                          │
-└───────────┬─────────────────────────────────────────────────────┘
-            │
-            │ Coordinates
-            │
-    ┌───────┴──────────┬──────────────┬────────────────┐
-    │                  │              │                │
-    ▼                  ▼              ▼                ▼
-┌─────────┐    ┌──────────────┐  ┌────────────┐  ┌──────────┐
-│ Welfare │    │  Proposal    │  │ Conditional│  │ Privacy  │
-│ Metric  │    │  Registry    │  │ Market     │  │ Coord.   │
-│ Registry│    │              │  │ Factory    │  │          │
-└─────────┘    └──────────────┘  └────────────┘  └──────────┘
-                                                       │
-    ┌──────────────────────────────────────────────────┤
-    │                                                  │
-    ▼                                                  ▼
-┌─────────┐                                    ┌──────────────┐
-│ Oracle  │                                    │  Ragequit    │
-│Resolver │                                    │  Module      │
-└─────────┘                                    └──────────────┘
-```
+| Contract | Directory | Responsibility |
+|----------|-----------|----------------|
+| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow: create, accept, resolve, draw, claim, refund |
+| `MembershipManager` | `contracts/access/` | Tiered, time-bound memberships (USDC); monthly & concurrent creation limits |
+| `SanctionsGuard` | `contracts/access/` | Non-bypassable screening against the Chainalysis oracle + operator deny list |
+| `KeyRegistry` | `contracts/privacy/` | Public encryption keys for end-to-end encrypted wager terms |
+| `PolymarketOracleAdapter` | `contracts/oracles/` | Reads outcomes from Polymarket's Conditional Token Framework |
+| `ChainlinkDataFeedOracleAdapter` | `contracts/oracles/` | Resolves price-threshold conditions against Chainlink feeds |
+| `ChainlinkFunctionsOracleAdapter` | `contracts/oracles/` | Resolves custom off-chain computations via Chainlink Functions |
+| `UMAOptimisticOracleV3Adapter` | `contracts/oracles/` | Resolves assertions via UMA Optimistic Oracle V3 |
 
-### Proposal Lifecycle (ClearPath)
+All four oracle adapters implement the same `IOracleAdapter` interface
+(`isConditionResolved`, `getOutcome`, condition metadata), so `WagerRegistry`
+resolves any oracle-typed wager through a uniform `autoResolveFromOracle` /
+`autoResolveFromPolymarket` path. See [Smart Contracts](smart-contracts.md)
+for per-contract detail and the lifecycle state machine.
 
-```
-1. SUBMISSION
-   User → ProposalRegistry
-   - Submit with 50 MATIC bond
-   - Define milestones
-   - 7-day review period
+## Frontend layer
 
-2. MARKET CREATION
-   FutarchyGovernor → ConditionalMarketFactory
-   - Deploy PASS/FAIL token pair
-   - Initialize LMSR liquidity
-   - Set 7-21 day trading period
+`frontend/` is a Vite-built React SPA. Key structural pieces:
 
-3. TRADING PHASE
-   Traders → PrivacyCoordinator → ConditionalMarketFactory
-   - Submit encrypted positions (Nightmarket)
-   - Use key-change messages (MACI)
-   - Trade PASS/FAIL tokens
-   - Batch process in epochs
+| Piece | Path | Role |
+|-------|------|------|
+| Routing | `src/App.jsx` | `/` landing, `/app` dashboard, `/wallet` account center, `/friend-market/accept` QR/deep-link acceptance, `/admin` role-gated panel, `/terms` `/risk` `/privacy` legal pages |
+| Wallet state | `src/hooks/useWalletManagement.js`, wagmi config | Connection, roles, network switching (137 ↔ 80002) |
+| Wager creation | `src/hooks/useFriendMarketCreation.js`, `components/fairwins/FriendMarketsModal.jsx` | Membership check → USDC approval → `createWager` → encrypted IPFS upload |
+| Wager data | `src/contexts/FriendMarketsContext.jsx`, `src/data/wagers/` | Per-chain cache; reads via direct RPC (`EventsSource`) with optional subgraph source |
+| Encryption | `src/hooks/useEncryption.js` | Wallet-signature-derived keys; envelope encryption of terms; `KeyRegistry` lookups |
+| Constants | `src/constants/wagerDefaults.js` | Canonical resolution-type enum, status names, stake/deadline defaults |
+| Addresses | `src/config/contracts.js` | Per-chain contract addresses — **generated**, do not hand-edit |
 
-4. RESOLUTION
-   Reporter → OracleResolver
-   - Submit welfare metric values
-   - 3-day settlement window
-   - 2-day challenge period
-   - UMA escalation if disputed
+### Data flow
 
-5. DECISION
-   OracleResolver → ConditionalMarketFactory
-   - Compare PASS vs FAIL values
-   - Higher value indicates approval
-   - Resolve conditional tokens
-
-6. EXECUTION
-   FutarchyGovernor → Treasury
-   - 2-day timelock
-   - Ragequit window opens
-   - Execute if approved
-   - Return proposer bond
+```mermaid
+flowchart LR
+    subgraph Reads
+        RPC[Polygon JSON-RPC] -->|getWager / getUserWagers / events| Ctx[FriendMarketsContext cache]
+        SUB[Subgraph<br/>optional, legacy v1] -.fallback only.-> Ctx
+        Ctx --> UI[Dashboard / My Wagers]
+    end
+    subgraph Writes
+        UI2[User action] --> Approve[ERC-20 approve] --> Call[WagerRegistry call] --> Pending[localStorage pending-tx<br/>resume on reload]
+    end
 ```
 
-## Privacy Architecture
+- **Reads** go straight to the chain with ethers.js (`getWager`,
+  `getUserWagers`, event scans). The Graph subgraph under `subgraph/` indexes
+  the *legacy v1* `FriendGroupMarketFactory`, not `WagerRegistry`, so the live
+  app does not depend on it.
+- **Writes** are wallet transactions. In-flight transactions are tracked in
+  localStorage so a page reload can resume a half-finished creation flow.
+- **Encrypted terms** never touch a server: the SPA encrypts client-side,
+  pins to IPFS via Pinata, and stores the CID in the wager's `metadataUri`.
 
-### Nightmarket Integration
+### Contract address sync
 
-```
-Trader Position Submission:
-1. Generate position data (amount, direction, price)
-2. Create Poseidon hash commitment: H = Poseidon(position, nonce)
-3. Generate Groth16 zkSNARK proof of validity
-4. Submit (commitment, proof) to PrivacyCoordinator
-5. Position added to epoch batch
+Deployment records in `deployments/<network>-chain<id>-v2.json` are the source
+of truth. After a deploy, regenerate the frontend config:
 
-Public Information:
-- Total trading volume
-- Aggregate prices
-- Number of positions
-
-Private Information:
-- Individual position sizes
-- Trader identities
-- Position directions
+```bash
+npm run sync:frontend-contracts -- --network polygon --chainId 137
 ```
 
-### MACI Integration
+This rewrites the per-chain blocks in `frontend/src/config/contracts.js`.
 
-```
-Anti-Collusion Flow:
-1. Trader registers public key with PrivacyCoordinator
-2. Submits encrypted position using public key
-3. If bribed, submits key-change message
-4. Key change invalidates previous positions
-5. Makes vote buying unenforceable
+## Serving infrastructure
 
-Key Change Message:
-- Encrypted with old public key
-- Contains new public key
-- Processed by coordinator
-- Previous positions become invalid
+```mermaid
+flowchart LR
+    Dev[git push] --> CB[Cloud Build<br/>cloudbuild.yaml]
+    CB -->|"docker build (Vite build → nginx image)"| AR[Artifact Registry]
+    AR -->|gcloud run deploy| CR[Cloud Run<br/>nginx :8080]
+    CR --> CF[Cloudflare] --> Users[fairwins.app]
+    SM[Secret Manager<br/>PINATA_JWT, ORIGIN_LOCK_SECRET] --> CR
 ```
 
-## Market Mechanics
+- **Build**: multi-stage Dockerfile — Node builds the Vite bundle, nginx
+  serves it. Public configuration (`VITE_NETWORK_ID`, `VITE_RPC_URL`,
+  `VITE_IPFS_GATEWAY`, WalletConnect project ID) is baked in as build args;
+  secrets are injected at runtime from Secret Manager, never into the bundle.
+- **nginx** (`frontend/nginx.conf`): SPA fallback routing, immutable caching
+  for hashed assets, no-cache HTML, and security headers — CSP allowing only
+  the required origins (WalletConnect relay, IPFS gateways, Polymarket Gamma
+  API, Cloudflare Insights), HSTS, and a Permissions-Policy that scopes the
+  camera to `self` for the in-app QR scanner.
+- **Cloudflare** fronts Cloud Run; an origin-lock secret ensures traffic
+  reaches Cloud Run only via Cloudflare.
 
-### LMSR (Logarithmic Market Scoring Rule)
+This footprint is intentionally fixed: SPA + nginx on Cloud Run, contracts,
+IPFS, Cloudflare, and Cloud Logging. New features must not introduce an
+application backend.
 
-```
-Cost Function: C(q) = b * ln(e^(q_pass/b) + e^(q_fail/b))
+## Networks and deployments
 
-Where:
-- b = liquidity parameter (higher = more liquidity)
-- q_pass = quantity of PASS tokens
-- q_fail = quantity of FAIL tokens
+| Network | Chain ID | Purpose | Record |
+|---------|----------|---------|--------|
+| Polygon mainnet | 137 | Production | `deployments/polygon-chain137-v2.json` |
+| Polygon Amoy | 80002 | Testnet | `deployments/amoy-chain80002-v2.json` |
+| Hardhat | 1337 | Local development | generated locally |
+| Mordor (ETC) | 63 | Legacy v1, read-only | historical |
 
-Price Calculation:
-P_pass = e^(q_pass/b) / (e^(q_pass/b) + e^(q_fail/b))
-P_fail = e^(q_fail/b) / (e^(q_pass/b) + e^(q_fail/b))
+Contracts deploy deterministically via the Safe Singleton Factory with a
+versioned salt prefix (`FairWins-P2P-v2.0-`) — see
+[Singleton Deployment Patterns](singleton-deployment-patterns.md).
 
-Properties:
-- Prices always sum to 1
-- Bounded loss for market maker
-- Automated liquidity provision
-- Price reflects aggregate beliefs
-```
+## Security architecture
 
-### Token Redemption
+- **Checks-effects-interactions** throughout; payouts are pull-based.
+- **Role separation**: `DEFAULT_ADMIN_ROLE` (config), `GUARDIAN_ROLE`
+  (pause), `ACCOUNT_MODERATOR_ROLE` (freeze accounts), `ROLE_MANAGER_ROLE`
+  (memberships). No role can move escrowed stakes.
+- **Sanctions screening** on every create/accept via `SanctionsGuard`.
+- **CI security gates**: Slither, Medusa fuzzing, and the full Hardhat suite
+  must pass — see [Security Testing](../security/index.md).
 
-```
-After Resolution:
-- PASS tokens: Redeem for actual welfare metric value if passed
-- FAIL tokens: Redeem for actual welfare metric value if failed
-- Profit = (final_value - purchase_price) * token_amount
-```
+## Historical note
 
-## Security Model
-
-### Bond System
-
-```
-Proposal Bond (50):
-- Required for proposal submission
-- Returned on good-faith resolution
-- Forfeited for spam/malicious proposals
-
-Oracle Reporter Bond (100):
-- Required for reporting welfare metrics
-- Returned if report accepted
-- Slashed if report successfully challenged
-
-Challenger Bond (150):
-- Required to challenge oracle report
-- Must exceed reporter bond (prevents cheap griefing)
-- Returned if challenge succeeds
-- Forfeited if challenge fails
-```
-
-### Access Control
-
-```
-FutarchyGovernor (Owner):
-- Can activate proposals
-- Can finalize resolutions
-- Can execute approved proposals
-- Can update guardians
-
-Guardians:
-- Can trigger emergency pause
-- Multi-sig (initially 5-of-7)
-- Powers decrease over time
-
-PrivacyCoordinator (Coordinator):
-- Can process message batches
-- Can advance epochs
-- Cannot decrypt individual positions
-
-Public:
-- Can submit proposals (with bond)
-- Can trade on markets
-- Can report oracle values (with bond)
-- Can challenge reports (with bond)
-```
-
-## Data Flow
-
-### Welfare Metric Updates
-
-```
-1. External Oracle → Fetch on-chain data
-   - Treasury balances
-   - Transaction counts
-   - Hash rate statistics
-   - GitHub activity
-
-2. Oracle → Calculate Metrics
-   - TWAP for treasury value
-   - Composite indices
-   - Normalized scores
-
-3. Oracle → OracleResolver
-   - Submit pass_value (if proposal passes)
-   - Submit fail_value (if proposal fails)
-   - Include evidence (IPFS hash)
-
-4. Challenge Period → Verification
-   - Community reviews evidence
-   - Challengers can dispute
-   - Escalate to UMA if needed
-
-5. Finalization → ConditionalMarketFactory
-   - Resolve markets
-   - Enable token redemption
-   - Distribute payouts
-```
-
-## Scalability Considerations
-
-### Gas Optimization
-
-```
-Batch Operations:
-- PrivacyCoordinator processes positions in batches
-- Reduces per-transaction costs
-- Amortizes verification overhead
-
-Storage Optimization:
-- Use mappings over arrays where possible
-- Pack struct fields efficiently
-- Use events for historical data
-
-Lazy Evaluation:
-- Markets resolve only when finalized
-- Token redemption on-demand
-- Minimize upfront computation
-```
-
-### Layer 2 Integration
-
-```
-Future Improvements:
-- Deploy core contracts on L1
-- Move trading to L2 (Optimism/Arbitrum)
-- Use L1 for security-critical operations
-- Use L2 for high-frequency trading
-- Cross-layer messaging for settlement
-```
-
-## Upgradeability
-
-### Progressive Decentralization
-
-```
-Year 1: Guardian multisig can pause
-Year 2: Increase multisig threshold
-Year 3: Remove pause authority
-Year 4: Full community control
-
-Contract Upgrades:
-- Use UUPS proxy pattern
-- Upgrade authority controlled by futarchy
-- Upgrade proposals go through full process
-- Meta-governance: system governs itself
-```
-
-## Integration Points
-
-### External Systems
-
-```
-Treasury Vault (ECIP-1112):
-- FutarchyGovernor whitelisted
-- Withdrawal authorization
-- Spending limits enforced
-
-UMA Oracle (Dispute Resolution):
-- Escalation endpoint
-- Token holder voting
-- Final arbitration
-
-Gnosis CTF (Conditional Tokens):
-- Standard token interface
-- Market resolution
-- Redemption mechanics
-
-MACI Coordinator:
-- Key registry
-- Message processing
-- Epoch management
-```
-
-## Monitoring & Analytics
-
-### Key Metrics
-
-```
-Proposal Metrics:
-- Submission rate
-- Approval rate
-- Average funding amount
-- Bond forfeiture rate
-
-Market Metrics:
-- Trading volume
-- Liquidity depth
-- Price volatility
-- Number of traders
-
-Governance Metrics:
-- Participation rate
-- Ragequit utilization
-- Oracle accuracy
-- Challenge frequency
-
-Privacy Metrics:
-- Position count per epoch
-- Batch processing time
-- Key change frequency
-- Proof verification success rate
-```
-
-## Emergency Procedures
-
-### Emergency Pause
-
-```
-Triggers:
-- Critical bug discovery
-- Oracle manipulation
-- Market manipulation
-- Security breach
-
-Actions:
-- Halt new proposals
-- Freeze trading
-- Prevent execution
-- Preserve funds
-
-Recovery:
-- Fix vulnerability
-- Deploy patch
-- Community review
-- Unpause via futarchy vote
-```
-
-## Future Enhancements
-
-### Roadmap
-
-```
-Phase 1 (Current):
-- Core futarchy system
-- Basic privacy
-- Single-metric evaluation
-
-Phase 2:
-- Multi-metric aggregation
-- Advanced ZK circuits
-- L2 deployment
-- Mobile app
-
-Phase 3:
-- Cross-chain governance
-- Reputation systems
-- Automated welfare tracking
-- AI-assisted analysis
-
-Phase 4:
-- Full decentralization
-- Protocol upgrades via futarchy
-- DAO-of-DAOs coordination
-- Universal governance framework
-```
+Earlier iterations of this repository (futarchy governance, conditional-token
+markets, friend-group market factories, perpetual futures) are preserved under
+`contracts-archive/` and `docs/archived/` for reference. They are not deployed,
+not maintained, and must never be imported by active code.

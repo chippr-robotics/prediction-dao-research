@@ -959,7 +959,7 @@ This platform-specific approach:
 **Prediction DAO Resources**:
 - [Architecture Documentation](../developer-guide/architecture.md)
 - [ConditionalMarketFactory](../reference/contracts.md#conditionalmarketfactory)
-- [FairWins Markets](../system-overview/fairwins-markets.md)
+- [FairWins Markets](../archived/fairwins-markets.md)
 - [Nightmarket Privacy](../system-overview/privacy.md)
 
 **Related Research**:

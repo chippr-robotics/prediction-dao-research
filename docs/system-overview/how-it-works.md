@@ -1,330 +1,154 @@
 # How It Works
 
-Detailed explanation of how the Prediction DAO system operates.
+This page walks through the full on-chain lifecycle of a wager, from creation
+to payout, including every exit path.
 
 > See also: [Roles and Tiers](roles-and-tiers.md) for the membership /
 > admin-role model, and the [Account Moderation Policy](account-moderation.md)
 > for the per-account freeze power.
 
-## System Flow
+## Lifecycle state machine
 
-For a complete flow diagram, see the [Architecture documentation](../developer-guide/architecture.md).
-
-## Proposal Lifecycle
-
-### 1. Submission Phase
-
-A proposer submits a proposal by:
-
-- Posting a 50 MATIC bond
-- Providing title, description, funding amount
-- Specifying recipient address
-- Selecting welfare metric for evaluation
-- Optional: Adding milestones
-
-The proposal enters a 7-day review period where the community can discuss it.
-
-### 2. Activation Phase
-
-After review, the Futarchy Governor activates the proposal:
-
-- Conditional Market Factory creates PASS/FAIL token pairs
-- LMSR market maker initialized with liquidity
-- Trading period begins (configurable 7-21 days)
-- Privacy Coordinator enables encrypted trading
-
-### 3. Trading Phase
-
-Traders participate by:
-
-- Registering public keys with Privacy Coordinator
-- Creating encrypted position commitments
-- Generating zkSNARK proofs of validity
-- Submitting trades in batched epochs
-- Optionally changing keys to prevent collusion
-
-Market prices adjust based on LMSR:
-
-```
-P_pass = e^(q_pass/b) / (e^(q_pass/b) + e^(q_fail/b))
-P_fail = e^(q_fail/b) / (e^(q_pass/b) + e^(q_fail/b))
+```mermaid
+stateDiagram-v2
+    [*] --> Open: createWager()<br/>creator stake escrowed
+    Open --> Active: acceptWager()<br/>opponent stake escrowed
+    Open --> Refunded: cancelOpen() / declineWager() /<br/>acceptance deadline passes
+    Active --> Resolved: declareWinner() or<br/>autoResolveFromPolymarket() /<br/>autoResolveFromOracle()
+    Active --> Draw: declareDraw()<br/>(both parties consent,<br/>or arbitrator ruling)
+    Active --> Refunded: claimRefund()<br/>after resolve deadline
+    Resolved --> [*]: claimPayout()<br/>winner takes full pot
+    Draw --> [*]: stakes returned<br/>automatically
+    Refunded --> [*]
 ```
 
-Where:
-- `b` is the liquidity parameter
-- `q_pass`, `q_fail` are outstanding shares
+## 1. Creation (`Open`)
 
-### 4. Resolution Phase
+The creator calls `WagerRegistry.createWager()` (or `createWagerWithTerms()`,
+which additionally binds the current terms-of-service hash on-chain) with:
 
-When trading ends:
+- the **opponent** address (and optionally an **arbitrator** for third-party
+  resolution),
+- the **stake token** (USDC by default) and both stake amounts — equal stakes
+  for an even-money wager, asymmetric stakes for a bookmaker-style odds wager,
+- an **acceptance deadline** and a **resolve deadline**,
+- the **resolution type** (see below) plus an oracle condition ID if
+  oracle-resolved,
+- a **metadata hash/URI** pointing at the (optionally encrypted) terms on IPFS.
 
-- Oracle reporter submits welfare metric values for both scenarios
-- Provides evidence (typically IPFS hash to data)
-- Posts 100 MATIC bond
-- 3-day settlement window begins
+The creator's stake transfers into escrow immediately and `WagerCreated` is
+emitted. Before any state changes, the registry checks:
 
-### 5. Challenge Phase
+- **Membership** — `MembershipManager.checkCanCreate()` enforces the caller's
+  tier limits (monthly creations and concurrent open wagers).
+- **Sanctions** — `SanctionsGuard.checkBlocked()` reverts if the creator is on
+  the Chainalysis sanctions list or the operator deny list.
 
-During the 2-day challenge period:
+## 2. Acceptance (`Open → Active`)
 
-- Anyone can challenge the oracle report
-- Challenger posts 150 MATIC bond (must exceed reporter's bond)
-- Provides counter-evidence
-- Escalates to UMA for arbitration if needed
+The opponent — usually arriving via a QR code or deep link — calls
+`acceptWager()`. Their stake transfers into escrow, both parties are screened
+by `SanctionsGuard`, and `WagerAccepted` is emitted. The wager is now live
+until its end time.
 
-### 6. Execution Phase
+If the opponent never accepts:
 
-After finalization:
+- the creator can `cancelOpen()` at any time, or
+- after the acceptance deadline anyone can call `claimRefund()` or
+  `batchExpireOpen()` to return the creator's stake.
 
-- 2-day timelock period
-- Ragequit window opens for dissenting members
-- If PASS market value > FAIL: Proposal executes
-- If FAIL market value > PASS: Proposal rejected
-- Bonds returned to honest participants
+The opponent can also explicitly `declineWager()`, which refunds the creator
+immediately.
 
-## Market Mechanics
+## 3. Resolution (`Active → Resolved` / `Draw`)
 
-### LMSR (Logarithmic Market Scoring Rule)
+How a wager resolves is fixed at creation time:
 
-The system uses LMSR for automated market making with these properties:
+| Resolution type | Who can settle | How |
+|----------------|----------------|-----|
+| `Either` | Creator or opponent | `declareWinner(wagerId, winner)` |
+| `Creator` | Creator only | `declareWinner(...)` |
+| `Opponent` | Opponent only | `declareWinner(...)` |
+| `ThirdParty` | Named arbitrator | `declareWinner(...)` |
+| `Polymarket` | Anyone (permissionless trigger) | `autoResolveFromPolymarket(wagerId)` reads the linked Polymarket CTF condition |
+| `ChainlinkDataFeed` | Anyone | `autoResolveFromOracle(wagerId)` compares a Chainlink price feed against the registered threshold |
+| `ChainlinkFunctions` | Anyone | `autoResolveFromOracle(wagerId)` reads the fulfilled Chainlink Functions request |
+| `UMA` | Anyone | `autoResolveFromOracle(wagerId)` reads the settled UMA Optimistic Oracle V3 assertion |
 
-**Bounded Loss**: Maximum loss = `b * ln(2)`
+For oracle types, the creator declares at creation which side they take
+(`creatorIsYes`); when the adapter reports the outcome, the registry maps it to
+a winner and emits `WagerResolved`. All four adapters implement the same
+`IOracleAdapter` interface (`isConditionResolved` / `getOutcome`), so the
+registry treats them uniformly.
 
-**Instant Liquidity**: No need to wait for counterparties
+### Draws
 
-**Probability Prices**: Prices reflect implied probabilities
+Participant-resolved wagers can settle as a draw via `declareDraw()`: the first
+call records one party's consent (`DrawProposed`), the second call from the
+other party settles it (`WagerDrawn`) and returns each side's own stake. For
+third-party wagers the arbitrator's single `declareDraw()` settles immediately.
+A consenting party can back out with `revokeDraw()` before the other side
+agrees.
 
-**Sybil Resistance**: Splitting trades doesn't reduce costs
+## 4. Settlement
 
-### Token Redemption
+- **Win** — the winner calls `claimPayout(wagerId)` and receives the full pot
+  (both stakes). Payouts are pull-based and can only be claimed once
+  (`PayoutClaimed`).
+- **Draw** — stakes are returned to each party during settlement; no claim
+  step is needed.
+- **Timeout** — if an `Active` wager passes its resolve deadline unresolved,
+  anyone can call `claimRefund(wagerId)`; both stakes go back to their owners
+  (`WagerRefunded`). This is the safety net for oracles that never report and
+  counterparties that disappear.
 
-After resolution:
+## End-to-end sequence
 
-```
-If PASS wins:
-  PASS token value = actual welfare metric value
-  FAIL token value = 0
+```mermaid
+sequenceDiagram
+    actor C as Creator
+    actor O as Opponent
+    participant FE as FairWins SPA
+    participant WR as WagerRegistry
+    participant MM as MembershipManager
+    participant SG as SanctionsGuard
+    participant IPFS as IPFS
 
-If FAIL wins:
-  FAIL token value = actual welfare metric value
-  PASS token value = 0
-```
-
-Traders profit/loss:
-
-```
-Profit = (redemption_value - purchase_price) × token_amount
-```
-
-## Privacy Architecture
-
-### Nightmarket-Style Position Encryption
-
-1. **Commitment Phase**:
-   - Trader creates position: `(amount, direction, nonce)`
-   - Computes Poseidon hash: `H = Poseidon(position, nonce)`
-   - Submits commitment
-
-2. **Proof Generation**:
-   - Generates Groth16 zkSNARK proof
-   - Proves position is valid without revealing details
-   - Includes public inputs (commitment, merkle root)
-
-3. **Batch Processing**:
-   - Positions accumulated in epochs
-   - Processed together to prevent timing analysis
-   - Only aggregate data revealed
-
-### MACI-Style Key Changes
-
-1. **Registration**:
-   - User registers public key with coordinator
-   - Key used to encrypt messages
-
-2. **Key Change Message**:
-   - Encrypted with old public key
-   - Contains new public key
-   - Submitted on-chain
-
-3. **Effect**:
-   - Invalidates all previous positions using old key
-   - Makes vote-buying unenforceable
-   - Prevents collusion
-
-## Oracle System
-
-### Designated Reporter Model
-
-**Phase 1: Report Submission**
-- First reporter gets priority
-- Posts 100 MATIC bond
-- Submits PASS and FAIL values
-- Provides evidence URI
-
-**Phase 2: Settlement**
-- 3-day settlement window
-- Data aggregation and verification
-- Community review
-
-**Phase 3: Challenge**
-- 2-day challenge period
-- Requires 150 MATIC bond
-- Must provide counter-evidence
-
-**Phase 4: Escalation** (if challenged)
-- UMA oracle system
-- Token holder voting
-- Final arbitration
-
-### Evidence Requirements
-
-Oracle reports must include:
-
-- Methodology description
-- Data sources used
-- Calculation details
-- IPFS hash to full data
-- Timestamp ranges
-
-## Security Mechanisms
-
-### Bond System
-
-Creates economic incentives for honest behavior:
-
-| Role | Bond | Returned If | Slashed If |
-|------|------|-------------|-----------|
-| Proposer | 50 MATIC | Good faith | Spam/malicious |
-| Reporter | 100 MATIC | Accurate report | False report |
-| Challenger | 150 MATIC | Challenge succeeds | Frivolous challenge |
-
-### Timelock and Ragequit
-
-**Timelock** (2 days):
-- Prevents immediate execution
-- Allows time for community verification
-- Opens ragequit window
-
-**Ragequit**:
-- Proportional treasury withdrawal
-- Available to token holders who disagree
-- Executed during timelock period
-
-### Access Control
-
-**Multi-sig Guardians**:
-- Can trigger emergency pause
-- Initially 5-of-7 threshold
-- Powers decrease over time
-- Full decentralization by Year 4
-
-**Spending Limits**:
-- 50,000 MATIC per proposal max
-- 100,000 MATIC daily aggregate max
-- Prevents treasury drainage
-
-## Welfare Metrics
-
-### Primary: Treasury Value
-
-**Measurement**: Time-weighted average price (TWAP) of all treasury holdings
-
-**Calculation**:
-```
-TWAP = Σ(price_i × duration_i) / Σ(duration_i)
+    C->>FE: fill wager form
+    FE->>IPFS: upload encrypted terms (optional)
+    FE->>WR: createWager(opponent, stakes, deadlines, type, metadataUri)
+    WR->>SG: checkBlocked(creator)
+    WR->>MM: checkCanCreate / recordCreate
+    WR-->>C: WagerCreated (stake escrowed)
+    C-->>O: QR code / deep link
+    O->>FE: open /friend-market/accept?marketId=N
+    FE->>WR: acceptWager(N)
+    WR->>SG: checkBlocked(opponent, creator)
+    WR-->>O: WagerAccepted (stake escrowed)
+    Note over WR: wager Active until end time
+    C->>WR: declareWinner(N, winner)  ⟂  or oracle auto-resolve
+    WR-->>C: WagerResolved
+    O->>WR: claimPayout(N)
+    WR->>O: full pot transferred
 ```
 
-**Data Sources**:
-- DEX prices
-- Oracle price feeds
-- Cross-referenced for accuracy
+## Memberships and limits
 
-### Secondary: Network Activity
+Wager participation requires an active membership purchased through
+`MembershipManager` (`purchaseTier()` / `purchaseTierWithTerms()`), priced in
+USDC. Each tier — Bronze, Silver, Gold, Platinum — sets a monthly creation
+allowance and a cap on concurrently open wagers. The registry calls
+`recordCreate` / `recordClose` hooks so the limits track actual usage. Admins
+can also grant or revoke memberships out of band. Full details:
+[Roles and Tiers](roles-and-tiers.md).
 
-**Composite Index** including:
-- Transaction count
-- Active addresses
-- Contract interactions
-- Gas consumption
+## What keeps it honest
 
-**Formula**:
-```
-Activity = weighted_average(txCount, activeAddrs, gasUsed)
-```
-
-### Tertiary: Hash Rate Security
-
-**Measurement**: Network hash rate relative to comparable PoW chains
-
-**Calculation**:
-```
-Security = (network_hashrate / average_hashrate) × 100
-```
-
-### Quaternary: Developer Activity
-
-**GitHub Metrics**:
-- Commits per week
-- Pull requests opened/merged
-- Active contributors
-- Issue resolution rate
-
-**Scoring**:
-```
-DevActivity = weighted_sum(commits, PRs, contributors, issues)
-```
-
-## Economic Model
-
-### Market Maker Funding
-
-LMSR requires capital:
-
-- Initial: From proposal bond
-- Additional: DAO treasury allocation
-- Sustainable: Bounded loss property
-
-### Fee Structure
-
-Currently minimal fees:
-
-- No trading fees (subsidized by protocol)
-- Gas fees only (network cost)
-- May add small spread in future
-
-### Incentive Alignment
-
-**Traders**: Profit from accurate predictions
-
-**Proposers**: Bond returned if proposal legitimate
-
-**Oracles**: Bond and reputation at stake
-
-**Community**: Protocol improves → token value increases
-
-## Upgradeability
-
-### Progressive Decentralization Timeline
-
-**Year 1**: Guardian multisig active
-
-**Year 2**: Increased threshold requirements
-
-**Year 3**: Reduced pause authority
-
-**Year 4+**: Full community control
-
-### Upgrade Process
-
-1. Proposal submitted for upgrade
-2. Goes through futarchy process
-3. Market decides if upgrade improves welfare
-4. If approved, UUPS proxy updated
-5. Meta-governance: system governs itself
-
-## For More Details
-
-- [Introduction](introduction.md) - System overview
-- [Privacy Mechanisms](privacy.md) - Detailed ZK explanation
-- [Security Model](security.md) - Threat analysis
-- [Governance](governance.md) - Decentralization roadmap
+| Property | Mechanism |
+|----------|-----------|
+| Loser can't dodge payment | both stakes escrowed at acceptance |
+| Funds can't get stuck | refund paths after every deadline; `batchExpireOpen` for stale offers |
+| Outcome can't be forged | resolution authority fixed at creation; oracle adapters read external sources |
+| Terms can't be rewritten | metadata hash recorded on-chain at creation |
+| Sanctioned use blocked | `SanctionsGuard` screening on create and accept |
+| Operator overreach bounded | Guardian can pause, Moderator can freeze accounts — neither can move escrowed funds |

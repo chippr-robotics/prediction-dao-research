@@ -365,7 +365,7 @@ However, the fundamental alignment between platform purpose and optimal mechanis
 - **Main Document**: [Dex v3 Integration Analysis](dex-v3-integration-analysis.md)
 - **Platform Overview**: [System Introduction](../system-overview/introduction.md)
 - **ClearPath Details**: [Governance](../system-overview/governance.md)
-- **FairWins Details**: [FairWins Markets](../system-overview/fairwins-markets.md)
+- **FairWins Details**: [FairWins Markets](../archived/fairwins-markets.md)
 
 ---
 

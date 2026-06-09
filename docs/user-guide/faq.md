@@ -1,472 +1,158 @@
 # Frequently Asked Questions (FAQ)
 
-Common questions about the Prediction DAO system.
+## General
 
-## General Questions
+### What is FairWins?
 
-### What is Prediction DAO?
+FairWins is a peer-to-peer wager app. You and a friend agree on a bet, both
+stakes are locked in a smart-contract escrow on Polygon, and the wager is
+settled by whoever you both chose to trust up front: yourselves, a neutral
+arbitrator, or an external oracle (Polymarket, Chainlink, UMA).
 
-Prediction DAO is a futarchy-based governance system that uses prediction markets to make decisions. Instead of voting directly on proposals, the community votes on welfare metrics (what defines success), and prediction markets determine which proposals will maximize those metrics.
+### Is this a prediction market or a casino?
 
-### What is futarchy?
+Neither. There is no order book, no liquidity pool, no odds-setting house, and
+no trading. Every wager is a private 1-v-1 agreement; FairWins just holds the
+stakes and pays the winner. You can't bet "against the market" — only against
+a specific person who accepts your wager.
 
-Futarchy is a governance system based on the principle: **"Vote on values, bet on beliefs."**
+### Who is the counterparty?
 
-- Community votes on **values** (welfare metrics that define success)
-- Prediction markets **bet** on which proposals will maximize those values
-- Market prices aggregate distributed knowledge better than voting alone
+Always a specific person — usually someone you shared a QR code or link with.
+FairWins never takes the other side of a bet.
 
-### How does this differ from traditional DAOs?
+### What does it cost?
 
-Traditional DAOs use direct voting on proposals. Prediction DAO uses:
+- A **membership tier** (Bronze → Platinum, priced in USDC) is required to
+  create and accept wagers, and sets your monthly/concurrent wager limits.
+- **Gas** on Polygon (paid in POL, typically a few cents per action).
+- There is no rake on the pot itself — the winner claims both stakes in full.
 
-- **Market-based decisions**: Traders put money behind their beliefs
-- **Privacy protection**: Zero-knowledge proofs hide individual positions
-- **Welfare metrics**: Objective measures of success
-- **Anti-collusion**: MACI-style key changes prevent vote buying
+## Getting set up
 
-### Is this system suitable for all types of decisions?
+### Which wallets are supported?
 
-Futarchy works best for decisions that:
+MetaMask (browser) and anything that speaks WalletConnect (mobile wallets).
 
-- Have measurable outcomes
-- Affect objective metrics
-- Benefit from diverse information
-- Need to prevent collusion
+### Which networks does it run on?
 
-It may not be ideal for purely subjective or values-based decisions.
+Polygon mainnet (chain 137) is production. Polygon Amoy (chain 80002) is the
+testnet, reachable from the toggle in the wallet menu if you want to practice
+with test funds.
 
-## Getting Started
+### What tokens do I need?
 
-### What do I need to participate?
+POL for gas and USDC for stakes and membership. The Account Center's **Swap**
+tab can convert between them via Uniswap.
 
-- MetaMask or compatible Web3 wallet
-- MATIC tokens for gas fees and bonds
-- Understanding of the proposal you're voting on
+## Wagers
 
-### Where do I get MATIC?
+### What kinds of wagers can I make?
 
-- **Mainnet**: Purchase from cryptocurrency exchanges
-- **Testnet**: Request from Polygon Amoy (Polymarket testnet) faucet
-- **Local**: Use pre-funded Hardhat test accounts
+Anything with a binary outcome between two people: even-money (equal stakes)
+or bookmaker-style (asymmetric stakes at odds you set). Resolution can be by
+either party, one named party, a third-party arbitrator, or an oracle
+(Polymarket / Chainlink Data Feed / Chainlink Functions / UMA).
 
-### How much does it cost to participate?
+### What happens to my stake when I create a wager?
 
-**Trading**: Only gas fees (~150,000 gas per trade)
+It transfers into the `WagerRegistry` escrow contract immediately. If nobody
+accepts before the acceptance deadline, you reclaim it. Once accepted, both
+stakes stay in escrow until the wager resolves, draws, or times out.
 
-**Submitting Proposals**: 50 MATIC bond + gas fees (bond returned)
+### Can a wager end in a tie?
 
-**Oracle Reporting**: 100 MATIC bond + gas fees (bond returned)
+Yes. For participant-resolved wagers, both parties can consent to a **draw**
+(or the arbitrator can declare one), and each side gets its own stake back.
 
-**Challenging**: 150 MATIC bond + gas fees (forfeited if challenge fails)
+### What if the other person never resolves the wager?
 
-### Can I participate anonymously?
+After the resolve deadline passes, either party can trigger a refund — both
+stakes go back to their owners. Money can't get stuck.
 
-Yes! Privacy protection is built-in:
+### What if I picked an oracle and it never reports?
 
-- Your trading positions are encrypted
-- Zero-knowledge proofs hide your identity
-- Only aggregate market data is public
-- Key-change capability prevents linking positions
+Same refund path: once the resolve deadline passes unresolved, either party
+reclaims their stake.
 
-## Proposals
+### Can the loser refuse to pay?
 
-### How do I submit a proposal?
+No — that's the point. Both stakes are already in escrow, and the contract
+pays the winner directly when the wager resolves.
 
-1. Connect your wallet
-2. Navigate to "Submit Proposal"
-3. Fill in all required details
-4. Post 50 MATIC bond
-5. Submit transaction
+### Can I cancel a wager?
 
-See the [Submitting Proposals guide](submitting-proposals.md) for details.
+You can cancel your own wager any time *before* it's accepted (and the invitee
+can decline it). After acceptance, there's no unilateral cancel — only
+resolution, mutual draw, or the deadline-based refund.
 
-### What makes a good proposal?
+## Privacy
 
-A good proposal has:
+### Who can see my wager?
 
-- Clear objectives and deliverables
-- Reasonable budget and timeline
-- Strong rationale for funding
-- Appropriate welfare metric selection
-- Credible team or individual
+The on-chain record (addresses, stakes, deadlines, status) is public, like all
+blockchain data. The **terms** of the wager can be end-to-end encrypted: the
+chain stores only a hash and an IPFS pointer, and only the participants (plus
+the arbitrator, if any) hold keys to decrypt the content. See
+[Private Wager Encryption](private-market-encryption.md).
 
-### Can I edit a proposal after submission?
+### What's the encryption key in the Security tab for?
 
-No, proposals cannot be edited after submission. Consider your proposal carefully before submitting.
+It's your published public key (registered on-chain in `KeyRegistry`) that
+lets friends encrypt wager terms so only you can read them. Registering it is
+optional but required to participate in encrypted wagers.
 
-### What happens if my proposal is rejected?
+## Trust and safety
 
-If your proposal fails (FAIL tokens win):
+### Can FairWins take my money?
 
-- Proposal is not executed
-- No funds are transferred
-- Your 50 MATIC bond is returned (if submitted in good faith)
-- You can learn from feedback and submit an improved version
+No. Operators hold two narrowly-scoped powers — a **Guardian** can pause the
+protocol, and an **Account Moderator** can freeze a specific account for cause
+— but neither can move escrowed stakes or redirect payouts. See the
+[Account Moderation Policy](../system-overview/account-moderation.md) and
+[Security Model](../system-overview/security.md).
 
-### How long does the proposal process take?
+### Why was my transaction blocked?
 
-Minimum timeline:
+Wager creation and acceptance screen both addresses against the Chainalysis
+sanctions oracle (plus an operator deny list). Sanctioned addresses cannot
+participate.
 
-- 7 days: Review period
-- 7-21 days: Trading period
-- 3 days: Oracle settlement
-- 2 days: Challenge period
-- 2 days: Timelock
-- **Total: 21-35 days minimum**
+### Are the contracts audited and tested?
 
-### Can I submit multiple proposals?
+The contract suite runs a security pipeline of unit tests, Slither static
+analysis, and Medusa fuzzing on every change — see
+[Security Testing](../security/index.md). Deployed addresses are recorded in
+the repository's `deployments/` directory so you can verify what you're
+interacting with.
 
-Yes, but each requires a separate 50 MATIC bond. Consider timing to avoid having too many proposals active simultaneously.
+### Is wagering legal where I live?
 
-## Trading
+That's on you. The app presents an eligibility notice and the
+[Terms](https://fairwins.app/terms) and [Risk Disclosure](https://fairwins.app/risk)
+before entry — make sure peer-to-peer wagering is lawful in your jurisdiction
+before using it.
 
-### How do prediction markets work?
+## Troubleshooting
 
-Prediction markets create conditional tokens:
+### The accept link shows a wager but the Accept button is disabled
 
-- **PASS tokens**: Bet that the proposal will succeed
-- **FAIL tokens**: Bet that the proposal will fail
-- **Prices**: Reflect aggregate market beliefs (0-1)
-- **Winner**: Determined by oracle-reported welfare metrics
+Check, in order: your wallet is connected, you're on the right network (the
+banner offers a one-click switch), the acceptance deadline hasn't passed, you
+have an active membership, and you hold enough USDC for the stake plus a
+little POL for gas.
 
-### Do I need a counterparty to trade?
+### The QR scanner can't see my camera
 
-No! The system uses LMSR (Logarithmic Market Scoring Rule) for automated market making. You can always trade against the automated market maker.
+Grant camera permission to fairwins.app in your browser. On iOS, the scanner
+requires Safari's camera permission for the site.
 
-### How are prices determined?
+### My wager disappeared from the dashboard
 
-Prices are calculated using LMSR:
+Check the **History** tab of My Wagers — resolved, declined, expired, and
+refunded wagers move there.
 
-```
-P_pass + P_fail = 1
-```
+### Where can I get more help?
 
-Prices adjust based on:
-
-- Current token holdings
-- Liquidity parameter (b)
-- Recent trading activity
-
-### What is slippage?
-
-Slippage is the difference between expected and executed price. Larger trades cause more slippage. You can:
-
-- Split large orders into smaller trades
-- Trade during high liquidity periods
-- Accept higher slippage for faster execution
-
-### Can I lose more than I invest?
-
-No, maximum loss is limited to your initial investment. There are no margin calls or negative balances.
-
-### When can I redeem my tokens?
-
-After the market resolves:
-
-1. Oracle submits welfare metric values
-2. Challenge period passes (2 days)
-3. Market finalizes
-4. Winning tokens become redeemable
-
-Navigate to your portfolio and click "Redeem" on settled positions.
-
-### What if I hold the losing tokens?
-
-Losing tokens become worthless. For example:
-
-- If PASS wins: FAIL tokens are worth 0
-- If FAIL wins: PASS tokens are worth 0
-
-This is the risk of trading prediction markets.
-
-## Privacy & Security
-
-### How is my privacy protected?
-
-Multiple privacy layers:
-
-1. **Poseidon Encryption**: Positions encrypted with SNARK-friendly hash
-2. **Zero-Knowledge Proofs**: Groth16 zkSNARKs prove validity without revealing details
-3. **Batch Processing**: Trades mixed in epochs
-4. **Key Changes**: MACI-style key updates prevent linking
-
-### What information is public?
-
-Public:
-
-- Total trading volume
-- Aggregate PASS/FAIL prices
-- Number of positions (not identities)
-- Proposal outcomes
-
-Private:
-
-- Your position size
-- Your trading direction
-- Your identity
-- Your profit/loss
-
-### What is a key change and when should I use it?
-
-Key change is a MACI feature that lets you change your encryption key, invalidating previous commitments. Use it if:
-
-- You suspect vote buying attempts
-- You want to break collusion agreements
-- You want additional privacy
-- You're concerned about coercion
-
-### Is the smart contract code audited?
-
-!!! warning "Security Status"
-    This is research and demonstration code. Before mainnet deployment:
-    
-    - Minimum 2 independent security audits required
-    - Bug bounty program (100k USD in)
-    - 30-day community review period
-    - Formal verification of critical functions
-
-### What are the main security risks?
-
-Potential risks:
-
-- Smart contract vulnerabilities
-- Oracle manipulation
-- Market manipulation
-- Privacy proof failures
-- Network attacks
-
-Mitigations are built-in, but always DYOR (Do Your Own Research).
-
-## Welfare Metrics
-
-### What are welfare metrics?
-
-Welfare metrics are objective measures of protocol success:
-
-1. **Treasury Value**: Total DAO treasury value (TWAP)
-2. **Network Activity**: Transaction volume and active addresses
-3. **Hash Rate Security**: Network hash rate metrics
-4. **Developer Activity**: GitHub contributions and activity
-
-### How are welfare metrics measured?
-
-Each metric has specific calculation methods:
-
-- **Treasury**: Time-weighted average price of holdings
-- **Network Activity**: Composite index of on-chain activity
-- **Hash Rate**: Relative to other PoW chains
-- **Developer**: GitHub API data
-
-### Can welfare metrics be changed?
-
-Yes, through the governance process itself. The DAO can vote to:
-
-- Add new welfare metrics
-- Adjust metric weights
-- Change calculation methods
-- Update data sources
-
-### What if the oracle reports incorrectly?
-
-There's a 2-day challenge period where anyone can:
-
-1. Post 150  challenge bond
-2. Submit counter-evidence
-3. Escalate to UMA for arbitration
-
-If the challenge succeeds:
-
-- Oracle's 100 MATIC bond is slashed
-- Challenger receives compensation
-- Correct values are used
-
-## Technical Issues
-
-### Why did my transaction fail?
-
-Common reasons:
-
-- **Insufficient gas**: Increase gas limit
-- **Insufficient balance**: Need more
-- **Slippage**: Price moved too much, increase tolerance
-- **Network congestion**: Try again or increase gas price
-- **Wrong network**: Verify you're on correct network
-
-### I can't see my position
-
-Check:
-
-- You're on the correct network
-- You're using the right wallet address
-- The transaction confirmed
-- Your browser cache (try clearing)
-- Wait for block confirmations
-
-### The website won't load
-
-Try:
-
-- Refresh the page
-- Clear browser cache
-- Try a different browser
-- Check if MetaMask is up to date
-- Verify your internet connection
-
-### Gas fees are too high
-
-Strategies to reduce costs:
-
-- Trade during off-peak hours
-- Batch multiple actions
-- Use Layer 2 solutions (when available)
-- Wait for lower network congestion
-
-## Governance
-
-### What is ragequit?
-
-Ragequit allows minority token holders to exit with their proportional treasury share if they disagree with a proposal. It's a minority protection mechanism borrowed from Moloch DAO.
-
-### When can I ragequit?
-
-During the 2-day timelock period after a proposal passes but before execution.
-
-### How do guardians work?
-
-Guardians are a multisig that can:
-
-- Trigger emergency pause
-- Initially 5-of-7 multisig
-- Powers decrease over time
-- Full decentralization after Year 4
-
-### What is progressive decentralization?
-
-A schedule for reducing guardian powers:
-
-- **Year 1**: Full pause authority
-- **Year 2**: Increased multisig threshold
-- **Year 3**: Reduced pause authority
-- **Year 4+**: Full community control
-
-## Oracle System
-
-### Who can be an oracle reporter?
-
-Anyone can report oracle values by posting a 100 MATIC bond. The first reporter for each proposal gets priority.
-
-### How are oracle values verified?
-
-Multiple stages:
-
-1. **Designated Reporter**: Posts bond and submits values
-2. **Evidence**: Provides IPFS hash to data sources
-3. **Challenge Period**: 2-day community review
-4. **UMA Escalation**: If challenged, UMA token holders arbitrate
-
-### What prevents oracle manipulation?
-
-Protections include:
-
-- Bond requirements (100)
-- Challenge mechanism (150 MATIC bond)
-- Evidence requirements
-- UMA escalation for disputes
-- Slashing for false reports
-
-## Economic Questions
-
-### How does LMSR work?
-
-LMSR (Logarithmic Market Scoring Rule) provides:
-
-- Automated liquidity
-- Bounded loss for market maker
-- Prices that reflect probabilities
-- No need for order books
-
-The cost function is:
-
-```
-C(q) = b * ln(e^(q_pass/b) + e^(q_fail/b))
-```
-
-### Where does market liquidity come from?
-
-Liquidity is provided by:
-
-- The LMSR automated market maker
-- Initial liquidity from proposal bond
-- DAO treasury allocation
-- Trader activity
-
-### What is the maximum loss for the market maker?
-
-The liquidity parameter (b) bounds the maximum loss:
-
-```
-Max Loss = b * ln(2)
-```
-
-This makes market making sustainable.
-
-### Can markets be manipulated?
-
-Safeguards against manipulation:
-
-- Time-weighted average prices (TWAP)
-- Privacy prevents front-running
-- Multi-day trading periods
-- Oracle verification process
-- Economic cost to manipulate
-
-## Getting Help
-
-### Where can I get support?
-
-- Check this FAQ
-- Review the documentation
-- Join community channels
-- Ask in Discord/Telegram
-- Submit GitHub issues
-
-### How do I report a bug?
-
-1. Check if it's a known issue
-2. Gather relevant details
-3. Submit to GitHub issues
-4. Include reproduction steps
-5. Add screenshots if applicable
-
-### How can I contribute?
-
-See the [Contributing Guide](../developer-guide/contributing.md) for:
-
-- Code contributions
-- Documentation improvements
-- Bug reports
-- Feature suggestions
-- Community support
-
-### Where can I learn more?
-
-Additional resources:
-
-- [System Overview](../system-overview/introduction.md)
-- [Developer Guide](../developer-guide/setup.md)
-- [Architecture Documentation](../developer-guide/architecture.md)
-- [Original Futarchy Specification](https://gist.github.com/realcodywburns/8c89419db5c7797b678afe5ee66cc02b)
-
-## Still Have Questions?
-
-If your question isn't answered here:
-
-1. Search the full documentation
-2. Ask in community channels
-3. Submit a question via GitHub discussions
-4. Contact the team directly
-
----
-
-**Last Updated**: December 2025
+Open an issue on
+[GitHub](https://github.com/chippr-robotics/prediction-dao-research/issues).

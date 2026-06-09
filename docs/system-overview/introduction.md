@@ -1,4 +1,16 @@
-# Introduction to Prediction DAO
+# Introduction
+
+## What is FairWins?
+
+FairWins is a **peer-to-peer wager management layer**: a set of smart contracts
+on Polygon that escrow stakes for 1-v-1 wagers and settle them from a resolution
+source the two parties agree on up front, plus a React single-page app that makes
+the whole flow usable from a phone.
+
+It is deliberately **not** a prediction market. There is no order book, no
+liquidity pool, no market maker, and no token trading. Every wager is a private
+agreement between exactly two people (optionally with a named arbitrator), and
+the protocol's only job is to hold the stakes and pay the right person.
 
 > Before purchasing a membership, please read
 > [Roles and Tiers](roles-and-tiers.md) and the
@@ -6,298 +18,92 @@
 > paused by a Guardian role holder and individual accounts can be frozen by
 > an Account Moderator role holder.
 
-## What is Prediction DAO?
+## The problem it solves
 
-Prediction DAO is a futarchy-based governance system that uses prediction markets to make decisions about resource allocation and protocol changes.
+Informal bets between friends have two failure modes:
 
-## Core Concept: Futarchy
+1. **Settlement risk** — the loser doesn't pay up.
+2. **Disagreement risk** — the parties can't agree on what actually happened.
 
-**"Vote on values, bet on beliefs"** - Robin Hanson
+FairWins removes the first with on-chain escrow: both stakes are locked in
+`WagerRegistry` the moment a wager is accepted, and the contract — not the
+counterparty — pays the winner. It mitigates the second by letting the parties
+pick a resolution mechanism *before* the wager starts:
 
-Traditional DAOs face a fundamental problem: voters may know what they want but not how to achieve it. Futarchy solves this by separating two types of decisions:
+- trust each other (**Either** party can declare the winner),
+- trust one party (**Creator** or **Opponent** declares),
+- trust a neutral friend (**Third Party** arbitrator), or
+- trust an external **oracle** (Polymarket, Chainlink Data Feed, Chainlink
+  Functions, or UMA's Optimistic Oracle V3).
 
-1. **Values** (What we care about): Decided by democratic voting
-2. **Beliefs** (How to achieve values): Decided by prediction markets
+If resolution never happens, nobody loses their money: once the resolve
+deadline passes, either party can trigger a refund and both stakes go back
+where they came from. A draw path also exists — with both parties' consent (or
+an arbitrator's ruling) the wager settles as a draw and each side gets its own
+stake back.
 
-### How It Works
+## System at a glance
 
 ```mermaid
-graph LR
-    A[Community Votes] -->|Selects| B[Welfare Metrics]
-    B -->|Measures| C[Protocol Success]
-    D[Proposal Submitted] --> E[Prediction Market]
-    E -->|PASS if prices indicate| C
-    E -->|FAIL if prices indicate| F[No Change]
+flowchart LR
+    subgraph Client ["Your browser (no backend)"]
+        SPA[React SPA]
+    end
+    subgraph Polygon ["Polygon (chain 137)"]
+        WR[WagerRegistry<br/>escrow + lifecycle]
+        MM[MembershipManager<br/>tiers + limits]
+        SG[SanctionsGuard]
+        KR[KeyRegistry]
+        OA[Oracle adapters]
+    end
+    IPFS[(IPFS<br/>encrypted terms)]
+    EXT[Polymarket / Chainlink / UMA]
+
+    SPA -->|ethers.js / wagmi| WR
+    SPA --> MM
+    SPA --> KR
+    SPA -->|encrypted envelopes| IPFS
+    WR --> MM
+    WR --> SG
+    WR --> OA
+    OA --> EXT
 ```
 
-1. **Democratic Phase**: Community votes on welfare metrics
-   - What defines success for the protocol?
-   - Examples: Treasury value, network activity, security
-
-2. **Market Phase**: Traders bet on proposals
-   - Will this proposal increase the welfare metric?
-   - Market prices aggregate distributed knowledge
-
-3. **Execution Phase**: Market determines outcome
-   - If PASS price > FAIL price: Proposal executes
-   - If FAIL price > PASS price: Proposal rejected
-
-## Why Futarchy?
-
-### Problems with Traditional Governance
-
-❌ **Voter Ignorance**: Most voters lack expertise to evaluate technical proposals
-
-❌ **Misaligned Incentives**: Voters don't have skin in the game
-
-❌ **Poor Information Aggregation**: One-person-one-vote doesn't weight expertise
-
-❌ **Collusion**: Vote buying and coordination attacks
-
-### Futarchy Solutions
-
-✅ **Aggregates Expertise**: Market prices reflect collective knowledge
-
-✅ **Skin in the Game**: Traders profit only if they're correct
-
-✅ **Information-Weighted**: Those with better information trade more
-
-✅ **Privacy Protected**: Zero-knowledge proofs prevent vote buying
-
-## System Architecture
-
-### High-Level Overview
-
-```
-┌─────────────────────────────────────────┐
-│         Futarchy Governor               │
-│     (Main Coordination Layer)           │
-└────────────┬────────────────────────────┘
-             │
-    ┌────────┼────────┬────────────┐
-    ▼        ▼        ▼            ▼
-┌───────┐ ┌──────┐ ┌──────┐ ┌──────────┐
-│Welfare│ │Proposal│ │Markets│ │Privacy   │
-│Metrics│ │Registry│ │       │ │Coordinator│
-└───────┘ └────────┘ └──────┘ └──────────┘
-```
-
-### Components
-
-1. **Welfare Metric Registry**: Tracks what we care about
-2. **Proposal Registry**: Manages proposals and their lifecycle
-3. **Conditional Market Factory**: Creates PASS/FAIL token markets
-4. **Privacy Coordinator**: Encrypts positions and prevents collusion
-5. **Oracle Resolver**: Determines actual welfare metric changes
-6. **Ragequit Module**: Allows minority exit
-
-## Key Innovations
-
-### 1. Privacy Mechanisms
-
-**Nightmarket Integration**: Zero-knowledge position encryption
-
-- Positions encrypted with Poseidon hashes
-- Groth16 zkSNARKs prove validity
-- Individual positions remain private
-- Only aggregate data is public
-
-**MACI Integration**: Anti-collusion via key changes
-
-- Encrypted key-change messages
-- Invalidates previous commitments
-- Prevents verifiable vote buying
-- Makes collusion unenforceable
-
-### 2. Conditional Tokens
-
-Based on Gnosis Conditional Token Framework:
-
-- **PASS tokens**: Redeemable if proposal passes and increases welfare
-- **FAIL tokens**: Redeemable if proposal fails or decreases welfare
-- **Market prices**: Reflect probability-weighted beliefs
-- **LMSR**: Automated liquidity provision
-
-### 3. Multi-Stage Oracle
-
-**Designated Reporting**:
-
-- Reporter posts bond (100)
-- Submits welfare metric values
-- Provides evidence (IPFS hash)
-
-**Challenge Period**:
-
-- 2-day community review
-- Anyone can challenge with 150 MATIC bond
-- Escalate to UMA if disputed
-
-**Finalization**:
-
-- Accepts report or UMA decision
-- Resolves markets
-- Enables token redemption
-
-### 4. Minority Protection
-
-**Ragequit Mechanism** (from Moloch DAO):
-
-- Exit with proportional treasury share
-- Available during timelock period
-- Prevents forced participation
-- Protects dissenting minorities
-
-## Workflow Example
-
-### Complete Proposal Lifecycle
-
-1. **Submission** (Day 0)
-   - User submits proposal with 50 MATIC bond
-   - Enters 7-day review period
-   - Community discusses proposal
-
-2. **Market Creation** (Day 7)
-   - Markets created with PASS/FAIL tokens
-   - Initial price: 0.50 (probability scale) each
-   - Trading period begins (7-21 days)
-
-3. **Trading** (Days 7-28)
-   - Traders buy PASS if bullish on proposal
-   - Traders buy FAIL if bearish on proposal
-   - All positions encrypted with ZK proofs
-   - Prices adjust via LMSR
-
-4. **Resolution** (Day 28)
-   - Oracle reports welfare metric values
-   - Provides evidence for both scenarios
-   - 3-day settlement window
-
-5. **Challenge** (Days 28-30)
-   - Community can challenge report
-   - Challenger posts 150 MATIC bond
-   - Escalate to UMA if challenged
-
-6. **Execution** (Day 32)
-   - 2-day timelock period
-   - Ragequit window opens
-   - If PASS > FAIL: Execute proposal
-   - If FAIL > PASS: Reject proposal
-
-## Use Cases
-
-### What Futarchy Works Well For
-
-✅ **Treasury Management**: Investment decisions with clear ROI
-
-✅ **Protocol Upgrades**: Technical changes with measurable impacts
-
-✅ **Resource Allocation**: Grants and funding with defined outcomes
-
-✅ **Feature Prioritization**: Development decisions affecting metrics
-
-### What Futarchy Doesn't Work For
-
-❌ **Purely Subjective Decisions**: Values, ethics, community standards
-
-❌ **Unmeasurable Outcomes**: Changes without clear metrics
-
-❌ **Time-Sensitive Decisions**: Emergencies requiring immediate action
-
-❌ **Constitutional Changes**: Fundamental governance modifications
-
-## Benefits
-
-### For the Protocol
-
-- **Better Decisions**: Leverages distributed knowledge
-- **Aligned Incentives**: Traders profit from accuracy
-- **Objective Outcomes**: Based on measurable metrics
-- **Continuous Learning**: System improves over time
-
-### For Participants
-
-- **Meaningful Participation**: Contribute expertise via trading
-- **Financial Upside**: Profit from correct predictions
-- **Privacy Protection**: Anonymous participation
-- **Minority Rights**: Exit option via ragequit
-
-## Challenges and Mitigations
-
-### Challenge: Market Manipulation
-
-**Mitigations**:
-
-- TWAP (Time-Weighted Average Price) oracles
-- Privacy prevents front-running
-- Multi-day trading periods
-- Oracle verification process
-
-### Challenge: Low Liquidity
-
-**Mitigations**:
-
-- LMSR automated market maker
-- Bounded loss for protocol
-- Treasury-backed liquidity
-- No counterparty needed
-
-### Challenge: Oracle Accuracy
-
-**Mitigations**:
-
-- Bond requirements (100)
-- Evidence requirements
-- Challenge mechanism (150)
-- UMA escalation path
-
-### Challenge: Privacy vs Transparency
-
-**Mitigations**:
-
-- Aggregate data public
-- Individual positions private
-- Verifiable via zkSNARKs
-- Audit trail for disputes
-
-## Future Development
-
-### Phase 1 (Current)
-
-- Core futarchy system
-- Basic privacy features
-- Single-metric evaluation
-
-### Phase 2
-
-- Multi-metric aggregation
-- Advanced ZK circuits
-- Layer 2 deployment
-- Mobile application
-
-### Phase 3
-
-- Cross-chain governance
-- Reputation systems
-- Automated welfare tracking
-- AI-assisted analysis
-
-### Phase 4
-
-- Full decentralization
-- Meta-governance (futarchy governs itself)
-- DAO-of-DAOs coordination
-- Universal governance framework
-
-## Learn More
-
-- [How It Works](how-it-works.md) - Detailed technical explanation
-- [Privacy Mechanisms](privacy.md) - ZK proofs and anti-collusion
-- [Security Model](security.md) - Threat models and protections
-- [Governance](governance.md) - Progressive decentralization
-
-## References
-
-- [Original Futarchy Specification](https://gist.github.com/realcodywburns/8c89419db5c7797b678afe5ee66cc02b)
-- [Nightmarket Privacy](https://blog.zkga.me/nightmarket)
-- [MACI Anti-Collusion](https://github.com/privacy-scaling-explorations/maci)
-- [Gnosis Conditional Tokens](https://docs.gnosis.io/conditionaltokens/)
+## Design principles
+
+- **No backend.** The app is a static SPA served by nginx; every read and write
+  goes straight from the user's wallet to the chain (or to IPFS for encrypted
+  metadata). There is no application server that could censor, front-run, or
+  lose your data.
+- **Escrow first.** Funds only move through `WagerRegistry`. Payouts are
+  pull-based (`claimPayout`) and refunds are always reachable.
+- **Privacy by default.** Wager terms can be end-to-end encrypted client-side
+  and stored on IPFS; the chain only sees a hash and a content URI. See
+  [Privacy Mechanisms](privacy.md).
+- **Compliance without custody.** `SanctionsGuard` screens addresses against the
+  Chainalysis sanctions oracle at create/accept time, and an Account Moderator
+  role can freeze accounts for cause — but no operator can take escrowed funds.
+  See [Security Model](security.md) and [Account Moderation](account-moderation.md).
+- **Membership-gated creation.** Creating and accepting wagers requires an
+  active membership tier (Bronze → Platinum, priced in USDC), which also rate
+  limits how many wagers an account can run concurrently. See
+  [Roles and Tiers](roles-and-tiers.md).
+
+## Where things live
+
+| Layer | Technology | Location |
+|-------|-----------|----------|
+| Contracts | Solidity (Hardhat) | `contracts/` — deployed on Polygon 137 & Amoy 80002 |
+| Frontend | React + Vite + wagmi/ethers | `frontend/` — served at [fairwins.app](https://fairwins.app) |
+| Encrypted metadata | IPFS (Pinata) | referenced from each wager's `metadataUri` |
+| Address book | JSON deployment records | `deployments/` (source of truth) |
+
+## A note on the project's history
+
+This repository began as *prediction-dao-research*: an exploration of
+futarchy-based DAO governance (ClearPath), conditional-token markets, and
+friend-group market factories. That research is preserved in `docs/archived/`
+and `contracts-archive/`, but none of it is deployed or maintained. The live
+product is the P2P wager system described in these docs.
+
+Continue with [How It Works](how-it-works.md) for the full wager lifecycle.

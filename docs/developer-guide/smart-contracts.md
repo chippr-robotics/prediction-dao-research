@@ -1,542 +1,220 @@
 # Smart Contracts
 
-Overview of the smart contracts powering the FairWins P2P wager platform and ClearPath governance system.
+Reference for the active FairWins contract suite under `contracts/`.
+(`contracts-archive/` holds superseded research — governance, conditional-token
+markets, friend-group factories — and is reference-only.)
 
-> **Note (v3 P2P refactor):** the active P2P stack is now
-> `contracts/access/MembershipManager.sol` + `contracts/wagers/WagerRegistry.sol`,
-> with OpenZeppelin AccessControl gating four admin roles
-> (`DEFAULT_ADMIN_ROLE`, `GUARDIAN_ROLE`, `ACCOUNT_MODERATOR_ROLE`,
-> `ROLE_MANAGER_ROLE`) and one paid user role (`WAGER_PARTICIPANT_ROLE`).
-> The `FriendGroupMarketFactory` / `TieredRoleManager` / `TierRegistry` chain
-> below is historical. See [Roles and Tiers](../system-overview/roles-and-tiers.md)
-> and [Account Moderation Policy](../system-overview/account-moderation.md).
-
-## Contract Architecture
-
-The system has two main contract groups: the **P2P Wager** contracts (FairWins) and the **Governance** contracts (ClearPath), sharing common infrastructure.
+## Contract relationships
 
 ```mermaid
 graph TD
-    subgraph FairWins [FairWins - P2P Wagers]
-        H[FriendGroupMarketFactory] --> D[ConditionalMarketFactory]
-        H --> F[OracleResolver]
-        H --> I[CTF1155]
-    end
-    subgraph ClearPath [ClearPath - Governance]
-        A[FutarchyGovernor] --> B[WelfareMetricRegistry]
-        A --> C[ProposalRegistry]
-        A --> D
-        A --> E[PrivacyCoordinator]
-        A --> F
-        A --> G[RagequitModule]
-    end
-    E --> D
-    F --> D
+    WR[WagerRegistry<br/><i>wagers/</i>]
+    MM[MembershipManager<br/><i>access/</i>]
+    SG[SanctionsGuard<br/><i>access/</i>]
+    KR[KeyRegistry<br/><i>privacy/</i>]
+    PA[PolymarketOracleAdapter]
+    CDF[ChainlinkDataFeedOracleAdapter]
+    CFN[ChainlinkFunctionsOracleAdapter]
+    UMAA[UMAOptimisticOracleV3Adapter]
+
+    WR -->|checkCanCreate / recordCreate / recordClose| MM
+    WR -->|checkBlocked| SG
+    WR -->|getOutcome via IOracleAdapter| PA & CDF & CFN & UMAA
+    MM -->|checkBlocked| SG
+    SG -->|isSanctioned| CHA[Chainalysis oracle]
+    PA --> PM[Polymarket CTF]
+    CDF --> FEED[Chainlink price feeds]
+    CFN --> DON[Chainlink Functions DON]
+    UMAA --> OO[UMA Optimistic Oracle V3]
+    KR -.read by frontend for<br/>envelope encryption.-> WR
 ```
 
-## P2P Wager Contracts
+Four admin roles (OpenZeppelin `AccessControl`) span the suite:
+`DEFAULT_ADMIN_ROLE` (configuration), `GUARDIAN_ROLE` (pause),
+`ACCOUNT_MODERATOR_ROLE` (per-account freeze), `ROLE_MANAGER_ROLE`
+(membership grants); plus the paid user role `WAGER_PARTICIPANT_ROLE`.
+See [Roles and Tiers](../system-overview/roles-and-tiers.md) and the
+[Account Moderation Policy](../system-overview/account-moderation.md).
 
-### FriendGroupMarketFactory.sol
+## WagerRegistry (`contracts/wagers/WagerRegistry.sol`)
 
-**Purpose**: Creates and manages private P2P wager markets between trusted parties
+The core contract: escrow plus a state machine over every wager.
 
-**Key Responsibilities**:
+### Wager state machine
 
-- Wager creation with configurable binary outcome types
-- Stake escrow and management
-- Oracle source selection (Polymarket, Chainlink, UMA, manual)
-- Invite link / QR code generation
-- Resolution and payout settlement
+```mermaid
+stateDiagram-v2
+    [*] --> Open: createWager / createWagerWithTerms
+    Open --> Active: acceptWager
+    Open --> Refunded: cancelOpen / declineWager /<br/>claimRefund / batchExpireOpen<br/>(after acceptDeadline)
+    Active --> Resolved: declareWinner /<br/>autoResolveFromPolymarket /<br/>autoResolveFromOracle
+    Active --> Draw: declareDraw (both parties<br/>or arbitrator)
+    Active --> Refunded: claimRefund (after resolveDeadline)
+    Resolved --> [*]: claimPayout (winner, once)
+    Draw --> [*]: stakes auto-returned
+    Refunded --> [*]
+```
 
-This is the primary entry point for the FairWins platform. See [contracts/README.md](../../contracts/README.md) for the full contract directory structure.
+### Key functions
 
----
+| Function | Caller | Effect |
+|----------|--------|--------|
+| `createWager(opponent, arbitrator, token, creatorStake, opponentStake, acceptDeadline, resolveDeadline, resolutionType, conditionId, creatorIsYes, metadataHash, metadataUri)` | Creator | Escrows creator stake, emits `WagerCreated` |
+| `createWagerWithTerms(...)` | Creator | Same, additionally binds the current terms-version hash |
+| `acceptWager(wagerId)` | Named opponent | Escrows opponent stake, activates wager, emits `WagerAccepted` |
+| `declineWager(wagerId)` / `cancelOpen(wagerId)` | Opponent / creator | Refunds creator, closes the offer |
+| `declareWinner(wagerId, winner)` | Authorized declarer (per resolution type) | Resolves the wager, emits `WagerResolved` |
+| `declareDraw(wagerId)` / `revokeDraw(wagerId)` | Participants or arbitrator | Two-party consent (bitmask) settles a draw, emits `DrawProposed` → `WagerDrawn` |
+| `autoResolveFromPolymarket(wagerId)` / `autoResolveFromOracle(wagerId)` | Anyone | Pulls the outcome from the wager's oracle adapter and resolves |
+| `claimPayout(wagerId)` | Winner | Transfers the full pot once (`PayoutClaimed`) |
+| `claimRefund(wagerId)` | Anyone (funds go to owners) | Refunds expired-Open or deadline-passed-Active wagers (`WagerRefunded`) |
+| `batchExpireOpen(wagerIds[])` | Anyone | Bulk-expires stale open offers |
 
-## Governance Contracts
+### Resolution types
 
-### FutarchyGovernor.sol
+The on-chain enum (mirrored canonically in
+`frontend/src/constants/wagerDefaults.js`):
 
-**Purpose**: Main governance coordinator and entry point
+| # | Type | Settled by |
+|---|------|-----------|
+| 0 | `Either` | Either participant |
+| 1 | `Creator` | Creator only |
+| 2 | `Opponent` | Opponent only |
+| 3 | `ThirdParty` | Arbitrator named at creation |
+| 4 | `Polymarket` | Linked Polymarket CTF condition |
+| 5 | `ChainlinkDataFeed` | Price feed vs. registered threshold |
+| 6 | `ChainlinkFunctions` | Fulfilled Chainlink Functions request |
+| 7 | `UMA` | Settled UMA OO-V3 assertion |
 
-**Key Responsibilities**:
+For oracle types the creator records which side they take (`creatorIsYes`);
+the registry maps the reported boolean outcome to a winner. Tied/invalid
+oracle outcomes settle as a draw.
 
-- Manages proposal lifecycle
-- Coordinates all other contracts
-- Implements timelock mechanism
-- Controls treasury access
-- Emergency pause functionality
+### Guards on every state change
 
-**Key Functions**:
+- `SanctionsGuard.checkBlocked()` on the creator at create, and on both
+  parties at accept.
+- `MembershipManager.checkCanCreate()` before create; `recordCreate` /
+  `recordClose` hooks keep concurrent-wager counts accurate.
+- Guardian pause halts new activity; account freezes (`AccountFrozen`) block a
+  specific address. Neither affects escrowed funds or refund paths.
+
+## MembershipManager (`contracts/access/MembershipManager.sol`)
+
+Time-bound, USDC-priced membership tiers that gate wager participation.
+
+- **Tiers**: `None`, `Bronze`, `Silver`, `Gold`, `Platinum` — each with a
+  monthly creation allowance and a max-concurrent-wagers cap.
+- `purchaseTier()` / `purchaseTierWithTerms()` (records the accepted-terms
+  hash on-chain), `upgradeTier()`, `extendMembership()`.
+- `checkCanCreate(user, role)` view + `recordCreate` / `recordClose` hooks
+  called by `WagerRegistry`.
+- `grantMembership()` / `revokeMembership()` for `ROLE_MANAGER_ROLE`.
+- Fees flow to the treasury address fixed at deployment.
+
+## SanctionsGuard (`contracts/access/SanctionsGuard.sol`)
+
+Non-bypassable compliance screening.
+
+- `checkBlocked(account)` — reverts with `SanctionedAddress` if the account is
+  on the operator deny list **or** flagged by the wired sanctions oracle.
+- On Polygon mainnet the oracle is Chainalysis's on-chain sanctions list
+  (`0x40C57923924B5c5c5455c48D93317139ADDaC8fb`); testnets use a mock.
+- `setDenied()` (`SANCTIONS_ADMIN_ROLE`) and `setSanctionsOracle()`
+  (`DEFAULT_ADMIN_ROLE`) are the only mutators.
+
+## KeyRegistry (`contracts/privacy/KeyRegistry.sol`)
+
+On-chain directory of encryption public keys powering private wager terms.
+
+- `registerKey(bytes publicKey)` — 32–2048 bytes; supports X25519 and X-Wing
+  post-quantum hybrid keys ([ADR-003](../adr/003-xwing-post-quantum-encryption.md)).
+- `registerKeyWithEligibility(publicKey, termsRef)` — also emits a dated
+  eligibility attestation.
+- `getPublicKey(user)` / `hasKey(user)` — used by the frontend to encrypt
+  wager envelopes for counterparties and arbitrators. See
+  [Encryption Architecture](encryption-architecture.md).
+
+## Oracle adapters (`contracts/oracles/`)
+
+All adapters implement `IOracleAdapter`:
 
 ```solidity
-function activateProposal(uint256 proposalId) external
-function finalizeProposal(uint256 proposalId) external
-function executeProposal(uint256 proposalId) external
-function pause() external onlyGuardian
+function isConditionResolved(bytes32 conditionId) external view returns (bool);
+function getOutcome(bytes32 conditionId)
+    external view returns (bool outcome, uint256 confidence, uint256 resolvedAt);
 ```
 
-**Events**:
+| Adapter | Source | Condition registration |
+|---------|--------|------------------------|
+| `PolymarketOracleAdapter` | Polymarket CTF payouts | Links an existing Polymarket condition ID; caches resolutions |
+| `ChainlinkDataFeedOracleAdapter` | Chainlink price feed | `registerCondition(feed, threshold, op, deadline)` with GT/GTE/LT/LTE/EQ comparisons |
+| `ChainlinkFunctionsOracleAdapter` | Chainlink Functions DON | `registerCondition(encodedRequest, sourceHash, subscriptionId, gasLimit, donId)`; fulfills via `FunctionsClient` callback |
+| `UMAOptimisticOracleV3Adapter` | UMA Optimistic Oracle V3 | `registerCondition(claim, bondCurrency, bondAmount, liveness)`; settles via `assertionResolvedCallback` |
 
-```solidity
-event ProposalActivated(uint256 indexed proposalId, uint256 marketId);
-event ProposalFinalized(uint256 indexed proposalId, bool approved);
-event ProposalExecuted(uint256 indexed proposalId);
+```mermaid
+sequenceDiagram
+    participant Any as Anyone
+    participant WR as WagerRegistry
+    participant AD as Oracle adapter
+    participant SRC as External source
+
+    Note over SRC: underlying event resolves<br/>(market settles / price crosses /<br/>assertion passes liveness)
+    Any->>WR: autoResolveFromOracle(wagerId)
+    WR->>AD: isConditionResolved(conditionId)?
+    AD->>SRC: read settled outcome
+    AD-->>WR: (outcome, confidence, resolvedAt)
+    WR->>WR: map outcome → winner via creatorIsYes
+    WR-->>Any: WagerResolved
 ```
 
-### WelfareMetricRegistry.sol
+## Deployed addresses
 
-**Purpose**: Manages welfare metrics and their weights
+`deployments/` is the source of truth. Current v2 deployments:
 
-**Key Features**:
+=== "Polygon Mainnet (137)"
 
-- Stores welfare metric definitions
-- Manages metric weights
-- Versioning support
-- Democratic updates
+    | Contract | Address |
+    |----------|---------|
+    | WagerRegistry | `0x5023765809fDA93ab9F11B684fdb76521eD31774` |
+    | MembershipManager | `0x00c3ef4e02Ef00Ad6eE955dF5022A22F6ea73dae` |
+    | SanctionsGuard | `0x2Dc53d91A189be71DfE96Ea9BCFCF6aDDA77BC76` |
+    | KeyRegistry | `0xcEFdeBba8E040c035c690ca9057cF22E73247c24` |
+    | PolymarketOracleAdapter | `0x83688e9b8D4f085E3eF4619D91e0e6303cFcf0A4` |
+    | ChainlinkDataFeedOracleAdapter | `0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23` |
+    | ChainlinkFunctionsOracleAdapter | `0x148C2E347a601AC1a680b17321529b0Ffc31AeFc` |
+    | UMAOptimisticOracleV3Adapter | `0x8224433d099Af6cd30540A78421aBFd6e044E949` |
+    | Stake token (USDC) | `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359` |
 
-**Welfare Metrics**:
+=== "Polygon Amoy (80002)"
 
-1. **Primary**: Treasury Value (TWAP)
-2. **Secondary**: Network Activity
-3. **Tertiary**: Hash Rate Security  
-4. **Quaternary**: Developer Activity
+    | Contract | Address |
+    |----------|---------|
+    | WagerRegistry | `0x66c7fa8cB1642Fc5e94Fa92928f1d6333c8d657f` |
+    | MembershipManager | `0xFaEbF662aa591fF95e97306b413522efC958540f` |
+    | KeyRegistry | `0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb` |
+    | PolymarketOracleAdapter | `0x423d2Ca885d67E46062CFF732Eff952f4F736136` |
+    | ChainlinkDataFeedOracleAdapter | `0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23` |
+    | ChainlinkFunctionsOracleAdapter | `0x074fC18C1E322a7537b53B8B2Bf0762629E3b532` |
+    | UMAOptimisticOracleV3Adapter | `0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88` |
+    | Stake token (test USDC) | `0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582` |
 
-**Key Functions**:
+Deployment uses the Safe Singleton Factory with salt prefix
+`FairWins-P2P-v2.0-` for deterministic cross-chain addresses — see
+[Singleton Deployment Patterns](singleton-deployment-patterns.md). After any
+deploy, run `npm run sync:frontend-contracts` to regenerate
+`frontend/src/config/contracts.js`.
 
-```solidity
-function registerMetric(string memory name, string memory description) external
-function updateMetricWeight(uint256 metricId, uint256 weight) external
-function getMetricValue(uint256 metricId) external view returns (uint256)
+## Development workflow
+
+```bash
+npm run compile        # compile the suite
+npm test               # unit + integration tests
+npm run test:fork      # fork tests against live networks
+npm run test:coverage  # coverage report
 ```
 
-### ProposalRegistry.sol
-
-**Purpose**: Handles proposal submission and storage
-
-**Key Features**:
-
-- Permissionless submission with bond
-- Standardized metadata schemas
-- Milestone tracking
-- Status management
-
-**Proposal Structure**:
-
-```solidity
-struct Proposal {
-    uint256 id;
-    address proposer;
-    string title;
-    string description;
-    uint256 fundingAmount;
-    address recipient;
-    uint256 welfareMetricId;
-    uint256 bond;
-    ProposalStatus status;
-    uint256 submissionTime;
-    Milestone[] milestones;
-}
-```
-
-**Key Functions**:
-
-```solidity
-function submitProposal(
-    string memory title,
-    string memory description,
-    uint256 fundingAmount,
-    address recipient,
-    uint256 welfareMetricId
-) external payable returns (uint256)
-
-function getProposal(uint256 proposalId) external view returns (Proposal memory)
-```
-
-### ConditionalMarketFactory.sol
-
-**Purpose**: Creates and manages prediction markets with flexible binary outcome types
-
-**Key Features**:
-
-- Deploys outcome token pairs with configurable bet types
-- Support for multiple binary bet formats (Yes/No, Above/Below, Pass/Fail, etc.)
-- LMSR automated market making
-- Gnosis CTF compatibility
-- Token redemption logic
-
-**Supported Bet Types**:
-
-The contract supports the following binary bet types through the `BetType` enum:
-
-- `YesNo` - Standard Yes / No outcomes
-- `PassFail` - Pass / Fail outcomes (default for governance)
-- `AboveBelow` - Above / Below a threshold
-- `HigherLower` - Higher / Lower than reference
-- `InOut` - In / Out of range
-- `OverUnder` - Over / Under a value
-- `ForAgainst` - For / Against a proposal
-- `TrueFalse` - True / False statement
-- `WinLose` - Win / Lose outcome
-- `UpDown` - Up / Down movement
-
-**Market Structure**:
-
-```solidity
-struct Market {
-    uint256 proposalId;
-    address passToken;
-    address failToken;
-    uint256 liquidityParameter; // b in LMSR
-    uint256 startTime;
-    uint256 endTime;
-    bool resolved;
-    bool outcome; // true = positive outcome wins
-    BetType betType; // Type of binary bet
-}
-```
-
-**Key Functions**:
-
-```solidity
-function getOutcomeLabels(BetType betType) 
-    public pure returns (string memory positiveOutcome, string memory negativeOutcome)
-
-function deployMarketPair(
-    uint256 proposalId,
-    address collateralToken,
-    uint256 liquidityAmount,
-    uint256 liquidityParameter,
-    uint256 tradingPeriod,
-    BetType betType
-) external returns (uint256 marketId)
-```
-
-**LMSR Pricing**:
-
-```solidity
-function calculateCost(
-    uint256 passShares,
-    uint256 failShares,
-    int256 sharesDelta,
-    bool buyingPass
-) public view returns (uint256)
-
-function getPrice(uint256 marketId, bool isPass) public view returns (uint256)
-```
-
-### PrivacyCoordinator.sol
-
-**Purpose**: Manages privacy and anti-collusion features
-
-**Key Features**:
-
-- Nightmarket-style position encryption
-- MACI-style key-change messages  
-- Poseidon hash commitments
-- Groth16 zkSNARK verification
-- Batch processing
-
-**Privacy Flow**:
-
-```solidity
-// 1. Register public key
-function registerKey(uint256 publicKeyX, uint256 publicKeyY) external
-
-// 2. Submit encrypted position
-function submitEncryptedPosition(
-    uint256 marketId,
-    bytes32 commitment,
-    bytes memory zkProof
-) external
-
-// 3. Optional: Change key to prevent collusion
-function submitKeyChange(
-    bytes memory encryptedMessage,
-    bytes memory newPublicKey
-) external
-```
-
-### OracleResolver.sol
-
-**Purpose**: Multi-stage oracle resolution with dispute mechanism
-
-**Key Features**:
-
-- Designated reporter system
-- Bond-based incentives
-- Challenge mechanism
-- UMA escalation
-- Evidence requirements
-
-**Resolution Flow**:
-
-```solidity
-// 1. Submit report
-function submitReport(
-    uint256 proposalId,
-    uint256 passValue,
-    uint256 failValue,
-    string memory evidenceURI
-) external payable
-
-// 2. Challenge (if needed)
-function challengeReport(
-    uint256 proposalId,
-    string memory challengeReason,
-    string memory counterEvidenceURI
-) external payable
-
-// 3. Escalate to UMA (if challenged)
-function escalateToUMA(uint256 proposalId) external
-```
-
-### RagequitModule.sol
-
-**Purpose**: Minority protection mechanism
-
-**Key Features**:
-
-- Moloch-style ragequit
-- Proportional treasury share
-- Time-windowed execution
-- Prevents forced participation
-
-**Key Functions**:
-
-```solidity
-function ragequit(
-    uint256 proposalId,
-    uint256 tokenAmount
-) external
-
-function calculateRagequitValue(
-    uint256 tokenAmount
-) public view returns (uint256)
-```
-
-## Contract Interactions
-
-### Proposal Submission Flow
-
-```solidity
-// 1. User submits proposal
-ProposalRegistry.submitProposal{value: 50 ether}(...)
-  -> Emits ProposalSubmitted event
-  -> FutarchyGovernor notified
-
-// 2. After review period
-FutarchyGovernor.activateProposal(proposalId)
-  -> ConditionalMarketFactory.createMarket(proposalId)
-  -> Markets created with PASS/FAIL tokens
-```
-
-### Trading Flow
-
-```solidity
-// 1. User registers with privacy coordinator
-PrivacyCoordinator.registerKey(pubKeyX, pubKeyY)
-
-// 2. User submits encrypted trade
-PrivacyCoordinator.submitEncryptedPosition(marketId, commitment, proof)
-  -> Validates zkProof
-  -> Adds to batch
-  
-// 3. Batch processing
-PrivacyCoordinator.processBatch()
-  -> ConditionalMarketFactory.executeTrades(...)
-  -> Prices updated via LMSR
-```
-
-### Resolution Flow
-
-```solidity
-// 1. Oracle reports
-OracleResolver.submitReport{value: 100 ether}(proposalId, passValue, failValue, evidence)
-
-// 2. Challenge period (2 days)
-OracleResolver.challengeReport{value: 150 ether}(proposalId, reason, counterEvidence)
-
-// 3. Finalization
-FutarchyGovernor.finalizeProposal(proposalId)
-  -> ConditionalMarketFactory.resolveMarket(marketId, outcome)
-  -> Users can redeem tokens
-```
-
-## Security Features
-
-### Access Control
-
-```solidity
-// Role-based access control
-modifier onlyGovernor()
-modifier onlyGuardian()
-modifier onlyProposer(uint256 proposalId)
-
-// Multi-sig guardian
-address[] public guardians;
-uint256 public guardianThreshold;
-```
-
-### Bond System
-
-```solidity
-// Proposal bond: 50
-uint256 public constant PROPOSAL_BOND = 50 ether;
-
-// Oracle bond: 100
-uint256 public constant ORACLE_BOND = 100 ether;
-
-// Challenge bond: 150
-uint256 public constant CHALLENGE_BOND = 150 ether;
-```
-
-### Spending Limits
-
-```solidity
-// Per-proposal limit
-uint256 public constant MAX_PROPOSAL_AMOUNT = 50_000 ether;
-
-// Daily aggregate limit  
-uint256 public constant DAILY_SPENDING_LIMIT = 100_000 ether;
-```
-
-### Timelock
-
-```solidity
-// Minimum timelock before execution
-uint256 public constant TIMELOCK_PERIOD = 2 days;
-
-// Challenge period
-uint256 public constant CHALLENGE_PERIOD = 2 days;
-```
-
-## Gas Optimization
-
-### Storage Optimization
-
-```solidity
-// Pack struct fields efficiently
-struct Proposal {
-    address proposer;           // 20 bytes
-    uint96 fundingAmount;       // 12 bytes (fits in same slot)
-    uint256 id;                 // new slot
-    // ...
-}
-```
-
-### Batch Operations
-
-```solidity
-// Process multiple trades in single transaction
-function processBatch(Trade[] calldata trades) external {
-    for (uint256 i = 0; i < trades.length; i++) {
-        _processTrade(trades[i]);
-    }
-}
-```
-
-### View Functions
-
-```solidity
-// Use view for read-only operations
-function getProposalStatus(uint256 proposalId) 
-    external 
-    view 
-    returns (ProposalStatus)
-{
-    return proposals[proposalId].status;
-}
-```
-
-## Testing Contracts
-
-### Unit Tests
-
-```javascript
-describe("ProposalRegistry", function () {
-  it("should submit proposal with correct bond", async function () {
-    const tx = await proposalRegistry.submitProposal(
-      "Title",
-      "Description",
-      ethers.parseEther("1000"),
-      recipient.address,
-      1,
-      { value: ethers.parseEther("50") }
-    );
-    
-    await expect(tx)
-      .to.emit(proposalRegistry, "ProposalSubmitted");
-  });
-});
-```
-
-### Integration Tests
-
-```javascript
-describe("End-to-End Proposal Flow", function () {
-  it("should execute approved proposal", async function () {
-    // Submit proposal
-    await proposalRegistry.submitProposal(...);
-    
-    // Activate proposal
-    await futarchyGovernor.activateProposal(0);
-    
-    // Trade on market
-    await privacyCoordinator.submitEncryptedPosition(...);
-    
-    // Resolve
-    await oracleResolver.submitReport(...);
-    
-    // Execute
-    await futarchyGovernor.executeProposal(0);
-  });
-});
-```
-
-## Deployment
-
-See [deployment scripts](https://github.com/chippr-robotics/prediction-dao-research/tree/main/scripts) for details.
-
-```javascript
-// scripts/deploy.js
-async function main() {
-  // Deploy in correct order
-  const WelfareMetricRegistry = await ethers.deployContract("WelfareMetricRegistry");
-  await WelfareMetricRegistry.waitForDeployment();
-  
-  const ProposalRegistry = await ethers.deployContract("ProposalRegistry");
-  await ProposalRegistry.waitForDeployment();
-  
-  // ... deploy other contracts
-  
-  const FutarchyGovernor = await ethers.deployContract(
-    "FutarchyGovernor",
-    [welfareRegistry.target, proposalRegistry.target, /* ... */]
-  );
-  
-  console.log("FutarchyGovernor deployed to:", FutarchyGovernor.target);
-}
-```
-
-## Upgradeability
-
-Using UUPS proxy pattern:
-
-```solidity
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-
-contract FutarchyGovernor is UUPSUpgradeable {
-    function _authorizeUpgrade(address newImplementation) 
-        internal 
-        override 
-        onlyGovernor 
-    {}
-}
-```
-
-## Next Steps
-
-- [Learn about testing practices](testing.md)
-- [Explore the architecture](architecture.md)
-- [Review the frontend integration](frontend.md)
-- [Read contributing guidelines](contributing.md)
+Contract changes must follow checks-effects-interactions, pass Slither and
+Medusa, and receive a security review — see
+[Security Testing](../security/index.md) and the binding standards in
+`.specify/memory/constitution.md`.

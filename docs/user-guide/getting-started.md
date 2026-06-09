@@ -1,193 +1,102 @@
 # Getting Started
 
-Welcome to the Prediction DAO! This guide will help you get started with using the system.
+This guide takes you from zero to ready-to-wager on
+[fairwins.app](https://fairwins.app).
 
-## What You'll Need
+## What you'll need
 
-### Required
-
-- **Web3 Wallet**: MetaMask or compatible Web3 wallet
-- **MATIC Tokens**: For paying gas fees and bonds
-- **Web Browser**: Modern browser (Chrome, Firefox, Safari, or Brave)
-
-### Recommended
-
-- Basic understanding of blockchain and DAOs
-- Familiarity with prediction markets (helpful but not required)
-
-## Installation Steps
-
-### 1. Install MetaMask
-
-If you don't already have MetaMask:
-
-1. Visit [metamask.io](https://metamask.io)
-2. Download and install the browser extension
-3. Create a new wallet or import an existing one
-4. **Securely store** your seed phrase
+- **A Web3 wallet** — MetaMask (browser extension) or any wallet that supports
+  WalletConnect (mobile)
+- **POL** — for gas fees on Polygon (a few dollars' worth lasts a long time)
+- **USDC on Polygon** — for stakes and your membership fee
+- **A modern browser** — Chrome, Firefox, Safari, or Brave
 
 !!! danger "Security Warning"
-    Never share your seed phrase with anyone. The Prediction DAO will never ask for it.
+    Never share your seed phrase with anyone. FairWins will never ask for it.
 
-### 2. Add the Network
+## 1. Install a wallet
 
-Connect to the appropriate network:
+If you don't already have one:
 
-=== "Mainnet (Production)"
+1. Visit [metamask.io](https://metamask.io) and install the extension, or use
+   a WalletConnect-compatible mobile wallet
+2. Create a new wallet or import an existing one
+3. **Securely store** your seed phrase
 
-    - **Network Name**: Polygon Amoy
-    - **RPC URL**: Check with your preferred provider
+## 2. Connect to the app
+
+1. Open [fairwins.app](https://fairwins.app) and press **Launch App**
+2. Read and acknowledge the eligibility notice (the [Terms](https://fairwins.app/terms),
+   [Risk Disclosure](https://fairwins.app/risk), and [Privacy Policy](https://fairwins.app/privacy)
+   are linked there and in the footer)
+3. Click the wallet button in the header and choose **MetaMask** or
+   **WalletConnect**
+4. Approve the connection in your wallet
+
+The app runs on **Polygon mainnet (chain 137)**. If your wallet is on another
+network, a banner offers a one-click **Switch Network**. A testnet mode
+(Polygon Amoy, chain 80002) can be toggled from the wallet dropdown if you want
+to try things with test funds first.
+
+=== "Polygon Mainnet (production)"
+
+    - **Chain ID**: 137
+    - **Currency**: POL
+    - **Stake token**: USDC (`0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`)
+
+=== "Polygon Amoy (testnet)"
+
     - **Chain ID**: 80002
-    - **Currency Symbol**: MATIC
-
-=== "Testnet (Polygon Amoy)"
-
-    - **Network Name**: Polygon Amoy
     - **RPC URL**: https://rpc-amoy.polygon.technology
-    - **Chain ID**: 80002
-    - **Currency Symbol**: MATIC
+    - **Currency**: test POL (free from the [Polygon faucet](https://faucet.polygon.technology/))
 
-=== "Local Development"
+## 3. Fund your wallet
 
-    - **Network Name**: Hardhat Local
-    - **RPC URL**: http://127.0.0.1:8545
-    - **Chain ID**: 1337
-    - **Currency Symbol**: ETH
+You'll need POL for gas and USDC for stakes. Buy them on an exchange and
+withdraw to Polygon, or bridge from another chain. The app's **Account Center →
+Swap** tab can also swap tokens via Uniswap once you hold something on Polygon.
 
-### 3. Get MATIC Tokens
+## 4. Get a membership
 
-=== "Mainnet"
+Creating and accepting wagers requires an active membership tier:
 
-    Purchase MATIC from a cryptocurrency exchange and transfer to your wallet.
+1. Open **My Account** (the Account Center) and select the **Membership** tab
+2. Pick a tier — Bronze, Silver, Gold, or Platinum. Higher tiers allow more
+   wagers per month and more running at the same time
+3. Approve the USDC payment and confirm the purchase transaction
 
-=== "Testnet"
+Memberships are time-bound and renewable. Details and current pricing:
+[Roles and Tiers](../system-overview/roles-and-tiers.md).
 
-    Request testnet tokens from a faucet:
-    
-    - [Polygon Amoy (Polymarket testnet) Faucet](https://easy.hebeswap.com/#/faucet)
+## 5. (Optional) Register an encryption key
 
-=== "Local Development"
+If you want your wager terms end-to-end encrypted so only participants can read
+them:
 
-    The local Hardhat node provides test accounts with pre-funded ETH.
+1. Go to **Account Center → Security**
+2. Click **Register Key** and sign the message in your wallet
 
-### 4. Access the Application
+This publishes an encryption public key on-chain so friends can encrypt wager
+terms for you. See [Private Wager Encryption](private-market-encryption.md).
 
-1. Navigate to the Prediction DAO web interface
-2. Click "Connect Wallet" in the top right
-3. Select MetaMask and approve the connection
-4. You're ready to go!
+## You're ready
 
-## Understanding the Interface
+```mermaid
+flowchart LR
+    A[Wallet connected] --> B[Membership active] --> C[Create your first wager]
+```
 
-### Dashboard
+Head to [Creating a Wager](create-wager.md) — or, if a friend sent you a QR
+code or link, straight to [Accepting a Wager](accept-wager.md).
 
-The main dashboard shows:
+## Troubleshooting
 
-- **Active Proposals**: Currently trading proposals
-- **Your Positions**: Your active market positions
-- **Welfare Metrics**: Current protocol success measures
-- **Recent Activity**: Latest system events
+| Problem | Fix |
+|---------|-----|
+| Wallet won't connect | Refresh the page; make sure only one wallet extension is active |
+| "Wrong network" banner | Click **Switch Network**, or select Polygon manually in your wallet |
+| Transaction fails on create/accept | Check you have an active membership tier and enough USDC + POL |
+| Stake approval loops | Approve the exact USDC amount when prompted, then retry the action |
+| QR scanner shows no camera | Allow camera access for fairwins.app in your browser settings |
 
-### Navigation
-
-- **Proposals**: View and create proposals
-- **Markets**: Browse and trade on prediction markets
-- **Metrics**: View welfare metrics and voting
-- **Portfolio**: Manage your positions and balances
-- **Settings**: Configure your preferences
-
-## User Roles
-
-### :material-lightbulb: Proposer
-
-Submit proposals for the DAO to consider. Requires a 50 MATIC bond.
-
-[Learn more about submitting proposals →](submitting-proposals.md)
-
-### :material-chart-line: Trader
-
-Trade on prediction markets to express your beliefs about proposals.
-
-[Learn more about trading →](trading-on-markets.md)
-
-### :material-vote: Voter
-
-Participate in welfare metric selection and governance decisions.
-
-### :material-gavel: Oracle Reporter
-
-Report welfare metric values after proposals execute. Requires a 100 MATIC bond.
-
-### :material-shield: Challenger
-
-Challenge incorrect oracle reports. Requires a 150 MATIC bond.
-
-## Key Concepts
-
-### Futarchy
-
-"Vote on values, bet on beliefs" - The DAO uses prediction markets to make decisions:
-
-1. The community votes on **welfare metrics** (what defines success)
-2. Proposers submit **proposals** (suggested actions)
-3. Markets are created with **PASS** and **FAIL** tokens
-4. Traders bet on whether proposals will improve welfare metrics
-5. The market's prediction determines if the proposal is executed
-
-### Privacy Protection
-
-Your trading positions are private:
-
-- Positions are encrypted using zero-knowledge proofs
-- Your identity is not linked to your trades
-- Key-change capability prevents vote buying
-- Only aggregate market data is public
-
-### Welfare Metrics
-
-The protocol uses four types of metrics to measure success:
-
-1. **Treasury Value** (Primary): Total value of DAO treasury
-2. **Network Activity** (Secondary): Transaction volume and active users
-3. **Hash Rate Security** (Tertiary): Network security metrics
-4. **Developer Activity** (Quaternary): GitHub activity and contributions
-
-## Next Steps
-
-Ready to participate? Choose your path:
-
-<div class="grid cards" markdown>
-
--   :material-file-document:{ .lg .middle } __Submit a Proposal__
-
-    ---
-
-    Have an idea for the DAO? Learn how to submit a proposal.
-
-    [:octicons-arrow-right-24: Proposal Guide](submitting-proposals.md)
-
--   :material-chart-line:{ .lg .middle } __Trade on Markets__
-
-    ---
-
-    Express your beliefs about proposals by trading.
-
-    [:octicons-arrow-right-24: Trading Guide](trading-on-markets.md)
-
--   :material-help-circle:{ .lg .middle } __Get Help__
-
-    ---
-
-    Have questions? Check our FAQ.
-
-    [:octicons-arrow-right-24: FAQ](faq.md)
-
-</div>
-
-## Getting Help
-
-If you need assistance:
-
-- Check the [FAQ](faq.md) for common questions
-- Review the [System Overview](../system-overview/how-it-works.md) for technical details
-- Join our community channels (links in the app)
+More in the [FAQ](faq.md).

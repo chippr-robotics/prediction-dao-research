@@ -1,69 +1,125 @@
-# User Journeys Through Prediction DAO
+# User Journeys
 
-This guide walks you through using ClearPath and FairWins, showing how participants interact with the platform from first visit to achieving their goals.
+End-to-end walkthroughs of every flow in the FairWins app, as two friends —
+the **creator** and the **opponent** — would experience them. Each journey maps
+to a detailed how-to guide linked along the way.
 
-## Choosing Your Platform
+## Journey 1: An even-money bet between friends
 
-The landing page presents two pathways built on shared infrastructure. ClearPath serves DAOs needing formal governance with futarchy principles: the community votes on success metrics (welfare metrics), and prediction markets determine which proposals maximize those metrics. It includes treasury management, minority protections, and institutional safeguards.
+The simplest case: two friends, equal stakes, and they trust each other to
+declare the result.
 
-FairWins enables open prediction markets where anyone can create markets on any topic, set resolution criteria, and trade without governance overhead. Both platforms use zero-knowledge proofs to protect trading positions while maintaining market transparency.
+```mermaid
+sequenceDiagram
+    actor A as Alex (creator)
+    actor B as Bri (opponent)
+    participant App as FairWins app
+    participant Chain as Polygon
 
-## ClearPath: DAO Governance Through Markets
+    A->>App: Dashboard → "Friends Decide (1v1)"
+    A->>App: terms, 10 USDC stake, "Either" resolution
+    App->>Chain: approve USDC + createWager
+    App-->>A: QR code + share link
+    A-->>B: sends link
+    B->>App: opens link → wager preview
+    B->>App: connect wallet → Accept
+    App->>Chain: approve USDC + acceptWager
+    Note over A,B: event happens — Alex wins
+    B->>App: My Wagers → Resolve → "Alex won"
+    App->>Chain: declareWinner
+    A->>App: claim winnings (20 USDC)
+```
 
-### Joining and Trading
+1. **Alex creates.** From the Dashboard, *Friends Decide (1v1)* opens the
+   wager form: description, 10 USDC stake each, an acceptance deadline
+   (default 6 hours), an end time (default 1 day), and **Either** resolution —
+   meaning either of them can declare the winner afterwards. Details:
+   [Creating a Wager](create-wager.md).
+2. **Alex shares.** After the transaction confirms, the app shows a QR code
+   and a copyable deep link.
+3. **Bri accepts.** The link opens an acceptance page showing the stake, the
+   terms, the deadline, and who created it — viewable even before connecting a
+   wallet. Bri connects, approves USDC, and accepts; both stakes are now in
+   escrow. Details: [Accepting a Wager](accept-wager.md).
+4. **Someone declares.** After the event, either of them opens *My Wagers* and
+   declares the winner. Honest counterparties make this a one-click affair; if
+   they both agree it was a tie, a mutual **draw** returns each stake. Details:
+   [Resolving a Wager](resolve-wager.md).
+5. **Winner claims.** The winner collects the whole pot — 20 USDC.
 
-After connecting your wallet, the dashboard shows active proposals and welfare metrics (treasury value, network activity, security, developer momentum). Each proposal has a market with PASS and FAIL tokens. Prices reflect collective belief about whether the proposal will improve the selected metric.
+## Journey 2: An oracle settles it
 
-When you trade, the system generates zero-knowledge proofs that encrypt your position. Other participants see aggregate prices adjust but cannot identify your holdings. This privacy prevents vote buying and front-running while enabling honest price discovery.
+When the friends don't want *any* human in the loop, they peg the wager to an
+external data source at creation time.
 
-As proposals move through trading, oracle reporting, challenge periods, and resolution, you monitor your portfolio. When markets resolve, winning tokens become redeemable for payouts based on actual welfare metric values. Over time, you develop intuition about proposal quality and market dynamics.
+```mermaid
+flowchart TD
+    A["Create wager → 'Oracle Settles (1v1)'"] --> B{Pick a source}
+    B -->|Polymarket| C[Browse live Polymarket markets<br/>and link one — pick your side]
+    B -->|Chainlink Data Feed| D[Price threshold, e.g.<br/>ETH above $5k at deadline]
+    B -->|Chainlink Functions| E[Custom off-chain query<br/>registered by an admin]
+    B -->|UMA| F[Optimistic assertion with<br/>a dispute window]
+    C & D & E & F --> G[Share → friend accepts]
+    G --> H[Oracle reports outcome]
+    H --> I[Anyone triggers auto-resolve<br/>winner claims the pot]
+```
 
-### Submitting Proposals
+The creation flow is the same as Journey 1, except the creator chooses
+*Oracle Settles* and picks the source — for a Polymarket wager, an in-app
+browser searches live Polymarket markets and the creator picks which side
+they're taking. Once the underlying source resolves, the wager shows *Awaiting
+Oracle* until anyone (either party, or any helpful third party) triggers
+auto-resolution on-chain. No one has to trust anyone's word.
 
-The proposal submission interface asks for title, description, funding amount, recipient address, welfare metric selection, and milestones. The 50 MATIC bond (returned on resolution) ensures serious proposals. After the seven-day review period where community members discuss your idea, markets open for trading.
+If the oracle never reports, the wager refunds after its resolve deadline —
+stakes are never stranded.
 
-You watch as prices evolve, revealing collective judgment about your proposal's merit. Whether it passes or fails, you learn from how the market evaluates different aspects and can refine future proposals based on this feedback.
+## Journey 3: A bookmaker-style odds wager
 
-### Beyond Trading
+The creator can offer asymmetric stakes — e.g. *my 30 USDC against your 10* —
+by choosing **Bookmaker** on the Dashboard and setting an odds multiplier. The
+app derives the two stake amounts, and everything else (sharing, acceptance,
+resolution) works exactly like Journeys 1 and 2.
 
-You can participate in welfare metric governance to shape success measures, serve as an oracle reporter by posting a 100 MATIC bond to submit verified values, or challenge incorrect reports with evidence and a 150 MATIC bond. The ragequit mechanism lets you exit with your proportional treasury share if you oppose a passed proposal, protecting minority rights without blocking majority decisions.
+## Journey 4: A neutral arbitrator
 
-## FairWins: Open Prediction Markets
+For higher-stakes or easily-disputed bets, the creator selects **Third Party**
+resolution and names an arbitrator's address at creation. Only the arbitrator
+can declare the winner (or a draw). If the terms are encrypted, they're
+encrypted for the arbitrator too, so they can actually read what they're
+ruling on. Arbitrators see their pending cases in *My Wagers → Arbitrating*.
 
-### Discovering and Trading
+## Journey 5: Nothing happens — getting your money back
 
-FairWins presents diverse markets created by users on any topic. Each shows the creator's resolution criteria, evidence sources, and timeline. Markets use YES/NO tokens instead of PASS/FAIL, but mechanics are identical: LMSR provides liquidity, privacy protection encrypts positions, and prices reflect aggregate beliefs.
+Every wager has two deadlines, and both protect you:
 
-When you find a market where your research suggests mispricing, you take a position. Privacy protection prevents others from copying your strategy. You can exit early by trading out or hold through resolution for conditional token payouts.
+- **No one accepted in time?** After the acceptance deadline, reclaim your
+  stake from *My Wagers* (the contract also lets anyone expire stale offers in
+  batch).
+- **Accepted but never resolved?** After the resolve deadline, either party
+  can trigger a refund and both stakes return to their owners.
+- **Changed your mind before acceptance?** Cancel the open wager any time; the
+  opponent can likewise decline it.
 
-### Creating Markets
+## Journey 6: Managing your account
 
-The market creation interface guides you through defining your prediction precisely. Clear resolution criteria prevent disputes. You specify what counts as success, verification sources, and timing. Initial liquidity (minimum 100 USDC) seeds the LMSR market maker, and a creator bond (returned after proper resolution) aligns incentives with fair outcomes.
+The **Account Center** (My Account) is home base:
 
-After creation, your market appears in the marketplace. As trading develops, prices reveal how others evaluate your question. When resolution time arrives, you submit outcome evidence. Proper resolution builds reputation, making future markets you create more attractive to participants.
+| Tab | What it's for |
+|-----|---------------|
+| Account | Your address, connection status, disconnect |
+| Membership | Your current tier, limits, and tier purchase/renewal |
+| Security | Registering your encryption key for private wagers |
+| Preferences | Polymarket category filters for oracle browsing |
+| Swap | Swapping tokens via Uniswap (e.g. POL → USDC) |
 
-## Common Patterns Across Platforms
+A QR **scanner** is also available for accepting wagers in person — point it
+at a friend's share code and you land directly on the acceptance page.
 
-### Information and Decision Making
+## What happens behind the scenes
 
-Success requires research before trading. You evaluate proposals or questions, consider multiple perspectives, and form independent judgments. Privacy protection ensures your research generates returns without being immediately copied by others watching your trades.
-
-The decision process continues as markets evolve. New information might strengthen or weaken your thesis. Price movements signal what others think. You balance conviction against risk, choosing position sizes appropriate for your confidence level.
-
-### The Social Dimension
-
-While positions stay private, discussion happens in community channels. Proposal creators engage with questions, market creators clarify criteria, and traders share analysis. These interactions enrich understanding without enabling manipulation, since private positions prevent vote buying even when analysis is public.
-
-### Learning Through Cycles
-
-Each completed market teaches lessons. Correct predictions build confidence in your methods. When markets move against you, you examine where reasoning failed. This feedback develops better judgment about quality, likelihood, and market efficiency over time.
-
-The futarchy foundation means trading generates collective intelligence beyond personal returns. Accurate markets help DAOs make better decisions in ClearPath and provide valuable signals in FairWins. Your participation contributes to these broader purposes while pursuing individual goals.
-
-## Growing Into Advanced Usage
-
-As you gain experience, you might hold positions across multiple markets, understanding correlations and managing overall exposure. You develop specialization in particular domains where you add most value. Reputation matters more for some roles: FairWins creators benefit from fair resolution track records, ClearPath proposers gain credibility through successes, oracle reporters build reputations for accuracy.
-
-The key-change capability offers protection beyond basic encryption. If someone attempts vote buying, changing your key invalidates previous commitments, preventing verification of your positions. This MACI-inspired feature stops coercion while maintaining privacy.
-
-Your path through Prediction DAO evolves from understanding basics to sophisticated engagement. Over time, the mechanics fade into background infrastructure, letting you focus on substantive questions: which proposals deserve support, what events seem likely, how welfare metrics respond to actions. The platforms succeed when they enable this focus on collective intelligence rather than technical complexity.
+Each journey above is a thin UI over a handful of contract calls — see
+[How It Works](../system-overview/how-it-works.md) for the on-chain lifecycle
+and state machine, and the
+[Architecture guide](../developer-guide/architecture.md) for the full system
+diagram.

@@ -1,61 +1,56 @@
-# User Experience Overview
+# User Guide Overview
 
-This documentation suite guides you through using ClearPath (institutional governance) and FairWins (open markets). Rather than listing features, these guides show how real people accomplish their goals through interconnected narratives that build intuition about the system's logic.
+FairWins lets you make a wager with a friend, lock both stakes in a smart
+contract, and have the outcome settled by whoever — or whatever — you both
+agreed to trust: each other, a neutral friend, or an external oracle like
+Polymarket, Chainlink, or UMA.
 
-## Documentation Structure
+This guide covers everything you do in the app at [fairwins.app](https://fairwins.app).
 
-**User Journeys** explores typical paths from discovering the platform through sophisticated engagement. See how DAO members participate in governance, traders evaluate proposals, and market creators attract participants. The flow emphasizes experience over isolated actions.
+## The five-minute version
 
-**Practical Scenarios** presents eight concrete stories (Sarah, Marcus, Elena, David, Lisa, Robert, Maya, Tom) demonstrating real usage patterns: proposal submission, trading strategies, market creation, oracle reporting, challenging reports, ragequit, portfolio management, and anti-coercion.
+```mermaid
+flowchart LR
+    A[Connect wallet] --> B[Get a membership]
+    B --> C[Create a wager]
+    C --> D[Share QR / link]
+    D --> E[Friend accepts]
+    E --> F[Outcome declared<br/>or oracle settles]
+    F --> G[Winner claims pot]
+```
 
-**Understanding the Interface** walks through what you see and why, explaining dashboards, proposal/market views, trading interfaces, and portfolio management. The interface enables your decisions without prescribing them.
+1. **Connect** a wallet (MetaMask or WalletConnect) on Polygon.
+2. **Buy a membership** tier — this is what authorizes you to create and accept
+   wagers, and sets how many you can run at once.
+3. **Create a wager**: terms, stake (USDC), deadlines, and a resolution method.
+4. **Share it** with your friend as a QR code or link.
+5. They **accept**, their stake locks, and the bet is on.
+6. When the event happens, the wager **resolves** — by one of you, an
+   arbitrator, or an oracle — and the **winner claims** both stakes.
 
-**Using the System** provides structured guidance about connecting wallets, navigating sections, understanding lifecycles, managing portfolios, and interpreting states. More instructional but still user-focused.
+## Reading paths
 
-**Submitting Proposals** and **Trading on Markets** dive deeper into specific activities, combining narrative with practical examples. They provide frameworks for thinking about these decisions without prescribing choices.
+- **New here?** Start with [Getting Started](getting-started.md), then skim
+  [User Journeys](user-journeys.md) to see the full flows.
+- **Making your first bet?** [Creating a Wager](create-wager.md), then
+  [Accepting a Wager](accept-wager.md) for your friend's side.
+- **Bet finished?** [Resolving a Wager](resolve-wager.md) covers declaring
+  winners, draws, oracle settlement, and refunds.
+- **Care about privacy?** [Private Wager Encryption](private-market-encryption.md)
+  explains how wager terms stay readable only to participants.
+- **Questions?** The [FAQ](faq.md).
 
-**FAQ** answers common questions about concepts, participation requirements, technical details, and procedures.
+## What you'll need
 
-## Reading Paths
+- A wallet on **Polygon mainnet** (chain 137) — the app can switch networks
+  for you, and a testnet mode (Polygon Amoy) is available from the wallet menu.
+- A little **POL** for gas.
+- **USDC** for stakes and the membership fee.
 
-**New users**: Start with Getting Started, then User Journeys.
+## What FairWins is not
 
-**Proposers**: Read Submitting Proposals, Sarah's story in Practical Scenarios, and relevant User Journeys sections.
-
-**Traders**: Begin with Trading on Markets, Marcus's story, and trading sections of User Journeys.
-
-**Market creators**: Focus on FairWins sections of User Journeys and Elena's story in Practical Scenarios.
-
-**Evaluators**: Read Introduction sections of User Journeys and Understanding the Interface, skim Practical Scenarios for diverse use cases.
-
-## Documentation Philosophy
-
-**Narrative over lists**: Paragraphs flow naturally rather than defaulting to bullets. Lists appear only when genuinely appropriate.
-
-**User perspective**: Everything framed from your viewpoint. We ask "what do you see and why might you care" rather than "what does the system do."
-
-**Context over instructions**: We explain what you're accomplishing, what information matters for decisions, and what results from actions. Interface changes, but concepts and decision processes remain stable.
-
-**Respect for judgment**: We never tell you whether to trade PASS or FAIL, whether to submit proposals, or whether prices are correct. We help you understand factors that matter, how to evaluate information, and what consequences follow.
-
-**Honesty about complexity**: We manage complexity through progressive disclosure rather than oversimplification. Basic concepts in straightforward language. Deeper details when needed. Technical mechanisms when relevant to decisions.
-
-## Connecting Experience to Purpose
-
-These guides help you understand why the system works the way it does and how your participation contributes to larger goals.
-
-**Futarchy as governance**: ClearPath implements "vote on values, bet on beliefs." Your trading contributes to collective intelligence helping the DAO make better decisions.
-
-**Open prediction markets**: FairWins makes markets accessible beyond governance. Your fair market creation and informed trading expand the ecosystem.
-
-**Privacy-preserving infrastructure**: Zero-knowledge proofs, encrypted positions, and key-change capabilities protect honest participation. We explain these features in terms of what they enable for you.
-
-## Living Documentation
-
-This documentation evolves with the platform and user needs. If sections confuse, questions aren't addressed, or your experience differs from descriptions, that feedback improves future versions.
-
-The documentation succeeds when it helps you accomplish goals with confidence, whether participating in DAO governance, creating/trading on markets, or exploring futarchy and prediction markets generally.
-
-## Getting Started
-
-Choose your entry point based on immediate interests. Documents interconnect, so follow curiosity, use cross-references when topics interest you, and return to sections as understanding develops. The best reading path serves your needs right now.
+There is no order book, no trading, no house, and no token to farm. Wagers are
+private 1-v-1 agreements; the protocol just escrows the stakes and pays the
+winner. Operators can pause the protocol or freeze abusive accounts (see the
+[Account Moderation Policy](../system-overview/account-moderation.md)), but
+they can never take escrowed stakes.
