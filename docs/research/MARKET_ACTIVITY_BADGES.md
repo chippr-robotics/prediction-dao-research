@@ -43,13 +43,13 @@ This document provides a comprehensive specification for implementing market act
 ## Quick Start
 
 ### For Product Managers
-- **Read**: [Market Activity Badge Specification](docs/reference/market-activity-badges.md)
+- **Read**: [Market Activity Badge Specification](docs/archived/market-activity-badges.md)
 - **Purpose**: Understand business goals, metrics, and user impact
 - **Decision Points**: Badge thresholds, priorities, and display rules
 
 ### For Developers
-- **Read**: [Badge Implementation Guide](docs/reference/badge-implementation-guide.md)
-- **Reference**: [TypeScript Type Definitions](docs/reference/badge-types.ts)
+- **Read**: [Badge Implementation Guide](docs/archived/badge-implementation-guide.md)
+- **Reference**: [TypeScript Type Definitions](docs/archived/badge-types.ts)
 - **Action**: Follow step-by-step integration instructions
 
 ### For Designers
@@ -230,17 +230,17 @@ Monitor these signals for problems:
 
 ## Getting Started
 
-1. **Review the Specification**: Read [market-activity-badges.md](docs/reference/market-activity-badges.md) for complete details
-2. **Check Type Definitions**: Review [badge-types.ts](docs/reference/badge-types.ts) for implementation reference
-3. **Follow Implementation Guide**: Use [badge-implementation-guide.md](docs/reference/badge-implementation-guide.md) for step-by-step integration
+1. **Review the Specification**: Read [market-activity-badges.md](docs/archived/market-activity-badges.md) for complete details
+2. **Check Type Definitions**: Review [badge-types.ts](docs/archived/badge-types.ts) for implementation reference
+3. **Follow Implementation Guide**: Use [badge-implementation-guide.md](docs/archived/badge-implementation-guide.md) for step-by-step integration
 4. **Test Thoroughly**: Use provided test cases and create additional scenarios
 5. **Monitor & Iterate**: Track metrics and adjust thresholds based on data
 
 ## Support & Questions
 
-- **Specification Questions**: See [market-activity-badges.md](docs/reference/market-activity-badges.md)
-- **Implementation Help**: See [badge-implementation-guide.md](docs/reference/badge-implementation-guide.md)
-- **Type Reference**: See [badge-types.ts](docs/reference/badge-types.ts)
+- **Specification Questions**: See [market-activity-badges.md](docs/archived/market-activity-badges.md)
+- **Implementation Help**: See [badge-implementation-guide.md](docs/archived/badge-implementation-guide.md)
+- **Type Reference**: See [badge-types.ts](docs/archived/badge-types.ts)
 - **General Questions**: Contact the team or file an issue
 
 ## License
