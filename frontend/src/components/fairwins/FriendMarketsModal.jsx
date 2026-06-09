@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useEncryption } from '../../hooks/useEncryption'
 import { useFriendMarketCreation } from '../../hooks/useFriendMarketCreation'
@@ -12,6 +11,7 @@ import {
 } from '../../constants/wagerDefaults'
 import { ResolutionType, isOracleModelExposed } from '../../constants/wagerDefaults'
 import QRScanner from '../ui/QRScanner'
+import WagerQRCode from '../ui/WagerQRCode'
 import AddressInput from '../ui/AddressInput'
 import { isEnsName } from '../../utils/validation'
 import { getCurrentDocument } from '../../utils/legalDocs'
@@ -1866,20 +1866,10 @@ function FriendMarketsModal({
 
                   <div className="fm-qr-section">
                     <div className="fm-qr-container">
-                      <QRCodeSVG
+                      <WagerQRCode
                         value={getMarketUrl(createdMarket)}
                         size={180}
-                        level="H"
-                        includeMargin={false}
-                        fgColor="#36B37E"
-                        bgColor="transparent"
-                        aria-label="QR code to share this wager"
-                        imageSettings={{
-                          src: '/assets/logo_fairwins.svg',
-                          height: 32,
-                          width: 32,
-                          excavate: true,
-                        }}
+                        ariaLabel="QR code to share this wager"
                       />
                     </div>
                     <p className="fm-qr-hint">

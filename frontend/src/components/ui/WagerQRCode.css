@@ -1,0 +1,14 @@
+/* Shared QR renderer (spec 009).
+   Solid white, padded quiet-zone container so dark QR modules always sit on a
+   light field — theme-independent and reliably scannable inside any modal. */
+.wager-qr {
+  display: inline-block;
+  background: #FFFFFF;
+  padding: 12px;
+  border-radius: 12px;
+  line-height: 0; /* avoid extra inline whitespace under the svg */
+}
+
+.wager-qr svg {
+  display: block;
+}
