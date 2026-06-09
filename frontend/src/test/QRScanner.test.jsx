@@ -240,7 +240,7 @@ describe('QRScanner Component', () => {
   })
 
   describe('Error Handling', () => {
-    it('exposes an alert role when camera access fails', async () => {
+    it('shows a visible camera-error message (not just aria-label) when access fails', async () => {
       const { Html5Qrcode } = await import('html5-qrcode')
       Html5Qrcode.getCameras = vi.fn().mockRejectedValue(new Error('No cameras'))
 
@@ -255,8 +255,12 @@ describe('QRScanner Component', () => {
       await waitFor(() => {
         const alert = screen.getByRole('alert')
         expect(alert).toBeInTheDocument()
-        expect(alert).toHaveAttribute('aria-label', expect.stringMatching(/camera/i))
+        // The message is rendered as visible text (Spec 010 follow-up), not aria-label only.
+        expect(alert).toHaveTextContent(/camera/i)
+        expect(alert).not.toHaveAttribute('aria-label')
       })
+      // A permissions hint is shown so a real denial isn't a cryptic triangle.
+      expect(screen.getByText(/allow camera access/i)).toBeInTheDocument()
     })
   })
 })
