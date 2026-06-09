@@ -154,6 +154,12 @@ You will indemnify and hold harmless FairWins and Chippr Robotics LLC and their 
 
 We may restrict, suspend, or terminate your access to the Service at any time, including for suspected ineligibility, circumvention, sanctions concerns, or breach, **without notice and without refund**. Settled on-chain Wagers are unaffected by termination.
 
+### Account Moderation
+
+An **Account Moderator** is a protocol role that can freeze — and later unfreeze — an individual account for cause. Cause includes suspected fraud or abuse, sanctions or eligibility concerns, or a court order or other lawful demand. While an account is frozen it cannot create or accept wagers, cancel, declare a winner, or claim payouts or refunds on the WagerRegistry. Permissionless on-chain resolution (for example Polymarket auto-resolution) may still occur, but a frozen account cannot claim until it is unfrozen. Freezing is an on-chain action recorded on the WagerRegistry; it does not entitle you to any refund of membership or other fees and does not affect already-settled Wagers.
+
+Separately, a **Guardian-Role** holder may pause the protocol in response to a security incident, which temporarily blocks all wager creation, acceptance, and settlement for everyone until the protocol is unpaused.
+
 ## 22. Governing Law; Arbitration; Class Action Waiver
 
 **22.1 Governing law.** These Terms are governed by the laws of `[GOVERNING LAW JURISDICTION]`, without regard to conflict-of-laws rules.

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { TIER_NAMES } from '../../hooks/useRoleDetails'
+import { ACCOUNT_MODERATION_PATH } from '../../constants/legalLinks'
 import './RoleDetailsCard.css'
 
 const ROLE_DISPLAY_NAMES = {
@@ -150,7 +151,7 @@ export function RoleDetailsCard({ role, onUpgrade, onExtend, compact = false, is
             <strong>This account is currently frozen by a platform moderator.</strong>
             <div>You cannot create or accept wagers, or claim payouts or refunds, until unfrozen.</div>
             {freezeReason && <div>Reason: {freezeReason}</div>}
-            <a href="/docs/system-overview/account-moderation" target="_blank" rel="noreferrer">
+            <a href={ACCOUNT_MODERATION_PATH} target="_blank" rel="noopener noreferrer">
               Account moderation policy
             </a>
           </div>

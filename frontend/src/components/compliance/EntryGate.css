@@ -1,0 +1,95 @@
+/**
+ * Entry-gate notice readability (Spec 010 — US3, FR-010/FR-013).
+ *
+ * The entry-gate-* classes previously had no styles, so the eligibility notice ran
+ * edge-to-edge and was hard to read (UAT). This presents it as a centered, padded,
+ * scrollable card with comfortable spacing, responsive down to ~360px. Colors use
+ * theme.css tokens so light and dark both keep WCAG-AA contrast.
+ */
+
+.entry-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.entry-gate {
+  width: 100%;
+  max-width: 40rem;
+  margin: auto;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  line-height: 1.6;
+}
+
+.entry-gate h2 {
+  margin: 0 0 1rem;
+  line-height: 1.25;
+}
+
+.entry-gate p {
+  margin: 0 0 1rem;
+}
+
+.entry-gate ul {
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+}
+
+.entry-gate li {
+  margin: 0 0 0.5rem;
+}
+
+.entry-gate a {
+  color: var(--accent-color, var(--brand-secondary));
+}
+
+.entry-gate-warning {
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--warning-color, #f59e0b);
+  background: rgba(245, 166, 35, 0.08);
+  color: var(--text-secondary);
+}
+
+.entry-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.entry-gate-actions .confirm-btn {
+  flex: 1 1 8rem;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.entry-gate-actions .confirm-btn.primary {
+  background: var(--primary-button, var(--brand-primary));
+  color: var(--primary-button-text, #fff);
+  border-color: transparent;
+}
+
+.entry-gate-actions .confirm-btn:hover {
+  filter: brightness(0.97);
+}
+
+@media (max-width: 480px) {
+  .entry-gate {
+    padding: 1.5rem 1.25rem;
+  }
+}

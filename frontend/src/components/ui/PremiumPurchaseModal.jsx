@@ -8,6 +8,7 @@ import { recordRolePurchase } from '../../utils/roleStorage'
 import { purchaseRoleWithStablecoin, getUserTierOnChain } from '../../utils/blockchainService'
 import { ensureKeyRegistered } from '../../utils/keyRegistryService'
 import { getCurrentDocument } from '../../utils/legalDocs'
+import { ACCOUNT_MODERATION_PATH } from '../../constants/legalLinks'
 import MembershipAttestation from '../compliance/MembershipAttestation'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import './PremiumPurchaseModal.css'
@@ -464,7 +465,7 @@ function PremiumPurchaseModal({ isOpen = true, onClose, action = 'purchase' }) {
                         An <strong>Account Moderator</strong> can freeze your account for cause
                         (fraud, abuse, court order, etc.). A frozen account cannot create or accept
                         wagers, or claim payouts or refunds, until unfrozen. See{' '}
-                        <a href="/docs/system-overview/account-moderation" target="_blank" rel="noreferrer">
+                        <a href={ACCOUNT_MODERATION_PATH} target="_blank" rel="noopener noreferrer">
                           Account Moderation policy
                         </a>.
                       </li>

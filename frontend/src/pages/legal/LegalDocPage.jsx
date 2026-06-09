@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { getCurrentDocument } from '../../utils/legalDocs'
+import './LegalDocPage.css'
 
 /**
  * Versioned legal-document pages (Spec 007 — FR-017/FR-024, SC-010/SC-015).
@@ -39,11 +40,29 @@ function renderInline(text, keyPrefix) {
   return nodes
 }
 
+/** Slugify heading text into a URL-fragment-safe id (e.g. "Account Moderation" → "account-moderation"). */
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .replace(/[`*_[\]()]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 function renderMarkdown(md) {
   const lines = md.split('\n')
   const blocks = []
   let list = null
   let para = []
+  // Heading ids must be unique within the document (duplicate ids are an a11y violation).
+  const seenIds = new Set()
+  const uniqueId = (base) => {
+    let id = base || 'section'
+    let n = 2
+    while (seenIds.has(id)) id = `${base}-${n++}`
+    seenIds.add(id)
+    return id
+  }
 
   const flushPara = () => {
     if (para.length) {
@@ -68,7 +87,7 @@ function renderMarkdown(md) {
       flushPara(); flushList()
       const level = Math.min(h[1].length + 1, 6) // shift down one (page owns the h1)
       const Tag = `h${level}`
-      blocks.push(<Tag key={`h${idx}`}>{renderInline(h[2], `h${idx}`)}</Tag>)
+      blocks.push(<Tag key={`h${idx}`} id={uniqueId(slugify(h[2]))}>{renderInline(h[2], `h${idx}`)}</Tag>)
       return
     }
     const li = line.match(/^[-*]\s+(.*)$/)
@@ -92,6 +111,20 @@ function renderMarkdown(md) {
 
 export function LegalDocPage({ docType }) {
   const doc = useMemo(() => getCurrentDocument(docType), [docType])
+
+  // Deep-link support: scroll to the #fragment section once the doc has rendered
+  // (SPA navigation paints the content client-side, so the browser's native
+  // fragment scroll can fire before the target exists). FR-002 / SC-003.
+  useEffect(() => {
+    if (!doc || typeof window === 'undefined' || !window.location.hash) return
+    const id = decodeURIComponent(window.location.hash.slice(1))
+    const el = id && document.getElementById(id)
+    if (!el) return
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    try {
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+    } catch { /* jsdom: scrollIntoView not implemented */ }
+  }, [doc])
 
   if (!doc) {
     return (
