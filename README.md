@@ -1,41 +1,57 @@
 # FairWins — P2P Wager Management Layer
 
-> A smart contract infrastructure for managing peer-to-peer wagers that resolve based on external oracle sources.
+> Smart-contract escrow for peer-to-peer wagers, resolved by the participants
+> or by external oracles. Live on Polygon mainnet at [fairwins.app](https://fairwins.app).
 
-FairWins is **not** a prediction market. It's a wager management layer that enables friends and groups to create private wagers that automatically resolve based on trusted external sources like Polymarket, Chainlink price feeds, and UMA's optimistic oracle.
+FairWins is **not** a prediction market. It's a wager management layer that
+enables friends to create private 1-v-1 wagers whose stakes are locked in
+escrow and whose outcomes are settled by whoever the parties agreed to trust:
+themselves, a neutral arbitrator, or trusted external sources like Polymarket,
+Chainlink, and UMA's optimistic oracle.
+
+📖 **Full documentation:** [docs/](docs/index.md) (MkDocs site — user guide,
+architecture, contract reference)
 
 ## Key Insight
 
-Rather than compete with established prediction markets, FairWins **leverages** them. When you and your friends want to bet on whether Bitcoin will hit $100k, FairWins handles the stake management, dispute resolution, and payout distribution—while the actual outcome is determined by battle-tested oracles.
+Rather than compete with established prediction markets, FairWins
+**leverages** them. When you and a friend want to bet on whether Bitcoin will
+hit $100k, FairWins handles the stake escrow and payout — while the actual
+outcome is determined by battle-tested oracles.
 
 ## Features
 
-### Multi-Oracle Resolution
+### Eight resolution types
 
-Create wagers that resolve from multiple oracle sources:
+| Type | Settled by |
+|------|-----------|
+| `Either` / `Creator` / `Opponent` | The participants themselves |
+| `ThirdParty` | A neutral arbitrator named at creation |
+| `Polymarket` | A linked Polymarket CTF condition |
+| `ChainlinkDataFeed` | A price feed threshold (GT/GTE/LT/LTE/EQ) |
+| `ChainlinkFunctions` | A custom off-chain computation via the DON |
+| `UMA` | An Optimistic Oracle V3 assertion |
 
-| Oracle | Use Case | Resolution Type |
-|--------|----------|-----------------|
-| **Polymarket** | Event outcomes | Binary YES/NO markets |
-| **Chainlink** | Price targets | Above/below thresholds |
-| **UMA** | Custom claims | Optimistic assertion with disputes |
-| **Manual** | Friend disputes | Challenge period + arbitration |
+### Wager mechanics
 
-### Friend Group Markets
+- **1v1 even-money or bookmaker odds** — equal stakes, or asymmetric stakes at
+  a creator-set multiplier
+- **QR / deep-link sharing** — the opponent scans a code and accepts in-app
+- **Mutual draws** — both parties (or the arbitrator) can settle a push; each
+  side gets its own stake back
+- **End-to-end encrypted terms** — envelope encryption (X-Wing post-quantum
+  hybrid KEM) with keys published in an on-chain `KeyRegistry`; ciphertext on
+  IPFS, only a hash on-chain
 
-Private wagers between trusted groups with:
+### Safety mechanisms
 
-- **1v1 Markets**: Direct bets between two parties
-- **Group Markets**: 3-10 participants for pools and props
-- **Market Pegging**: Auto-resolve based on Polymarket outcomes
-- **Manual Resolution**: Creator-resolved with challenge period
-
-### Safety Mechanisms
-
-- **24-hour Challenge Period**: Dispute manual resolutions before finalization
-- **90-day Claim Timeout**: Unclaimed funds return to treasury
-- **30-day Oracle Timeout**: Stuck markets trigger mutual refund option
-- **Stake Escrow**: All funds locked in contract until resolution
+- **Stake escrow** — both stakes locked in `WagerRegistry` until resolution
+- **Refund paths everywhere** — expired offers, declined wagers, and wagers
+  whose resolve deadline passes unresolved all return stakes to their owners;
+  funds can never get stuck
+- **Pull-based payouts** — the winner claims the pot; claims can't be redirected
+- **Sanctions screening** — `SanctionsGuard` checks the Chainalysis oracle on
+  every create and accept
 
 ### Roles, tiers, and operator powers
 
@@ -64,36 +80,33 @@ distinct OpenZeppelin AccessControl role:
   three roles above.
 
 See [Roles and Tiers](docs/system-overview/roles-and-tiers.md) for the full
-privilege matrix.
+privilege matrix. No role can move escrowed stakes.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    FriendGroupMarketFactory                 │
-│  • Create wagers  • Manage stakes  • Handle resolutions     │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         │               │               │
-         ▼               ▼               ▼
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│  Polymarket │  │  Chainlink  │  │     UMA     │
-│   Adapter   │  │   Adapter   │  │   Adapter   │
-│             │  │             │  │             │
-│ Event bets  │  │ Price bets  │  │ Custom bets │
-└─────────────┘  └─────────────┘  └─────────────┘
-         │               │               │
-         └───────────────┼───────────────┘
-                         │
-                         ▼
-                 ┌─────────────┐
-                 │   Oracle    │
-                 │  Registry   │
-                 │             │
-                 │ Aggregation │
-                 └─────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                        WagerRegistry                         │
+│   create · accept · declareWinner · draw · claim · refund    │
+└───────┬──────────────┬───────────────────────┬───────────────┘
+        │              │                       │
+        ▼              ▼                       ▼
+┌───────────────┐ ┌──────────────┐  ┌─────────────────────────┐
+│ Membership    │ │ Sanctions    │  │     Oracle adapters     │
+│ Manager       │ │ Guard        │  │ (IOracleAdapter)        │
+│ tiers, limits │ │ Chainalysis  │  │ Polymarket · Chainlink  │
+└───────────────┘ └──────────────┘  │ DataFeed · Functions ·  │
+                                    │ UMA OOv3                │
+┌───────────────┐                   └─────────────────────────┘
+│ KeyRegistry   │   public keys for end-to-end
+│ (privacy)     │   encrypted wager terms (IPFS)
+└───────────────┘
 ```
+
+Frontend: React + Vite SPA (no backend) served by nginx on Cloud Run behind
+Cloudflare. Deployed addresses are recorded in [`deployments/`](deployments/)
+— Polygon mainnet (137) and Polygon Amoy testnet (80002). Full picture:
+[Architecture guide](docs/developer-guide/architecture.md).
 
 ## Quick Start
 
@@ -101,156 +114,85 @@ privilege matrix.
 
 ```bash
 npm install
-npx hardhat compile
+npm run compile
 ```
 
 ### Run Tests
 
 ```bash
-npx hardhat test
+npm test                # contract suite
+npm run test:fork       # fork tests
+npm run test:coverage   # coverage
+npm run test:frontend   # frontend (Vitest)
 ```
 
-### Create a Wager (Pegged to Polymarket)
+### Run the app locally
 
-```solidity
-// Create a market pegged to Polymarket's Bitcoin $100k market
-uint256 marketId = factory.createPeggedMarket(
-    "BTC $100k Pool",
-    polymarketConditionId,
-    [alice, bob, carol],
-    1 ether  // stake per person
-);
-
-// After Polymarket resolves, anyone can trigger resolution
-factory.resolveFromOracle(marketId);
-
-// Winners claim their stakes
-factory.claimWinnings(marketId);
+```bash
+npm run frontend
 ```
 
-### Create a Price-Based Wager (Chainlink)
+### Wager lifecycle (contract level)
 
 ```solidity
-// Create condition: ETH above $5000 by end of 2025
-bytes32 conditionId = chainlinkAdapter.createCondition(
-    ethPriceFeed,
-    5000_00000000,  // $5000 (8 decimals)
-    ComparisonType.ABOVE,
-    1735689600,     // Dec 31, 2025
-    "ETH above $5000 by 2025"
+// Creator escrows their stake and defines the wager
+uint256 id = registry.createWager(
+    opponent, arbitrator, usdc,
+    creatorStake, opponentStake,
+    acceptDeadline, resolveDeadline,
+    ResolutionType.Polymarket,
+    polymarketConditionId, /* creatorIsYes */ true,
+    metadataHash, "ipfs://<cid>"
 );
 
-// Create wager using this condition
-uint256 marketId = factory.createOracleMarket(conditionId, ...);
+// Opponent escrows their stake
+registry.acceptWager(id);
+
+// After the linked Polymarket market settles, anyone can trigger resolution
+registry.autoResolveFromPolymarket(id);
+
+// Winner pulls the full pot
+registry.claimPayout(id);
+
+// — or, if it never resolved by the deadline, either party gets made whole
+registry.claimRefund(id);
 ```
 
-### Create a Custom Wager (UMA)
+### Adding a new oracle adapter
+
+1. Implement the `IOracleAdapter` interface
+2. Wire it into `WagerRegistry`'s adapter slot for its resolution type
+3. Write tests (unit + fork) and update the docs
 
 ```solidity
-// Create condition for any verifiable claim
-bytes32 conditionId = umaAdapter.createCondition(
-    "Lakers will win the 2025 NBA Finals",
-    deadline
-);
-
-// After deadline, someone asserts the outcome (requires bond)
-umaAdapter.assertOutcome(conditionId, true);
-
-// After challenge period, settle
-umaAdapter.settleCondition(conditionId);
+contract MyOracleAdapter is IOracleAdapter {
+    function isConditionResolved(bytes32 conditionId) external view returns (bool);
+    function getOutcome(bytes32 conditionId) external view returns (
+        bool outcome, uint256 confidence, uint256 resolvedAt
+    );
+    function getConditionMetadata(bytes32 conditionId) external view returns (
+        string memory description, uint256 expectedResolutionTime
+    );
+}
 ```
 
 ## Contracts
 
-### Core
+| Contract | Location | Description |
+|----------|----------|-------------|
+| `WagerRegistry` | `contracts/wagers/` | Wager lifecycle + stake escrow |
+| `MembershipManager` | `contracts/access/` | Tiered memberships, rate limits |
+| `SanctionsGuard` | `contracts/access/` | Chainalysis screening + deny list |
+| `KeyRegistry` | `contracts/privacy/` | Encryption public keys |
+| `PolymarketOracleAdapter` | `contracts/oracles/` | Polymarket CTF outcomes |
+| `ChainlinkDataFeedOracleAdapter` | `contracts/oracles/` | Price-threshold conditions |
+| `ChainlinkFunctionsOracleAdapter` | `contracts/oracles/` | Custom DON computations |
+| `UMAOptimisticOracleV3Adapter` | `contracts/oracles/` | Optimistic assertions |
 
-| Contract | Description |
-|----------|-------------|
-| `FriendGroupMarketFactory` | Creates and manages P2P wagers |
-| `OracleRegistry` | Aggregates multiple oracle adapters |
+`contracts-archive/` holds superseded research (governance, conditional-token
+markets, friend-group factories) — reference only, never deploy.
 
-### Oracle Adapters
-
-| Contract | Oracle | Use Case |
-|----------|--------|----------|
-| `PolymarketOracleAdapter` | Polymarket CTF | Event outcome markets |
-| `ChainlinkOracleAdapter` | Chainlink | Price threshold conditions |
-| `UMAOracleAdapter` | UMA OOv3 | Arbitrary truth assertions |
-
-### Interfaces
-
-| Interface | Description |
-|-----------|-------------|
-| `IOracleAdapter` | Standard interface for oracle adapters |
-
-## Wager Lifecycle
-
-```
-1. CREATE       → Stakes locked in escrow
-2. ACTIVE       → Waiting for resolution source
-3. RESOLVE      → Oracle provides outcome OR manual resolution
-   └─ CHALLENGE → 24h dispute window (manual only)
-4. FINALIZE     → Resolution confirmed
-5. CLAIM        → Winners withdraw stakes
-   └─ TIMEOUT   → 90 days to claim, then treasury
-```
-
-## Safety Features
-
-### Challenge Period (Manual Resolutions)
-
-When markets are resolved manually, a 24-hour challenge period allows participants to dispute:
-
-```solidity
-// Challenger must post a bond
-factory.challengeResolution{value: 0.1 ether}(marketId);
-
-// Admin resolves dispute
-factory.resolveDispute(marketId, true);  // Challenger wins
-```
-
-### Oracle Timeout
-
-If an oracle-pegged market doesn't resolve within 30 days of expected time:
-
-```solidity
-// Anyone can trigger timeout mode
-factory.triggerOracleTimeout(marketId);
-
-// Both parties can accept mutual refund
-factory.acceptMutualRefund(marketId);  // Each party calls
-
-// Or admin can force resolution
-factory.forceOracleResolution(marketId, true);
-```
-
-### Claim Timeout
-
-Unclaimed winnings return to treasury after 90 days:
-
-```solidity
-// After 90 days, treasury can sweep
-factory.sweepUnclaimedFunds(marketId);
-```
-
-## Testing
-
-The test suite covers all functionality:
-
-```
-1237 passing tests
-
-Test Files:
-- FriendGroupMarketFactory.test.js (78 tests)
-- FriendGroupMarketFactory.Claim.test.js (16 tests)
-- FriendGroupMarketFactory.Challenge.test.js (31 tests)
-- FriendGroupMarketFactory.Timeout.test.js (18 tests)
-- FriendGroupMarketFactory.OracleTimeout.test.js (22 tests)
-- OracleRegistry.test.js (34 tests)
-- ChainlinkOracleAdapter.test.js (35 tests)
-- UMAOracleAdapter.test.js (25 tests)
-- PolymarketOracleAdapter.test.js (various)
-```
+Details: [Smart Contracts guide](docs/developer-guide/smart-contracts.md).
 
 ## Why Not Build a Prediction Market?
 
@@ -270,53 +212,10 @@ FairWins sidesteps these by:
 
 ## Development
 
-### Prerequisites
-
-- Node.js v18+
-- npm or yarn
-
-### Local Development
-
-```bash
-# Install dependencies
-npm install
-
-# Compile contracts
-npx hardhat compile
-
-# Run all tests
-npx hardhat test
-
-# Run specific test file
-npx hardhat test test/OracleRegistry.test.js
-
-# Generate coverage report
-npx hardhat coverage
-```
-
-### Adding a New Oracle Adapter
-
-1. Implement `IOracleAdapter` interface
-2. Add to `OracleRegistry`
-3. Write tests
-4. Update documentation
-
-```solidity
-contract MyOracleAdapter is IOracleAdapter {
-    function oracleType() external pure returns (string memory) {
-        return "MyOracle";
-    }
-
-    function isConditionSupported(bytes32 conditionId) external view returns (bool);
-    function isConditionResolved(bytes32 conditionId) external view returns (bool);
-    function getOutcome(bytes32 conditionId) external view returns (
-        bool outcome, uint256 confidence, uint256 resolvedAt
-    );
-    function getConditionMetadata(bytes32 conditionId) external view returns (
-        string memory description, uint256 expectedResolutionTime
-    );
-}
-```
+This repo uses [Spec Kit](https://github.com/github/spec-kit) for spec-driven
+feature development — see [CLAUDE.md](CLAUDE.md) and the binding standards in
+`.specify/memory/constitution.md`. Contract changes must follow
+checks-effects-interactions and pass Slither/Medusa in CI.
 
 ## License
 

@@ -251,7 +251,7 @@ Track these metrics monthly:
 - [OpenZeppelin Test Helpers](https://docs.openzeppelin.com/test-helpers/)
 - [Integration Testing Best Practices](https://martinfowler.com/bliki/IntegrationTest.html)
 - [Test Fixtures Pattern](https://martinfowler.com/bliki/TestFixture.html)
-- Internal: `docs/developer-guide/integration-testing.md`
+- Internal: `docs/archived/integration-testing.md`
 - Internal: `docs/developer-guide/testing.md`
 
 ## Revision History

@@ -1,6 +1,12 @@
-# Welcome to FairWins & ClearPath
+# Welcome to FairWins
 
-**Private wagers with friends, powered by trustless oracles** — A platform suite built on shared, privacy-preserving infrastructure.
+**Peer-to-peer wagers with friends, settled by smart-contract escrow and trustless oracles.**
+
+FairWins is a wager *management* layer — not a prediction market. Two people agree
+on a bet, both stakes are locked in an audited escrow contract on Polygon, and the
+wager is resolved either by the participants themselves, a neutral arbitrator, or
+an external oracle (Polymarket, Chainlink, UMA). There is no order book, no market
+making, and no house.
 
 > **Important**: Before purchasing a tier or interacting with the protocol,
 > please read the [Roles and Tiers](system-overview/roles-and-tiers.md)
@@ -8,38 +14,66 @@
 > The protocol can be paused by a Guardian role holder, and individual
 > accounts can be frozen for cause by an Account Moderator role holder.
 
-## Platform Suite Overview
+## How it works
 
-### 🎯 FairWins — P2P Wager Management Layer
+```mermaid
+sequenceDiagram
+    actor C as Creator
+    actor O as Opponent
+    participant W as WagerRegistry (escrow)
+    participant A as Oracle Adapter
 
-FairWins is a peer-to-peer wager platform where friends create, accept, and resolve private wagers with trustless oracle integration. Stakes are locked in escrow and automatically settled.
+    C->>W: createWager (stake locked)
+    C-->>O: share QR code / link
+    O->>W: acceptWager (stake locked)
+    Note over W: Wager active until end time
+    alt Participant-resolved
+        C->>W: declareWinner
+    else Oracle-resolved
+        A->>W: autoResolve (Polymarket / Chainlink / UMA)
+    end
+    W->>O: winner claims full pot
+```
 
-**Key Features:**
-- Create 1v1 private wagers on any topic
-- Share wagers via QR code or invite link
-- Multiple oracle sources (Polymarket, Chainlink, UMA, manual + challenge)
-- Escrow-based stake management
-- Flexible binary outcome types (Yes/No, Over/Under, Win/Lose, etc.)
+1. **Create** — pick the terms, the stake (USDC), and how the wager resolves
+2. **Share** — send your friend a QR code or deep link
+3. **Lock** — both stakes are held in smart-contract escrow
+4. **Resolve** — a participant, arbitrator, or oracle declares the outcome
+5. **Settle** — the winner claims the combined pot; expired or unresolved wagers are refundable
 
-### 🏛️ ClearPath — DAO Governance Platform
+## Where it runs
 
-ClearPath brings clarity to governance through futarchy-based decision-making, integrating privacy-preserving mechanisms for transparent yet secure collective intelligence in decentralized organizations.
+| Network | Chain ID | Status |
+|---------|----------|--------|
+| Polygon Mainnet | 137 | **Live** — production at [fairwins.app](https://fairwins.app) |
+| Polygon Amoy | 80002 | Testnet (toggle in the wallet menu) |
 
-**Key Features:**
-- Futarchy-based governance (vote on values, bet on beliefs)
-- Democratic welfare metric selection
-- Treasury management and proposal evaluation
-- Privacy-preserving voting mechanisms
-- Minority protection through ragequit
+Recorded contract addresses live in [`deployments/`](https://github.com/chippr-robotics/prediction-dao-research/tree/main/deployments)
+— see the [Architecture guide](developer-guide/architecture.md) for the full map.
 
-## System Overview
+## Resolution options
 
-Both FairWins and ClearPath are built on the same secure foundation:
+| Type | Who settles it |
+|------|----------------|
+| Either | Either participant can declare the winner |
+| Creator / Opponent | Only the named party declares |
+| Third Party | A neutral arbitrator chosen at creation |
+| Polymarket | Auto-settles from a linked Polymarket market |
+| Chainlink Data Feed | Auto-settles from a price-feed threshold |
+| Chainlink Functions | Auto-settles from a custom off-chain computation |
+| UMA | Auto-settles via UMA's Optimistic Oracle V3 |
 
-- **Conditional tokens** (Gnosis CTF) enable efficient binary outcome markets
-- **Oracle integration** resolves wagers and proposals via trusted data sources
-- **Privacy mechanisms** prevent collusion and protect participant identity
-- **Smart contract escrow** ensures trustless stake management
+## Privacy & security
+
+- **End-to-end encrypted terms** — wager descriptions are envelope-encrypted
+  client-side (X-Wing post-quantum hybrid KEM, [ADR-003](adr/003-xwing-post-quantum-encryption.md))
+  and stored on IPFS; only the participants (and arbitrator, if any) can read them
+- **On-chain key registry** — participants publish encryption public keys via `KeyRegistry`
+- **Escrow** — stakes are held by `WagerRegistry` until resolution; refund paths
+  exist for expired offers and unresolved wagers
+- **Sanctions screening** — `SanctionsGuard` checks the Chainalysis sanctions
+  oracle before any wager is created or accepted
+- **No backend** — the app is a static SPA; all state lives on-chain or on IPFS
 
 ## Quick Navigation
 
@@ -49,7 +83,7 @@ Both FairWins and ClearPath are built on the same secure foundation:
 
     ---
 
-    Learn how to create wagers, accept challenges, and track results.
+    Learn how to create wagers, accept challenges, and claim winnings.
 
     [:octicons-arrow-right-24: Getting Started](user-guide/getting-started.md)
 
@@ -57,7 +91,7 @@ Both FairWins and ClearPath are built on the same secure foundation:
 
     ---
 
-    Set up your development environment and learn about the shared architecture.
+    Set up your development environment and learn the system architecture.
 
     [:octicons-arrow-right-24: Setup Instructions](developer-guide/setup.md)
 
@@ -65,9 +99,9 @@ Both FairWins and ClearPath are built on the same secure foundation:
 
     ---
 
-    Understand P2P wager flows, oracle integration, and system design.
+    Understand the contracts, frontend, oracle integration, and infrastructure.
 
-    [:octicons-arrow-right-24: Architecture](architecture/P2P_WAGER_PLATFORM_ASSESSMENT.md)
+    [:octicons-arrow-right-24: Architecture](developer-guide/architecture.md)
 
 -   :fontawesome-solid-book:{ .lg .middle } __API Reference__
 
@@ -79,107 +113,21 @@ Both FairWins and ClearPath are built on the same secure foundation:
 
 </div>
 
-## Choosing Your Platform
+## System components
 
-### When to Use FairWins
+| Contract | Role |
+|----------|------|
+| `WagerRegistry` | Wager lifecycle and stake escrow (create, accept, resolve, claim, refund) |
+| `MembershipManager` | Tiered memberships (Bronze → Platinum) with creation rate limits |
+| `SanctionsGuard` | Non-bypassable sanctions screening (Chainalysis oracle + deny list) |
+| `KeyRegistry` | Public encryption keys for private wager terms |
+| Oracle adapters | `PolymarketOracleAdapter`, `ChainlinkDataFeedOracleAdapter`, `ChainlinkFunctionsOracleAdapter`, `UMAOptimisticOracleV3Adapter` |
 
-Choose FairWins for:
-- **Private wagers** between friends or small groups
-- **Event predictions** with automatic oracle resolution
-- **Casual bets** with trustless escrow (no need to trust the other party)
-- **Any binary outcome** — sports, crypto prices, weather, custom events
-
-### When to Use ClearPath
-
-Choose ClearPath for:
-- **DAO governance** with formal proposal processes
-- **Treasury management** for institutional investors
-- **Protocol decisions** requiring welfare metric tracking
-- **Grant allocation** with transparent evaluation
-
-## Key Features
-
-### :handshake: P2P Wager Flow
-
-1. **Create** — Pick a topic, set the stake, choose an oracle
-2. **Invite** — Share a QR code or link with your friend
-3. **Lock** — Both stakes are held in smart contract escrow
-4. **Resolve** — Oracle determines outcome automatically
-5. **Settle** — Winner claims the combined stake
-
-### :shield: Oracle Sources
-
-- **Polymarket** — Peg to real-world event outcomes
-- **Chainlink** — Price feeds for crypto wagers
-- **UMA** — Custom truth assertions with dispute resolution
-- **Manual + Challenge** — Creator resolves with 24h dispute window
-
-### :closed_lock_with_key: Privacy & Security
-
-- **Zero-Knowledge Position Encryption**: Poseidon encryption and Groth16 zkSNARKs for private positions
-- **MACI Integration**: Key-change messages prevent verifiable vote buying
-- **Escrow**: All stakes locked in audited smart contracts until resolution
-
-## System Components
-
-### FairWins Smart Contracts
-
-1. **FriendGroupMarketFactory** — Creates P2P wager markets between trusted parties
-2. **ConditionalMarketFactory** — Deploys binary outcome token pairs (CTF-compatible)
-3. **OracleResolver** — Multi-stage oracle resolution with dispute mechanism
-4. **CTF1155** — ERC-1155 conditional tokens for wager positions
-
-### ClearPath Smart Contracts
-
-5. **FutarchyGovernor** — Main governance coordinator
-6. **WelfareMetricRegistry** — Welfare metrics management
-7. **ProposalRegistry** — Proposal submission and management
-8. **RagequitModule** — Minority protection
-
-### Shared Infrastructure
-
-9. **PrivacyCoordinator** — Privacy and anti-collusion
-10. **TieredRoleManager** — Role-based access control
-11. **NullifierRegistry** — RSA accumulator-based blocklist
-
-## Getting Started
-
-Choose your path based on your use case:
-
-=== "FairWins (P2P Wagers)"
-
-    Want to create private wagers with friends or build on the wager platform?
-
-    :octicons-arrow-right-24: [FairWins User Guide](user-guide/getting-started.md#fairwins-wagers)
-
-=== "ClearPath (DAO Governance)"
-
-    Want to participate in institutional governance or manage a DAO treasury?
-
-    :octicons-arrow-right-24: [ClearPath User Guide](user-guide/getting-started.md#clearpath-dao)
-
-=== "Developers"
-
-    Want to contribute to the project or integrate with the systems?
-
-    :octicons-arrow-right-24: [Developer Guide](developer-guide/setup.md)
-
-=== "Researchers"
-
-    Want to understand the technical details and design decisions?
-
-    :octicons-arrow-right-24: [Architecture](architecture/P2P_WAGER_PLATFORM_ASSESSMENT.md)
-
-## Security Notice
-
-!!! warning "Development Status"
-    Both FairWins and ClearPath are in active development. Before mainnet deployment:
-
-    1. Complete professional security audits (minimum 2)
-    2. Run bug bounty program
-    3. Community review period (30+ days)
-    4. Formal verification of critical functions
-    5. Progressive decentralization of guardian powers
+The earlier futarchy/DAO-governance research (ClearPath, friend-group market
+factories, conditional-token markets) has been superseded by this P2P design;
+its documentation is preserved under
+[`docs/archived/`](https://github.com/chippr-robotics/prediction-dao-research/tree/main/docs/archived)
+and the contracts under `contracts-archive/`.
 
 ## License
 

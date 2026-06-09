@@ -1,279 +1,150 @@
 # Frontend Development
 
-Guide to developing the React frontend for Prediction DAO.
+Guide to developing the FairWins React frontend in `frontend/`.
 
-## Technology Stack
+## Technology stack
 
-- **React** 18+ - UI framework
-- **Vite** - Build tool and dev server
-- **ethers.js** v6 - Ethereum library
-- **React Hooks** - State management
-- **CSS** - Styling
+- **React 18** + **Vite** — SPA, no server-side rendering, no backend
+- **wagmi** — wallet connection (MetaMask, WalletConnect) and chain switching
+- **ethers.js v6** — contract reads/writes
+- **Vitest** — unit tests (`npm run test:frontend` from the repo root)
+- **Cypress** — E2E tests
+- Plain **CSS** co-located with components
 
-## Project Structure
+## Project structure
 
 ```
-frontend/
-├── src/
-│   ├── components/
-│   │   ├── ProposalSubmission.jsx
-│   │   ├── ProposalList.jsx
-│   │   ├── WelfareMetrics.jsx
-│   │   └── MarketTrading.jsx
-│   ├── App.jsx
-│   ├── App.css
-│   ├── main.jsx
-│   └── config.js
-├── public/
-├── index.html
-├── vite.config.js
-└── package.json
+frontend/src/
+├── App.jsx                  # routes (see below)
+├── pages/                   # route-level pages (WalletPage, MarketAcceptancePage, legal/)
+├── components/
+│   ├── fairwins/            # Dashboard, FriendMarketsModal, MyMarketsModal,
+│   │                        #   MarketAcceptanceModal, ShareWagerModal
+│   ├── wallet/              # WalletButton (connect + network toggle)
+│   ├── compliance/          # EntryGate (eligibility notice)
+│   └── ui/                  # WagerQRCode, QRScanner, PremiumPurchaseModal, ...
+├── hooks/                   # useFriendMarketCreation, useEncryption,
+│                            #   useWalletManagement, useChainTokens, ...
+├── contexts/                # FriendMarketsContext (wager cache), DexContext
+├── data/wagers/             # EventsSource (RPC scan) + SubgraphSource (optional)
+├── abis/                    # contract ABIs (WagerRegistry, MembershipManager, ...)
+├── config/
+│   ├── contracts.js         # per-chain addresses — GENERATED, do not hand-edit
+│   ├── networks.js          # chain capabilities (DEX, Polymarket availability)
+│   └── wagmi.js             # connectors + default chain
+└── constants/wagerDefaults.js  # canonical enums & defaults (resolution types,
+                                #   statuses, stake/deadline bounds)
 ```
 
-## Getting Started
+## Routes (`src/App.jsx`)
+
+| Route | Page | Notes |
+|-------|------|-------|
+| `/` | LandingPage | public marketing page |
+| `/terms`, `/risk`, `/privacy` | LegalDocPage | versioned, hash-linked legal documents |
+| `/app` (aliases `/main`, `/fairwins`) | Dashboard | main workspace, inside `AppLayout` (Header + EntryGate + Footer) |
+| `/wallet` | WalletPage | Account Center: Account / Membership / Security / Preferences / Swap tabs |
+| `/friend-market/accept` | MarketAcceptancePage | QR / deep-link wager acceptance (`?marketId=N`) |
+| `/admin` | AdminPanel | role-gated (Guardian / Role Manager / Account Moderator / Admin) |
+| `*` | redirect to `/` | |
+
+## Getting started
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run frontend           # dev server, from the repo root
+# or
+cd frontend && npm install && npm run dev
 ```
 
-## Connecting to Contracts
+## Contract configuration
 
-### Contract Configuration
-
-```javascript
-// src/config.js
-export const contracts = {
-  FutarchyGovernor: "0x...",
-  WelfareMetricRegistry: "0x...",
-  ProposalRegistry: "0x...",
-  ConditionalMarketFactory: "0x...",
-  PrivacyCoordinator: "0x...",
-  OracleResolver: "0x...",
-  RagequitModule: "0x..."
-};
-
-export const network = {
-  chainId: 1337,
-  name: "Hardhat Local"
-};
-```
-
-### Using ethers.js
-
-```javascript
-import { ethers } from 'ethers';
-import { contracts } from './config';
-
-// Connect to provider
-const provider = new ethers.BrowserProvider(window.ethereum);
-
-// Get signer
-const signer = await provider.getSigner();
-
-// Create contract instance
-const proposalRegistry = new ethers.Contract(
-  contracts.ProposalRegistry,
-  ProposalRegistryABI,
-  signer
-);
-
-// Call contract methods
-const tx = await proposalRegistry.submitProposal(...);
-await tx.wait();
-```
-
-## Key Components
-
-### Wallet Connection
-
-```javascript
-const [account, setAccount] = useState(null);
-const [provider, setProvider] = useState(null);
-
-const connectWallet = async () => {
-  if (window.ethereum) {
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      const address = await signer.getAddress();
-      
-      setProvider(provider);
-      setAccount(address);
-    } catch (error) {
-      console.error("Error connecting wallet:", error);
-    }
-  } else {
-    alert("Please install MetaMask!");
-  }
-};
-```
-
-### Proposal Submission
-
-```javascript
-const ProposalSubmission = () => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [fundingAmount, setFundingAmount] = useState('');
-  
-  const submitProposal = async () => {
-    try {
-      const tx = await proposalRegistry.submitProposal(
-        title,
-        description,
-        ethers.parseEther(fundingAmount),
-        recipientAddress,
-        welfareMetricId,
-        { value: ethers.parseEther("50") }
-      );
-      
-      await tx.wait();
-      alert("Proposal submitted!");
-    } catch (error) {
-      console.error("Error submitting proposal:", error);
-    }
-  };
-  
-  return (
-    <form onSubmit={submitProposal}>
-      <input 
-        value={title} 
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Proposal Title"
-      />
-      {/* More form fields */}
-      <button type="submit">Submit Proposal</button>
-    </form>
-  );
-};
-```
-
-### Reading Contract State
-
-```javascript
-const ProposalList = () => {
-  const [proposals, setProposals] = useState([]);
-  
-  useEffect(() => {
-    const loadProposals = async () => {
-      const count = await proposalRegistry.proposalCount();
-      const proposalArray = [];
-      
-      for (let i = 0; i < count; i++) {
-        const proposal = await proposalRegistry.getProposal(i);
-        proposalArray.push(proposal);
-      }
-      
-      setProposals(proposalArray);
-    };
-    
-    loadProposals();
-  }, []);
-  
-  return (
-    <div>
-      {proposals.map((proposal, index) => (
-        <div key={index}>
-          <h3>{proposal.title}</h3>
-          <p>{proposal.description}</p>
-        </div>
-      ))}
-    </div>
-  );
-};
-```
-
-### Listening to Events
-
-```javascript
-useEffect(() => {
-  const filter = proposalRegistry.filters.ProposalSubmitted();
-  
-  const handleProposalSubmitted = (proposalId, proposer) => {
-    console.log(`New proposal ${proposalId} from ${proposer}`);
-    // Update UI
-  };
-  
-  proposalRegistry.on(filter, handleProposalSubmitted);
-  
-  return () => {
-    proposalRegistry.off(filter, handleProposalSubmitted);
-  };
-}, [proposalRegistry]);
-```
-
-## Best Practices
-
-### Error Handling
-
-```javascript
-try {
-  const tx = await contract.method();
-  await tx.wait();
-} catch (error) {
-  if (error.code === 'ACTION_REJECTED') {
-    alert("Transaction rejected by user");
-  } else if (error.code === 'INSUFFICIENT_FUNDS') {
-    alert("Insufficient funds");
-  } else {
-    console.error("Transaction error:", error);
-    alert("Transaction failed. See console for details.");
-  }
-}
-```
-
-### Loading States
-
-```javascript
-const [loading, setLoading] = useState(false);
-
-const submitTransaction = async () => {
-  setLoading(true);
-  try {
-    const tx = await contract.method();
-    await tx.wait();
-  } finally {
-    setLoading(false);
-  }
-};
-
-return (
-  <button disabled={loading} onClick={submitTransaction}>
-    {loading ? "Processing..." : "Submit"}
-  </button>
-);
-```
-
-### Network Detection
-
-```javascript
-useEffect(() => {
-  const checkNetwork = async () => {
-    const { chainId } = await provider.getNetwork();
-    if (chainId !== expectedChainId) {
-      alert("Please switch to the correct network");
-    }
-  };
-  
-  if (provider) {
-    checkNetwork();
-  }
-}, [provider]);
-```
-
-## Building for Production
+Addresses come from `src/config/contracts.js`, keyed by chain ID (137 Polygon
+mainnet, 80002 Amoy, 1337 Hardhat, 63 legacy Mordor). The file is **generated**
+from `deployments/` records:
 
 ```bash
-npm run build
+npm run sync:frontend-contracts -- --network polygon --chainId 137
 ```
 
-Output will be in `dist/` directory.
+Never hand-edit addresses; fix the deployment record and re-sync.
 
-## Next Steps
+## Core patterns
 
-- [Review smart contracts](smart-contracts.md)
-- [Learn about testing](testing.md)
-- [Read contributing guidelines](contributing.md)
+### Writing: the wager-creation flow
+
+`useFriendMarketCreation` shows the canonical write pattern — every mutation
+is preceded by the same guards the contracts enforce:
+
+1. membership check (`MembershipManager.getMembership`)
+2. expired-wager cleanup if the user is at their concurrent limit
+   (`batchExpireOpen`)
+3. ERC-20 `approve` for the stake if allowance is insufficient
+4. the actual `WagerRegistry.createWager(...)` call
+5. optional encrypted-terms upload to IPFS (CID stored in `metadataUri`)
+
+In-flight transactions are persisted to localStorage so a reload can resume
+the flow.
+
+### Reading: the wager cache
+
+`FriendMarketsContext` is the single source of truth for the user's wagers,
+cached per chain. It pulls from `data/wagers/EventsSource.js` (direct RPC event
+scans + `getUserWagers` pagination); `SubgraphSource.js` exists but the
+deployed subgraph indexes the legacy v1 factory, so RPC is the primary path.
+
+### Encryption
+
+`useEncryption` derives encryption keys from a wallet signature, looks up
+counterparty public keys in `KeyRegistry`, and envelope-encrypts wager terms
+before pinning to IPFS. Decryption is lazy — triggered when the user opens a
+wager's details. See [Encryption Architecture](encryption-architecture.md).
+
+### Network handling
+
+`config/wagmi.js` defines the default chain (Polygon 137, overridable via
+`VITE_NETWORK_ID`); `useNetworkMode` implements the mainnet ↔ Amoy toggle in
+the wallet dropdown. Per-chain feature flags (DEX availability, Polymarket
+side-bets) live in `config/networks.js` — gate UI on those capabilities rather
+than on chain IDs.
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_NETWORK_ID` | default chain (137 production, 80002 testnet) |
+| `VITE_RPC_URL` | default RPC endpoint |
+| `VITE_WALLETCONNECT_PROJECT_ID` | WalletConnect cloud project |
+| `VITE_IPFS_GATEWAY` | IPFS read gateway (Pinata) |
+| `VITE_ORACLE_MODELS` | `polymarket-only` (default) or `all` — which oracle resolution types the UI exposes |
+
+Secrets (e.g. the Pinata JWT) are **never** Vite build args — they're injected
+at runtime on Cloud Run. See [Architecture](architecture.md#serving-infrastructure).
+
+## Testing
+
+```bash
+npm run test:frontend      # Vitest, from the repo root
+```
+
+Gotchas worth knowing before mocking contract hooks: `vi.mock` factories are
+hoisted (no outer-scope references), and `getContractAddress` mocks must cover
+every chain the component touches. Match existing test patterns in
+`frontend/src/**/__tests__/`.
+
+## Building for production
+
+```bash
+cd frontend && npm run build   # output in dist/
+```
+
+Production images are built by `cloudbuild.yaml` (multi-stage Docker: Vite
+build → nginx). Routing, caching, and security headers live in
+`frontend/nginx.conf` — note the CSP origin allowlist and the
+Permissions-Policy `camera=(self)` required by the QR scanner.
+
+## Next steps
+
+- [Architecture overview](architecture.md)
+- [Smart contracts](smart-contracts.md)
+- [Testing](testing.md)
+- [Contributing guidelines](contributing.md)

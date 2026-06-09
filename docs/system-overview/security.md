@@ -1,6 +1,6 @@
 # Security Model
 
-Understanding how the Prediction DAO platform preserves trust, protects participants, and maintains system integrity.
+Understanding how FairWins preserves trust, protects participants, and maintains system integrity.
 
 ## Operator powers
 
@@ -58,7 +58,7 @@ For the full role / privilege matrix, see [Roles and Tiers](roles-and-tiers.md).
 
 ## Philosophy of Security
 
-Security in a decentralized governance system requires more than technical safeguards. It demands a thoughtful blend of cryptographic protection, economic incentives, and transparency. The Prediction DAO platform approaches security through layers that work together to create a resilient environment where honest participation becomes the rational choice.
+Security in a decentralized wager protocol requires more than technical safeguards. It demands a thoughtful blend of cryptographic protection, economic incentives, and transparency. FairWins approaches security through layers that work together to create a resilient environment where honest participation becomes the rational choice.
 
 Think of the security model as a series of concentric circles. At the core lies the smart contract code itself, written carefully and audited thoroughly. Around that sits a layer of cryptographic privacy tools that shield individual positions while keeping aggregate data transparent. Further out, economic mechanisms create skin-in-the-game that discourages manipulation. Finally, time delays and governance checks provide humans with the breathing room needed to catch problems before they cause harm.
 

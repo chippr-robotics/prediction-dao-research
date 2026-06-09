@@ -1,171 +1,122 @@
-# Resolving and Challenging a Wager
+# Resolving a Wager
 
-This guide covers the end-of-life of a P2P wager: proposing an outcome, the challenge period, arbitration, and claiming winnings.
+This guide covers the end of a wager's life: declaring a winner, draws, oracle
+settlement, claiming the pot, and every way stakes come back if nothing
+resolves.
 
-## Wager Resolution Flow
+## Resolution flow
 
-```
-Trading Period Ends
-        |
-        v
-  Pending Resolution
-        |
-        v
-  Party Proposes Outcome
-        |
-        v
-  Challenge Period (default: 24 hours)
-       / \
-      /   \
-  No Challenge    Challenge Filed
-      |               |
-      v               v
-  Resolution      Arbitrator
-  Finalized       Resolves
-      |               |
-      v               v
-  Winner Claims   Winner Claims
-  Winnings        Winnings
+```mermaid
+flowchart TD
+    A[Wager Active<br/>end time passes] --> B{Resolution type}
+    B -->|Either / Creator / Opponent| C[Authorized party<br/>declares winner]
+    B -->|Third Party| D[Arbitrator<br/>declares winner]
+    B -->|"Oracle (Polymarket /<br/>Chainlink / UMA)"| E[Source resolves →<br/>anyone triggers auto-resolve]
+    C & D & E --> F[Resolved]
+    F --> G[Winner claims full pot]
+    A -->|both parties consent,<br/>or arbitrator| H[Draw — each side<br/>gets own stake back]
+    A -->|resolve deadline passes<br/>unresolved| I[Refund — both stakes<br/>returned]
 ```
 
-## Step 1: Trading Period Ends
+## Declaring a winner
 
-When the wager's end date passes, the status transitions from **Active** to **Pending Resolution**. No more acceptance or participation changes can occur.
+Who can declare depends on the resolution type fixed at creation:
 
-The wager dashboard shows the status change and indicates that resolution is now available.
+| Resolution type | Who declares |
+|----------------|--------------|
+| Either | Creator or opponent |
+| Creator only | The creator |
+| Opponent only | The opponent |
+| Third Party | The named arbitrator |
+| Polymarket / Chainlink / UMA | Nobody — the oracle outcome is read on-chain; anyone can trigger it |
 
-## Step 2: Propose a Resolution
+To declare:
 
-Who can propose depends on the resolution type set at creation:
+1. Open *My Wagers* and find the wager (creators see resolution controls in
+   the **Created** tab; arbitrators in the **Arbitrating** tab)
+2. Click **Resolve** and select who won
+3. Confirm the transaction (`declareWinner`)
 
-| Resolution Type | Who Can Propose |
-|----------------|-----------------|
-| Either Party | Creator or opponent |
-| Creator Only | Only the wager creator |
-| Opponent Only | Only the opponent |
-| Third Party | The designated arbitrator |
-| Auto-Pegged | Resolved automatically from oracle source |
+The wager moves to **Resolved** and the winner can claim.
 
-To propose an outcome:
+!!! tip "Encrypted wagers and arbitrators"
+    If the terms were encrypted, the arbitrator received their own decryption
+    key at creation, so they can read exactly what they're ruling on.
 
-1. Open the wager from your dashboard
-2. Click **Propose Resolution**
-3. Select the outcome: **True** (creator wins) or **False** (opponent wins)
-4. Confirm the transaction
+## Oracle settlement
 
-The contract records the proposal and starts the challenge period.
+For oracle-pegged wagers, the app shows *Awaiting Oracle* until the underlying
+source resolves:
 
-### Auto-Pegged Resolution
+- **Polymarket** — the linked market settles on Polymarket
+- **Chainlink Data Feed** — the price condition is evaluated at its deadline
+- **Chainlink Functions** — the registered off-chain computation is fulfilled
+- **UMA** — the assertion survives its dispute window
 
-For wagers pegged to an external oracle (Polymarket, Chainlink, UMA), resolution happens differently:
+Once the source has resolved, **anyone** can trigger settlement on-chain (the
+app exposes a button; the contract calls are `autoResolveFromPolymarket` /
+`autoResolveFromOracle`). The outcome maps to whichever side the creator
+declared they were taking when the wager was made. A tied or invalid oracle
+outcome settles as a draw.
 
-- **Polymarket** -- The system reads the outcome from the pegged Polymarket event
-- **Chainlink** -- Price feed data determines the outcome
-- **UMA** -- A truth assertion resolves the wager
+## Draws
 
-Call the appropriate function (`resolveFromOracle` or `resolveFromPolymarket`) or wait for the system to trigger it automatically.
+If you both agree the bet was a push:
 
-## Step 3: Challenge Period
+1. One party clicks **Propose Draw** (`declareDraw`) — this records consent
+2. The other party clicks the same — the wager settles as a **Draw** and each
+   side's own stake is returned automatically
 
-After a resolution is proposed, a **challenge period** begins. The default duration is 24 hours but may be configured differently per wager.
+Either party can withdraw consent (`revokeDraw`) before the other agrees. For
+third-party wagers, the arbitrator's single draw declaration settles
+immediately.
 
-During this period, the other party can review the proposed outcome and decide whether to accept or challenge it.
+## Claiming the pot
 
-### If No Challenge
+Once resolved:
 
-If the challenge period expires without a challenge:
+1. Open the wager (it's now in *My Wagers → History*)
+2. If you won, click **Claim Winnings** and confirm (`claimPayout`)
+3. The full pot — your stake plus your opponent's — transfers to your wallet
 
-1. Anyone can call **Finalize Resolution** to lock in the outcome
-2. The wager status transitions to **Resolved**
-3. The winner can now claim their winnings
+Claims are pull-based and can only be made once. There is no claim deadline;
+the pot waits for you in escrow.
 
-### If Challenged
+## Refunds
 
-If the other party disagrees with the proposed outcome:
+Stakes can never get stuck. Every dead end has a refund path:
 
-1. Click **Challenge Resolution** on the wager details page
-2. Post a challenge bond (the required amount is displayed in the UI)
-3. Confirm the transaction
+| Situation | What to do |
+|-----------|-----------|
+| Nobody accepted before the acceptance deadline | **Reclaim Stake** from *My Wagers* (`claimRefund`); stale offers can also be expired in bulk |
+| You changed your mind before acceptance | **Cancel** the open wager (`cancelOpen`) |
+| Your opponent declined | Creator's stake returns automatically |
+| Active wager passed its resolve deadline unresolved (e.g. oracle never reported, counterparty vanished) | Either party clicks **Refund** (`claimRefund`); both stakes return to their owners |
 
-The wager status transitions to **Challenged**, and the designated arbitrator is notified.
+## Timeline summary
 
-**Challenge bond behavior:**
-- If the challenge **succeeds** (arbitrator overturns the proposal), the bond is returned to the challenger
-- If the challenge **fails** (arbitrator upholds the proposal), the bond is forfeited
-
-## Step 4: Arbitrator Resolution (Challenged Wagers Only)
-
-When a wager is challenged, the designated arbitrator resolves the dispute:
-
-1. The arbitrator reviews the wager terms and the proposed/challenged outcome
-2. The arbitrator calls `resolveDispute(friendMarketId, outcome)` with the correct outcome
-3. The wager transitions to **Resolved**
-
-If no arbitrator was designated at creation, the platform's default dispute resolution process applies.
-
-## Step 5: Claim Winnings
-
-Once the wager is resolved:
-
-1. Open the resolved wager from your dashboard
-2. If you are the winner, click **Claim Winnings**
-3. Confirm the transaction
-4. Your winnings (your stake + opponent's stake, minus any fees) are transferred to your wallet
-
-For group wagers, each winner claims individually based on their share.
-
-### Claim Timeout
-
-Winners have **90 days** to claim their winnings after resolution. After the claim timeout:
-
-- Unclaimed funds are swept to the platform treasury
-- The winner can no longer claim
-- This prevents funds from being locked indefinitely in the contract
-
-Check your dashboard regularly for resolved wagers that need claiming.
-
-## Step 6: Oracle Timeout and Mutual Refund
-
-If a wager uses oracle-based resolution and the oracle fails to report within **30 days** of the expected resolution time:
-
-1. The wager status transitions to **Oracle Timed Out**
-2. A mutual refund is triggered automatically
-3. All participants receive their original stakes back
-4. No winner is declared
-
-Either party can also request a **mutual refund** at any time if both agree:
-
-1. One party clicks **Request Mutual Refund**
-2. The other party clicks **Accept Mutual Refund**
-3. Once both have agreed, all stakes are returned
-
-## Timeline Summary
-
-| Event | Timeframe |
-|-------|-----------|
-| Acceptance deadline | Default 48 hours from creation |
-| Trading period | Default 7 days from activation |
-| Challenge period | Default 24 hours after resolution proposal |
-| Claim timeout | 90 days after resolution |
-| Oracle timeout | 30 days after expected resolution time |
+| Event | Default | Bound |
+|-------|---------|-------|
+| Acceptance deadline | 6 hours after creation | up to 30 days |
+| End time | 1 day after creation | 1 hour – 21 days |
+| Resolution window after end time | 48 hours | up to 180 days, then refundable |
 
 ## Troubleshooting
 
-**"NotPendingResolution" error** -- The trading period has not ended yet. Wait for the wager end date to pass.
+**"Not authorized" when resolving** — the resolution type names someone else
+as the declarer; check the wager's resolution type.
 
-**"NotAuthorized" error** -- You are not authorized to propose a resolution for this wager. Check the resolution type to see who is allowed.
+**Resolve button missing** — the wager's end time hasn't passed yet, or you're
+looking at a wager you can't resolve (e.g. opponent-only resolution).
 
-**"ChallengePeriodNotExpired" error** -- The challenge period is still active. Wait for it to expire before finalizing.
+**Oracle wager stuck on "Awaiting Oracle"** — the underlying source hasn't
+resolved yet. If it never does, use the refund path after the resolve deadline.
 
-**"AlreadyChallenged" error** -- This resolution has already been challenged. Wait for the arbitrator to resolve.
+**"Already claimed"** — the pot was already paid out; check the wager's
+history entry.
 
-**"AlreadyClaimed" error** -- Winnings have already been claimed for this wager.
-
-**"ClaimTimeoutNotExpired" error** -- The 90-day claim window has not expired yet (relevant for treasury sweep).
-
-**Cannot find the Claim button** -- Only the winner sees the claim option. If the outcome was not in your favor, there is nothing to claim.
-
-## Related Guides
+## Related guides
 
 - [Creating a Wager](create-wager.md)
 - [Accepting a Wager](accept-wager.md)
+- [How It Works](../system-overview/how-it-works.md) — the on-chain state machine

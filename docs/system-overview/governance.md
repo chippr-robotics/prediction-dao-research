@@ -1,6 +1,6 @@
 # Governance
 
-Governance structure and progressive decentralization roadmap for Prediction DAO.
+Governance structure and progressive decentralization roadmap for FairWins.
 
 ## On-chain operator roles
 

@@ -3,13 +3,13 @@
 > **Note (v3 P2P refactor):** The core mechanic is now **peer-to-peer wagers**
 > via the `WagerRegistry` contract — not LMSR market making. The rest of this
 > page describes the legacy LMSR design and is preserved for historical
-> context. For the current mechanic see [How it Works](how-it-works.md), and
+> context. For the current mechanic see [How it Works](../system-overview/how-it-works.md), and
 > for the role / tier / pricing structure see
-> [Roles and Tiers](roles-and-tiers.md).
+> [Roles and Tiers](../system-overview/roles-and-tiers.md).
 >
 > **Before you purchase a tier**, please read the
-> [Account Moderation Policy](account-moderation.md) and the
-> [Operator powers section in security.md](security.md#operator-powers) —
+> [Account Moderation Policy](../system-overview/account-moderation.md) and the
+> [Operator powers section in security.md](../system-overview/security.md#operator-powers) —
 > the protocol can be paused by a Guardian role holder and individual
 > accounts can be frozen by an Account Moderator role holder.
 
@@ -568,10 +568,10 @@ Both platforms share:
 ## Resources
 
 ### Documentation
-- [System Introduction](introduction.md) - Overall system overview
-- [How It Works](how-it-works.md) - Detailed mechanics
-- [Privacy Mechanisms](privacy.md) - Privacy features
-- [Integration Testing](../developer-guide/integration-testing.md) - Test documentation
+- [System Introduction](../system-overview/introduction.md) - Overall system overview
+- [How It Works](../system-overview/how-it-works.md) - Detailed mechanics
+- [Privacy Mechanisms](../system-overview/privacy.md) - Privacy features
+- [Integration Testing](integration-testing.md) - Test documentation
 
 ### Technical References
 - [ConditionalMarketFactory Contract](../reference/contracts.md#conditionalmarketfactory)
@@ -589,7 +589,7 @@ Ready to use FairWins? Check out:
 
 1. **[Setup Guide](../developer-guide/setup.md)** - Install and configure
 2. **[User Guide](../user-guide/getting-started.md)** - Start trading
-3. **[Trading Guide](../user-guide/trading-on-markets.md)** - Learn to trade
+3. **[Trading Guide](trading-on-markets.md)** - Learn to trade
 4. **[FAQ](../user-guide/faq.md)** - Common questions
 
 ## Community
