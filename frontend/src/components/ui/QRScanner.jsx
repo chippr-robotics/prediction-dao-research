@@ -185,8 +185,12 @@ function QRScanner({ isOpen, onClose, onScanSuccess }) {
         <div className="scanner-container">
           <div id="qr-reader" ref={scannerRef}></div>
           {error && (
-            <div className="scanner-error" role="alert" aria-label={error}>
+            <div className="scanner-error" role="alert">
               <span className="error-icon" aria-hidden="true">⚠️</span>
+              <p className="scanner-error-message">{error}</p>
+              <p className="scanner-error-hint">
+                Allow camera access for this site in your browser settings, then reopen the scanner.
+              </p>
             </div>
           )}
         </div>
