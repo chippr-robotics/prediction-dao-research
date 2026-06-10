@@ -115,7 +115,7 @@ Frontend-only feature: all source under `frontend/src/`, tests under `frontend/s
 - [X] T030 [P] Accessibility pass (constitution V / spec FR-014): axe check on Dashboard with feed open, keyboard-only traversal of bell → feed → entry → close (quickstart step 9); fix any violations in `frontend/src/components/notifications/*`
 - [X] T031 Full validation: `npm run test:frontend` and frontend ESLint all green; confirm no `continue-on-error` or CI changes introduced
 - [ ] T032 Manual quickstart validation on Polygon Amoy with two accounts per `specs/012-wager-notifications/quickstart.md` steps 1–8 (incl. acknowledge-or-view read semantics and absence of legacy tab counts); record outcomes against the SC gates table (note any deviation in quickstart.md) — *automated outcomes recorded in quickstart.md (2026-06-10); the on-chain two-account walkthrough needs a human with a funded wallet — left open as the PR review checklist*
-- [ ] T033 Commit, push `feat/012-wager-notifications`, and open a PR with `gh pr create -R chippr-robotics/prediction-dao-research --head feat/012-wager-notifications` with inline `--body` (snap-confined gh: no /tmp body files, no auto-discovery); summarize spec/plan links and SC results
+- [X] T033 Commit, push `feat/012-wager-notifications`, and open a PR with `gh pr create -R chippr-robotics/prediction-dao-research --head feat/012-wager-notifications` with inline `--body` (snap-confined gh: no /tmp body files, no auto-discovery); summarize spec/plan links and SC results
 
 ---
 
