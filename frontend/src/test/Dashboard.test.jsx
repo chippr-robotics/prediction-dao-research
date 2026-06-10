@@ -167,6 +167,52 @@ describe('Dashboard Component', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('friend-modal')).not.toBeInTheDocument()
     })
+
+    // Spec 011 follow-up: Share Account quick action surfaces the address QR
+    // modal (AddressQRModal, contracts M1–M10) in its QUICK variant — a
+    // clean, minimally branded QR using the persisted color choice, with no
+    // color options and no visible address text.
+    it('"Share Account" opens the quick QR view for the connected address', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('Share Account'))
+
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      // QR rendered for the exact connected address (account alias of
+      // address) — asserted via the contracted accessible name (A1), which
+      // embeds the shortened connected address.
+      expect(
+        screen.getByRole('img', { name: /qr code for your wallet address 0x1234/i })
+      ).toBeInTheDocument()
+      // Quick variant: no color options, no visible address text.
+      expect(screen.queryAllByRole('radio')).toHaveLength(0)
+      expect(
+        screen.queryByText(defaultWalletContext.account)
+      ).not.toBeInTheDocument()
+    })
+
+    it('"Share Account" QR uses the color preference saved on the Account page', () => {
+      localStorage.setItem('fairwins_qrcolor_v1', 'forest')
+      const { container } = renderWithProviders(<Dashboard />)
+      fireEvent.click(screen.getByText('Share Account'))
+
+      const html = container.querySelector('.address-qr svg').outerHTML.toUpperCase()
+      expect(html).toContain('#14532D')
+      localStorage.removeItem('fairwins_qrcolor_v1')
+    })
+
+    it('"Share Account" modal closes via its close button', () => {
+      renderWithProviders(<Dashboard />)
+      fireEvent.click(screen.getByText('Share Account'))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /close address qr dialog/i })
+      )
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 
   describe('Rendering', () => {
@@ -196,6 +242,7 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('Oracle Settles (1v1)')).toBeInTheDocument()
       expect(screen.getByText('Bookmaker')).toBeInTheDocument()
       expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
+      expect(screen.getByText('Share Account')).toBeInTheDocument()
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
     })
 

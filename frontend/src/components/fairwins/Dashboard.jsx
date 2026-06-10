@@ -9,6 +9,7 @@ import FriendMarketsModal from './FriendMarketsModal'
 import MyMarketsModal from './MyMarketsModal'
 import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
+import AddressQRModal from '../ui/AddressQRModal'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { NETWORK_CONFIG } from '../../config/contracts'
@@ -81,6 +82,26 @@ function QuickActions({ onAction }) {
       description: 'Accept a wager from a friend'
     },
     {
+      id: 'share-account',
+      // QR grid with an outward arrow — keeps the QR vocabulary of the
+      // adjacent Scan card while staying visually distinct from it.
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+          <line x1="17.5" y1="21" x2="17.5" y2="15" />
+          <polyline points="14.5 17.5 17.5 14.5 20.5 17.5" />
+        </svg>
+      ),
+      title: 'Share Account',
+      // The visible title alone is ambiguous for screen readers ("Account"
+      // could mean the My Account page), so the accessible name spells out
+      // the QR outcome (spec 011 W1 naming convention).
+      ariaLabel: 'Share Account — show your address as a QR code',
+      description: 'Show your address as a QR code'
+    },
+    {
       id: 'my-wagers',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -102,7 +123,7 @@ function QuickActions({ onAction }) {
           key={action.id}
           className="quick-action-card"
           onClick={() => onAction(action.id)}
-          aria-label={action.title}
+          aria-label={action.ariaLabel || action.title}
         >
           <div className="quick-action-icon" aria-hidden="true">
             {action.icon}
@@ -344,6 +365,7 @@ function Dashboard() {
   const [createResolutionCategory, setCreateResolutionCategory] = useState('all')
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
+  const [showAddressQR, setShowAddressQR] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   // Pre-fill payload for the create-wager modal when launched from a
   // Polymarket card. Cleared on modal close so subsequent opens start clean.
@@ -374,6 +396,9 @@ function Dashboard() {
         break
       case 'scan-qr':
         setShowQrScanner(true)
+        break
+      case 'share-account':
+        setShowAddressQR(true)
         break
       default:
         break
@@ -519,6 +544,18 @@ function Dashboard() {
         onClose={() => setShowQrScanner(false)}
         onScanSuccess={handleQrScanSuccess}
       />
+
+      {/* Address QR Modal (spec 011) — quick variant: clean QR using the
+          persisted Account-page color, no color options, no visible address.
+          Mounted per open so the preference is re-read each time. */}
+      {showAddressQR && (
+        <AddressQRModal
+          isOpen
+          onClose={() => setShowAddressQR(false)}
+          address={account}
+          variant="quick"
+        />
+      )}
     </div>
   )
 }

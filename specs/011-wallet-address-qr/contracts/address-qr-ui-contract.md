@@ -98,6 +98,22 @@ in force, untouched.
   inspection/manual check, not Vitest: the jsdom matchMedia mock always
   reports `matches: false`.)
 
+### Quick variant (post-spec follow-up: Dashboard "Share Account" quick action)
+
+`variant="quick"` renders a clean, minimally branded view for in-person
+sharing. Guarantees added by PR #650:
+
+- **V1**: No color options are rendered; the persisted Account-page choice
+  (`fairwins_qrcolor_v1`) is applied automatically. The full (default)
+  variant is unchanged.
+- **V2**: The address text is not shown. The QR, Copy, and Share actions are
+  unchanged (M4–M7 payloads identical).
+- **V3**: On copy failure the address text is revealed as the manual-copy
+  fallback, preserving M5's escape hatch.
+- **V4**: Minimal branding — corner accents removed
+  (`address-qr-modal--quick` modifier), white quiet-zone card and wordmark
+  retained. Dialog semantics (M1, M3, M10) unchanged.
+
 ## Utility: `qrColorPreference` (`frontend/src/utils/qrColorPreference.js`)
 
 ### Exports

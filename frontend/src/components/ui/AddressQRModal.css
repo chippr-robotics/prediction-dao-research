@@ -79,6 +79,18 @@
   border-radius: var(--radius-lg);
 }
 
+/* Quick variant (Dashboard Share Account): minimal branding — no corner
+   accents, tighter card. The white quiet zone and wordmark stay. */
+.address-qr-modal--quick {
+  max-width: 360px;
+  padding: 28px 24px;
+}
+
+.address-qr-modal--quick .address-qr-frame::before,
+.address-qr-modal--quick .address-qr-frame::after {
+  display: none;
+}
+
 .address-qr-frame::before,
 .address-qr-frame::after {
   content: '';
