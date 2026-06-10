@@ -192,32 +192,10 @@
   flex-shrink: 0;
 }
 
-.mm-tab-badge {
-  background: #4C9AFF;
-  color: white;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 0.15rem 0.4rem;
-  border-radius: 10px;
-  min-width: 18px;
-  text-align: center;
-}
-
-.mm-tab-badge.mm-tab-badge-unread {
-  background: #36B37E;
-  animation: mmBadgePulse 2s ease-in-out infinite;
-  box-shadow: 0 0 0 0 rgba(54, 179, 126, 0.4);
-}
-
-@keyframes mmBadgePulse {
-  0%, 100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(54, 179, 126, 0.4);
-  }
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 4px rgba(54, 179, 126, 0);
-  }
+/* Action-needed badge (spec 012 FR-007) — sits next to the row's status badge. */
+.mm-action-needed-badge {
+  margin-left: 0.5rem;
+  vertical-align: middle;
 }
 
 /* Filter Bar */
@@ -1781,7 +1759,7 @@
     padding: 0.75rem 0.5rem;
   }
 
-  .mm-tab span:not(.mm-tab-badge) {
+  .mm-tab span {
     display: none;
   }
 

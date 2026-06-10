@@ -398,7 +398,10 @@ function processMarketResult(marketId, marketResult, acceptanceStatus, acceptanc
  * @param {string} userAddress - User's wallet address
  * @returns {Promise<Array>} Array of friend market objects
  */
-const WAGER_STATUS_NAMES = ['none', 'pending', 'active', 'resolved', 'cancelled', 'refunded']
+// Index-aligned with IWagerRegistry.sol `enum Status { None, Open, Active,
+// Resolved, Cancelled, Refunded, Draw }`. Exported for regression testing
+// (spec 012 T002 — Draw previously fell through to 'unknown').
+export const WAGER_STATUS_NAMES = ['none', 'pending', 'active', 'resolved', 'cancelled', 'refunded', 'draw']
 
 function toWagerShape(id, w) {
   const tokenAddr = w.token
