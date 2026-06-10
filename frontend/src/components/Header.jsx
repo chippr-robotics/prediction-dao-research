@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import WalletButton from './wallet/WalletButton'
 import ThemeToggle from './ui/ThemeToggle'
+import NotificationBell from './notifications/NotificationBell'
 import './Header.css'
 
 function Header({ hideWalletButton = false, appMode = false }) {
@@ -95,6 +96,9 @@ function Header({ hideWalletButton = false, appMode = false }) {
         {/* Wallet Connection Section */}
         <div className="header-actions">
           {appMode && <ThemeToggle />}
+          {/* Spec 012: single unread indicator — renders null when
+              disconnected or outside the WagerActivityProvider. */}
+          {appMode && <NotificationBell />}
           {!hideWalletButton && (
             <WalletButton
                 theme="dark"

@@ -1,9 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, within, act } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
 import { WalletContext, ThemeContext, UIContext, FriendMarketsContext } from '../contexts'
 import { BrowserRouter } from 'react-router-dom'
+
+// Identity-stable wager-activity context stub (spec 012). The modal consumes
+// useWagerActivityOptional; a stable object keeps its effects from looping.
+const wagerActivityCtx = vi.hoisted(() => ({
+  entries: [],
+  unreadCount: 0,
+  isPolling: false,
+  lastPolledAt: null,
+  markEntryRead: vi.fn(),
+  markWagerRead: vi.fn(),
+  markAllRead: vi.fn(),
+  actionNeededByWagerId: {},
+  actionNeededCount: 0,
+  refresh: vi.fn()
+}))
+
+vi.mock('../hooks/useWagerActivity', () => ({
+  useWagerActivity: () => wagerActivityCtx,
+  useWagerActivityOptional: () => wagerActivityCtx
+}))
 
 // Mock hooks
 vi.mock('../hooks', () => ({
@@ -28,12 +48,6 @@ vi.mock('../hooks', () => ({
     error: null,
     hasMore: false,
     totalKnown: 0
-  })),
-  useMyWagerNotifications: vi.fn(() => ({
-    unreadCount: 0,
-    unreadMarketIds: [],
-    markMarketAsRead: vi.fn(),
-    isMarketUnread: vi.fn(() => false)
   })),
   useLazyIpfsEnvelope: vi.fn((markets) => ({
     markets: markets || [],
@@ -509,27 +523,6 @@ describe('MyMarketsModal', () => {
       expect(dismissMarket).toHaveBeenCalledWith('99')
     })
 
-    it('should show tab badges only for unread wagers (count circuit breaker)', async () => {
-      const { useMyWagerNotifications } = await import('../hooks')
-      // Mark wager id '1' (the user-created one) as unread
-      useMyWagerNotifications.mockReturnValueOnce({
-        unreadCount: 1,
-        unreadMarketIds: ['1'],
-        markMarketAsRead: vi.fn(),
-        isMarketUnread: (id) => String(id) === '1',
-      })
-
-      await act(async () => {
-        renderWithProviders(
-          <MyMarketsModal isOpen={true} onClose={mockOnClose} friendMarkets={mockMarkets} />
-        )
-      })
-
-      await waitFor(() => {
-        const createdTab = screen.getByRole('tab', { name: /created/i })
-        expect(within(createdTab).getByText('1')).toBeInTheDocument()
-      })
-    })
   })
 
   describe('Keyboard Navigation', () => {

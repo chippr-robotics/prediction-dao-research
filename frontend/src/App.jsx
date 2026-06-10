@@ -21,6 +21,7 @@ import WalletPage from './pages/WalletPage'
 import MarketAcceptancePage from './pages/MarketAcceptancePage'
 import { TermsPage, RiskPage, PrivacyPage } from './pages/legal/LegalDocPage'
 import EntryGate from './components/compliance/EntryGate'
+import { WagerActivityProvider } from './contexts/WagerActivityContext.jsx'
 
 //admin
 import AdminPanel from './components/AdminPanel'
@@ -33,14 +34,16 @@ import { ComponentExamples } from './components/ui'
 
 function AppLayout() {
   return (
-    <>
+    /* Spec 012: wager watcher scoped to the app-mode tree — the header bell
+       and the wager views below consume it; landing pages never poll. */
+    <WagerActivityProvider>
       <Header appMode />
       {/* Spec 007 (US4): client-side eligibility notice gate before any app content. */}
       <EntryGate />
       <Outlet />
       {/* Spec 010 (US2): condensed legal/policy footer inside the app. */}
       <Footer variant="condensed" />
-    </>
+    </WagerActivityProvider>
   )
 }
 

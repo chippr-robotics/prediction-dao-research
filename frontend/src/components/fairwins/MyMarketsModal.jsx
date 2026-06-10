@@ -3,6 +3,7 @@ import { ethers } from 'ethers'
 import { useWallet, useWeb3 } from '../../hooks'
 import { useLazyMarketDecryption } from '../../hooks/useEncryption'
 import { useLazyIpfsEnvelope } from '../../hooks/useIpfs'
+import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { WagerStatus as MarketStatus, DisputeStatus, WAGER_DEFAULTS } from '../../constants/wagerDefaults'
 import { getContractAddressForChain } from '../../config/contracts'
@@ -11,7 +12,18 @@ import { WAGER_REGISTRY_ABI } from '../../abis/WagerRegistry'
 import { getFeeOverrides } from '../../utils/feeOverrides'
 import { getTransactionUrl } from '../../config/blockExplorer'
 import MarketAcceptanceModal from './MarketAcceptanceModal'
+import Badge from '../ui/Badge'
 import './MyMarketsModal.css'
+
+// Spec 012 FR-007: user-facing labels for the activity watcher's ActionKind
+// values, shown as a badge on wager rows that need something from the user.
+const ACTION_NEEDED_LABELS = {
+  accept: 'Accept',
+  resolve: 'Resolve',
+  claim: 'Claim',
+  refund: 'Refund',
+  respondDraw: 'Respond to draw'
+}
 
 /**
  * MyMarketsModal Component
@@ -29,10 +41,16 @@ import './MyMarketsModal.css'
 function MyMarketsModal({
   isOpen,
   onClose,
-  friendMarkets = []
+  friendMarkets = [],
+  initialSelectedMarketId = null
 }) {
   const { isConnected, account, chainId } = useWallet()
   const { signer, isCorrectNetwork, switchNetwork } = useWeb3()
+
+  // Wager activity watcher (spec 012). Optional: the modal must keep working
+  // when rendered outside WagerActivityProvider (legacy trees, tests).
+  const activity = useWagerActivityOptional()
+  const markWagerRead = activity?.markWagerRead
 
   // Active network metadata, used to scope/label the wagers shown so it's
   // clear they belong to the selected network (testnet vs mainnet).
@@ -121,6 +139,17 @@ function MyMarketsModal({
       setStatusFilter('all')
     }
   }, [isOpen])
+
+  // Feed navigation (spec 012 T019): when the caller passes a wager id, open
+  // directly at that wager's detail view. Runs only on open / id change —
+  // after this it never fights the user's own navigation. Viewing a wager
+  // marks its activity entries read (FR-004); declared after the open-reset
+  // effect so it wins the same-commit ordering.
+  useEffect(() => {
+    if (!isOpen || initialSelectedMarketId == null) return
+    setSelectedMarketId(initialSelectedMarketId)
+    markWagerRead?.(String(initialSelectedMarketId))
+  }, [isOpen, initialSelectedMarketId, markWagerRead])
 
   // Handle escape key
   useEffect(() => {
@@ -419,6 +448,8 @@ function MyMarketsModal({
 
   const handleMarketSelect = (market) => {
     setSelectedMarketId(market.id)
+    // FR-004: viewing a wager's details clears its unread activity entries.
+    markWagerRead?.(String(market.id))
   }
 
   const handleBackToList = () => {
@@ -605,9 +636,6 @@ function MyMarketsModal({
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
             <span>Participating</span>
-            {categorizedMarkets.participating.length > 0 && (
-              <span className="mm-tab-badge">{categorizedMarkets.participating.length}</span>
-            )}
           </button>
           <button
             className={`mm-tab ${activeTab === 'created' ? 'active' : ''}`}
@@ -621,9 +649,6 @@ function MyMarketsModal({
               <path d="M2 12l10 5 10-5"/>
             </svg>
             <span>Created</span>
-            {categorizedMarkets.created.length > 0 && (
-              <span className="mm-tab-badge">{categorizedMarkets.created.length}</span>
-            )}
           </button>
           {categorizedMarkets.arbitrating.length > 0 && (
             <button
@@ -636,7 +661,6 @@ function MyMarketsModal({
                 <path d="M12 3v18M5 7h14M5 7l-3 6a4 4 0 008 0L5 7zM19 7l-3 6a4 4 0 008 0l-5-6z"/>
               </svg>
               <span>Arbitrating</span>
-              <span className="mm-tab-badge">{categorizedMarkets.arbitrating.length}</span>
             </button>
           )}
           <button
@@ -650,9 +674,6 @@ function MyMarketsModal({
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span>History</span>
-            {categorizedMarkets.history.length > 0 && (
-              <span className="mm-tab-badge">{categorizedMarkets.history.length}</span>
-            )}
           </button>
         </nav>
 
@@ -1015,6 +1036,11 @@ function MarketsTable({
   account,
   showResolveCountdown = false
 }) {
+  // Action-needed badges (spec 012 FR-007): derived live from the activity
+  // watcher; null outside WagerActivityProvider (legacy trees → no badges).
+  const activity = useWagerActivityOptional()
+  const actionNeededByWagerId = activity?.actionNeededByWagerId
+
   const expiredMarkets = useMemo(
     () => markets.filter(m => m.computedStatus === MarketStatus.EXPIRED),
     [markets]
@@ -1064,6 +1090,7 @@ function MarketsTable({
             const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
             const showClearBtn = isExpired && typeof onClearExpired === 'function'
             const displayTitle = getMarketDisplayTitle(market)
+            const actionNeeded = actionNeededByWagerId?.[String(market.id)] ?? null
 
             return (
               <tr
@@ -1113,6 +1140,14 @@ function MarketsTable({
                   <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
                     {showUnderConsideration ? 'Under Consideration' : getStatusLabel(market.computedStatus)}
                   </span>
+                  {actionNeeded && (
+                    <Badge
+                      variant={actionNeeded === 'claim' ? 'success' : 'warning'}
+                      className="mm-action-needed-badge"
+                    >
+                      {ACTION_NEEDED_LABELS[actionNeeded] ?? actionNeeded}
+                    </Badge>
+                  )}
                 </td>
                 {tableHasActionsColumn && (
                   <td className="mm-table-actions" onClick={(e) => e.stopPropagation()}>

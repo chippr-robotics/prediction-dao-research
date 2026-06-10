@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useWallet, useWalletRoles, useWalletConnection } from '../../hooks'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
 import { useModal } from '../../hooks/useUI'
+import { useWagerActivityOptional } from '../../hooks/useWagerActivity'
 import { ROLES } from '../../contexts/RoleContext'
 import { SHOW_ALL_ORACLE_MODELS } from '../../constants/wagerDefaults'
 import FriendMarketsModal from './FriendMarketsModal'
@@ -11,6 +12,7 @@ import PolymarketBrowser from './PolymarketBrowser'
 import QRScanner from '../ui/QRScanner'
 import AddressQRModal from '../ui/AddressQRModal'
 import PremiumPurchaseModal from '../ui/PremiumPurchaseModal'
+import Badge from '../ui/Badge'
 import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import { NETWORK_CONFIG } from '../../config/contracts'
 import './Dashboard.css'
@@ -28,7 +30,15 @@ const formatAddress = (addr) => {
 // QUICK ACTION CARDS
 // ============================================================================
 
-function QuickActions({ onAction }) {
+function QuickActions({ onAction, actionNeededCount = 0 }) {
+  // Spec 012 FR-007: the My Wagers entry point surfaces the watcher's
+  // action-needed count. The full sentence goes into the button's aria-label
+  // (an aria-label suppresses descendant text for the accessible name) and is
+  // duplicated as an sr-only span inside the visible badge.
+  const actionNeededText =
+    `${actionNeededCount} wager${actionNeededCount === 1 ? '' : 's'} ` +
+    `need${actionNeededCount === 1 ? 's' : ''} action`
+
   const actions = [
     {
       id: 'create-1v1-friends',
@@ -112,7 +122,13 @@ function QuickActions({ onAction }) {
         </svg>
       ),
       title: 'My Wagers',
-      description: 'View active and past wagers'
+      description: 'View active and past wagers',
+      ariaLabel: actionNeededCount > 0
+        ? `My Wagers — ${actionNeededText}`
+        : undefined,
+      badge: actionNeededCount > 0
+        ? { count: actionNeededCount, label: actionNeededText }
+        : null
     }
   ]
 
@@ -132,6 +148,12 @@ function QuickActions({ onAction }) {
             <h4>{action.title}</h4>
             <p>{action.description}</p>
           </div>
+          {action.badge && (
+            <Badge variant="warning" className="quick-action-badge">
+              <span aria-hidden="true">{action.badge.count}</span>
+              <span className="sr-only">{action.badge.label}</span>
+            </Badge>
+          )}
         </button>
       ))}
     </div>
@@ -352,6 +374,11 @@ function Dashboard() {
   const { hasRole } = useWalletRoles()
   const { showModal, hideModal } = useModal()
   const navigate = useNavigate()
+  const location = useLocation()
+  // Wager activity watcher (spec 012). Optional: the dashboard must keep
+  // working when rendered outside WagerActivityProvider (legacy tests).
+  const activity = useWagerActivityOptional()
+  const actionNeededCount = activity?.actionNeededCount ?? 0
   // Demo mode is dev-only — set VITE_USE_MOCK_WAGERS=true in your .env to
   // bypass the wallet gate and view the dashboard with sample data. Production
   // never sets this so the badge and welcome bypass stay off.
@@ -370,9 +397,29 @@ function Dashboard() {
   // Pre-fill payload for the create-wager modal when launched from a
   // Polymarket card. Cleared on modal close so subsequent opens start clean.
   const [initialPolymarketMarket, setInitialPolymarketMarket] = useState(null)
+  // Wager id the My Wagers modal should open directly on (feed navigation).
+  const [initialWagerId, setInitialWagerId] = useState(null)
 
   // Friend markets from shared context (single fetch, no duplication)
   const { friendMarkets } = useFriendMarkets()
+
+  // Feed → wager navigation (spec 012 T018/FR-004). The activity feed
+  // navigates to /app with { openWagerId } in router state. Stash the id and
+  // open My Wagers during render (React's "adjust state while rendering"
+  // pattern — guarded, so it settles after one extra render), then consume
+  // the router state in an effect so a refresh or back-navigation doesn't
+  // re-open the modal.
+  const routeWagerId = location.state?.openWagerId == null
+    ? null
+    : String(location.state.openWagerId)
+  if (routeWagerId != null && initialWagerId !== routeWagerId) {
+    setInitialWagerId(routeWagerId)
+    setShowMyWagers(true)
+  }
+  useEffect(() => {
+    if (routeWagerId == null) return
+    navigate(location.pathname, { replace: true, state: {} })
+  }, [routeWagerId, location.pathname, navigate])
 
   const handleQuickAction = useCallback((actionId) => {
     switch (actionId) {
@@ -500,7 +547,7 @@ function Dashboard() {
 
       {/* Quick Actions */}
       <section className="dashboard-section">
-        <QuickActions onAction={handleQuickAction} />
+        <QuickActions onAction={handleQuickAction} actionNeededCount={actionNeededCount} />
       </section>
 
       {/* Top Polymarket markets — self-gates on chain capability, renders
@@ -534,8 +581,12 @@ function Dashboard() {
       {/* My Wagers Modal */}
       <MyMarketsModal
         isOpen={showMyWagers}
-        onClose={() => setShowMyWagers(false)}
+        onClose={() => {
+          setShowMyWagers(false)
+          setInitialWagerId(null)
+        }}
         friendMarkets={friendMarkets}
+        initialSelectedMarketId={initialWagerId}
       />
 
       {/* QR Scanner Modal */}
