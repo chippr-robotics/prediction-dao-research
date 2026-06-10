@@ -268,11 +268,13 @@ function WalletPage() {
                           <button onClick={handleDisconnect} className="disconnect-btn">Disconnect Wallet</button>
                         </div>
                       </div>
-                      <AddressQRModal
-                        isOpen={isQRModalOpen}
-                        onClose={() => setIsQRModalOpen(false)}
-                        address={address}
-                      />
+                      {isQRModalOpen && (
+                        <AddressQRModal
+                          isOpen
+                          onClose={() => setIsQRModalOpen(false)}
+                          address={address}
+                        />
+                      )}
                     </div>
 
                     {hasRole(ROLES.ADMIN) && (

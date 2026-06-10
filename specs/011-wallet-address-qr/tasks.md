@@ -106,9 +106,9 @@ Frontend-only feature: all source under `frontend/src/`, all tests in the flat `
 
 **Purpose**: Gates, non-regression proof, manual acceptance, and PR
 
-- [ ] T017 [P] Lint gate: `cd frontend && npm run lint` — zero new errors/warnings in the feature files (`AddressQRCode.jsx`, `AddressQRModal.jsx`, `useClipboard.js`, `qrColorPreference.js`, `WalletPage.jsx`, new tests)
-- [ ] T018 [P] Full suite + coverage: `npm run test:frontend` and `npm run test:coverage` from repo root — everything green including the untouched `frontend/src/test/WagerQRCode.test.jsx` (W3) and the existing axe suite
-- [ ] T019 Non-regression proof per plan constraints: `git diff --stat origin/main` shows NO changes under `contracts/`, `subgraph/`, `.github/workflows/`, `frontend/nginx.conf*`, `frontend/src/components/ui/WagerQRCode.*`, `frontend/src/test/WagerQRCode.test.jsx`, and NO dependency additions in `frontend/package.json`
+- [x] T017 [P] Lint gate: `cd frontend && npm run lint` — zero new errors/warnings in the feature files (`AddressQRCode.jsx`, `AddressQRModal.jsx`, `useClipboard.js`, `qrColorPreference.js`, `WalletPage.jsx`, new tests)
+- [x] T018 [P] Full suite + coverage: `npm run test:frontend` and `npm run test:coverage` from repo root — everything green including the untouched `frontend/src/test/WagerQRCode.test.jsx` (W3) and the existing axe suite
+- [x] T019 Non-regression proof per plan constraints: `git diff --stat origin/main` shows NO changes under `contracts/`, `subgraph/`, `.github/workflows/`, `frontend/nginx.conf*`, `frontend/src/components/ui/WagerQRCode.*`, `frontend/src/test/WagerQRCode.test.jsx`, and NO dependency additions in `frontend/package.json`
 - [ ] T020 Execute the manual validation walkthroughs AND the SC-002 device scan matrix from `specs/011-wallet-address-qr/quickstart.md` (4 palette colors × iOS Camera / Android Camera / FairWins in-app QRScanner — 12 cells, every cell must decode to the exact address); record the filled matrix for the PR description
 - [ ] T021 Commit on `feat/wallet-address-qr`, push, and open the PR: `gh pr create -R chippr-robotics/prediction-dao-research --head feat/wallet-address-qr --title "feat: wallet address QR display & sharing (spec 011)" --body "<summary + filled scan matrix>"` (gh snap constraints: explicit `-R`/`--head`, inline `--body`); confirm CI green before merge
 
@@ -172,6 +172,6 @@ Task: "T007 entry-point tests in frontend/src/test/WalletPage.test.jsx"
 ## Notes
 
 - Total: 21 tasks (Setup 2, Foundational 2, US1 6, US2 4, US3 2, Polish 5)
-- Traceability: every story task cites contract IDs from `contracts/address-qr-ui-contract.md`; FR/SC coverage — FR-001/002/003/008/009 → US1; FR-004/005 → US2; FR-006/007 → US3; SC-002 → T003 (contrast) + T020 (device matrix)
+- Traceability: every story task cites contract IDs from `contracts/address-qr-ui-contract.md`; FR/SC coverage — FR-001/002/003/008/009 → US1; FR-004/005 → US2; FR-006/007 → US3; SC-001 → T007/T010; SC-002 → T003 (contrast) + T020 (device matrix); SC-003 → T011–T014 (confirmation appears immediately; the 2000 ms figure is the reset *duration*, not latency); SC-004 → T012/T014; SC-005 → T015/T016 (mechanism proven by tests; the 95% figure is a post-launch tolerance for users who clear local data)
 - Never modify: `WagerQRCode.*`, its tests, nginx configs, anything under `contracts/` (Solidity) — this feature is frontend-only
-- Commit after each task or logical group on `feat/wallet-address-qr`; never push to `main`
+- Commit after each task or logical group on `011-wallet-address-qr`; never push to `main`

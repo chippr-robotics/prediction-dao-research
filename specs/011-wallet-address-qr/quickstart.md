@@ -27,7 +27,7 @@ npx vitest run src/test/qrColorPreference.test.js
 npx vitest run src/test/useClipboard.test.jsx
 npx vitest run src/test/AddressQRCode.test.jsx
 npx vitest run src/test/AddressQRModal.test.jsx
-npx vitest run src/test/accessibility.test.jsx   # axe job parity
+npx vitest run src/test/accessibility.test.jsx   # axe job parity (pre-existing suite)
 ```
 
 **Expected**: all green, including
@@ -49,8 +49,10 @@ npm run frontend   # Vite dev server, open the printed localhost URL
 
 1. Connect a wallet → header → **My Account** (routes to `/wallet`).
 2. On the **Account** tab, click **Show QR** (1 interaction → SC-001).
-3. Expect a branded modal: QR code, full address text, Copy/Share buttons,
-   four named color swatches.
+3. Expect a branded modal with the QR code and full address text (after US2
+   is implemented the modal also shows Copy/Share buttons; after US3, the
+   four named color swatches — validating US1 alone needs only QR +
+   address).
 4. Scan the QR with another device's stock camera → decoded text must equal
    the connected address exactly, including capitalization (EIP-55).
 5. Switch accounts in the wallet extension while the modal is open → QR and
@@ -89,7 +91,8 @@ npm run frontend   # Vite dev server, open the printed localhost URL
 Per research decision D10, optical decode is verified manually before merge
 and the results recorded in the PR description. Scan **each of the four
 palette colors** with each scanner; every cell must decode to the exact
-address:
+address. **Any failed cell blocks merge** until the failure mode is
+identified and fixed:
 
 | Scanner | Midnight | Forest | Ocean | Plum |
 |---------|----------|--------|-------|------|

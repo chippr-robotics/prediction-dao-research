@@ -59,10 +59,14 @@ in force, untouched.
   shown instead.
 - **M2 (content)**: When open with a valid address: renders `AddressQRCode`,
   the full address text (user-selectable), a Copy button, a Share button, and
-  the color radiogroup — all within one dialog.
+  the color radiogroup — all within one dialog. (Satisfied incrementally:
+  QR + address in US1, Copy/Share in US2, radiogroup in US3; fully met after
+  US3.)
 - **M3 (dialog semantics)**: `role="dialog"`, `aria-modal="true"`, labelled
   by the modal heading; Escape closes; focus moves into the dialog on open
-  and returns to the trigger on close.
+  and returns to the trigger on close. (Vitest asserts what jsdom supports —
+  `document.activeElement` transitions; full tab-cycle trapping is verified
+  manually per quickstart.)
 - **M4 (copy success)**: Activating Copy writes the exact `address` string to
   the clipboard and shows visible confirmation ("Copied!") for ~2 s.
 - **M5 (copy failure)**: If the clipboard API is missing or rejects, a
@@ -74,8 +78,10 @@ in force, untouched.
   only, no `url`/`title`. A user-cancelled share (`AbortError`) produces no
   error UI.
 - **M7 (share, fallback)**: When `navigator.share` is absent, the Share
-  button remains present and performs the copy path with visible "copied"
-  confirmation (FR-005 graceful degradation).
+  button remains present and copies the **full share payload**
+  (`My FairWins wallet address:\n<address>`, matching data-model.md — not
+  just the bare address) with visible "copied" confirmation (FR-005 graceful
+  degradation).
 - **M8 (color selection)**: The radiogroup offers exactly the four palette
   options, each with a visible/announced name; selecting one immediately
   re-renders the QR with that foreground and persists the id via
@@ -88,7 +94,9 @@ in force, untouched.
   next render (FR-009).
 - **A2 (axe)**: The open modal passes vitest-axe `toHaveNoViolations`.
 - **A3 (motion)**: Entrance animations are disabled under
-  `prefers-reduced-motion: reduce`.
+  `prefers-reduced-motion: reduce`. (CSS-only behavior — verified by CSS
+  inspection/manual check, not Vitest: the jsdom matchMedia mock always
+  reports `matches: false`.)
 
 ## Utility: `qrColorPreference` (`frontend/src/utils/qrColorPreference.js`)
 

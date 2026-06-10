@@ -21,6 +21,8 @@ import './AddressQRModal.css'
  *    preserved end-to-end). Falsy while open → connect prompt, never a QR.
  */
 function AddressQRModal({ isOpen, onClose, address }) {
+  // Lazy initializer reads the persisted choice when the modal mounts; the
+  // parent mounts it per open (FR-007), so every open reflects storage.
   const [paletteId, setPaletteId] = useState(getQRColorPreference)
   const { copied, error: copyError, copy } = useClipboard()
   const closeButtonRef = useRef(null)
@@ -56,14 +58,6 @@ function AddressQRModal({ isOpen, onClose, address }) {
       copy(shareText)
     }
   }
-
-  // Re-read the persisted color each time the dialog opens so a choice saved
-  // in an earlier session applies without re-selection (FR-007).
-  useEffect(() => {
-    if (isOpen) {
-      setPaletteId(getQRColorPreference())
-    }
-  }, [isOpen])
 
   // Move focus into the dialog on open; return it to the trigger on close.
   useEffect(() => {
