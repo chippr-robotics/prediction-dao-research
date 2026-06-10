@@ -130,6 +130,51 @@
   padding: 10px 12px;
 }
 
+.address-qr-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.address-qr-action-btn {
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--brand-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.address-qr-action-btn:hover {
+  opacity: 0.9;
+}
+
+.address-qr-action-btn:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.address-qr-share-btn {
+  background: var(--brand-secondary);
+}
+
+.address-qr-share-btn:focus-visible {
+  outline-color: var(--brand-secondary);
+}
+
+/* Persistent polite live region: empty until a copy succeeds or fails so
+   screen readers announce state changes (M4/M5). */
+.address-qr-status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
 .address-qr-connect-prompt {
   margin: 8px 0 0;
   color: var(--text-secondary);

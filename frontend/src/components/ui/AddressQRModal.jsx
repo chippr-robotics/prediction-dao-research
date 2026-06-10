@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import AddressQRCode from './AddressQRCode'
+import { useClipboard } from '../../hooks/useClipboard'
 import { getQRColorPreference } from '../../utils/qrColorPreference'
 import './AddressQRModal.css'
 
@@ -17,8 +18,35 @@ import './AddressQRModal.css'
  */
 function AddressQRModal({ isOpen, onClose, address }) {
   const [paletteId, setPaletteId] = useState(getQRColorPreference)
+  const { copied, error: copyError, copy } = useClipboard()
   const closeButtonRef = useRef(null)
   const triggerRef = useRef(null)
+
+  // The full share payload: context line first, address alone on its own
+  // line so recipients can copy it cleanly (research D7). Text-only — no
+  // url/title, which messaging apps would turn into a mangling link preview.
+  const shareText = `My FairWins wallet address:\n${address}`
+
+  const handleCopy = () => {
+    copy(address)
+  }
+
+  const handleShare = async () => {
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ text: shareText })
+      } catch (err) {
+        // User cancelled the share sheet — not an error (M6).
+        if (err?.name !== 'AbortError') {
+          console.warn('Share failed:', err)
+        }
+      }
+    } else {
+      // No Web Share API (desktop browsers): degrade to copying the full
+      // share payload with the same visible confirmation (M7 / FR-005).
+      copy(shareText)
+    }
+  }
 
   // Re-read the persisted color each time the dialog opens so a choice saved
   // in an earlier session applies without re-selection (FR-007).
@@ -97,6 +125,27 @@ function AddressQRModal({ isOpen, onClose, address }) {
             </p>
 
             <p className="address-qr-address">{address}</p>
+
+            <div className="address-qr-actions">
+              <button
+                type="button"
+                className="address-qr-action-btn"
+                onClick={handleCopy}
+              >
+                {copied ? 'Copied!' : 'Copy Address'}
+              </button>
+              <button
+                type="button"
+                className="address-qr-action-btn address-qr-share-btn"
+                onClick={handleShare}
+              >
+                Share
+              </button>
+            </div>
+
+            <p className="address-qr-status" role="status" aria-live="polite">
+              {copyError || (copied ? 'Address copied to clipboard.' : '')}
+            </p>
           </div>
         )}
       </div>
