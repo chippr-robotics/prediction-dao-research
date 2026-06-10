@@ -167,6 +167,38 @@ describe('Dashboard Component', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByTestId('friend-modal')).not.toBeInTheDocument()
     })
+
+    // Spec 011 follow-up: Share Account quick action surfaces the address QR
+    // modal (AddressQRModal, contracts M1–M10) directly from the dashboard.
+    it('"Share Account" opens the address QR modal with the connected address', () => {
+      renderWithProviders(<Dashboard />)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('Share Account'))
+
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      // QR rendered for the exact connected address (account alias of
+      // address) — asserted via the contracted accessible name (A1), which
+      // embeds the shortened connected address.
+      expect(
+        screen.getByRole('img', { name: /qr code for your wallet address 0x1234/i })
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(defaultWalletContext.account)
+      ).toBeInTheDocument()
+    })
+
+    it('"Share Account" modal closes via its close button', () => {
+      renderWithProviders(<Dashboard />)
+      fireEvent.click(screen.getByText('Share Account'))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /close address qr dialog/i })
+      )
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 
   describe('Rendering', () => {
@@ -196,6 +228,7 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('Oracle Settles (1v1)')).toBeInTheDocument()
       expect(screen.getByText('Bookmaker')).toBeInTheDocument()
       expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
+      expect(screen.getByText('Share Account')).toBeInTheDocument()
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
     })
 
