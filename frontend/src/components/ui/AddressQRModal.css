@@ -1,0 +1,186 @@
+/* Address QR modal (spec 011) — follows the ShareModal/ModalSystem idiom:
+   fixed blurred backdrop, centered card, bottom-sheet on small screens. The
+   QR always sits on a solid white quiet-zone card so it scans regardless of
+   theme; FairWins branding lives in the frame, never inside the QR. */
+
+.address-qr-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: addressQrFadeIn 0.3s ease;
+  padding: 16px;
+}
+
+.address-qr-modal {
+  position: relative;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: center;
+  animation: addressQrSlideUp 0.3s ease;
+}
+
+.address-qr-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.address-qr-close:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+
+.address-qr-close:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.address-qr-title {
+  margin: 0 0 20px;
+  font-size: 1.25rem;
+}
+
+.address-qr-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* White quiet-zone card with brand corner accents. The inner .address-qr div
+   (from AddressQRCode) holds the SVG; the white surface is non-negotiable for
+   scannability (contract C3). */
+.address-qr-frame {
+  position: relative;
+  background: #ffffff;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+}
+
+.address-qr-frame::before,
+.address-qr-frame::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: var(--brand-primary);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.address-qr-frame::before {
+  top: -4px;
+  left: -4px;
+  border-width: 3px 0 0 3px;
+  border-top-left-radius: 8px;
+}
+
+.address-qr-frame::after {
+  bottom: -4px;
+  right: -4px;
+  border-width: 0 3px 3px 0;
+  border-bottom-right-radius: 8px;
+}
+
+.address-qr svg {
+  display: block;
+}
+
+.address-qr-wordmark {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.address-qr-address {
+  margin: 0;
+  font-family: monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+  user-select: all;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.address-qr-connect-prompt {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+@keyframes addressQrFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes addressQrSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .address-qr-backdrop,
+  .address-qr-modal {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .address-qr-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .address-qr-modal {
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 24px 20px 32px;
+  }
+
+  /* ~200px QR on small screens (240px QR + 16px padding scales down). */
+  .address-qr-frame {
+    padding: 12px;
+  }
+
+  .address-qr svg {
+    width: 200px;
+    height: 200px;
+  }
+}

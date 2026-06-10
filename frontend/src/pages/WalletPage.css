@@ -321,6 +321,34 @@
   word-break: break-all;
 }
 
+.wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.show-qr-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+  background: var(--brand-primary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.show-qr-btn:hover {
+  opacity: 0.9;
+}
+
+.show-qr-btn:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
 .disconnect-btn {
   padding: 10px 20px;
   font-size: 14px;
