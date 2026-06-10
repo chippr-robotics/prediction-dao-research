@@ -49,5 +49,5 @@ artifacts live under `specs/<feature>/`.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/010-footer-policy-fixes/plan.md
+at specs/011-wallet-address-qr/plan.md
 <!-- SPECKIT END -->

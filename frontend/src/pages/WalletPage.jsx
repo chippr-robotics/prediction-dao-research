@@ -9,6 +9,7 @@ import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
+import AddressQRModal from '../components/ui/AddressQRModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
 import LoadingScreen from '../components/ui/LoadingScreen'
 import './WalletPage.css'
@@ -56,6 +57,7 @@ function WalletPage() {
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('account')
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [connectingConnectorId, setConnectingConnectorId] = useState(null)
   const [connectionError, setConnectionError] = useState(null)
   const [keyRegistered, setKeyRegistered] = useState(null)
@@ -261,8 +263,18 @@ function WalletPage() {
                           <span className="label">Address:</span>
                           <span className="value">{address}</span>
                         </div>
-                        <button onClick={handleDisconnect} className="disconnect-btn">Disconnect Wallet</button>
+                        <div className="wallet-actions">
+                          <button onClick={() => setIsQRModalOpen(true)} className="show-qr-btn">Show QR Code</button>
+                          <button onClick={handleDisconnect} className="disconnect-btn">Disconnect Wallet</button>
+                        </div>
                       </div>
+                      {isQRModalOpen && (
+                        <AddressQRModal
+                          isOpen
+                          onClose={() => setIsQRModalOpen(false)}
+                          address={address}
+                        />
+                      )}
                     </div>
 
                     {hasRole(ROLES.ADMIN) && (

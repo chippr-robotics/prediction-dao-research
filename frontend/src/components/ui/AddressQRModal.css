@@ -1,0 +1,300 @@
+/* Address QR modal (spec 011) — follows the ShareModal/ModalSystem idiom:
+   fixed blurred backdrop, centered card, bottom-sheet on small screens. The
+   QR always sits on a solid white quiet-zone card so it scans regardless of
+   theme; FairWins branding lives in the frame, never inside the QR. */
+
+.address-qr-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: addressQrFadeIn 0.3s ease;
+  padding: 16px;
+}
+
+.address-qr-modal {
+  position: relative;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 32px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: center;
+  animation: addressQrSlideUp 0.3s ease;
+}
+
+.address-qr-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.address-qr-close:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+
+.address-qr-close:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.address-qr-title {
+  margin: 0 0 20px;
+  font-size: 1.25rem;
+}
+
+.address-qr-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* White quiet-zone card with brand corner accents. The inner .address-qr div
+   (from AddressQRCode) holds the SVG; the white surface is non-negotiable for
+   scannability (contract C3). */
+.address-qr-frame {
+  position: relative;
+  background: #ffffff;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+}
+
+.address-qr-frame::before,
+.address-qr-frame::after {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: var(--brand-primary);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.address-qr-frame::before {
+  top: -4px;
+  left: -4px;
+  border-width: 3px 0 0 3px;
+  border-top-left-radius: 8px;
+}
+
+.address-qr-frame::after {
+  bottom: -4px;
+  right: -4px;
+  border-width: 0 3px 3px 0;
+  border-bottom-right-radius: 8px;
+}
+
+.address-qr svg {
+  display: block;
+}
+
+.address-qr-wordmark {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.address-qr-address {
+  margin: 0;
+  font-family: monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+  user-select: all;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.address-qr-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.address-qr-action-btn {
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--brand-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.address-qr-action-btn:hover {
+  opacity: 0.9;
+}
+
+.address-qr-action-btn:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.address-qr-share-btn {
+  background: var(--brand-secondary);
+}
+
+.address-qr-share-btn:focus-visible {
+  outline-color: var(--brand-secondary);
+}
+
+/* Persistent polite live region: empty until a copy succeeds or fails so
+   screen readers announce state changes (M4/M5). */
+.address-qr-status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.address-qr-connect-prompt {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+/* Color customization (US3): named swatches as native radios — keyboard
+   group navigation for free, selection shown by outline + check, never by
+   color alone (WCAG 1.4.1). */
+.address-qr-colors {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 16px 16px;
+  margin: 4px 0 0;
+  width: 100%;
+}
+
+.address-qr-colors legend {
+  padding: 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.qr-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.qr-color-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.qr-color-swatch.selected {
+  border-color: var(--brand-primary);
+}
+
+.qr-color-swatch:focus-within {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Keep the native radio focusable/SR-visible but visually replaced by the
+   swatch chip. */
+.qr-color-swatch input[type='radio'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.swatch-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}
+
+.swatch-check {
+  min-width: 1em;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+@keyframes addressQrFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes addressQrSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .address-qr-backdrop,
+  .address-qr-modal {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .address-qr-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .address-qr-modal {
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 24px 20px 32px;
+  }
+
+  /* ~200px QR on small screens (240px QR + 16px padding scales down). */
+  .address-qr-frame {
+    padding: 12px;
+  }
+
+  .address-qr svg {
+    width: 200px;
+    height: 200px;
+  }
+}
