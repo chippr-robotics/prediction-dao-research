@@ -169,8 +169,10 @@ describe('Dashboard Component', () => {
     })
 
     // Spec 011 follow-up: Share Account quick action surfaces the address QR
-    // modal (AddressQRModal, contracts M1–M10) directly from the dashboard.
-    it('"Share Account" opens the address QR modal with the connected address', () => {
+    // modal (AddressQRModal, contracts M1–M10) in its QUICK variant — a
+    // clean, minimally branded QR using the persisted color choice, with no
+    // color options and no visible address text.
+    it('"Share Account" opens the quick QR view for the connected address', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
@@ -184,9 +186,21 @@ describe('Dashboard Component', () => {
       expect(
         screen.getByRole('img', { name: /qr code for your wallet address 0x1234/i })
       ).toBeInTheDocument()
+      // Quick variant: no color options, no visible address text.
+      expect(screen.queryAllByRole('radio')).toHaveLength(0)
       expect(
-        screen.getByText(defaultWalletContext.account)
-      ).toBeInTheDocument()
+        screen.queryByText(defaultWalletContext.account)
+      ).not.toBeInTheDocument()
+    })
+
+    it('"Share Account" QR uses the color preference saved on the Account page', () => {
+      localStorage.setItem('fairwins_qrcolor_v1', 'forest')
+      const { container } = renderWithProviders(<Dashboard />)
+      fireEvent.click(screen.getByText('Share Account'))
+
+      const html = container.querySelector('.address-qr svg').outerHTML.toUpperCase()
+      expect(html).toContain('#14532D')
+      localStorage.removeItem('fairwins_qrcolor_v1')
     })
 
     it('"Share Account" modal closes via its close button', () => {

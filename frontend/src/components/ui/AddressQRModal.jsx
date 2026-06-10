@@ -19,8 +19,14 @@ import './AddressQRModal.css'
  *  - onClose (function, required): close button, backdrop, and Escape.
  *  - address (string, required): connected wallet address (EIP-55 casing
  *    preserved end-to-end). Falsy while open → connect prompt, never a QR.
+ *  - variant ('full' | 'quick'): 'quick' (Dashboard Share Account action) is
+ *    a clean, minimally branded view for in-person sharing — no color
+ *    options (the persisted Account-page choice applies) and no visible
+ *    address text. The address is revealed only as the copy-failure
+ *    fallback so the manual-copy escape hatch (contract M5) survives.
  */
-function AddressQRModal({ isOpen, onClose, address }) {
+function AddressQRModal({ isOpen, onClose, address, variant = 'full' }) {
+  const isQuick = variant === 'quick'
   // Lazy initializer reads the persisted choice when the modal mounts; the
   // parent mounts it per open (FR-007), so every open reflects storage.
   const [paletteId, setPaletteId] = useState(getQRColorPreference)
@@ -99,7 +105,7 @@ function AddressQRModal({ isOpen, onClose, address }) {
       aria-modal="true"
       aria-labelledby="address-qr-title"
     >
-      <div className="address-qr-modal">
+      <div className={`address-qr-modal${isQuick ? ' address-qr-modal--quick' : ''}`}>
         <button
           ref={closeButtonRef}
           className="address-qr-close"
@@ -127,7 +133,9 @@ function AddressQRModal({ isOpen, onClose, address }) {
               FairWins
             </p>
 
-            <p className="address-qr-address">{address}</p>
+            {(!isQuick || copyError) && (
+              <p className="address-qr-address">{address}</p>
+            )}
 
             <div className="address-qr-actions">
               <button
@@ -150,6 +158,7 @@ function AddressQRModal({ isOpen, onClose, address }) {
               {copyError || (copied ? 'Address copied to clipboard.' : '')}
             </p>
 
+            {!isQuick && (
             <fieldset className="address-qr-colors">
               <legend>QR color</legend>
               <div className="qr-color-options">
@@ -178,6 +187,7 @@ function AddressQRModal({ isOpen, onClose, address }) {
                 ))}
               </div>
             </fieldset>
+            )}
           </div>
         )}
       </div>

@@ -545,13 +545,15 @@ function Dashboard() {
         onScanSuccess={handleQrScanSuccess}
       />
 
-      {/* Address QR Modal (spec 011) — mounted per open so the persisted
-          color preference is re-read each time (lazy useState initializer). */}
+      {/* Address QR Modal (spec 011) — quick variant: clean QR using the
+          persisted Account-page color, no color options, no visible address.
+          Mounted per open so the preference is re-read each time. */}
       {showAddressQR && (
         <AddressQRModal
           isOpen
           onClose={() => setShowAddressQR(false)}
           address={account}
+          variant="quick"
         />
       )}
     </div>

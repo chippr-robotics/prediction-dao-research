@@ -238,6 +238,76 @@ describe('AddressQRModal — copy and share (US2)', () => {
   })
 })
 
+// Quick variant (V1–V5) — opened from the Dashboard "Share Account" quick
+// action: a clean, minimally branded QR for in-person sharing. No color
+// options (the persisted Account-page choice applies), no visible address
+// (revealed only as the copy-failure fallback so M5's manual-copy escape
+// hatch survives).
+describe('AddressQRModal — quick variant', () => {
+  function renderQuick(props = {}) {
+    return renderModal({ variant: 'quick', ...props })
+  }
+
+  afterEach(() => {
+    removeShare()
+  })
+
+  it('V1: renders no color options', () => {
+    renderQuick()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    expect(screen.queryByRole('group', { name: /qr color/i })).not.toBeInTheDocument()
+  })
+
+  it('V2: does not show the address text, but still renders the QR', () => {
+    renderQuick()
+    expect(screen.queryByText(ADDRESS)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: /qr code for your wallet address/i })
+    ).toBeInTheDocument()
+  })
+
+  it('V3: applies the persisted Account-page color choice', () => {
+    localStorage.setItem(STORAGE_KEY, 'ocean')
+    const { container } = renderQuick()
+    const html = container.querySelector('.address-qr svg').outerHTML.toUpperCase()
+    expect(html).toContain('#1E3A8A')
+    expect(html).not.toContain('#0E141B')
+  })
+
+  it('V4: Copy still writes the exact address; failure reveals the address as the manual fallback (M5)', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      writable: true,
+      configurable: true,
+      value: { writeText: vi.fn(() => Promise.reject(new Error('NotAllowedError'))) },
+    })
+    renderQuick()
+    expect(screen.queryByText(ADDRESS)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toMatch(/couldn.t copy|doesn.t allow/i)
+    )
+    // Fallback reveal: the address appears so manual copy is possible.
+    expect(screen.getByText(ADDRESS)).toBeInTheDocument()
+  })
+
+  it('V5: minimal branding — quick modifier class applied, wordmark retained, dialog semantics intact', async () => {
+    const { container } = renderQuick()
+    expect(container.querySelector('.address-qr-modal--quick')).toBeInTheDocument()
+    expect(screen.getByText('FairWins')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('V1 guard: the full (default) variant still renders the color options', () => {
+    renderModal()
+    expect(screen.getAllByRole('radio')).toHaveLength(4)
+    expect(screen.getByText(ADDRESS)).toBeInTheDocument()
+  })
+})
+
 // US3 — color customization (M8–M9). Native radios keyed off
 // QR_COLOR_PALETTE; selection restyles the QR immediately and persists under
 // fairwins_qrcolor_v1. Arrow-key group navigation is native radio behavior
