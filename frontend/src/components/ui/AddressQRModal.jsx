@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import AddressQRCode from './AddressQRCode'
 import { useClipboard } from '../../hooks/useClipboard'
-import { getQRColorPreference } from '../../utils/qrColorPreference'
+import {
+  QR_COLOR_PALETTE,
+  getQRColorPreference,
+  setQRColorPreference,
+} from '../../utils/qrColorPreference'
 import './AddressQRModal.css'
 
 /**
@@ -29,6 +33,11 @@ function AddressQRModal({ isOpen, onClose, address }) {
 
   const handleCopy = () => {
     copy(address)
+  }
+
+  const handleSelectColor = (id) => {
+    setPaletteId(id)
+    setQRColorPreference(id)
   }
 
   const handleShare = async () => {
@@ -146,6 +155,35 @@ function AddressQRModal({ isOpen, onClose, address }) {
             <p className="address-qr-status" role="status" aria-live="polite">
               {copyError || (copied ? 'Address copied to clipboard.' : '')}
             </p>
+
+            <fieldset className="address-qr-colors">
+              <legend>QR color</legend>
+              <div className="qr-color-options">
+                {QR_COLOR_PALETTE.map(({ id, name, fg }) => (
+                  <label
+                    key={id}
+                    className={`qr-color-swatch${paletteId === id ? ' selected' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="qr-color"
+                      value={id}
+                      checked={paletteId === id}
+                      onChange={() => handleSelectColor(id)}
+                    />
+                    <span
+                      className="swatch-dot"
+                      style={{ backgroundColor: fg }}
+                      aria-hidden="true"
+                    />
+                    <span className="swatch-name">{name}</span>
+                    <span className="swatch-check" aria-hidden="true">
+                      {paletteId === id ? '✓' : ''}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           </div>
         )}
       </div>

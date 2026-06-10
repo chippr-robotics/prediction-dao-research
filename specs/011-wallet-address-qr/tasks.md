@@ -92,11 +92,11 @@ Frontend-only feature: all source under `frontend/src/`, all tests in the flat `
 
 ### Tests for User Story 3 (write first, must fail)
 
-- [ ] T015 [US3] Extend `frontend/src/test/AddressQRModal.test.jsx` with failing customization tests: M8 (radiogroup offers exactly Midnight/Forest/Ocean/Plum with visible/announced names; selecting one immediately changes the rendered QR fg to that palette hex and calls through to storage key `fairwins_qrcolor_v1`; a stored value pre-selects on open), M9 (radios keyboard-operable; selected state indicated beyond color alone — assert presence of the non-color indicator), re-run A2 axe assertion with the radiogroup rendered
+- [x] T015 [US3] Extend `frontend/src/test/AddressQRModal.test.jsx` with failing customization tests: M8 (radiogroup offers exactly Midnight/Forest/Ocean/Plum with visible/announced names; selecting one immediately changes the rendered QR fg to that palette hex and calls through to storage key `fairwins_qrcolor_v1`; a stored value pre-selects on open), M9 (radios keyboard-operable; selected state indicated beyond color alone — assert presence of the non-color indicator), re-run A2 axe assertion with the radiogroup rendered
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Implement the color radiogroup in `frontend/src/components/ui/AddressQRModal.jsx` + `frontend/src/components/ui/AddressQRModal.css`: native radio inputs (or `role="radiogroup"`/`role="radio"`) labelled Midnight/Forest/Ocean/Plum driven by `QR_COLOR_PALETTE` (no hardcoded duplicate hex values), selection updates component state → `AddressQRCode` `paletteId` → `setQRColorPreference(id)`, selected swatch shows outline + check indicator, focus styles per `frontend/src/App.css` conventions — make T015 pass
+- [x] T016 [US3] Implement the color radiogroup in `frontend/src/components/ui/AddressQRModal.jsx` + `frontend/src/components/ui/AddressQRModal.css`: native radio inputs (or `role="radiogroup"`/`role="radio"`) labelled Midnight/Forest/Ocean/Plum driven by `QR_COLOR_PALETTE` (no hardcoded duplicate hex values), selection updates component state → `AddressQRCode` `paletteId` → `setQRColorPreference(id)`, selected swatch shows outline + check indicator, focus styles per `frontend/src/App.css` conventions — make T015 pass
 
 **Checkpoint**: All three stories independently functional
 

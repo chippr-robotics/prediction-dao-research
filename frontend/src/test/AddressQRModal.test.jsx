@@ -237,3 +237,74 @@ describe('AddressQRModal — copy and share (US2)', () => {
     )
   })
 })
+
+// US3 — color customization (M8–M9). Native radios keyed off
+// QR_COLOR_PALETTE; selection restyles the QR immediately and persists under
+// fairwins_qrcolor_v1. Arrow-key group navigation is native radio behavior
+// (verified manually per quickstart); here we assert real radio semantics,
+// names, indicator, and persistence.
+describe('AddressQRModal — color customization (US3)', () => {
+  it('M8: offers exactly the four named options as a radio group', () => {
+    renderModal()
+    const radios = screen.getAllByRole('radio')
+    expect(radios).toHaveLength(4)
+    expect(screen.getByRole('radio', { name: /midnight/i })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /forest/i })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /ocean/i })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /plum/i })).toBeInTheDocument()
+    // Native radios sharing one name attribute → browser-native arrow-key
+    // group navigation and single-selection semantics (M9).
+    const names = new Set(radios.map((r) => r.getAttribute('name')))
+    expect(names.size).toBe(1)
+    radios.forEach((r) => expect(r.getAttribute('type')).toBe('radio'))
+  })
+
+  it('M8: default selection is midnight; selecting Forest restyles the QR immediately and persists', () => {
+    const { container } = renderModal()
+    expect(screen.getByRole('radio', { name: /midnight/i })).toBeChecked()
+
+    fireEvent.click(screen.getByRole('radio', { name: /forest/i }))
+
+    expect(screen.getByRole('radio', { name: /forest/i })).toBeChecked()
+    const html = container.querySelector('.address-qr svg').outerHTML.toUpperCase()
+    expect(html).toContain('#14532D')
+    expect(html).not.toContain('#0E141B')
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('forest')
+  })
+
+  it('M8: a previously persisted choice is pre-selected on open (FR-007)', () => {
+    localStorage.setItem(STORAGE_KEY, 'plum')
+    const { container } = renderModal()
+    expect(screen.getByRole('radio', { name: /plum/i })).toBeChecked()
+    expect(container.querySelector('.address-qr svg').outerHTML.toUpperCase()).toContain(
+      '#581C87'
+    )
+  })
+
+  it('M9: the selected swatch shows a non-color indicator and radios are keyboard-focusable', () => {
+    renderModal()
+    const ocean = screen.getByRole('radio', { name: /ocean/i })
+    fireEvent.click(ocean)
+
+    // Non-color selection indicator (✓) rendered for the selected swatch only.
+    const checks = document.querySelectorAll('.qr-color-swatch .swatch-check')
+    const visibleChecks = Array.from(checks).filter((c) => c.textContent.trim() !== '')
+    expect(visibleChecks).toHaveLength(1)
+    expect(
+      visibleChecks[0].closest('.qr-color-swatch').textContent
+    ).toMatch(/ocean/i)
+
+    // Keyboard reachability: a native checked radio is focusable.
+    ocean.focus()
+    expect(document.activeElement).toBe(ocean)
+  })
+
+  it('M9/A2: the radiogroup has an accessible group label and the modal stays axe-clean', async () => {
+    const { container } = renderModal()
+    expect(
+      screen.getByRole('group', { name: /qr color/i })
+    ).toBeInTheDocument()
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+})

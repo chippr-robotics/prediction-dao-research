@@ -180,6 +180,75 @@
   color: var(--text-secondary);
 }
 
+/* Color customization (US3): named swatches as native radios — keyboard
+   group navigation for free, selection shown by outline + check, never by
+   color alone (WCAG 1.4.1). */
+.address-qr-colors {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 16px 16px;
+  margin: 4px 0 0;
+  width: 100%;
+}
+
+.address-qr-colors legend {
+  padding: 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.qr-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.qr-color-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.qr-color-swatch.selected {
+  border-color: var(--brand-primary);
+}
+
+.qr-color-swatch:focus-within {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Keep the native radio focusable/SR-visible but visually replaced by the
+   swatch chip. */
+.qr-color-swatch input[type='radio'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.swatch-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(127, 127, 127, 0.4);
+}
+
+.swatch-check {
+  min-width: 1em;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
 @keyframes addressQrFadeIn {
   from {
     opacity: 0;
