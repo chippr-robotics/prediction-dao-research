@@ -12,12 +12,18 @@ free-text search is sent to `/markets?search=` (unsupported — the endpoint
 returns a default set regardless), and category filtering uses `tag_slug=`
 (unsupported — also ignored). The fix re-points the data layer at the correct
 Gamma endpoints — `/public-search?q=<term>` for relevance-ranked search and
-`/markets?tag_id=<numeric id>` for category browse — maps the six user-facing
-category labels to their real numeric tag IDs, threads the active category into
-search so users can search within a category, preserves the typed query when
-toggling filters, collapses the double debounce into one, and adds the missing
-Vitest coverage. Scope is the frontend picker (`PolymarketBrowser`) and its data
-hooks (`usePolymarketSearch.js`); no contract, on-chain, or new-oracle changes.
+`/events?tag_id=<numeric id>` for category browse (both return **events with
+nested markets**) — and presents results **grouped by event**: a game or
+question with many sub-markets (moneyline, spreads, over/unders) is one
+expandable row the user expands to pick a specific sub-market, instead of
+flooding the list (per clarification 2026-06-13). It maps the six user-facing
+category labels to their real numeric tag IDs, makes the category chips
+multi-select with OR semantics, threads the active category into search (an
+active category constrains the search by default), preserves the typed query
+when toggling filters, collapses the double debounce into one, and adds the
+missing Vitest coverage. Scope is the frontend picker (`PolymarketBrowser`) and
+its data hooks (`usePolymarketSearch.js`); no contract, on-chain, or new-oracle
+changes.
 
 ## Technical Context
 
@@ -111,15 +117,18 @@ frontend/
 ├── src/
 │   ├── components/
 │   │   └── fairwins/
-│   │       ├── PolymarketBrowser.jsx      # MODIFY — query/filter wiring, debounce,
-│   │       │                              #   pass category into search, preserve query
-│   │       ├── PolymarketBrowser.css      # (unchanged unless new state needs styling)
+│   │       ├── PolymarketBrowser.jsx      # MODIFY — event-grouped rows w/ expand state,
+│   │       │                              #   multi-select OR chips, query/filter wiring,
+│   │       │                              #   single debounce, pass category into search,
+│   │       │                              #   preserve query on toggle
+│   │       ├── PolymarketBrowser.css      # MODIFY — expandable event row + sub-market list
 │   │       ├── FriendMarketsModal.jsx     # call site (inline) — no API change expected
 │   │       └── Dashboard.jsx              # call site (feed) — no API change expected
 │   ├── hooks/
-│   │   └── usePolymarketSearch.js         # MODIFY — /public-search?q, tag_id mapping,
-│   │                                      #   eligibility filter, category-aware search,
-│   │                                      #   slug→tag_id resolver/cache
+│   │   └── usePolymarketSearch.js         # MODIFY — /public-search?q (search) +
+│   │                                      #   /events?tag_id (browse), event grouping,
+│   │                                      #   eligibility filter, category-constrained
+│   │                                      #   search, multi-tag merge, slug→tag_id cache
 │   ├── config/
 │   │   └── networks.js                    # READ — Gamma base URL (already present)
 │   └── test/

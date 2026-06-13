@@ -6,8 +6,9 @@ The picker depends on these Gamma endpoints. Base URL comes from
 `Accept: application/json`, use `AbortController`, and tolerate transient
 failure (surface an error + retry, never a stale list).
 
-Rate limit: the `/public-search` family is ~350 requests / 10s — debounce and
-abort superseded requests.
+Both search and browse return **events with nested markets**, normalized into
+`NormalizedEvent` (see data-model.md). Rate limit: the `/public-search` family is
+~350 requests / 10s — debounce and abort superseded requests.
 
 ---
 
@@ -25,47 +26,49 @@ abort superseded requests.
 Example: `GET /public-search?q=knicks&limit_per_type=10`
 
 **Response (200)**: `{ "events": Event[], "pagination": {…} }`
-- `Event` includes `tags: Tag[]` and `markets: Market[]`.
-- `Market` includes `conditionId`, `question`, `active`, `closed`, `volume`,
-  `endDate`, `outcomes`, `outcomePrices`, `slug`, `image`/`icon`.
+- `Event`: `id`, `title`, `slug`, `tags: Tag[]`, `markets: Market[]`, `image`/`icon`.
+- `Market`: `conditionId`, `question`, `groupItemTitle`, `active`, `closed`,
+  `volume`, `endDate`, `outcomes`, `outcomePrices`, `slug`, `image`/`icon`.
 
 **Consumer rules**:
-- Flatten `events[].markets[]`, normalize, and keep only surfaceable markets
-  (`conditionId` present, `active === true`, `closed !== true`).
-- When categories are active, first keep only events whose `tags[].id` intersects
-  the selected `tagId`s, then flatten (Decision 4).
-- Preserve upstream order as relevance.
+- Normalize each event → `NormalizedEvent` keeping only surfaceable child markets
+  (`conditionId` present, `active === true`, `closed !== true`); drop events with
+  zero eligible children.
+- When categories are active, keep only events whose `tags[].id` intersects the
+  selected `tag_id`s (OR) before surfacing (Decision 6).
+- Preserve upstream event order as relevance.
 
 **Errors**: non-2xx → throw `Polymarket Gamma API returned <status>`; empty `q`
-→ caller must not send the request (treat blank as browse mode).
+→ caller must not send the request (blank = browse mode).
 
 ---
 
-## 2. Category browse — `GET /markets`
+## 2. Category / top browse — `GET /events`
 
-**Purpose**: list active, condition-bearing markets, optionally by category,
-ordered by volume (replaces the broken `tag_slug=`).
+**Purpose**: list active events (with nested markets), optionally by category,
+ordered by volume (replaces the broken `/markets?tag_slug=`).
 
 **Request params**:
 | param       | value |
 |-------------|-------|
-| `tag_id`    | numeric category id (omit for default top markets) |
+| `tag_id`    | numeric category id (omit for default top events) |
 | `active`    | `true` |
 | `closed`    | `false` |
 | `order`     | `volume` |
 | `ascending` | `false` |
 | `limit`     | e.g. `12` |
 
-Example: `GET /markets?tag_id=1&active=true&closed=false&order=volume&ascending=false&limit=12`
+Example: `GET /events?tag_id=1&active=true&closed=false&order=volume&ascending=false&limit=12`
 
-**Response (200)**: `Market[]` (or `{ data: Market[] }`) — normalize the same way;
-each has `conditionId`, `question`, `active`, `closed`, `volume`, `endDate`, …
+**Response (200)**: `Event[]` (or `{ data: Event[] }`) — same `Event`/`Market`
+shape as §1; events carry `tags`, `volume`/`volume24hr`, nested `markets[]`.
 
 **Consumer rules**:
-- Single category → one request. Multiple categories → one request per `tag_id`
-  in parallel, merge + de-dupe by `conditionId`, re-sort by volume, cap at
-  `limit` (Decision 5).
-- Apply the same surfaceable filter as search.
+- No category → one request (default top events).
+- One category → one request with `tag_id`.
+- Multiple categories → one request per `tag_id` in parallel, merge + de-dupe by
+  **event `id`**, re-sort by volume, cap at `limit` (Decision 5, OR semantics).
+- Apply the same per-market surfaceable filter and drop empty events as §1.
 
 ---
 
@@ -76,7 +79,7 @@ each has `conditionId`, `question`, `active`, `closed`, `volume`, `endDate`, …
 Example: `GET /tags/slug/pop-culture` → `{ "id": "596", "label": "Culture",
 "slug": "pop-culture", … }`
 
-**Verified seed mapping** (fallback if resolution is skipped/fails):
+**Verified seed mapping** (fallback / hermetic-test seed):
 
 | slug          | tag_id |
 |---------------|--------|
@@ -87,29 +90,32 @@ Example: `GET /tags/slug/pop-culture` → `{ "id": "596", "label": "Culture",
 | `business`    | `107`  |
 | `tech`        | `1401` |
 
-**Consumer rules**: resolve once, memoize in module scope; prefer the seed map
-to avoid a network round-trip (and to keep tests hermetic). A slug with no
-resolvable id applies no filter for that slug and yields an empty state rather
-than the default list.
+**Consumer rules**: prefer the seed map; resolve via `/tags/slug` only if
+unseeded; memoize in module scope. A slug with no resolvable id applies no filter
+for that slug.
 
 ---
 
 ## Contract test obligations
 
-Each obligation below is asserted in Vitest by mocking `fetch` (`vi.stubGlobal`)
-and inspecting the requested URL + handling the canned response:
+Asserted in Vitest by mocking `fetch` (`vi.stubGlobal`) and inspecting the
+requested URL + handling the canned response:
 
 - **C1**: search issues `GET …/public-search?q=<encoded query>&limit_per_type=…`
   (never `/markets?search=`).
-- **C2**: browse with a category issues `GET …/markets?...&tag_id=<numeric id>…`
-  using the verified mapping (never `tag_slug=`).
-- **C3**: only surfaceable markets (conditionId + active + !closed) appear;
-  closed/condition-less items in the payload are dropped.
-- **C4**: combined query+category keeps only markets from events tagged with a
-  selected `tag_id`.
-- **C5**: multi-category browse merges results from each `tag_id` request and
-  de-dupes by `conditionId`.
+- **C2**: browse issues `GET …/events?...` and, with a category, includes
+  `tag_id=<numeric id>` from the verified mapping (never `tag_slug=`, never
+  `/markets`).
+- **C3**: events are normalized with only surfaceable child markets
+  (conditionId + active + !closed); events with zero eligible children are
+  dropped.
+- **C4**: combined query+category keeps only events whose `tags` include a
+  selected `tag_id` (OR across selected categories).
+- **C5**: multi-category browse fans out one request per `tag_id` and merges +
+  de-dupes events by `id`.
 - **C6**: a superseded in-flight request is aborted and never overwrites newer
   results.
 - **C7**: non-2xx and network failure surface an error string; aborts are
   swallowed silently.
+- **C8**: a multi-market event normalizes to one `NormalizedEvent` with N
+  children (grouping), and a single-market event to one child.

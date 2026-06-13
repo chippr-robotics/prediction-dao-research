@@ -24,16 +24,19 @@ browse (feed) variant.
 
 ## Manual validation (maps to user stories)
 
-1. **Search relevance (US1)** — type `knicks`. **Expect**: only Knicks-related
-   markets (e.g. "Pacers vs. Knicks", spreads, over/unders); no album/GTA-VI
-   noise. Clearing the box returns to the top-markets list.
-2. **Category narrowing (US2)** — with no query, tap **Sports**. **Expect**: the
-   list changes to sports markets. Tap **Crypto**. **Expect**: a different,
-   crypto set (not the previous list). Tap **Clear**. **Expect**: default top
-   markets return.
+1. **Search relevance + grouping (US1/FR-017)** — type `knicks`. **Expect**:
+   only Knicks-related results; no album/GTA-VI noise. A game with many
+   sub-markets (moneyline/spreads/over-unders) appears as **one expandable event
+   row** — expand it to see and select an individual sub-market. Clearing the box
+   returns to the top-events list.
+2. **Category narrowing, multi-select OR (US2)** — with no query, tap **Sports**.
+   **Expect**: the list changes to sports events. Also tap **Crypto**.
+   **Expect**: the union of sports OR crypto events. Tap **Clear**. **Expect**:
+   default top events return.
 3. **Search within category (US3)** — type `lakers`, then toggle **Sports**.
    **Expect**: the typed query is **preserved** (not wiped) and results reflect
-   both. Remove **Sports** → results broaden to the query alone.
+   both. Selecting **Sports** first and then typing also constrains to Sports.
+   Remove **Sports** → results broaden to the query alone.
 4. **Responsive + trustworthy (US4)** — type quickly; results update within ~1s
    of pausing, no flicker/out-of-order. Simulate a failure (offline / block the
    Gamma host in devtools) → an error with a **Retry** that re-issues the
@@ -45,11 +48,11 @@ browse (feed) variant.
 ## Quick API sanity (optional, no app needed)
 
 ```bash
-# Search must be relevant (uses q=, not search=)
+# Search must be relevant (uses q=, not search=); returns events w/ nested markets
 curl -s "https://gamma-api.polymarket.com/public-search?q=knicks&limit_per_type=5"
 
-# Category browse by numeric tag_id (Sports=1)
-curl -s "https://gamma-api.polymarket.com/markets?tag_id=1&active=true&closed=false&order=volume&ascending=false&limit=5"
+# Category browse by numeric tag_id (Sports=1); events with nested markets
+curl -s "https://gamma-api.polymarket.com/events?tag_id=1&active=true&closed=false&order=volume&ascending=false&limit=5"
 
 # Slug → tag_id mapping
 curl -s "https://gamma-api.polymarket.com/tags/slug/pop-culture"
@@ -65,14 +68,14 @@ npx vitest run src/test/usePolymarketSearch.test.js \
 ```
 
 `fetch` is mocked via `vi.stubGlobal` (no MSW). The suite must cover contract
-obligations **C1–C7** ([gamma-api.md](./contracts/gamma-api.md)) and component
-obligations **T1–T7** ([polymarket-hooks.md](./contracts/polymarket-hooks.md)),
+obligations **C1–C8** ([gamma-api.md](./contracts/gamma-api.md)) and component
+obligations **T1–T8** ([polymarket-hooks.md](./contracts/polymarket-hooks.md)),
 including the regression fixture where searching `knicks` against the old code
-path would have returned GTA-VI markets.
+path would have returned GTA-VI markets, and the event-grouping/expand case.
 
 ## Done / acceptance
 
-- Manual steps 1–5 pass; success criteria SC-001…SC-008 in
+- Manual steps 1–5 pass; success criteria SC-001…SC-009 in
   [spec.md](./spec.md) hold.
 - New Vitest files pass; `npm run lint` (frontend) clean; vitest-axe clean.
 - No `contracts/` (Solidity) or deployment changes; behavior identical across
