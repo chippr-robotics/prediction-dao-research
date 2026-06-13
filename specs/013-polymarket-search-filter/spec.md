@@ -32,23 +32,27 @@ wager. Without this, the picker is unusable for anyone with a specific event in
 mind.
 
 **Independent Test**: Type a distinctive term (e.g. "knicks") and confirm every
-returned market's question is plausibly related to that term, that an obviously
-relevant market appears near the top, and that selecting a result attaches it to
-the wager.
+returned result is plausibly related to that term, that an obviously relevant
+event appears near the top, that an event with many sub-markets appears as one
+expandable row, and that selecting a sub-market attaches it to the wager.
 
 **Acceptance Scenarios**:
 
 1. **Given** the picker is open with no query, **When** the user types a term
-   that matches live markets, **Then** the list updates to show only markets
-   whose question text relates to that term, most-relevant first.
+   that matches live markets, **Then** the list updates to show only events
+   whose markets relate to that term, most-relevant first.
 2. **Given** a search term that matches no live markets, **When** results
    return, **Then** the user sees a clear "no matching markets" empty state
    rather than an unrelated or stale list.
 3. **Given** search results are shown, **When** the user clears the search box,
    **Then** the picker returns to the default browse list of top markets.
-4. **Given** the user selects a market from the search results, **When** they
-   continue, **Then** that market is linked to the wager and used for automatic
-   settlement.
+4. **Given** an event that has many sub-markets (e.g. a game's moneyline,
+   spreads, and over/unders), **When** it appears in results, **Then** it is
+   shown as a single event row that the user can expand to reveal and select an
+   individual sub-market.
+5. **Given** the user selects a (sub-)market from the results, **When** they
+   continue, **Then** that specific market is linked to the wager and used for
+   automatic settlement.
 
 ---
 
@@ -71,9 +75,10 @@ produces a different, category-appropriate set.
 
 1. **Given** the default browse list is shown, **When** the user selects a
    category, **Then** the list updates to show only markets in that category.
-2. **Given** a category is selected, **When** the user selects a different
-   category, **Then** the list updates to the newly selected category's markets
-   (not the previous category's or the default set).
+2. **Given** one category is selected, **When** the user selects an additional
+   category, **Then** the list updates to the union of markets across all
+   selected categories (OR semantics), and deselecting a category narrows the
+   list back to the remaining selected categories.
 3. **Given** one or more categories are selected, **When** the user clears the
    selection, **Then** the list returns to the default top-markets browse view.
 4. **Given** a selected category has no eligible live markets, **When** results
@@ -106,6 +111,9 @@ confirm removing the category broadens results back to the query alone.
 3. **Given** a query and a category are both active, **When** the user clears the
    query, **Then** the category remains active and the list shows that
    category's browse view.
+4. **Given** one or more categories are already selected, **When** the user then
+   types a query, **Then** the search is constrained to the selected categories
+   by default (results must match both the query and a selected category).
 
 ---
 
@@ -162,6 +170,25 @@ as current.
   still adjustable.
 - **Query that matches a category name**: Treated as a text search over markets,
   not as an implicit category switch (categories change only via the filters).
+- **Event with a single market**: An event that has only one market is shown
+  directly (no redundant expand affordance for a single child).
+- **Expanded event whose sub-markets become ineligible**: Only eligible
+  sub-markets are listed under an event; an event with no eligible sub-markets is
+  not shown at all.
+
+## Clarifications
+
+### Session 2026-06-13
+
+- Q: How should the picker present an event that returns many sub-markets (e.g.
+  "knicks" → a game's moneyline + several spreads + several over/unders)? → A:
+  Group them under a single expandable event row; the user expands to select an
+  individual sub-market (not one top-level row per sub-market).
+- Q: Should category chips be multi-select or single-select? → A: Multi-select
+  with OR semantics (results belong to any selected category).
+- Q: When a category is already selected and the user types a query, should
+  search be constrained to that category by default? → A: Yes — constrain the
+  search to the selected categories by default.
 
 ## Requirements *(mandatory)*
 
@@ -171,10 +198,13 @@ as current.
   relevant to the user's query, ordered most-relevant first. Searching a
   distinctive term MUST NOT return markets unrelated to that term.
 - **FR-002**: The picker MUST narrow results to the selected category when a
-  category filter is active, and selecting different categories MUST produce
-  correspondingly different result sets.
-- **FR-003**: The picker MUST support applying a search query and a category
-  filter simultaneously, returning markets that satisfy both.
+  category filter is active. Category filters MUST be multi-selectable, combined
+  with OR semantics (results belong to ANY selected category), and selecting
+  different categories MUST produce correspondingly different result sets.
+- **FR-003**: The picker MUST support applying a search query and category
+  filters simultaneously, returning only results that satisfy both. When one or
+  more categories are already selected and the user types a query, the search
+  MUST be constrained to the selected categories by default.
 - **FR-004**: Changing the category selection MUST preserve any text the user has
   already typed in the search box.
 - **FR-005**: Clearing the search query MUST return to the active category's
@@ -203,30 +233,43 @@ as current.
 - **FR-013**: The category filter set offered to users MUST map to real,
   supported upstream categories so that every offered category returns its
   corresponding markets.
-- **FR-014**: Selecting a market from any result (search or browse) MUST link
-  that market to the wager such that the wager settles automatically when the
-  market resolves, preserving the existing selection behavior.
+- **FR-014**: Selecting a (sub-)market from any result (search or browse) MUST
+  link that specific market to the wager such that the wager settles
+  automatically when the market resolves, preserving the existing selection
+  behavior.
+- **FR-017**: When an event exposes multiple related markets (e.g. a game's
+  moneyline, spreads, and over/unders), the picker MUST group them under a single
+  event entry that the user can expand to reveal and select an individual
+  sub-market, rather than listing every sub-market as a separate top-level
+  result. An event with a single market is shown without a redundant expand step.
 - **FR-015**: Search and filter behavior MUST be consistent everywhere the picker
   appears (wager-creation flow and dashboard feed).
 - **FR-016**: The search and filter behavior MUST be covered by automated tests,
-  including relevant-results, category-narrowing, combined query+category,
-  query-preservation-on-toggle, empty/error states, and superseded-request
-  handling.
+  including relevant-results, multi-category OR narrowing, combined
+  query+category (default constraint), query-preservation-on-toggle,
+  event grouping/expand and sub-market selection, empty/error states, and
+  superseded-request handling.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Market (matchup)**: A single Polymarket prediction market the user can link
-  a wager to. Relevant attributes for this feature: a human-readable question/
-  title, category/topic association, a popularity signal (e.g. trading volume),
-  resolution/active status, and the identifiers required to link it for automatic
-  settlement.
-- **Search query**: The free-text term the user types to find markets by their
-  question text.
+- **Event (grouped matchup)**: A real-world happening (e.g. a specific game or
+  question) that groups one or more related markets. Shown as a single
+  expandable row in the picker. Relevant attributes: a human-readable title, its
+  category/topic association(s), and its set of eligible child markets. An event
+  is surfaced only if it has at least one eligible child market.
+- **Market (sub-market)**: A single Polymarket prediction market under an event
+  that the user actually links a wager to. Relevant attributes: a human-readable
+  question/title, a popularity signal (e.g. trading volume), resolution/active
+  status, and the identifiers required to link it for automatic settlement.
+- **Search query**: The free-text term the user types to find events/markets by
+  their text.
 - **Category filter**: A user-selectable topic (e.g. Sports, Politics, Crypto,
-  Pop Culture, Business, Tech) that constrains results to markets in that topic.
-- **Result set / picker state**: The current list shown to the user plus its
-  state (browsing vs. searching, selected categories, loading/empty/error),
-  driven by the combination of active query and active category filters.
+  Pop Culture, Business, Tech). Multiple may be selected at once; selected
+  categories constrain results with OR semantics.
+- **Result set / picker state**: The current list of events (with their
+  expandable sub-markets) shown to the user plus its state (browsing vs.
+  searching, selected categories, expanded events, loading/empty/error), driven
+  by the combination of active query and active category filters.
 
 ## Success Criteria *(mandatory)*
 
@@ -251,6 +294,9 @@ as current.
   appears.
 - **SC-008**: Automated tests cover the search, filter, combined, state, and
   race-condition behaviors and pass in CI.
+- **SC-009**: An event with many related sub-markets (e.g. a single game's
+  moneyline/spreads/over-unders) occupies a single result row that expands to its
+  sub-markets, rather than flooding the list with one row per sub-market.
 
 ## Assumptions
 
