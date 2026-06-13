@@ -36,9 +36,9 @@ Web app — frontend feature. Source under `frontend/src/`, tests under
 
 **Purpose**: Test fixtures/helpers the rest of the work depends on
 
-- [ ] T001 [P] Create Gamma API test fixtures in `frontend/src/test/fixtures/polymarket.js`: a `/public-search?q=knicks` payload (events with a multi-sub-market game event + the GTA-VI regression items), `/events?tag_id=<id>` payloads for ≥2 categories, an event containing a closed/condition-less (ineligible) market, a single-market event, and an error case.
-- [ ] T002 [P] Add a `fetch` mock helper (URL-aware, returns fixtures via `vi.stubGlobal`) in `frontend/src/test/helpers/mockGammaFetch.js`, following the existing pattern in `frontend/src/test/ipfsService.test.js`.
-- [ ] T003 [P] Confirm the Gamma base URL is sourced from `frontend/src/config/networks.js` (`network.polymarket.gammaApiUrl`) and note the verified category seed map (politics=2, sports=1, crypto=21, pop-culture=596, business=107, tech=1401) for use in T005.
+- [X] T001 [P] Create Gamma API test fixtures in `frontend/src/test/fixtures/polymarket.js`: a `/public-search?q=knicks` payload (events with a multi-sub-market game event + the GTA-VI regression items), `/events?tag_id=<id>` payloads for ≥2 categories, an event containing a closed/condition-less (ineligible) market, a single-market event, and an error case.
+- [X] T002 [P] Add a `fetch` mock helper (URL-aware, returns fixtures via `vi.stubGlobal`) in `frontend/src/test/helpers/mockGammaFetch.js`, following the existing pattern in `frontend/src/test/ipfsService.test.js`.
+- [X] T003 [P] Confirm the Gamma base URL is sourced from `frontend/src/config/networks.js` (`network.polymarket.gammaApiUrl`) and note the verified category seed map (politics=2, sports=1, crypto=21, pop-culture=596, business=107, tech=1401) for use in T005.
 
 ---
 
@@ -49,9 +49,9 @@ Web app — frontend feature. Source under `frontend/src/`, tests under
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Add `normaliseGammaEvent(event)` in `frontend/src/hooks/usePolymarketSearch.js` that reuses `normaliseGammaMarket` for children, sets each child `label = groupItemTitle || question`, keeps only eligible children (`conditionId` present, `active === true`, `closed !== true`), captures event `id/title/slug/volume/tagIds`, and returns `null` when the event has zero eligible children. (data-model: NormalizedEvent/NormalizedMarket; Decisions 7, 10)
-- [ ] T005 Add `resolveCategoryTagId(slug)` in `frontend/src/hooks/usePolymarketSearch.js` backed by the verified seed map, memoized in module scope, with a `GET /tags/slug/{slug}` fallback for unseeded slugs. (Decision 3)
-- [ ] T006 Add a single-flight request helper (one `AbortController`, discard superseded responses, swallow `AbortError`, surface non-2xx as `Polymarket Gamma API returned <status>`) in `frontend/src/hooks/usePolymarketSearch.js`, to be used by both hooks. (Decision 8; C6/C7)
+- [X] T004 Add `normaliseGammaEvent(event)` in `frontend/src/hooks/usePolymarketSearch.js` that reuses `normaliseGammaMarket` for children, sets each child `label = groupItemTitle || question`, keeps only eligible children (`conditionId` present, `active === true`, `closed !== true`), captures event `id/title/slug/volume/tagIds`, and returns `null` when the event has zero eligible children. (data-model: NormalizedEvent/NormalizedMarket; Decisions 7, 10)
+- [X] T005 Add `resolveCategoryTagId(slug)` in `frontend/src/hooks/usePolymarketSearch.js` backed by the verified seed map, memoized in module scope, with a `GET /tags/slug/{slug}` fallback for unseeded slugs. (Decision 3)
+- [X] T006 Add a single-flight request helper (one `AbortController`, discard superseded responses, swallow `AbortError`, surface non-2xx as `Polymarket Gamma API returned <status>`) in `frontend/src/hooks/usePolymarketSearch.js`, to be used by both hooks. (Decision 8; C6/C7)
 
 **Checkpoint**: Normalization, tag resolution, and fetch safety are ready.
 
@@ -68,15 +68,15 @@ sub-market, and a single-market event selects directly.
 
 ### Tests for User Story 1 ⚠️ (write first, must fail)
 
-- [ ] T007 [P] [US1] Hook tests in `frontend/src/test/usePolymarketSearch.test.js`: search calls `…/public-search?q=<encoded>&limit_per_type=…` (never `/markets?search=`), normalizes to events with eligible children, drops ineligible/empty events, and the `knicks` fixture yields only relevant events. (C1, C3, C8; regression)
-- [ ] T008 [P] [US1] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: typing shows grouped event rows; a multi-sub-market event renders one expandable row that reveals children on expand; selecting a child calls `onSelectMarket` with its `conditionId`; a single-market event selects directly without expanding. (T1, T7)
+- [X] T007 [P] [US1] Hook tests in `frontend/src/test/usePolymarketSearch.test.js`: search calls `…/public-search?q=<encoded>&limit_per_type=…` (never `/markets?search=`), normalizes to events with eligible children, drops ineligible/empty events, and the `knicks` fixture yields only relevant events. (C1, C3, C8; regression)
+- [X] T008 [P] [US1] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: typing shows grouped event rows; a multi-sub-market event renders one expandable row that reveals children on expand; selecting a child calls `onSelectMarket` with its `conditionId`; a single-market event selects directly without expanding. (T1, T7)
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Rewrite `usePolymarketSearch({ limit })` in `frontend/src/hooks/usePolymarketSearch.js` to fetch `GET /public-search?q=<query>&limit_per_type=<limit>` via the T006 helper, map results through `normaliseGammaEvent`, return `NormalizedEvent[]`, and clear on blank/whitespace query. (C1; Decision 1)
-- [ ] T010 [US1] Implement event-grouped rendering in `frontend/src/components/fairwins/PolymarketBrowser.jsx`: one row per `NormalizedEvent` keyed by `id`; events with >1 child get an expand toggle (`aria-expanded`) backed by an `expandedEventIds` set; expanded child list keyed by `conditionId` with `label`; single-child events select on row click; selection calls `onSelectMarket(market)` and honors `selectedConditionId`. (FR-017; Decision 10)
-- [ ] T011 [US1] Add expandable-event-row and sub-market-list styles (collapsed/expanded, selected child) in `frontend/src/components/fairwins/PolymarketBrowser.css`.
-- [ ] T012 [US1] Wire the search input through a single debounce to `usePolymarketSearch` in `frontend/src/components/fairwins/PolymarketBrowser.jsx`, removing the component-level pre-debounce so search no longer double-fires. (depends on T010)
+- [X] T009 [US1] Rewrite `usePolymarketSearch({ limit })` in `frontend/src/hooks/usePolymarketSearch.js` to fetch `GET /public-search?q=<query>&limit_per_type=<limit>` via the T006 helper, map results through `normaliseGammaEvent`, return `NormalizedEvent[]`, and clear on blank/whitespace query. (C1; Decision 1)
+- [X] T010 [US1] Implement event-grouped rendering in `frontend/src/components/fairwins/PolymarketBrowser.jsx`: one row per `NormalizedEvent` keyed by `id`; events with >1 child get an expand toggle (`aria-expanded`) backed by an `expandedEventIds` set; expanded child list keyed by `conditionId` with `label`; single-child events select on row click; selection calls `onSelectMarket(market)` and honors `selectedConditionId`. (FR-017; Decision 10)
+- [X] T011 [US1] Add expandable-event-row and sub-market-list styles (collapsed/expanded, selected child) in `frontend/src/components/fairwins/PolymarketBrowser.css`.
+- [X] T012 [US1] Wire the search input through a single debounce to `usePolymarketSearch` in `frontend/src/components/fairwins/PolymarketBrowser.jsx`, removing the component-level pre-debounce so search no longer double-fires. (depends on T010)
 
 **Checkpoint**: Search returns relevant, grouped, expandable, selectable results — MVP usable.
 
@@ -92,13 +92,13 @@ the union of sports OR crypto events; Clear → default top events.
 
 ### Tests for User Story 2 ⚠️ (write first, must fail)
 
-- [ ] T013 [P] [US2] Hook tests in `frontend/src/test/usePolymarketTopMarkets.test.js`: no category → `GET /events?…order=volume&ascending=false`; one category → includes `tag_id=<seed id>` (never `tag_slug`, never `/markets`); multiple categories → one request per `tag_id`, results merged/de-duped by event `id`. (C2, C5)
-- [ ] T014 [P] [US2] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: selecting a category narrows results; selecting a second shows the union; chips are multi-select (`aria-pressed`); Clear restores default top events; category-empty shows its distinct empty state. (T2)
+- [X] T013 [P] [US2] Hook tests in `frontend/src/test/usePolymarketTopMarkets.test.js`: no category → `GET /events?…order=volume&ascending=false`; one category → includes `tag_id=<seed id>` (never `tag_slug`, never `/markets`); multiple categories → one request per `tag_id`, results merged/de-duped by event `id`. (C2, C5)
+- [X] T014 [P] [US2] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: selecting a category narrows results; selecting a second shows the union; chips are multi-select (`aria-pressed`); Clear restores default top events; category-empty shows its distinct empty state. (T2)
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Rewrite `usePolymarketTopMarkets({ categories, limit })` in `frontend/src/hooks/usePolymarketSearch.js` to fetch `GET /events?…&order=volume&ascending=false` (default) and `GET /events?tag_id=<resolveCategoryTagId(slug)>…` per selected category in parallel, merge/de-dupe by event `id`, re-sort by volume, cap at `limit`, and normalize via `normaliseGammaEvent`. (C2, C5; Decisions 2, 4, 5)
-- [ ] T016 [US2] Make the category chips multi-select in `frontend/src/components/fairwins/PolymarketBrowser.jsx` (toggle add/remove slug, Clear-all) and route browse mode through the shared grouped event render from T010. (FR-002)
+- [X] T015 [US2] Rewrite `usePolymarketTopMarkets({ categories, limit })` in `frontend/src/hooks/usePolymarketSearch.js` to fetch `GET /events?…&order=volume&ascending=false` (default) and `GET /events?tag_id=<resolveCategoryTagId(slug)>…` per selected category in parallel, merge/de-dupe by event `id`, re-sort by volume, cap at `limit`, and normalize via `normaliseGammaEvent`. (C2, C5; Decisions 2, 4, 5)
+- [X] T016 [US2] Make the category chips multi-select in `frontend/src/components/fairwins/PolymarketBrowser.jsx` (toggle add/remove slug, Clear-all) and route browse mode through the shared grouped event render from T010. (FR-002)
 
 **Checkpoint**: Browse-by-category works with OR multi-select; US1 still works.
 
@@ -115,13 +115,13 @@ broadens to query alone.
 
 ### Tests for User Story 3 ⚠️ (write first, must fail)
 
-- [ ] T017 [P] [US3] Hook test in `frontend/src/test/usePolymarketSearch.test.js`: `usePolymarketSearch({ categories })` keeps only events whose `tagIds` intersect the selected `tag_id`s (OR across categories). (C4)
-- [ ] T018 [P] [US3] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: toggling a category preserves the query; query+category constrains results; selecting a category before typing also constrains (default); removing the category broadens results. (T3)
+- [X] T017 [P] [US3] Hook test in `frontend/src/test/usePolymarketSearch.test.js`: `usePolymarketSearch({ categories })` keeps only events whose `tagIds` intersect the selected `tag_id`s (OR across categories). (C4)
+- [X] T018 [P] [US3] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: toggling a category preserves the query; query+category constrains results; selecting a category before typing also constrains (default); removing the category broadens results. (T3)
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Add a `categories` input to `usePolymarketSearch` in `frontend/src/hooks/usePolymarketSearch.js` and filter the normalized events by `tagIds ∩ resolved selected tag_ids` (OR) before returning. (C4; Decision 6)
-- [ ] T020 [US3] In `frontend/src/components/fairwins/PolymarketBrowser.jsx`, pass `activeCategories` into `usePolymarketSearch`, and remove the `if (trimmedQuery) setQuery('')` branch in `toggleCategory` so the query persists across category toggles. (FR-003, FR-004)
+- [X] T019 [US3] Add a `categories` input to `usePolymarketSearch` in `frontend/src/hooks/usePolymarketSearch.js` and filter the normalized events by `tagIds ∩ resolved selected tag_ids` (OR) before returning. (C4; Decision 6)
+- [X] T020 [US3] In `frontend/src/components/fairwins/PolymarketBrowser.jsx`, pass `activeCategories` into `usePolymarketSearch`, and remove the `if (trimmedQuery) setQuery('')` branch in `toggleCategory` so the query persists across category toggles. (FR-003, FR-004)
 
 **Checkpoint**: Query and category compose correctly; US1/US2 still work.
 
@@ -138,14 +138,14 @@ distinct; every listed market is eligible; axe finds no violations.
 
 ### Tests for User Story 4 ⚠️ (write first, must fail)
 
-- [ ] T021 [P] [US4] Hook tests in `frontend/src/test/usePolymarketSearch.test.js`: a superseded in-flight request is aborted and never overwrites newer results; non-2xx/network failure sets an error string and clears results; `AbortError` is swallowed. (C6, C7, T5)
-- [ ] T022 [P] [US4] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: distinct loading (skeleton/`aria-busy`), empty (search vs category vs no-markets), and error (`role="alert"` + Retry) states; Retry re-issues the correct request for the active mode; ineligible markets never render. (T4, T6)
-- [ ] T023 [US4] Accessibility test in `frontend/src/test/PolymarketBrowser.test.jsx` using `vitest-axe`: no violations in collapsed list, expanded event, empty, and error states. (T8) — same file as T022, so runs after it.
+- [X] T021 [P] [US4] Hook tests in `frontend/src/test/usePolymarketSearch.test.js`: a superseded in-flight request is aborted and never overwrites newer results; non-2xx/network failure sets an error string and clears results; `AbortError` is swallowed. (C6, C7, T5)
+- [X] T022 [P] [US4] Component tests in `frontend/src/test/PolymarketBrowser.test.jsx`: distinct loading (skeleton/`aria-busy`), empty (search vs category vs no-markets), and error (`role="alert"` + Retry) states; Retry re-issues the correct request for the active mode; ineligible markets never render. (T4, T6)
+- [X] T023 [US4] Accessibility test in `frontend/src/test/PolymarketBrowser.test.jsx` using `vitest-axe`: no violations in collapsed list, expanded event, empty, and error states. (T8) — same file as T022, so runs after it.
 
 ### Implementation for User Story 4
 
-- [ ] T024 [US4] Consolidate to a single debounce (~300–350ms) and confirm both hooks use the T006 single-flight/supersession helper in `frontend/src/hooks/usePolymarketSearch.js`; remove the now-redundant second debounce. (FR-009, FR-010; Decision 8)
-- [ ] T025 [US4] Finalize the picker's state UI in `frontend/src/components/fairwins/PolymarketBrowser.jsx`: mutually-exclusive loading/empty/error/list rendering, mode-aware Retry handler, distinct empty copy, and preserved/added ARIA (`aria-expanded` on the expand toggle, keyboard-navigable sub-markets, `role="alert"`, `aria-busy`). (FR-011, FR-012; Constitution V)
+- [X] T024 [US4] Consolidate to a single debounce (~300–350ms) and confirm both hooks use the T006 single-flight/supersession helper in `frontend/src/hooks/usePolymarketSearch.js`; remove the now-redundant second debounce. (FR-009, FR-010; Decision 8)
+- [X] T025 [US4] Finalize the picker's state UI in `frontend/src/components/fairwins/PolymarketBrowser.jsx`: mutually-exclusive loading/empty/error/list rendering, mode-aware Retry handler, distinct empty copy, and preserved/added ARIA (`aria-expanded` on the expand toggle, keyboard-navigable sub-markets, `role="alert"`, `aria-busy`). (FR-011, FR-012; Constitution V)
 
 **Checkpoint**: All four stories function independently and the picker is trustworthy.
 
@@ -153,10 +153,10 @@ distinct; every listed market is eligible; axe finds no violations.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T026 [P] Verify both call sites consume grouped events correctly — `FriendMarketsModal.jsx` (inline) and `Dashboard.jsx` (feed) — and update the PolymarketBrowser stub/assertions in `frontend/src/test/FriendMarketsModal.test.jsx` if the grouped shape changed expectations. (FR-015)
-- [ ] T027 [P] Remove dead code (old `search=`/`tag_slug` params, double-debounce remnants) and refresh JSDoc in `frontend/src/hooks/usePolymarketSearch.js`.
-- [ ] T028 Run `npm run lint` and `npm run test:frontend` from `frontend/`; fix any lint/test failures (no `continue-on-error`; Constitution IV).
-- [ ] T029 Execute the manual validation in `specs/013-polymarket-search-filter/quickstart.md` (search+grouping, multi-select OR, search-within-category, states) and confirm SC-001…SC-009.
+- [X] T026 [P] Verify both call sites consume grouped events correctly — `FriendMarketsModal.jsx` (inline) and `Dashboard.jsx` (feed) — and update the PolymarketBrowser stub/assertions in `frontend/src/test/FriendMarketsModal.test.jsx` if the grouped shape changed expectations. (FR-015)
+- [X] T027 [P] Remove dead code (old `search=`/`tag_slug` params, double-debounce remnants) and refresh JSDoc in `frontend/src/hooks/usePolymarketSearch.js`.
+- [X] T028 Run `npm run lint` and `npm run test:frontend` from `frontend/`; fix any lint/test failures (no `continue-on-error`; Constitution IV).
+- [X] T029 Execute the manual validation in `specs/013-polymarket-search-filter/quickstart.md` (search+grouping, multi-select OR, search-within-category, states) and confirm SC-001…SC-009.
 
 ---
 
