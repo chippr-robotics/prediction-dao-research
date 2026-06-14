@@ -50,7 +50,9 @@ Produced by `normaliseGammaMarket` (reused).
 | `outcomes`    | `{name,price}[]`| parsed `outcomes`/`outcomePrices`      | |
 
 **Surface rule** (Decision 7): surfaceable iff `conditionId != null` AND
-`active === true` AND `closed !== true`. Filtered before its event is assembled.
+`active === true` AND `closed !== true` AND `endDate` is present, parseable, and
+in the future (`Date.parse(endDate) > Date.now()`). Filtered before its event is
+assembled.
 
 ## Entity: CategoryFilter
 

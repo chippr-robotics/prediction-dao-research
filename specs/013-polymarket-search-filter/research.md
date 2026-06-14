@@ -129,9 +129,9 @@ unverified/undocumented; client-side `tags` filter is simpler and certain.
 ## Decision 7 — Eligibility filter: active, not closed, condition-bearing (per sub-market)
 
 **Decision**: Within each event, keep only markets where `active === true`,
-`closed !== true`, and `conditionId` is present (FR-006, FR-007). An **event is
-surfaced only if it has ≥1 eligible market**; events with zero eligible markets
-are dropped entirely.
+`closed !== true`, `conditionId` is present, AND the end date is present,
+parseable, and in the future (FR-006, FR-007). An **event is surfaced only if it
+has ≥1 eligible market**; events with zero eligible markets are dropped entirely.
 
 **Rationale**: Only such markets can back a new wager (`/public-search` and
 `/events` can include closed markets even for live queries, so the client-side

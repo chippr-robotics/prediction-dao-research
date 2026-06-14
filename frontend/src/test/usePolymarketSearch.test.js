@@ -5,6 +5,8 @@ import { installGammaFetch, urlHas } from './helpers/mockGammaFetch'
 import {
   searchKnicksPayload,
   searchIneligiblePayload,
+  mkEvent,
+  mkMarket,
 } from './fixtures/polymarket'
 
 describe('usePolymarketSearch', () => {
@@ -48,6 +50,40 @@ describe('usePolymarketSearch', () => {
     })
 
     expect(result.current.results).toEqual([])
+  })
+
+  it('drops markets that have already ended (only future events are wagerable)', async () => {
+    const payload = {
+      events: [
+        mkEvent({
+          id: 'ev-past',
+          title: 'Already finished',
+          tags: [{ id: '1', label: 'Sports', slug: 'sports' }],
+          markets: [mkMarket({ id: 'past', conditionId: '0xpast', endDate: '2020-01-01T00:00:00Z' })],
+        }),
+        mkEvent({
+          id: 'ev-future',
+          title: 'Upcoming game',
+          tags: [{ id: '1', label: 'Sports', slug: 'sports' }],
+          markets: [
+            mkMarket({ id: 'fut', conditionId: '0xfut', question: 'Future market?', endDate: '2030-01-01T00:00:00Z' }),
+            mkMarket({ id: 'fin', conditionId: '0xfin', question: 'Finished market?', endDate: '2019-06-01T00:00:00Z' }),
+          ],
+        }),
+      ],
+      pagination: { hasMore: false },
+    }
+    installGammaFetch([{ match: urlHas('/public-search'), json: payload }])
+
+    const { result } = renderHook(() => usePolymarketSearch({ limit: 10 }))
+    await act(async () => {
+      await result.current.runSearch('anything')
+    })
+
+    // The all-past event is dropped; the future event keeps only its future market.
+    expect(result.current.results).toHaveLength(1)
+    expect(result.current.results[0].id).toBe('ev-future')
+    expect(result.current.results[0].markets.map((m) => m.conditionId)).toEqual(['0xfut'])
   })
 
   it('fires no request and clears for a blank query', async () => {

@@ -32,8 +32,8 @@ Example: `GET /public-search?q=knicks&limit_per_type=10`
 
 **Consumer rules**:
 - Normalize each event → `NormalizedEvent` keeping only surfaceable child markets
-  (`conditionId` present, `active === true`, `closed !== true`); drop events with
-  zero eligible children.
+  (`conditionId` present, `active === true`, `closed !== true`, and a future,
+  parseable `endDate`); drop events with zero eligible children.
 - When categories are active, keep only events whose `tags[].id` intersects the
   selected `tag_id`s (OR) before surfacing (Decision 6).
 - Preserve upstream event order as relevance.
@@ -107,8 +107,8 @@ requested URL + handling the canned response:
   `tag_id=<numeric id>` from the verified mapping (never `tag_slug=`, never
   `/markets`).
 - **C3**: events are normalized with only surfaceable child markets
-  (conditionId + active + !closed); events with zero eligible children are
-  dropped.
+  (conditionId + active + !closed + future endDate); events with zero eligible
+  children — including all-past-dated events — are dropped.
 - **C4**: combined query+category keeps only events whose `tags` include a
   selected `tag_id` (OR across selected categories).
 - **C5**: multi-category browse fans out one request per `tag_id` and merges +
