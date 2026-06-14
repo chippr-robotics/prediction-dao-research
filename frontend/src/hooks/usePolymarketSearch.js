@@ -104,9 +104,23 @@ export function normaliseGammaMarket(m) {
   }
 }
 
-/** A market may back a wager only if it is active, unresolved, and has a condition id. */
+/**
+ * A market's resolution must be in the future to be wagerable. Markets with a
+ * missing or unparseable end date are treated as ineligible — we can't confirm
+ * they're still open, and the wager form needs a settlement date.
+ */
+function endsInFuture(endDate) {
+  if (!endDate) return false
+  const t = Date.parse(endDate)
+  return Number.isFinite(t) && t > Date.now()
+}
+
+/**
+ * A market may back a wager only if it is active, unresolved, has a condition id,
+ * and ends in the future (so users can't pick an event that has already passed).
+ */
 function isEligibleMarket(m) {
-  return Boolean(m.conditionId) && m.active === true && m.closed !== true
+  return Boolean(m.conditionId) && m.active === true && m.closed !== true && endsInFuture(m.endDate)
 }
 
 /**

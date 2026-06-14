@@ -164,8 +164,9 @@ as current.
   with retry is shown; the picker never presents stale results as current.
 - **Markets missing required data**: Markets lacking the data needed to link or
   display them are excluded so the user never selects an unusable market.
-- **Resolved / closed / inactive markets**: Never shown, since they cannot back a
-  new wager.
+- **Resolved / closed / inactive / already-ended markets**: Never shown, since
+  they cannot back a new wager. A market whose end date is in the past (or
+  missing/unparseable) is excluded even if the upstream still flags it active.
 - **Category with zero eligible markets**: Distinct empty state, with selection
   still adjustable.
 - **Query that matches a category name**: Treated as a text search over markets,
@@ -212,8 +213,9 @@ as current.
   clearing the category selection MUST return to the default top-markets view
   while preserving any active query.
 - **FR-006**: The picker MUST display only markets that are active, tradeable,
-  and unresolved (eligible to back a new wager); resolved, closed, or inactive
-  markets MUST be excluded.
+  unresolved, AND end in the future (eligible to back a new wager); resolved,
+  closed, inactive, or already-ended markets MUST be excluded. A market whose
+  resolution/end date is missing or unparseable MUST be treated as ineligible.
 - **FR-007**: The picker MUST exclude markets that lack the data required to link
   a wager or to render a usable result card, so a user cannot select an unusable
   market.
@@ -286,7 +288,7 @@ as current.
 - **SC-004**: Results update within roughly one second of the user pausing
   typing, with no flicker from out-of-order responses.
 - **SC-005**: 100% of listed markets are eligible to back a new wager (active,
-  tradeable, unresolved, and complete enough to link).
+  tradeable, unresolved, ending in the future, and complete enough to link).
 - **SC-006**: Empty, loading, and error states are each distinctly presented;
   a failed request always offers a retry and never displays a stale list as
   current.
