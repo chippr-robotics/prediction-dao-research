@@ -40,13 +40,13 @@ const QA_ARROW = (
 )
 
 function QuickActionCard({ action, onAction }) {
-  // Each card carries its own accent (hex + "r,g,b" string) so the CSS can
-  // tint the icon chip, accent rail, hover glow and arrow from one source of
-  // truth without a class explosion.
+  // Every card uses the single site-green brand accent (set on
+  // .quick-action-card in CSS). Tiles are differentiated by icon, tag, and
+  // label — not color. The `qa-{category}` class only drives the subtle
+  // primary-group emphasis on the creation tiles.
   return (
     <button
       className={`quick-action-card qa-${action.category}`}
-      style={{ '--qa-accent': action.accent, '--qa-accent-rgb': action.accentRgb }}
       onClick={() => onAction(action.id)}
       aria-label={action.ariaLabel || action.title}
     >
@@ -81,13 +81,12 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
 
   // The six actions split into two intents the user actually has: starting a
   // wager (three settlement styles) vs. tracking/handing one off. Grouping +
-  // per-card accent colors make that split legible at a glance.
+  // labels/tags/icons make that split legible — all tiles share the site-green
+  // brand accent (no per-tile colors).
   const createActions = [
     {
       id: 'create-1v1-friends',
       category: 'create',
-      accent: '#36B37E',
-      accentRgb: '54, 179, 126',
       tag: 'People settle',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -103,8 +102,6 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     {
       id: 'create-1v1-oracle',
       category: 'create',
-      accent: '#3B82F6',
-      accentRgb: '59, 130, 246',
       tag: 'Oracle settles',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -121,8 +118,6 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     {
       id: 'create-bookmaker',
       category: 'create',
-      accent: '#8B5CF6',
-      accentRgb: '139, 92, 246',
       tag: 'Set the odds',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -139,8 +134,6 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     {
       id: 'my-wagers',
       category: 'track',
-      accent: '#06B6D4',
-      accentRgb: '6, 182, 212',
       tag: 'Track',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -162,8 +155,6 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     {
       id: 'scan-qr',
       category: 'qr',
-      accent: '#F59E0B',
-      accentRgb: '245, 158, 11',
       tag: 'Scan',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -179,8 +170,6 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     {
       id: 'share-account',
       category: 'qr',
-      accent: '#EC4899',
-      accentRgb: '236, 72, 153',
       tag: 'Share',
       // QR grid with an outward arrow — keeps the QR vocabulary of the
       // adjacent Scan card while staying visually distinct from it.

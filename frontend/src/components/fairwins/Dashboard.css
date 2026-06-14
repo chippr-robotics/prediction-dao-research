@@ -197,10 +197,10 @@
 
 /* The quick-actions surface is a 3-column grid. Group headers span the full
    row (grid-column: 1 / -1) so the six tiles read as two labeled intent
-   clusters: "Create a wager" and "Track & share". Each tile drives its own
-   accent from the --qa-accent / --qa-accent-rgb custom properties set inline
-   per card, so one color source feeds the rail, icon chip, hover glow and
-   arrow. */
+   clusters: "Start a wager" and "Track & share". Every tile shares the single
+   site-green brand accent (--qa-accent / --qa-accent-rgb, set on
+   .quick-action-card) which feeds the rail, icon chip, hover glow and arrow;
+   tiles are told apart by icon, tag and label rather than color. */
 .quick-actions-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -234,10 +234,6 @@
   color: var(--brand-primary, #00b894);
 }
 
-.qa-group-header--track .qa-group-eyebrow {
-  color: #06B6D4;
-}
-
 .qa-group-sub {
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -246,6 +242,10 @@
 /* --- Action tile --- */
 
 .quick-action-card {
+  /* Single site-green brand accent shared by every tile (hex + rgb channels
+     kept in sync so the rgba() tints match the solid color). */
+  --qa-accent: var(--brand-primary, #36B37E);
+  --qa-accent-rgb: var(--brand-primary-rgb, 54, 179, 126);
   position: relative;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -273,7 +273,7 @@
     var(--surface-color);
 }
 
-/* Left accent rail — the per-tile color signature. */
+/* Left accent rail — the site-green brand signature on every tile. */
 .qa-rail {
   position: absolute;
   left: 0;
