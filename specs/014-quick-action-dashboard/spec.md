@@ -12,7 +12,8 @@
 
 ### Session 2026-06-14
 
-- Q: How many visible, labeled action groups should the dashboard show? → A: Two groups — "Start a wager" (the three creation tiles) and "Track & share" (My Wagers plus the two QR actions); the QR pair stays distinguishable through its own per-action accent color and iconography rather than a separate heading.
+- Q: How many visible, labeled action groups should the dashboard show? → A: Two groups — "Start a wager" (the three creation tiles) and "Track & share" (My Wagers plus the two QR actions); the QR pair stays distinguishable through iconography rather than a separate heading.
+- Q: Should each action have its own accent color? → A: No — all quick-action tiles use the single site-green brand accent. Actions are differentiated by icon, role tag, and label, not by color. (Supersedes the earlier per-action color treatment.)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -160,9 +161,9 @@ from each other, and that *Share Account* keeps its descriptive accessible name.
   outbound cue) without requiring a separate group heading.
 - **FR-002**: The three wager-creation actions MUST be presented as the primary,
   most visually prominent group.
-- **FR-003**: Each quick action MUST have a distinct visual identity (color and
-  icon) so it is individually recognizable, replacing the current uniform
-  single-color treatment.
+- **FR-003**: Each quick action MUST be individually recognizable through its
+  icon, role tag, and label. All tiles MUST share the single site-green brand
+  accent — actions are not differentiated by color.
 - **FR-004**: The system MUST preserve the existing action labels exactly:
   "Friends Decide (1v1)", "Oracle Settles (1v1)", "Bookmaker", "My Wagers",
   "Scan QR Code", "Share Account".
