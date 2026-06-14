@@ -8,6 +8,12 @@
 
 **Input**: User description: "the quick action dashboard needs better creative design. the buttons do different things — 3 do wagers, one shows wagers, and 2 do qr activities. create a more visually interesting dashboard. use /speckit-specify to make a coherent experience."
 
+## Clarifications
+
+### Session 2026-06-14
+
+- Q: How many visible, labeled action groups should the dashboard show? → A: Two groups — "Start a wager" (the three creation tiles) and "Track & share" (My Wagers plus the two QR actions); the QR pair stays distinguishable through its own per-action accent color and iconography rather than a separate heading.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The "Your Wagers" dashboard is the connected user's home base. Today it presents
@@ -147,9 +153,11 @@ from each other, and that *Share Account* keeps its descriptive accessible name.
 
 ### Functional Requirements
 
-- **FR-001**: The dashboard MUST organize the six quick actions into intent-based
-  groups — wager creation, wager tracking, and QR handoff — with a visible label
-  for each group.
+- **FR-001**: The dashboard MUST organize the six quick actions into two visibly
+  labeled, intent-based groups: "Start a wager" (the three creation actions) and
+  "Track & share" (My Wagers plus the two QR actions). Within "Track & share",
+  the two QR actions MUST remain individually distinguishable (e.g., inbound vs.
+  outbound cue) without requiring a separate group heading.
 - **FR-002**: The three wager-creation actions MUST be presented as the primary,
   most visually prominent group.
 - **FR-003**: Each quick action MUST have a distinct visual identity (color and
