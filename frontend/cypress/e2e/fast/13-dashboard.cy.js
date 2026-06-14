@@ -38,19 +38,26 @@ describe('Dashboard', () => {
   // ---------------------------------------------------------------------------
   // DSH-01: Quick action cards visible
   // ---------------------------------------------------------------------------
-  it('[DSH-01] Quick action cards visible (1v1 Friends, 1v1 Oracle, Bookmaker, Scan QR, My Wagers)', () => {
+  it('[DSH-01] Quick action cards visible, grouped by intent (create / track / QR)', () => {
     connectAndVisitDashboard()
 
-    // The quick-actions-grid should contain exactly 5 action cards.
+    // The quick-actions-grid holds the six action tiles, ordered by their
+    // intent group: three "Create a wager" tiles, then "Track & share"
+    // (My Wagers, Scan QR, Share Account).
     cy.get('.quick-actions-grid', { timeout: 10000 }).should('be.visible')
-    cy.get('.quick-action-card').should('have.length', 5)
+    cy.get('.quick-action-card').should('have.length', 6)
 
-    // Verify each action card title.
+    // Verify each action card title in group order.
     cy.get('.quick-action-card').eq(0).should('contain.text', 'Friends Decide (1v1)')
     cy.get('.quick-action-card').eq(1).should('contain.text', 'Oracle Settles (1v1)')
     cy.get('.quick-action-card').eq(2).should('contain.text', 'Bookmaker')
-    cy.get('.quick-action-card').eq(3).should('contain.text', 'Scan QR Code')
-    cy.get('.quick-action-card').eq(4).should('contain.text', 'My Wagers')
+    cy.get('.quick-action-card').eq(3).should('contain.text', 'My Wagers')
+    cy.get('.quick-action-card').eq(4).should('contain.text', 'Scan QR Code')
+    cy.get('.quick-action-card').eq(5).should('contain.text', 'Share Account')
+
+    // The two intent groups are labeled.
+    cy.get('.qa-group-eyebrow').should('contain.text', 'Start a wager')
+    cy.get('.qa-group-eyebrow').should('contain.text', 'Track & share')
   })
 
   // ---------------------------------------------------------------------------

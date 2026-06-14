@@ -30,6 +30,46 @@ const formatAddress = (addr) => {
 // QUICK ACTION CARDS
 // ============================================================================
 
+// Trailing affordance arrow, shared by every card. Sits in the right column
+// and slides/brightens on hover so the whole tile reads as actionable.
+const QA_ARROW = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
+  </svg>
+)
+
+function QuickActionCard({ action, onAction }) {
+  // Each card carries its own accent (hex + "r,g,b" string) so the CSS can
+  // tint the icon chip, accent rail, hover glow and arrow from one source of
+  // truth without a class explosion.
+  return (
+    <button
+      className={`quick-action-card qa-${action.category}`}
+      style={{ '--qa-accent': action.accent, '--qa-accent-rgb': action.accentRgb }}
+      onClick={() => onAction(action.id)}
+      aria-label={action.ariaLabel || action.title}
+    >
+      <span className="qa-rail" aria-hidden="true" />
+      <span className="quick-action-icon" aria-hidden="true">
+        {action.icon}
+      </span>
+      <span className="quick-action-content">
+        {action.tag && <span className="qa-tag">{action.tag}</span>}
+        <h4>{action.title}</h4>
+        <p>{action.description}</p>
+      </span>
+      <span className="qa-arrow" aria-hidden="true">{QA_ARROW}</span>
+      {action.badge && (
+        <Badge variant="warning" className="quick-action-badge">
+          <span aria-hidden="true">{action.badge.count}</span>
+          <span className="sr-only">{action.badge.label}</span>
+        </Badge>
+      )}
+    </button>
+  )
+}
+
 function QuickActions({ onAction, actionNeededCount = 0 }) {
   // Spec 012 FR-007: the My Wagers entry point surfaces the watcher's
   // action-needed count. The full sentence goes into the button's aria-label
@@ -39,9 +79,16 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     `${actionNeededCount} wager${actionNeededCount === 1 ? '' : 's'} ` +
     `need${actionNeededCount === 1 ? 's' : ''} action`
 
-  const actions = [
+  // The six actions split into two intents the user actually has: starting a
+  // wager (three settlement styles) vs. tracking/handing one off. Grouping +
+  // per-card accent colors make that split legible at a glance.
+  const createActions = [
     {
       id: 'create-1v1-friends',
+      category: 'create',
+      accent: '#36B37E',
+      accentRgb: '54, 179, 126',
+      tag: 'People settle',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -55,6 +102,10 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     },
     {
       id: 'create-1v1-oracle',
+      category: 'create',
+      accent: '#3B82F6',
+      accentRgb: '59, 130, 246',
+      tag: 'Oracle settles',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10" />
@@ -69,6 +120,10 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     },
     {
       id: 'create-bookmaker',
+      category: 'create',
+      accent: '#8B5CF6',
+      accentRgb: '139, 92, 246',
+      tag: 'Set the odds',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="12" y1="1" x2="12" y2="23" />
@@ -77,9 +132,39 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
       ),
       title: 'Bookmaker',
       description: 'Offer odds and let a friend take the other side'
+    }
+  ]
+
+  const utilityActions = [
+    {
+      id: 'my-wagers',
+      category: 'track',
+      accent: '#06B6D4',
+      accentRgb: '6, 182, 212',
+      tag: 'Track',
+      icon: (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      ),
+      title: 'My Wagers',
+      description: 'View active and past wagers',
+      ariaLabel: actionNeededCount > 0
+        ? `My Wagers — ${actionNeededText}`
+        : undefined,
+      badge: actionNeededCount > 0
+        ? { count: actionNeededCount, label: actionNeededText }
+        : null
     },
     {
       id: 'scan-qr',
+      category: 'qr',
+      accent: '#F59E0B',
+      accentRgb: '245, 158, 11',
+      tag: 'Scan',
       icon: (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="7" height="7" />
@@ -93,6 +178,10 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
     },
     {
       id: 'share-account',
+      category: 'qr',
+      accent: '#EC4899',
+      accentRgb: '236, 72, 153',
+      tag: 'Share',
       // QR grid with an outward arrow — keeps the QR vocabulary of the
       // adjacent Scan card while staying visually distinct from it.
       icon: (
@@ -110,51 +199,36 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
       // the QR outcome (spec 011 W1 naming convention).
       ariaLabel: 'Share Account — show your address as a QR code',
       description: 'Show your address as a QR code'
-    },
-    {
-      id: 'my-wagers',
-      icon: (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-        </svg>
-      ),
-      title: 'My Wagers',
-      description: 'View active and past wagers',
-      ariaLabel: actionNeededCount > 0
-        ? `My Wagers — ${actionNeededText}`
-        : undefined,
-      badge: actionNeededCount > 0
-        ? { count: actionNeededCount, label: actionNeededText }
-        : null
     }
   ]
 
   return (
     <div className="quick-actions-grid">
-      {actions.map(action => (
-        <button
-          key={action.id}
-          className="quick-action-card"
-          onClick={() => onAction(action.id)}
-          aria-label={action.ariaLabel || action.title}
-        >
-          <div className="quick-action-icon" aria-hidden="true">
-            {action.icon}
-          </div>
-          <div className="quick-action-content">
-            <h4>{action.title}</h4>
-            <p>{action.description}</p>
-          </div>
-          {action.badge && (
-            <Badge variant="warning" className="quick-action-badge">
-              <span aria-hidden="true">{action.badge.count}</span>
-              <span className="sr-only">{action.badge.label}</span>
-            </Badge>
-          )}
-        </button>
+      <div className="qa-group-header" role="presentation">
+        <span className="qa-group-eyebrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Start a wager
+        </span>
+        <span className="qa-group-sub">Pick who settles the outcome</span>
+      </div>
+      {createActions.map(action => (
+        <QuickActionCard key={action.id} action={action} onAction={onAction} />
+      ))}
+
+      <div className="qa-group-header qa-group-header--track" role="presentation">
+        <span className="qa-group-eyebrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Track &amp; share
+        </span>
+        <span className="qa-group-sub">Your wagers and in-person handoffs</span>
+      </div>
+      {utilityActions.map(action => (
+        <QuickActionCard key={action.id} action={action} onAction={onAction} />
       ))}
     </div>
   )
