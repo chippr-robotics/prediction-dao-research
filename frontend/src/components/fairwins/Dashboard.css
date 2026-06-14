@@ -195,56 +195,144 @@
    QUICK ACTIONS GRID
    ============================================================================ */
 
+/* The quick-actions surface is a 3-column grid. Group headers span the full
+   row (grid-column: 1 / -1) so the six tiles read as two labeled intent
+   clusters: "Create a wager" and "Track & share". Each tile drives its own
+   accent from the --qa-accent / --qa-accent-rgb custom properties set inline
+   per card, so one color source feeds the rail, icon chip, hover glow and
+   arrow. */
 .quick-actions-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+  align-items: stretch;
 }
 
-.quick-action-card {
+/* --- Group headers --- */
+
+.qa-group-header {
+  grid-column: 1 / -1;
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.qa-group-header:first-child {
+  margin-top: 0;
+}
+
+.qa-group-eyebrow {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 1rem;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--brand-primary, #00b894);
+}
+
+.qa-group-header--track .qa-group-eyebrow {
+  color: #06B6D4;
+}
+
+.qa-group-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* --- Action tile --- */
+
+.quick-action-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.15rem 1.15rem 1.15rem 1.35rem;
   background: var(--surface-color);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease,
+    border-color 0.2s ease, background 0.2s ease;
+  text-align: left;
   color: inherit;
   font-family: inherit;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Creation tiles are the primary group: a faint accent wash lifts them above
+   the track/QR utility tiles. */
+.quick-action-card.qa-create {
+  background:
+    linear-gradient(135deg, rgba(var(--qa-accent-rgb), 0.07), rgba(var(--qa-accent-rgb), 0) 55%),
+    var(--surface-color);
+}
+
+/* Left accent rail — the per-tile color signature. */
+.qa-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--qa-accent), rgba(var(--qa-accent-rgb), 0.45));
 }
 
 .quick-action-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  border-color: rgba(0, 184, 148, 0.4);
-  background: rgba(0, 184, 148, 0.05);
+  transform: translateY(-3px);
+  border-color: rgba(var(--qa-accent-rgb), 0.5);
+  box-shadow: 0 12px 28px rgba(var(--qa-accent-rgb), 0.18);
 }
 
 .quick-action-card:focus-visible {
-  outline: 2px solid var(--brand-primary, #00b894);
+  outline: 2px solid var(--qa-accent, var(--brand-primary, #00b894));
   outline-offset: 2px;
 }
 
 .quick-action-icon {
-  color: var(--brand-primary, #00b894);
+  color: var(--qa-accent, var(--brand-primary, #00b894));
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  background: rgba(0, 184, 148, 0.1);
+  width: 52px;
+  height: 52px;
+  background: rgba(var(--qa-accent-rgb), 0.12);
   border-radius: 14px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.quick-action-card:hover .quick-action-icon {
+  background: rgba(var(--qa-accent-rgb), 0.18);
+  transform: scale(1.04);
+}
+
+.quick-action-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Small accent eyebrow on each tile — a non-color cue to its role (e.g.
+   "People settle", "Oracle settles", "Scan", "Share"). */
+.qa-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--qa-accent, var(--brand-primary, #00b894));
+  margin-bottom: 0.2rem;
 }
 
 .quick-action-content h4 {
   font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.2rem 0;
 }
 
 .quick-action-content p {
@@ -252,6 +340,46 @@
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.3;
+}
+
+/* Trailing arrow affordance — dim by default (visible on touch) and brightens
+   + slides on hover. */
+.qa-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qa-accent, var(--brand-primary, #00b894));
+  opacity: 0.35;
+  transform: translateX(-3px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.quick-action-card:hover .qa-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Action-needed badge (My Wagers) — pinned to the top-right corner so it never
+   collides with the arrow column. */
+.quick-action-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-action-card,
+  .quick-action-icon,
+  .qa-arrow {
+    transition: none;
+  }
+  .quick-action-card:hover {
+    transform: none;
+  }
+  .quick-action-card:hover .quick-action-icon {
+    transform: none;
+  }
 }
 
 /* ============================================================================
@@ -546,12 +674,11 @@
   }
 
   .quick-actions-grid {
-    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
   }
 
   .quick-action-card {
-    padding: 1rem 0.75rem;
+    padding: 1rem 1rem 1rem 1.15rem;
   }
 
   .wagers-grid {
@@ -559,31 +686,34 @@
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .dashboard-container {
     padding: 0.75rem;
   }
 
+  /* Horizontal tiles read best full-width on phones — one per row. */
   .quick-actions-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  .quick-action-card {
-    padding: 0.75rem;
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
   }
 
   .quick-action-icon {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
   }
 
   .quick-action-content h4 {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
   }
 
   .quick-action-content p {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  /* Keep the arrow visible on touch where there's no hover state. */
+  .qa-arrow {
+    opacity: 0.5;
+    transform: none;
   }
 
   .header-content h1 {
