@@ -1,15 +1,14 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useChainTokens } from '../../hooks/useChainTokens'
 import { useUserPreferences } from '../../hooks/useUserPreferences'
-import { useFriendMarkets } from '../../contexts/FriendMarketsContext.js'
 import {
   usePolymarketSearch,
   usePolymarketTopMarkets,
 } from '../../hooks/usePolymarketSearch'
 import './PolymarketBrowser.css'
 
-// Canonical filter chips. Slugs match Polymarket's `tag_slug` values; labels
-// are what the user sees.
+// Canonical filter chips. Slugs map to Polymarket numeric tag ids inside the
+// hooks; labels are what the user sees.
 const QUICK_FILTERS = [
   { slug: 'politics', label: 'Politics' },
   { slug: 'sports', label: 'Sports' },
@@ -19,7 +18,7 @@ const QUICK_FILTERS = [
   { slug: 'tech', label: 'Tech' },
 ]
 
-const SEARCH_DEBOUNCE_MS = 350
+const SEARCH_DEBOUNCE_MS = 325
 
 const formatVolume = (v) => {
   if (v == null || Number.isNaN(v)) return null
@@ -28,34 +27,14 @@ const formatVolume = (v) => {
   return `$${Math.round(v)}`
 }
 
-const normaliseCategoryString = (c) => {
-  if (!c) return ''
-  if (Array.isArray(c)) return c.join(' ').toLowerCase()
-  return String(c).toLowerCase()
-}
-
-/**
- * Build a Set of category slugs/keywords gleaned from the user's prior friend
- * markets. We don't have a structured category on past wagers, so we
- * substring-match against the description as a first pass.
- */
-function buildHistoryCategorySet(friendMarkets) {
-  const set = new Set()
-  for (const m of friendMarkets || []) {
-    const desc = (m?.description || '').toLowerCase()
-    for (const { slug } of QUICK_FILTERS) {
-      if (desc.includes(slug.replace('-', ' ')) || desc.includes(slug)) {
-        set.add(slug)
-      }
-    }
-  }
-  return set
-}
-
 /**
  * Reusable Polymarket market browser. Used as a dashboard feed (variant="feed")
  * and as an in-modal market picker (variant="inline"). Self-gates on chain
  * capability — returns null on chains without Polymarket support.
+ *
+ * Results are grouped by event: an event with several related markets (e.g. a
+ * game's moneyline/spreads/over-unders) shows as one expandable row; a
+ * single-market event selects directly.
  */
 function PolymarketBrowser({
   onSelectMarket,
@@ -70,12 +49,10 @@ function PolymarketBrowser({
   const polymarketSidebetsEnabled = Boolean(capabilities?.polymarketSidebets)
 
   const { preferences } = useUserPreferences()
-  const { friendMarkets } = useFriendMarkets()
 
-  // Filter state. We avoid an effect-driven sync from preferences by deriving
-  // the effective filter set: if the user has touched the chips, use their
-  // local state; otherwise fall back to the prop or the saved preference
-  // (which may arrive async after the wallet connects).
+  // Filter state. Derive the effective filter set: if the user has touched the
+  // chips, use their local state; otherwise fall back to the prop or the saved
+  // preference (which may arrive async after the wallet connects).
   const [userTouched, setUserTouched] = useState(false)
   const [localCategories, setLocalCategories] = useState(() => {
     if (Array.isArray(defaultCategories)) return defaultCategories
@@ -89,6 +66,8 @@ function PolymarketBrowser({
 
   const [query, setQuery] = useState('')
   const trimmedQuery = query.trim()
+
+  const [expandedEventIds, setExpandedEventIds] = useState(() => new Set())
 
   // Feed-variant accordion state. Inline variant is always expanded.
   const [isExpanded, setIsExpanded] = useState(false)
@@ -106,88 +85,81 @@ function PolymarketBrowser({
     results: searchResults,
     isLoading: searchLoading,
     error: searchError,
-    search: runSearch,
+    runSearch,
     clear: clearSearch,
-  } = usePolymarketSearch({ limit })
+  } = usePolymarketSearch({ limit, categories: activeCategories })
 
-  // Debounce-and-fire search whenever the query changes.
+  // Single debounce: drive the (immediate) hook search from the input. The hook
+  // re-creates runSearch when the active categories change, so this effect also
+  // re-fires to keep search constrained to the selected categories.
+  const debounceRef = useRef(null)
   useEffect(() => {
     if (!trimmedQuery) {
       clearSearch()
       return undefined
     }
-    const handle = setTimeout(() => runSearch(trimmedQuery), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(handle)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => runSearch(trimmedQuery), SEARCH_DEBOUNCE_MS)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
   }, [trimmedQuery, runSearch, clearSearch])
 
   const isSearchMode = trimmedQuery.length > 0
-  const rawResults = isSearchMode ? searchResults : topResults
+  const events = isSearchMode ? searchResults : topResults
   const isLoading = isSearchMode ? searchLoading : topLoading
   const error = isSearchMode ? searchError : topError
 
-  // History-boost ranking. Boost factor mixes user's saved category prefs
-  // with categories inferred from their past wagers.
-  const historySlugs = useMemo(() => buildHistoryCategorySet(friendMarkets), [friendMarkets])
-  const savedSlugs = useMemo(
-    () => new Set(preferences?.polymarketCategories || []),
-    [preferences?.polymarketCategories],
-  )
-
-  const rankedResults = useMemo(() => {
-    const scored = (rawResults || []).map((m) => {
-      const cat = normaliseCategoryString(m.category)
-      let boost = 1
-      for (const slug of savedSlugs) {
-        if (cat.includes(slug.replace('-', ' ')) || cat.includes(slug)) {
-          boost += 0.5
-          break
-        }
-      }
-      for (const slug of historySlugs) {
-        if (cat.includes(slug.replace('-', ' ')) || cat.includes(slug)) {
-          boost += 0.5
-          break
-        }
-      }
-      const volume = Number(m.volume) || 0
-      // Search results return relevance-ordered already — skip volume in their score
-      // but keep history/category nudge so familiar markets still float up.
-      const score = isSearchMode ? boost : (volume || 1) * boost
-      return { market: m, score }
-    })
-    scored.sort((a, b) => b.score - a.score)
-    return scored.map((s) => s.market)
-  }, [rawResults, savedSlugs, historySlugs, isSearchMode])
-
   const toggleCategory = useCallback((slug) => {
-    // First touch: snapshot the currently-shown filter set so toggles operate
-    // on it (the lazy initialiser may have missed the async-loaded preferences).
     const base = userTouched ? localCategories : activeCategories
     setUserTouched(true)
     setLocalCategories(
-      base.includes(slug) ? base.filter((s) => s !== slug) : [...base, slug]
+      base.includes(slug) ? base.filter((s) => s !== slug) : [...base, slug],
     )
-    if (trimmedQuery) {
-      setQuery('')
-    }
-  }, [userTouched, localCategories, activeCategories, trimmedQuery])
+    // NOTE: the query is intentionally preserved here so toggling a filter
+    // refines (not resets) an in-progress search.
+  }, [userTouched, localCategories, activeCategories])
 
   const clearAllFilters = useCallback(() => {
     setUserTouched(true)
     setLocalCategories([])
   }, [])
 
+  const toggleEvent = useCallback((eventId) => {
+    setExpandedEventIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(eventId)) next.delete(eventId)
+      else next.add(eventId)
+      return next
+    })
+  }, [])
+
   const handleRetry = useCallback(() => {
-    if (isSearchMode) {
-      runSearch(trimmedQuery)
-    } else {
-      refreshTop()
-    }
+    if (isSearchMode) runSearch(trimmedQuery)
+    else refreshTop()
   }, [isSearchMode, runSearch, trimmedQuery, refreshTop])
 
   if (!polymarketSidebetsEnabled) return null
 
   const rootClassName = `pmb pmb--${variant}${className ? ` ${className}` : ''}`
+
+  const renderMarketCard = (market) => {
+    const isSelected = selectedConditionId && market.conditionId === selectedConditionId
+    const vol = formatVolume(market.volume)
+    return (
+      <button
+        type="button"
+        className={`pmb__card ${isSelected ? 'pmb__card--selected' : ''}`}
+        onClick={() => onSelectMarket?.(market)}
+      >
+        <div className="pmb__card-question">{market.label || market.question}</div>
+        <div className="pmb__card-meta">
+          {vol && <span className="pmb__card-volume">{vol} vol</span>}
+        </div>
+        {isSelected && <span className="pmb__card-selected-badge">Selected</span>}
+      </button>
+    )
+  }
 
   return (
     <section className={rootClassName} aria-label="Polymarket markets">
@@ -277,7 +249,7 @@ function PolymarketBrowser({
             </div>
           )}
 
-          {!isLoading && !error && rankedResults.length === 0 && (
+          {!isLoading && !error && events.length === 0 && (
             <div className="pmb__empty">
               {isSearchMode ? (
                 <p>No matching Polymarket events.</p>
@@ -294,27 +266,46 @@ function PolymarketBrowser({
             </div>
           )}
 
-          {!isLoading && !error && rankedResults.length > 0 && (
+          {!isLoading && !error && events.length > 0 && (
             <ul className={`pmb__grid pmb__grid--${variant}`} role="list">
-              {rankedResults.map((m) => {
-                const isSelected = selectedConditionId && m.conditionId === selectedConditionId
-                const vol = formatVolume(m.volume)
+              {events.map((ev) => {
+                // Single-market event: select directly, no expand affordance.
+                if (ev.markets.length === 1) {
+                  return (
+                    <li key={ev.id} className="pmb__card-wrapper">
+                      {renderMarketCard(ev.markets[0])}
+                    </li>
+                  )
+                }
+
+                const isOpen = expandedEventIds.has(ev.id)
+                const vol = formatVolume(ev.volume)
                 return (
-                  <li key={m.conditionId} className="pmb__card-wrapper">
+                  <li key={ev.id} className="pmb__event">
                     <button
                       type="button"
-                      className={`pmb__card ${isSelected ? 'pmb__card--selected' : ''}`}
-                      onClick={() => onSelectMarket?.(m)}
+                      className="pmb__event-header"
+                      onClick={() => toggleEvent(ev.id)}
+                      aria-expanded={isOpen}
                     >
-                      <div className="pmb__card-question">{m.question}</div>
-                      <div className="pmb__card-meta">
-                        {m.category && (
-                          <span className="pmb__card-tag">{normaliseCategoryString(m.category)}</span>
-                        )}
+                      <span className="pmb__event-title">{ev.title}</span>
+                      <span className="pmb__event-meta">
+                        <span className="pmb__event-count">{ev.markets.length} markets</span>
                         {vol && <span className="pmb__card-volume">{vol} vol</span>}
-                      </div>
-                      {isSelected && <span className="pmb__card-selected-badge">Selected</span>}
+                        <span className="pmb__event-chevron" aria-hidden="true">
+                          {isOpen ? '▾' : '▸'}
+                        </span>
+                      </span>
                     </button>
+                    {isOpen && (
+                      <ul className="pmb__submarkets" role="list">
+                        {ev.markets.map((market) => (
+                          <li key={market.conditionId} className="pmb__card-wrapper">
+                            {renderMarketCard(market)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 )
               })}
