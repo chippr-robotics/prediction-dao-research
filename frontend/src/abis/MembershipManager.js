@@ -22,6 +22,27 @@ export const MEMBERSHIP_MANAGER_ABI = [
   },
   {
     "inputs": [],
+    "name": "AccessControlBadConfirmation",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "neededRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AccessControlUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "AlreadyActive",
     "type": "error"
   },
@@ -53,28 +74,6 @@ export const MEMBERSHIP_MANAGER_ABI = [
   {
     "inputs": [],
     "name": "NotUpgrade",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "owner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnableInvalidOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
-    ],
-    "name": "OwnableUnauthorizedAccount",
     "type": "error"
   },
   {
@@ -267,6 +266,62 @@ export const MEMBERSHIP_MANAGER_ABI = [
         "type": "bytes32"
       },
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "by",
+        "type": "address"
+      }
+    ],
+    "name": "MembershipRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "termsHash",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "at",
+        "type": "uint64"
+      }
+    ],
+    "name": "MembershipTermsRecorded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
         "indexed": false,
         "internalType": "enum IMembershipManager.Tier",
         "name": "fromTier",
@@ -294,17 +349,86 @@ export const MEMBERSHIP_MANAGER_ABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "previousOwner",
+        "name": "token",
+        "type": "address"
+      }
+    ],
+    "name": "PaymentTokenUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "previousAdminRole",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "newAdminRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RoleAdminChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
         "type": "address"
       },
       {
         "indexed": true,
         "internalType": "address",
-        "name": "newOwner",
+        "name": "sender",
         "type": "address"
       }
     ],
-    "name": "OwnershipTransferred",
+    "name": "RoleGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleRevoked",
     "type": "event"
   },
   {
@@ -313,11 +437,11 @@ export const MEMBERSHIP_MANAGER_ABI = [
       {
         "indexed": true,
         "internalType": "address",
-        "name": "token",
+        "name": "guard",
         "type": "address"
       }
     ],
-    "name": "PaymentTokenUpdated",
+    "name": "SanctionsGuardUpdated",
     "type": "event"
   },
   {
@@ -407,6 +531,32 @@ export const MEMBERSHIP_MANAGER_ABI = [
     ],
     "name": "WagerCreated",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DEFAULT_ADMIN_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "ROLE_MANAGER_ROLE",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [],
@@ -558,6 +708,25 @@ export const MEMBERSHIP_MANAGER_ABI = [
         "internalType": "bytes32",
         "name": "role",
         "type": "bytes32"
+      }
+    ],
+    "name": "getRoleAdmin",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
       },
       {
         "internalType": "enum IMembershipManager.Tier",
@@ -633,7 +802,25 @@ export const MEMBERSHIP_MANAGER_ABI = [
         "type": "uint32"
       }
     ],
-    "name": "grantTierAdmin",
+    "name": "grantMembership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "grantRole",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -663,13 +850,48 @@ export const MEMBERSHIP_MANAGER_ABI = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "owner",
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "hasRole",
     "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
         "internalType": "address",
         "name": "",
         "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "name": "memberTermsHash",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
       }
     ],
     "stateMutability": "view",
@@ -702,6 +924,29 @@ export const MEMBERSHIP_MANAGER_ABI = [
       }
     ],
     "name": "purchaseTier",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "enum IMembershipManager.Tier",
+        "name": "tier",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "acceptedTermsHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "purchaseTierWithTerms",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -743,10 +988,70 @@ export const MEMBERSHIP_MANAGER_ABI = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "renounceOwnership",
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "callerConfirmation",
+        "type": "address"
+      }
+    ],
+    "name": "renounceRole",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "revokeMembership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "revokeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "sanctionsGuard",
+    "outputs": [
+      {
+        "internalType": "contract ISanctionsGuard",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -776,6 +1081,19 @@ export const MEMBERSHIP_MANAGER_ABI = [
       }
     ],
     "name": "setPaymentToken",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "guard",
+        "type": "address"
+      }
+    ],
+    "name": "setSanctionsGuard",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -846,14 +1164,20 @@ export const MEMBERSHIP_MANAGER_ABI = [
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "newOwner",
-        "type": "address"
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
       }
     ],
-    "name": "transferOwnership",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "supportsInterface",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -883,6 +1207,29 @@ export const MEMBERSHIP_MANAGER_ABI = [
       }
     ],
     "name": "upgradeTier",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "enum IMembershipManager.Tier",
+        "name": "newTier",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "acceptedTermsHash",
+        "type": "bytes32"
+      }
+    ],
+    "name": "upgradeTierWithTerms",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
