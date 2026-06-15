@@ -49,11 +49,11 @@ const AMOY_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
   // v2 core (populated by `npm run sync:frontend-contracts -- --network amoy --chainId 80002`)
-  wagerRegistry: '0x95cC567EF97f21bdd135844652aD8792fa8ba266',
-  membershipManager: '0xFaEbF662aa591fF95e97306b413522efC958540f',
-  keyRegistry: '0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb',
-  sanctionsGuard: '',
-  polymarketAdapter: '0x423d2Ca885d67E46062CFF732Eff952f4F736136',
+  wagerRegistry: '0x916841aEe4832a2e9DD42470fa05a7329486e75a',
+  membershipManager: '0x101C3eC35fa48A500c2dFA9026f1d42F1431Abe8',
+  keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
+  sanctionsGuard: '0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3',
+  polymarketAdapter: '0x98fe63209f5BffcCe905bF8779a1F06576A2C313',
   // Stake / payment tokens (Circle USDC + Wrapped MATIC on Amoy)
   paymentToken: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
   wmatic: '0x0ae690AAD8663aaB12a671A6A0d74242332de85f',

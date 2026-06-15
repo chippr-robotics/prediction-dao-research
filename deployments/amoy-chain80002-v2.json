@@ -7,17 +7,19 @@
   "wmatic": "0x0ae690AAD8663aaB12a671A6A0d74242332de85f",
   "polymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22",
   "contracts": {
-    "polymarketAdapter": "0x423d2Ca885d67E46062CFF732Eff952f4F736136",
-    "membershipManager": "0xFaEbF662aa591fF95e97306b413522efC958540f",
-    "wagerRegistry": "0x66c7fa8cB1642Fc5e94Fa92928f1d6333c8d657f",
-    "keyRegistry": "0xb314c4Ee52D9D89bf7FEE66a43aBeAc7D047a5Cb",
+    "polymarketAdapter": "0x98fe63209f5BffcCe905bF8779a1F06576A2C313",
+    "membershipManager": "0x101C3eC35fa48A500c2dFA9026f1d42F1431Abe8",
+    "wagerRegistry": "0x916841aEe4832a2e9DD42470fa05a7329486e75a",
+    "keyRegistry": "0xcEFdeBba8E040c035c690ca9057cF22E73247c24",
+    "sanctionsGuard": "0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3",
     "chainlinkDataFeedAdapter": "0x7ae8220Dc02D0504EDCBa2C1B1AbA579AA3F0f23",
     "chainlinkFunctionsAdapter": "0x074fC18C1E322a7537b53B8B2Bf0762629E3b532",
     "umaAdapter": "0xcEa9b4A01CcD3aA6545ea834a268C69e7eEfee88"
   },
   "mocks": {
-    "mockPolymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22"
+    "mockPolymarketCTF": "0x95F40ea10E6C51892783c4E7721Ada1425917e22",
+    "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
   },
   "saltPrefix": "FairWins-P2P-v2.0-",
-  "timestamp": "2026-05-24T02:29:26.974Z"
+  "timestamp": "2026-06-15T02:23:55.220Z"
 }
