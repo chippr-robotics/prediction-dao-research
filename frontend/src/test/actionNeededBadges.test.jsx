@@ -245,7 +245,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
   describe('MyMarketsModal wager cards', () => {
     it('shows an action badge on exactly the wager that needs action', async () => {
       activityRef.current = baseActivity({
-        actionNeededByWagerId: { '1': 'claim', '2': null }
+        actionNeededByWagerId: { '1': 'accept', '2': null }
       })
       const markets = [wagerOne(), wagerTwo()]
 
@@ -254,18 +254,16 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       const row1 = screen.getByText('Wager One').closest('tr')
-      expect(within(row1).getByText('Claim')).toBeInTheDocument()
+      expect(within(row1).getByText('Accept')).toBeInTheDocument()
 
       // Wager 2 (action kind null) has no badge — exactly one in the document.
       expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(1)
       const row2 = screen.getByText('Wager Two').closest('tr')
-      expect(within(row2).queryByText('Claim')).not.toBeInTheDocument()
+      expect(within(row2).queryByText('Accept')).not.toBeInTheDocument()
     })
 
     it.each([
       ['accept', 'Accept'],
-      ['resolve', 'Resolve'],
-      ['claim', 'Claim'],
       ['refund', 'Refund'],
       ['respondDraw', 'Respond to draw']
     ])('labels a "%s" action badge "%s"', async (kind, label) => {
@@ -281,9 +279,26 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       expect(within(row).getByText(label)).toBeInTheDocument()
     })
 
+    // 'claim' and 'resolve' have a real action button in the row's Actions
+    // column, so the duplicate status badge is intentionally suppressed.
+    it.each(['claim', 'resolve'])(
+      'does not render a redundant status badge for "%s"',
+      async (kind) => {
+        activityRef.current = baseActivity({
+          actionNeededByWagerId: { '1': kind }
+        })
+
+        await act(async () => {
+          render(modalUi([wagerOne()]))
+        })
+
+        expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+      }
+    )
+
     it('removes the badge when the action is no longer needed', async () => {
       activityRef.current = baseActivity({
-        actionNeededByWagerId: { '1': 'claim', '2': null }
+        actionNeededByWagerId: { '1': 'accept', '2': null }
       })
       const markets = [wagerOne(), wagerTwo()]
 
@@ -292,7 +307,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         view = render(modalUi(markets))
       })
 
-      expect(screen.getByText('Claim')).toBeInTheDocument()
+      expect(screen.getByText('Accept')).toBeInTheDocument()
 
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': null, '2': null }
@@ -301,7 +316,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         view.rerender(modalUi(markets))
       })
 
-      expect(screen.queryByText('Claim')).not.toBeInTheDocument()
+      expect(screen.queryByText('Accept')).not.toBeInTheDocument()
       expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
     })
 

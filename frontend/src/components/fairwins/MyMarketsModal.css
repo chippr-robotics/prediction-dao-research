@@ -578,6 +578,11 @@
   color: #E5533D;
 }
 
+/* Neutral outcome (draw, refunded, settled-by-other) — no win/loss colour. */
+.mm-outcome.neutral {
+  color: var(--text-secondary, #AAB6C2);
+}
+
 /* Action Buttons in Table */
 .mm-action-btn {
   display: inline-flex;
