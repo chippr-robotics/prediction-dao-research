@@ -25,6 +25,12 @@ const ACTION_NEEDED_LABELS = {
   respondDraw: 'Respond to draw'
 }
 
+// 'claim' and 'resolve' already have a real action button in the row's Actions
+// column, so a duplicate status-column badge for them is just noise (and the
+// badge looked clickable but wasn't). Suppress those two; the remaining action
+// kinds have no inline button yet, so their badge stays as the only affordance.
+const ACTION_BADGES_WITH_BUTTON = new Set(['claim', 'resolve'])
+
 /**
  * True when `account` is the declared winner of a resolved wager whose payout
  * has not yet been pulled — i.e. the viewer can call claimPayout to collect.
@@ -694,8 +700,12 @@ function MyMarketsModal({
             onClick={onClose}
             aria-label="Close modal"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            {/* Two separate <line>s with the stroke on the <svg> (matching the
+                tab icons that render reliably). The previous single multi-moveto
+                <path> rendered blank on mobile, leaving an empty square. */}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </header>
@@ -707,9 +717,14 @@ function MyMarketsModal({
             onClick={() => { setActiveTab('participating'); setSelectedMarketId(null) }}
             role="tab"
             aria-selected={activeTab === 'participating'}
+            aria-label="Participating — wagers others sent you (inbound)"
+            title="Participating — wagers others sent you (inbound)"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            {/* Inbound: a wager that came TO you — arrow pointing down into a tray. */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             <span>Participating</span>
           </button>
@@ -718,11 +733,14 @@ function MyMarketsModal({
             onClick={() => { setActiveTab('created'); setSelectedMarketId(null) }}
             role="tab"
             aria-selected={activeTab === 'created'}
+            aria-label="Created — wagers you sent out (outbound)"
+            title="Created — wagers you sent out (outbound)"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-              <path d="M2 17l10 5 10-5"/>
-              <path d="M2 12l10 5 10-5"/>
+            {/* Outbound: a wager you sent OUT — arrow pointing up out of a tray. */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             <span>Created</span>
           </button>
@@ -732,6 +750,8 @@ function MyMarketsModal({
               onClick={() => { setActiveTab('arbitrating'); setSelectedMarketId(null) }}
               role="tab"
               aria-selected={activeTab === 'arbitrating'}
+              aria-label="Arbitrating — wagers you resolve as the neutral arbitrator"
+              title="Arbitrating — wagers you resolve as the neutral arbitrator"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 3v18M5 7h14M5 7l-3 6a4 4 0 008 0L5 7zM19 7l-3 6a4 4 0 008 0l-5-6z"/>
@@ -744,6 +764,8 @@ function MyMarketsModal({
             onClick={() => { setActiveTab('history'); setSelectedMarketId(null) }}
             role="tab"
             aria-selected={activeTab === 'history'}
+            aria-label="History — resolved and settled wagers"
+            title="History — resolved and settled wagers"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"/>
@@ -1106,6 +1128,49 @@ function getMarketDisplayTitle(market) {
   return market.proposalTitle || market.description || `Market #${market.id}`
 }
 
+/**
+ * Human-readable outcome for a terminal wager row in the History tab.
+ *
+ * The raw `market.outcome` field is almost never populated for peer wagers (it
+ * only exists for some oracle markets), which is why the Outcome column showed
+ * "N/A" for every resolved bet. We derive a meaningful result from the wager's
+ * terminal status and on-chain winner instead:
+ *   - resolved + you won              → "Won"   (green)
+ *   - resolved + you staked and lost  → "Lost"  (red)
+ *   - resolved + you only arbitrated  → winner's short address (neutral)
+ *   - draw / refunded / cancelled / … → that status (neutral)
+ */
+function getRowOutcome(market, account) {
+  const status = market.computedStatus
+  if (status === MarketStatus.DRAW) return { label: 'Draw', tone: 'neutral' }
+  if (status === MarketStatus.REFUNDED) return { label: 'Refunded', tone: 'neutral' }
+  if (status === MarketStatus.CANCELLED) return { label: 'Cancelled', tone: 'neutral' }
+  if (status === MarketStatus.DECLINED) return { label: 'Declined', tone: 'neutral' }
+  if (status === MarketStatus.ORACLE_TIMED_OUT) return { label: 'Timed Out', tone: 'neutral' }
+
+  if (status === MarketStatus.RESOLVED) {
+    const userAddr = account?.toLowerCase()
+    const winner = market.winner?.toLowerCase?.()
+    if (userAddr && winner) {
+      if (winner === userAddr) return { label: 'Won', tone: 'positive' }
+      const isCreator = market.creator?.toLowerCase() === userAddr
+      const isParticipant = market.participants?.some(p => p?.toLowerCase() === userAddr)
+      if (isCreator || isParticipant) return { label: 'Lost', tone: 'negative' }
+    }
+    if (market.winner) {
+      return { label: `${market.winner.slice(0, 6)}…${market.winner.slice(-4)}`, tone: 'neutral' }
+    }
+    return { label: 'Resolved', tone: 'neutral' }
+  }
+
+  // Non-terminal or unknown: fall back to any explicit outcome the data carries.
+  if (market.outcome) {
+    const positive = market.outcome === 'Pass' || market.outcome === 'Yes' || market.outcome === 'Won'
+    return { label: market.outcome, tone: positive ? 'positive' : 'negative' }
+  }
+  return { label: 'N/A', tone: 'neutral' }
+}
+
 function MarketsTable({
   markets,
   onSelect,
@@ -1190,6 +1255,7 @@ function MarketsTable({
             const showClearBtn = isExpired && typeof onClearExpired === 'function'
             const displayTitle = getMarketDisplayTitle(market)
             const actionNeeded = actionNeededByWagerId?.[String(market.id)] ?? null
+            const rowOutcome = showOutcome ? getRowOutcome(market, account) : null
 
             return (
               <tr
@@ -1226,8 +1292,8 @@ function MarketsTable({
                 </td>
                 <td className="mm-table-time">
                   {showOutcome ? (
-                    <span className={`mm-outcome ${market.outcome === 'Pass' || market.outcome === 'Yes' ? 'positive' : 'negative'}`}>
-                      {market.outcome || 'N/A'}
+                    <span className={`mm-outcome ${rowOutcome.tone}`}>
+                      {rowOutcome.label}
                     </span>
                   ) : isExpired ? (
                     <span className="mm-time-expired">Expired</span>
@@ -1239,7 +1305,7 @@ function MarketsTable({
                   <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
                     {showUnderConsideration ? 'Under Consideration' : getStatusLabel(market.computedStatus)}
                   </span>
-                  {actionNeeded && (
+                  {actionNeeded && !ACTION_BADGES_WITH_BUTTON.has(actionNeeded) && (
                     <Badge
                       variant={actionNeeded === 'claim' ? 'success' : 'warning'}
                       className="mm-action-needed-badge"
