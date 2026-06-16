@@ -62,10 +62,10 @@ const tx = await registry.createWager(
     ethers.ZeroAddress,         // arbitrator (required for ThirdParty type)
     USDC_ADDRESS,               // stake token (must pass isAllowedToken)
     stake,                      // creatorStake
-    stake,                      // opponentStake (differs for bookmaker odds)
+    stake,                      // opponentStake (differs for Offer odds)
     now + 6 * 3600,             // acceptDeadline  (≤ 30 days out)
     now + 86400 + 48 * 3600,    // resolveDeadline (≤ 180 days out)
-    0,                          // ResolutionType.Either
+    1,                          // ResolutionType.Creator ("Me" — UI no longer offers Either)
     ethers.ZeroHash,            // oracle conditionId (oracle types only)
     true,                       // creatorIsYes (oracle types only)
     metadataHash,               // keccak256 of the terms

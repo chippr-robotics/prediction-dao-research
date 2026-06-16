@@ -14,7 +14,7 @@ by `QuickActionCard`.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | string | Stable action key; switch target in `handleQuickAction` (`create-1v1-friends`, `create-1v1-oracle`, `create-bookmaker`, `my-wagers`, `scan-qr`, `share-account`). Unchanged. |
+| `id` | string | Stable action key; switch target in `handleQuickAction` (`create-1v1-friends`, `create-1v1-oracle`, `create-offer`, `my-wagers`, `scan-qr`, `share-account`). |
 | `category` | `'create' \| 'track' \| 'qr'` | Drives the group a tile renders in and the `qa-{category}` modifier class. |
 | `accent` | string (hex) | Per-action color; sets `--qa-accent`. |
 | `accentRgb` | string (`"r, g, b"`) | Same color as channels; sets `--qa-accent-rgb` for rgba tints. |

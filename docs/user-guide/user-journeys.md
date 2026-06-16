@@ -74,17 +74,19 @@ auto-resolution on-chain. No one has to trust anyone's word.
 If the oracle never reports, the wager refunds after its resolve deadline —
 stakes are never stranded.
 
-## Journey 3: A bookmaker-style odds wager
+## Journey 3: Make an Offer (asymmetric odds)
 
 The creator can offer asymmetric stakes — e.g. *my 30 USDC against your 10* —
-by choosing **Bookmaker** on the Dashboard and setting an odds multiplier. The
-app derives the two stake amounts, and everything else (sharing, acceptance,
-resolution) works exactly like Journeys 1 and 2.
+by choosing **Make an Offer** on the Dashboard and setting an odds multiplier.
+The app derives the two stake amounts: whoever settles the wager puts up the
+majority (insurer) stake, so picking **Me** vs **Them** as the settler flips
+which side risks more. Everything else (sharing, acceptance, resolution) works
+exactly like Journeys 1 and 2.
 
 ## Journey 4: A neutral arbitrator
 
-For higher-stakes or easily-disputed bets, the creator selects **Third Party**
-resolution and names an arbitrator's address at creation. Only the arbitrator
+For higher-stakes or easily-disputed bets, the creator chooses **A Friend** as
+the settler and names an arbitrator's address at creation. Only the arbitrator
 can declare the winner (or a draw). If the terms are encrypted, they're
 encrypted for the arbitrator too, so they can actually read what they're
 ruling on. Arbitrators see their pending cases in *My Wagers → Arbitrating*.

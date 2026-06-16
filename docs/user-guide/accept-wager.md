@@ -32,11 +32,12 @@ the wrong network, the app offers a one-click switch.
 - **Terms** — the wager description. If it's encrypted you'll see "Encrypted
   Wager" until you decrypt it (one wallet signature derives your key; you must
   have an encryption key registered — Account Center → Security)
-- **Your stake** — the amount you must lock, fixed by the creator. For
-  bookmaker wagers, note the odds multiplier
+- **Your stake** — the amount you must lock, fixed by the creator. For an
+  **Offer**, note the odds multiplier — if you're the settler you put up the
+  majority stake
 - **Time remaining** — the acceptance deadline countdown
-- **Resolution type** — who will settle it: either party, one named party, an
-  arbitrator, or an oracle (Polymarket / Chainlink / UMA)
+- **Who settles it** — the creator (**Me**), you the opponent (**Them**), a
+  neutral **Friend** (arbitrator), or an **Oracle** (Polymarket / Chainlink / UMA)
 
 ### 4. Accept (or decline)
 

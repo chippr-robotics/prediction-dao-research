@@ -26,7 +26,7 @@ FairWins is a **wager management layer** that helps users track and manage peer-
 | **QR Code Sharing** | Basic | Share market links via QR |
 | **Multicall3 Batching** | Implemented | Efficient batch contract reads |
 | **Multi-party Acceptance** | Implemented | Invitation/acceptance flow with deadlines |
-| **Custom Odds (Bookmaker)** | Implemented | Asymmetric stake ratios |
+| **Custom Odds (Make an Offer)** | Implemented | Asymmetric stake ratios; the settler puts up the majority stake |
 
 ### What's Missing (Gaps)
 

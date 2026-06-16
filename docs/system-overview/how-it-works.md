@@ -30,7 +30,8 @@ which additionally binds the current terms-of-service hash on-chain) with:
 - the **opponent** address (and optionally an **arbitrator** for third-party
   resolution),
 - the **stake token** (USDC by default) and both stake amounts — equal stakes
-  for an even-money wager, asymmetric stakes for a bookmaker-style odds wager,
+  for an even-money wager, asymmetric stakes for an **Offer** (odds) wager
+  where the settler puts up the majority stake,
 - an **acceptance deadline** and a **resolve deadline**,
 - the **resolution type** (see below) plus an oracle condition ID if
   oracle-resolved,
@@ -74,6 +75,12 @@ How a wager resolves is fixed at creation time:
 | `ChainlinkDataFeed` | Anyone | `autoResolveFromOracle(wagerId)` compares a Chainlink price feed against the registered threshold |
 | `ChainlinkFunctions` | Anyone | `autoResolveFromOracle(wagerId)` reads the fulfilled Chainlink Functions request |
 | `UMA` | Anyone | `autoResolveFromOracle(wagerId)` reads the settled UMA Optimistic Oracle V3 assertion |
+
+The on-chain enum names are unchanged. In the create UI these are surfaced as
+**Me** (`Creator`), **Them** (`Opponent`), **A Friend** (`ThirdParty`), and
+**An Oracle** (`Polymarket` / Chainlink / UMA). `Either` is retained on-chain for
+pre-existing wagers but is no longer offered when creating new ones — every new
+wager names a single settler, which in an Offer also carries the majority stake.
 
 For oracle types, the creator declares at creation which side they take
 (`creatorIsYes`); when the adapter reports the outcome, the registry maps it to

@@ -24,23 +24,24 @@ you're on the wrong network the app offers a one-click switch.
 |--------------|-----------------|
 | **Friends Decide (1v1)** | Even-money wager you and your opponent settle yourselves |
 | **Oracle Settles (1v1)** | Wager pegged to an external source (Polymarket, Chainlink, UMA) |
-| **Bookmaker** | Asymmetric stakes at odds you set (e.g. your 30 USDC vs. their 10) |
+| **Make an Offer** | Asymmetric stakes at odds you set — whoever settles puts up the majority stake (e.g. your 30 USDC vs. their 10) |
 
 ### 3. Fill in the wager details
 
 - **Description** — what you're betting on, stated clearly enough that both
   sides (and an arbitrator, if any) can judge the outcome
-- **Stake amount** — default 10 USDC; for bookmaker wagers you set the odds
+- **Stake amount** — default 10 USDC; for an **Offer** you set the odds
   multiplier and the app derives the two stakes
 - **End time** — when the bet is decided (default 1 day; minimum 1 hour,
   maximum 21 days)
 - **Acceptance deadline** — how long your opponent has to accept before you
   can reclaim your stake (default 6 hours)
-- **Resolution type** — who settles it:
-    - *Either* — either of you can declare the winner (default)
-    - *Creator only* / *Opponent only* — one named side declares
-    - *Third Party* — enter a trusted arbitrator's address
-    - *Oracle* — link an external source (next step)
+- **Who settles it** — every wager names a single settler; in an **Offer**
+  that settler also puts up the majority (insurer) stake:
+    - *Me* — you settle the outcome (default); in an Offer you stake the majority
+    - *Them* — your opponent settles; in an Offer they stake the majority
+    - *A Friend* — a neutral arbitrator you name settles it (enter their address)
+    - *An Oracle* — link an external source (next step)
 
 ### 4. (Oracle wagers) link the source
 
@@ -90,7 +91,7 @@ are embedded. They follow the [Accept Wager](accept-wager.md) flow.
 | Acceptance deadline | 6 hours | up to 30 days |
 | Resolution window after end time | 48 hours | up to 180 days |
 | Odds multiplier (even money) | 200 (2×) | — |
-| Resolution type | Either | — |
+| Settler (resolution type) | Me (Creator) | — |
 
 ## Troubleshooting
 

@@ -14,7 +14,7 @@ explanation that most users don't need yet and that generate avoidable support a
 operations overhead.
 
 This feature **hides every oracle model except Polymarket across the frontend**: a
-user creating an oracle wager (in **both** the 1v1 and **Bookmaker** flows) sees only
+user creating an oracle wager (in **both** the 1v1 and **Make an Offer** flows) sees only
 the Polymarket path and no option to select any other oracle, and no **landing/
 marketing** page or onboarding/dashboard copy names or links Chainlink or UMA. The
 on-chain contracts are **unchanged** — the other oracle models remain fully
@@ -33,7 +33,7 @@ As someone creating an oracle-settled wager, I want a single, obvious oracle pat
 surface; it directly reduces new-user confusion and the support load.
 
 **Independent Test**: Open the oracle wager-creation flow — in **both** the 1v1 and
-the **Bookmaker** paths — and confirm Polymarket is the only oracle model presented
+the **Make an Offer** paths — and confirm Polymarket is the only oracle model presented
 and the only one that can be selected.
 
 **Acceptance Scenarios**:
@@ -48,10 +48,10 @@ and the only one that can be selected.
 3. **Given** the selection is reduced to one option, **When** the user views it,
    **Then** there is no leftover empty selector, dead tab, or "choose an oracle"
    prompt implying other choices exist.
-4. **Given** the **Bookmaker** creation flow (which shares the oracle selection),
+4. **Given** the **Make an Offer** creation flow (which shares the oracle selection),
    **When** its settlement/oracle dropdown is shown, **Then** no Chainlink Data Feed,
    Chainlink Functions, or UMA option is present — Polymarket is the only oracle
-   settlement offered — and the Bookmaker + Polymarket path still works.
+   settlement offered — and the Make an Offer + Polymarket path still works.
 
 ### User Story 2 - Oracle messaging (incl. landing pages) reflects Polymarket-only (Priority: P2)
 
@@ -116,7 +116,7 @@ options reappear in the creation flow and copy, with no other change needed.
 ### Functional Requirements
 
 - **FR-001**: In the user-facing oracle wager-creation flow — including **both the
-  1v1 and the Bookmaker** paths — the system MUST present **only Polymarket** as the
+  1v1 and the Make an Offer** paths — the system MUST present **only Polymarket** as the
   oracle model — visible, selected, and the sole selectable oracle option. Chainlink
   Data Feed, Chainlink Functions, and UMA MUST NOT be selectable by any means
   (visible control, hidden control, dropdown entry, or keyboard navigation).
@@ -149,10 +149,10 @@ options reappear in the creation flow and copy, with no other change needed.
 
 ### Measurable Outcomes
 
-- **SC-001**: In the oracle creation flow — **1v1 and Bookmaker** — **100%** of users
+- **SC-001**: In the oracle creation flow — **1v1 and Make an Offer** — **100%** of users
   are offered exactly one oracle model (Polymarket) and **0** paths exist to select
   Chainlink or UMA.
-- **SC-002**: The Polymarket creation path (1v1 and Bookmaker) completes successfully
+- **SC-002**: The Polymarket creation path (1v1 and Make an Offer) completes successfully
   with **no regression** versus today.
 - **SC-003**: No user-facing oracle copy, onboarding, or **landing/marketing** page
   names or links Chainlink or UMA while the feature is active (a text scan of every
@@ -175,13 +175,13 @@ options reappear in the creation flow and copy, with no other change needed.
 - "Polymarket markets" in the request refers to the Polymarket oracle resolution
   model (linked-market auto-settlement), the model already used in the platform.
 - **Scope decided 2026-06-06**: this change applies to the **end-user** surfaces —
-  the oracle creation flow (**1v1 and Bookmaker**), the dashboard/onboarding copy,
+  the oracle creation flow (**1v1 and Make an Offer**), the dashboard/onboarding copy,
   and the **landing/marketing pages** (folded in from 004; the landing footer
-  "Oracles" list + the bookmaker dropdown share the same exposure switch). The
+  "Oracles" list + the Make an Offer dropdown share the same exposure switch). The
   **admin Oracle Adapters tab is out of scope and unchanged** — operations keep full
   visibility/management of all deployed adapters (including the dormant Chainlink/UMA
   ones) so they can operate Polymarket and keep the others warm for the later
-  re-enable. The bookmaker dropdown's oracle options already derive from the same
+  re-enable. The Make an Offer dropdown's oracle options already derive from the same
   exposed-oracle list as the 1v1 flow, so the single switch governs it.
 
 ## Out of Scope

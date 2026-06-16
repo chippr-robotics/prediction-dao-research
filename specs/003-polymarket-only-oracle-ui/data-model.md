@@ -22,7 +22,7 @@
 
 | Surface | Reads | Behavior |
 |---|---|---|
-| `FriendMarketsModal` oracle tab strip (1v1 **and Bookmaker**, `resolutionCategory='all'`) | `EXPOSED_ORACLE_RESOLUTION_TYPES` | renders only exposed models; if 1 → auto-select Polymarket, no chooser |
+| `FriendMarketsModal` oracle tab strip (1v1 **and Make an Offer**, `resolutionCategory='all'`) | `EXPOSED_ORACLE_RESOLUTION_TYPES` | renders only exposed models; if 1 → auto-select Polymarket, no chooser |
 | `FriendMarketsModal` initial `resolutionType` | exposed set | falls back to Polymarket if a pre-selected model is hidden |
 | `Dashboard` / `OnboardingTutorial` copy | setting | reduced wording when Polymarket-only; full when `all` |
 | `LandingPage` footer "Oracles" list (folded from 004) | setting | only the Polymarket link when Polymarket-only; Chainlink/UMA links restored when `all` |

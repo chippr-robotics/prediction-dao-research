@@ -34,8 +34,8 @@ outcome is determined by battle-tested oracles.
 
 ### Wager mechanics
 
-- **1v1 even-money or bookmaker odds** — equal stakes, or asymmetric stakes at
-  a creator-set multiplier
+- **1v1 even-money or Make an Offer odds** — equal stakes, or asymmetric stakes
+  at a creator-set multiplier where the settler puts up the majority stake
 - **QR / deep-link sharing** — the opponent scans a code and accepts in-app
 - **Mutual draws** — both parties (or the arbitrator) can settle a push; each
   side gets its own stake back
