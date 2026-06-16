@@ -26,6 +26,24 @@ const ACTION_NEEDED_LABELS = {
 }
 
 /**
+ * True when `account` is the declared winner of a resolved wager whose payout
+ * has not yet been pulled — i.e. the viewer can call claimPayout to collect.
+ *
+ * WagerRegistry escrows both stakes and pays the winner on a *pull* basis
+ * (claimPayout), so a resolved wager sits here until the winner claims. The
+ * list row and the detail view both gate the "Claim" action on this so the
+ * green action badge has a real button behind it (previously the badge looked
+ * clickable but only opened the detail card — nothing claimed the funds).
+ */
+function isWinnerUnpaid(market, account) {
+  if (!market || !account) return false
+  if (String(market.status).toLowerCase() !== 'resolved') return false
+  if (market.paid) return false
+  return market.winner != null &&
+    market.winner.toLowerCase() === account.toLowerCase()
+}
+
+/**
  * MyMarketsModal Component
  *
  * A comprehensive modal for users to manage their wagers:
@@ -55,7 +73,7 @@ function MyMarketsModal({
   // Active network metadata, used to scope/label the wagers shown so it's
   // clear they belong to the selected network (testnet vs mainnet).
   const activeNetwork = useMemo(() => (chainId ? getNetwork(chainId) : null), [chainId])
-  const { dismissedIds, dismissMarket, dismissMarkets } = useFriendMarkets()
+  const { dismissedIds, dismissMarket, dismissMarkets, refresh: refreshFriendMarkets } = useFriendMarkets()
 
   const { markets: marketsWithEnvelopes, fetchEnvelope } = useLazyIpfsEnvelope(friendMarkets)
   const { markets: decryptableMarkets, decryptMarket, isMarketDecrypting } = useLazyMarketDecryption(marketsWithEnvelopes)
@@ -583,6 +601,64 @@ function MyMarketsModal({
     dismissMarkets(markets.map(m => m.id))
   }, [dismissMarkets])
 
+  // Winner pulls their payout. The contract escrows both stakes and pays the
+  // winner via claimPayout (pull, not push), so resolving a wager isn't the
+  // end of the flow — the winner still has to claim. This is the action behind
+  // the green "Claim" badge in the list and the "Claim Winnings" button in the
+  // detail view. claimingId/claimError are keyed by wager id so a single
+  // in-flight claim and its error map back to the right row.
+  const [claimingId, setClaimingId] = useState(null)
+  const [claimError, setClaimError] = useState(null)
+
+  const handleClaimPayout = useCallback(async (market) => {
+    if (!signer) return
+    const id = String(market.id)
+
+    if (!isCorrectNetwork) {
+      try {
+        await switchNetwork()
+      } catch {
+        setClaimError({ id, message: 'Please switch to the correct network.' })
+        return
+      }
+    }
+
+    setClaimingId(id)
+    setClaimError(null)
+
+    try {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await registry.claimPayout(market.wagerId ?? market.id)
+      await tx.wait()
+      // Pull fresh on-chain data so the claimed wager flips to paid (which
+      // hides the Claim affordances) and clear its unread activity.
+      markWagerRead?.(id)
+      await refreshFriendMarkets?.()
+    } catch (err) {
+      const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
+      const lower = reason.toLowerCase()
+      let message
+      if (err?.code === 'ACTION_REJECTED' || err?.code === 4001 || lower.includes('user rejected')) {
+        message = 'Transaction was cancelled in your wallet.'
+      } else if (lower.includes('alreadypaid') || lower.includes('already paid') || lower.includes('already claimed')) {
+        message = 'This payout has already been claimed.'
+      } else if (lower.includes('notwinner') || lower.includes('not winner')) {
+        message = 'Only the winning side can claim this payout.'
+      } else if (lower.includes('notresolved') || lower.includes('not resolved')) {
+        message = 'This wager has not been resolved yet.'
+      } else {
+        message = 'Failed to claim winnings. Please try again.'
+      }
+      setClaimError({ id, message })
+    } finally {
+      setClaimingId(null)
+    }
+  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets])
+
   if (!isOpen) return null
 
   return (
@@ -764,6 +840,9 @@ function MyMarketsModal({
                       signer={signer}
                       isCorrectNetwork={isCorrectNetwork}
                       switchNetwork={switchNetwork}
+                      onClaimPayout={handleClaimPayout}
+                      claimingId={claimingId}
+                      claimError={claimError}
                       onRefunded={() => {
                         setSelectedMarketId(null)
                         fetchMarketsData?.()
@@ -794,6 +873,9 @@ function MyMarketsModal({
                       statusFilter={statusFilter}
                       showResolveCountdown
                       onResolve={handleOpenResolution}
+                      onClaim={handleClaimPayout}
+                      claimingId={claimingId}
+                      claimError={claimError}
                     />
                   )}
                 </div>
@@ -924,6 +1006,9 @@ function MyMarketsModal({
                       isHistoryView
                       onDecrypt={handleDecryptMarket}
                       isDecrypting={isMarketDecrypting(selectedMarket?.id)}
+                      onClaimPayout={handleClaimPayout}
+                      claimingId={claimingId}
+                      claimError={claimError}
                     />
                   ) : categorizedMarkets.history.length === 0 ? (
                     <div className="mm-empty-state">
@@ -940,6 +1025,10 @@ function MyMarketsModal({
                       getStatusLabel={getStatusLabel}
                       getTimeRemaining={getTimeRemaining}
                       showOutcome
+                      account={account}
+                      onClaim={handleClaimPayout}
+                      claimingId={claimingId}
+                      claimError={claimError}
                     />
                   )}
                 </div>
@@ -1032,6 +1121,9 @@ function MarketsTable({
   onAccept,
   onClearExpired,
   onClearAllExpired,
+  onClaim,
+  claimingId,
+  claimError,
   statusFilter,
   account,
   showResolveCountdown = false
@@ -1065,8 +1157,15 @@ function MarketsTable({
     return getTimeRemaining(endTime)
   }
 
+  // A resolved wager whose winner is the viewer and hasn't pulled their payout
+  // yet gets a real Claim button in the actions column (fixes the bug where the
+  // green "Claim" badge only opened the detail card instead of claiming).
+  const canClaim = (market) =>
+    typeof onClaim === 'function' && isWinnerUnpaid(market, account)
+  const hasClaimableRow = markets.some(canClaim)
+
   const tableHasActionsColumn =
-    showActions || canAccept || showResolveCountdown ||
+    showActions || canAccept || showResolveCountdown || hasClaimableRow ||
     (typeof onClearExpired === 'function' && expiredMarkets.length > 0)
 
   return (
@@ -1184,6 +1283,21 @@ function MarketsTable({
                       >
                         {isCreator ? 'Reclaim & Clear' : 'Clear'}
                       </button>
+                    )}
+                    {canClaim(market) && (
+                      <>
+                        <button
+                          className="mm-action-btn mm-action-claim"
+                          onClick={(e) => { e.stopPropagation(); onClaim(market) }}
+                          disabled={claimingId === String(market.id)}
+                          title="Claim your winnings"
+                        >
+                          {claimingId === String(market.id) ? 'Claiming…' : 'Claim'}
+                        </button>
+                        {claimError?.id === String(market.id) && (
+                          <span className="mm-action-error" role="alert">{claimError.message}</span>
+                        )}
+                      </>
                     )}
                   </td>
                 )}
@@ -1339,9 +1453,16 @@ function MarketDetailView({
   isCorrectNetwork,
   switchNetwork,
   onWithdraw,
-  onRefunded
+  onRefunded,
+  onClaimPayout,
+  claimingId,
+  claimError
 }) {
   const isCreator = market.creator?.toLowerCase() === account?.toLowerCase()
+  // Winner can pull their escrowed payout while the wager is resolved-unpaid.
+  const showClaimButton =
+    typeof onClaimPayout === 'function' && isWinnerUnpaid(market, account)
+  const isClaiming = claimingId === String(market.id)
   const position = userPositions?.find(p => String(p.marketId) === String(market.id))
   // For un-accepted offers, the relevant deadline is the *acceptance*
   // deadline, not the trading/resolve window — the latter is what made
@@ -1662,6 +1783,37 @@ function MarketDetailView({
 
       {/* Actions */}
       <div className="mm-detail-actions">
+        {showClaimButton && (
+          <div className="mm-claim-section">
+            <button
+              type="button"
+              className="mm-btn-primary mm-btn-claim"
+              onClick={() => onClaimPayout(market)}
+              disabled={isClaiming}
+            >
+              {isClaiming ? (
+                <>
+                  <span className="mm-spinner-small"></span>
+                  Claiming Winnings...
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 1v22"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+                  </svg>
+                  Claim Winnings
+                </>
+              )}
+            </button>
+            <p className="mm-claim-hint">
+              You won this wager. Claim to transfer the combined stakes to your wallet.
+            </p>
+            {claimError?.id === String(market.id) && (
+              <p className="mm-withdraw-error" role="alert">{claimError.message}</p>
+            )}
+          </div>
+        )}
         {isCreatorView && isCreator && (market.computedStatus || market.status) === MarketStatus.PENDING_ACCEPTANCE && !withdrawSuccess && (
           <div className="mm-withdraw-section">
             <button

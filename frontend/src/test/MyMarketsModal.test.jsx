@@ -804,6 +804,102 @@ describe('MyMarketsModal', () => {
     })
   })
 
+  describe('Claim winnings (winner pull payout)', () => {
+    const me = '0x1234567890123456789012345678901234567890'
+    const other = '0xABCDEF1234567890ABCDEF1234567890ABCDEF12'
+
+    const resolvedWon = (overrides = {}) => ({
+      id: '42', description: 'Won Wager', creator: me, opponent: other,
+      participants: [me, other], status: 'resolved', marketType: 'friend',
+      winner: me, paid: false,
+      endDate: new Date(Date.now() - 3_600_000).toISOString(),
+      ...overrides
+    })
+
+    const openHistory = async (user) => {
+      const historyTab = screen.getByRole('tab', { name: /history/i })
+      await user.click(historyTab)
+    }
+
+    it('shows a real Claim button for the winner of a resolved, unpaid wager', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[resolvedWon()]} />
+        )
+      })
+      await openHistory(user)
+
+      await waitFor(() => expect(screen.getByText('Won Wager')).toBeInTheDocument())
+      expect(screen.getByRole('button', { name: /^claim$/i })).toBeInTheDocument()
+    })
+
+    it('claims in place instead of opening the detail card (regression: claim opened the card)', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[resolvedWon()]} />
+        )
+      })
+      await openHistory(user)
+
+      const claimBtn = await screen.findByRole('button', { name: /^claim$/i })
+      await act(async () => {
+        await user.click(claimBtn)
+      })
+
+      // The click must NOT navigate into the detail view — that was the bug.
+      expect(screen.queryByText('Back to list')).not.toBeInTheDocument()
+      // Still on the list (the row title is rendered in the table, not the detail header).
+      expect(screen.getByText('Won Wager')).toBeInTheDocument()
+    })
+
+    it('shows the Claim Winnings button in the detail view when the row is opened', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose} friendMarkets={[resolvedWon()]} />
+        )
+      })
+      await openHistory(user)
+
+      // Open the detail by clicking the row title (not the Claim button).
+      const titleCell = await screen.findByText('Won Wager')
+      await user.click(titleCell)
+
+      expect(await screen.findByText('Back to list')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /claim winnings/i })).toBeInTheDocument()
+    })
+
+    it('does not show a Claim button to the losing side', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose}
+            friendMarkets={[resolvedWon({ winner: other })]} />
+        )
+      })
+      await openHistory(user)
+
+      await waitFor(() => expect(screen.getByText('Won Wager')).toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument()
+    })
+
+    it('does not show a Claim button once the payout has been paid', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen onClose={mockOnClose}
+            friendMarkets={[resolvedWon({ paid: true })]} />
+        )
+      })
+      await openHistory(user)
+
+      await waitFor(() => expect(screen.getByText('Won Wager')).toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: /^claim$/i })).not.toBeInTheDocument()
+    })
+  })
+
   describe('Accessibility', () => {
     it('should have proper tab roles', async () => {
       await act(async () => {
