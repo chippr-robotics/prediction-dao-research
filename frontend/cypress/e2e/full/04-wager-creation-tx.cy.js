@@ -331,11 +331,12 @@ describe('Wager Creation with Real Transactions', () => {
       encrypted: false,
     })
 
-    // Verify the acceptance deadline field is displayed (deterministic, not editable)
+    // Verify the derived acceptance deadline is displayed (deterministic, not
+    // editable) via the glanceable "Accept by" timeline tile.
     cy.get('[role="dialog"]').within(() => {
-      cy.contains('Acceptance Deadline').should('be.visible')
-      cy.get('.fm-readonly-value').should('exist')
-      cy.get('.fm-readonly-value').invoke('text').should('not.be.empty').and('not.equal', '—')
+      cy.contains('Accept by').should('be.visible')
+      cy.get('.fm-stat-tile.is-accept .fm-stat-time').should('exist')
+      cy.get('.fm-stat-tile.is-accept .fm-stat-time').invoke('text').should('not.be.empty').and('not.equal', '—')
     })
 
     submitWagerForm()

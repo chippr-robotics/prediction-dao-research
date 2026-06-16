@@ -320,8 +320,9 @@ describe('Accessibility', () => {
       .should('have.attr', 'max')
       .and('not.be.empty')
 
-    // The acceptance deadline should be displayed in locale format.
-    cy.get('.fm-readonly-value', { timeout: 3000 })
+    // The derived timeline tiles (Accept by / Ends / Resolve by) should
+    // render with a real clock value, not the em-dash placeholder.
+    cy.get('.fm-stat-tile.is-accept .fm-stat-time', { timeout: 3000 })
       .should('be.visible')
       .invoke('text')
       .should('not.be.empty')
