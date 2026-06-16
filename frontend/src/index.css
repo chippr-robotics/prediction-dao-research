@@ -65,3 +65,13 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+
+/* Icon-only buttons: the global `padding: 0.6em 1.2em` above, combined with
+   `box-sizing: border-box`, subtracts ~38px of horizontal padding from
+   fixed-size icon buttons (e.g. 32-36px close/refresh/QR controls). That
+   collapses the content box to zero width and squeezes the SVG out of view,
+   leaving an empty square. Reset padding when the button's only element child
+   is an <svg> so text buttons keep their default padding. */
+button:has(> svg:only-child) {
+  padding: 0;
+}
