@@ -25,11 +25,12 @@ const ACTION_NEEDED_LABELS = {
   respondDraw: 'Respond to draw'
 }
 
-// 'claim' and 'resolve' already have a real action button in the row's Actions
-// column, so a duplicate status-column badge for them is just noise (and the
-// badge looked clickable but wasn't). Suppress those two; the remaining action
-// kinds have no inline button yet, so their badge stays as the only affordance.
-const ACTION_BADGES_WITH_BUTTON = new Set(['claim', 'resolve'])
+// 'accept', 'claim' and 'resolve' already have a real action button in the
+// row's Actions column ("View Offer", "Claim", "Resolve"), so a duplicate
+// status-column badge for them is just noise (and the badge looked clickable
+// but wasn't). Suppress those; the remaining action kinds have no inline button
+// yet, so their badge stays as the only affordance.
+const ACTION_BADGES_WITH_BUTTON = new Set(['accept', 'claim', 'resolve'])
 
 /**
  * True when `account` is the declared winner of a resolved wager whose payout
