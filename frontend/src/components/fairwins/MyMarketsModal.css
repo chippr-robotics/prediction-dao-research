@@ -635,6 +635,45 @@
   background: rgba(229, 83, 61, 0.22);
 }
 
+.mm-action-btn.mm-action-claim {
+  background: linear-gradient(135deg, #36B37E 0%, #2F9E6E 100%);
+  color: white;
+}
+
+.mm-action-btn.mm-action-claim:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3DC48B 0%, #36B37E 100%);
+}
+
+.mm-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Inline claim failure shown beside the row's Claim button. */
+.mm-action-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  color: #E5533D;
+}
+
+/* Winner's "Claim Winnings" call-to-action in the detail view. */
+.mm-claim-section {
+  margin-bottom: 1rem;
+}
+
+.mm-btn-claim {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mm-claim-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
 /* Expired offer treatment */
 .mm-status-badge.status-expired {
   background: rgba(229, 83, 61, 0.15);
