@@ -1,0 +1,139 @@
+/* NetworkSettings — My Account → Network tab */
+
+.network-settings .section h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.network-card-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.network-card {
+  padding: 16px;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.network-card.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.network-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.network-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.network-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.network-kind {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.network-kind.mainnet {
+  color: var(--color-success, #15803d);
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.network-kind.testnet {
+  color: var(--color-warning, #b45309);
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.network-active-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  padding: 6px 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.network-switch-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  background: var(--brand-primary, var(--color-primary));
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  white-space: nowrap;
+}
+
+.network-switch-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.network-switch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.network-feature-tags {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.network-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.network-tag.available {
+  color: var(--color-success, #15803d);
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.network-tag.unavailable {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  opacity: 0.75;
+}
+
+.network-tag-icon {
+  font-weight: 700;
+}
