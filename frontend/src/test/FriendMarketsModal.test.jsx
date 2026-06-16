@@ -337,12 +337,39 @@ describe('FriendMarketsModal', () => {
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
     })
 
-    it('opens into the Bookmaker form (with opponent + odds) when initialType="bookmaker"', () => {
+    it('opens into the Offer form (with opponent + odds) when initialType="offer"', () => {
       renderWithProviders(
-        <FriendMarketsModal {...defaultProps} initialType="bookmaker" resolutionCategory="all" />
+        <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
       )
       expect(screen.getByLabelText(/opponent address/i)).toBeInTheDocument()
+      // Default settler is "Me" (creator), so the opponent is the underdog
+      // getting the odds → the slider is labelled "Opponent's Odds".
       expect(screen.getByLabelText(/opponent.*odds/i)).toBeInTheDocument()
+    })
+
+    it('Offer settler tabs are labelled Me / Them / Friend / Oracle (no Either Party)', () => {
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
+      )
+      expect(screen.getByRole('tab', { name: /^me$/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^them$/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^friend$/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^oracle$/i })).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /either party/i })).not.toBeInTheDocument()
+    })
+
+    it('choosing "Them" flips the odds ownership to the creator (Your Odds)', async () => {
+      const user = userEvent.setup()
+      renderWithProviders(
+        <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
+      )
+      // Default "Me" → opponent is the underdog (Opponent's Odds).
+      expect(screen.getByLabelText(/opponent.*odds/i)).toBeInTheDocument()
+      // Switch the settler to "Them": the opponent now carries the majority
+      // (insurer) stake, so the creator becomes the underdog ("Your Odds").
+      await user.click(screen.getByRole('tab', { name: /^them$/i }))
+      expect(screen.getByLabelText(/your odds/i)).toBeInTheDocument()
+      expect(screen.queryByLabelText(/opponent.*odds/i)).not.toBeInTheDocument()
     })
 
     it('no longer offers group / member-address inputs', () => {
@@ -351,19 +378,19 @@ describe('FriendMarketsModal', () => {
       expect(screen.queryByLabelText(/minimum participants/i)).not.toBeInTheDocument()
     })
 
-    it('participant category shows people-settled resolution options incl. Third Party', () => {
+    it('participant category shows people-settled resolution options incl. Friend (no Either Party)', () => {
       renderWithProviders(
         <FriendMarketsModal {...defaultProps} resolutionCategory="participant" />
       )
       const select = screen.getByLabelText(/who can resolve/i)
       const labels = Array.from(select.querySelectorAll('option')).map(o => o.textContent)
-      // ThirdParty is re-enabled (Spec Kit 005): the arbitrator is now indexed
-      // for discovery and encrypted-for, so they can find and resolve the wager.
+      // "Either Party" was retired — every wager names a single settler. ThirdParty
+      // ("A Friend") is re-enabled (Spec Kit 005): the arbitrator is indexed for
+      // discovery and encrypted-for, so they can find and resolve the wager.
       expect(labels).toEqual([
-        'Either Party',
-        'Creator Only',
-        'Opponent Only',
-        'Third Party (Arbitrator)',
+        'Me (Creator)',
+        'Them (Opponent)',
+        'A Friend (Arbitrator)',
       ])
     })
 
@@ -387,7 +414,7 @@ describe('FriendMarketsModal', () => {
       // The oracle flow renders settlement sources as tabs at the top of the
       // form (no <select> dropdown), and excludes the participant-settled options.
       expect(screen.queryByRole('combobox', { name: /which oracle settles this/i })).not.toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /polymarket/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /oracle/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /chainlink data feed/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /chainlink functions/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /^uma$/i })).toBeInTheDocument()
@@ -412,7 +439,7 @@ describe('FriendMarketsModal', () => {
         <FriendMarketsModal {...defaultProps} resolutionCategory="oracle" />,
         { chainId: 1337 }
       )
-      expect(screen.getByRole('tab', { name: /polymarket/i })).toBeDisabled()
+      expect(screen.getByRole('tab', { name: /oracle/i })).toBeDisabled()
     })
 
     it('no longer renders a type-selector or Back link', () => {
@@ -489,9 +516,9 @@ describe('FriendMarketsModal', () => {
       expect(stakeInput).toHaveAttribute('min', '0.1')
     })
 
-    it('should require an opponent address for a Bookmaker wager', async () => {
+    it('should require an opponent address for an Offer wager', async () => {
       renderWithProviders(
-        <FriendMarketsModal {...defaultProps} initialType="bookmaker" resolutionCategory="all" />
+        <FriendMarketsModal {...defaultProps} initialType="offer" resolutionCategory="all" />
       )
 
       await userEvent.type(screen.getByLabelText(/what's the bet/i), 'Patriots will win the Super Bowl')
@@ -808,7 +835,7 @@ describe('FriendMarketsModal', () => {
 
       // Switch resolution type to Polymarket (via the tab strip) so the inline
       // browser renders.
-      await userEvent.click(screen.getByRole('tab', { name: /polymarket/i }))
+      await userEvent.click(screen.getByRole('tab', { name: /oracle/i }))
 
       // Pick the (single) mocked market.
       await userEvent.click(screen.getByTestId(`pmb-pick-${polymarketMarket.conditionId}`))

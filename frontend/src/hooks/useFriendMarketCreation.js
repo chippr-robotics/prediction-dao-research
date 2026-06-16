@@ -165,17 +165,30 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       // Stakes
       const stakeAmountRaw = data.data.stakeAmount || '10'
       const stakeWei = ethers.parseUnits(String(stakeAmountRaw), tokenDecimals)
-      const isBookmaker = data.marketType === 'bookmaker'
+      const isOffer = data.marketType === 'offer'
       const oddsMultiplier = parseInt(data.data.oddsMultiplier, 10) || 100
+      const offerResolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Creator
 
       let creatorStakeWei = stakeWei
       let opponentStakeWei = stakeWei
-      if (isBookmaker) {
-        // Bookmaker: opponent puts up the headline stake, creator covers (odds-100)% of it.
-        opponentStakeWei = stakeWei
-        creatorStakeWei = (opponentStakeWei * BigInt(oddsMultiplier - 100)) / 100n
-        if (creatorStakeWei <= 0n) {
-          throw new Error(`Bookmaker odds (${oddsMultiplier}%) would result in zero or negative creator stake.`)
+      if (isOffer) {
+        // Offer: one side puts up the majority (insurer) stake, the other risks
+        // the smaller headline stake to win the whole pot. The *settler* carries
+        // the majority stake (skin in the game): when the opponent settles
+        // ("Them") they're the insurer, otherwise the creator is.
+        //   majorityStake = headlineStake * (odds - 100) / 100
+        const majorityStakeWei = (stakeWei * BigInt(oddsMultiplier - 100)) / 100n
+        if (majorityStakeWei <= 0n) {
+          throw new Error(`Offer odds (${oddsMultiplier}%) would result in zero or negative majority stake.`)
+        }
+        if (offerResolutionType === ResolutionType.Opponent) {
+          // "Them" settles → opponent is the insurer (majority); creator risks the headline.
+          opponentStakeWei = majorityStakeWei
+          creatorStakeWei = stakeWei
+        } else {
+          // "Me" / "Friend" / "Oracle" → creator is the insurer (majority); opponent risks the headline.
+          creatorStakeWei = majorityStakeWei
+          opponentStakeWei = stakeWei
         }
       }
 
@@ -244,7 +257,7 @@ export function useFriendMarketCreation({ onMarketCreated } = {}) {
       }
 
       // Resolution
-      const resolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Either
+      const resolutionType = parseInt(data.data.resolutionType, 10) || ResolutionType.Creator
       // The form field is `oracleConditionId` (future-proof: same slot serves Polymarket
       // and the upcoming ChainlinkDataFeed / ChainlinkFunctions / UMA adapters). The
       // contract param is still named `polymarketConditionId` for legacy reasons; we

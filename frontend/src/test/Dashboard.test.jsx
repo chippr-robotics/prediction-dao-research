@@ -157,9 +157,9 @@ describe('Dashboard Component', () => {
       expect(modal).toHaveAttribute('data-resolution-category', 'oracle')
     })
 
-    it('"Bookmaker" opens the all-resolution flow', () => {
-      const modal = openVia('Bookmaker')
-      expect(modal).toHaveAttribute('data-initial-type', 'bookmaker')
+    it('"Make an Offer" opens the all-resolution flow', () => {
+      const modal = openVia('Make an Offer')
+      expect(modal).toHaveAttribute('data-initial-type', 'offer')
       expect(modal).toHaveAttribute('data-resolution-category', 'all')
     })
 
@@ -240,7 +240,7 @@ describe('Dashboard Component', () => {
       renderWithProviders(<Dashboard />)
       expect(screen.getByText('Friends Decide (1v1)')).toBeInTheDocument()
       expect(screen.getByText('Oracle Settles (1v1)')).toBeInTheDocument()
-      expect(screen.getByText('Bookmaker')).toBeInTheDocument()
+      expect(screen.getByText('Make an Offer')).toBeInTheDocument()
       expect(screen.getByText('Scan QR Code')).toBeInTheDocument()
       expect(screen.getByText('Share Account')).toBeInTheDocument()
       expect(screen.getByText('My Wagers')).toBeInTheDocument()
@@ -252,7 +252,7 @@ describe('Dashboard Component', () => {
       // Default (VITE_ORACLE_MODELS=polymarket-only) hides Chainlink/UMA copy.
       expect(screen.getByText('Auto-settles from a linked Polymarket market')).toBeInTheDocument()
       expect(screen.queryByText(/Chainlink or UMA/)).not.toBeInTheDocument()
-      expect(screen.getByText('Offer odds and let a friend take the other side')).toBeInTheDocument()
+      expect(screen.getByText('Offer odds and choose who settles — you or your friend')).toBeInTheDocument()
     })
   })
 

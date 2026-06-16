@@ -280,12 +280,12 @@ describe('Claim Payouts', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // CLM-04: Claim bookmaker wager payout (asymmetric)
+  // CLM-04: Claim offer wager payout (asymmetric)
   // ---------------------------------------------------------------------------
-  it('[CLM-04] Claim bookmaker payout with asymmetric stakes', () => {
+  it('[CLM-04] Claim offer payout with asymmetric stakes', () => {
     connectAndVisit(0)
 
-    // Check history for any bookmaker wagers
+    // Check history for any offer wagers
     cy.openMyWagers('history')
 
     cy.get('.mm-panel, [role="tabpanel"]', { timeout: 10000 }).invoke('text').then((text) => {

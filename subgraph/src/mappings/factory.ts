@@ -12,7 +12,7 @@ import {
 } from '../../generated/FriendGroupMarketFactory/FriendGroupMarketFactory'
 import { Wager, User } from '../../generated/schema'
 
-const MARKET_TYPES = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet', 'bookmaker']
+const MARKET_TYPES = ['oneVsOne', 'smallGroup', 'eventTracking', 'propBet', 'offer']
 const STATUSES = [
   'pending_acceptance',
   'active',

@@ -41,8 +41,9 @@ const CUSTOM_TOKEN_OPTION = { id: 'CUSTOM', symbol: 'Custom', name: 'Custom Toke
 
 // Participant-resolved (people settle it) resolution types, in enum order.
 // Oracle-resolved types are computed per-chain at render time (adapter-gated).
+// "Either Party" (ResolutionType.Either) was retired: every wager now names a
+// single settler, which also drives who puts up the majority stake in an Offer.
 const PARTICIPANT_RESOLUTION_TYPES = [
-  ResolutionType.Either,
   ResolutionType.Creator,
   ResolutionType.Opponent,
   // ThirdParty re-enabled (Spec Kit 005): the WagerRegistry v3 per-user index now
@@ -56,20 +57,18 @@ const PARTICIPANT_RESOLUTION_TYPES = [
 // participant/oracle flows render from a single mapped source instead of a
 // hand-maintained option list.
 const RESOLUTION_TYPE_LABELS = {
-  [ResolutionType.Either]: 'Either Party',
-  [ResolutionType.Creator]: 'Creator Only',
-  [ResolutionType.Opponent]: 'Opponent Only',
-  [ResolutionType.ThirdParty]: 'Third Party (Arbitrator)',
-  [ResolutionType.Polymarket]: 'Linked Market (Polymarket)',
+  [ResolutionType.Creator]: 'Me (Creator)',
+  [ResolutionType.Opponent]: 'Them (Opponent)',
+  [ResolutionType.ThirdParty]: 'A Friend (Arbitrator)',
+  [ResolutionType.Polymarket]: 'An Oracle (Polymarket)',
   [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed (price condition)',
   [ResolutionType.ChainlinkFunctions]: 'Chainlink Functions (custom request)',
   [ResolutionType.UMA]: 'UMA Optimistic Oracle (claim assertion)',
 }
 const RESOLUTION_TYPE_HINTS = {
-  [ResolutionType.Either]: 'Either you or your opponent can resolve the wager',
-  [ResolutionType.Creator]: 'Only you (the creator) can resolve the wager',
-  [ResolutionType.Opponent]: 'Only your opponent can resolve the wager',
-  [ResolutionType.ThirdParty]: 'A neutral third party you name resolves the wager (they can read the terms but cannot take a side)',
+  [ResolutionType.Creator]: 'You settle the outcome — so you put up the majority stake (skin in the game)',
+  [ResolutionType.Opponent]: 'Your opponent settles the outcome — so they put up the majority stake (skin in the game)',
+  [ResolutionType.ThirdParty]: 'A neutral friend you name settles the wager (they can read the terms but cannot take a side)',
   [ResolutionType.Polymarket]: 'Settles automatically when the linked Polymarket market resolves',
   [ResolutionType.ChainlinkDataFeed]: 'Settles automatically once the price feed reading at the deadline passes the threshold',
   [ResolutionType.ChainlinkFunctions]: 'Settles when the Chainlink Functions DON returns a result (admin-registered request)',
@@ -90,22 +89,37 @@ const ORACLE_TAB_TYPES = [
 ].filter(isOracleModelExposed)
 
 // Short labels for the resolution tab strip — the full RESOLUTION_TYPE_LABELS
-// are too long to read comfortably as tabs.
+// are too long to read comfortably as tabs. Phrased from the offerer's point of
+// view: who settles the wager (and, for participants, who carries the majority
+// stake).
 const RESOLUTION_TAB_LABELS = {
-  [ResolutionType.Either]: 'Either Party',
-  [ResolutionType.Creator]: 'Creator',
-  [ResolutionType.Opponent]: 'Opponent',
-  [ResolutionType.Polymarket]: 'Polymarket',
+  [ResolutionType.Creator]: 'Me',
+  [ResolutionType.Opponent]: 'Them',
+  [ResolutionType.ThirdParty]: 'Friend',
+  [ResolutionType.Polymarket]: 'Oracle',
   [ResolutionType.ChainlinkDataFeed]: 'Chainlink Data Feed',
   [ResolutionType.ChainlinkFunctions]: 'Chainlink Functions',
   [ResolutionType.UMA]: 'UMA',
+}
+
+// Glyphs paired with each tab label. The participant settlers use plain emoji;
+// the oracle tabs share a single oracle glyph (no Polymarket logo asset ships
+// with the app yet — swap in an <img> here when one does).
+const RESOLUTION_TAB_ICONS = {
+  [ResolutionType.Creator]: '👤',
+  [ResolutionType.Opponent]: '👥',
+  [ResolutionType.ThirdParty]: '⚖️',
+  [ResolutionType.Polymarket]: '🔮',
+  [ResolutionType.ChainlinkDataFeed]: '🔮',
+  [ResolutionType.ChainlinkFunctions]: '🔮',
+  [ResolutionType.UMA]: '🔮',
 }
 
 /**
  * FriendMarketsModal
  *
  * Focused modal for creating a new 1v1 friend market (either a standard
- * even-stakes wager or a Bookmaker odds wager). Opens directly into the form
+ * even-stakes wager or an Offer odds wager). Opens directly into the form
  * for the provided initialType, defaulting to 1v1. The `resolutionCategory`
  * prop narrows the resolution choices to participant-resolved or
  * oracle-resolved so each flow can present the right configuration. Group/event
@@ -145,14 +159,14 @@ function FriendMarketsModal({
   )
 
   // Resolution choices are split into two flows, driven by `resolutionCategory`:
-  //   - 'participant' → people settle it (Either / Creator / Opponent)
+  //   - 'participant' → people settle it (Me / Them / Friend)
   //   - 'oracle'      → an oracle settles it (Polymarket / Chainlink / UMA), each
   //                     self-gated on being reachable/deployed on the active chain
-  //   - 'all'         → both (used by the Bookmaker card)
+  //   - 'all'         → both (used by the Make an Offer card)
   // The Set/order mirrors `enum ResolutionType` in IWagerRegistry.sol.
   // Only adapters that are reachable AND exposed by the current VITE_ORACLE_MODELS
   // setting are offered (default: Polymarket only). This drives the selectable
-  // options and the auto-selected default in both the 1v1 and Bookmaker flows.
+  // options and the auto-selected default in both the 1v1 and Offer flows.
   const availableOracleResolutionTypes = useMemo(() => [
     ...(polymarketSidebetsEnabled && isOracleModelExposed(ResolutionType.Polymarket) ? [ResolutionType.Polymarket] : []),
     ...(chainlinkDataFeedAdapter && isOracleModelExposed(ResolutionType.ChainlinkDataFeed) ? [ResolutionType.ChainlinkDataFeed] : []),
@@ -168,14 +182,14 @@ function FriendMarketsModal({
 
   // Default resolution to pre-select when the modal opens, per category.
   const defaultResolutionType = useMemo(() => {
-    if (resolutionCategory === 'participant') return ResolutionType.Either
+    if (resolutionCategory === 'participant') return ResolutionType.Creator
     if (resolutionCategory === 'oracle') {
       return availableOracleResolutionTypes[0] ?? ResolutionType.Polymarket
     }
     return WAGER_DEFAULTS.RESOLUTION_TYPE
   }, [resolutionCategory, availableOracleResolutionTypes])
 
-  // The oracle ('oracle') and Bookmaker ('all') flows present the settlement
+  // The oracle ('oracle') and Offer ('all') flows present the settlement
   // source as a tab strip at the top of the form (with the market/condition
   // picker right under it) instead of a dropdown buried below the stake fields.
   // The participant-only flow keeps its simple "Who Can Resolve?" dropdown.
@@ -204,7 +218,7 @@ function FriendMarketsModal({
   }), [polymarketSidebetsEnabled, chainlinkDataFeedAdapter, chainlinkFunctionsAdapter, umaAdapter])
 
   // Resolution types rendered as tabs. Oracle types are always shown (locked
-  // when unavailable). The Bookmaker ('all') flow also lists the participant
+  // when unavailable). The Offer ('all') flow also lists the participant
   // settlement choices first.
   const resolutionTabTypes = useMemo(() => {
     if (resolutionCategory === 'oracle') return ORACLE_TAB_TYPES
@@ -270,7 +284,7 @@ function FriendMarketsModal({
     creatorSide: '',
     // Deterministic accept-by time (midpoint of now → end).
     acceptanceDeadline: getMidpointAcceptanceDeadline(getDefaultEndDateTime()),
-    // Leverage/odds for Bookmaker markets (200 = 2x equal stakes, 10000 = 100x)
+    // Leverage/odds for Offer markets (200 = 2x equal stakes, 10000 = 100x)
     oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER,
     // Resolution type: 0=Either, 1=Creator, 2=Opponent, 4=Polymarket, 5/6/7=oracle adapters
     resolutionType: WAGER_DEFAULTS.RESOLUTION_TYPE
@@ -637,7 +651,7 @@ function FriendMarketsModal({
       newErrors.description = 'Description must be at least 10 characters'
     }
 
-    // Every supported wager type (1v1 and Bookmaker) is a head-to-head bet with
+    // Every supported wager type (1v1 and Offer) is a head-to-head bet with
     // a single opponent — the v2 contract has no group mode.
     {
       const rawOpponent = formData.opponent.trim()
@@ -850,7 +864,7 @@ function FriendMarketsModal({
       let finalMetadata = marketMetadata
 
       if (enableEncryption) {
-        // Every wager type (1v1 + Bookmaker) is head-to-head, so we always
+        // Every wager type (1v1 + Offer) is head-to-head, so we always
         // encrypt to the single opponent. Use the ENS-resolved address (falls
         // back to raw input when the user typed a hex address, since
         // onResolvedChange mirrors that value).
@@ -1027,7 +1041,7 @@ function FriendMarketsModal({
   const getTypeLabel = (type) => {
     switch (type) {
       case 'oneVsOne': return '1v1'
-      case 'bookmaker': return 'Bookmaker'
+      case 'offer': return 'Offer'
       default: return type
     }
   }
@@ -1091,7 +1105,7 @@ function FriendMarketsModal({
                 <form className="fm-form" onSubmit={handleSubmit}>
                   <div className="fm-form-grid">
                     {/* Settlement source + market selection — surfaced at the very
-                        top of the oracle / Bookmaker flows so users pick the
+                        top of the oracle / Offer flows so users pick the
                         resource they're betting on (Polymarket event / oracle
                         condition) first. The source is chosen via tabs; oracle
                         sources that aren't reachable on the active chain render as
@@ -1106,7 +1120,7 @@ function FriendMarketsModal({
                         {!(resolutionCategory === 'oracle' && resolutionTabTypes.length <= 1) && (
                         <div className="fm-form-group fm-form-full">
                           <label id="fm-resolution-tabs-label">
-                            {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'How does this settle?'}
+                            {resolutionCategory === 'oracle' ? 'Which oracle settles this?' : 'Who settles this offer?'}
                           </label>
                           <div
                             className="fm-resolution-tabs"
@@ -1128,6 +1142,9 @@ function FriendMarketsModal({
                                   className={`fm-resolution-tab ${active ? 'active' : ''} ${locked ? 'locked' : ''}`}
                                   onClick={() => { if (!locked) handleFormChange('resolutionType', t) }}
                                 >
+                                  {RESOLUTION_TAB_ICONS[t] && (
+                                    <span className="fm-resolution-tab-icon" aria-hidden="true">{RESOLUTION_TAB_ICONS[t]}</span>
+                                  )}
                                   <span className="fm-resolution-tab-label">{RESOLUTION_TAB_LABELS[t]}</span>
                                   {locked && (
                                     <svg className="fm-resolution-tab-lock" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -1155,7 +1172,7 @@ function FriendMarketsModal({
                         )}
 
                         {/* Linked Market — Polymarket event lookup */}
-                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') &&
                          formData.resolutionType === ResolutionType.Polymarket && (
                           <div className="fm-form-group fm-form-full">
                             <label htmlFor="fm-polymarket-search">
@@ -1255,7 +1272,7 @@ function FriendMarketsModal({
                         )}
 
                         {/* Oracle condition picker — Chainlink Data Feed / Chainlink Functions / UMA */}
-                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') &&
                          isExtensibleOracleType(formData.resolutionType) && (
                           <div className="fm-form-group fm-form-full">
                             <label htmlFor="fm-oracle-condition-picker">
@@ -1284,7 +1301,7 @@ function FriendMarketsModal({
                             Polymarket has its own outcome-named side picker below — we
                             skip it for the new types and use a binary YES/NO labelling
                             that maps to the contract's creatorIsYes bool. */}
-                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') &&
                          isExtensibleOracleType(formData.resolutionType) && (
                           <div className="fm-form-group fm-form-full">
                             <label>
@@ -1320,7 +1337,7 @@ function FriendMarketsModal({
                         )}
 
                         {/* Creator side — which outcome of the linked Polymarket are you taking? */}
-                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') &&
+                        {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') &&
                          formData.resolutionType === ResolutionType.Polymarket &&
                          selectedPolymarketMarket && (
                           <div className="fm-form-group fm-form-full">
@@ -1387,7 +1404,7 @@ function FriendMarketsModal({
                       {errors.description && <span className="fm-error">{errors.description}</span>}
                     </div>
 
-                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                    {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-opponent">
                           Opponent Address <span className="fm-required">*</span>
@@ -1501,7 +1518,7 @@ function FriendMarketsModal({
                     )}
 
                     {/* Resolution Type selector (participant flow only). The
-                        oracle / Bookmaker flows render a tab strip at the top of
+                        oracle / Offer flows render a tab strip at the top of
                         the form instead — see the settlement section above. */}
                     {!useResolutionTabs && resolutionOptionTypes.length > 0 && (
                       <div className="fm-form-group fm-form-full">
@@ -1525,7 +1542,7 @@ function FriendMarketsModal({
 
                     {/* Arbitrator address — required when a neutral third party resolves. */}
                     {formData.resolutionType === ResolutionType.ThirdParty &&
-                     (friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                     (friendMarketType === 'oneVsOne' || friendMarketType === 'offer') && (
                       <div className="fm-form-group fm-form-full">
                         <label htmlFor="fm-arbitrator">
                           Arbitrator Address <span className="fm-required">*</span>
@@ -1548,11 +1565,27 @@ function FriendMarketsModal({
                       </div>
                     )}
 
-                    {/* Odds/Leverage selector - only for Bookmaker markets */}
-                    {friendMarketType === 'bookmaker' && (
+                    {/* Odds/Leverage selector - only for Offers. The settler puts
+                        up the majority (insurer) stake; the other side risks the
+                        smaller headline stake to win the whole pot. Direction
+                        follows the settler tab: "Them" → the opponent is the
+                        insurer; anything else ("Me" / "Friend" / "Oracle") → you
+                        (the creator) are the insurer. */}
+                    {friendMarketType === 'offer' && (() => {
+                      const opponentSettles = formData.resolutionType === ResolutionType.Opponent
+                      const sym = selectedStakeToken?.symbol
+                      const headline = parseFloat(formData.stakeAmount || 0)        // minority stake
+                      const majority = headline * (formData.oddsMultiplier - 100) / 100
+                      const pot = headline * formData.oddsMultiplier / 100
+                      // The insurer = the settler (majority stake); the underdog =
+                      // the headline staker who gets the odds payout.
+                      const insurerLabel = opponentSettles ? 'Opponent stakes' : 'You stake'
+                      const underdogLabel = opponentSettles ? 'You stake' : 'Opponent stakes'
+                      const oddsOwnerLabel = opponentSettles ? 'Your Odds' : "Opponent's Odds"
+                      return (
                       <div className="fm-form-group fm-form-full">
                         <div className="fm-input-header">
-                          <label htmlFor="fm-odds">Opponent&apos;s Odds</label>
+                          <label htmlFor="fm-odds">{oddsOwnerLabel}</label>
                           <span className="fm-odds-value">{formData.oddsMultiplier / 100}x</span>
                         </div>
                         <input
@@ -1581,31 +1614,28 @@ function FriendMarketsModal({
                         </div>
                         <div className="fm-odds-summary">
                           <div className="fm-odds-row">
-                            <span>Opponent stakes:</span>
-                            <span>{formatUSD(formData.stakeAmount, selectedStakeToken?.symbol)}</span>
+                            <span>{underdogLabel}:</span>
+                            <span>{formatUSD(headline, sym)}</span>
                           </div>
                           <div className="fm-odds-row">
-                            <span>You stake:</span>
-                            <span>{formatUSD(
-                              parseFloat(formData.stakeAmount || 0) * (formData.oddsMultiplier - 100) / 100,
-                              selectedStakeToken?.symbol
-                            )}</span>
+                            <span>{insurerLabel}:</span>
+                            <span>{formatUSD(majority, sym)}</span>
                           </div>
                           <div className="fm-odds-row fm-odds-highlight">
                             <span>Total pot:</span>
-                            <span>{formatUSD(
-                              parseFloat(formData.stakeAmount || 0) * formData.oddsMultiplier / 100,
-                              selectedStakeToken?.symbol
-                            )}</span>
+                            <span>{formatUSD(pot, sym)}</span>
                           </div>
                         </div>
                         <span className="fm-hint">
                           {formData.oddsMultiplier === 200
                             ? 'Equal stakes - both sides risk the same amount'
-                            : `You're the insurer - risking more for smaller returns. Opponent risks ${formatUSD(formData.stakeAmount, selectedStakeToken?.symbol)} to win ${formatUSD(parseFloat(formData.stakeAmount || 0) * formData.oddsMultiplier / 100, selectedStakeToken?.symbol)}`}
+                            : opponentSettles
+                              ? `Your opponent is the insurer (they settle, so they stake more). You risk ${formatUSD(headline, sym)} to win ${formatUSD(pot, sym)}.`
+                              : `You're the insurer - risking more for smaller returns. Opponent risks ${formatUSD(headline, sym)} to win ${formatUSD(pot, sym)}.`}
                         </span>
                       </div>
-                    )}
+                      )
+                    })()}
 
                     {/*
                       End date input. Hidden entirely when a Polymarket is
@@ -1750,7 +1780,7 @@ function FriendMarketsModal({
                                   </div>
                                 )}
 
-                                {(friendMarketType === 'oneVsOne' || friendMarketType === 'bookmaker') && (
+                                {(friendMarketType === 'oneVsOne' || friendMarketType === 'offer') && (
                                   <p className="fm-encryption-note">
                                     Your opponent must have registered their encryption key to create an encrypted wager.
                                   </p>

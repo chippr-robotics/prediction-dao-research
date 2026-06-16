@@ -27,8 +27,11 @@ export const WAGER_DEFAULTS = {
   /** Odds multiplier for equal-stake wagers (200 = 2×, 100 basis points) */
   ODDS_MULTIPLIER: 200,
 
-  /** Default resolution type: 0=Either, 1=Initiator, 2=Receiver, 3=ThirdParty, 5=PolymarketOracle (linked market) */
-  RESOLUTION_TYPE: 0,
+  /** Default resolution type: 1=Creator ("Me"), 2=Opponent ("Them"), 3=ThirdParty
+   *  ("Friend"), 4=Polymarket ("Oracle"). The legacy "Either Party" (0) option was
+   *  retired — every wager now names a single settler, which also drives who puts
+   *  up the majority stake in an Offer. */
+  RESOLUTION_TYPE: 1,
 
   /** Default trading / wager duration in days */
   WAGER_END_DAYS: 1,
@@ -63,15 +66,20 @@ export const WAGER_DEFAULTS = {
 }
 
 /**
- * Derive a wager's subtype and the opponent's odds multiplier from the
+ * Derive a wager's subtype and the offered odds multiplier from the
  * asymmetric on-chain stakes.
  *
- * v2 WagerRegistry has no `marketType` field — a bookmaker wager is encoded
- * purely as `creatorStake !== opponentStake`, where the opponent risks
- * `opponentStake` to win the whole pot (`creatorStake + opponentStake`). The
- * creation path mirrors this: `creatorStake = opponentStake * (odds - 100) / 100`.
- * Inverting that, the opponent's payout multiplier in basis points is
- * `(creatorStake + opponentStake) / opponentStake * 100` (200 = 2× = even money).
+ * v2 WagerRegistry has no `marketType` field — an Offer is encoded purely as
+ * `creatorStake !== opponentStake`. One party puts up the majority stake (the
+ * settler, in the creation flow) while the other risks the smaller "headline"
+ * stake to win the whole pot (`creatorStake + opponentStake`). The creation path
+ * mirrors this: `majorityStake = minorityStake * (odds - 100) / 100`. Inverting
+ * that, the headline party's payout multiplier in basis points is
+ * `(creatorStake + opponentStake) / minorityStake * 100` (200 = 2× = even money).
+ *
+ * The multiplier is computed off the *smaller* (minority/headline) stake so it
+ * is direction-agnostic: it recovers the same odds the creator picked whether
+ * the creator or the opponent is the majority staker.
  *
  * Accepts raw stakes as BigInt | string | number (wei or unit — only the ratio
  * matters). Returns `{ type, oddsMultiplier }`.
@@ -87,12 +95,14 @@ export function deriveWagerType(creatorStake, opponentStake) {
     opponent = 0n
   }
   // Equal (or unknown) stakes are an even-money 1v1; no odds to surface.
-  if (opponent <= 0n || creator === opponent) {
+  if (creator <= 0n || opponent <= 0n || creator === opponent) {
     return { type: 'oneVsOne', oddsMultiplier: WAGER_DEFAULTS.ODDS_MULTIPLIER }
   }
+  const pot = creator + opponent
+  const minority = creator < opponent ? creator : opponent
   return {
-    type: 'bookmaker',
-    oddsMultiplier: Number(((creator + opponent) * 100n) / opponent),
+    type: 'offer',
+    oddsMultiplier: Number((pot * 100n) / minority),
   }
 }
 

@@ -1592,7 +1592,7 @@
   font-size: 0.9rem;
 }
 
-/* ── Resolution-type tabs (oracle / Bookmaker flows) ─────────────────── */
+/* ── Resolution-type tabs (oracle / Make an Offer flows) ─────────────── */
 .fm-resolution-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1637,6 +1637,12 @@
 .fm-resolution-tab-lock {
   flex-shrink: 0;
   opacity: 0.8;
+}
+
+.fm-resolution-tab-icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 /* ── Oracle condition picker ─────────────────────────────────────────── */

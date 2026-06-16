@@ -49,7 +49,7 @@ const getWagerTypeLabel = (marketType) => {
     case 'oneVsOne': return '1v1'
     case 'smallGroup': return 'Group'
     case 'eventTracking': return 'Event'
-    case 'bookmaker': return 'Bookmaker'
+    case 'offer': return 'Offer'
     case 'propBet': return 'Prop Bet'
     default: return marketType || 'Friend Wager'
   }

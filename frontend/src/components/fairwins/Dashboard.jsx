@@ -116,7 +116,7 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
         : 'Auto-settles from a linked Polymarket market'
     },
     {
-      id: 'create-bookmaker',
+      id: 'create-offer',
       category: 'create',
       tag: 'Set the odds',
       icon: (
@@ -125,8 +125,8 @@ function QuickActions({ onAction, actionNeededCount = 0 }) {
           <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       ),
-      title: 'Bookmaker',
-      description: 'Offer odds and let a friend take the other side'
+      title: 'Make an Offer',
+      description: 'Offer odds and choose who settles — you or your friend'
     }
   ]
 
@@ -449,9 +449,9 @@ function Dashboard() {
 
   // Modal state
   const [showCreateWager, setShowCreateWager] = useState(false)
-  const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'bookmaker'
+  const [createWagerType, setCreateWagerType] = useState(null) // 'oneVsOne' or 'offer'
   // Narrows the modal's resolution choices: 'participant' (people settle),
-  // 'oracle' (oracle settles), or 'all' (both — used by the Bookmaker card).
+  // 'oracle' (oracle settles), or 'all' (both — used by the Make an Offer card).
   const [createResolutionCategory, setCreateResolutionCategory] = useState('all')
   const [showMyWagers, setShowMyWagers] = useState(false)
   const [showQrScanner, setShowQrScanner] = useState(false)
@@ -496,8 +496,8 @@ function Dashboard() {
         setCreateResolutionCategory('oracle')
         setShowCreateWager(true)
         break
-      case 'create-bookmaker':
-        setCreateWagerType('bookmaker')
+      case 'create-offer':
+        setCreateWagerType('offer')
         setCreateResolutionCategory('all')
         setShowCreateWager(true)
         break

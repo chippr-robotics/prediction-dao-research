@@ -423,10 +423,10 @@ function toWagerShape(id, w) {
     description = `Wager #${id}`
   }
 
-  // v2 WagerRegistry has no marketType field — a bookmaker wager is encoded as
+  // v2 WagerRegistry has no marketType field — an Offer is encoded as
   // asymmetric stakes (creatorStake !== opponentStake). Derive the subtype and
-  // the opponent's odds from the raw on-chain stakes so the table badge and the
-  // acceptance modal reflect bookmaker terms instead of collapsing to even-money
+  // the offered odds from the raw on-chain stakes so the table badge and the
+  // acceptance modal reflect Offer terms instead of collapsing to even-money
   // 1v1. Derivation uses raw wei (ratio is decimals-independent).
   const { type: wagerType, oddsMultiplier } = deriveWagerType(w.creatorStake, w.opponentStake)
 

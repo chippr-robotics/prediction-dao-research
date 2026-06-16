@@ -51,10 +51,10 @@
     "stakeAmount": "10000000",
     "stakeToken": "USDC"
   },
-  "bookmaker": {
+  "offer": {
     "status": "Open",
     "statusCode": 0,
-    "description": "Test bookmaker wager with asymmetric odds",
+    "description": "Test offer wager with asymmetric odds",
     "creatorStake": "100000000",
     "opponentStake": "50000000",
     "stakeToken": "USDC",
