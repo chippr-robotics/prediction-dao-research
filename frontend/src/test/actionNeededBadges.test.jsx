@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
@@ -243,9 +244,9 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
   })
 
   describe('MyMarketsModal wager cards', () => {
-    it('shows an action badge on exactly the wager that needs action', async () => {
+    it('shows a Refund button on exactly the wager that needs a refund', async () => {
       activityRef.current = baseActivity({
-        actionNeededByWagerId: { '1': 'accept', '2': null }
+        actionNeededByWagerId: { '1': 'refund', '2': null }
       })
       const markets = [wagerOne(), wagerTwo()]
 
@@ -254,21 +255,17 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       const row1 = screen.getByText('Wager One').closest('tr')
-      expect(within(row1).getByText('Accept')).toBeInTheDocument()
+      expect(within(row1).getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
+      // The button replaces the badge — no redundant status pill.
+      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
 
-      // Wager 2 (action kind null) has no badge — exactly one in the document.
-      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(1)
       const row2 = screen.getByText('Wager Two').closest('tr')
-      expect(within(row2).queryByText('Accept')).not.toBeInTheDocument()
+      expect(within(row2).queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
     })
 
-    it.each([
-      ['accept', 'Accept'],
-      ['refund', 'Refund'],
-      ['respondDraw', 'Respond to draw']
-    ])('labels a "%s" action badge "%s"', async (kind, label) => {
+    it('shows a Respond to Draw button when a draw is proposed', async () => {
       activityRef.current = baseActivity({
-        actionNeededByWagerId: { '1': kind }
+        actionNeededByWagerId: { '1': 'respondDraw' }
       })
 
       await act(async () => {
@@ -276,12 +273,13 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       const row = screen.getByText('Wager One').closest('tr')
-      expect(within(row).getByText(label)).toBeInTheDocument()
+      expect(within(row).getByRole('button', { name: /respond to draw/i })).toBeInTheDocument()
+      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
     })
 
-    // 'claim' and 'resolve' have a real action button in the row's Actions
-    // column, so the duplicate status badge is intentionally suppressed.
-    it.each(['claim', 'resolve'])(
+    // Every action kind now has a matching button in the Actions column, so the
+    // duplicate status badge is suppressed across the board.
+    it.each(['accept', 'claim', 'resolve', 'refund', 'respondDraw'])(
       'does not render a redundant status badge for "%s"',
       async (kind) => {
         activityRef.current = baseActivity({
@@ -296,9 +294,9 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       }
     )
 
-    it('removes the badge when the action is no longer needed', async () => {
+    it('removes the Refund button when the action is no longer needed', async () => {
       activityRef.current = baseActivity({
-        actionNeededByWagerId: { '1': 'accept', '2': null }
+        actionNeededByWagerId: { '1': 'refund', '2': null }
       })
       const markets = [wagerOne(), wagerTwo()]
 
@@ -307,7 +305,7 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         view = render(modalUi(markets))
       })
 
-      expect(screen.getByText('Accept')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^refund$/i })).toBeInTheDocument()
 
       activityRef.current = baseActivity({
         actionNeededByWagerId: { '1': null, '2': null }
@@ -316,7 +314,41 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
         view.rerender(modalUi(markets))
       })
 
-      expect(screen.queryByText('Accept')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^refund$/i })).not.toBeInTheDocument()
+      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+    })
+
+    it('suppresses the "refund" badge when the row shows a Clear/Reclaim button', async () => {
+      const user = userEvent.setup()
+      // An expired pending offer → computedStatus EXPIRED → the row renders a
+      // Clear button, which makes the "refund" action badge redundant.
+      const expired = {
+        id: '7',
+        description: 'Expired Offer',
+        creator: OTHER,
+        participants: [ME],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '7': 'refund' }
+      })
+
+      await act(async () => {
+        render(modalUi([expired]))
+      })
+
+      // Expired offers are hidden under the default "all" filter — switch to Expired.
+      const statusSelect = screen.getAllByRole('combobox')[1]
+      await act(async () => {
+        await user.selectOptions(statusSelect, 'expired')
+      })
+
+      expect(screen.getByText('Expired Offer')).toBeInTheDocument()
+      // The Clear button is present, so the refund badge is suppressed.
+      expect(screen.getByRole('button', { name: /^clear$/i })).toBeInTheDocument()
       expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
     })
 

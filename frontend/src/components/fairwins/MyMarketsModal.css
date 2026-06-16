@@ -649,6 +649,28 @@
   background: linear-gradient(135deg, #3DC48B 0%, #36B37E 100%);
 }
 
+/* Refund — returning your own stake (not winnings), so a neutral blue rather
+   than the green Claim treatment. */
+.mm-action-btn.mm-action-refund {
+  background: linear-gradient(135deg, #4C9AFF 0%, #3A7FD5 100%);
+  color: white;
+}
+
+.mm-action-btn.mm-action-refund:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5CA9FF 0%, #4C9AFF 100%);
+}
+
+/* Respond to Draw — a counterparty needs an answer, so an attention amber that
+   matches the resolve/dispute family. */
+.mm-action-btn.mm-action-draw {
+  background: linear-gradient(135deg, #F5A623 0%, #D99520 100%);
+  color: #0E141B;
+}
+
+.mm-action-btn.mm-action-draw:hover:not(:disabled) {
+  background: linear-gradient(135deg, #FFB834 0%, #F5A623 100%);
+}
+
 .mm-action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
