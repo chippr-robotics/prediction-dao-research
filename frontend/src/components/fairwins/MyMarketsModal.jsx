@@ -25,11 +25,11 @@ const ACTION_NEEDED_LABELS = {
   respondDraw: 'Respond to draw'
 }
 
-// 'accept', 'claim' and 'resolve' already have a real action button in the
-// row's Actions column ("View Offer", "Claim", "Resolve"), so a duplicate
-// status-column badge for them is just noise (and the badge looked clickable
-// but wasn't). Suppress those; the remaining action kinds have no inline button
-// yet, so their badge stays as the only affordance.
+// Action kinds whose row always renders a matching button in the Actions
+// column ("View Offer", "Claim", "Resolve"), so a duplicate status-column badge
+// is just noise (and the badge looked clickable but wasn't). 'refund' and
+// 'respondDraw' also have buttons now, but only conditionally, so they're
+// handled per-row (see actionBadgeRedundant) rather than in this set.
 const ACTION_BADGES_WITH_BUTTON = new Set(['accept', 'claim', 'resolve'])
 
 /**
@@ -666,6 +666,62 @@ function MyMarketsModal({
     }
   }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets])
 
+  // Participant reclaims their stake on a wager that ran past its resolution
+  // window without a winner being declared (the "refundable" state). Mirrors
+  // handleClaimPayout: a pull call (claimRefund) keyed by wager id so the
+  // in-flight spinner and any error map back to the right row. This backs the
+  // "Refund" list button (refundable case) — the expired pre-acceptance case is
+  // handled separately by handleClearExpired's "Reclaim & Clear".
+  const [refundingId, setRefundingId] = useState(null)
+  const [refundError, setRefundError] = useState(null)
+
+  const handleClaimRefund = useCallback(async (market) => {
+    if (!signer) return
+    const id = String(market.id)
+
+    if (!isCorrectNetwork) {
+      try {
+        await switchNetwork()
+      } catch {
+        setRefundError({ id, message: 'Please switch to the correct network.' })
+        return
+      }
+    }
+
+    setRefundingId(id)
+    setRefundError(null)
+
+    try {
+      const registry = new ethers.Contract(
+        getContractAddressForChain('wagerRegistry', chainId),
+        WAGER_REGISTRY_ABI,
+        signer
+      )
+      const tx = await registry.claimRefund(market.wagerId ?? market.id)
+      await tx.wait()
+      // Pull fresh on-chain data so the refunded wager leaves the list and clear
+      // its unread activity.
+      markWagerRead?.(id)
+      await refreshFriendMarkets?.()
+    } catch (err) {
+      const reason = err?.reason || err?.shortMessage || err?.data?.message || err?.message || ''
+      const lower = reason.toLowerCase()
+      let message
+      if (err?.code === 'ACTION_REJECTED' || err?.code === 4001 || lower.includes('user rejected')) {
+        message = 'Transaction was cancelled in your wallet.'
+      } else if (lower.includes('alreadyrefunded') || lower.includes('already refunded')) {
+        message = 'This wager has already been refunded.'
+      } else if (lower.includes('notrefundable') || lower.includes('not refundable')) {
+        message = 'Not refundable yet — the resolution window may still be open. Try resolving instead.'
+      } else {
+        message = 'Failed to claim refund. Please try again.'
+      }
+      setRefundError({ id, message })
+    } finally {
+      setRefundingId(null)
+    }
+  }, [signer, isCorrectNetwork, switchNetwork, chainId, markWagerRead, refreshFriendMarkets])
+
   if (!isOpen) return null
 
   return (
@@ -899,6 +955,9 @@ function MyMarketsModal({
                       onClaim={handleClaimPayout}
                       claimingId={claimingId}
                       claimError={claimError}
+                      onRefund={handleClaimRefund}
+                      refundingId={refundingId}
+                      refundError={refundError}
                     />
                   )}
                 </div>
@@ -959,6 +1018,9 @@ function MyMarketsModal({
                       onClearExpired={handleClearExpired}
                       onClearAllExpired={handleClearAllExpired}
                       statusFilter={statusFilter}
+                      onRefund={handleClaimRefund}
+                      refundingId={refundingId}
+                      refundError={refundError}
                     />
                   )}
                 </div>
@@ -1190,6 +1252,9 @@ function MarketsTable({
   onClaim,
   claimingId,
   claimError,
+  onRefund,
+  refundingId,
+  refundError,
   statusFilter,
   account,
   showResolveCountdown = false
@@ -1230,8 +1295,18 @@ function MarketsTable({
     typeof onClaim === 'function' && isWinnerUnpaid(market, account)
   const hasClaimableRow = markets.some(canClaim)
 
+  // Rows that need a Refund (refundable, not the expired-offer case) or a
+  // Respond-to-Draw button — both derived from the activity watcher's action
+  // kind, so the Actions column appears even in tabs that have no other button.
+  const actionKindOf = (market) => actionNeededByWagerId?.[String(market.id)] ?? null
+  const hasRefundRow = typeof onRefund === 'function' &&
+    markets.some(m => actionKindOf(m) === 'refund' && m.computedStatus !== MarketStatus.EXPIRED)
+  const hasDrawRow = typeof onResolve === 'function' &&
+    markets.some(m => actionKindOf(m) === 'respondDraw')
+
   const tableHasActionsColumn =
     showActions || canAccept || showResolveCountdown || hasClaimableRow ||
+    hasRefundRow || hasDrawRow ||
     (typeof onClearExpired === 'function' && expiredMarkets.length > 0)
 
   return (
@@ -1257,15 +1332,24 @@ function MarketsTable({
             const displayTitle = getMarketDisplayTitle(market)
             const actionNeeded = actionNeededByWagerId?.[String(market.id)] ?? null
             const rowOutcome = showOutcome ? getRowOutcome(market, account) : null
-            // Hide the action badge when this row already exposes a button for
-            // the same action: accept→"View Offer", claim→"Claim",
-            // resolve→"Resolve" (always have a button), plus refund→"Reclaim &
-            // Clear" but only in the expired-offer case that renders that button.
-            // The refundable case (active past the resolve deadline) has no grid
-            // button, and 'respondDraw' never does, so those keep their badge.
+            // Refundable case (active past the resolve window): a "Refund"
+            // button that pulls the stake back. The expired pre-acceptance case
+            // keeps its own "Reclaim & Clear" button (showClearBtn) instead.
+            const showRefundBtn =
+              actionNeeded === 'refund' && !showClearBtn && typeof onRefund === 'function'
+            // Counterparty proposed a draw: a "Respond to Draw" button that opens
+            // the resolution flow so this user can confirm (or decline) it.
+            const showDrawBtn =
+              actionNeeded === 'respondDraw' && typeof onResolve === 'function'
+            // Hide the action badge whenever this row already exposes a button for
+            // the same action — accept→"View Offer", claim→"Claim",
+            // resolve→"Resolve", refund→"Reclaim & Clear"/"Refund",
+            // respondDraw→"Respond to Draw". Falls back to the badge only when no
+            // matching button is rendered (e.g. outside the relevant tab).
             const actionBadgeRedundant =
               ACTION_BADGES_WITH_BUTTON.has(actionNeeded) ||
-              (actionNeeded === 'refund' && showClearBtn)
+              (actionNeeded === 'refund' && (showClearBtn || showRefundBtn)) ||
+              showDrawBtn
 
             return (
               <tr
@@ -1374,6 +1458,30 @@ function MarketsTable({
                           <span className="mm-action-error" role="alert">{claimError.message}</span>
                         )}
                       </>
+                    )}
+                    {showRefundBtn && (
+                      <>
+                        <button
+                          className="mm-action-btn mm-action-refund"
+                          onClick={(e) => { e.stopPropagation(); onRefund(market) }}
+                          disabled={refundingId === String(market.id)}
+                          title="Reclaim your stake — the resolution window has passed"
+                        >
+                          {refundingId === String(market.id) ? 'Refunding…' : 'Refund'}
+                        </button>
+                        {refundError?.id === String(market.id) && (
+                          <span className="mm-action-error" role="alert">{refundError.message}</span>
+                        )}
+                      </>
+                    )}
+                    {showDrawBtn && (
+                      <button
+                        className="mm-action-btn mm-action-draw"
+                        onClick={(e) => { e.stopPropagation(); onResolve(market) }}
+                        title="Your counterparty proposed a draw — review and respond"
+                      >
+                        Respond to Draw
+                      </button>
                     )}
                   </td>
                 )}
