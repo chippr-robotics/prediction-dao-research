@@ -5,7 +5,6 @@ import { useDex } from '../../hooks/useDex'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { useWalletRoles } from '../../hooks'
 import { useRoleDetails } from '../../hooks/useRoleDetails'
-import { useTheme } from '../../hooks/useTheme'
 import { useModal } from '../../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../../contexts/RoleContext'
 import { DEX_ADDRESSES, TOKENS } from '../../constants/dex'
@@ -41,14 +40,13 @@ function WalletButton({ className = '' }) {
   const navigate = useNavigate()
   const { showModal } = useModal()
   const { balances, loading: balanceLoading } = useDex()
-  const { isTestnet, network, switchMode: switchNetworkMode, isSwitching: isNetworkSwitching } = useNetworkMode()
+  const { isTestnet, network } = useNetworkMode()
   const { hasRole, rolesLoading, refreshRoles } = useWalletRoles()
   const {
     roleDetails,
     loading: roleDetailsLoading,
     refresh: refreshRoleDetails
   } = useRoleDetails()
-  const { toggleMode, isDark } = useTheme()
   const dropdownRef = useRef(null)
   const buttonRef = useRef(null)
   const [connectorStatus, setConnectorStatus] = useState({})
@@ -392,39 +390,6 @@ function WalletButton({ className = '' }) {
                   </div>
                 </div>
               )}
-
-              {/* Network Toggle */}
-              <div className="dropdown-section">
-                <div className="toggle-row">
-                  <span className="toggle-label">
-                    {isTestnet ? 'Amoy Testnet' : 'Polygon Mainnet'}
-                  </span>
-                  <button
-                    onClick={() => switchNetworkMode('toggle')}
-                    className="toggle-btn"
-                    disabled={isNetworkSwitching}
-                    aria-label={`Switch to ${isTestnet ? 'Polygon Mainnet' : 'Amoy Testnet'}`}
-                  >
-                    {isNetworkSwitching ? 'Switching...' : isTestnet ? 'Mainnet' : 'Testnet'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Theme Toggle */}
-              <div className="dropdown-section">
-                <div className="toggle-row">
-                  <span className="toggle-label">
-                    {isDark ? '🌙 Dark Theme' : '☀️ Light Theme'}
-                  </span>
-                  <button
-                    onClick={toggleMode}
-                    className="toggle-btn"
-                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}
-                  >
-                    {isDark ? 'Light Mode' : 'Dark Mode'}
-                  </button>
-                </div>
-              </div>
 
               {/* Navigation Actions */}
               <div className="dropdown-actions">

@@ -8,6 +8,7 @@ import { useModal } from '../hooks/useUI'
 import { ROLES, ROLE_INFO } from '../contexts/RoleContext'
 import { hasRegisteredKey, ensureKeyRegistered } from '../utils/keyRegistryService'
 import SwapPanel from '../components/fairwins/SwapPanel'
+import NetworkSettings from '../components/wallet/NetworkSettings'
 import PremiumPurchaseModal from '../components/ui/PremiumPurchaseModal'
 import AddressQRModal from '../components/ui/AddressQRModal'
 import BlockiesAvatar from '../components/ui/BlockiesAvatar'
@@ -248,6 +249,7 @@ function WalletPage() {
               <div className="tabs" role="tablist">
                 <button role="tab" aria-selected={activeTab === 'account'} className={`tab ${activeTab === 'account' ? 'active' : ''}`} onClick={() => setActiveTab('account')}>Account</button>
                 <button role="tab" aria-selected={activeTab === 'membership'} className={`tab ${activeTab === 'membership' ? 'active' : ''}`} onClick={() => setActiveTab('membership')}>Membership</button>
+                <button role="tab" aria-selected={activeTab === 'network'} className={`tab ${activeTab === 'network' ? 'active' : ''}`} onClick={() => setActiveTab('network')}>Network</button>
                 <button role="tab" aria-selected={activeTab === 'security'} className={`tab ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>Security</button>
                 <button role="tab" aria-selected={activeTab === 'preferences'} className={`tab ${activeTab === 'preferences' ? 'active' : ''}`} onClick={() => setActiveTab('preferences')}>Preferences</button>
                 <button role="tab" aria-selected={activeTab === 'swap'} className={`tab ${activeTab === 'swap' ? 'active' : ''}`} onClick={() => setActiveTab('swap')}>Swap</button>
@@ -328,6 +330,12 @@ function WalletPage() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {activeTab === 'network' && (
+                  <div className="network-section" role="tabpanel">
+                    <NetworkSettings />
                   </div>
                 )}
 

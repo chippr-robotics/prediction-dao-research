@@ -37,6 +37,8 @@ const NETWORKS = {
     name: 'Polygon Amoy',
     isTestnet: true,
     isPrimary: false,
+    // Surfaced in the My Account → Network tab as a user-switchable network.
+    selectable: true,
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_AMOY || 'https://rpc-amoy.polygon.technology',
     explorer: { name: 'Polygonscan', baseUrl: 'https://amoy.polygonscan.com' },
@@ -88,6 +90,8 @@ const NETWORKS = {
     name: 'Polygon',
     isTestnet: false,
     isPrimary: true,
+    // Surfaced in the My Account → Network tab as a user-switchable network.
+    selectable: true,
     nativeCurrency: { decimals: 18, name: 'MATIC', symbol: 'MATIC' },
     rpcUrl: import.meta.env?.VITE_RPC_URL_POLYGON || 'https://polygon-bor-rpc.publicnode.com',
     explorer: { name: 'Polygonscan', baseUrl: 'https://polygonscan.com' },
@@ -126,6 +130,8 @@ const NETWORKS = {
     name: 'Hardhat',
     isTestnet: true,
     isPrimary: false,
+    // Local dev only — not offered in the user-facing network switcher.
+    selectable: false,
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
     rpcUrl: 'http://127.0.0.1:8545',
     explorer: { name: 'Local', baseUrl: '' },
@@ -161,6 +167,18 @@ export function isSupportedChainId(chainId) {
 
 export function listSupportedChainIds() {
   return Object.keys(NETWORKS).map((id) => parseInt(id, 10))
+}
+
+/**
+ * Networks offered in the user-facing network switcher (My Account → Network).
+ * Mainnets first, then testnets, so the production default surfaces at the top.
+ * Future chains opt in by setting `selectable: true` on their NETWORKS entry.
+ */
+export function getSelectableNetworks() {
+  return listSupportedChainIds()
+    .map((id) => NETWORKS[id])
+    .filter((net) => net?.selectable)
+    .sort((a, b) => Number(a.isTestnet) - Number(b.isTestnet))
 }
 
 /**
