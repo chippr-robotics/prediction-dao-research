@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, within, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../components/fairwins/Dashboard'
 import MyMarketsModal from '../components/fairwins/MyMarketsModal'
@@ -316,6 +317,40 @@ describe('Action-needed badges (spec 012 T023, FR-007)', () => {
       })
 
       expect(screen.queryByText('Refund')).not.toBeInTheDocument()
+      expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
+    })
+
+    it('suppresses the "refund" badge when the row shows a Clear/Reclaim button', async () => {
+      const user = userEvent.setup()
+      // An expired pending offer → computedStatus EXPIRED → the row renders a
+      // Clear button, which makes the "refund" action badge redundant.
+      const expired = {
+        id: '7',
+        description: 'Expired Offer',
+        creator: OTHER,
+        participants: [ME],
+        status: 'pending_acceptance',
+        acceptanceDeadline: Date.now() - 60 * 60 * 1000,
+        endDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        marketType: 'friend'
+      }
+      activityRef.current = baseActivity({
+        actionNeededByWagerId: { '7': 'refund' }
+      })
+
+      await act(async () => {
+        render(modalUi([expired]))
+      })
+
+      // Expired offers are hidden under the default "all" filter — switch to Expired.
+      const statusSelect = screen.getAllByRole('combobox')[1]
+      await act(async () => {
+        await user.selectOptions(statusSelect, 'expired')
+      })
+
+      expect(screen.getByText('Expired Offer')).toBeInTheDocument()
+      // The Clear button is present, so the refund badge is suppressed.
+      expect(screen.getByRole('button', { name: /^clear$/i })).toBeInTheDocument()
       expect(document.querySelectorAll('.mm-action-needed-badge')).toHaveLength(0)
     })
 

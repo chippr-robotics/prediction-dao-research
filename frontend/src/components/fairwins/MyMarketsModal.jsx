@@ -1257,6 +1257,15 @@ function MarketsTable({
             const displayTitle = getMarketDisplayTitle(market)
             const actionNeeded = actionNeededByWagerId?.[String(market.id)] ?? null
             const rowOutcome = showOutcome ? getRowOutcome(market, account) : null
+            // Hide the action badge when this row already exposes a button for
+            // the same action: accept→"View Offer", claim→"Claim",
+            // resolve→"Resolve" (always have a button), plus refund→"Reclaim &
+            // Clear" but only in the expired-offer case that renders that button.
+            // The refundable case (active past the resolve deadline) has no grid
+            // button, and 'respondDraw' never does, so those keep their badge.
+            const actionBadgeRedundant =
+              ACTION_BADGES_WITH_BUTTON.has(actionNeeded) ||
+              (actionNeeded === 'refund' && showClearBtn)
 
             return (
               <tr
@@ -1306,7 +1315,7 @@ function MarketsTable({
                   <span className={`mm-status-badge ${getStatusClass(market.computedStatus)}`}>
                     {showUnderConsideration ? 'Under Consideration' : getStatusLabel(market.computedStatus)}
                   </span>
-                  {actionNeeded && !ACTION_BADGES_WITH_BUTTON.has(actionNeeded) && (
+                  {actionNeeded && !actionBadgeRedundant && (
                     <Badge
                       variant={actionNeeded === 'claim' ? 'success' : 'warning'}
                       className="mm-action-needed-badge"
