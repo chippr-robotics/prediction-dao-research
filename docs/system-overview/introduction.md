@@ -28,13 +28,16 @@ Informal bets between friends have two failure modes:
 FairWins removes the first with on-chain escrow: both stakes are locked in
 `WagerRegistry` the moment a wager is accepted, and the contract — not the
 counterparty — pays the winner. It mitigates the second by letting the parties
-pick a resolution mechanism *before* the wager starts:
+pick who settles it *before* the wager starts:
 
-- trust each other (**Either** party can declare the winner),
-- trust one party (**Creator** or **Opponent** declares),
-- trust a neutral friend (**Third Party** arbitrator), or
-- trust an external **oracle** (Polymarket, Chainlink Data Feed, Chainlink
-  Functions, or UMA's Optimistic Oracle V3).
+- you settle (**Me** — the creator declares the winner),
+- your opponent settles (**Them** — the opponent declares),
+- a neutral friend settles (**A Friend** — an arbitrator named at creation), or
+- an external **oracle** settles (**An Oracle** — Polymarket, Chainlink Data
+  Feed, Chainlink Functions, or UMA's Optimistic Oracle V3).
+
+In an **Offer** (asymmetric odds) the chosen settler also puts up the majority
+stake, so they have skin in the game.
 
 If resolution never happens, nobody loses their money: once the resolve
 deadline passes, either party can trigger a refund and both stakes go back

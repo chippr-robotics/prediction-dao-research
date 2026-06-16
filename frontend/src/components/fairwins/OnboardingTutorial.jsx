@@ -74,8 +74,8 @@ const buildTutorialSteps = (stable) => [
           <li>
             <span className="step-number">3</span>
             <div className="step-content">
-              <strong>Choose resolution method</strong>
-              <span>Either party, initiator, receiver, or third party</span>
+              <strong>Choose who settles</strong>
+              <span>You (Me), your opponent (Them), a Friend, or an Oracle</span>
             </div>
           </li>
           <li>
@@ -115,7 +115,7 @@ const buildTutorialSteps = (stable) => [
             <div className="anatomy-title">Will BTC hit $100k by March?</div>
             <div className="anatomy-stats">
               <span>{`50 ${stable}`}</span>
-              <span>1v1 &bull; Either Party</span>
+              <span>1v1 &bull; You Settle</span>
             </div>
           </div>
           <div className="anatomy-labels">
@@ -156,24 +156,24 @@ const buildTutorialSteps = (stable) => [
         <p className="tutorial-resolution-group-label">Peer Resolution</p>
         <div className="tutorial-next-steps">
           <div className="next-step-item">
-            <span className="next-icon">&#129309;</span>
+            <span className="next-icon">&#128100;</span>
             <div className="next-content">
-              <strong>Either Party</strong>
-              <span>Either side can propose the outcome</span>
+              <strong>Me</strong>
+              <span>You settle the outcome — and put up the majority stake in an Offer</span>
             </div>
           </div>
           <div className="next-step-item">
-            <span className="next-icon">&#128100;</span>
+            <span className="next-icon">&#128101;</span>
             <div className="next-content">
-              <strong>Creator / Opponent</strong>
-              <span>Designated party reports the result</span>
+              <strong>Them</strong>
+              <span>Your opponent settles — and puts up the majority stake in an Offer</span>
             </div>
           </div>
           <div className="next-step-item">
             <span className="next-icon">&#9878;&#65039;</span>
             <div className="next-content">
-              <strong>Third Party</strong>
-              <span>Trusted arbiter resolves the wager</span>
+              <strong>A Friend</strong>
+              <span>A trusted, neutral arbiter resolves the wager</span>
             </div>
           </div>
         </div>

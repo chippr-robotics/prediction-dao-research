@@ -14,7 +14,7 @@ display. Frontend-only; no chain/contract changes.
 npm --prefix frontend run dev
 ```
 Open the app → start creating an **oracle / auto-settled** wager (check **both** the
-1v1 and the **Bookmaker** flows):
+1v1 and the **Make an Offer** flows):
 - **Expect**: Polymarket is the only oracle model offered and is selected; there is
   **no** Chainlink Data Feed / Chainlink Functions / UMA option (no tab, dropdown
   entry, or keyboard path), and no empty/dead oracle chooser — in both flows.

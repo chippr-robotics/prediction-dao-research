@@ -8,10 +8,10 @@ resolves.
 
 ```mermaid
 flowchart TD
-    A[Wager Active<br/>end time passes] --> B{Resolution type}
-    B -->|Either / Creator / Opponent| C[Authorized party<br/>declares winner]
-    B -->|Third Party| D[Arbitrator<br/>declares winner]
-    B -->|"Oracle (Polymarket /<br/>Chainlink / UMA)"| E[Source resolves →<br/>anyone triggers auto-resolve]
+    A[Wager Active<br/>end time passes] --> B{Who settles?}
+    B -->|Me / Them| C[The named settler<br/>declares winner]
+    B -->|A Friend| D[Arbitrator<br/>declares winner]
+    B -->|"An Oracle (Polymarket /<br/>Chainlink / UMA)"| E[Source resolves →<br/>anyone triggers auto-resolve]
     C & D & E --> F[Resolved]
     F --> G[Winner claims full pot]
     A -->|both parties consent,<br/>or arbitrator| H[Draw — each side<br/>gets own stake back]
@@ -20,15 +20,17 @@ flowchart TD
 
 ## Declaring a winner
 
-Who can declare depends on the resolution type fixed at creation:
+Who can declare depends on the settler fixed at creation:
 
-| Resolution type | Who declares |
+| Settler | Who declares |
 |----------------|--------------|
-| Either | Creator or opponent |
-| Creator only | The creator |
-| Opponent only | The opponent |
-| Third Party | The named arbitrator |
-| Polymarket / Chainlink / UMA | Nobody — the oracle outcome is read on-chain; anyone can trigger it |
+| Me (Creator) | The creator |
+| Them (Opponent) | The opponent |
+| A Friend (Third Party) | The named arbitrator |
+| An Oracle (Polymarket / Chainlink / UMA) | Nobody — the oracle outcome is read on-chain; anyone can trigger it |
+
+> Older wagers created with the retired **Either Party** option (either side could
+> declare) still resolve that way; the option is no longer offered for new wagers.
 
 To declare:
 

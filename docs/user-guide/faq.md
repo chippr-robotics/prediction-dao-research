@@ -50,9 +50,10 @@ tab can convert between them via Uniswap.
 ### What kinds of wagers can I make?
 
 Anything with a binary outcome between two people: even-money (equal stakes)
-or bookmaker-style (asymmetric stakes at odds you set). Resolution can be by
-either party, one named party, a third-party arbitrator, or an oracle
-(Polymarket / Chainlink Data Feed / Chainlink Functions / UMA).
+or an **Offer** (asymmetric stakes at odds you set, where the side that settles
+puts up the majority stake). You pick who settles — you (**Me**), your opponent
+(**Them**), a neutral **Friend** (arbitrator), or an **Oracle** (Polymarket /
+Chainlink Data Feed / Chainlink Functions / UMA).
 
 ### What happens to my stake when I create a wager?
 

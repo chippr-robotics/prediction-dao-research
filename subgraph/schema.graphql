@@ -28,7 +28,7 @@ enum MarketType {
   smallGroup
   eventTracking
   propBet
-  bookmaker
+  offer
 }
 
 type User @entity(immutable: false) {

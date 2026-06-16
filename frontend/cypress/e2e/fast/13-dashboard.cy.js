@@ -50,7 +50,7 @@ describe('Dashboard', () => {
     // Verify each action card title in group order.
     cy.get('.quick-action-card').eq(0).should('contain.text', 'Friends Decide (1v1)')
     cy.get('.quick-action-card').eq(1).should('contain.text', 'Oracle Settles (1v1)')
-    cy.get('.quick-action-card').eq(2).should('contain.text', 'Bookmaker')
+    cy.get('.quick-action-card').eq(2).should('contain.text', 'Make an Offer')
     cy.get('.quick-action-card').eq(3).should('contain.text', 'My Wagers')
     cy.get('.quick-action-card').eq(4).should('contain.text', 'Scan QR Code')
     cy.get('.quick-action-card').eq(5).should('contain.text', 'Share Account')

@@ -86,6 +86,12 @@ The on-chain enum (mirrored canonically in
 | 6 | `ChainlinkFunctions` | Fulfilled Chainlink Functions request |
 | 7 | `UMA` | Settled UMA OO-V3 assertion |
 
+The enum is wire-stable and unchanged. The create UI labels `Creator` / `Opponent`
+/ `ThirdParty` / `Polymarket` as **Me** / **Them** / **A Friend** / **An Oracle**,
+and no longer offers `Either` (0) for new wagers — every new wager names a single
+settler, which in an **Offer** (asymmetric odds) also carries the majority stake.
+`Either` is retained on-chain so any pre-existing wagers still resolve.
+
 For oracle types the creator records which side they take (`creatorIsYes`);
 the registry maps the reported boolean outcome to a winner. Tied/invalid
 oracle outcomes settle as a draw.

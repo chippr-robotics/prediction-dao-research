@@ -11,7 +11,7 @@ references for tasks and test mapping.
 - **C2**: The grid contains exactly **six** `.quick-action-card` elements, each a
   native `<button>`.
 - **C3**: Tiles render in two labeled groups, in DOM order:
-  1. **Start a wager** — Friends Decide (1v1), Oracle Settles (1v1), Bookmaker
+  1. **Start a wager** — Friends Decide (1v1), Oracle Settles (1v1), Make an Offer
   2. **Track & share** — My Wagers, Scan QR Code, Share Account
 - **C4**: Each group is introduced by a `.qa-group-eyebrow` label: "Start a wager"
   and "Track & share". Group labels are decorative (`role="presentation"`), not
@@ -24,7 +24,7 @@ references for tasks and test mapping.
 |------|-------|-------------|
 | create-1v1-friends | `Friends Decide (1v1)` | `You and a friend settle the outcome` |
 | create-1v1-oracle | `Oracle Settles (1v1)` | `Auto-settles from a linked Polymarket market` (default) / `Auto-settles from Polymarket, Chainlink or UMA` (all-models mode) |
-| create-bookmaker | `Bookmaker` | `Offer odds and let a friend take the other side` |
+| create-offer | `Make an Offer` | `Offer odds and choose who settles — you or your friend` |
 | my-wagers | `My Wagers` | `View active and past wagers` |
 | scan-qr | `Scan QR Code` | `Accept a wager from a friend` |
 | share-account | `Share Account` | `Show your address as a QR code` |
@@ -35,7 +35,7 @@ references for tasks and test mapping.
   `resolutionCategory=participant`.
 - **A2** `create-1v1-oracle` → create modal, `initialType=oneVsOne`,
   `resolutionCategory=oracle`.
-- **A3** `create-bookmaker` → create modal, `initialType=bookmaker`,
+- **A3** `create-offer` → create modal, `initialType=offer`,
   `resolutionCategory=all`.
 - **A4** `my-wagers` → opens My Wagers modal.
 - **A5** `scan-qr` → opens the QR scanner modal.

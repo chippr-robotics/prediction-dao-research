@@ -540,7 +540,7 @@ function MyMarketsModal({
       participants: market.participants || [],
       arbitrator: market.arbitrator || null,
       marketType: market.type || 'oneVsOne',
-      // Opponent's odds for a bookmaker wager (200 = even money). Surfaced so
+      // Headline party's odds for an Offer wager (200 = even money). Surfaced so
       // the acceptance modal shows the real payout instead of defaulting to 1v1.
       opponentOddsMultiplier: market.opponentOddsMultiplier || market.oddsMultiplier || WAGER_DEFAULTS.ODDS_MULTIPLIER,
       status: market.status,
@@ -1686,9 +1686,9 @@ function MarketDetailView({
           </span>
         </div>
         <div className="mm-detail-meta">
-          <span className={`mm-type-badge mm-type-${market.type === 'bookmaker' ? 'bookmaker' : market.marketType}`}>
-            {market.type === 'bookmaker'
-              ? `Bookmaker${market.oddsMultiplier ? ` · ${market.oddsMultiplier / 100}x` : ''}`
+          <span className={`mm-type-badge mm-type-${market.type === 'offer' ? 'offer' : market.marketType}`}>
+            {market.type === 'offer'
+              ? `Offer${market.oddsMultiplier ? ` · ${market.oddsMultiplier / 100}x` : ''}`
               : market.marketType === 'friend' ? 'Friend Wager' : 'Wager'}
           </span>
           {market.category && <span className="mm-category-tag">{market.category}</span>}

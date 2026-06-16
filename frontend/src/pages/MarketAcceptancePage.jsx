@@ -119,9 +119,9 @@ function MarketAcceptancePage() {
         // The opponent puts up opponentStake on acceptance; that's what the modal cares about.
         const stakePerParticipant = ethers.formatUnits(w.opponentStake, decimals)
 
-        // v2 WagerRegistry has no marketType field — a bookmaker wager is encoded
+        // v2 WagerRegistry has no marketType field — an Offer is encoded
         // as asymmetric stakes (creatorStake !== opponentStake). Derive the subtype
-        // and the opponent's odds from raw stakes so the offer shows real bookmaker
+        // and the offered odds from raw stakes so the offer shows real Offer
         // terms instead of collapsing to even-money 1v1.
         const { type: wagerType, oddsMultiplier } = deriveWagerType(w.creatorStake, w.opponentStake)
 

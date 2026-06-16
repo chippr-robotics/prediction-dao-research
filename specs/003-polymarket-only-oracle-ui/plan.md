@@ -10,7 +10,7 @@ Hide every oracle model except **Polymarket** across the user-facing frontend,
 reversibly. The change is driven by a **single source of truth** — an "exposed
 oracle models" constant derived from one `VITE_*` env flag (default:
 Polymarket-only). The oracle tab strip in `FriendMarketsModal` renders from that
-constant — covering **both the 1v1 and the Bookmaker** flows (they share the same
+constant — covering **both the 1v1 and the Make an Offer** flows (they share the same
 oracle selection via `resolutionCategory='all'`); with one model it auto-selects
 Polymarket and shows no multi-tab chooser. The **landing page** footer "Oracles"
 list and the onboarding/dashboard copy are conditioned on the same flag (Chainlink/
@@ -101,11 +101,11 @@ frontend/
 │   ├── components/
 │   │   ├── LandingPage.jsx                # footer "Oracles" list (L~421-422): drop Chainlink/UMA links unless flag=all (folded from 004)
 │   │   └── fairwins/
-│   │       ├── FriendMarketsModal.jsx    # ORACLE_TAB_TYPES -> derive from EXPOSED_*; covers BOTH 1v1 + Bookmaker (resolutionCategory 'all'); default-select Polymarket; suppress single-tab strip
+│   │       ├── FriendMarketsModal.jsx    # ORACLE_TAB_TYPES -> derive from EXPOSED_*; covers BOTH 1v1 + Make an Offer (resolutionCategory 'all'); default-select Polymarket; suppress single-tab strip
 │   │       ├── Dashboard.jsx              # copy: "Polymarket, Chainlink or UMA" -> conditional on the flag
 │   │       └── OnboardingTutorial.jsx     # copy: Chainlink/UMA explainer cards -> conditional on the flag
 │   └── test/
-│       └── oracleExposure.test.jsx        # NEW — 1v1 + Bookmaker selector shows only Polymarket by default; all four when flag=all; landing has no Chainlink/UMA
+│       └── oracleExposure.test.jsx        # NEW — 1v1 + Make an Offer selector shows only Polymarket by default; all four when flag=all; landing has no Chainlink/UMA
 │   # READ-ONLY / unchanged: OracleConditionPicker.jsx (unreachable branches), components/admin/OracleAdaptersTab.jsx (out of scope)
 contracts/ subgraph/                        # UNTOUCHED (no on-chain changes)
 ```

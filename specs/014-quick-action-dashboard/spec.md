@@ -21,7 +21,7 @@ The "Your Wagers" dashboard is the connected user's home base. Today it presents
 six quick-action tiles in a single uniform grid. The tiles look identical, yet
 they trigger three fundamentally different kinds of work:
 
-- **Create a wager** — *Friends Decide (1v1)*, *Oracle Settles (1v1)*, *Bookmaker*
+- **Create a wager** — *Friends Decide (1v1)*, *Oracle Settles (1v1)*, *Make an Offer*
 - **Track a wager** — *My Wagers* (also surfaces an "action needed" count)
 - **Hand off in person via QR** — *Scan QR Code*, *Share Account*
 
@@ -64,7 +64,7 @@ that each action remains individually identifiable.
 ### User Story 2 - Start the right kind of wager quickly (Priority: P1)
 
 A user who wants to create a wager can tell the three creation paths apart —
-friends settle, an oracle settles, or they set the odds as a bookmaker — and
+friends settle, an oracle settles, or they make an offer (set the odds) — and
 launch the correct flow in one tap. The existing labels, descriptions, and the
 flow each tile opens are unchanged.
 
@@ -72,7 +72,7 @@ flow each tile opens are unchanged.
 grouping must not slow it down or change established behavior.
 
 **Independent Test**: Tap each creation tile and confirm it opens the same flow
-it does today (participant-settled, oracle-settled, or bookmaker), with the same
+it does today (participant-settled, oracle-settled, or Make an Offer), with the same
 labels and descriptions.
 
 **Acceptance Scenarios**:
@@ -81,8 +81,8 @@ labels and descriptions.
    (1v1)*, **Then** the participant-settled create flow opens, exactly as before.
 2. **Given** the redesigned dashboard, **When** the user taps *Oracle Settles
    (1v1)*, **Then** the oracle-settled create flow opens, exactly as before.
-3. **Given** the redesigned dashboard, **When** the user taps *Bookmaker*,
-   **Then** the bookmaker create flow opens, exactly as before.
+3. **Given** the redesigned dashboard, **When** the user taps *Make an Offer*,
+   **Then** the Make an Offer create flow opens, exactly as before.
 
 ---
 
@@ -165,7 +165,7 @@ from each other, and that *Share Account* keeps its descriptive accessible name.
   icon, role tag, and label. All tiles MUST share the single site-green brand
   accent — actions are not differentiated by color.
 - **FR-004**: The system MUST preserve the existing action labels exactly:
-  "Friends Decide (1v1)", "Oracle Settles (1v1)", "Bookmaker", "My Wagers",
+  "Friends Decide (1v1)", "Oracle Settles (1v1)", "Make an Offer", "My Wagers",
   "Scan QR Code", "Share Account".
 - **FR-005**: The system MUST preserve each action's existing description text and
   the click behavior/flow it triggers.

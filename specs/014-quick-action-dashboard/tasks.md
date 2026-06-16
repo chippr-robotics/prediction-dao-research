@@ -86,9 +86,9 @@ per-action identity.
 before, with the create group first.
 
 **Independent Test**: Tap each create tile; confirm participant / oracle /
-bookmaker flow opens with unchanged labels and descriptions.
+Make an Offer flow opens with unchanged labels and descriptions.
 
-- [X] T009 [US2] Ensure the three creation tiles (Friends Decide, Oracle Settles, Bookmaker) carry the exact existing titles/descriptions and render in the "Start a wager" group first, so Friends Decide is the first `.quick-action-card`, in `frontend/src/components/fairwins/Dashboard.jsx` (FR-004/FR-005). Contract C5, data-model validation.
+- [X] T009 [US2] Ensure the three creation tiles (Friends Decide, Oracle Settles, Make an Offer) carry the exact existing titles/descriptions and render in the "Start a wager" group first, so Friends Decide is the first `.quick-action-card`, in `frontend/src/components/fairwins/Dashboard.jsx` (FR-004/FR-005). Contract C5, data-model validation.
 - [X] T010 [US2] Confirm each `id` still dispatches its existing flow in `handleQuickAction` (participant / oracle / all) in `frontend/src/components/fairwins/Dashboard.jsx`. Contract A1–A3.
 - [X] T011 [P] [US2] Keep `frontend/src/test/Dashboard.test.jsx` green — create-flow wiring (A1–A3), exact label/description assertions, and demo/connected rendering pass unchanged.
 

@@ -90,7 +90,7 @@ function openAndFillWagerForm(config = {}) {
     cy.wait(500)
   }
 
-  // Set odds multiplier (bookmaker)
+  // Set odds multiplier (offer)
   if (config.oddsMultiplier) {
     cy.get('#fm-odds, [role="dialog"] .fm-odds-slider')
       .first()
@@ -405,16 +405,16 @@ describe('Wager Creation with Real Transactions', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // CRE-11: Bookmaker with asymmetric odds
+  // CRE-11: Offer with asymmetric odds
   // ---------------------------------------------------------------------------
-  it('[CRE-11] Create bookmaker wager with asymmetric odds', () => {
+  it('[CRE-11] Create offer wager with asymmetric odds', () => {
     connectWalletAndVisit(0)
 
-    cy.openCreateWagerModal('bookmaker')
+    cy.openCreateWagerModal('offer')
 
-    // Bookmaker-type form has odds slider
+    // Offer-type form has odds slider
     cy.get('[role="dialog"]').within(() => {
-      cy.get('#fm-description, input[type="text"]').first().clear().type('CRE-11: Bookmaker 5x odds')
+      cy.get('#fm-description, input[type="text"]').first().clear().type('CRE-11: Offer 5x odds')
 
       cy.get('input[placeholder*="0x"]').first().clear().type(TEST_ACCOUNTS[1])
       cy.wait(500)

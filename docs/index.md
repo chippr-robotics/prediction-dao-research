@@ -51,17 +51,21 @@ sequenceDiagram
 Recorded contract addresses live in [`deployments/`](https://github.com/chippr-robotics/prediction-dao-research/tree/main/deployments)
 — see the [Architecture guide](developer-guide/architecture.md) for the full map.
 
-## Resolution options
+## Who settles a wager
 
-| Type | Who settles it |
+| Settler | Who settles it |
 |------|----------------|
-| Either | Either participant can declare the winner |
-| Creator / Opponent | Only the named party declares |
-| Third Party | A neutral arbitrator chosen at creation |
-| Polymarket | Auto-settles from a linked Polymarket market |
-| Chainlink Data Feed | Auto-settles from a price-feed threshold |
-| Chainlink Functions | Auto-settles from a custom off-chain computation |
-| UMA | Auto-settles via UMA's Optimistic Oracle V3 |
+| Me (Creator) | The creator declares the winner |
+| Them (Opponent) | The opponent declares the winner |
+| A Friend (Third Party) | A neutral arbitrator chosen at creation |
+| An Oracle — Polymarket | Auto-settles from a linked Polymarket market |
+| An Oracle — Chainlink Data Feed | Auto-settles from a price-feed threshold |
+| An Oracle — Chainlink Functions | Auto-settles from a custom off-chain computation |
+| An Oracle — UMA | Auto-settles via UMA's Optimistic Oracle V3 |
+
+In the create UI these settlers appear as **Me**, **Them**, **A Friend**, and
+**An Oracle** (the oracle tab covers Polymarket / Chainlink / UMA). The retired
+**Either Party** option is no longer offered for new wagers.
 
 ## Privacy & security
 

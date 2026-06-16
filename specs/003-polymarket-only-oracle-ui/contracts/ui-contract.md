@@ -18,9 +18,9 @@ isOracleModelExposed(rt)      // helper: boolean (rt ∈ exposed set)
 
 ## Per-surface acceptance contract (what "done" means)
 
-- **FriendMarketsModal — oracle selection (1v1 AND Bookmaker)**:
+- **FriendMarketsModal — oracle selection (1v1 AND Make an Offer)**:
   - Renders only `EXPOSED_ORACLE_RESOLUTION_TYPES` as choices — in both the 1v1 and
-    the Bookmaker (`resolutionCategory='all'`) flows.
+    the Make an Offer (`resolutionCategory='all'`) flows.
   - With one exposed model: oracle resolution defaults to Polymarket and **no
     multi-tab oracle chooser / empty selector** is shown (FR-002).
   - No keyboard/DOM/programmatic path selects a hidden model (FR-001).
