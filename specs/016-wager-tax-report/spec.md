@@ -14,6 +14,7 @@
 
 - Q: How should each transfer's Cost Basis be derived, given the platform cannot observe off-platform acquisition cost? → A: Use the stablecoin's recorded USD fair market value at the time the tokens were staked / entered the platform; user-supplied per-lot acquisition cost is deferred from v1.
 - Q: Should this spec include the admin/operations capability to generate reports on behalf of users (and the new Operations role)? → A: No — scope this spec to user self-service reporting only; admin/operations functionality and the Operations role are deferred to a separate PR.
+- Q: Where should each transfer's USD fair market value come from, given de-pegging? → A: Use a par $1.00 baseline for v1, stored in a structured value field so a real historical price feed can replace it later; explicit de-peg pricing is deferred.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -92,9 +93,9 @@ and re-download it to confirm the file is unchanged.
 - **Future or inverted ranges**: If a user enters a to date before the from date, or a range
   extending into the future, the system rejects or normalizes the request with a clear
   message rather than producing a misleading report.
-- **Stablecoin de-pegging**: When the USD fair market value of a stablecoin at the time of a
-  transfer differs from $1.00, the report must reflect the actual value at that time, not a
-  hardcoded $1.00.
+- **Stablecoin de-pegging**: v1 values every stablecoin transfer at a par $1.00 baseline; the
+  value is held in a structured field so that, once a historical price feed is integrated, a
+  de-pegged value at the transfer time can replace the baseline without reworking the report.
 - **Multiple stablecoins**: A user who transacted in more than one stablecoin in the period
   sees each transfer reported in its own ticker, with USD values computed per transfer.
 - **Open / unresolved / refunded / drawn wagers**: Stakes that are deposited but not yet
@@ -126,8 +127,10 @@ and re-download it to confirm the file is unchanged.
   date and time of the transfer, the specific stablecoin ticker (e.g. USDC, USDT, PYUSD),
   and the exact amount of tokens transferred.
 - **FR-005**: For each transfer, the report MUST record the Financial Values: the U.S.
-  dollar fair market value at the time of the transfer (reflecting de-pegging rather than a
-  fixed $1.00), the cost basis, and any transaction/gas/network fees paid.
+  dollar fair market value at the time of the transfer, the cost basis, and any
+  transaction/gas/network fees paid. For v1 the fair market value uses a par $1.00 per-token
+  baseline, recorded in a structured value field so a real historical price feed can replace
+  it later without changing the report's shape (explicit de-peg pricing is deferred).
 - **FR-006**: For each transfer, the report MUST record the Blockchain Evidence: the full
   transaction hash, the sending wallet address, and the receiving wallet address.
 - **FR-007**: The report MUST be produced as a downloadable document that the user can save
@@ -201,9 +204,10 @@ and re-download it to confirm the file is unchanged.
 - **Data source**: Wager activity, amounts, timestamps, participants, and transaction hashes
   are drawn from existing on-chain records and the project's indexing of them; no new
   category of on-chain data is required, only its presentation.
-- **Fair market value source**: USD fair-market values are obtained from a price source/oracle
-  appropriate to the active network and the transfer's timestamp; de-pegging is reflected by
-  using the value at that time rather than a fixed $1.00.
+- **Fair market value source (v1)**: USD fair-market values use a par $1.00 per-token baseline,
+  stored in a structured value field. A real historical price feed (oracle or external price
+  service) and de-peg-aware valuation are a deferred enhancement that can populate the same
+  field without changing the report's structure.
 - **Reporting time zone**: Period boundaries and pre-defined periods are resolved against a
   single, clearly stated reporting time zone (UTC by default) so results are deterministic.
 - **Scope of activity**: "Wagers participated in" covers wagers where the account was the
