@@ -8,6 +8,13 @@
 
 **Input**: User description: "report generation function for a user. The user should be able to select a time period with a from and to date or select pre-defined time periods like last month, last quarter, last year, last calendar year, etc. in order to generate a downloadable document containing information about all of the wagers they have participated in with details such as Transaction Mechanics (date/time, stablecoin ticker, amount sent), Financial Values (fair market value in USD, cost basis, transaction fees), and Blockchain Evidence (transaction hash, sending and receiving wallet addresses). The reports should be viewable and downloadable from the My Account page. The admin section should also be capable of generating reports for users. We will add a role for the operations person which will perform this activity."
 
+## Clarifications
+
+### Session 2026-06-17
+
+- Q: How should each transfer's Cost Basis be derived, given the platform cannot observe off-platform acquisition cost? → A: Use the stablecoin's recorded USD fair market value at the time the tokens were staked / entered the platform; user-supplied per-lot acquisition cost is deferred from v1.
+- Q: Should this spec include the admin/operations capability to generate reports on behalf of users (and the new Operations role)? → A: No — scope this spec to user self-service reporting only; admin/operations functionality and the Operations role are deferred to a separate PR.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Self-service tax report for a chosen period (Priority: P1)
@@ -76,37 +83,6 @@ and re-download it to confirm the file is unchanged.
 
 ---
 
-### User Story 3 - Operations / admin generates a report on behalf of a user (Priority: P2)
-
-A staff member holding the Operations role (or an administrator) opens the admin section,
-selects a specific user, chooses a reporting period, and generates the same report on that
-user's behalf — for support requests, dispute resolution, or compliance.
-
-**Why this priority**: Users will request help, and compliance/operations staff need to
-produce records on demand. This extends the same reporting capability to privileged staff
-and introduces the new Operations role, but the user-facing self-service flow (Stories 1–2)
-delivers value first.
-
-**Independent Test**: Sign in as a user holding only the Operations role, open the admin
-report tool, select another user with known activity and a period, generate the report, and
-confirm it matches what that user would receive for the same period. Then confirm a user
-without the Operations or admin role cannot reach or use the tool.
-
-**Acceptance Scenarios**:
-
-1. **Given** a staff member with the Operations role, **When** they select a target user
-   and reporting period in the admin section, **Then** they can generate and download a
-   report containing that user's wager activity for the period.
-2. **Given** a user without the Operations role or an administrative role, **When** they
-   attempt to access the report-for-user tool, **Then** access is denied.
-3. **Given** an operations-generated report, **When** it is compared to the report the
-   target user would generate for the same period, **Then** the content matches.
-4. **Given** any generation of a report on behalf of a user, **When** it completes, **Then**
-   the action is recorded (who generated it, for which user, which period, and when) for
-   accountability.
-
----
-
 ### Edge Cases
 
 - **Period boundaries / time zone**: A transfer whose timestamp sits exactly on the from or
@@ -163,26 +139,18 @@ without the Operations or admin role cannot reach or use the tool.
   record and not tax advice.
 - **FR-010**: Users MUST be able to view a history of their previously generated reports and
   re-download them from the My Account area.
-- **FR-011**: The system MUST introduce an "Operations" role distinct from existing
-  administrative roles, whose purpose is to generate reports on behalf of users.
-- **FR-012**: Staff holding the Operations role, and administrators, MUST be able to select
-  a target user and reporting period in the admin section and generate the same report on
-  that user's behalf.
-- **FR-013**: Reports generated on behalf of a user MUST contain the same content the user
-  would obtain for the same period and network.
-- **FR-014**: The system MUST restrict the generate-report-for-user capability to holders of
-  the Operations or an administrative role and MUST deny it to all other users.
-- **FR-015**: The system MUST record an auditable trail of each report generated on behalf
-  of a user, capturing who generated it, the target user, the period, and the timestamp.
-- **FR-016**: The system MUST handle invalid period selections (inverted ranges, ranges
+- **FR-011**: A user MUST only be able to generate and view reports for their own wager
+  activity; the report MUST cover the signed-in user's account and MUST NOT expose another
+  user's activity.
+- **FR-012**: The system MUST handle invalid period selections (inverted ranges, ranges
   extending into the future) with a clear, user-understandable message instead of producing
   a misleading or partial report.
-- **FR-017**: The system MUST scope reported activity to the active network and MUST NOT
+- **FR-013**: The system MUST scope reported activity to the active network and MUST NOT
   combine testnet and mainnet activity in a single report.
-- **FR-018**: When fair-market-value or cost-basis information for a transfer cannot be
+- **FR-014**: When fair-market-value or cost-basis information for a transfer cannot be
   determined, the report MUST surface the gap explicitly rather than silently substituting
   a value.
-- **FR-019**: Cost basis MUST be derived from the recorded USD fair market value of the
+- **FR-015**: Cost basis MUST be derived from the recorded USD fair market value of the
   stablecoin at the time the tokens were staked / entered the platform for that transfer
   (the same valuation source used for fair market value, reflecting any de-pegging). The
   report MUST note that this reflects on-platform value at staking time and that a user's
@@ -191,12 +159,11 @@ without the Operations or admin role cannot reach or use the tool.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Report Request**: A user's (or operations staff's) intent to generate a report —
-  identifies the target account/wallet, the resolved reporting period (start and end), the
-  network, the requester, and whether it was self-service or generated on behalf of a user.
+- **Report Request**: A user's intent to generate a report — identifies the signed-in
+  account/wallet, the resolved reporting period (start and end), and the network.
 - **Activity Report**: The generated document and its metadata — covered account, period,
-  network, generation timestamp, generating party, the list of transfer line items, and
-  computed totals; persisted so it can be re-listed and re-downloaded.
+  network, generation timestamp, the list of transfer line items, and computed totals;
+  persisted so it can be re-listed and re-downloaded.
 - **Transfer Line Item**: A single wager-related stablecoin movement — transfer timestamp,
   direction (deposit/payout/refund), stablecoin ticker, token amount, USD fair market value,
   cost basis, fees, transaction hash, sending address, receiving address, and the wager it
@@ -204,8 +171,6 @@ without the Operations or admin role cannot reach or use the tool.
 - **Reporting Period**: A named or custom span — for pre-defined periods, the rule that maps
   a name (e.g. "last calendar year") to fixed start/end boundaries; for custom periods, the
   user-supplied from/to dates.
-- **Operations Role**: A privileged staff capability, separate from existing admin roles,
-  that authorizes generating reports on behalf of any user.
 
 ## Success Criteria *(mandatory)*
 
@@ -221,13 +186,8 @@ without the Operations or admin role cannot reach or use the tool.
   address) with no blank required field unless the gap is explicitly flagged.
 - **SC-004**: Per-stablecoin and overall totals in the report reconcile exactly to the sum
   of the included line items.
-- **SC-005**: 100% of attempts by non-privileged users to generate a report for another user
-  are denied, and 100% of operations/admin-generated reports are recorded in the audit
-  trail.
-- **SC-006**: An operations staff member can locate a user and produce that user's report
-  for a given period in under 2 minutes.
-- **SC-007**: A report generated by operations for a given user and period is equivalent in
-  content to the report that user would self-generate for the same period and network.
+- **SC-005**: 100% of generated reports contain only the signed-in user's own activity, with
+  no other user's activity included.
 
 ## Assumptions
 
@@ -238,8 +198,6 @@ without the Operations or admin role cannot reach or use the tool.
 - **"My Account" location**: The user-facing entry point is the existing account/wallet area
   of the app where users already view their wallet, roles, and membership status; reporting
   is added there rather than as a new top-level destination.
-- **Admin location**: The operations/admin report tool lives within the existing admin
-  section alongside other role-gated tools.
 - **Data source**: Wager activity, amounts, timestamps, participants, and transaction hashes
   are drawn from existing on-chain records and the project's indexing of them; no new
   category of on-chain data is required, only its presentation.
@@ -259,9 +217,14 @@ without the Operations or admin role cannot reach or use the tool.
   enhancement and is out of scope for v1.
 - **Not tax advice**: The report is an informational activity record; the platform does not
   compute tax owed or provide tax advice, and the document states this.
-- **Authentication/authorization**: Existing account sign-in and the existing role/access
-  framework are reused; the new Operations role is added to that framework rather than a new
-  permission system.
+- **Authentication/authorization**: Existing account sign-in is reused; a report covers the
+  signed-in user's own activity only.
 - **Retention**: Generated reports are retained and re-listable for the user; a specific
   retention duration follows standard practice for financial records unless otherwise
   directed.
+
+### Out of Scope (this feature)
+
+- **Admin / operations report generation**: The ability for staff to generate reports on
+  behalf of users, and the new "Operations" role, are deferred to a separate PR/feature and
+  are intentionally excluded here.
