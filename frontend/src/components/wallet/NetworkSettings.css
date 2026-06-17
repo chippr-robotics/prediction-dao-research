@@ -137,3 +137,40 @@
 .network-tag-icon {
   font-weight: 700;
 }
+
+/* Per-network operational documentation (native currency, explorer, faucet, swap) */
+.network-docs {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: 6px;
+}
+
+.network-doc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.network-doc-row dt {
+  flex: 0 0 110px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.network-doc-row dd {
+  margin: 0;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.network-doc-row a {
+  color: var(--brand-primary, var(--color-primary));
+  text-decoration: none;
+}
+
+.network-doc-row a:hover {
+  text-decoration: underline;
+}

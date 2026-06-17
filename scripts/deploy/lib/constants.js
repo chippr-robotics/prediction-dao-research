@@ -26,8 +26,12 @@ const SINGLETON_FACTORY_ADDRESS = "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7";
  */
 const TOKENS = {
   mordor: {
-    USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // USC Stablecoin (6 decimals)
-    WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC
+    // ⚠️ VERIFY ON-CHAIN BEFORE DEPLOY (Spec 015, T001): confirm this is the
+    // canonical Classic USD (USC) on Mordor (chain 63) — not the ETC-mainnet
+    // token — and confirm decimals. The deploy reads decimals() on-chain, but a
+    // wrong address would mis-stake funds. requireRealStablecoin aborts if unset.
+    USC: "0xDE093684c796204224BC081f937aa059D903c52a",   // Classic USD (USC) — VERIFY
+    WETC: "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",  // Wrapped ETC — VERIFY (used as 2nd real stake token)
     WMATIC: null,
   },
   amoy: {
@@ -303,6 +307,28 @@ const DEFAULT_MAX_RUNTIME_BYTES = 24_576;
 const MAINNET_CHAIN_IDS = [1, 61, 137]; // Ethereum, Ethereum Classic, Polygon mainnets
 
 // =============================================================================
+// PER-NETWORK DEPLOY FLAGS
+// =============================================================================
+
+/**
+ * Deploy-time behaviour flags for chains where the standard (Polygon-centric)
+ * integrations do not exist. Ethereum Classic (Mordor) has no Polymarket /
+ * Chainlink / UMA infrastructure and uses Classic USD (USC) + WETC as REAL
+ * tokens, so its core-only deploy must not inject mock stake tokens or a mock
+ * Polymarket adapter (Spec 015 / Constitution III). The MockSanctionsOracle is
+ * intentionally NOT suppressed here — like Amoy, a testnet without a real
+ * Chainalysis oracle still needs an on-chain oracle to keep the Sanctions Guard
+ * enforced (Spec 015 FR-016, clarified "enforce, same as others").
+ */
+const NETWORK_DEPLOY_FLAGS = {
+  mordor: {
+    noPolymarket: true,          // skip PolymarketOracleAdapter + Mock CTF; WagerRegistry gets address(0)
+    requireRealStablecoin: true, // never deploy a MockERC20 stablecoin; abort if USC is unset/invalid
+    noMockWrappedNative: true,   // use real WETC (or single-token allowlist); never a mock wrapped-native
+  },
+};
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -337,4 +363,5 @@ module.exports = {
   DEFAULT_MAX_INITCODE_BYTES,
   DEFAULT_MAX_RUNTIME_BYTES,
   MAINNET_CHAIN_IDS,
+  NETWORK_DEPLOY_FLAGS,
 };

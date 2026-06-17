@@ -159,11 +159,26 @@ application backend.
 | Polygon mainnet | 137 | Production | `deployments/polygon-chain137-v2.json` |
 | Polygon Amoy | 80002 | Testnet | `deployments/amoy-chain80002-v2.json` |
 | Hardhat | 1337 | Local development | generated locally |
-| Mordor (ETC) | 63 | Legacy v1, read-only | historical |
+| Mordor (ETC) | 63 | Testnet (Ethereum Classic, v2 core-only) | `deployments/mordor-chain63-v2.json` |
 
 Contracts deploy deterministically via the Safe Singleton Factory with a
 versioned salt prefix (`FairWins-P2P-v2.0-`) — see
 [Singleton Deployment Patterns](singleton-deployment-patterns.md).
+
+### Mordor (Ethereum Classic testnet)
+
+Mordor runs a **core-only** v2 deployment (Spec 015): `WagerRegistry`,
+`MembershipManager`, `KeyRegistry`, and an enforced `SanctionsGuard`. Ethereum
+Classic has no Polymarket, Chainlink, or UMA infrastructure, so the oracle
+adapters are **not** deployed and `WagerRegistry` runs with a zero Polymarket
+adapter — only peer/designated-resolver wagers (Either/Creator/Opponent/
+ThirdParty) are offered. Stakes use **Classic USD (USC)**, the network's real
+fiat-backed stablecoin (no mock); swaps go through **ETCswap** when configured.
+Native gas is test ETC (faucet); the explorer is
+[Blockscout](https://etc-mordor.blockscout.com). The legacy v1 Mordor deployment
+is **retired** — its addresses live only in version-control history. The Network
+tab (My Account → Network) surfaces Mordor with capability tags derived from the
+deployment record and operational links (explorer, faucet, Classic USD, ETCswap).
 
 ## Security architecture
 

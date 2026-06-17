@@ -1,0 +1,42 @@
+{
+  "network": "mordor",
+  "chainId": 63,
+  "deployer": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "treasury": "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+  "paymentToken": "0xDE093684c796204224BC081f937aa059D903c52a",
+  "wmatic": "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a",
+  "polymarketCTF": null,
+  "contracts": {
+    "membershipManager": "0xB6Cd0Cf7E11Cc58398b2f1ACA6938509B070a38E",
+    "wagerRegistry": "0xAE5b3148E1509973e4A03Dc809A78098215c5Eff",
+    "keyRegistry": "0xcEFdeBba8E040c035c690ca9057cF22E73247c24",
+    "sanctionsGuard": "0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3"
+  },
+  "mocks": {
+    "mockSanctionsOracle": "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
+  },
+  "constructorArgs": {
+    "membershipManager": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0xDE093684c796204224BC081f937aa059D903c52a",
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1"
+    ],
+    "wagerRegistry": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0xB6Cd0Cf7E11Cc58398b2f1ACA6938509B070a38E",
+      "0x0000000000000000000000000000000000000000",
+      [
+        "0xDE093684c796204224BC081f937aa059D903c52a",
+        "0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a"
+      ]
+    ],
+    "sanctionsGuard": [
+      "0x52502d049571C7893447b86c4d8B38e6184bF6e1",
+      "0xa5F0bB3a63C55721078be5ee80653E9cB0927D9E"
+    ],
+    "keyRegistry": [],
+    "mockSanctionsOracle": []
+  },
+  "saltPrefix": "FairWins-P2P-v2.0-",
+  "timestamp": "2026-06-17T00:14:09.951Z"
+}

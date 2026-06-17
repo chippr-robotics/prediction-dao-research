@@ -8,25 +8,24 @@
  * Last updated: 2026-05-09 (Amoy network added for Polymarket integration)
  */
 
-// Mordor (Ethereum Classic testnet) legacy v1 deployment — read-only at this point.
+// Mordor (Ethereum Classic testnet, chainId 63) — v2 P2P betting deployment.
+// CORE ONLY: no oracle adapters (ETC has no Polymarket/Chainlink/UMA), so those
+// keys are intentionally absent and their capability tags read "unavailable".
+// The legacy v1 Mordor deployment is retired (Spec 015 FR-017). Deployed +
+// verified on Blockscout (etc-mordor.blockscout.com) 2026-06-16; addresses are
+// kept in sync from the record via:
+//   npx hardhat run scripts/deploy/deploy.js --network mordor
+//   npm run sync:frontend-contracts -- --network mordor --chainId 63
 const MORDOR_CONTRACTS = {
   deployer: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-  treasury: '0x52502d049571C7893447b86c4d8B38e6184bF6e1',
-  roleManagerCore: '0x6a6422Ed3198332AC8DA2852BBff4749B66a3D8D',
-  ragequitModule: '0xD6b6eDE9EacDC90e20Fe95Db1875EaBB07004A1c',
-  tieredRoleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
-  tierRegistry: '0x476cf3dEA109D6FC95aD19d246FD4e95693c47a3',
-  usageTracker: '0x10f1b557a53C05A92DF820CCfDC77EaB0c732Bde',
-  membershipManager: '0xCD172d9888a6F47203dD6f0684f250f6Ac56f6Ed',
-  paymentProcessor: '0x6e063138809263820F61146c34a74EB3B2629A59',
-  membershipPaymentManager: '0x797717EAf6d054b35A30c9afF0e231a35Bb5abB7',
-  friendGroupResolutionLib: '0x1C8780a84539c3c2F98530a2275fB9D2E4eA5aE9',
-  friendGroupClaimsLib: '0xca3b4c3e0E04E5Ffcb0983d6e2DfE793BbEEfBbc',
-  friendGroupCreationLib: '0xB3060ED1dc17dB2297021D5874821ce13777A657',
-  friendGroupMarketFactory: '0xE1eC8d34b36f55015ed636337121CA8EFbA96227',
-  nullifierRegistry: '0x5569FEe7f8Bab39EEd08bf448Dd6824640C7d272',
-  zkKeyManager: '0xF75bcd3673E379E0a85CC944AA147B7596c7AE67',
-  roleManager: '0x55e6346Be542B13462De504FCC379a2477D227f0',
+  treasury: '',
+  wagerRegistry: '0xAE5b3148E1509973e4A03Dc809A78098215c5Eff',
+  membershipManager: '0xB6Cd0Cf7E11Cc58398b2f1ACA6938509B070a38E',
+  keyRegistry: '0xcEFdeBba8E040c035c690ca9057cF22E73247c24',
+  sanctionsGuard: '0xdF41355dD5E47FCA4eE2F2205af4C70Dab8C13B3',
+  // Classic USD (USC) — real on-chain stablecoin (no mock); set by sync.
+  paymentToken: '0xDE093684c796204224BC081f937aa059D903c52a',
+  wmatic: '0x1953cab0E5bFa6D4a9BaD6E05fD46C1CC6527a5a',
 }
 
 // Local Hardhat sandbox (chainId 1337) — populated by deploy.js + sync.
@@ -84,7 +83,7 @@ const POLYGON_CONTRACTS = {
 }
 
 const NETWORK_CONTRACTS = {
-  63: MORDOR_CONTRACTS,     // Mordor (legacy v1)
+  63: MORDOR_CONTRACTS,     // Mordor (Ethereum Classic testnet, v2 core-only)
   80002: AMOY_CONTRACTS,    // Polygon Amoy (v2)
   137: POLYGON_CONTRACTS,   // Polygon mainnet (v2) — LIVE
   1337: HARDHAT_CONTRACTS,  // Local Hardhat sandbox

@@ -35,6 +35,7 @@ const {
   UMA_OOV3,
   WAGER_PARTICIPANT_TIERS,
   MAINNET_CHAIN_IDS,
+  NETWORK_DEPLOY_FLAGS,
   ROLE_HASHES,
   SINGLETON_FACTORY_ADDRESS,
 } = require("./lib/constants");
@@ -52,10 +53,14 @@ const {
 
 const USDC_DECIMALS = 6;
 
-// Convert a tier config's price (currently in 18-decimal ethers) to 6-decimal USDC.
-// e.g. ethers.parseEther("50") → 50 * 10^6 = 50000000
-function toUSDC(price18) {
-  return price18 / (10n ** 12n);
+// Convert a tier config's price (authored in 18-decimal ethers) to the payment
+// token's own decimals. Tier prices are denominated in whole dollars, so a token
+// with `decimals` decimals needs price18 / 10^(18 - decimals). USDC/USC (6) →
+// /10^12; an 18-decimal stablecoin → no scaling. Reading decimals on-chain (not
+// assuming 6) keeps membership tier prices correct on any stablecoin (Spec 015 U1).
+function toTokenUnits(price18, decimals) {
+  if (decimals > 18) throw new Error(`Unsupported stablecoin decimals ${decimals} (>18)`);
+  return price18 / (10n ** BigInt(18 - decimals));
 }
 
 async function resolvePolymarketCTF(networkName, deployer, saltPrefix) {
@@ -88,10 +93,10 @@ async function resolvePolymarketCTF(networkName, deployer, saltPrefix) {
   return mock.address;
 }
 
-async function seedTiers(membershipManager, deployer, role, label, tierConfigs) {
-  console.log(`\nSeeding tiers for ${label}...`);
+async function seedTiers(membershipManager, deployer, role, label, tierConfigs, decimals = USDC_DECIMALS) {
+  console.log(`\nSeeding tiers for ${label} (payment token decimals: ${decimals})...`);
   for (const cfg of tierConfigs) {
-    const priceUSDC = toUSDC(cfg.price);
+    const priceUSDC = toTokenUnits(cfg.price, decimals);
     const limits = {
       monthlyMarketCreation:
         cfg.limits.monthlyMarketCreation > 2n ** 32n - 1n
@@ -103,7 +108,7 @@ async function seedTiers(membershipManager, deployer, role, label, tierConfigs) 
           : Number(cfg.limits.maxConcurrentMarkets),
     };
     const tierNames = ["NONE", "BRONZE", "SILVER", "GOLD", "PLATINUM"];
-    console.log(`  ${label} ${tierNames[cfg.tier]}: ${ethers.formatUnits(priceUSDC, USDC_DECIMALS)} USDC, ${limits.monthlyMarketCreation || "∞"}/mo, ${limits.maxConcurrentMarkets || "∞"} concurrent`);
+    console.log(`  ${label} ${tierNames[cfg.tier]}: ${ethers.formatUnits(priceUSDC, decimals)} (token units), ${limits.monthlyMarketCreation || "∞"}/mo, ${limits.maxConcurrentMarkets || "∞"} concurrent`);
     const tx = await membershipManager.connect(deployer).setTier(
       role,
       cfg.tier,
@@ -151,9 +156,16 @@ async function main() {
     : deployer.address;
   console.log(`Treasury: ${treasury}`);
 
+  // -------- Per-network deploy flags --------
+  // Ethereum Classic (Mordor) is core-only: no Polymarket adapter, real stake
+  // tokens only (Classic USD + WETC), no mock wrapped-native (Spec 015).
+  const flags = NETWORK_DEPLOY_FLAGS[networkName] || {};
+
   // -------- Resolve token addresses --------
   let usdc = TOKENS[networkName]?.USC;
-  let wmatic = TOKENS[networkName]?.WMATIC;
+  // Wrapped native: prefer an explicit WMATIC, else the chain's wrapped-native
+  // (WETC on Ethereum Classic). Both are real tokens — never a mock here.
+  let wmatic = TOKENS[networkName]?.WMATIC || TOKENS[networkName]?.WETC || null;
   const deployments = {};
 
   // Never let a mainnet deployment fall back to a worthless MockERC20 as the
@@ -165,6 +177,16 @@ async function main() {
       `Real token addresses are required on mainnet '${networkName}' (chainId ${chainId}). ` +
         `Missing: ${[!usdc && "USDC", !wmatic && "WMATIC"].filter(Boolean).join(", ")}. ` +
         `Set TOKENS["${networkName}"] in scripts/deploy/lib/constants.js.`
+    );
+  }
+
+  // requireRealStablecoin (Spec 015 FR-003): on flagged networks the stablecoin
+  // MUST be a pre-existing real token — abort rather than mint a MockERC20.
+  if (flags.requireRealStablecoin && (!usdc || !ethers.isAddress(usdc))) {
+    throw new Error(
+      `A real stablecoin (Classic USD) address is required on '${networkName}'. ` +
+        `Set TOKENS["${networkName}"].USC in scripts/deploy/lib/constants.js and ` +
+        `verify it on-chain before deploying (Spec 015, T001). No mock is substituted.`
     );
   }
 
@@ -180,33 +202,65 @@ async function main() {
     deployments.mockUSDC = mock.address;
   }
   if (!wmatic) {
-    console.log(`\nNo WMATIC configured for ${networkName}; deploying MockERC20 (18 dec)...`);
-    const mock = await deployDeterministic(
-      "MockERC20",
-      ["Wrapped Matic", "WMATIC", 0],
-      generateSalt(SALT_PREFIXES.V2 + "MockWMATIC"),
-      deployer
-    );
-    wmatic = mock.address;
-    deployments.mockWMATIC = mock.address;
+    if (flags.noMockWrappedNative) {
+      // Core-only network with no real wrapped-native: allowlist the stablecoin
+      // alone rather than minting a mock (Spec 015, Constitution III).
+      console.log(`\nNo real wrapped-native for ${networkName}; allowlisting stablecoin only (no mock).`);
+    } else {
+      console.log(`\nNo WMATIC configured for ${networkName}; deploying MockERC20 (18 dec)...`);
+      const mock = await deployDeterministic(
+        "MockERC20",
+        ["Wrapped Matic", "WMATIC", 0],
+        generateSalt(SALT_PREFIXES.V2 + "MockWMATIC"),
+        deployer
+      );
+      wmatic = mock.address;
+      deployments.mockWMATIC = mock.address;
+    }
   }
-  console.log(`USDC:   ${usdc}`);
-  console.log(`WMATIC: ${wmatic}`);
+
+  // Read the stablecoin's decimals on-chain so tier prices scale correctly on any
+  // payment token (Spec 015 U1 — never assume 6).
+  let stablecoinDecimals = USDC_DECIMALS;
+  try {
+    const erc20 = new ethers.Contract(usdc, ["function decimals() view returns (uint8)"], ethers.provider);
+    stablecoinDecimals = Number(await erc20.decimals());
+  } catch (e) {
+    console.log(`  ⚠️  could not read decimals() of ${usdc}; defaulting to ${USDC_DECIMALS}`);
+  }
+
+  // Allowlisted stake tokens for WagerRegistry — real tokens only, drop empties.
+  const stakeTokens = [usdc, wmatic].filter(Boolean);
+  console.log(`USDC:   ${usdc} (decimals ${stablecoinDecimals})`);
+  console.log(`WMATIC/WETC: ${wmatic || "(none — stablecoin-only allowlist)"}`);
 
   // -------- Polymarket CTF + Adapter --------
-  const polymarketCTF = await resolvePolymarketCTF(networkName, deployer, SALT_PREFIXES.V2);
-  console.log(`Polymarket CTF: ${polymarketCTF}`);
-  if (deployments.mockUSDC || polymarketCTF !== POLYMARKET_CTF[networkName]) {
-    deployments.polymarketCTF = polymarketCTF;
-  }
+  // On core-only networks (Ethereum Classic has no Polymarket), skip the adapter
+  // and Mock CTF entirely and construct WagerRegistry with a zero adapter, which
+  // disables the Polymarket resolution type (WagerRegistry.sol: "may be zero to
+  // disable"). The zero address is intentionally NOT recorded as polymarketAdapter
+  // — the frontend capability tag treats any 40-hex address as "deployed", so a
+  // zero would falsely light up (Spec 015 FR-001/FR-008).
+  let polymarketCTF = null;
+  let adapterAddress = ethers.ZeroAddress;
+  if (flags.noPolymarket) {
+    console.log("Polymarket: skipped (core-only network) — WagerRegistry adapter = address(0)");
+  } else {
+    polymarketCTF = await resolvePolymarketCTF(networkName, deployer, SALT_PREFIXES.V2);
+    console.log(`Polymarket CTF: ${polymarketCTF}`);
+    if (deployments.mockUSDC || polymarketCTF !== POLYMARKET_CTF[networkName]) {
+      deployments.polymarketCTF = polymarketCTF;
+    }
 
-  const adapter = await deployDeterministic(
-    "PolymarketOracleAdapter",
-    [deployer.address, polymarketCTF],
-    generateSalt(SALT_PREFIXES.V2 + "PolymarketOracleAdapter"),
-    deployer
-  );
-  deployments.polymarketAdapter = adapter.address;
+    const adapter = await deployDeterministic(
+      "PolymarketOracleAdapter",
+      [deployer.address, polymarketCTF],
+      generateSalt(SALT_PREFIXES.V2 + "PolymarketOracleAdapter"),
+      deployer
+    );
+    adapterAddress = adapter.address;
+    deployments.polymarketAdapter = adapter.address;
+  }
 
   // -------- MembershipManager --------
   const mgrDeploy = await deployDeterministic(
@@ -219,7 +273,7 @@ async function main() {
   const membershipManager = mgrDeploy.contract;
 
   if (!mgrDeploy.alreadyDeployed || process.env.FORCE_SEED_TIERS === "true") {
-    await seedTiers(membershipManager, deployer, ROLE_HASHES.WAGER_PARTICIPANT_ROLE, "WAGER_PARTICIPANT", WAGER_PARTICIPANT_TIERS);
+    await seedTiers(membershipManager, deployer, ROLE_HASHES.WAGER_PARTICIPANT_ROLE, "WAGER_PARTICIPANT", WAGER_PARTICIPANT_TIERS, stablecoinDecimals);
   } else {
     console.log("\nMembershipManager already deployed — skipping tier seed (idempotent re-runs should re-seed manually if config changed)");
   }
@@ -235,7 +289,7 @@ async function main() {
   // is REUSED as-is (no adapter redeploy / no setPolymarketAdapter change).
   const regDeploy = await deployDeterministic(
     "WagerRegistry",
-    [deployer.address, mgrDeploy.address, adapter.address, [usdc, wmatic]],
+    [deployer.address, mgrDeploy.address, adapterAddress, stakeTokens],
     generateSalt(SALT_PREFIXES.V2 + "WagerRegistry-userindex"),
     deployer
   );
@@ -400,7 +454,26 @@ async function main() {
     console.log(`  ${k.padEnd(22)} ${v}`);
   }
   console.log(`  USDC                   ${usdc}`);
-  console.log(`  WMATIC                 ${wmatic}`);
+  console.log(`  WMATIC/WETC            ${wmatic || "(none — stablecoin-only allowlist)"}`);
+
+  // Persist the EXACT constructor args used for each contract so verify.js can
+  // reproduce them without recomputing from env/constants (which could drift
+  // between this deploy and a later standalone `verify.js` run). These are read
+  // in the SAME process as the deploy, so they equal the deploy-time values.
+  const constructorArgs = {
+    membershipManager: [deployer.address, usdc, treasury],
+    wagerRegistry: [deployer.address, mgrDeploy.address, adapterAddress, stakeTokens],
+    sanctionsGuard: [deployer.address, sanctionsOracleAddr],
+    keyRegistry: [],
+  };
+  if (!flags.noPolymarket) constructorArgs.polymarketAdapter = [deployer.address, polymarketCTF];
+  if (oracleDeployments.chainlinkDataFeedAdapter) constructorArgs.chainlinkDataFeedAdapter = [deployer.address];
+  if (oracleDeployments.chainlinkFunctionsAdapter) constructorArgs.chainlinkFunctionsAdapter = [deployer.address, CHAINLINK_FUNCTIONS_ROUTER[networkName]];
+  if (oracleDeployments.umaAdapter) constructorArgs.umaAdapter = [deployer.address, UMA_OOV3[networkName]];
+  if (deployments.mockSanctionsOracle) constructorArgs.mockSanctionsOracle = [];
+  if (deployments.mockUSDC) constructorArgs.mockUSDC = ["USD Coin", "USDC", 0];
+  if (deployments.mockWMATIC) constructorArgs.mockWMATIC = ["Wrapped Matic", "WMATIC", 0];
+  if (deployments.polymarketCTF) constructorArgs.mockPolymarketCTF = [];
 
   const record = {
     network: networkName,
@@ -411,7 +484,9 @@ async function main() {
     wmatic,
     polymarketCTF,
     contracts: {
-      polymarketAdapter: adapter.address,
+      // polymarketAdapter is omitted on core-only networks (zero adapter) so the
+      // frontend capability tag does not falsely report it as deployed.
+      ...(flags.noPolymarket ? {} : { polymarketAdapter: adapterAddress }),
       membershipManager: mgrDeploy.address,
       wagerRegistry: regDeploy.address,
       keyRegistry: keyDeploy.address,
@@ -426,13 +501,16 @@ async function main() {
           mockSanctionsOracle: deployments.mockSanctionsOracle,
         }
       : null,
+    constructorArgs,
     saltPrefix: SALT_PREFIXES.V2,
     timestamp: new Date().toISOString(),
   };
 
   saveDeployment(getDeploymentFilename(network, "v2"), record);
   console.log("\n✓ Deployment record saved");
-  console.log("\nNext: run `npm run sync:frontend-contracts -- --network " + networkName + " --chainId " + chainId + "`");
+  console.log("\nNext:");
+  console.log("  1. sync frontend:  npm run sync:frontend-contracts -- --network " + networkName + " --chainId " + chainId);
+  console.log("  2. verify source:  npx hardhat run scripts/deploy/verify.js --network " + networkName);
 }
 
 main().then(() => process.exit(0)).catch((err) => {
