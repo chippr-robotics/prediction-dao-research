@@ -182,6 +182,19 @@ describe('MarketAcceptanceModal', () => {
       expect(screen.getByText('Private Wager')).toBeInTheDocument()
     })
 
+    it('should show pre-decrypted terms without re-prompting when opener supplies them', () => {
+      const marketData = createMockMarketData({
+        isEncrypted: true,
+        decryptedDescription: "I'm betting Yes: Will England win Group L?",
+      })
+      render(<MarketAcceptanceModal {...defaultProps} marketData={marketData} />)
+
+      // The real terms are shown (not the "Encrypted Wager" placeholder) and
+      // no signature/decrypt prompt is needed.
+      expect(screen.getByText("I'm betting Yes: Will England win Group L?")).toBeInTheDocument()
+      expect(screen.queryByText('Decrypt Wager Details')).not.toBeInTheDocument()
+    })
+
     it('should show decrypt prompt for encrypted markets when user can decrypt', () => {
       useEncryption.mockReturnValue({
         decryptMetadata: vi.fn(),

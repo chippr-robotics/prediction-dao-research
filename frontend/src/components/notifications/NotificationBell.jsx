@@ -22,7 +22,7 @@ function NotificationBell() {
     <div className="notification-bell-wrap">
       <button
         type="button"
-        className="notification-bell"
+        className={`notification-bell${unreadCount > 0 ? ' has-unread' : ''}`}
         aria-label={`Notifications, ${unreadCount} unread`}
         aria-haspopup="dialog"
         aria-expanded={open}

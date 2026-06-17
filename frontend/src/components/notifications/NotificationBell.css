@@ -25,6 +25,24 @@
   background: var(--surface-color, var(--bg-secondary));
 }
 
+/* Keep the bell glyph readable on every header surface/theme — the icon
+   inherits the button's `color`, so pin it to the primary text token. */
+.notification-bell-icon {
+  color: var(--text-primary);
+}
+
+/* With unread activity the bell needs to read clearly against the header.
+   Tint the button with the brand color and brighten the glyph so it stands
+   out instead of fading into the surface behind it. */
+.notification-bell.has-unread {
+  background: color-mix(in srgb, var(--brand-primary) 18%, var(--bg-secondary));
+  border-color: var(--brand-primary);
+}
+
+.notification-bell.has-unread .notification-bell-icon {
+  color: var(--brand-primary);
+}
+
 .notification-bell:focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;

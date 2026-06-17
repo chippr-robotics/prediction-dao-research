@@ -97,6 +97,16 @@ function MarketAcceptanceModal({
   const [isDecrypting, setIsDecrypting] = useState(false)
   const [decryptionError, setDecryptionError] = useState(null)
 
+  // If the opener already decrypted the wager (e.g. the My Wagers list, which
+  // runs lazy decryption), use that plaintext directly so the acceptance screen
+  // shows the real terms — and the user isn't asked to sign again just to read
+  // what they're already looking at one screen back.
+  useEffect(() => {
+    if (marketData?.decryptedDescription) {
+      setDecryptedDescription(marketData.decryptedDescription)
+    }
+  }, [marketData?.decryptedDescription])
+
   // Determine user's role
   const isArbitrator = marketData?.arbitrator?.toLowerCase() === account?.toLowerCase()
   const isParticipant = marketData?.participants?.some(
