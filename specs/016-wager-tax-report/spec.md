@@ -15,6 +15,7 @@
 - Q: How should each transfer's Cost Basis be derived, given the platform cannot observe off-platform acquisition cost? → A: Use the stablecoin's recorded USD fair market value at the time the tokens were staked / entered the platform; user-supplied per-lot acquisition cost is deferred from v1.
 - Q: Should this spec include the admin/operations capability to generate reports on behalf of users (and the new Operations role)? → A: No — scope this spec to user self-service reporting only; admin/operations functionality and the Operations role are deferred to a separate PR.
 - Q: Where should each transfer's USD fair market value come from, given de-pegging? → A: Use a par $1.00 baseline for v1, stored in a structured value field so a real historical price feed can replace it later; explicit de-peg pricing is deferred.
+- Q: How should "report history / re-download" be satisfied? → A: Persist only report metadata (period, generated-at, network) and regenerate the document on demand from immutable indexed data; do not store the rendered document. Members can also remove report entries they no longer want from their history.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -59,20 +60,22 @@ the included rows.
 
 ---
 
-### User Story 2 - View and re-download previously generated reports (Priority: P2)
+### User Story 2 - View, re-download, and manage report history (Priority: P2)
 
 From the My Account area, a user can see a list of reports they have previously generated
-(with the period each covers and when it was created), view them again, and re-download
-them without regenerating from scratch.
+(with the period each covers and when it was created), re-open and re-download any of them,
+and remove entries they no longer want. History stores only the report metadata; the
+document is regenerated on demand from the immutable indexed data.
 
 **Why this priority**: Tax records are referenced repeatedly (filing, amendments, audits).
-Persisting and re-listing generated reports avoids forcing users to recreate identical
-documents and gives them confidence their history is retained. It builds directly on
-Story 1 but is not required for the first usable slice.
+Re-listing past reports and letting users tidy their history gives them confidence their
+records are available without cluttering the view. It builds directly on Story 1 but is not
+required for the first usable slice.
 
 **Independent Test**: After generating a report in Story 1, navigate away and return to My
 Account, confirm the report appears in a history list with its period and creation date,
-and re-download it to confirm the file is unchanged.
+re-download it to confirm equivalent content is produced, then remove the entry and confirm
+it disappears from the list.
 
 **Acceptance Scenarios**:
 
@@ -80,7 +83,10 @@ and re-download it to confirm the file is unchanged.
    section of My Account, **Then** they see that report listed with its covered period and
    generation date.
 2. **Given** a listed historical report, **When** the user selects it, **Then** they can
-   view and re-download the same document without re-running the generation.
+   view and re-download an equivalent document for that period, regenerated from the
+   immutable indexed data.
+3. **Given** a report entry in the user's history, **When** the user removes it, **Then** it
+   no longer appears in their history list, while their underlying wager data is unaffected.
 
 ---
 
@@ -141,19 +147,24 @@ and re-download it to confirm the file is unchanged.
 - **FR-009**: The report MUST carry a clear statement that it is an informational activity
   record and not tax advice.
 - **FR-010**: Users MUST be able to view a history of their previously generated reports and
-  re-download them from the My Account area.
-- **FR-011**: A user MUST only be able to generate and view reports for their own wager
+  re-download them from the My Account area. The system MUST persist only report metadata
+  (covered period, generation date/time, network) and regenerate the document on demand from
+  the immutable indexed data, rather than storing the rendered document; a report regenerated
+  for the same account, period, and network MUST reproduce equivalent content.
+- **FR-011**: Users MUST be able to remove individual report entries from their own report
+  history, after which the removed entry no longer appears in their history list.
+- **FR-012**: A user MUST only be able to generate, view, and remove reports for their own wager
   activity; the report MUST cover the signed-in user's account and MUST NOT expose another
   user's activity.
-- **FR-012**: The system MUST handle invalid period selections (inverted ranges, ranges
+- **FR-013**: The system MUST handle invalid period selections (inverted ranges, ranges
   extending into the future) with a clear, user-understandable message instead of producing
   a misleading or partial report.
-- **FR-013**: The system MUST scope reported activity to the active network and MUST NOT
+- **FR-014**: The system MUST scope reported activity to the active network and MUST NOT
   combine testnet and mainnet activity in a single report.
-- **FR-014**: When fair-market-value or cost-basis information for a transfer cannot be
+- **FR-015**: When fair-market-value or cost-basis information for a transfer cannot be
   determined, the report MUST surface the gap explicitly rather than silently substituting
   a value.
-- **FR-015**: Cost basis MUST be derived from the recorded USD fair market value of the
+- **FR-016**: Cost basis MUST be derived from the recorded USD fair market value of the
   stablecoin at the time the tokens were staked / entered the platform for that transfer
   (the same valuation source used for fair market value, reflecting any de-pegging). The
   report MUST note that this reflects on-platform value at staking time and that a user's
@@ -164,9 +175,13 @@ and re-download it to confirm the file is unchanged.
 
 - **Report Request**: A user's intent to generate a report — identifies the signed-in
   account/wallet, the resolved reporting period (start and end), and the network.
-- **Activity Report**: The generated document and its metadata — covered account, period,
-  network, generation timestamp, the list of transfer line items, and computed totals;
-  persisted so it can be re-listed and re-downloaded.
+- **Report History Entry**: The persisted metadata for a previously generated report —
+  covered account, period, network, and generation timestamp. This is what is stored and
+  listed; the rendered document itself is not stored but regenerated on demand from indexed
+  data. A user can remove their own history entries.
+- **Activity Report (document)**: The rendered output produced on demand from a Report
+  History Entry (or a fresh request) — header info, the list of transfer line items, and
+  computed totals.
 - **Transfer Line Item**: A single wager-related stablecoin movement — transfer timestamp,
   direction (deposit/payout/refund), stablecoin ticker, token amount, USD fair market value,
   cost basis, fees, transaction hash, sending address, receiving address, and the wager it

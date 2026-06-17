@@ -31,7 +31,11 @@
 
 ## Notes
 
-- All checklist items pass. The sole open question — **FR-019 (cost-basis derivation
-  method)** — was resolved with the user: cost basis uses the stablecoin's USD fair market
-  value at staking time, and user-supplied per-lot acquisition cost is deferred from v1.
-- Spec is ready for `/speckit-clarify` (optional) or `/speckit-plan`.
+- All checklist items pass. Clarifications resolved with the user (see spec `## Clarifications`):
+  cost basis = stablecoin USD fair market value at staking time; scope limited to user
+  self-service (admin/operations + Operations role deferred to a separate PR); FMV uses a par
+  $1.00 v1 baseline in a structured field; report history stores metadata only and regenerates
+  documents on demand, with users able to remove their own history entries.
+- Low-impact items left to documented defaults (Assumptions): output format (PDF + CSV) and
+  report retention duration. These can be confirmed during `/speckit-plan` without blocking.
+- Spec is ready for `/speckit-plan`.
