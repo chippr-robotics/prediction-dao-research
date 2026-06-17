@@ -1903,6 +1903,97 @@
   }
 }
 
+/* Narrow screens: the 4-column wager table can't fit the Actions column, so it
+   used to push the buttons off-screen behind a horizontal scroll (you couldn't
+   see what action a row needed). Below 640px we drop the table layout and render
+   each row as a self-contained card: title, then time + status on one line, then
+   the action buttons wrapping onto their own full-width line — everything visible
+   without any sideways scrolling. */
+@media (max-width: 640px) {
+  .mm-table-container {
+    overflow-x: visible;
+  }
+
+  .mm-table,
+  .mm-table tbody,
+  .mm-table tr,
+  .mm-table td {
+    display: block;
+    width: 100%;
+  }
+
+  /* Hide the header row without removing it from the accessibility tree. */
+  .mm-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .mm-table-row {
+    border: 1px solid var(--border-color, #23303D);
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+    padding: 0.875rem;
+    background: var(--bg-primary, #0E141B);
+  }
+
+  .mm-table-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .mm-table td {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  /* Title gets the full width and can wrap (no ellipsis truncation in a card). */
+  .mm-table-market {
+    max-width: none;
+    min-width: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .mm-table-market-title > span {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* Time + status sit together above the actions. */
+  .mm-table-time {
+    display: inline-block;
+    margin: 0 0 0.5rem 0;
+    margin-right: 0.75rem;
+  }
+
+  /* Actions get their own full-width line and wrap instead of overflowing. */
+  .mm-table-actions {
+    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .mm-table-actions .mm-action-btn {
+    margin-right: 0;
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 40px;
+  }
+
+  /* Keep the unread accent bar aligned to the card's rounded corner. */
+  .mm-table-row.mm-unread::before {
+    border-radius: 2px 0 0 2px;
+  }
+}
+
 /* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .my-markets-modal-backdrop,

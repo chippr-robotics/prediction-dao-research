@@ -365,20 +365,37 @@ export function useEncryption() {
     // Get the envelope's signing version
     const envelopeVersion = getEnvelopeSigningVersion(envelope)
 
-    // Check if cached signature version matches envelope's signing version
+    // Obtain the key-derivation signature, prompting the wallet at most once.
+    // We capture the RETURNED signature here rather than reading the keyPairs
+    // state below, because initializeKeys/ensureInitialized call setKeyPairs()
+    // and React has not flushed that update into this closure yet. Reading the
+    // stale (null) keyPairs is exactly what made decryption fall through to the
+    // signer-based path and prompt the user to sign a SECOND time — the decrypt
+    // double-signature bug. With the signature in hand we derive the keys
+    // synchronously, so a single signature unlocks the wager (click → sign → see).
+    let init
     if (cachedVersion !== null && cachedVersion !== envelopeVersion) {
       console.log(`[useEncryption] Version mismatch: cached v${cachedVersion}, envelope v${envelopeVersion}. Re-signing...`)
       // Clear the stale cache and directly call initializeKeys to force fresh signature
-      // Note: We call initializeKeys directly instead of updating state and calling ensureInitialized
-      // because state updates are async and ensureInitialized would see stale values
       clearSignatureCache(account)
-      await initializeKeys()
+      init = await initializeKeys()
     } else {
       // Ensure we have keys (may prompt user once if no cached signature)
-      await ensureInitialized()
+      init = await ensureInitialized()
     }
 
-    // Use unified decrypt with both key types
+    // Derive both private keys from the freshly-obtained signature and decrypt
+    // in the same pass — no dependence on the not-yet-flushed keyPairs state.
+    if (init?.signature) {
+      const x25519Keys = deriveKeyPairFromSignature(init.signature)
+      const xwingKeys = deriveXWingKeyPairFromSignature(init.signature)
+      return decryptEnvelopeUnified(envelope, account, {
+        x25519PrivateKey: x25519Keys.privateKey,
+        xwingSecretKey: xwingKeys.secretKey
+      })
+    }
+
+    // Fallback: use in-state keys if they already happen to be populated.
     if (keyPairs.x25519?.privateKey && keyPairs.xwing?.secretKey) {
       return decryptEnvelopeUnified(envelope, account, {
         x25519PrivateKey: keyPairs.x25519.privateKey,
@@ -386,7 +403,8 @@ export function useEncryption() {
       })
     }
 
-    // Fallback to signer-based decryption for v1.0 only (shouldn't happen after ensureInitialized)
+    // Last-resort signer-based decryption for v1.0 only (shouldn't happen after
+    // ensureInitialized returns a signature).
     if (!signer) {
       throw new Error('No signer available')
     }
@@ -826,11 +844,11 @@ export function useLazyMarketDecryption(markets) {
   }, [markets, decryptionCache, decryptingIds, decryptionErrors, account, isEncrypted, canUserDecrypt])
 
   // Function to decrypt a single market on demand
-  const decryptMarket = useCallback(async (marketId) => {
+  const decryptMarket = useCallback(async (marketId, envelopeOverride = null) => {
     const marketIdStr = String(marketId)
     const market = markets?.find(m => String(m.id) === marketIdStr)
 
-    if (!market) {
+    if (!market && !envelopeOverride) {
       throw new Error('Market not found')
     }
 
@@ -840,9 +858,17 @@ export function useLazyMarketDecryption(markets) {
       return cached.metadata
     }
 
+    // Prefer an envelope handed straight to us by the caller (typically the
+    // value fetchEnvelope just resolved). The markets prop only merges that
+    // envelope into market.metadata on the NEXT render, so the market captured
+    // in this closure can still carry the un-encrypted placeholder. Without the
+    // override the first "Decrypt" click saw "not encrypted" and silently
+    // no-opped, which is why decryption used to take two clicks.
+    const envelope = envelopeOverride ?? market?.metadata
+
     // Not encrypted?
-    if (!isEncrypted(market.metadata)) {
-      return market.metadata
+    if (!isEncrypted(envelope)) {
+      return envelope
     }
 
     // Note: We don't hard-block based on canUserDecrypt here.
@@ -868,7 +894,7 @@ export function useLazyMarketDecryption(markets) {
 
     try {
       // This may prompt for signature if not yet initialized
-      const decrypted = await decryptMetadata(market.metadata)
+      const decrypted = await decryptMetadata(envelope)
 
       // Cache the result
       setDecryptionCache(prev => {
