@@ -116,14 +116,21 @@ function MyMarketsModal({
   const [showAcceptanceModal, setShowAcceptanceModal] = useState(false)
   const [acceptanceMarket, setAcceptanceMarket] = useState(null)
 
-  // Filter state
-  const [marketTypeFilter, setMarketTypeFilter] = useState('all') // 'all', 'friend'
+  // Sort + filter state. The old "Type" filter was dropped: every wager in this
+  // view is a friend wager, so it only ever had one meaningful option. Its slot
+  // is reused for a Sort control over fields we already hold (recency, end time,
+  // stake size).
+  const [sortKey, setSortKey] = useState('newest') // 'newest' | 'endingSoon' | 'stakeHighToLow'
   const [statusFilter, setStatusFilter] = useState('all')
 
   const handleDecryptMarket = useCallback(async (marketId) => {
     try {
-      await fetchEnvelope(marketId)
-      await decryptMarket(marketId)
+      // Pass the just-fetched envelope straight into decryptMarket. The merged
+      // copy on the markets prop only lands on the next render, so handing the
+      // envelope over directly lets a single click run fetch → decrypt in one
+      // pass instead of the old fetch-then-(re-click)-to-decrypt flow.
+      const envelope = await fetchEnvelope(marketId)
+      await decryptMarket(marketId, envelope)
     } catch (err) {
       console.error('[MyMarketsModal] Decryption failed:', err)
     }
@@ -160,7 +167,7 @@ function MyMarketsModal({
       setActiveTab('participating')
       setSelectedMarketId(null)
       setShowResolutionModal(false)
-      setMarketTypeFilter('all')
+      setSortKey('newest')
       setStatusFilter('all')
     }
   }, [isOpen])
@@ -310,11 +317,6 @@ function MyMarketsModal({
       const status = getMarketStatus(market)
       const marketWithStatus = { ...market, computedStatus: status }
 
-      // Apply type filter
-      if (marketTypeFilter !== 'all' && market.marketType !== marketTypeFilter) {
-        return
-      }
-
       // Apply status filter. The default ("all") view also hides expired
       // offers so they don't clutter the list — pick "Expired" explicitly
       // to see them.
@@ -351,18 +353,43 @@ function MyMarketsModal({
       }
     })
 
-    // Sort each list newest-first. Wager `id` is sequential on-chain (higher =
-    // newer) and always present; createdAt is preferred when available.
+    // Sort each list by the user-selected key. Wager `id` is sequential on-chain
+    // (higher = newer) and always present, so it is the stable tiebreaker for
+    // every comparator.
+    const endMs = (m) => {
+      if (m.tradingEndTime != null) {
+        return typeof m.tradingEndTime === 'bigint'
+          ? Number(m.tradingEndTime) * 1000
+          : Number(m.tradingEndTime)
+      }
+      return m.endDate ? new Date(m.endDate).getTime() : 0
+    }
+    const stakeOf = (m) => parseFloat(m.stakeAmount) || 0
     const byNewest = (a, b) =>
       (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0) ||
       (Number(b.id) || 0) - (Number(a.id) || 0)
-    participating.sort(byNewest)
-    created.sort(byNewest)
-    arbitrating.sort(byNewest)
-    history.sort(byNewest)
+    // Soonest-ending first; wagers with no end time sort to the bottom.
+    const byEndingSoon = (a, b) => {
+      const ae = endMs(a)
+      const be = endMs(b)
+      if (!ae && !be) return byNewest(a, b)
+      if (!ae) return 1
+      if (!be) return -1
+      return ae - be || byNewest(a, b)
+    }
+    const byStake = (a, b) => stakeOf(b) - stakeOf(a) || byNewest(a, b)
+    const comparator =
+      sortKey === 'endingSoon' ? byEndingSoon
+        : sortKey === 'stakeHighToLow' ? byStake
+          : byNewest
+
+    participating.sort(comparator)
+    created.sort(comparator)
+    arbitrating.sort(comparator)
+    history.sort(comparator)
 
     return { participating, created, arbitrating, history }
-  }, [markets, decryptableMarkets, userPositions, account, marketTypeFilter, statusFilter, dismissedIds, chainId])
+  }, [markets, decryptableMarkets, userPositions, account, sortKey, statusFilter, dismissedIds, chainId])
 
   // Derive the selected market from the live categorized lists so the detail
   // view reflects fresh data (e.g., decryptedMetadata) after decryption
@@ -864,19 +891,22 @@ function MyMarketsModal({
         {/* Filter Bar */}
         <div className="mm-filter-bar">
           <div className="mm-filter-group">
-            <label>Type:</label>
+            <label htmlFor="mm-sort-select">Sort:</label>
             <select
-              value={marketTypeFilter}
-              onChange={(e) => setMarketTypeFilter(e.target.value)}
+              id="mm-sort-select"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value)}
               className="mm-filter-select"
             >
-              <option value="all">All Wagers</option>
-              <option value="friend">Friend Wagers</option>
+              <option value="newest">Newest</option>
+              <option value="endingSoon">Ending soonest</option>
+              <option value="stakeHighToLow">Highest stake</option>
             </select>
           </div>
           <div className="mm-filter-group">
-            <label>Status:</label>
+            <label htmlFor="mm-status-select">Status:</label>
             <select
+              id="mm-status-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="mm-filter-select"

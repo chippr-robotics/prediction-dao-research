@@ -133,3 +133,52 @@ describe('useEncryption — wager creation bug fixes', () => {
     ).toThrow(/not initialized/i)
   })
 })
+
+describe('useEncryption — decrypt flow (My Wagers decrypt bug)', () => {
+  beforeEach(() => {
+    signMessage.mockClear()
+    sessionStorage.clear()
+  })
+
+  it('decryptMetadata prompts for a signature exactly once (no decrypt double-sign)', async () => {
+    // Envelope is addressed to the connected account, signed with the same
+    // signature the mocked wallet returns, so the derived key can unwrap it.
+    const envelope = encryptMarketMetadata(
+      metadata,
+      [{ address: ACCOUNT, signature: FIXED_SIGNATURE }],
+      2
+    )
+
+    const { result } = renderHook(() => useEncryption())
+
+    let decrypted
+    await act(async () => {
+      decrypted = await result.current.decryptMetadata(envelope)
+    })
+
+    // Regression: the old code read the not-yet-flushed keyPairs state, fell
+    // through to signer-based decryption, and prompted a SECOND signature.
+    expect(signMessage).toHaveBeenCalledTimes(1)
+    expect(decrypted).toMatchObject(metadata)
+  })
+
+  it('decryptMetadata does not prompt at all when a session signature is cached', async () => {
+    cacheSignature(ACCOUNT, FIXED_SIGNATURE)
+    const envelope = encryptMarketMetadata(
+      metadata,
+      [{ address: ACCOUNT, signature: FIXED_SIGNATURE }],
+      2
+    )
+
+    const { result } = renderHook(() => useEncryption())
+
+    let decrypted
+    await act(async () => {
+      decrypted = await result.current.decryptMetadata(envelope)
+    })
+
+    // Keys derive from the cached signature — viewing is click → see.
+    expect(signMessage).not.toHaveBeenCalled()
+    expect(decrypted).toMatchObject(metadata)
+  })
+})

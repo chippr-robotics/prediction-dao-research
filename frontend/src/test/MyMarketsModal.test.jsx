@@ -303,7 +303,7 @@ describe('MyMarketsModal', () => {
   })
 
   describe('Filter Bar', () => {
-    it('should display type filter dropdown', async () => {
+    it('should display sort dropdown in place of the old type filter', async () => {
       await act(async () => {
         renderWithProviders(
           <MyMarketsModal isOpen={true} onClose={mockOnClose} />
@@ -311,10 +311,29 @@ describe('MyMarketsModal', () => {
       })
 
       await waitFor(() => {
-        const typeSelect = screen.getByText('Type:').nextElementSibling
-        expect(typeSelect).toBeInTheDocument()
-        expect(typeSelect.tagName).toBe('SELECT')
+        const sortSelect = screen.getByText('Sort:').nextElementSibling
+        expect(sortSelect).toBeInTheDocument()
+        expect(sortSelect.tagName).toBe('SELECT')
       })
+
+      // The redundant friend-only "Type" filter is gone.
+      expect(screen.queryByText('Type:')).not.toBeInTheDocument()
+    })
+
+    it('offers recency, end-time and stake sort options', async () => {
+      await act(async () => {
+        renderWithProviders(
+          <MyMarketsModal isOpen={true} onClose={mockOnClose} />
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Sort:')).toBeInTheDocument()
+      })
+
+      const sortSelect = screen.getByText('Sort:').nextElementSibling
+      const optionValues = Array.from(sortSelect.options).map((o) => o.value)
+      expect(optionValues).toEqual(['newest', 'endingSoon', 'stakeHighToLow'])
     })
 
     it('should display refresh button', async () => {
