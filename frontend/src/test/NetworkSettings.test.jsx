@@ -59,4 +59,35 @@ describe('NetworkSettings — relocated network selector', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch to Polygon Amoy' }))
     expect(switchChain).toHaveBeenCalledWith({ chainId: 80002 })
   })
+
+  it('lists Mordor (Ethereum Classic) as a selectable testnet', () => {
+    render(<NetworkSettings />)
+    const card = screen.getByText('Ethereum Classic Mordor').closest('.network-card')
+    expect(card).toBeInTheDocument()
+    expect(within(card).getByText('Testnet')).toBeInTheDocument()
+  })
+
+  it('switches to Mordor (chainId 63) through wagmi', () => {
+    render(<NetworkSettings />)
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to Ethereum Classic Mordor' }))
+    expect(switchChain).toHaveBeenCalledWith({ chainId: 63 })
+  })
+
+  it('marks oracle + swap features unavailable on Mordor (no oracle adapters, no DEX configured)', () => {
+    render(<NetworkSettings />)
+    const card = screen.getByText('Ethereum Classic Mordor').closest('.network-card')
+    expect(within(card).getByText('Polymarket Oracle').closest('.network-tag')).toHaveClass('unavailable')
+    expect(within(card).getByText('Chainlink Oracle').closest('.network-tag')).toHaveClass('unavailable')
+    expect(within(card).getByText('UMA Oracle').closest('.network-tag')).toHaveClass('unavailable')
+    expect(within(card).getByText('Token Swap').closest('.network-tag')).toHaveClass('unavailable')
+  })
+
+  it('documents Mordor explorer and Classic USD stablecoin on the card', () => {
+    render(<NetworkSettings />)
+    const card = screen.getByText('Ethereum Classic Mordor').closest('.network-card')
+    const explorer = within(card).getByRole('link', { name: 'Blockscout' })
+    expect(explorer).toHaveAttribute('href', 'https://etc-mordor.blockscout.com')
+    expect(explorer).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    expect(within(card).getByText('Classic USD (USC)')).toBeInTheDocument()
+  })
 })

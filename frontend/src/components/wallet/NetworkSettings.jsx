@@ -82,6 +82,66 @@ function NetworkSettings() {
                     </li>
                   ))}
                 </ul>
+
+                <dl className="network-docs">
+                  <div className="network-doc-row">
+                    <dt>Native currency</dt>
+                    <dd>
+                      {net.nativeCurrency?.symbol}
+                      {net.nativeCurrency?.name ? ` (${net.nativeCurrency.name})` : ''}
+                    </dd>
+                  </div>
+                  {net.stablecoin && (
+                    <div className="network-doc-row">
+                      <dt>Stablecoin</dt>
+                      <dd>
+                        {net.stablecoin.name} ({net.stablecoin.symbol})
+                      </dd>
+                    </div>
+                  )}
+                  {net.explorer?.baseUrl && (
+                    <div className="network-doc-row">
+                      <dt>Explorer</dt>
+                      <dd>
+                        <a
+                          href={net.explorer.baseUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {net.explorer.name || 'Block explorer'}
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  {net.isTestnet && net.resources?.faucet && (
+                    <div className="network-doc-row">
+                      <dt>Faucet</dt>
+                      <dd>
+                        <a
+                          href={net.resources.faucet}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {`Get test ${net.nativeCurrency?.symbol || 'tokens'}`}
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                  {net.capabilities?.dex && net.resources?.dexUrl && (
+                    <div className="network-doc-row">
+                      <dt>Swap</dt>
+                      <dd>
+                        <a
+                          href={net.resources.dexUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {`Swap into ${net.stablecoin?.symbol || 'tokens'}`}
+                        </a>
+                      </dd>
+                    </div>
+                  )}
+                </dl>
               </li>
             )
           })}

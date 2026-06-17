@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 
 import { DEPLOYED_CONTRACTS, getContractAddress, getContractAddressForChain } from '../config/contracts'
 
-// Each contract slot is either an empty placeholder (pre-deploy state) or a
-// 0x-prefixed 40-character hex address (post-sync:frontend-contracts state).
-// The frontend treats both as valid; tests assert the shape rather than that
-// the addresses are non-empty so the migration baseline passes before the
-// first Polygon Amoy deployment lands.
+// The test build pins VITE_NETWORK_ID=63 (Mordor), which is now a v2 P2P
+// deployment (the legacy v1 Mordor contracts were retired — Spec 015 FR-017).
+// Each contract slot is either an empty placeholder (pre-deploy / pre-sync) or a
+// 0x-prefixed 40-character hex address (post-sync:frontend-contracts). The
+// frontend treats both as valid; tests assert the v2 SHAPE rather than that the
+// addresses are non-empty, so the baseline passes before the Mordor deploy lands.
 const ADDR_OR_PLACEHOLDER = /^(0x[0-9a-fA-F]{40})?$/
 
 describe('contracts config', () => {
@@ -14,55 +15,46 @@ describe('contracts config', () => {
     it('exposes core contract address slots', () => {
       expect(DEPLOYED_CONTRACTS).toHaveProperty('deployer')
       expect(DEPLOYED_CONTRACTS).toHaveProperty('treasury')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('roleManagerCore')
+      expect(DEPLOYED_CONTRACTS).toHaveProperty('wagerRegistry')
       expect(DEPLOYED_CONTRACTS.deployer).toMatch(ADDR_OR_PLACEHOLDER)
       expect(DEPLOYED_CONTRACTS.treasury).toMatch(ADDR_OR_PLACEHOLDER)
-      expect(DEPLOYED_CONTRACTS.roleManagerCore).toMatch(ADDR_OR_PLACEHOLDER)
+      expect(DEPLOYED_CONTRACTS.wagerRegistry).toMatch(ADDR_OR_PLACEHOLDER)
     })
 
-    it('exposes RBAC contract address slots', () => {
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('tieredRoleManager')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('tierRegistry')
+    it('exposes membership + key registry slots', () => {
       expect(DEPLOYED_CONTRACTS).toHaveProperty('membershipManager')
-      expect(DEPLOYED_CONTRACTS.tieredRoleManager).toMatch(ADDR_OR_PLACEHOLDER)
-      expect(DEPLOYED_CONTRACTS.tierRegistry).toMatch(ADDR_OR_PLACEHOLDER)
+      expect(DEPLOYED_CONTRACTS).toHaveProperty('keyRegistry')
       expect(DEPLOYED_CONTRACTS.membershipManager).toMatch(ADDR_OR_PLACEHOLDER)
+      expect(DEPLOYED_CONTRACTS.keyRegistry).toMatch(ADDR_OR_PLACEHOLDER)
     })
 
-    it('exposes role manager contract slots', () => {
-      // tieredRoleManager - TieredRoleManager with tier-based membership limits
-      // roleManager - alias for TieredRoleManager (tier checks, market limits)
-      // roleManagerCore - modular RoleManagerCore (used by PaymentProcessor for role grants)
-      // sync:frontend-contracts may set roleManager === tieredRoleManager and
-      // roleManagerCore to a distinct address, but the slots must always exist.
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('tieredRoleManager')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('roleManager')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('roleManagerCore')
+    it('exposes the sanctions guard + payment token slots', () => {
+      // SanctionsGuard is enforced on every v2 network (Spec 015 FR-016).
+      // paymentToken is the per-network stablecoin (Classic USD on Mordor).
+      expect(DEPLOYED_CONTRACTS).toHaveProperty('sanctionsGuard')
+      expect(DEPLOYED_CONTRACTS).toHaveProperty('paymentToken')
+      expect(DEPLOYED_CONTRACTS.sanctionsGuard).toMatch(ADDR_OR_PLACEHOLDER)
+      expect(DEPLOYED_CONTRACTS.paymentToken).toMatch(ADDR_OR_PLACEHOLDER)
     })
 
-    it('exposes friend market contract slots', () => {
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('friendGroupMarketFactory')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('friendGroupCreationLib')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('friendGroupResolutionLib')
-      expect(DEPLOYED_CONTRACTS).toHaveProperty('friendGroupClaimsLib')
-      expect(DEPLOYED_CONTRACTS.friendGroupMarketFactory).toMatch(ADDR_OR_PLACEHOLDER)
-      expect(DEPLOYED_CONTRACTS.friendGroupCreationLib).toMatch(ADDR_OR_PLACEHOLDER)
-      expect(DEPLOYED_CONTRACTS.friendGroupResolutionLib).toMatch(ADDR_OR_PLACEHOLDER)
-      expect(DEPLOYED_CONTRACTS.friendGroupClaimsLib).toMatch(ADDR_OR_PLACEHOLDER)
+    it('does NOT expose oracle adapters on Mordor (core-only — no Polymarket/Chainlink/UMA)', () => {
+      // Spec 015 FR-001: oracle adapters are not deployed on Ethereum Classic, so
+      // their slots are absent and the Network-tab tags read "unavailable".
+      expect(DEPLOYED_CONTRACTS).not.toHaveProperty('polymarketAdapter')
+      expect(DEPLOYED_CONTRACTS).not.toHaveProperty('chainlinkDataFeedAdapter')
+      expect(DEPLOYED_CONTRACTS).not.toHaveProperty('umaAdapter')
     })
   })
 
   describe('getContractAddress', () => {
     it('returns address from DEPLOYED_CONTRACTS', () => {
-      expect(getContractAddress('roleManager')).toEqual(DEPLOYED_CONTRACTS.roleManager)
-      expect(getContractAddress('roleManagerCore')).toEqual(DEPLOYED_CONTRACTS.roleManagerCore)
-      expect(getContractAddress('tieredRoleManager')).toEqual(DEPLOYED_CONTRACTS.tieredRoleManager)
+      expect(getContractAddress('wagerRegistry')).toEqual(DEPLOYED_CONTRACTS.wagerRegistry)
+      expect(getContractAddress('membershipManager')).toEqual(DEPLOYED_CONTRACTS.membershipManager)
+      expect(getContractAddress('keyRegistry')).toEqual(DEPLOYED_CONTRACTS.keyRegistry)
     })
 
-    it('returns address for friendGroupMarketFactory', () => {
-      expect(getContractAddress('friendGroupMarketFactory')).toEqual(
-        DEPLOYED_CONTRACTS.friendGroupMarketFactory
-      )
+    it('returns the payment token slot', () => {
+      expect(getContractAddress('paymentToken')).toEqual(DEPLOYED_CONTRACTS.paymentToken)
     })
 
     it('returns undefined for unknown contract names', () => {
@@ -72,15 +64,9 @@ describe('contracts config', () => {
 
     it('handles case sensitivity correctly', () => {
       // Contract names are case-sensitive and should match DEPLOYED_CONTRACTS keys exactly
-      expect(getContractAddress('friendGroupMarketFactory')).toBeDefined()
-      expect(getContractAddress('FRIENDGROUPMARKETFACTORY')).toBeUndefined() // Wrong case
+      expect(getContractAddress('membershipManager')).toBeDefined()
+      expect(getContractAddress('MEMBERSHIPMANAGER')).toBeUndefined() // Wrong case
     })
-
-    // Note: Environment variable override tests would require mocking import.meta.env
-    // which is challenging in Vitest. The function supports:
-    // - VITE_FRIENDGROUPMARKETFACTORY_ADDRESS (uppercase name)
-    // - VITE_FRIEND_GROUP_MARKET_FACTORY_ADDRESS (snake_case conversion)
-    // These are verified through manual testing and integration tests.
   })
 
   describe('getContractAddressForChain', () => {
@@ -98,6 +84,13 @@ describe('contracts config', () => {
       expect(getContractAddressForChain('wagerRegistry', 137)).toMatch(/^0x[0-9a-fA-F]{40}$/)
     })
 
+    it('returns no oracle adapter for Mordor (63) — core-only deployment', () => {
+      // Spec 015 FR-001/FR-008: oracle adapters are absent on Mordor, so these
+      // resolve to undefined and the capability tags stay grey.
+      expect(getContractAddressForChain('polymarketAdapter', 63)).toBeUndefined()
+      expect(getContractAddressForChain('umaAdapter', 63)).toBeUndefined()
+    })
+
     it('returns undefined on a chain with no deployment', () => {
       // An unconfigured chain (e.g. Ethereum mainnet, 1) has no NETWORK_CONTRACTS
       // entry — membership and wager reads must resolve to undefined so a testnet
@@ -107,8 +100,8 @@ describe('contracts config', () => {
     })
 
     it('falls back to the active-chain lookup when no chainId is given', () => {
-      expect(getContractAddressForChain('roleManager')).toEqual(
-        getContractAddress('roleManager')
+      expect(getContractAddressForChain('membershipManager')).toEqual(
+        getContractAddress('membershipManager')
       )
     })
   })

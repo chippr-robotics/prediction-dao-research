@@ -426,8 +426,12 @@ describe('FriendMarketsModal', () => {
       // a single settlement type, so the tab strip is hidden — but the Polymarket
       // search (PolymarketBrowser) MUST still render. Previously the search was
       // nested inside the (hidden) tab block and disappeared entirely.
+      // Render on a Polymarket-enabled chain (Amoy). The default test chain (61)
+      // falls back to the build network (Mordor/63), which is core-only and has
+      // no Polymarket — see Spec 015.
       renderWithProviders(
-        <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="oracle" />
+        <FriendMarketsModal {...defaultProps} initialType="oneVsOne" resolutionCategory="oracle" />,
+        { chainId: 80002 }
       )
       expect(await screen.findByTestId('mock-polymarket-browser')).toBeInTheDocument()
     })

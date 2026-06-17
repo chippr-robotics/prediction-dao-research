@@ -85,6 +85,61 @@ const NETWORKS = {
       }
     },
   },
+  63: {
+    chainId: 63,
+    name: 'Ethereum Classic Mordor',
+    isTestnet: true,
+    isPrimary: false,
+    // Surfaced in the My Account → Network tab as a user-switchable network.
+    selectable: true,
+    nativeCurrency: { decimals: 18, name: 'Ethereum Classic', symbol: 'ETC' },
+    rpcUrl: import.meta.env?.VITE_RPC_URL_MORDOR || 'https://rpc.mordor.etccooperative.org',
+    explorer: { name: 'Blockscout', baseUrl: 'https://etc-mordor.blockscout.com' },
+    // Classic USD (USC) — Ethereum Classic's fiat-backed stablecoin (Brale-issued),
+    // reused as-is (never a mock). Verify the canonical Mordor address + decimals
+    // on-chain before relying on it (Spec 015, T001). Override via VITE_MORDOR_USC.
+    stablecoin: {
+      address: import.meta.env?.VITE_MORDOR_USC || '0xDE093684c796204224BC081f937aa059D903c52a',
+      symbol: 'USC',
+      name: 'Classic USD',
+      decimals: 6,
+    },
+    // ETCswap (Uniswap V3 fork on Ethereum Classic). Supply all addresses via
+    // VITE_MORDOR_ETCSWAP_* + VITE_MORDOR_WETC to enable in-app swaps on Mordor.
+    // When any required address is missing the DEX capability flips off and the
+    // swap UI is hidden (no mock DEX) — Spec 015 FR-011.
+    dex: (() => {
+      const factory = import.meta.env?.VITE_MORDOR_ETCSWAP_FACTORY
+      const router = import.meta.env?.VITE_MORDOR_ETCSWAP_SWAP_ROUTER
+      const quoter = import.meta.env?.VITE_MORDOR_ETCSWAP_QUOTER
+      const positionManager = import.meta.env?.VITE_MORDOR_ETCSWAP_POSITION_MANAGER
+      const wnative = import.meta.env?.VITE_MORDOR_WETC
+      if (!factory || !router || !quoter || !wnative) return null
+      return {
+        factory,
+        swapRouter: router,
+        quoter,
+        positionManager: positionManager || null,
+        wnative,
+      }
+    })(),
+    contracts: {}, // populated by sync:frontend-contracts after deploy
+    polymarket: null, // no Polymarket on Ethereum Classic
+    // Per-network documentation links for the Network tab (not derivable from the
+    // fields above). Faucet URL is verified in Spec 015 T003 — set VITE_MORDOR_FAUCET
+    // (or update the default) once confirmed; the card hides the row when empty.
+    resources: {
+      faucet: import.meta.env?.VITE_MORDOR_FAUCET || '',
+      dexUrl: import.meta.env?.VITE_MORDOR_ETCSWAP_URL || 'https://etcswap.org',
+    },
+    get capabilities() {
+      return {
+        polymarketSidebets: false,
+        dex: Boolean(this.dex),
+        friendMarkets: true,
+      }
+    },
+  },
   137: {
     chainId: 137,
     name: 'Polygon',

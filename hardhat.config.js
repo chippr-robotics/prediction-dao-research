@@ -206,6 +206,40 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD).setAction(async (args, hre, runSup
   };
 });
 
+// --- Block explorer verification (@nomicfoundation/hardhat-verify) ---
+// hardhat-verify 2.x selects Etherscan API V2 (the unified endpoint
+// api.etherscan.io/v2/api?chainid=<id>) ONLY when etherscan.apiKey is a STRING; a
+// per-network OBJECT forces legacy V1 mode and keeps customChains apiURLs. The two
+// modes are mutually exclusive in one config, and Etherscan V2 does NOT cover
+// Blockscout chains (Ethereum Classic 61 / Mordor 63). So pick the right shape from
+// the --network being acted on:
+//   * Etherscan family (polygon 137, amoy 80002) -> V2 unified, single ETHERSCAN_API_KEY
+//     (Polygonscan V1 keys/endpoints were shut off 2025-08-15; mint the key at etherscan.io).
+//   * Blockscout (etc 61, mordor 63) -> V1 object + customChains pointing at <host>/api.
+//     Blockscout ignores the key value but hardhat-verify needs a non-empty placeholder.
+function verifyTargetNetwork() {
+  const i = process.argv.indexOf("--network");
+  if (i !== -1) return process.argv[i + 1];
+  // Hardhat also accepts the network via the HARDHAT_NETWORK env var (no --network flag).
+  return process.env.HARDHAT_NETWORK;
+}
+const BLOCKSCOUT_VERIFY_NETWORKS = new Set(["etc", "mordor"]);
+const etherscanConfig = BLOCKSCOUT_VERIFY_NETWORKS.has(verifyTargetNetwork())
+  ? {
+      // Blockscout (Ethereum Classic mainnet + Mordor). Key value is ignored by the
+      // server but must be a non-empty string for hardhat-verify to resolve the chain.
+      apiKey: { etc: "empty", mordor: "empty" },
+      customChains: [
+        { network: "etc", chainId: 61, urls: { apiURL: "https://etc.blockscout.com/api", browserURL: "https://etc.blockscout.com" } },
+        { network: "mordor", chainId: 63, urls: { apiURL: "https://etc-mordor.blockscout.com/api", browserURL: "https://etc-mordor.blockscout.com" } },
+      ],
+    }
+  : {
+      // Etherscan V2 unified key (covers Polygon 137 + Amoy 80002 via the built-in
+      // chain list — no customChains needed). Mint at etherscan.io (NOT polygonscan.com).
+      apiKey: process.env.ETHERSCAN_API_KEY || "",
+    };
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
@@ -240,11 +274,23 @@ module.exports = {
       url: "http://127.0.0.1:8545",
     },
     mordor: {
-      url: "https://rpc.mordor.etccooperative.org",
+      url: process.env.MORDOR_RPC_URL || "https://rpc.mordor.etccooperative.org",
       chainId: 63,
-      // SECURITY: Keys loaded from floppy disk only - no PRIVATE_KEY env var fallback
-      // Mount floppy and set FLOPPY_KEYSTORE_PASSWORD to use
+      // Deployer key: floppy keystore when mounted, else PRIVATE_KEY from .env
+      // (loadFloppyKeysSync allowFallback=true). Explorer: Blockscout (no API key).
       accounts: floppyKeys,
+      // Legacy chain (no EIP-1559). The gas-price oracle suggests ~300 gwei, which
+      // pushes the ~4.76M-gas WagerRegistry deploy over the node's 1 ETH tx-fee cap.
+      // Pin a lower legacy gasPrice via GAS_PRICE_WEI (e.g. 100000000000 = 100 gwei).
+      ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
+    },
+    // Ethereum Classic mainnet (chainId 61). MAINNET — deploy.js requires
+    // CONFIRM_MAINNET=true. Explorer verification is Blockscout (etc.blockscout.com).
+    etc: {
+      url: process.env.ETC_RPC_URL || "https://etc.rivet.link",
+      chainId: 61,
+      accounts: floppyKeys,
+      ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
     },
     amoy: {
       url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
@@ -252,10 +298,11 @@ module.exports = {
       accounts: floppyKeys,
       ...(process.env.GAS_PRICE_WEI ? { gasPrice: Number(process.env.GAS_PRICE_WEI) } : {}),
     },
-    // Polygon mainnet (production). Deployer key comes from the floppy keystore
-    // only — no PRIVATE_KEY fallback. Prefer a paid POLYGON_RPC_URL over the
-    // public endpoint for deploys. deploy.js additionally requires
-    // CONFIRM_MAINNET=true to run against this network (chainId 137).
+    // Polygon mainnet (production). Deployer key: floppy keystore when mounted,
+    // else PRIVATE_KEY from .env (loadFloppyKeysSync allowFallback=true) — keep the
+    // production key on the floppy. Prefer a paid POLYGON_RPC_URL over the public
+    // endpoint. deploy.js requires CONFIRM_MAINNET=true for chainId 137. Explorer
+    // verification is Polygonscan via Etherscan V2 (ETHERSCAN_API_KEY).
     polygon: {
       url: process.env.POLYGON_RPC_URL || "https://polygon-rpc.com",
       chainId: 137,
@@ -299,37 +346,7 @@ module.exports = {
     noColors: process.env.REPORT_GAS ? true : false,
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
   },
-  etherscan: {
-    apiKey: {
-      'mordor': 'empty',
-      'amoy': process.env.POLYGONSCAN_API_KEY || 'empty',
-      'polygon': process.env.POLYGONSCAN_API_KEY || 'empty'
-   },
-    customChains: [
-      {
-        network: "polygon",
-        chainId: 137,
-        urls: {
-          apiURL: "https://api.polygonscan.com/api",
-          browserURL: "https://polygonscan.com"
-        }
-      },
-      {
-        network: "mordor",
-        chainId: 63,
-        urls: {
-          apiURL: "https://etc-mordor.blockscout.com/api",
-          browserURL: "https://etc-mordor.blockscout.com"
-        }
-      },
-      {
-        network: "amoy",
-        chainId: 80002,
-        urls: {
-          apiURL: "https://api-amoy.polygonscan.com/api",
-          browserURL: "https://amoy.polygonscan.com"
-        }
-      }
-    ]
-  }
+  // Network-aware: Etherscan V2 for polygon/amoy, Blockscout for etc/mordor.
+  // See verifyTargetNetwork()/etherscanConfig above.
+  etherscan: etherscanConfig,
 };
