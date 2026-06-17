@@ -533,10 +533,39 @@ function MyMarketsModal({
 
   // Handle opening acceptance modal
   const handleOpenAcceptance = (market) => {
+    // The wager's plaintext title once decryption (lazy hook) has run. We pass
+    // this through so the acceptance modal can show what the wager is actually
+    // about instead of the "Encrypted Wager" placeholder — the user already
+    // decrypted it here in My Wagers, so re-prompting for a signature on the
+    // acceptance screen would be redundant.
+    const decryptedDescription =
+      market.decryptedMetadata?.description ||
+      market.decryptedMetadata?.name ||
+      market.decryptedMetadata?.question ||
+      null
+
+    // The on-chain encrypted envelope, as a JSON string the modal can parse if
+    // it still needs to decrypt itself (metadataCipher is the parsed object).
+    const rawDescription = typeof market.metadataCipher === 'string'
+      ? market.metadataCipher
+      : market.metadataCipher
+        ? JSON.stringify(market.metadataCipher)
+        : undefined
+
     // Transform market data to match what MarketAcceptanceModal expects
     const marketData = {
       id: market.id,
       description: market.description || market.proposalTitle,
+      // Encryption context — without these the modal falls back to the literal
+      // "Encrypted Wager" string and gives the user no way to see the terms.
+      isEncrypted: Boolean(market.isEncrypted),
+      decryptedDescription,
+      rawDescription,
+      ipfsCid: market.ipfsCid || null,
+      resolutionType: market.resolutionType,
+      // Surface the wager's resolution/end date on the acceptance screen so the
+      // counterparty can see when it settles (e.g. a linked Polymarket's date).
+      estimatedMarketEndDate: market.endTime || (market.endDate ? new Date(market.endDate).getTime() : null),
       creator: market.creator,
       participants: market.participants || [],
       arbitrator: market.arbitrator || null,

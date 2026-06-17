@@ -585,10 +585,15 @@ function FriendMarketsModal({
     setFormData(prev => {
       const updated = { ...prev, oracleConditionId: market.conditionId }
       // Lock the wager's end time to the linked market so the side bet can't
-      // resolve before (or long after) Polymarket does.
+      // resolve before (or long after) Polymarket does. Re-derive the accept-by
+      // deadline from the new end time so the timeline tiles ("Accept by") show
+      // the right time immediately — otherwise they keep the stale default until
+      // submit re-runs validateForm. (The initialPolymarketMarket path already
+      // does this; this is the in-modal picker equivalent.)
       const linkedEnd = toDateTimeLocal(market.endDate)
       if (linkedEnd) {
         updated.endDateTime = linkedEnd
+        updated.acceptanceDeadline = getMidpointAcceptanceDeadline(linkedEnd)
       }
       const sideSynced = prev.creatorSide !== '' && (
         prev.description === '' || prev.description === lastAutoDescriptionRef.current
