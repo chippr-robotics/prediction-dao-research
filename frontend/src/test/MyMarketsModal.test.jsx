@@ -533,11 +533,14 @@ describe('MyMarketsModal', () => {
         expect(screen.getByText('Expired Offer')).toBeInTheDocument()
       })
 
-      // Time-left cell reads "Expired", not "tomorrow"
+      // Status pill reads "Expired" while collapsed.
       expect(screen.getAllByText('Expired').length).toBeGreaterThan(0)
 
+      // Expand the card to reveal its actions, then clear.
+      await user.click(screen.getByText('Expired Offer'))
+
       // Invitee (not creator) → button label is just "Clear"
-      const clearBtn = screen.getByRole('button', { name: /^clear$/i })
+      const clearBtn = await screen.findByRole('button', { name: /^clear$/i })
       await user.click(clearBtn)
       expect(dismissMarket).toHaveBeenCalledWith('99')
     })
@@ -746,6 +749,9 @@ describe('MyMarketsModal', () => {
       const createdTab = screen.getByRole('tab', { name: /created/i })
       await user.click(createdTab)
 
+      // Expand the card to reveal its Resolve action.
+      await user.click(await screen.findByText('Either Bet'))
+
       const resolveBtn = await screen.findByRole('button', { name: /^resolve$/i })
       await user.click(resolveBtn)
 
@@ -850,7 +856,9 @@ describe('MyMarketsModal', () => {
       await openHistory(user)
 
       await waitFor(() => expect(screen.getByText('Won Wager')).toBeInTheDocument())
-      expect(screen.getByRole('button', { name: /^claim$/i })).toBeInTheDocument()
+      // Expand the card to reveal its Claim action.
+      await user.click(screen.getByText('Won Wager'))
+      expect(await screen.findByRole('button', { name: /^claim$/i })).toBeInTheDocument()
     })
 
     it('claims in place instead of opening the detail card (regression: claim opened the card)', async () => {
@@ -862,6 +870,8 @@ describe('MyMarketsModal', () => {
       })
       await openHistory(user)
 
+      // Expand the card, then claim from within it.
+      await user.click(await screen.findByText('Won Wager'))
       const claimBtn = await screen.findByRole('button', { name: /^claim$/i })
       await act(async () => {
         await user.click(claimBtn)
@@ -882,9 +892,9 @@ describe('MyMarketsModal', () => {
       })
       await openHistory(user)
 
-      // Open the detail by clicking the row title (not the Claim button).
-      const titleCell = await screen.findByText('Won Wager')
-      await user.click(titleCell)
+      // Expand the card, then open the full detail via "View details".
+      await user.click(await screen.findByText('Won Wager'))
+      await user.click(await screen.findByRole('button', { name: /view details/i }))
 
       expect(await screen.findByText('Back to list')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /claim winnings/i })).toBeInTheDocument()

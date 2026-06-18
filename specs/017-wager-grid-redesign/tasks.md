@@ -33,8 +33,8 @@ under `frontend/cypress/e2e/`.
 
 **Purpose**: Small shared scaffolding the grid components will use.
 
-- [ ] T001 [P] Add `MyWagersDensity` enum (`COMPACT`/`COMFORTABLE`) and the `fairwins.myWagers.density` sessionStorage key constant in `frontend/src/constants/wagerDefaults.js`
-- [ ] T002 [P] Create empty card stylesheet `frontend/src/components/fairwins/WagerCard.css` (file + header comment) for use by the new components
+- [x] T001 [P] Add `MyWagersDensity` enum (`COMPACT`/`COMFORTABLE`) and the `fairwins.myWagers.density` sessionStorage key constant in `frontend/src/constants/wagerDefaults.js`
+- [x] T002 [P] Create empty card stylesheet `frontend/src/components/fairwins/WagerCard.css` (file + header comment) for use by the new components
 
 ---
 
@@ -45,11 +45,11 @@ user story can build on a rendering grid. No visual polish yet.
 
 **⚠️ CRITICAL**: No user story work begins until this phase is complete.
 
-- [ ] T003 Extract the pure, table-agnostic helpers `getMarketDisplayTitle`, `getRowOutcome`, and `isWinnerUnpaid` from `frontend/src/components/fairwins/MyMarketsModal.jsx` into a new `frontend/src/components/fairwins/wagerCardHelpers.js` and re-import them in `MyMarketsModal.jsx` (no behavior change)
-- [ ] T004 [P] Create `frontend/src/components/fairwins/WagerCardGrid.jsx` scaffold accepting the full `MarketsTable` prop contract plus `density` (see `contracts/wager-card-grid.contract.md`); render one placeholder `WagerCard` per `markets[i]`
-- [ ] T005 [P] Create `frontend/src/components/fairwins/WagerCard.jsx` scaffold rendering only the collapsed header shell (props per contract; imports helpers from T003)
-- [ ] T006 Add base responsive grid + card-shell CSS (flex-wrap grid container, 16px rounded card, single-column at phone width) in `frontend/src/components/fairwins/WagerCard.css`
-- [ ] T007 Replace `<MarketsTable .../>` with `<WagerCardGrid .../>` at all four call sites (Participating, Created, Arbitrating, History) in `frontend/src/components/fairwins/MyMarketsModal.jsx`, passing the new `density` prop; keep `MarketsTable` in the file temporarily
+- [x] T003 Extract the pure, table-agnostic helpers `getMarketDisplayTitle`, `getRowOutcome`, and `isWinnerUnpaid` from `frontend/src/components/fairwins/MyMarketsModal.jsx` into a new `frontend/src/components/fairwins/wagerCardHelpers.js` and re-import them in `MyMarketsModal.jsx` (no behavior change)
+- [x] T004 [P] Create `frontend/src/components/fairwins/WagerCardGrid.jsx` scaffold accepting the full `MarketsTable` prop contract plus `density` (see `contracts/wager-card-grid.contract.md`); render one placeholder `WagerCard` per `markets[i]`
+- [x] T005 [P] Create `frontend/src/components/fairwins/WagerCard.jsx` scaffold rendering only the collapsed header shell (props per contract; imports helpers from T003)
+- [x] T006 Add base responsive grid + card-shell CSS (flex-wrap grid container, 16px rounded card, single-column at phone width) in `frontend/src/components/fairwins/WagerCard.css`
+- [x] T007 Replace `<MarketsTable .../>` with `<WagerCardGrid .../>` at all four call sites (Participating, Created, Arbitrating, History) in `frontend/src/components/fairwins/MyMarketsModal.jsx`, passing the new `density` prop; keep `MarketsTable` in the file temporarily
 
 **Checkpoint**: My Wagers renders cards (collapsed) from live data in every tab.
 
@@ -65,14 +65,14 @@ viewport resize reflows columns; an empty tab shows its empty state.
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] Add collapsed-card unit tests (stake prominent, real token symbol, title truncation, status pill text+class, History outcome color) in `frontend/src/test/WagerCard.test.jsx`
-- [ ] T009 [P] [US1] Update the "With Markets Data" and "Empty States" assertions in `frontend/src/test/MyMarketsModal.test.jsx` from table rows/cells to card DOM
+- [x] T008 [P] [US1] Add collapsed-card unit tests (stake prominent, real token symbol, title truncation, status pill text+class, History outcome color) in `frontend/src/test/WagerCard.test.jsx`
+- [x] T009 [P] [US1] Update the "With Markets Data" and "Empty States" assertions in `frontend/src/test/MyMarketsModal.test.jsx` from table rows/cells to card DOM
 
 ### Implementation for User Story 1
 
-- [ ] T010 [US1] Render collapsed card content in `frontend/src/components/fairwins/WagerCard.jsx`: prominent stake + `market.stakeTokenSymbol`, title via `getMarketDisplayTitle`, status pill via `getStatusLabel`/`getStatusClass`, History outcome via `getRowOutcome`
-- [ ] T011 [US1] Implement responsive multi→single column reflow and the comfortable-density preview meta-line (avatar dot + opponent + time) in `frontend/src/components/fairwins/WagerCard.css` and `WagerCard.jsx`
-- [ ] T012 [US1] Ensure each tab's empty state renders correctly with the grid in `frontend/src/components/fairwins/MyMarketsModal.jsx` (preserve existing per-tab empty copy)
+- [x] T010 [US1] Render collapsed card content in `frontend/src/components/fairwins/WagerCard.jsx`: prominent stake + `market.stakeTokenSymbol`, title via `getMarketDisplayTitle`, status pill via `getStatusLabel`/`getStatusClass`, History outcome via `getRowOutcome`
+- [x] T011 [US1] Implement responsive multi→single column reflow and the comfortable-density preview meta-line (avatar dot + opponent + time) in `frontend/src/components/fairwins/WagerCard.css` and `WagerCard.jsx`
+- [x] T012 [US1] Ensure each tab's empty state renders correctly with the grid in `frontend/src/components/fairwins/MyMarketsModal.jsx` (preserve existing per-tab empty copy)
 
 **Checkpoint**: US1 fully functional — cards browseable and responsive; MVP demoable.
 
@@ -89,15 +89,15 @@ another collapses the first; encrypted card shows decrypt → reveals in place;
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Add expand/collapse, single-open invariant, decrypt state-machine (locked→decrypting→revealed→unavailable), and "View details"→`onSelect` tests in `frontend/src/test/WagerCard.test.jsx`
-- [ ] T014 [P] [US2] Migrate the "FR-010 graceful degradation (terms unavailable)" tests in `frontend/src/test/MyMarketsModal.test.jsx` to the expanded-card DOM
+- [x] T013 [P] [US2] Add expand/collapse, single-open invariant, decrypt state-machine (locked→decrypting→revealed→unavailable), and "View details"→`onSelect` tests in `frontend/src/test/WagerCard.test.jsx`
+- [x] T014 [P] [US2] Migrate the "FR-010 graceful degradation (terms unavailable)" tests in `frontend/src/test/MyMarketsModal.test.jsx` to the expanded-card DOM
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Add single-open `openId` accordion state in `frontend/src/components/fairwins/WagerCardGrid.jsx` (expanding one collapses others; reset when `markets`/tab changes)
-- [ ] T016 [US2] Build the expanded region in `frontend/src/components/fairwins/WagerCard.jsx`: terms box + 2-column metadata grid (opponent/outcome, ends/settled, wager ID, creator), chevron rotation, `aria-expanded`/`aria-controls`
-- [ ] T017 [US2] Wire locked/decrypting/revealed/unavailable states to `onDecrypt(id)`/`isDecrypting`/`market.decryptedMetadata` in `WagerCard.jsx`, preserving the terms-unavailable + retry behavior (FR-010)
-- [ ] T018 [US2] Add the "View details" control in `WagerCard.jsx` calling `onSelect(market)` (opens the existing `MarketDetailView`)
+- [x] T015 [US2] Add single-open `openId` accordion state in `frontend/src/components/fairwins/WagerCardGrid.jsx` (expanding one collapses others; reset when `markets`/tab changes)
+- [x] T016 [US2] Build the expanded region in `frontend/src/components/fairwins/WagerCard.jsx`: terms box + 2-column metadata grid (opponent/outcome, ends/settled, wager ID, creator), chevron rotation, `aria-expanded`/`aria-controls`
+- [x] T017 [US2] Wire locked/decrypting/revealed/unavailable states to `onDecrypt(id)`/`isDecrypting`/`market.decryptedMetadata` in `WagerCard.jsx`, preserving the terms-unavailable + retry behavior (FR-010)
+- [x] T018 [US2] Add the "View details" control in `WagerCard.jsx` calling `onSelect(market)` (opens the existing `MarketDetailView`)
 
 **Checkpoint**: US1 + US2 work — cards inspectable inline with detail view retained.
 
@@ -113,16 +113,16 @@ invalid ones), invoke the existing flow, and the list/state updates with a toast
 
 ### Tests for User Story 3
 
-- [ ] T019 [P] [US3] Add action-visibility-by-state tests (accept/decline, resolve, claim, refund, respond-to-draw, reclaim & clear), busy/disabled via `claimingId`/`refundingId`, and per-card error rendering in `frontend/src/test/WagerCard.test.jsx`
-- [ ] T020 [P] [US3] Add a confirmation-toast test (toast appears on successful action) in `frontend/src/test/MyMarketsModal.test.jsx`
+- [x] T019 [P] [US3] Add action-visibility-by-state tests (accept/decline, resolve, claim, refund, respond-to-draw, reclaim & clear), busy/disabled via `claimingId`/`refundingId`, and per-card error rendering in `frontend/src/test/WagerCard.test.jsx`
+- [x] T020 [P] [US3] Add a confirmation-toast test (toast appears on successful action) in `frontend/src/test/MyMarketsModal.test.jsx`
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] Compute available actions in `frontend/src/components/fairwins/WagerCard.jsx` from the existing predicates (`canResolve`, `canAccept`, `isCreatorOfPending`, `isWinnerUnpaid`) and the activity-watcher kinds (`accept/resolve/claim/refund/respondDraw`); render buttons with primary/danger/success/ghost variants
-- [ ] T022 [US3] Wire each action's `onClick` to the existing callbacks (`onAccept`/`onResolve`/`onClaim`/`onRefund`/`onClearExpired`) in `WagerCard.jsx`, including opening the resolution and acceptance modals (no change to on-chain semantics)
-- [ ] T023 [US3] Implement busy/disabled state (`claimingId`/`refundingId`) and per-card error (`claimError`/`refundError`) in `WagerCard.jsx`
-- [ ] T024 [US3] Add a confirmation toast on successful action in `frontend/src/components/fairwins/MyMarketsModal.jsx` (+ styles in `MyMarketsModal.css`)
-- [ ] T025 [US3] Preserve the clear-all-expired affordance under the Expired filter in `frontend/src/components/fairwins/WagerCardGrid.jsx` (`statusFilter === EXPIRED && onClearAllExpired`)
+- [x] T021 [US3] Compute available actions in `frontend/src/components/fairwins/WagerCard.jsx` from the existing predicates (`canResolve`, `canAccept`, `isCreatorOfPending`, `isWinnerUnpaid`) and the activity-watcher kinds (`accept/resolve/claim/refund/respondDraw`); render buttons with primary/danger/success/ghost variants
+- [x] T022 [US3] Wire each action's `onClick` to the existing callbacks (`onAccept`/`onResolve`/`onClaim`/`onRefund`/`onClearExpired`) in `WagerCard.jsx`, including opening the resolution and acceptance modals (no change to on-chain semantics)
+- [x] T023 [US3] Implement busy/disabled state (`claimingId`/`refundingId`) and per-card error (`claimError`/`refundError`) in `WagerCard.jsx`
+- [x] T024 [US3] Add a confirmation toast on successful action in `frontend/src/components/fairwins/MyMarketsModal.jsx` (+ styles in `MyMarketsModal.css`)
+- [x] T025 [US3] Preserve the clear-all-expired affordance under the Expired filter in `frontend/src/components/fairwins/WagerCardGrid.jsx` (`statusFilter === EXPIRED && onClearAllExpired`)
 
 **Checkpoint**: US1–US3 work — full action set reachable from cards (zero dropped).
 
@@ -139,14 +139,14 @@ tab/filter/sort/open state; header stays pinned on scroll.
 
 ### Tests for User Story 4
 
-- [ ] T026 [P] [US4] Add pill-tab count-badge and density-toggle behavior tests (toggle preserves tab/filter/sort) in `frontend/src/test/MyMarketsModal.test.jsx`
-- [ ] T027 [P] [US4] Update the "Tab Navigation" tests in `frontend/src/test/MyMarketsModal.test.jsx` for the pill markup and Arbitrating-only-when-present rule
+- [x] T026 [P] [US4] Add pill-tab count-badge and density-toggle behavior tests (toggle preserves tab/filter/sort) in `frontend/src/test/MyMarketsModal.test.jsx`
+- [x] T027 [P] [US4] Update the "Tab Navigation" tests in `frontend/src/test/MyMarketsModal.test.jsx` for the pill markup and Arbitrating-only-when-present rule
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Restyle tabs as pills with count badges (Arbitrating shown only when its count > 0) in `frontend/src/components/fairwins/MyMarketsModal.jsx` + `MyMarketsModal.css`
-- [ ] T029 [US4] Add the density toggle to the toolbar; hold `density` state in `MyMarketsModal.jsx` (default compact, mirrored to `sessionStorage`) and pass to every `WagerCardGrid`
-- [ ] T030 [US4] Confirm status filter, sort, and refresh operate on the card grid and the header (title, network pill, tabs, toolbar) stays sticky on scroll in `MyMarketsModal.jsx`/`MyMarketsModal.css`
+- [x] T028 [US4] Restyle tabs as pills with count badges (Arbitrating shown only when its count > 0) in `frontend/src/components/fairwins/MyMarketsModal.jsx` + `MyMarketsModal.css`
+- [x] T029 [US4] Add the density toggle to the toolbar; hold `density` state in `MyMarketsModal.jsx` (default compact, mirrored to `sessionStorage`) and pass to every `WagerCardGrid`
+- [x] T030 [US4] Confirm status filter, sort, and refresh operate on the card grid and the header (title, network pill, tabs, toolbar) stays sticky on scroll in `MyMarketsModal.jsx`/`MyMarketsModal.css`
 
 **Checkpoint**: All four stories independently functional.
 
@@ -156,12 +156,12 @@ tab/filter/sort/open state; header stays pinned on scroll.
 
 **Purpose**: Remove dead code, finish test/selector migration, and validate.
 
-- [ ] T031 Remove the now-unused `MarketsTable` component (and any dead helpers) from `frontend/src/components/fairwins/MyMarketsModal.jsx`; reuse `ResolveButtonWithCountdown` inside cards where the resolve countdown is shown
-- [ ] T032 [P] Sweep any remaining table-oriented assertions (`role="table"`, column headers, row cells) in `frontend/src/test/MyMarketsModal.test.jsx`
-- [ ] T033 [P] Update My Wagers Cypress selectors for the card DOM in `frontend/cypress/e2e/full/05-wager-acceptance.cy.js`, `06-decline-cancel.cy.js`, `07-manual-resolution.cy.js`, `10-claim-payouts.cy.js` (and `fast/13-dashboard.cy.js`, `fast/22-accessibility.cy.js` as needed)
-- [ ] T034 Accessibility pass (keyboard operate tabs/expand/actions, `aria-expanded`/labels, color-contrast/status-not-by-color-alone) in `WagerCard.jsx`/`WagerCardGrid.jsx`/CSS; ensure axe/Lighthouse CI is clean
-- [ ] T035 [P] Run `cd frontend && npm run lint` and `npm run test:frontend`; fix any failures
-- [ ] T036 Execute the `specs/017-wager-grid-redesign/quickstart.md` manual validation scenarios and confirm the diff contains no `contracts/`, ABI, or subgraph changes
+- [x] T031 Remove the now-unused `MarketsTable` component (and any dead helpers) from `frontend/src/components/fairwins/MyMarketsModal.jsx`; reuse `ResolveButtonWithCountdown` inside cards where the resolve countdown is shown
+- [x] T032 [P] Sweep any remaining table-oriented assertions (`role="table"`, column headers, row cells) in `frontend/src/test/MyMarketsModal.test.jsx`
+- [x] T033 [P] Update My Wagers Cypress selectors for the card DOM in `frontend/cypress/e2e/full/05-wager-acceptance.cy.js`, `06-decline-cancel.cy.js`, `07-manual-resolution.cy.js`, `10-claim-payouts.cy.js` (and `fast/13-dashboard.cy.js`, `fast/22-accessibility.cy.js` as needed)
+- [x] T034 Accessibility pass (keyboard operate tabs/expand/actions, `aria-expanded`/labels, color-contrast/status-not-by-color-alone) in `WagerCard.jsx`/`WagerCardGrid.jsx`/CSS; ensure axe/Lighthouse CI is clean
+- [x] T035 [P] Run `cd frontend && npm run lint` and `npm run test:frontend`; fix any failures
+- [x] T036 Execute the `specs/017-wager-grid-redesign/quickstart.md` manual validation scenarios and confirm the diff contains no `contracts/`, ABI, or subgraph changes
 
 ---
 

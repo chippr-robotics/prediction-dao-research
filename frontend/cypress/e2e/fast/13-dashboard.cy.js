@@ -149,9 +149,11 @@ describe('Dashboard', () => {
 
     // If there are wager rows, clicking one should show the detail view.
     cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
-      if (rows.length > 0) {
-        cy.wrap(rows.first()).click()
+      const cards = $panel.find('.wc-card .wc-header')
+      if (cards.length > 0) {
+        // Expand the first card, then open the full detail via "View details".
+        cy.wrap(cards.first()).click()
+        cy.contains('.wc-card button', 'View details').click()
         // Detail view should show the back button and market info.
         cy.get('.mm-detail, .mm-back-btn').should('be.visible')
         cy.get('.mm-detail-header, .mm-detail-title-row').should('be.visible')
@@ -174,7 +176,7 @@ describe('Dashboard', () => {
 
     // Check across all tabs that status badges exist and have the right classes.
     cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
-      const badges = $panel.find('.mm-status-badge')
+      const badges = $panel.find('.wc-status')
       if (badges.length > 0) {
         // Every badge should have a status-* class.
         badges.each((_, el) => {
@@ -302,7 +304,7 @@ describe('Dashboard', () => {
     cy.get('.mm-content').then(($content) => {
       const hasSpinner = $content.find('.mm-spinner, .mm-loading').length > 0
       const hasEmptyState = $content.find('.mm-empty-state').length > 0
-      const hasTable = $content.find('.mm-table, .mm-table-container').length > 0
+      const hasTable = $content.find('.mm-table, .mm-table-container, .wc-grid, .wc-grid-container').length > 0
       const hasWalletPrompt = $content.find('.mm-empty-icon').length > 0
       // Content should resolve to one of these states.
       expect(hasSpinner || hasEmptyState || hasTable || hasWalletPrompt).to.be.true
@@ -324,19 +326,18 @@ describe('Dashboard', () => {
     // UI pattern: if a wager has isEncrypted=true and no decryptedMetadata, the
     // button should appear.
     cy.get('.mm-panel, [role="tabpanel"]').then(($panel) => {
-      const rows = $panel.find('.mm-table-row, tr[role="button"]')
-      if (rows.length > 0) {
-        // Click first wager to see detail view.
-        cy.wrap(rows.first()).click()
-        cy.get('.mm-detail', { timeout: 5000 }).should('be.visible')
+      const cards = $panel.find('.wc-card .wc-header')
+      if (cards.length > 0) {
+        // Expand the first card; encrypted wagers reveal an inline decrypt CTA.
+        cy.wrap(cards.first()).click()
+        cy.get('.wc-card .wc-body', { timeout: 5000 }).should('be.visible')
 
-        // Check if it's encrypted — if so, the decrypt button should exist.
-        cy.get('.mm-detail').then(($detail) => {
-          const decryptBtn = $detail.find('button:contains("Decrypt Wager Details")')
+        cy.get('.wc-card .wc-body').then(($body) => {
+          const decryptBtn = $body.find('button:contains("Decrypt Wager Details")')
           if (decryptBtn.length > 0) {
             expect(decryptBtn).to.have.length.greaterThan(0)
           } else {
-            // Not encrypted or already decrypted — verify description shows.
+            // Not encrypted or already decrypted — verify the body renders.
             expect(true).to.be.true
           }
         })
@@ -409,7 +410,7 @@ describe('Dashboard', () => {
 
     // Default Participating tab + "All Status" filter → expired offer hidden.
     cy.get('.mm-empty-state', { timeout: 5000 }).should('be.visible')
-    cy.contains('.mm-table-row', 'DSH-14 Expired Friend Offer').should('not.exist')
+    cy.contains('.wc-card', 'DSH-14 Expired Friend Offer').should('not.exist')
   })
 
   it('[DSH-15] Expired filter surfaces expired offers with "Expired" time-left and a Clear button', () => {
@@ -418,10 +419,12 @@ describe('Dashboard', () => {
     cy.get('.mm-filter-bar .mm-filter-select').last().select('expired')
     cy.get('.mm-filter-bar .mm-filter-select').last().should('have.value', 'expired')
 
-    cy.contains('.mm-table-row', 'DSH-15', { timeout: 5000 }).should('be.visible')
+    cy.contains('.wc-card', 'DSH-15', { timeout: 5000 }).should('be.visible')
       .within(() => {
-        // Time-left column reads "Expired" (not e.g. "23h 6m" from endDate).
-        cy.get('.mm-time-expired').should('have.text', 'Expired')
+        // The status pill reads "Expired" (not e.g. "23h 6m" from endDate).
+        cy.get('.wc-status').should('contain.text', 'Expired')
+        // Expand the card to reveal its actions.
+        cy.get('.wc-header').click()
         // Opponent-side action is just "Clear" (creator's variant adds "Reclaim").
         cy.contains('button', /^Clear$/).should('be.visible')
       })
@@ -431,13 +434,16 @@ describe('Dashboard', () => {
     seedFriendMarketsAndOpen([expiredOfferAsOpponent('exp-16')])
 
     cy.get('.mm-filter-bar .mm-filter-select').last().select('expired')
-    cy.contains('.mm-table-row', 'DSH-16').should('be.visible')
+    cy.contains('.wc-card', 'DSH-16').should('be.visible').within(() => {
+      // Expand the card to reveal its Clear action.
+      cy.get('.wc-header').click()
+    })
 
     cy.contains('button', /^Clear$/).click({ force: true })
 
-    // Row gone from the list and the dismissed set recorded under the
+    // Card gone from the list and the dismissed set recorded under the
     // wallet's per-account key.
-    cy.contains('.mm-table-row', 'DSH-16').should('not.exist')
+    cy.contains('.wc-card', 'DSH-16').should('not.exist')
     cy.window().then((win) => {
       const raw = win.localStorage.getItem(
         `mywagers_dismissed:${TEST_ACCOUNT.toLowerCase()}`

@@ -197,6 +197,18 @@ export const WagerSortKey = {
   STATUS: 'status',
 }
 
+// ── My Wagers card-grid density (spec 017) ──────────────────────────
+// Controls how much each collapsed wager card shows. Compact is the default;
+// Comfortable adds an opponent/time preview line. Session-scoped (sessionStorage)
+// so it survives reopening the modal within a session but does not persist
+// long-term.
+export const MyWagersDensity = {
+  COMPACT: 'compact',
+  COMFORTABLE: 'comfortable',
+}
+
+export const MY_WAGERS_DENSITY_KEY = 'fairwins.myWagers.density'
+
 // Terminal statuses — wagers in these states are considered "history"
 export const TERMINAL_STATUSES = new Set([
   'resolved',
