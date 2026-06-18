@@ -13,6 +13,7 @@
 ### Session 2026-06-18
 
 - Q: How is "Net P&L" calculated? → A: Realized only — Net P&L = (payouts + refunds) − deposits over *settled* wagers; active stakes are excluded from the headline figure and surfaced separately as "at stake."
+- Q: How is "Win Rate" defined? → A: Wins ÷ (wins + losses) — denominator is wagers with a decisive winner; draws, refunds, and cancellations are excluded from both numerator and denominator.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -285,9 +286,10 @@ content.
 ### Key Entities *(include if feature involves data)*
 
 - **Account Summary**: The member's aggregate position on the active network —
-  net P&L (USD), win rate, total wagered, active-wager count, and wallet balance —
-  derived from their wagers, money-movement transfers, balances, and the
-  native→USD rate.
+  net P&L (USD, realized: payouts + refunds − deposits over settled wagers),
+  win rate (wins ÷ (wins + losses), draws/refunds/cancellations excluded), total
+  wagered, active-wager count, and wallet balance — derived from their wagers,
+  money-movement transfers, balances, and the native→USD rate.
 - **Wager (member-scoped)**: A bet the member created or accepted, with status
   (open, active, draw_proposed, resolved, drawn, refunded, cancelled, declined),
   stakes, token, timestamps, oracle/resolution type, and winner — the basis for
