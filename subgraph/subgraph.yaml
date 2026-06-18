@@ -4,13 +4,16 @@ schema:
   file: ./schema.graphql
 
 # Per-network address + startBlock live in networks.json; build per network with
-#   graph build --network <polygon|mordor|polygon-amoy>
+#   graph build --network <matic|mordor|polygon-amoy>
+# `matic` is The Graph's canonical network id for Polygon mainnet (137); the
+# alias `polygon` is rejected by the Studio deploy node ("network is not
+# supported"). Amoy's canonical id is `polygon-amoy`.
 # The defaults below target Polygon (137). NEVER use 0x0 / startBlock 0 — indexing
 # from genesis is the root cause of the RPC flood this work removes (issue #703/#704).
 dataSources:
   - kind: ethereum
     name: WagerRegistry
-    network: polygon
+    network: matic
     source:
       address: "0x5023765809fDA93ab9F11B684fdb76521eD31774"
       abi: WagerRegistry
